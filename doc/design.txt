@@ -1,0 +1,51 @@
+"""
+Dedupstore
+==========
+
+cache = Cache(path,)
+
+for file in files:
+    chunks = chunkify(file)
+    for chunk in chunkify(file):
+        if chunk.sha in cache:
+    	    cache.chunk_inc_ref(chunk)
+		else:
+		    fs.add_chunk(chunk)
+		
+	entry = Entry
+    archive.add(entry)
+Repository layout
+-----------------
+REPO/README
+REPO/VERSION
+REPO/tid = x
+REPO/data/
+REPO/txn-active/tid
+REPO/txn-active/add/<PATH>/
+REPO/txn-active/delete/<PATH>/
+REPO/txn-active/tid
+REPO/txn-commit/add/<PATH>/
+REPO/txn-commit/delete/<PATH>/
+
+REPO/archives/<ARCHIVENAME>
+REPO/blocks/XX/YY/XYZ
+
+txn_completed/add/<PATH>/
+txn_completed/delete/<PATH>/
+
+API
+---
+"""
+class Cache(object):
+
+	def chunk_inc_ref(self, chunk):
+		self.chunk_refcount.setdefault(chunk.sha, 0)
+		self.chunk_refcount[chunk.sha] += 1
+
+	def chunk_dec_ref(self, chunk):
+		assert self.chunk_refcount.get(chunk.sha, 0) > 0
+		self.chunk_refcount[chunk.sha] -= 1
+		if self.chunk_refcount[chunk.sha] == 0:
+			self.fs.delete_chunk(self.sha)
+
+txn = txn_begin()

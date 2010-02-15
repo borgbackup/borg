@@ -49,7 +49,9 @@ class Repository(object):
         if os.path.exists(os.path.join(self.path, 'txn-active')):
             self.rollback()
         if os.path.exists(os.path.join(self.path, 'txn-commit')):
-            self.commit()
+            self.apply_txn()
+        if os.path.exists(os.path.join(self.path, 'txn-applied')):
+            shutil.rmtree(os.path.join(self.path, 'txn-applied'))
         self.state = Repository.OPEN
 
     def close(self):
@@ -66,13 +68,33 @@ class Repository(object):
         remove_fd = open(os.path.join(self.path, 'txn-active', 'remove'), 'wb')
         remove_fd.write('\n'.join(self.txn_removed))
         remove_fd.close()
+        tid_fd = open(os.path.join(self.path, 'txn-active', 'tid'), 'wb')
+        tid_fd.write(str(self.tid + 1))
+        tid_fd.close()
         os.rename(os.path.join(self.path, 'txn-active'),
                   os.path.join(self.path, 'txn-commit'))
-        self.commit_txn()
+        self.apply_txn()
 
-    def commit_txn(self):
+    def apply_txn(self):
         assert os.path.isdir(os.path.join(self.path, 'txn-commit'))
-        raise NotImplementedError
+        tid = int(open(os.path.join(self.path, 'txn-commit', 'tid'), 'rb').read())
+        assert tid >= self.tid
+        remove_list = [line.strip() for line in
+                       open(os.path.join(self.path, 'txn-commit', 'remove'), 'rb').readlines()]
+        for name in remove_list:
+            path = os.path.join(self.path, 'data', name)
+            os.unlink(path)
+        add_path = os.path.join(self.path, 'txn-commit', 'add')
+        for name in os.listdir(add_path):
+            shutil.move(os.path.join(add_path, name),
+                        os.path.join(self.path, 'data'))
+        tid_fd = open(os.path.join(self.path, 'tid'), 'wb')
+        tid_fd.write(str(tid))
+        tid_fd.close()
+        os.rename(os.path.join(self.path, 'txn-commit'),
+                  os.path.join(self.path, 'txn-applied'))
+        shutil.rmtree(os.path.join(self.path, 'txn-applied'))
+        self.state = Repository.IDLE
 
     def rollback(self):
         """
@@ -88,7 +110,6 @@ class Repository(object):
         elif self.state == Repository.OPEN:
             os.mkdir(os.path.join(self.path, 'txn-active'))
             os.mkdir(os.path.join(self.path, 'txn-active', 'add'))
-            open(os.path.join(self.path, 'txn-active', 'tid'), 'wb').write(str(self.tid + 1))
             self.txn_removed = []
             self.state = Repository.ACTIVE
             
@@ -176,7 +197,11 @@ class RepositoryTestCase(unittest.TestCase):
         self.assertRaises(Exception, lambda: self.repo.get_file('foo'))
         self.assertEqual(self.repo.listdir(''), ['bar'])
         self.assertEqual(self.repo.state, Repository.ACTIVE)
+        self.assertEqual(os.path.exists(os.path.join(self.tmppath, 'repo', 'data', 'bar')), False)
         self.repo.commit()
+        self.assertEqual(os.path.exists(os.path.join(self.tmppath, 'repo', 'data', 'bar')), True)
+        self.assertEqual(self.repo.listdir(''), ['bar'])
+        self.assertEqual(self.repo.state, Repository.IDLE)
 
 if __name__ == '__main__':
     unittest.main()

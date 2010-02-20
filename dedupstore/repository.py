@@ -9,6 +9,8 @@ import unittest
 
 log = logging.getLogger('')
 
+# FIXME: UUID
+
 class Repository(object):
     """
     """
@@ -40,7 +42,6 @@ class Repository(object):
             raise Exception('%s Does not look like a repository2')
         self.lock_fd = open(os.path.join(path, 'lock'), 'w')
         fcntl.flock(self.lock_fd, fcntl.LOCK_EX)
-        print 'locked'
         self.tid = int(open(os.path.join(path, 'tid'), 'r').read())
         self.recover()
 
@@ -88,19 +89,18 @@ class Repository(object):
             os.unlink(path)
         add_list = [line.strip() for line in
                     open(os.path.join(self.path, 'txn-commit', 'add_index'), 'rb').readlines()]
-        add_path = os.path.join(self.path, 'txn-commit', 'add')
-        for name in os.listdir(add_path):
+        for name in add_list:
             destname = os.path.join(self.path, 'data', name)
             if not os.path.exists(os.path.dirname(destname)):
                 os.makedirs(os.path.dirname(destname))
-            shutil.move(os.path.join(add_path, name), destname)
+            shutil.move(os.path.join(self.path, 'txn-commit', 'add', name), destname)
         tid_fd = open(os.path.join(self.path, 'tid'), 'wb')
         tid_fd.write(str(tid))
         tid_fd.close()
         os.rename(os.path.join(self.path, 'txn-commit'),
                   os.path.join(self.path, 'txn-applied'))
         shutil.rmtree(os.path.join(self.path, 'txn-applied'))
-        self.state = Repository.IDLE
+        self.state = Repository.OPEN
 
     def rollback(self):
         """

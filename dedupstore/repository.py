@@ -7,8 +7,6 @@ import posixpath
 import shutil
 import unittest
 
-CHUNKSIZE = 256 * 1024
-
 log = logging.getLogger('')
 
 class Repository(object):
@@ -42,6 +40,7 @@ class Repository(object):
             raise Exception('%s Does not look like a repository2')
         self.lock_fd = open(os.path.join(path, 'lock'), 'w')
         fcntl.flock(self.lock_fd, fcntl.LOCK_EX)
+        print 'locked'
         self.tid = int(open(os.path.join(path, 'tid'), 'r').read())
         self.recover()
 
@@ -68,6 +67,9 @@ class Repository(object):
         remove_fd = open(os.path.join(self.path, 'txn-active', 'remove'), 'wb')
         remove_fd.write('\n'.join(self.txn_removed))
         remove_fd.close()
+        add_fd = open(os.path.join(self.path, 'txn-active', 'add_index'), 'wb')
+        add_fd.write('\n'.join(self.txn_added))
+        add_fd.close()
         tid_fd = open(os.path.join(self.path, 'txn-active', 'tid'), 'wb')
         tid_fd.write(str(self.tid + 1))
         tid_fd.close()
@@ -84,10 +86,14 @@ class Repository(object):
         for name in remove_list:
             path = os.path.join(self.path, 'data', name)
             os.unlink(path)
+        add_list = [line.strip() for line in
+                    open(os.path.join(self.path, 'txn-commit', 'add_index'), 'rb').readlines()]
         add_path = os.path.join(self.path, 'txn-commit', 'add')
         for name in os.listdir(add_path):
-            shutil.move(os.path.join(add_path, name),
-                        os.path.join(self.path, 'data'))
+            destname = os.path.join(self.path, 'data', name)
+            if not os.path.exists(os.path.dirname(destname)):
+                os.makedirs(os.path.dirname(destname))
+            shutil.move(os.path.join(add_path, name), destname)
         tid_fd = open(os.path.join(self.path, 'tid'), 'wb')
         tid_fd.write(str(tid))
         tid_fd.close()
@@ -111,6 +117,7 @@ class Repository(object):
             os.mkdir(os.path.join(self.path, 'txn-active'))
             os.mkdir(os.path.join(self.path, 'txn-active', 'add'))
             self.txn_removed = []
+            self.txn_added = []
             self.state = Repository.ACTIVE
             
     def get_file(self, path):
@@ -127,11 +134,16 @@ class Repository(object):
         """
         """
         self.prepare_txn()
-        if path in self.txn_removed:
-            self.txn_removed.remove(path)
         if os.path.exists(os.path.join(self.path, 'txn-active', 'add', path)):
             raise Exception('FileAlreadyExists: %s' % path)
-        fd = open(os.path.join(self.path, 'txn-active', 'add', path), 'wb')
+        if path in self.txn_removed:
+            self.txn_removed.remove(path)
+        if path not in self.txn_added:
+                self.txn_added.append(path)
+        filename = os.path.join(self.path, 'txn-active', 'add', path)
+        if not os.path.exists(os.path.dirname(filename)):
+            os.makedirs(os.path.dirname(filename))  
+        fd = open(filename, 'wb')
         try:
             fd.write(data)
         finally:

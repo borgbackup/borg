@@ -6,6 +6,7 @@ import os
 import posixpath
 import shutil
 import unittest
+import uuid
 
 log = logging.getLogger('')
 
@@ -30,6 +31,7 @@ class Repository(object):
         log.info('Initializing Repository at "%s"' % path)
         os.mkdir(path)
         open(os.path.join(path, 'VERSION'), 'wb').write(self.VERSION)
+        open(os.path.join(path, 'uuid'), 'wb').write(str(uuid.uuid4()))
         open(os.path.join(path, 'tid'), 'wb').write('0')
         os.mkdir(os.path.join(path, 'data'))
 
@@ -40,6 +42,7 @@ class Repository(object):
         version_path = os.path.join(path, 'version')
         if not os.path.exists(version_path) or open(version_path, 'rb').read() != self.VERSION:
             raise Exception('%s Does not look like a repository2')
+        self.uuid = open(os.path.join(path, 'uuid'), 'rb').read()
         self.lock_fd = open(os.path.join(path, 'lock'), 'w')
         fcntl.flock(self.lock_fd, fcntl.LOCK_EX)
         self.tid = int(open(os.path.join(path, 'tid'), 'r').read())

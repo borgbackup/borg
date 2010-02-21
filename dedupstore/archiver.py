@@ -18,6 +18,8 @@ class Cache(object):
         self.open(path)
 
     def open(self, path):
+        if self.repo.tid == 0:
+            return
         for archive in self.repo.listdir('archives'):
             self.archives.append(archive)
             data = self.repo.get_file(os.path.join('archives', archive))

@@ -13,13 +13,30 @@ class Cache(object):
     """
     def __init__(self, path, repo):
         self.repo = repo
+        self.path = path
         self.chunkmap = {}
         self.archives = []
-        self.open(path)
+        self.tid = -1
+        self.open()
+        if self.tid != self.repo.tid:
+            print self.tid, self.repo.tid
+            self.create()
 
-    def open(self, path):
+    def open(self):
         if self.repo.tid == 0:
             return
+        filename = os.path.join(self.path, '%s.cache' % self.repo.uuid)
+        if not os.path.exists(filename):
+            return
+        print 'Reading cache: ', filename, '...'
+        data = cPickle.loads(zlib.decompress(open(filename, 'rb').read()))
+        self.chunkmap = data['chunkmap']
+        self.tid = data['tid']
+        self.archives = data['archives']
+        print 'done'
+
+    def create(self):
+        print 'Recreating cache...'
         for archive in self.repo.listdir('archives'):
             self.archives.append(archive)
             data = self.repo.get_file(os.path.join('archives', archive))
@@ -27,11 +44,19 @@ class Cache(object):
             for item in a['items']:
                 if item['type'] == 'FILE':
                     for c in item['chunks']:
-                        print 'adding chunk', c.encode('hex')
                         self.chunk_incref(c)
+        self.tid = self.repo.tid
+        print 'done'
 
     def save(self):
         assert self.repo.state == Repository.OPEN
+        print 'saving',self.tid, self.repo.tid
+        data = {'chunkmap': self.chunkmap, 'tid': self.repo.tid, 'archives': self.archives}
+        filename = os.path.join(self.path, '%s.cache' % self.repo.uuid)
+        print 'Saving cache as:', filename
+        with open(filename, 'wb') as fd:
+            fd.write(zlib.compress(cPickle.dumps(data)))
+        print 'done'
 
     def chunk_filename(self, sha):
         hex = sha.encode('hex')
@@ -78,6 +103,7 @@ class Archiver(object):
         archive = {'name': name, 'items': items}
         zdata = zlib.compress(cPickle.dumps(archive))
         self.repo.put_file(os.path.join('archives', archive_name), zdata)
+        self.cache.archives.append(archive_name)
         print 'Archive file size: %d' % len(zdata)
         self.repo.commit()
         self.cache.save()

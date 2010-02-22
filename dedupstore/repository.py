@@ -10,7 +10,6 @@ import uuid
 
 log = logging.getLogger('')
 
-# FIXME: UUID
 
 class Repository(object):
     """
@@ -103,6 +102,7 @@ class Repository(object):
         os.rename(os.path.join(self.path, 'txn-commit'),
                   os.path.join(self.path, 'txn-applied'))
         shutil.rmtree(os.path.join(self.path, 'txn-applied'))
+        self.tid = tid
         self.state = Repository.OPEN
 
     def rollback(self):
@@ -137,12 +137,13 @@ class Repository(object):
         """
         """
         self.prepare_txn()
-        if os.path.exists(os.path.join(self.path, 'txn-active', 'add', path)):
+        if (path in self.txn_added or
+           (path not in self.txn_removed and os.path.exists(os.path.join(self.path, 'data', path)))):
             raise Exception('FileAlreadyExists: %s' % path)
         if path in self.txn_removed:
             self.txn_removed.remove(path)
         if path not in self.txn_added:
-                self.txn_added.append(path)
+            self.txn_added.append(path)
         filename = os.path.join(self.path, 'txn-active', 'add', path)
         if not os.path.exists(os.path.dirname(filename)):
             os.makedirs(os.path.dirname(filename))  

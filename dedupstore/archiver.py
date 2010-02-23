@@ -3,7 +3,7 @@ import sys
 import hashlib
 import zlib
 import cPickle
-from repository import Repository
+from store import Store
 
 CHUNKSIZE = 256 * 1024
 
@@ -11,21 +11,19 @@ CHUNKSIZE = 256 * 1024
 class Cache(object):
     """Client Side cache
     """
-    def __init__(self, path, repo):
-        self.repo = repo
+    def __init__(self, path, store):
+        self.store = store
         self.path = path
-        self.chunkmap = {}
-        self.archives = []
-        self.tid = -1
+        self.tid = 'unknown'
         self.open()
-        if self.tid != self.repo.tid:
-            print self.tid, self.repo.tid
+        if self.tid != self.store.tid:
+            print self.tid.encode('hex'), self.store.tid.encode('hex')
             self.create()
 
     def open(self):
-        if self.repo.tid == 0:
+        if self.store.tid == '':
             return
-        filename = os.path.join(self.path, '%s.cache' % self.repo.uuid)
+        filename = os.path.join(self.path, '%s.cache' % self.store.uuid)
         if not os.path.exists(filename):
             return
         print 'Reading cache: ', filename, '...'
@@ -35,59 +33,75 @@ class Cache(object):
         self.archives = data['archives']
         print 'done'
 
+    def update_manifest(self):
+        print 'old manifest', self.tid.encode('hex')
+        if self.tid:
+            self.chunk_decref(self.tid)
+        manifest = {'archives': self.archives.values()}
+        hash = self.add_chunk(zlib.compress(cPickle.dumps(manifest)))
+        print 'new manifest', hash.encode('hex')
+        self.store.commit(hash)
+
     def create(self):
+        self.archives = {}
+        self.chunkmap = {}
+        self.tid = self.store.tid
+        if self.store.tid == '':
+            return
         print 'Recreating cache...'
-        for archive in self.repo.listdir('archives'):
-            self.archives.append(archive)
-            data = self.repo.get_file(os.path.join('archives', archive))
-            a = cPickle.loads(zlib.decompress(data))
-            for item in a['items']:
+        self.chunk_incref(self.store.tid)
+        manifest = cPickle.loads(zlib.decompress(self.store.get(self.store.tid)))
+        for hash in manifest['archives']:
+            self.chunk_incref(hash)
+            archive = cPickle.loads(zlib.decompress(self.store.get(hash)))
+            self.archives[archive['name']] = hash
+            for item in archive['items']:
                 if item['type'] == 'FILE':
                     for c in item['chunks']:
                         self.chunk_incref(c)
-        self.tid = self.repo.tid
         print 'done'
 
     def save(self):
-        assert self.repo.state == Repository.OPEN
-        print 'saving',self.tid, self.repo.tid
-        data = {'chunkmap': self.chunkmap, 'tid': self.repo.tid, 'archives': self.archives}
-        filename = os.path.join(self.path, '%s.cache' % self.repo.uuid)
+        assert self.store.state == Store.OPEN
+        print 'saving cache'
+        data = {'chunkmap': self.chunkmap, 'tid': self.store.tid, 'archives': self.archives}
+        filename = os.path.join(self.path, '%s.cache' % self.store.uuid)
         print 'Saving cache as:', filename
         with open(filename, 'wb') as fd:
             fd.write(zlib.compress(cPickle.dumps(data)))
         print 'done'
 
-    def chunk_filename(self, sha):
-        hex = sha.encode('hex')
-        return 'chunks/%s/%s/%s' % (hex[:2], hex[2:4], hex[4:])
-
     def add_chunk(self, data):
-        sha = hashlib.sha1(data).digest()
-        if not self.seen_chunk(sha):
-            self.repo.put_file(self.chunk_filename(sha), data)
+        hash = hashlib.sha1(data).digest()
+        if not self.seen_chunk(hash):
+            self.store.put(data, hash)
         else:
-            print 'seen chunk', sha.encode('hex')
-        self.chunk_incref(sha)
-        return sha
+            print 'seen chunk', hash.encode('hex')
+        self.chunk_incref(hash)
+        return hash
 
-    def seen_chunk(self, sha):
-        return self.chunkmap.get(sha, 0) > 0
+    def seen_chunk(self, hash):
+        return self.chunkmap.get(hash, 0) > 0
 
-    def chunk_incref(self, sha):
-        self.chunkmap.setdefault(sha, 0)
-        self.chunkmap[sha] += 1
+    def chunk_incref(self, hash):
+        self.chunkmap.setdefault(hash, 0)
+        self.chunkmap[hash] += 1
 
-    def chunk_decref(self, sha):
-        assert self.chunkmap.get(sha, 0) > 0
-        self.chunkmap[sha] -= 1
-        return self.chunkmap[sha]
+    def chunk_decref(self, hash):
+        count = self.chunkmap.get(hash, 0) - 1
+        assert count >= 0
+        self.chunkmap[hash] = count
+        if not count:
+            print 'deleting chunk: ', hash.encode('hex')
+            self.store.delete(hash)
+        return count
+
 
 class Archiver(object):
 
     def __init__(self):
-        self.repo = Repository('/tmp/repo')
-        self.cache = Cache('/tmp/cache', self.repo)
+        self.store = Store('/tmp/store')
+        self.cache = Cache('/tmp/cache', self.store)
 
     def create_archive(self, archive_name, path):
         if archive_name in self.cache.archives:
@@ -101,11 +115,23 @@ class Archiver(object):
                 name = os.path.join(root, f)
                 items.append(self.process_file(name, self.cache))
         archive = {'name': name, 'items': items}
-        zdata = zlib.compress(cPickle.dumps(archive))
-        self.repo.put_file(os.path.join('archives', archive_name), zdata)
-        self.cache.archives.append(archive_name)
-        print 'Archive file size: %d' % len(zdata)
-        self.repo.commit()
+        hash = self.cache.add_chunk(zlib.compress(cPickle.dumps(archive)))
+        self.cache.archives[archive_name] = hash
+        self.cache.update_manifest()
+        self.cache.save()
+
+    def delete_archive(self, archive_name):
+        hash = self.cache.archives.get(archive_name)
+        if not hash:
+            raise Exception('Archive "%s" does not exist' % archive_name)
+        archive = cPickle.loads(zlib.decompress(self.store.get(hash)))
+        self.cache.chunk_decref(hash)
+        for item in archive['items']:
+            if item['type'] == 'FILE':
+                for c in item['chunks']:
+                    self.cache.chunk_decref(c)
+        del self.cache.archives[archive_name]
+        self.cache.update_manifest()
         self.cache.save()
 
     def process_dir(self, path, cache):
@@ -128,7 +154,10 @@ class Archiver(object):
 
 def main():
     archiver = Archiver()
-    archiver.create_archive(sys.argv[1], sys.argv[2])
+    if sys.argv[1] == 'delete':
+        archiver.delete_archive(sys.argv[2])
+    else:
+        archiver.create_archive(sys.argv[1], sys.argv[2])
 
 if __name__ == '__main__':
     main()

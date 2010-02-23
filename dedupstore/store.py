@@ -17,7 +17,7 @@ class Store(object):
     VERSION = 'DEDUPSTORE VERSION 1'
 
     def __init__(self, path):
-        self.tid = -1
+        self.tid = ''
         self.state = Store.IDLE
         if not os.path.exists(path):
             self.create(path)
@@ -27,7 +27,7 @@ class Store(object):
         os.mkdir(path)
         open(os.path.join(path, 'version'), 'wb').write(self.VERSION)
         open(os.path.join(path, 'uuid'), 'wb').write(str(uuid.uuid4()))
-        open(os.path.join(path, 'tid'), 'wb').write('0')
+        open(os.path.join(path, 'tid'), 'wb').write('')
         os.mkdir(os.path.join(path, 'data'))
 
     def open(self, path):
@@ -40,7 +40,7 @@ class Store(object):
         self.uuid = open(os.path.join(path, 'uuid'), 'rb').read()
         self.lock_fd = open(os.path.join(path, 'lock'), 'w')
         fcntl.flock(self.lock_fd, fcntl.LOCK_EX)
-        self.tid = int(open(os.path.join(path, 'tid'), 'r').read())
+        self.tid = open(os.path.join(path, 'tid'), 'r').read()
         self.recover()
 
     def recover(self):
@@ -59,7 +59,7 @@ class Store(object):
         self.lock_fd.close()
         self.state = Store.IDLE
 
-    def commit(self):
+    def commit(self, tid):
         """
         """
         if self.state == Store.OPEN:
@@ -70,15 +70,14 @@ class Store(object):
         with open(os.path.join(self.path, 'txn-active', 'write_index'), 'wb') as fd:
             fd.write('\n'.join(self.txn_write))
         with open(os.path.join(self.path, 'txn-active', 'tid'), 'wb') as fd:
-            fd.write(str(self.tid + 1))
+            fd.write(tid)
         os.rename(os.path.join(self.path, 'txn-active'),
                   os.path.join(self.path, 'txn-commit'))
         self.recover()
 
     def apply_txn(self):
         assert os.path.isdir(os.path.join(self.path, 'txn-commit'))
-        tid = int(open(os.path.join(self.path, 'txn-commit', 'tid'), 'rb').read())
-        assert tid == self.tid + 1
+        tid = open(os.path.join(self.path, 'txn-commit', 'tid'), 'rb').read()
         delete_list = [line.strip() for line in
                        open(os.path.join(self.path, 'txn-commit', 'delete_index'), 'rb').readlines()]
         for name in delete_list:
@@ -92,7 +91,7 @@ class Store(object):
                 os.makedirs(os.path.dirname(destname))
             os.rename(os.path.join(self.path, 'txn-commit', 'write', name), destname)
         with open(os.path.join(self.path, 'tid'), 'wb') as fd:
-            fd.write(str(tid))
+            fd.write(tid)
         os.rename(os.path.join(self.path, 'txn-commit'),
                   os.path.join(self.path, 'txn-applied'))
         shutil.rmtree(os.path.join(self.path, 'txn-applied'))
@@ -111,50 +110,50 @@ class Store(object):
             os.mkdir(os.path.join(self.path, 'txn-active', 'write'))
             self.state = Store.ACTIVE
 
-    def _filename(self, sha, base=''):
-        hex = sha.encode('hex')
+    def _filename(self, hash, base=''):
+        hex = hash.encode('hex')
         return os.path.join(base, hex[:2], hex[2:4], hex[4:])
             
-    def get(self, sha):
+    def get(self, hash):
         """
         """
-        path = self._filename(sha)
+        path = self._filename(hash)
         if path in self.txn_write:
             filename = os.path.join(self.path, 'txn-active', 'write', path)
             return open(filename, 'rb').read()
-        filename = self._filename(sha, os.path.join(self.path, 'objects'))
+        filename = self._filename(hash, os.path.join(self.path, 'objects'))
         if os.path.exists(filename):
             return open(filename, 'rb').read()
         else:
-            raise Exception('Object %s does not exist' % sha.encode('hex'))
+            raise Exception('Object %s does not exist' % hash.encode('hex'))
 
-    def put(self, data, sha=None):
+    def put(self, data, hash=None):
         """
         """
-        if not sha:
-            sha = hashlib.sha1(data).digest()
+        if not hash:
+            hash = hashlib.sha1(data).digest()
         self.prepare_txn()
-        path = self._filename(sha)
-        filename = self._filename(sha, os.path.join(self.path, 'objects'))
+        path = self._filename(hash)
+        filename = self._filename(hash, os.path.join(self.path, 'objects'))
         if (path in self.txn_write or
            (path not in self.txn_delete and os.path.exists(filename))):
-            raise Exception('Object already exists: %s' % sha.encode('hex'))
+            raise Exception('Object already exists: %s' % hash.encode('hex'))
         if path in self.txn_delete:
             self.txn_delete.remove(path)
         if path not in self.txn_write:
             self.txn_write.append(path)
-        filename = self._filename(sha, os.path.join(self.path, 'txn-active', 'write'))
+        filename = self._filename(hash, os.path.join(self.path, 'txn-active', 'write'))
         if not os.path.exists(os.path.dirname(filename)):
             os.makedirs(os.path.dirname(filename))
         with open(filename, 'wb') as fd:
             fd.write(data)
-        return sha
+        return hash
 
-    def delete(self, sha):
+    def delete(self, hash):
         """
         """
         self.prepare_txn()
-        path = self._filename(sha)
+        path = self._filename(hash)
         if path in self.txn_write:
             self.txn_write.remove(path)
             os.unlink(filename)
@@ -163,7 +162,7 @@ class Store(object):
             if os.path.exists(filename):
                 self.txn_delete.append(path)
             else:
-                raise Exception('Object does not exist: %s' % sha.encode('hex'))
+                raise Exception('Object does not exist: %s' % hash.encode('hex'))
 
 
 class StoreTestCase(unittest.TestCase):
@@ -176,31 +175,33 @@ class StoreTestCase(unittest.TestCase):
         shutil.rmtree(self.tmppath)
     
     def test1(self):
-        self.assertEqual(self.store.tid, 0)
+        self.assertEqual(self.store.tid, '')
         self.assertEqual(self.store.state, Store.OPEN)
-        SOMEDATA_sha = self.store.put('SOMEDATA')
+        SOMEDATA_hash = self.store.put('SOMEDATA')
         self.assertRaises(Exception, lambda: self.store.put('SOMEDATA'))
-        self.assertEqual(self.store.get(SOMEDATA_sha), 'SOMEDATA')
+        self.assertEqual(self.store.get(SOMEDATA_hash), 'SOMEDATA')
         self.store.rollback()
         self.assertRaises(Exception, lambda: self.store.get('SOMEDATA'))
-        self.assertEqual(self.store.tid, 0)
+        self.assertEqual(self.store.tid, '')
 
     def test2(self):
-        self.assertEqual(self.store.tid, 0)
+        self.assertEqual(self.store.tid, '')
         self.assertEqual(self.store.state, Store.OPEN)
-        SOMEDATA_sha = self.store.put('SOMEDATA')
-        self.assertEqual(self.store.get(SOMEDATA_sha), 'SOMEDATA')
-        self.store.commit()
-        self.assertEqual(self.store.get(SOMEDATA_sha), 'SOMEDATA')
-        self.assertEqual(self.store.tid, 1)
-        self.store.delete(SOMEDATA_sha)
+        SOMEDATA_hash = self.store.put('SOMEDATA')
+        self.assertEqual(self.store.get(SOMEDATA_hash), 'SOMEDATA')
+        self.store.commit(SOMEDATA_hash)
+        self.assertEqual(self.store.tid, SOMEDATA_hash)
+        self.assertEqual(self.store.get(SOMEDATA_hash), 'SOMEDATA')
+        self.store.delete(SOMEDATA_hash)
         self.assertRaises(Exception, lambda: self.store.get('SOMEDATA'))
         self.store.rollback()
-        self.assertEqual(self.store.get(SOMEDATA_sha), 'SOMEDATA')
-        self.store.delete(SOMEDATA_sha)
+        self.assertEqual(self.store.get(SOMEDATA_hash), 'SOMEDATA')
+        self.store.delete(SOMEDATA_hash)
         self.assertRaises(Exception, lambda: self.store.get('SOMEDATA'))
-        self.store.commit()
+        self.store.commit('Something Else')
+        self.assertEqual(self.store.tid, 'Something Else')
         self.assertRaises(Exception, lambda: self.store.get('SOMEDATA'))
+
 
 if __name__ == '__main__':
     unittest.main()

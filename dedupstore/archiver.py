@@ -3,6 +3,8 @@ import sys
 import hashlib
 import zlib
 import cPickle
+from optparse import OptionParser
+
 from store import Store
 
 CHUNKSIZE = 256 * 1024
@@ -103,17 +105,18 @@ class Archiver(object):
         self.store = Store('/tmp/store')
         self.cache = Cache('/tmp/cache', self.store)
 
-    def create_archive(self, archive_name, path):
+    def create_archive(self, archive_name, paths):
         if archive_name in self.cache.archives:
             raise Exception('Archive "%s" already exists' % archive_name)
         items = []
-        for root, dirs, files in os.walk(path):
-            for d in dirs:
-                name = os.path.join(root, d)
-                items.append(self.process_dir(name, self.cache))
-            for f in files:
-                name = os.path.join(root, f)
-                items.append(self.process_file(name, self.cache))
+        for path in paths:
+            for root, dirs, files in os.walk(path):
+                for d in dirs:
+                    name = os.path.join(root, d)
+                    items.append(self.process_dir(name, self.cache))
+                for f in files:
+                    name = os.path.join(root, f)
+                    items.append(self.process_file(name, self.cache))
         archive = {'name': name, 'items': items}
         hash = self.cache.add_chunk(zlib.compress(cPickle.dumps(archive)))
         self.cache.archives[archive_name] = hash
@@ -150,14 +153,34 @@ class Archiver(object):
             chunks.append(cache.add_chunk(zlib.compress(data)))
         print 'File: %s (%d chunks)' % (path, len(chunks))
         return {'type': 'FILE', 'path': path, 'size': size, 'chunks': chunks}
-
+    
+    def run(self):
+        parser = OptionParser()
+        parser.add_option("-C", "--cache", dest="cache",
+                          help="cache directory to use", metavar="CACHE")
+        parser.add_option("-s", "--store", dest="store",
+                          help="path to dedupe store", metavar="STORE")
+        parser.add_option("-c", "--create", dest="create_archive",
+                          help="create ARCHIVE", metavar="ARCHIVE")
+        parser.add_option("-d", "--delete", dest="delete_archive",
+                          help="delete ARCHIVE", metavar="ARCHIVE")
+        parser.add_option("-l", "--list-archives", dest="list_archives",
+                        help="list archives")
+        parser.add_option("-V", "--verify", dest="verify_archive",
+                        help="verify archive consistency")
+        parser.add_option("-e", "--extract", dest="extract_archive",
+                        help="extract ARCHIVE")
+        parser.add_option("-L", "--list-archive", dest="list_archive",
+                        help="verify archive consistency", metavar="ARCHIVE")
+        (options, args) = parser.parse_args()
+        if options.delete_archive:
+            self.delete_archive(options.delete_archive)
+        else:
+            self.create_archive(options.create_archive, args)
 
 def main():
     archiver = Archiver()
-    if sys.argv[1] == 'delete':
-        archiver.delete_archive(sys.argv[2])
-    else:
-        archiver.create_archive(sys.argv[1], sys.argv[2])
+    archiver.run()
 
 if __name__ == '__main__':
     main()

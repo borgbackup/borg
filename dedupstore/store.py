@@ -11,6 +11,12 @@ import uuid
 class Store(object):
     """
     """
+    class DoesNotExist(KeyError):
+        """"""
+
+    class AlreadyExists(KeyError):
+        """"""
+
     IDLE = 'Idle'
     OPEN = 'Open'
     ACTIVE = 'Active'
@@ -124,12 +130,12 @@ class Store(object):
             filename = os.path.join(self.path, 'txn-active', 'write', path)
             return open(filename, 'rb').read()
         if path in self.txn_delete:
-            raise Exception('Object %s does not exist' % hash.encode('hex'))
+            raise Store.DoesNotExist('Object %s:%s does not exist' % (ns.encode('hex'), id.encode('hex')))
         filename = self._filename(ns, id, os.path.join(self.path, 'data'))
         if os.path.exists(filename):
             return open(filename, 'rb').read()
         else:
-            raise Exception('Object %s does not exist' % hash.encode('hex'))
+            raise Store.DoesNotExist('Object %s:%s does not exist' % (ns.encode('hex'), id.encode('hex')))
 
     def put(self, ns, id, data):
         """
@@ -139,7 +145,7 @@ class Store(object):
         filename = self._filename(ns, id, os.path.join(self.path, 'data'))
         if (path in self.txn_write or
            (path not in self.txn_delete and os.path.exists(filename))):
-            raise Exception('Object already exists: %s:%s' % (ns.encode('hex'), id.encode('hex')))
+            raise Store.AlreadyExists('Object already exists: %s:%s' % (ns.encode('hex'), id.encode('hex')))
         if path in self.txn_delete:
             self.txn_delete.remove(path)
         if path not in self.txn_write:
@@ -164,7 +170,7 @@ class Store(object):
             if os.path.exists(filename):
                 self.txn_delete.append(path)
             else:
-                raise Exception('Object does not exist: %s' % hash.encode('hex'))
+                raise Store.DoesNotExist('Object does not exist: %s' % hash.encode('hex'))
 
     def list(self, ns, prefix='', marker=None, max_keys=1000000):
         for x in self.foo(os.path.join(self.path, 'data', ns.encode('hex')), 
@@ -209,10 +215,10 @@ class StoreTestCase(unittest.TestCase):
         self.assertEqual(self.store.tid, 0)
         self.assertEqual(self.store.state, Store.OPEN)
         self.store.put('SOMENS', 'SOMEID', 'SOMEDATA')
-        self.assertRaises(Exception, lambda: self.store.put('SOMENS', 'SOMEID', 'SOMEDATA'))
+        self.assertRaises(Store.AlreadyExists, lambda: self.store.put('SOMENS', 'SOMEID', 'SOMEDATA'))
         self.assertEqual(self.store.get('SOMENS', 'SOMEID'), 'SOMEDATA')
         self.store.rollback()
-        self.assertRaises(Exception, lambda: self.store.get('SOMENS', 'SOMEID'))
+        self.assertRaises(Store.DoesNotExist, lambda: self.store.get('SOMENS', 'SOMEID'))
         self.assertEqual(self.store.tid, 0)
 
     def test2(self):
@@ -224,14 +230,14 @@ class StoreTestCase(unittest.TestCase):
         self.assertEqual(self.store.tid, 1)
         self.assertEqual(self.store.get('SOMENS', 'SOMEID'), 'SOMEDATA')
         self.store.delete('SOMENS', 'SOMEID')
-        self.assertRaises(Exception, lambda: self.store.get('SOMENS', 'SOMEID'))
+        self.assertRaises(Store.DoesNotExist, lambda: self.store.get('SOMENS', 'SOMEID'))
         self.store.rollback()
         self.assertEqual(self.store.get('SOMENS', 'SOMEID'), 'SOMEDATA')
         self.store.delete('SOMENS', 'SOMEID')
-        self.assertRaises(Exception, lambda: self.store.get('SOMENS', 'SOMEID'))
+        self.assertRaises(Store.DoesNotExist, lambda: self.store.get('SOMENS', 'SOMEID'))
         self.store.commit()
         self.assertEqual(self.store.tid, 2)
-        self.assertRaises(Exception, lambda: self.store.get('SOMENS', 'SOMEID'))
+        self.assertRaises(Store.DoesNotExist, lambda: self.store.get('SOMENS', 'SOMEID'))
 
     def test_list(self):
         self.store.put('SOMENS', 'SOMEID12', 'SOMEDATA')

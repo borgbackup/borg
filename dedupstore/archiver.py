@@ -29,20 +29,23 @@ class Cache(object):
         filename = os.path.join(self.path, '%s.cache' % self.store.uuid)
         if not os.path.exists(filename):
             return
-        print 'Reading cache: ', filename, '...'
+        print 'Loading cache: ', filename, '...'
         data = cPickle.loads(zlib.decompress(open(filename, 'rb').read()))
         self.chunkmap = data['chunkmap']
+        self.archives = data['archives']
         self.tid = data['tid']
         print 'done'
 
     def create(self):
         self.chunkmap = {}
+        self.archives = []
         self.tid = self.store.tid
         if self.store.tid == 0:
             return
         print 'Recreating cache...'
         for id in self.store.list(NS_ARCHIVES):
             archive = cPickle.loads(zlib.decompress(self.store.get(NS_ARCHIVES, id)))
+            self.archives.append(archive['name'])
             for item in archive['items']:
                 if item['type'] == 'FILE':
                     for c in item['chunks']:
@@ -52,7 +55,7 @@ class Cache(object):
     def save(self):
         assert self.store.state == Store.OPEN
         print 'saving cache'
-        data = {'chunkmap': self.chunkmap, 'tid': self.store.tid}
+        data = {'chunkmap': self.chunkmap, 'tid': self.store.tid, 'archives': self.archives}
         filename = os.path.join(self.path, '%s.cache' % self.store.uuid)
         print 'Saving cache as:', filename
         with open(filename, 'wb') as fd:
@@ -87,13 +90,13 @@ class Cache(object):
 
 class Archiver(object):
 
-    def __init__(self):
-        self.store = Store('/tmp/store')
-        self.cache = Cache('/tmp/cache', self.store)
-
     def create_archive(self, archive_name, paths):
-#        if archive_name in self.cache.archives:
-#            raise Exception('Archive "%s" already exists' % archive_name)
+        try:
+            self.store.get(NS_ARCHIVES, archive_name)
+        except Store.DoesNotExist:
+            pass
+        else:
+            raise Exception('Archive "%s" already exists' % archive_name)
         items = []
         for path in paths:
             for root, dirs, files in os.walk(path):
@@ -106,21 +109,54 @@ class Archiver(object):
         archive = {'name': archive_name, 'items': items}
         hash = self.store.put(NS_ARCHIVES, archive_name, zlib.compress(cPickle.dumps(archive)))
         self.store.commit()
+        self.cache.archives.append(archive_name)
         self.cache.save()
 
     def delete_archive(self, archive_name):
-        archive = cPickle.loads(zlib.decompress(self.store.get(NS_ARCHIVES, archive_name)))
+        try:
+            archive = cPickle.loads(zlib.decompress(self.store.get(NS_ARCHIVES, archive_name)))
+        except Store.DoesNotExist:
+            raise Exception('Archive "%s" does not exist' % archive_name)
         self.store.delete(NS_ARCHIVES, archive_name)
-#        if not hash:
-#            raise Exception('Archive "%s" does not exist' % archive_name)
         for item in archive['items']:
             if item['type'] == 'FILE':
                 for c in item['chunks']:
                     self.cache.chunk_decref(c)
         self.store.commit()
+        self.cache.archives.remove(archive_name)
         self.cache.save()
 
+    def list_archives(self):
+        print 'Archives:'
+        for archive in sorted(self.cache.archives):
+            print archive
+
+    def list_archive(self, archive_name):
+        try:
+            archive = cPickle.loads(zlib.decompress(self.store.get(NS_ARCHIVES, archive_name)))
+        except Store.DoesNotExist:
+            raise Exception('Archive "%s" does not exist' % archive_name)
+        for item in archive['items']:
+            print item['path']
+
+    def verify_archive(self, archive_name):
+        try:
+            archive = cPickle.loads(zlib.decompress(self.store.get(NS_ARCHIVES, archive_name)))
+        except Store.DoesNotExist:
+            raise Exception('Archive "%s" does not exist' % archive_name)
+        for item in archive['items']:
+            if item['type'] == 'FILE':
+                print item['path'], '...',
+                for chunk in item['chunks']:
+                    data = self.store.get(NS_CHUNKS, chunk)
+                    if hashlib.sha1(data).digest() != chunk:
+                        print 'ERROR'
+                        break
+                else:
+                    print 'OK'
+
     def process_dir(self, path, cache):
+        path = path.lstrip('/\\:')
         print 'Directory: %s' % (path)
         return {'type': 'DIR', 'path': path}
 
@@ -134,9 +170,10 @@ class Archiver(object):
                 break
             size += len(data)
             chunks.append(cache.add_chunk(zlib.compress(data)))
+        path = path.lstrip('/\\:')
         print 'File: %s (%d chunks)' % (path, len(chunks))
         return {'type': 'FILE', 'path': path, 'size': size, 'chunks': chunks}
-    
+
     def run(self):
         parser = OptionParser()
         parser.add_option("-C", "--cache", dest="cache",
@@ -148,6 +185,7 @@ class Archiver(object):
         parser.add_option("-d", "--delete", dest="delete_archive",
                           help="delete ARCHIVE", metavar="ARCHIVE")
         parser.add_option("-l", "--list-archives", dest="list_archives",
+                        action="store_true", default=False,
                         help="list archives")
         parser.add_option("-V", "--verify", dest="verify_archive",
                         help="verify archive consistency")
@@ -156,7 +194,21 @@ class Archiver(object):
         parser.add_option("-L", "--list-archive", dest="list_archive",
                         help="verify archive consistency", metavar="ARCHIVE")
         (options, args) = parser.parse_args()
-        if options.delete_archive:
+        if options.store:
+            self.store = Store(options.store)
+        else:
+            parser.error('No store path specified')
+        if options.cache:
+            self.cache = Cache(options.cache, self.store)
+        else:
+            parser.error('No cache path specified')
+        if options.list_archives:
+            self.list_archives()
+        elif options.list_archive:
+            self.list_archive(options.list_archive)
+        elif options.verify_archive:
+            self.verify_archive(options.verify_archive)
+        elif options.delete_archive:
             self.delete_archive(options.delete_archive)
         else:
             self.create_archive(options.create_archive, args)

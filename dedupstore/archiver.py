@@ -8,7 +8,8 @@ from optparse import OptionParser
 from store import Store
 
 CHUNKSIZE = 256 * 1024
-
+NS_ARCHIVES = 'ARCHIVES'
+NS_CHUNKS  = 'CHUNKS'
 
 class Cache(object):
     """Client Side cache
@@ -16,14 +17,14 @@ class Cache(object):
     def __init__(self, path, store):
         self.store = store
         self.path = path
-        self.tid = 'unknown'
+        self.tid = -1
         self.open()
         if self.tid != self.store.tid:
-            print self.tid.encode('hex'), self.store.tid.encode('hex')
+            print self.tid, self.store.tid
             self.create()
 
     def open(self):
-        if self.store.tid == '':
+        if self.store.tid == -1:
             return
         filename = os.path.join(self.path, '%s.cache' % self.store.uuid)
         if not os.path.exists(filename):
@@ -32,31 +33,16 @@ class Cache(object):
         data = cPickle.loads(zlib.decompress(open(filename, 'rb').read()))
         self.chunkmap = data['chunkmap']
         self.tid = data['tid']
-        self.archives = data['archives']
         print 'done'
 
-    def update_manifest(self):
-        print 'old manifest', self.tid.encode('hex')
-        if self.tid:
-            self.chunk_decref(self.tid)
-        manifest = {'archives': self.archives.values()}
-        hash = self.add_chunk(zlib.compress(cPickle.dumps(manifest)))
-        print 'new manifest', hash.encode('hex')
-        self.store.commit(hash)
-
     def create(self):
-        self.archives = {}
         self.chunkmap = {}
         self.tid = self.store.tid
-        if self.store.tid == '':
+        if self.store.tid == 0:
             return
         print 'Recreating cache...'
-        self.chunk_incref(self.store.tid)
-        manifest = cPickle.loads(zlib.decompress(self.store.get(self.store.tid)))
-        for hash in manifest['archives']:
-            self.chunk_incref(hash)
-            archive = cPickle.loads(zlib.decompress(self.store.get(hash)))
-            self.archives[archive['name']] = hash
+        for id in self.store.list(NS_ARCHIVES):
+            archive = cPickle.loads(zlib.decompress(self.store.get(NS_ARCHIVES, id)))
             for item in archive['items']:
                 if item['type'] == 'FILE':
                     for c in item['chunks']:
@@ -66,7 +52,7 @@ class Cache(object):
     def save(self):
         assert self.store.state == Store.OPEN
         print 'saving cache'
-        data = {'chunkmap': self.chunkmap, 'tid': self.store.tid, 'archives': self.archives}
+        data = {'chunkmap': self.chunkmap, 'tid': self.store.tid}
         filename = os.path.join(self.path, '%s.cache' % self.store.uuid)
         print 'Saving cache as:', filename
         with open(filename, 'wb') as fd:
@@ -76,7 +62,7 @@ class Cache(object):
     def add_chunk(self, data):
         hash = hashlib.sha1(data).digest()
         if not self.seen_chunk(hash):
-            self.store.put(data, hash)
+            self.store.put(NS_CHUNKS, hash, data)
         else:
             print 'seen chunk', hash.encode('hex')
         self.chunk_incref(hash)
@@ -95,7 +81,7 @@ class Cache(object):
         self.chunkmap[hash] = count
         if not count:
             print 'deleting chunk: ', hash.encode('hex')
-            self.store.delete(hash)
+            self.store.delete(NS_CHUNKS, hash)
         return count
 
 
@@ -106,8 +92,8 @@ class Archiver(object):
         self.cache = Cache('/tmp/cache', self.store)
 
     def create_archive(self, archive_name, paths):
-        if archive_name in self.cache.archives:
-            raise Exception('Archive "%s" already exists' % archive_name)
+#        if archive_name in self.cache.archives:
+#            raise Exception('Archive "%s" already exists' % archive_name)
         items = []
         for path in paths:
             for root, dirs, files in os.walk(path):
@@ -117,24 +103,21 @@ class Archiver(object):
                 for f in files:
                     name = os.path.join(root, f)
                     items.append(self.process_file(name, self.cache))
-        archive = {'name': name, 'items': items}
-        hash = self.cache.add_chunk(zlib.compress(cPickle.dumps(archive)))
-        self.cache.archives[archive_name] = hash
-        self.cache.update_manifest()
+        archive = {'name': archive_name, 'items': items}
+        hash = self.store.put(NS_ARCHIVES, archive_name, zlib.compress(cPickle.dumps(archive)))
+        self.store.commit()
         self.cache.save()
 
     def delete_archive(self, archive_name):
-        hash = self.cache.archives.get(archive_name)
-        if not hash:
-            raise Exception('Archive "%s" does not exist' % archive_name)
-        archive = cPickle.loads(zlib.decompress(self.store.get(hash)))
-        self.cache.chunk_decref(hash)
+        archive = cPickle.loads(zlib.decompress(self.store.get(NS_ARCHIVES, archive_name)))
+        self.store.delete(NS_ARCHIVES, archive_name)
+#        if not hash:
+#            raise Exception('Archive "%s" does not exist' % archive_name)
         for item in archive['items']:
             if item['type'] == 'FILE':
                 for c in item['chunks']:
                     self.cache.chunk_decref(c)
-        del self.cache.archives[archive_name]
-        self.cache.update_manifest()
+        self.store.commit()
         self.cache.save()
 
     def process_dir(self, path, cache):

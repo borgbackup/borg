@@ -5,9 +5,11 @@ import zlib
 import cPickle
 from optparse import OptionParser
 
+from chunker import chunker, checksum
 from store import Store
 
-CHUNKSIZE = 256 * 1024
+
+CHUNKSIZE = 64 * 1024
 NS_ARCHIVES = 'ARCHIVES'
 NS_CHUNKS  = 'CHUNKS'
 
@@ -155,21 +157,34 @@ class Archiver(object):
                 else:
                     print 'OK'
 
+    def extract_archive(self, archive_name):
+        try:
+            archive = cPickle.loads(zlib.decompress(self.store.get(NS_ARCHIVES, archive_name)))
+        except Store.DoesNotExist:
+            raise Exception('Archive "%s" does not exist' % archive_name)
+        for item in archive['items']:
+            assert item['path'][0] not in ('/', '\\', ':')
+            print item['path']
+            if item['type'] == 'DIR':
+                if not os.path.exists(item['path']):
+                    os.makedirs(item['path'])
+            if item['type'] == 'FILE':
+                with open(item['path'], 'wb') as fd:
+                    for chunk in item['chunks']:
+                        fd.write(zlib.decompress(self.store.get(NS_CHUNKS, chunk)))
+
     def process_dir(self, path, cache):
         path = path.lstrip('/\\:')
         print 'Directory: %s' % (path)
         return {'type': 'DIR', 'path': path}
 
     def process_file(self, path, cache):
-        fd = open(path, 'rb')
-        size = 0
-        chunks = []
-        while True:
-            data = fd.read(CHUNKSIZE)
-            if not data:
-                break
-            size += len(data)
-            chunks.append(cache.add_chunk(zlib.compress(data)))
+        with open(path, 'rb') as fd:
+            size = 0
+            chunks = []
+            for chunk in chunker(fd, CHUNKSIZE, {}):
+                size += len(chunk)
+                chunks.append(cache.add_chunk(zlib.compress(chunk)))
         path = path.lstrip('/\\:')
         print 'File: %s (%d chunks)' % (path, len(chunks))
         return {'type': 'FILE', 'path': path, 'size': size, 'chunks': chunks}
@@ -208,6 +223,8 @@ class Archiver(object):
             self.list_archive(options.list_archive)
         elif options.verify_archive:
             self.verify_archive(options.verify_archive)
+        elif options.extract_archive:
+            self.extract_archive(options.extract_archive)
         elif options.delete_archive:
             self.delete_archive(options.delete_archive)
         else:

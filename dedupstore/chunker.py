@@ -68,7 +68,8 @@ def chunker(fd, chunk_size, chunks):
             return
         sum = roll_checksum(sum, data[i - 1], data[i - 1 + chunk_size], chunk_size)
         #print data[i:i + chunk_size], sum
-        if sum in chunks:
+        if chunks.get(sum):
+            print 'Woot', i
             if i > 1:
                 yield data[1:i]
             yield data[i:i + chunk_size]

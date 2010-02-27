@@ -2,6 +2,7 @@ import os
 import sys
 import hashlib
 import zlib
+import struct
 import cPickle
 from optparse import OptionParser
 
@@ -34,11 +35,13 @@ class Cache(object):
         print 'Loading cache: ', filename, '...'
         data = cPickle.loads(zlib.decompress(open(filename, 'rb').read()))
         self.chunkmap = data['chunkmap']
+        self.summap = data['summap']
         self.archives = data['archives']
         self.tid = data['tid']
         print 'done'
 
     def create(self):
+        self.summap = {}
         self.chunkmap = {}
         self.archives = []
         self.tid = self.store.tid
@@ -57,7 +60,8 @@ class Cache(object):
     def save(self):
         assert self.store.state == Store.OPEN
         print 'saving cache'
-        data = {'chunkmap': self.chunkmap, 'tid': self.store.tid, 'archives': self.archives}
+        data = {'chunkmap': self.chunkmap, 'summap': self.summap,
+                'tid': self.store.tid, 'archives': self.archives}
         filename = os.path.join(self.path, '%s.cache' % self.store.uuid)
         print 'Saving cache as:', filename
         with open(filename, 'wb') as fd:
@@ -65,9 +69,11 @@ class Cache(object):
         print 'done'
 
     def add_chunk(self, data):
-        hash = hashlib.sha1(data).digest()
+        sum = checksum(data)
+        #print 'chunk %d: %d' % (len(data), sum)
+        hash = struct.pack('I', sum) + hashlib.sha1(data).digest()
         if not self.seen_chunk(hash):
-            self.store.put(NS_CHUNKS, hash, data)
+            self.store.put(NS_CHUNKS, hash, zlib.compress(data))
         else:
             print 'seen chunk', hash.encode('hex')
         self.chunk_incref(hash)
@@ -77,10 +83,14 @@ class Cache(object):
         return self.chunkmap.get(hash, 0) > 0
 
     def chunk_incref(self, hash):
+        sum = struct.unpack('I', hash[:4])[0]
         self.chunkmap.setdefault(hash, 0)
+        self.summap.setdefault(sum, 0)
         self.chunkmap[hash] += 1
+        self.summap[sum] += 1
 
     def chunk_decref(self, hash):
+        self.summap[struct.unpack('I', hash[:4])[0]] -= 1
         count = self.chunkmap.get(hash, 0) - 1
         assert count >= 0
         self.chunkmap[hash] = count
@@ -182,9 +192,9 @@ class Archiver(object):
         with open(path, 'rb') as fd:
             size = 0
             chunks = []
-            for chunk in chunker(fd, CHUNKSIZE, {}):
+            for chunk in chunker(fd, CHUNKSIZE, self.cache.summap):
                 size += len(chunk)
-                chunks.append(cache.add_chunk(zlib.compress(chunk)))
+                chunks.append(cache.add_chunk(chunk))
         path = path.lstrip('/\\:')
         print 'File: %s (%d chunks)' % (path, len(chunks))
         return {'type': 'FILE', 'path': path, 'size': size, 'chunks': chunks}

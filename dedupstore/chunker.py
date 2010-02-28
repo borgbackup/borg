@@ -49,11 +49,11 @@ def chunker(fd, chunk_size, chunks):
     >>> list(chunker(fd, 4, chunks))
     ['ABCD', 'EFGH', 'IJ', 'KLMN']
     """
-    data = 'X' + fd.read(chunk_size * 2)
+    data = 'X' + fd.read(chunk_size * 3)
     i = 1
     sum = checksum(data[:chunk_size])
     while True:
-        if len(data) - i - 2 <= chunk_size:
+        if len(data) - i <= chunk_size * 2:
             data += fd.read(chunk_size * 2)
         if i == chunk_size + 1:
             yield data[1:chunk_size + 1]
@@ -62,14 +62,13 @@ def chunker(fd, chunk_size, chunks):
         if len(data) - i <= chunk_size:  # EOF?
             if len(data) > chunk_size + 1:
                 yield data[1:len(data) - chunk_size]
-                yield data[-chunk_size:]
+                yield data[:chunk_size]
             else:
                 yield data[1:]
             return
         sum = roll_checksum(sum, data[i - 1], data[i - 1 + chunk_size], chunk_size)
         #print data[i:i + chunk_size], sum
         if chunks.get(sum):
-            print 'Woot', i
             if i > 1:
                 yield data[1:i]
             yield data[i:i + chunk_size]

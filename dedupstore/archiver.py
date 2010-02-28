@@ -73,11 +73,14 @@ class Cache(object):
         #print 'chunk %d: %d' % (len(data), sum)
         hash = struct.pack('I', sum) + hashlib.sha1(data).digest()
         if not self.seen_chunk(hash):
-            self.store.put(NS_CHUNKS, hash, zlib.compress(data))
+            zdata = zlib.compress(data)
+            size = len(zdata)
+            self.store.put(NS_CHUNKS, hash, zdata)
         else:
-            print 'seen chunk', hash.encode('hex')
+            size = 0
+            #print 'seen chunk', hash.encode('hex')
         self.chunk_incref(hash)
-        return hash
+        return hash, size
 
     def seen_chunk(self, hash):
         return self.chunkmap.get(hash, 0) > 0
@@ -189,14 +192,20 @@ class Archiver(object):
         return {'type': 'DIR', 'path': path}
 
     def process_file(self, path, cache):
+        print 'Adding: %s...' % path,
+        sys.stdout.flush()
         with open(path, 'rb') as fd:
-            size = 0
+            origsize = 0
+            compsize = 0
             chunks = []
             for chunk in chunker(fd, CHUNKSIZE, self.cache.summap):
-                size += len(chunk)
-                chunks.append(cache.add_chunk(chunk))
+                origsize += len(chunk)
+                id, size = cache.add_chunk(chunk)
+                compsize += size
+                chunks.append(id)
         path = path.lstrip('/\\:')
-        print 'File: %s (%d chunks)' % (path, len(chunks))
+        ratio = origsize and compsize * 100 / origsize or 0
+        print '(%d chunks: %d%%)' % (len(chunks), ratio)
         return {'type': 'FILE', 'path': path, 'size': size, 'chunks': chunks}
 
     def run(self):

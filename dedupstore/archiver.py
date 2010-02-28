@@ -79,27 +79,35 @@ class Cache(object):
         else:
             size = 0
             #print 'seen chunk', hash.encode('hex')
-        self.chunk_incref(hash)
-        return hash, size
+        self.chunk_incref(id)
+        return id, size
 
     def seen_chunk(self, hash):
         return self.chunkmap.get(hash, 0) > 0
 
-    def chunk_incref(self, hash):
-        sum = struct.unpack('I', hash[:4])[0]
-        self.chunkmap.setdefault(hash, 0)
+    def chunk_incref(self, id):
+        sum = struct.unpack('I', id[:4])[0]
+        self.chunkmap.setdefault(id, 0)
         self.summap.setdefault(sum, 0)
-        self.chunkmap[hash] += 1
+        self.chunkmap[id] += 1
         self.summap[sum] += 1
 
-    def chunk_decref(self, hash):
-        self.summap[struct.unpack('I', hash[:4])[0]] -= 1
-        count = self.chunkmap.get(hash, 0) - 1
+    def chunk_decref(self, id):
+        sum = struct.unpack('I', id[:4])[0]
+        sumcount = self.summap[sum] - 1
+        count = self.chunkmap[id] - 1
+        assert sumcount >= 0
         assert count >= 0
-        self.chunkmap[hash] = count
-        if not count:
-            print 'deleting chunk: ', hash.encode('hex')
-            self.store.delete(NS_CHUNKS, hash)
+        if sumcount:
+            self.summap[sum] = sumcount
+        else:
+            del self.summap[sum]
+        if count:
+            self.chunkmap[id] = count
+        else:
+            del self.chunkmap[id]
+            print 'deleting chunk: ', id.encode('hex')
+            self.store.delete(NS_CHUNKS, id)
         return count
 
 
@@ -209,7 +217,7 @@ class Archiver(object):
         path = path.lstrip('/\\:')
         ratio = origsize and compsize * 100 / origsize or 0
         print '(%d chunks: %d%%)' % (len(chunks), ratio)
-        return {'type': 'FILE', 'path': path, 'size': size, 'chunks': chunks}
+        return {'type': 'FILE', 'path': path, 'size': origsize, 'chunks': chunks}
 
     def run(self):
         parser = OptionParser()

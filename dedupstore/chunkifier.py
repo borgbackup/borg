@@ -28,12 +28,71 @@ def roll_checksum(sum, remove, add, len):
     return (s1 & 0xffff) + ((s2 & 0xffff) << 16)
 
 
+class ChunkifyIter(object):
+    def __init__(self, fd, chunk_size, chunks):
+        self.fd = fd
+        self.chunk_size = chunk_size
+        self.chunks = chunks
+
+    def __iter__(self):
+        self.data = ''
+        self.i = 0
+        self.full_sum = True
+        self.extra = None
+        self.done = False
+        return self
+
+    def next(self):
+        if self.done:
+            raise StopIteration
+        if self.extra:
+            self.done = True
+            return self.extra
+        while True:
+            if len(self.data) - self.i < self.chunk_size:
+                self.data += self.fd.read(self.chunk_size * 3)
+            if not self.data:
+                raise StopIteration
+            if self.full_sum or len(self.data) - self.i < self.chunk_size:
+                self.sum = checksum(self.data[self.i:self.i + self.chunk_size])
+                self.full_sum = False
+                self.remove = self.data[self.i]
+            else:
+                self.sum = roll_checksum(self.sum, self.remove, self.data[self.i + self.chunk_size - 1], 
+                                         self.chunk_size)
+                self.remove = self.data[self.i]
+            if len(self.data) - self.i < self.chunk_size:  # EOF?
+                if len(self.data) > self.chunk_size:
+                    self.extra = self.data[-self.chunk_size:]
+                    return self.data[:len(self.data) - self.chunk_size]
+                else:
+                    self.done = True
+                    return self.data
+            elif self.sum in self.chunks:
+                if self.i > 0:
+                    chunk = self.data[:self.i]
+                    self.data = self.data[self.i:]
+                else:
+                    chunk = self.data[:self.chunk_size]
+                    self.data = self.data[self.chunk_size:]
+                self.full_sum = True
+                self.i = 0
+                return chunk
+            elif self.i == self.chunk_size:
+                chunk = self.data[:self.chunk_size]
+                self.data = self.data[self.chunk_size:]
+                self.i = 0
+                return chunk
+            else:
+                self.i += 1
+
+
 def chunkify(fd, chunk_size, chunks):
     """
     >>> fd = StringIO.StringIO('ABCDEFGHIJKLMN')
     >>> list(chunkify(fd, 4, {}))
     ['ABCD', 'EFGH', 'IJ', 'KLMN']
-    
+
     >>> fd = StringIO.StringIO('ABCDEFGHIJKLMN')
     >>> chunks = {44564754: True} # 'BCDE'
     >>> list(chunkify(fd, 4, chunks))
@@ -49,33 +108,8 @@ def chunkify(fd, chunk_size, chunks):
     >>> list(chunkify(fd, 4, chunks))
     ['ABCD', 'EFGH', 'IJ', 'KLMN']
     """
-    data = 'X' + fd.read(chunk_size * 3)
-    i = 1
-    sum = checksum(data[:chunk_size])
-    while True:
-        if len(data) - i <= chunk_size * 2:
-            data += fd.read(chunk_size * 2)
-        if i == chunk_size + 1:
-            yield data[1:chunk_size + 1]
-            i = 1
-            data = data[chunk_size:]
-        if len(data) - i <= chunk_size:  # EOF?
-            if len(data) > chunk_size + 1:
-                yield data[1:len(data) - chunk_size]
-                yield data[-chunk_size:]
-            else:
-                yield data[1:]
-            return
-        sum = roll_checksum(sum, data[i - 1], data[i - 1 + chunk_size], chunk_size)
-        #print data[i:i + chunk_size], sum
-        if chunks.get(sum):
-            if i > 1:
-                yield data[1:i]
-            yield data[i:i + chunk_size]
-            data = data[i + chunk_size - 1:]
-            i = 0
-            sum = checksum(data[:chunk_size])
-        i += 1
+    return ChunkifyIter(fd, chunk_size, chunks)
+
 
 if __name__ == '__main__':
     import StringIO

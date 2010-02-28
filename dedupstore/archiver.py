@@ -6,7 +6,7 @@ import struct
 import cPickle
 from optparse import OptionParser
 
-from chunker import chunker, checksum
+from chunkifier import chunkify, checksum
 from store import Store
 
 
@@ -70,12 +70,12 @@ class Cache(object):
 
     def add_chunk(self, data):
         sum = checksum(data)
+        data = zlib.compress(data)
         #print 'chunk %d: %d' % (len(data), sum)
-        hash = struct.pack('I', sum) + hashlib.sha1(data).digest()
-        if not self.seen_chunk(hash):
-            zdata = zlib.compress(data)
-            size = len(zdata)
-            self.store.put(NS_CHUNKS, hash, zdata)
+        id = struct.pack('I', sum) + hashlib.sha1(data).digest()
+        if not self.seen_chunk(id):
+            size = len(data)
+            self.store.put(NS_CHUNKS, id, data)
         else:
             size = 0
             #print 'seen chunk', hash.encode('hex')
@@ -164,7 +164,7 @@ class Archiver(object):
                 print item['path'], '...',
                 for chunk in item['chunks']:
                     data = self.store.get(NS_CHUNKS, chunk)
-                    if hashlib.sha1(data).digest() != chunk:
+                    if hashlib.sha1(data).digest() != chunk[4:]:
                         print 'ERROR'
                         break
                 else:
@@ -184,7 +184,10 @@ class Archiver(object):
             if item['type'] == 'FILE':
                 with open(item['path'], 'wb') as fd:
                     for chunk in item['chunks']:
-                        fd.write(zlib.decompress(self.store.get(NS_CHUNKS, chunk)))
+                        data = self.store.get(NS_CHUNKS, chunk)
+                        if hashlib.sha1(data).digest() != chunk[4:]:
+                            raise Exception('Invalid chunk checksum')
+                        fd.write(zlib.decompress(data))
 
     def process_dir(self, path, cache):
         path = path.lstrip('/\\:')
@@ -198,7 +201,7 @@ class Archiver(object):
             origsize = 0
             compsize = 0
             chunks = []
-            for chunk in chunker(fd, CHUNKSIZE, self.cache.summap):
+            for chunk in chunkify(fd, CHUNKSIZE, self.cache.summap):
                 origsize += len(chunk)
                 id, size = cache.add_chunk(chunk)
                 compsize += size

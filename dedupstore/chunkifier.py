@@ -28,25 +28,25 @@ def roll_checksum(sum, remove, add, len):
     return (s1 & 0xffff) + ((s2 & 0xffff) << 16)
 
 
-def chunker(fd, chunk_size, chunks):
+def chunkify(fd, chunk_size, chunks):
     """
     >>> fd = StringIO.StringIO('ABCDEFGHIJKLMN')
-    >>> list(chunker(fd, 4, {}))
+    >>> list(chunkify(fd, 4, {}))
     ['ABCD', 'EFGH', 'IJ', 'KLMN']
     
     >>> fd = StringIO.StringIO('ABCDEFGHIJKLMN')
     >>> chunks = {44564754: True} # 'BCDE'
-    >>> list(chunker(fd, 4, chunks))
+    >>> list(chunkify(fd, 4, chunks))
     ['A', 'BCDE', 'FGHI', 'J', 'KLMN']
 
     >>> fd = StringIO.StringIO('ABCDEFGHIJKLMN')
     >>> chunks = {44564754: True, 48496938: True} # 'BCDE', 'HIJK'
-    >>> list(chunker(fd, 4, chunks))
+    >>> list(chunkify(fd, 4, chunks))
     ['A', 'BCDE', 'FG', 'HIJK', 'LMN']
 
     >>> fd = StringIO.StringIO('ABCDEFGHIJKLMN')
     >>> chunks = {43909390: True, 50463030: True} # 'ABCD', 'KLMN'
-    >>> list(chunker(fd, 4, chunks))
+    >>> list(chunkify(fd, 4, chunks))
     ['ABCD', 'EFGH', 'IJ', 'KLMN']
     """
     data = 'X' + fd.read(chunk_size * 3)
@@ -62,7 +62,7 @@ def chunker(fd, chunk_size, chunks):
         if len(data) - i <= chunk_size:  # EOF?
             if len(data) > chunk_size + 1:
                 yield data[1:len(data) - chunk_size]
-                yield data[:chunk_size]
+                yield data[-chunk_size:]
             else:
                 yield data[1:]
             return

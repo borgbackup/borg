@@ -20,7 +20,7 @@ class Store(object):
     IDLE = 'Idle'
     OPEN = 'Open'
     ACTIVE = 'Active'
-    VERSION = 'DEDUPSTORE VERSION 1'
+    VERSION = 'DEDUPESTORE VERSION 1'
 
     def __init__(self, path):
         self.tid = '-1'

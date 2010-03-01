@@ -3,11 +3,11 @@
 
 from distutils.core import setup, Extension
 
-setup(name='Dedupstore',
+setup(name='Dedupestore',
       version='1.0',
       author='Jonas Borgström',
       author_email='jonas@borgstrom.se',
-      packages=['dedupstore'],
-      ext_modules=[Extension('_chunkifier', ['dedupstore/_chunkifier.c'])],
+      packages=['dedupestore'],
+      ext_modules=[Extension('_speedup', ['deduepstore/_speedup.c'])],
      )
     

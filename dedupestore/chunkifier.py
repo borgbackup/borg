@@ -73,6 +73,8 @@ class ChunkifyIter(object):
                 else:
                     self.done = True
                     return self.data[self.i:]
+            elif o == self.chunk_size:
+                return self.data[self.i-self.chunk_size:self.i]
             elif self.sum in self.chunks:
                 if o > 0:
                     chunk = self.data[self.i - o:self.i]
@@ -81,8 +83,6 @@ class ChunkifyIter(object):
                     self.i += self.chunk_size
                 self.full_sum = True
                 return chunk
-            elif o == self.chunk_size:
-                return self.data[self.i-self.chunk_size:self.i]
             else:
                 self.i += 1
                 o += 1

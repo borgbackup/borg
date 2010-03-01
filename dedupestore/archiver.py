@@ -17,30 +17,32 @@ NS_CHUNKS  = 'CHUNKS'
 class Cache(object):
     """Client Side cache
     """
-    def __init__(self, path, store):
+    def __init__(self, store):
         self.store = store
-        self.path = path
+        self.path = os.path.join(os.path.expanduser('~'), '.dedupestore', 'cache', 
+                                 '%s.cache' % self.store.uuid)
         self.tid = -1
         self.open()
         if self.tid != self.store.tid:
-            print self.tid, self.store.tid
-            self.create()
+            self.init()
 
     def open(self):
-        if self.store.tid == -1:
+        if not os.path.exists(self.path):
             return
-        filename = os.path.join(self.path, '%s.cache' % self.store.uuid)
-        if not os.path.exists(filename):
+        print 'Loading cache: ', self.path, '...'
+        data = cPickle.loads(zlib.decompress(open(self.path, 'rb').read()))
+        if data['uuid'] != self.store.uuid:
+            print >> sys.stderr, 'Cache UUID mismatch'
             return
-        print 'Loading cache: ', filename, '...'
-        data = cPickle.loads(zlib.decompress(open(filename, 'rb').read()))
         self.chunkmap = data['chunkmap']
         self.summap = data['summap']
         self.archives = data['archives']
         self.tid = data['tid']
         print 'done'
 
-    def create(self):
+    def init(self):
+        """Initializes cache by fetching and reading all archive indicies
+        """
         self.summap = {}
         self.chunkmap = {}
         self.archives = []
@@ -60,11 +62,14 @@ class Cache(object):
     def save(self):
         assert self.store.state == Store.OPEN
         print 'saving cache'
-        data = {'chunkmap': self.chunkmap, 'summap': self.summap,
+        data = {'uuid': self.store.uuid, 
+                'chunkmap': self.chunkmap, 'summap': self.summap,
                 'tid': self.store.tid, 'archives': self.archives}
-        filename = os.path.join(self.path, '%s.cache' % self.store.uuid)
-        print 'Saving cache as:', filename
-        with open(filename, 'wb') as fd:
+        print 'Saving cache as:', self.path
+        cachedir = os.path.dirname(self.path)
+        if not os.path.exists(cachedir):
+            os.makedirs(cachedir)
+        with open(self.path, 'wb') as fd:
             fd.write(zlib.compress(cPickle.dumps(data)))
         print 'done'
 
@@ -221,8 +226,6 @@ class Archiver(object):
 
     def run(self):
         parser = OptionParser()
-        parser.add_option("-C", "--cache", dest="cache",
-                          help="cache directory to use", metavar="CACHE")
         parser.add_option("-s", "--store", dest="store",
                           help="path to dedupe store", metavar="STORE")
         parser.add_option("-c", "--create", dest="create_archive",
@@ -243,10 +246,7 @@ class Archiver(object):
             self.store = Store(options.store)
         else:
             parser.error('No store path specified')
-        if options.cache:
-            self.cache = Cache(options.cache, self.store)
-        else:
-            parser.error('No cache path specified')
+        self.cache = Cache(self.store)
         if options.list_archives:
             self.list_archives()
         elif options.list_archive:

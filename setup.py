@@ -8,6 +8,6 @@ setup(name='Dedupestore',
       author='Jonas Borgström',
       author_email='jonas@borgstrom.se',
       packages=['dedupestore'],
-      ext_modules=[Extension('_speedup', ['deduepstore/_speedup.c'])],
+      ext_modules=[Extension('_speedups', ['dedupestore/_speedups.c'])],
      )
     

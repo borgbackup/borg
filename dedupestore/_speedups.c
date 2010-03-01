@@ -87,28 +87,50 @@ chunkify(PyObject *self, PyObject *args)
     return NULL;
   }
 
-  p->m = 10;
-  p->i = 0;
-  p->fd = fd;
-  p->chunk_size = chunk_size;
-  p->chunks = chunks;
-  return (PyObject *)p;
+    p->m = 10;
+    p->i = 0;
+    p->fd = fd;
+    p->chunk_size = chunk_size;
+    p->chunks = chunks;
+    return (PyObject *)p;
+  }
+
+  static PyObject *
+  checksum(PyObject *self, PyObject *args)
+  {
+    unsigned long int sum = 0, s1, s2;
+    PyObject *data;
+    Py_ssize_t i, len;
+    const char *ptr;
+    if (!PyArg_ParseTuple(args, "O|l", &data, &sum))  return NULL;
+    len = PyString_Size(data);
+    ptr = PyString_AsString(data);
+    s1 = sum & 0xffff;
+    s2 = sum >> 16;
+    printf("Woot %lu\n", sizeof(s1));
+    for(i=0; i < len; i++)
+    {
+        s1 += ptr[i] + 1;
+        s2 += s1;
+    }
+    return PyInt_FromLong(((s2 & 0xffff) << 16) | (s1 & 0xffff));
 }
 
 static PyMethodDef ChunkifierMethods[] = {
     {"chunkify",  chunkify, METH_VARARGS, ""},
+    {"checksum",  checksum, METH_VARARGS, ""},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
 PyMODINIT_FUNC
-init_chunkifier(void)
+init_speedups(void)
 {
   PyObject* m;
 
   ChunkifyIterType.tp_new = PyType_GenericNew;
   if (PyType_Ready(&ChunkifyIterType) < 0)  return;
 
-  m = Py_InitModule("_chunkifier", ChunkifierMethods);
+  m = Py_InitModule("_speedups", ChunkifierMethods);
 
   Py_INCREF(&ChunkifyIterType);
   PyModule_AddObject(m, "_ChunkifyIter", (PyObject *)&ChunkifyIterType);

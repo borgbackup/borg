@@ -40,9 +40,11 @@ class ChunkifyIter(object):
         self.full_sum = True
         self.extra = None
         self.done = False
+        self.buf_size = self.chunk_size * 3
         return self
 
     def next(self):
+        o = 0
         if self.done:
             raise StopIteration
         if self.extra:
@@ -51,7 +53,7 @@ class ChunkifyIter(object):
         while True:
             if len(self.data) - self.i < self.chunk_size:
                 self.data += self.fd.read(self.chunk_size * 3)
-            if not self.data:
+            if len(self.data) == self.i:
                 raise StopIteration
             if self.full_sum or len(self.data) - self.i < self.chunk_size:
                 self.sum = checksum(self.data[self.i:self.i + self.chunk_size])
@@ -62,29 +64,25 @@ class ChunkifyIter(object):
                                          self.chunk_size)
                 self.remove = self.data[self.i]
             if len(self.data) - self.i < self.chunk_size:  # EOF?
-                if len(self.data) > self.chunk_size:
+                if o > 0:
                     self.extra = self.data[-self.chunk_size:]
-                    return self.data[:len(self.data) - self.chunk_size]
+                    return self.data[-self.chunk_size - o + 1:-self.chunk_size]
                 else:
                     self.done = True
-                    return self.data
+                    return self.data[self.i:]
             elif self.sum in self.chunks:
-                if self.i > 0:
-                    chunk = self.data[:self.i]
-                    self.data = self.data[self.i:]
+                if o > 0:
+                    chunk = self.data[self.i - o:self.i]
                 else:
-                    chunk = self.data[:self.chunk_size]
-                    self.data = self.data[self.chunk_size:]
+                    chunk = self.data[self.i:self.i + self.chunk_size]
+                    self.i += self.chunk_size
                 self.full_sum = True
-                self.i = 0
                 return chunk
-            elif self.i == self.chunk_size:
-                chunk = self.data[:self.chunk_size]
-                self.data = self.data[self.chunk_size:]
-                self.i = 0
-                return chunk
+            elif o == self.chunk_size:
+                return self.data[self.i-self.chunk_size:self.i]
             else:
                 self.i += 1
+                o += 1
 
 
 def chunkify(fd, chunk_size, chunks):

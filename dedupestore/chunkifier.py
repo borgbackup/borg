@@ -40,7 +40,7 @@ class ChunkifyIter(object):
         self.full_sum = True
         self.extra = None
         self.done = False
-        self.buf_size = self.chunk_size * 3
+        self.buf_size = self.chunk_size * 10
         return self
 
     def next(self):
@@ -51,8 +51,11 @@ class ChunkifyIter(object):
             self.done = True
             return self.extra
         while True:
+            if self.i >  self.buf_size - self.chunk_size:
+                self.data = self.data[self.i - o:]
+                self.i = o
             if len(self.data) - self.i < self.chunk_size:
-                self.data += self.fd.read(self.chunk_size * 3)
+                self.data += self.fd.read(self.buf_size - len(self.data))
             if len(self.data) == self.i:
                 raise StopIteration
             if self.full_sum or len(self.data) - self.i < self.chunk_size:

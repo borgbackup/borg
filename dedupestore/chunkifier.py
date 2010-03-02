@@ -111,6 +111,13 @@ def chunkify(fd, chunk_size, chunks):
     """
     return ChunkifyIter(fd, chunk_size, chunks)
 
+try:
+    import _speedups
+    checksum = _speedups.checksum
+    roll_checksum = _speedups.roll_checksum
+except ImportError:
+    print 'Failed to load _speedups module, things will be slow'
+
 
 if __name__ == '__main__':
     import StringIO

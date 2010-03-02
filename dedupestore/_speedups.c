@@ -95,19 +95,24 @@ chunkify(PyObject *self, PyObject *args)
     return (PyObject *)p;
   }
 
-  static PyObject *
-  checksum(PyObject *self, PyObject *args)
-  {
+static PyObject *
+checksum(PyObject *self, PyObject *args)
+{
     unsigned long int sum = 0, s1, s2;
     PyObject *data;
     Py_ssize_t i, len;
     const char *ptr;
-    if (!PyArg_ParseTuple(args, "O|l", &data, &sum))  return NULL;
+    if(!PyArg_ParseTuple(args, "O|l", &data, &sum))  return NULL;
+    if(!PyString_Check(data))
+    {
+        PyErr_SetNone(PyExc_TypeError);
+        Py_INCREF(data);
+        return NULL;
+    }
     len = PyString_Size(data);
     ptr = PyString_AsString(data);
     s1 = sum & 0xffff;
     s2 = sum >> 16;
-    printf("Woot %lu\n", sizeof(s1));
     for(i=0; i < len; i++)
     {
         s1 += ptr[i] + 1;
@@ -116,9 +121,33 @@ chunkify(PyObject *self, PyObject *args)
     return PyInt_FromLong(((s2 & 0xffff) << 16) | (s1 & 0xffff));
 }
 
+static PyObject *
+roll_checksum(PyObject *self, PyObject *args)
+{
+    unsigned long int sum = 0, len, s1, s2, a, r;
+    PyObject *add, *remove;
+    if (!PyArg_ParseTuple(args, "lOOl", &sum, &remove, &add, &len))  return NULL;
+    if(!PyString_Check(remove) || !PyString_Check(add) || 
+        PyString_Size(remove) != 1 || PyString_Size(add) != 1)
+    {
+        PyErr_SetNone(PyExc_TypeError);
+        Py_INCREF(remove);
+        Py_INCREF(add);
+        return NULL;
+    }
+    a = *((const unsigned char *)PyString_AsString(add));
+    r = *((const unsigned char *)PyString_AsString(remove));
+    s1 = sum & 0xffff;
+    s2 = sum >> 16;
+    s1 -= r - a;
+    s2 -= len * (r + 1) - s1;
+    return PyInt_FromLong(((s2 & 0xffff) << 16) | (s1 & 0xffff));
+}
+
 static PyMethodDef ChunkifierMethods[] = {
     {"chunkify",  chunkify, METH_VARARGS, ""},
     {"checksum",  checksum, METH_VARARGS, ""},
+    {"roll_checksum",  roll_checksum, METH_VARARGS, ""},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 

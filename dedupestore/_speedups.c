@@ -55,6 +55,7 @@ static PyObject*
 ChunkifyIter_iternext(PyObject *self)
 {
     ChunkifyIter *c = (ChunkifyIter *)self;
+    PyObject *pysum;
     int o = 0;
     if(c->done)
     {
@@ -112,13 +113,29 @@ ChunkifyIter_iternext(PyObject *self)
         if(c->full_sum || c->i + c->chunk_size > c->data_len)
         {
             c->full_sum = 0;
-            c->sum = checksum(c->data + c->i, c->data_len - c->i, 0);
+            c->sum = checksum(c->data + c->i, c->chunk_size, 0);
         }
         else
         {
-            c->sum = roll_checksum(c->sum, c->remove, c->data[c->i + c->chunk_size], c->chunk_size);
+            c->sum = roll_checksum(c->sum, c->remove, c->data[c->i + c->chunk_size - 1], c->chunk_size);
         }
         c->remove = c->data[c->i];
+        pysum = PyInt_FromLong(c->sum);
+        if(PySequence_Contains(c->chunks, pysum) == 1)
+        {
+            Py_DECREF(pysum);
+            c->full_sum = 1;
+            if(o > 0)
+            {
+                return PyString_FromStringAndSize((char *)(c->data + c->i - o), o);
+            }
+            else
+            {
+                c->i += c->chunk_size;
+                return PyString_FromStringAndSize((char *)(c->data + c->i - c->chunk_size), c->chunk_size);
+            }
+        }
+        Py_DECREF(pysum);
         o++;
         c->i++;
     }

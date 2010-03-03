@@ -1,35 +1,129 @@
 #include <Python/Python.h>
 #include <Python/structmember.h>
 
-typedef struct {
-  PyObject_HEAD
-  long int m;
-  long int i;
-  long int chunk_size;
-  unsigned long int sum;
-  PyObject *data;
-  PyObject *fd;
-  PyObject *chunks;
-} ChunkifyIter;
-
-PyObject* ChunkifyIter_iter(PyObject *self)
+static unsigned long int
+checksum(const unsigned char *data, int len, unsigned long int sum)
 {
-  Py_INCREF(self);
-  return self;
+    unsigned long int s1, s2, i;
+    s1 = sum & 0xffff;
+    s2 = sum >> 16;
+    for(i=0; i < len; i++)
+    {
+        s1 += data[i] + 1;
+        s2 += s1;
+    }
+    return ((s2 & 0xffff) << 16) | (s1 & 0xffff);
 }
 
-PyObject* ChunkifyIter_iternext(PyObject *self)
+static unsigned long int
+roll_checksum(unsigned long int sum, unsigned char remove, unsigned char add, int len)
 {
-  ChunkifyIter *p = (ChunkifyIter *)self;
-  if (p->i < p->m) {
-    PyObject *tmp = Py_BuildValue("l", p->i);
-    (p->i)++;
-    return tmp;
-  } else {
-    /* Raising of standard StopIteration exception with empty value. */
+    unsigned long int s1, s2;
+    s1 = sum & 0xffff;
+    s2 = sum >> 16;
+    s1 -= remove - add;
+    s2 -= len * (remove + 1) - s1;
+    return ((s2 & 0xffff) << 16) | (s1 & 0xffff);
+}
+
+typedef struct {
+    PyObject_HEAD
+    int chunk_size, i, full_sum, done, buf_size, data_len;
+    PyObject *chunks, *fd, *extra;
+    unsigned long sum;
+    unsigned char *data, add, remove;
+} ChunkifyIter;
+
+static PyObject*
+ChunkifyIter_iter(PyObject *self)
+{
+    Py_INCREF(self);
+    return self;
+}
+
+static void
+ChunkifyIter_dealloc(PyObject *self)
+{
+    ChunkifyIter *c = (ChunkifyIter *)self;
+    Py_DECREF(c->fd);
+    Py_DECREF(c->chunks);
+    free(c->data);
+    self->ob_type->tp_free(self);
+}
+
+static PyObject*
+ChunkifyIter_iternext(PyObject *self)
+{
+    ChunkifyIter *c = (ChunkifyIter *)self;
+    int o = 0;
+    if(c->done)
+    {
+        PyErr_SetNone(PyExc_StopIteration);
+        return NULL;
+    }
+    if(c->extra)
+    {
+        c->done = 1;
+        return c->extra;
+    }
+    for(;;)
+    {
+        if(c->i > c->buf_size - c->chunk_size)
+        {
+            memmove(c->data, c->data + c->i - o, c->data_len - c->i + o);
+            c->data_len -= c->i - o;
+            c->i = o;
+        }
+        if(c->data_len - c->i < c->chunk_size)
+        {
+            PyObject *data = PyObject_CallMethod(c->fd, "read", "i", c->buf_size - c->data_len);
+            int n = PyString_Size(data);
+            memcpy(c->data + c->data_len, PyString_AsString(data), n);
+            c->data_len += n;
+            Py_DECREF(data);
+        }
+        if(c->i == c->data_len)
+        {
+            PyErr_SetNone(PyExc_StopIteration);
+            return NULL;
+        }
+        if(c->data_len - c->i < c->chunk_size) /* EOF ? */
+        {
+            if(o == 1)
+            {
+                c->done = 1;
+                return PyString_FromStringAndSize((char *)(c->data + c->i - 1), c->data_len - c->i + 1);
+            }
+            else if(o > 1)
+            {
+                c->extra = PyString_FromStringAndSize((char *)(c->data + c->i - 1), c->chunk_size);
+                return PyString_FromStringAndSize((char *)(c->data + c->i - o), o - 1);
+            }
+            else
+            {
+                c->done = 1;
+                return PyString_FromStringAndSize((char *)(c->data + c->i), c->data_len - c->i);
+            }
+        }
+        if(o == c->chunk_size)
+        {
+            return PyString_FromStringAndSize((char *)(c->data + c->i - c->chunk_size), c->chunk_size);
+        }
+        if(c->full_sum || c->i + c->chunk_size > c->data_len)
+        {
+            c->full_sum = 0;
+            c->sum = checksum(c->data + c->i, c->data_len - c->i, 0);
+        }
+        else
+        {
+            c->sum = roll_checksum(c->sum, c->remove, c->data[c->i + c->chunk_size], c->chunk_size);
+        }
+        c->remove = c->data[c->i];
+        o++;
+        c->i++;
+    }
     PyErr_SetNone(PyExc_StopIteration);
     return NULL;
-  }
 }
 
 static PyTypeObject ChunkifyIterType = {
@@ -38,7 +132,7 @@ static PyTypeObject ChunkifyIterType = {
     "_chunkifier._ChunkifyIter",       /*tp_name*/
     sizeof(ChunkifyIter),       /*tp_basicsize*/
     0,                         /*tp_itemsize*/
-    0,                         /*tp_dealloc*/
+    ChunkifyIter_dealloc,      /*tp_dealloc*/
     0,                         /*tp_print*/
     0,                         /*tp_getattr*/
     0,                         /*tp_setattr*/
@@ -68,86 +162,71 @@ static PyTypeObject ChunkifyIterType = {
 static PyObject *
 chunkify(PyObject *self, PyObject *args)
 {
-  PyObject *fd;
-  PyObject *chunks;
-  long int chunk_size;
-  ChunkifyIter *p;
+    PyObject *fd, *chunks;
+    long int chunk_size;
+    ChunkifyIter *c;
 
-  if (!PyArg_ParseTuple(args, "OlO", &fd, &chunk_size, &chunks))  return NULL;
-
-  /* I don't need python callable __init__() method for this iterator,
-     so I'll simply allocate it as PyObject and initialize it by hand. */
-
-  p = PyObject_New(ChunkifyIter, &ChunkifyIterType);
-  if (!p) return NULL;
-
-  /* I'm not sure if it's strictly necessary. */
-  if (!PyObject_Init((PyObject *)p, &ChunkifyIterType)) {
-    Py_DECREF(p);
-    return NULL;
-  }
-
-    p->m = 10;
-    p->i = 0;
-    p->fd = fd;
-    p->chunk_size = chunk_size;
-    p->chunks = chunks;
-    return (PyObject *)p;
-  }
-
-static PyObject *
-checksum(PyObject *self, PyObject *args)
-{
-    unsigned long int sum = 0, s1, s2;
-    PyObject *data;
-    Py_ssize_t i, len;
-    const char *ptr;
-    if(!PyArg_ParseTuple(args, "O|l", &data, &sum))  return NULL;
-    if(!PyString_Check(data))
+    if (!PyArg_ParseTuple(args, "OiO", &fd, &chunk_size, &chunks))
     {
-        PyErr_SetNone(PyExc_TypeError);
-        Py_INCREF(data);
         return NULL;
     }
-    len = PyString_Size(data);
-    ptr = PyString_AsString(data);
-    s1 = sum & 0xffff;
-    s2 = sum >> 16;
-    for(i=0; i < len; i++)
+    if (!(c = PyObject_New(ChunkifyIter, &ChunkifyIterType)))
     {
-        s1 += ptr[i] + 1;
-        s2 += s1;
+        return NULL;
     }
-    return PyInt_FromLong(((s2 & 0xffff) << 16) | (s1 & 0xffff));
+    PyObject_Init((PyObject *)c, &ChunkifyIterType);
+    c->buf_size = chunk_size * 10;
+    c->data = malloc(c->buf_size);
+    c->data_len = 0;
+    c->i = 0;
+    c->full_sum = 1;
+    c->done = 0;
+    c->extra = NULL;
+    c->fd = fd;
+    c->chunk_size = chunk_size;
+    c->chunks = chunks;
+    Py_INCREF(fd);
+    Py_INCREF(chunks);
+    return (PyObject *)c;
 }
 
 static PyObject *
-roll_checksum(PyObject *self, PyObject *args)
+py_checksum(PyObject *self, PyObject *args)
 {
-    unsigned long int sum = 0, len, s1, s2, a, r;
+    PyObject *data;
+    unsigned long int sum = 0;
+    if(!PyArg_ParseTuple(args, "O|k", &data, &sum))  return NULL;
+    if(!PyString_Check(data))
+    {
+        PyErr_SetNone(PyExc_TypeError);
+        return NULL;
+    }
+    return PyInt_FromLong(checksum((unsigned char *)PyString_AsString(data),
+                                   PyString_Size(data), sum));
+}
+
+static PyObject *
+py_roll_checksum(PyObject *self, PyObject *args)
+{
+    unsigned long int sum = 0, len, a, r;
     PyObject *add, *remove;
-    if (!PyArg_ParseTuple(args, "lOOl", &sum, &remove, &add, &len))  return NULL;
+    if (!PyArg_ParseTuple(args, "kOOk", &sum, &remove, &add, &len))  return NULL;
     if(!PyString_Check(remove) || !PyString_Check(add) || 
         PyString_Size(remove) != 1 || PyString_Size(add) != 1)
     {
         PyErr_SetNone(PyExc_TypeError);
-        Py_INCREF(remove);
-        Py_INCREF(add);
         return NULL;
     }
     a = *((const unsigned char *)PyString_AsString(add));
     r = *((const unsigned char *)PyString_AsString(remove));
-    s1 = sum & 0xffff;
-    s2 = sum >> 16;
-    s1 -= r - a;
-    s2 -= len * (r + 1) - s1;
-    return PyInt_FromLong(((s2 & 0xffff) << 16) | (s1 & 0xffff));
+    return PyInt_FromLong(roll_checksum(sum, r, a, len));
 }
+
 
 static PyMethodDef ChunkifierMethods[] = {
     {"chunkify",  chunkify, METH_VARARGS, ""},
-    {"checksum",  checksum, METH_VARARGS, ""},
-    {"roll_checksum",  roll_checksum, METH_VARARGS, ""},
+    {"checksum",  py_checksum, METH_VARARGS, ""},
+    {"roll_checksum",  py_roll_checksum, METH_VARARGS, ""},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 

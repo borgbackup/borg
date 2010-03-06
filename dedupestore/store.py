@@ -1,16 +1,21 @@
 #!/usr/bin/env python
 import os
 import fcntl
-import hashlib
 import tempfile
 import shutil
 import unittest
 import uuid
 
 
+CHUNK_SIZE = 256 * 1024
+NS_ARCHIVES = 'ARCHIVES'
+NS_CHUNKS = 'CHUNKS'
+
+
 class Store(object):
     """
     """
+
     class DoesNotExist(KeyError):
         """"""
 
@@ -173,18 +178,15 @@ class Store(object):
                 raise Store.DoesNotExist('Object does not exist: %s' % hash.encode('hex'))
 
     def list(self, ns, prefix='', marker=None, max_keys=1000000):
-        for x in self.foo(os.path.join(self.path, 'data', ns.encode('hex')), 
+        for x in self._walker(os.path.join(self.path, 'data', ns.encode('hex')), 
                           prefix, marker, '', max_keys):
             yield x
         
-
-    def foo(self, path, prefix, marker, base, max_keys):
+    def _walker(self, path, prefix, marker, base, max_keys):
         n = 0
         for name in sorted(os.listdir(path)):
             if n >= max_keys:
                 return
-            dirs = []
-            names = []
             id = name.decode('hex')
             if os.path.isdir(os.path.join(path, name)):
                 if prefix and not id.startswith(prefix[:len(id)]):

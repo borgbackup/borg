@@ -46,7 +46,7 @@ ChunkifyIter_dealloc(PyObject *self)
 {
     ChunkifyIter *c = (ChunkifyIter *)self;
     Py_DECREF(c->fd);
-    Py_DECREF(c->chunks);
+    Py_XDECREF(c->chunks);
     free(c->data);
     self->ob_type->tp_free(self);
 }
@@ -65,6 +65,7 @@ ChunkifyIter_iternext(PyObject *self)
     if(c->extra)
     {
         c->done = 1;
+	Py_INCREF(c->extra);
         return c->extra;
     }
     for(;;)

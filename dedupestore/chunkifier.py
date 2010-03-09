@@ -29,6 +29,7 @@ def roll_checksum(sum, remove, add, len):
 
 
 class ChunkifyIter(object):
+
     def __init__(self, fd, chunk_size, chunks):
         self.fd = fd
         self.chunk_size = chunk_size
@@ -140,6 +141,5 @@ except ImportError:
 
 
 if __name__ == '__main__':
-    import StringIO
     import doctest
     doctest.testmod()

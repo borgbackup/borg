@@ -2,7 +2,6 @@ import cPickle
 import hashlib
 import os
 import sys
-import struct
 import zlib
 
 from chunkifier import checksum
@@ -49,10 +48,11 @@ class Cache(object):
         for id in self.store.list(NS_ARCHIVES):
             archive = cPickle.loads(zlib.decompress(self.store.get(NS_ARCHIVES, id)))
             self.archives.append(archive['name'])
-            for item in archive['items']:
-                if item['type'] == 'FILE':
-                    for c in item['chunks']:
-                        self.chunk_incref(c)
+            for id, sum, csize, osize in archive['chunks']:
+                if self.seen_chunk(id):
+                    self.chunk_incref(id)
+                else:
+                    self.init_chunk(id, sum, csize, osize)
         print 'done'
 
     def save(self):
@@ -71,42 +71,39 @@ class Cache(object):
 
     def add_chunk(self, data):
         sum = checksum(data)
+        osize = len(data)
         data = zlib.compress(data)
-        #print 'chunk %d: %d' % (len(data), sum)
-        id = struct.pack('I', sum) + hashlib.sha1(data).digest()
-        if not self.seen_chunk(id):
-            size = len(data)
-            self.store.put(NS_CHUNKS, id, data)
-        else:
-            size = 0
-            #print 'seen chunk', hash.encode('hex')
-        self.chunk_incref(id)
-        return id, size
+        id = hashlib.sha1(data).digest()
+        if self.seen_chunk(id):
+            return self.chunk_incref(id)
+        csize = len(data)
+        self.store.put(NS_CHUNKS, id, data)
+        return self.init_chunk(id, sum, csize, osize)
 
-    def seen_chunk(self, hash):
-        return self.chunkmap.get(hash, 0) > 0
+    def init_chunk(self, id, sum, csize, osize):
+        self.chunkmap[id] = (1, sum, osize, csize)
+        self.summap.setdefault(sum, 1)
+        return id, sum, csize, osize
+
+    def seen_chunk(self, id):
+        return id in self.chunkmap
 
     def chunk_incref(self, id):
-        sum = struct.unpack('I', id[:4])[0]
-        self.chunkmap.setdefault(id, 0)
-        self.summap.setdefault(sum, 0)
-        self.chunkmap[id] += 1
+        count, sum, csize, osize = self.chunkmap[id]
+        self.chunkmap[id] = (count + 1, sum, osize, csize)
         self.summap[sum] += 1
+        return id, sum, csize, osize
 
     def chunk_decref(self, id):
-        sum = struct.unpack('I', id[:4])[0]
-        sumcount = self.summap[sum] - 1
-        count = self.chunkmap[id] - 1
-        assert sumcount >= 0
-        assert count >= 0
-        if sumcount:
-            self.summap[sum] = sumcount
-        else:
+        count, sum, csize, osize = self.chunkmap[id]
+        sumcount = self.summap[sum] 
+        if sumcount == 1:
             del self.summap[sum]
-        if count:
-            self.chunkmap[id] = count
         else:
+            self.summap[sum] = sumcount - 1
+        if count == 1:
             del self.chunkmap[id]
             print 'deleting chunk: ', id.encode('hex')
             self.store.delete(NS_CHUNKS, id)
-        return count
+        else:
+            self.chunkmap[id] = (count - 1, sum, csize, osize)

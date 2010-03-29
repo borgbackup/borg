@@ -1,5 +1,4 @@
 import os
-import sys
 import hashlib
 import zlib
 import cPickle
@@ -32,6 +31,7 @@ class Archive(object):
     def open(self, name):
         archive = cPickle.loads(zlib.decompress(self.store.get(NS_ARCHIVES, name)))
         self.items = archive['items']
+        self.name = archive['name']
         for i, (id, sum, csize, osize) in enumerate(archive['chunks']):
             self.chunk_idx[i] = id
 
@@ -82,7 +82,8 @@ class Archive(object):
         for item in self.items:
             if item['type'] == 'FILE':
                 for c in item['chunks']:
-                    cache.chunk_decref(c)
+                    id = self.chunk_idx[c]
+                    cache.chunk_decref(id)
         self.store.commit()
         cache.archives.remove(self.name)
         cache.save()

@@ -32,6 +32,7 @@ class Archive(object):
         archive = cPickle.loads(zlib.decompress(self.store.get(NS_ARCHIVES, name)))
         self.items = archive['items']
         self.name = archive['name']
+        self.chunks = archive['chunks']
         for i, (id, sum, csize, osize) in enumerate(archive['chunks']):
             self.chunk_idx[i] = id
 
@@ -39,6 +40,19 @@ class Archive(object):
         archive = {'name': name, 'items': self.items, 'chunks': self.chunks}
         self.store.put(NS_ARCHIVES, name, zlib.compress(cPickle.dumps(archive)))
         self.store.commit()
+
+    def stats(self, cache):
+        total_osize = 0
+        total_csize = 0
+        total_usize = 0
+        for item in self.items:
+            if item['type'] == 'FILE':
+                total_osize += item['size']
+        for id, sum, csize, osize in self.chunks:
+            total_csize += csize
+            if cache.seen_chunk(id) == 1:
+                total_usize += csize
+        return dict(osize=total_osize, csize=total_csize, usize=total_usize)
 
     def list(self):
         for item in self.items:
@@ -111,9 +125,11 @@ class Archive(object):
         with open(path, 'rb') as fd:
             path = path.lstrip('/\\:')
             chunks = []
+            size = 0
             for chunk in chunkify(fd, CHUNK_SIZE, cache.summap):
+                size += len(chunk)
                 chunks.append(self.add_chunk(*cache.add_chunk(chunk)))
-        return {'type': 'FILE', 'path': path, 'chunks': chunks}
+        return {'type': 'FILE', 'path': path, 'chunks': chunks, 'size': size}
 
 
 class Archiver(object):
@@ -143,6 +159,13 @@ class Archiver(object):
         archive = Archive(self.store, archive_name)
         archive.extract()
 
+    def archive_stats(self, archive_name):
+        archive = Archive(self.store, archive_name)
+        stats = archive.stats(self.cache)
+        print 'Original size:', stats['osize']
+        print 'Compressed size:', stats['csize']
+        print 'Unique data:', stats['usize']
+
     def run(self):
         parser = OptionParser()
         parser.add_option("-s", "--store", dest="store",
@@ -160,6 +183,8 @@ class Archiver(object):
                         help="extract ARCHIVE")
         parser.add_option("-L", "--list-archive", dest="list_archive",
                         help="verify archive consistency", metavar="ARCHIVE")
+        parser.add_option("-S", "--stats", dest="archive_stats",
+                        help="Display archive statistics", metavar="ARCHIVE")
         (options, args) = parser.parse_args()
         if options.store:
             self.store = Store(options.store)
@@ -176,9 +201,10 @@ class Archiver(object):
             self.extract_archive(options.extract_archive)
         elif options.delete_archive:
             self.delete_archive(options.delete_archive)
-        else:
+        elif options.create_archive:
             self.create_archive(options.create_archive, args)
-
+        elif options.archive_stats:
+            self.archive_stats(options.archive_stats)
 
 def main():
     archiver = Archiver()

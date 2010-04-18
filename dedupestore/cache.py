@@ -86,7 +86,8 @@ class Cache(object):
         return id, sum, csize, osize
 
     def seen_chunk(self, id):
-        return id in self.chunkmap
+        count, sum, csize, osize = self.chunkmap.get(id, (0, 0, 0, 0))
+        return count
 
     def chunk_incref(self, id):
         count, sum, csize, osize = self.chunkmap[id]

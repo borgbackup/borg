@@ -27,7 +27,7 @@ class Archive(object):
             self.chunks.append((id, sum, csize, osize))
             self.chunk_idx[id] = idx
             return idx
-        
+
     def open(self, name):
         archive = cPickle.loads(zlib.decompress(self.store.get(NS_ARCHIVES, name)))
         self.items = archive['items']
@@ -93,9 +93,11 @@ class Archive(object):
             for root, dirs, files in os.walk(path):
                 for d in dirs:
                     p = os.path.join(root, d)
+                    print p
                     self.items.append(self.process_dir(p, cache))
                 for f in files:
                     p = os.path.join(root, f)
+                    print p
                     self.items.append(self.process_file(p, cache))
         self.save(name)
         cache.archives.append(name)
@@ -103,13 +105,11 @@ class Archive(object):
 
     def process_dir(self, path, cache):
         path = path.lstrip('/\\:')
-        print 'Directory: %s' % (path)
         return {'type': 'DIR', 'path': path}
 
     def process_file(self, path, cache):
         with open(path, 'rb') as fd:
             path = path.lstrip('/\\:')
-            print 'Adding: %s...' % path
             chunks = []
             for chunk in chunkify(fd, CHUNK_SIZE, cache.summap):
                 chunks.append(self.add_chunk(*cache.add_chunk(chunk)))

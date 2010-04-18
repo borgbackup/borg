@@ -58,7 +58,7 @@ class Cache(object):
     def save(self):
         assert self.store.state == Store.OPEN
         print 'saving cache'
-        data = {'uuid': self.store.uuid, 
+        data = {'uuid': self.store.uuid,
                 'chunkmap': self.chunkmap, 'summap': self.summap,
                 'tid': self.store.tid, 'archives': self.archives}
         print 'Saving cache as:', self.path
@@ -96,7 +96,7 @@ class Cache(object):
 
     def chunk_decref(self, id):
         count, sum, csize, osize = self.chunkmap[id]
-        sumcount = self.summap[sum] 
+        sumcount = self.summap[sum]
         if sumcount == 1:
             del self.summap[sum]
         else:

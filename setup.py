@@ -10,4 +10,4 @@ setup(name='Dedupestore',
       packages=['dedupestore'],
       ext_modules=[Extension('_speedups', ['dedupestore/_speedups.c'])],
      )
-    
+

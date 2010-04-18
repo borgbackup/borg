@@ -1,6 +1,6 @@
 def checksum(data, sum=0):
     """Simple but fast checksum that can be updated at either end.
-    
+
     >>> checksum('FOOBAR')
     102367679
     >>> checksum('FOOBAR') == checksum('BAR', checksum('FOO'))

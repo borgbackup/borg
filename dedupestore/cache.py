@@ -82,7 +82,7 @@ class Cache(object):
 
     def init_chunk(self, id, sum, csize, osize):
         self.chunkmap[id] = (1, sum, osize, csize)
-        self.summap.setdefault(sum, 1)
+        self.summap[sum] = self.summap.get(sum, 0) + 1
         return id, sum, csize, osize
 
     def seen_chunk(self, id):

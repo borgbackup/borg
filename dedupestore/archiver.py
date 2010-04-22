@@ -45,12 +45,18 @@ class Archive(object):
         total_osize = 0
         total_csize = 0
         total_usize = 0
+        chunk_count = {}
         for item in self.items:
             if item['type'] == 'FILE':
                 total_osize += item['size']
-        for id, sum, csize, osize in self.chunks:
+                for idx in item['chunks']:
+                    id = self.chunk_idx[idx]
+                    chunk_count.setdefault(id, 0)
+                    chunk_count[id] += 1
+        for id, c in chunk_count.items():
+            count, sum, csize, osize = cache.chunkmap[id]
             total_csize += csize
-            if cache.seen_chunk(id) == 1:
+            if  c == count:
                 total_usize += csize
         return dict(osize=total_osize, csize=total_csize, usize=total_usize)
 
@@ -81,7 +87,6 @@ class Archive(object):
         for item in self.items:
             if item['type'] == 'FILE':
                 print item['path'], '...',
-                print self.chunk_idx[0].encode('hex')
                 for chunk in item['chunks']:
                     id = self.chunk_idx[chunk]
                     data = self.store.get(NS_CHUNKS, id)
@@ -134,6 +139,16 @@ class Archive(object):
 
 class Archiver(object):
 
+    def pretty_size(self, v):
+        if v > 1024 * 1024 * 1024:
+            return '%.2f GB' % (v / 1024. / 1024. / 1024.)
+        elif v > 1024 * 1024:
+            return '%.2f MB' % (v / 1024. / 1024.)
+        elif v > 1024:
+            return '%.2f kB' % (v / 1024.)
+        else:
+            return str(v)
+
     def create_archive(self, name, paths):
         archive = Archive(self.store)
         archive.create(name, paths, self.cache)
@@ -162,9 +177,9 @@ class Archiver(object):
     def archive_stats(self, archive_name):
         archive = Archive(self.store, archive_name)
         stats = archive.stats(self.cache)
-        print 'Original size:', stats['osize']
-        print 'Compressed size:', stats['csize']
-        print 'Unique data:', stats['usize']
+        print 'Original size:', self.pretty_size(stats['osize'])
+        print 'Compressed size:', self.pretty_size(stats['csize'])
+        print 'Unique data:', self.pretty_size(stats['usize'])
 
     def run(self):
         parser = OptionParser()

@@ -7,11 +7,6 @@ import unittest
 import uuid
 
 
-CHUNK_SIZE = 256 * 1024
-NS_ARCHIVES = 'ARCHIVES'
-NS_CHUNKS = 'CHUNKS'
-
-
 class Store(object):
     """
     """
@@ -33,7 +28,7 @@ class Store(object):
         if not os.path.exists(path):
             self.create(path)
         self.open(path)
-    
+
     def create(self, path):
         os.mkdir(path)
         open(os.path.join(path, 'version'), 'wb').write(self.VERSION)

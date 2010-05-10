@@ -5,8 +5,11 @@ import cPickle
 from optparse import OptionParser
 
 from chunkifier import chunkify
-from cache import Cache
-from store import Store, NS_ARCHIVES, NS_CHUNKS, CHUNK_SIZE
+from cache import Cache, NS_ARCHIVES, NS_CHUNKS
+from sqlitestore import SqliteStore
+
+
+CHUNK_SIZE = 256 * 1024
 
 
 class Archive(object):
@@ -202,7 +205,7 @@ class Archiver(object):
                         help="Display archive statistics", metavar="ARCHIVE")
         (options, args) = parser.parse_args()
         if options.store:
-            self.store = Store(options.store)
+            self.store = SqliteStore(options.store)
         else:
             parser.error('No store path specified')
         self.cache = Cache(self.store)

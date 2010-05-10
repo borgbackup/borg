@@ -5,7 +5,9 @@ import sys
 import zlib
 
 from chunkifier import checksum
-from store import Store, NS_ARCHIVES, NS_CHUNKS
+
+NS_ARCHIVES = 'ARCHIVES'
+NS_CHUNKS = 'CHUNKS'
 
 
 class Cache(object):
@@ -46,6 +48,8 @@ class Cache(object):
             return
         print 'Recreating cache...'
         for id in self.store.list(NS_ARCHIVES):
+
+
             archive = cPickle.loads(zlib.decompress(self.store.get(NS_ARCHIVES, id)))
             self.archives.append(archive['name'])
             for id, sum, csize, osize in archive['chunks']:
@@ -56,7 +60,7 @@ class Cache(object):
         print 'done'
 
     def save(self):
-        assert self.store.state == Store.OPEN
+        assert self.store.state == self.store.OPEN
         print 'saving cache'
         data = {'uuid': self.store.uuid,
                 'chunkmap': self.chunkmap, 'summap': self.summap,
@@ -81,7 +85,7 @@ class Cache(object):
         return self.init_chunk(id, sum, csize, osize)
 
     def init_chunk(self, id, sum, csize, osize):
-        self.chunkmap[id] = (1, sum, osize, csize)
+        self.chunkmap[id] = (1, sum, csize, osize)
         self.summap[sum] = self.summap.get(sum, 0) + 1
         return id, sum, csize, osize
 
@@ -91,7 +95,7 @@ class Cache(object):
 
     def chunk_incref(self, id):
         count, sum, csize, osize = self.chunkmap[id]
-        self.chunkmap[id] = (count + 1, sum, osize, csize)
+        self.chunkmap[id] = (count + 1, sum, csize, osize)
         self.summap[sum] += 1
         return id, sum, csize, osize
 

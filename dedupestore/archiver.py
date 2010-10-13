@@ -1,5 +1,7 @@
 import os
+import sys
 import hashlib
+import logging
 import zlib
 import cPickle
 from optparse import OptionParser
@@ -70,7 +72,7 @@ class Archive(object):
     def extract(self):
         for item in self.items:
             assert item['path'][0] not in ('/', '\\', ':')
-            print item['path']
+            logging.info(item['path'])
             if item['type'] == 'DIR':
                 if not os.path.exists(item['path']):
                     os.makedirs(item['path'])
@@ -89,15 +91,14 @@ class Archive(object):
     def verify(self):
         for item in self.items:
             if item['type'] == 'FILE':
-                print item['path'], '...',
                 for chunk in item['chunks']:
                     id = self.chunk_idx[chunk]
                     data = self.store.get(NS_CHUNKS, id)
                     if hashlib.sha1(data).digest() != id:
-                        print 'ERROR'
+                        logging.ERROR('%s ... ERROR', item['path'])
                         break
                 else:
-                    print 'OK'
+                    logging.info('%s ... OK', item['path'])
 
     def delete(self, cache):
         self.store.delete(NS_ARCHIVES, self.name)
@@ -115,23 +116,30 @@ class Archive(object):
             for root, dirs, files in os.walk(path):
                 for d in dirs:
                     p = os.path.join(root, d)
-                    print p
                     self.items.append(self.process_dir(p, cache))
                 for f in files:
                     p = os.path.join(root, f)
-                    print p
-                    self.items.append(self.process_file(p, cache))
+                    entry = self.process_file(p, cache)
+                    if entry:
+                        self.items.append(entry)
         self.save(name)
         cache.archives.append(name)
         cache.save()
 
     def process_dir(self, path, cache):
         path = path.lstrip('/\\:')
+        logging.info(path)
         return {'type': 'DIR', 'path': path}
 
     def process_file(self, path, cache):
-        with open(path, 'rb') as fd:
+        try:
+            fd = open(path, 'rb')
+        except IOError, e:
+            logging.error(e)
+            return
+        with fd:
             path = path.lstrip('/\\:')
+            logging.info(path)
             chunks = []
             size = 0
             for chunk in chunkify(fd, CHUNK_SIZE, 30):
@@ -186,6 +194,9 @@ class Archiver(object):
 
     def run(self):
         parser = OptionParser()
+        parser.add_option("-v", "--verbose",
+                          action="store_true", dest="verbose", default=False,
+                          help="Print status messages to stdout")
         parser.add_option("-s", "--store", dest="store",
                           help="path to dedupe store", metavar="STORE")
         parser.add_option("-c", "--create", dest="create_archive",
@@ -204,25 +215,32 @@ class Archiver(object):
         parser.add_option("-S", "--stats", dest="archive_stats",
                         help="Display archive statistics", metavar="ARCHIVE")
         (options, args) = parser.parse_args()
+        if options.verbose:
+            logging.basicConfig(level=logging.INFO, format='%(message)s')
+        else:
+            logging.basicConfig(level=logging.WARNING, format='%(message)s')
         if options.store:
             self.store = BandStore(options.store)
         else:
             parser.error('No store path specified')
         self.cache = Cache(self.store)
-        if options.list_archives:
+        if options.list_archives and not args:
             self.list_archives()
-        elif options.list_archive:
+        elif options.list_archive and not args:
             self.list_archive(options.list_archive)
-        elif options.verify_archive:
+        elif options.verify_archive and not args:
             self.verify_archive(options.verify_archive)
-        elif options.extract_archive:
+        elif options.extract_archive and not args:
             self.extract_archive(options.extract_archive)
-        elif options.delete_archive:
+        elif options.delete_archive and not args:
             self.delete_archive(options.delete_archive)
         elif options.create_archive:
             self.create_archive(options.create_archive, args)
-        elif options.archive_stats:
+        elif options.archive_stats and not args:
             self.archive_stats(options.archive_stats)
+        else:
+            parser.error('Invalid usage')
+            sys.exit(1)
 
 def main():
     archiver = Archiver()

@@ -18,8 +18,6 @@ class Cache(object):
                                  '%s.cache' % self.store.uuid)
         self.tid = -1
         self.open()
-        self.total = 0
-        self.max = 0
         if self.tid != self.store.tid:
             self.init()
 
@@ -47,8 +45,6 @@ class Cache(object):
             return
         print 'Recreating cache...'
         for id in self.store.list(NS_ARCHIVES):
-
-
             archive = cPickle.loads(zlib.decompress(self.store.get(NS_ARCHIVES, id)))
             self.archives.append(archive['name'])
             for id, sum, csize, osize in archive['chunks']:
@@ -76,12 +72,7 @@ class Cache(object):
         osize = len(data)
         data = zlib.compress(data)
         id = hashlib.sha1(data).digest()
-        self.total += 1
-        if osize == 55001* 4:
-            self.max += 1
-            print 'rate = %.2f' % (100.*self.max/self.total)
         if self.seen_chunk(id):
-            print 'yay %d bytes' % osize
             return self.chunk_incref(id)
         csize = len(data)
         self.store.put(NS_CHUNKS, id, data)
@@ -104,7 +95,6 @@ class Cache(object):
         count, csize, osize = self.chunkmap[id]
         if count == 1:
             del self.chunkmap[id]
-            print 'deleting chunk: ', id.encode('hex')
             self.store.delete(NS_CHUNKS, id)
         else:
             self.chunkmap[id] = (count - 1, csize, osize)

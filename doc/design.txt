@@ -2,6 +2,15 @@
 Dedupstore
 ==========
 
+TODO
+----
+* Symbolic links
+* Owner, group, mode
+* msgpack
+* Hard links
+
+
+
 cache = Cache(path,)
 
 for file in files:

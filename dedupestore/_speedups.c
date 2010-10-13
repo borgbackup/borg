@@ -1,5 +1,5 @@
-#include <Python/Python.h>
-#include <Python/structmember.h>
+#include <Python.h>
+#include <structmember.h>
 
 static unsigned long int
 checksum(const unsigned char *data, int len, unsigned long int sum)
@@ -28,15 +28,23 @@ roll_checksum(unsigned long int sum, unsigned char remove, unsigned char add, in
 
 typedef struct {
     PyObject_HEAD
-    int chunk_size, i, full_sum, done, buf_size, data_len;
-    PyObject *chunks, *fd, *extra;
-    unsigned long sum;
+    int chunk_size, window_size, i, last, eof, done, buf_size, data_len, initial;
+    PyObject *chunks, *fd;
+    unsigned long int sum;
     unsigned char *data, add, remove;
 } ChunkifyIter;
 
 static PyObject*
 ChunkifyIter_iter(PyObject *self)
 {
+    ChunkifyIter *c = (ChunkifyIter *)self;
+    c->data_len = 0;
+    c->done = 0;
+    c->eof = 0;
+    c->i = 0;
+    c->sum = 0;
+    c->last = -1;
+    c->initial = c->window_size;
     Py_INCREF(self);
     return self;
 }
@@ -46,7 +54,6 @@ ChunkifyIter_dealloc(PyObject *self)
 {
     ChunkifyIter *c = (ChunkifyIter *)self;
     Py_DECREF(c->fd);
-    Py_XDECREF(c->chunks);
     free(c->data);
     self->ob_type->tp_free(self);
 }
@@ -55,28 +62,25 @@ static PyObject*
 ChunkifyIter_iternext(PyObject *self)
 {
     ChunkifyIter *c = (ChunkifyIter *)self;
-    PyObject *pysum;
-    int o = 0;
     if(c->done)
     {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
     }
-    if(c->extra)
-    {
-        c->done = 1;
-	Py_INCREF(c->extra);
-        return c->extra;
-    }
     for(;;)
     {
-        if(c->i > c->buf_size - c->chunk_size)
+        if(c->i == c->buf_size)
         {
-            memmove(c->data, c->data + c->i - o, c->data_len - c->i + o);
-            c->data_len -= c->i - o;
-            c->i = o;
+            int diff = c->last + 1 - c->window_size;
+            memmove(c->data, c->data + diff, c->buf_size - diff);
+            c->i -= diff;
+            c->last -= diff;
+            c->data_len -= diff;
+            assert(c->i >= 0);
+            assert(c->last >= -1);
+            assert(c->data_len >= 0);
         }
-        if(c->data_len - c->i < c->chunk_size)
+        if(c->i == c->data_len)
         {
             PyObject *data = PyObject_CallMethod(c->fd, "read", "i", c->buf_size - c->data_len);
             int n = PyString_Size(data);
@@ -86,59 +90,42 @@ ChunkifyIter_iternext(PyObject *self)
         }
         if(c->i == c->data_len)
         {
+            if(c->last < c->i - 1) {
+                c->done = 1;
+                return PyString_FromStringAndSize((char *)(c->data + c->last + 1),
+                                                  c->data_len - c->last - 1);
+            }
             PyErr_SetNone(PyExc_StopIteration);
             return NULL;
         }
-        if(c->data_len - c->i < c->chunk_size) /* EOF ? */
+        if(c->initial)
         {
-            if(o == 1)
-            {
-                c->done = 1;
-                return PyString_FromStringAndSize((char *)(c->data + c->i - 1), c->data_len - c->i + 1);
-            }
-            else if(o > 1)
-            {
-                c->extra = PyString_FromStringAndSize((char *)(c->data + c->i - 1), c->chunk_size);
-                return PyString_FromStringAndSize((char *)(c->data + c->i - o), o - 1);
-            }
-            else
-            {
-                c->done = 1;
-                return PyString_FromStringAndSize((char *)(c->data + c->i), c->data_len - c->i);
-            }
-        }
-        if(o == c->chunk_size)
-        {
-            return PyString_FromStringAndSize((char *)(c->data + c->i - c->chunk_size), c->chunk_size);
-        }
-        if(c->full_sum || c->i + c->chunk_size > c->data_len)
-        {
-            c->full_sum = 0;
-            c->sum = checksum(c->data + c->i, c->chunk_size, 0);
+            c->initial--;
+            c->sum = checksum(c->data + c->i, 1, c->sum);
         }
         else
         {
-            c->sum = roll_checksum(c->sum, c->remove, c->data[c->i + c->chunk_size - 1], c->chunk_size);
+            c->sum = roll_checksum(c->sum,
+                                   c->data[c->i - c->window_size],
+                                   c->data[c->i],
+                                   c->window_size);
         }
-        c->remove = c->data[c->i];
-        pysum = PyInt_FromLong(c->sum);
-        if(PySequence_Contains(c->chunks, pysum) == 1)
-        {
-            Py_DECREF(pysum);
-            c->full_sum = 1;
-            if(o > 0)
-            {
-                return PyString_FromStringAndSize((char *)(c->data + c->i - o), o);
-            }
-            else
-            {
-                c->i += c->chunk_size;
-                return PyString_FromStringAndSize((char *)(c->data + c->i - c->chunk_size), c->chunk_size);
-            }
-        }
-        Py_DECREF(pysum);
-        o++;
         c->i++;
+        if(c->i == c->buf_size && c->last == c->window_size - 1)
+        {
+            int old_last = c->last;
+            c->last = c->i - 1;
+            printf("Max chunk size reached %d\n", c->last - old_last);
+            return PyString_FromStringAndSize((char *)(c->data + old_last + 1),
+                                              c->last - old_last);
+        }
+        else if((c->sum % c->chunk_size) == 0)
+        {
+            int old_last = c->last;
+            c->last = c->i - 1;
+            return PyString_FromStringAndSize((char *)(c->data + old_last + 1),
+                                              c->last - old_last);
+        }
     }
     PyErr_SetNone(PyExc_StopIteration);
     return NULL;
@@ -180,11 +167,11 @@ static PyTypeObject ChunkifyIterType = {
 static PyObject *
 chunkify(PyObject *self, PyObject *args)
 {
-    PyObject *fd, *chunks;
-    long int chunk_size;
+    PyObject *fd;
+    long int chunk_size, window_size;
     ChunkifyIter *c;
 
-    if (!PyArg_ParseTuple(args, "OiO", &fd, &chunk_size, &chunks))
+    if (!PyArg_ParseTuple(args, "Oii", &fd, &chunk_size, &window_size))
     {
         return NULL;
     }
@@ -193,18 +180,12 @@ chunkify(PyObject *self, PyObject *args)
         return NULL;
     }
     PyObject_Init((PyObject *)c, &ChunkifyIterType);
-    c->buf_size = chunk_size * 10;
+    c->buf_size = 10 * 1024 * 1024;
     c->data = malloc(c->buf_size);
-    c->data_len = 0;
-    c->i = 0;
-    c->full_sum = 1;
-    c->done = 0;
-    c->extra = NULL;
     c->fd = fd;
     c->chunk_size = chunk_size;
-    c->chunks = chunks;
+    c->window_size = window_size;
     Py_INCREF(fd);
-    Py_INCREF(chunks);
     return (PyObject *)c;
 }
 

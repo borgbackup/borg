@@ -9,7 +9,7 @@ from cache import Cache, NS_ARCHIVES, NS_CHUNKS
 #from sqlitestore import SqliteStore
 from bandstore import BandStore
 
-CHUNK_SIZE = 256 * 1024
+CHUNK_SIZE = 55001
 
 
 class Archive(object):
@@ -22,12 +22,12 @@ class Archive(object):
         if name:
             self.open(name)
 
-    def add_chunk(self, id, sum, csize, osize):
+    def add_chunk(self, id, csize, osize):
         try:
             return self.chunk_idx[id]
         except KeyError:
             idx = len(self.chunks)
-            self.chunks.append((id, sum, csize, osize))
+            self.chunks.append((id, csize, osize))
             self.chunk_idx[id] = idx
             return idx
 
@@ -36,7 +36,7 @@ class Archive(object):
         self.items = archive['items']
         self.name = archive['name']
         self.chunks = archive['chunks']
-        for i, (id, sum, csize, osize) in enumerate(archive['chunks']):
+        for i, (id, csize, osize) in enumerate(archive['chunks']):
             self.chunk_idx[i] = id
 
     def save(self, name):
@@ -57,7 +57,7 @@ class Archive(object):
                     chunk_count.setdefault(id, 0)
                     chunk_count[id] += 1
         for id, c in chunk_count.items():
-            count, sum, csize, osize = cache.chunkmap[id]
+            count, csize, osize = cache.chunkmap[id]
             total_csize += csize
             if  c == count:
                 total_usize += csize
@@ -134,7 +134,7 @@ class Archive(object):
             path = path.lstrip('/\\:')
             chunks = []
             size = 0
-            for chunk in chunkify(fd, CHUNK_SIZE, cache.summap):
+            for chunk in chunkify(fd, CHUNK_SIZE, 30):
                 size += len(chunk)
                 chunks.append(self.add_chunk(*cache.add_chunk(chunk)))
         return {'type': 'FILE', 'path': path, 'chunks': chunks, 'size': size}

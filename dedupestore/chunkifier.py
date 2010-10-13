@@ -30,103 +30,79 @@ def roll_checksum(sum, remove, add, len):
 
 class ChunkifyIter(object):
 
-    def __init__(self, fd, chunk_size, chunks):
+    def __init__(self, fd, chunk_size, window_size):
         self.fd = fd
         self.chunk_size = chunk_size
-        self.chunks = chunks
+        self.window_size = window_size
+        self.buf_size = self.chunk_size * 10
 
     def __iter__(self):
         self.data = ''
-        self.i = 0
-        self.full_sum = True
-        self.extra = None
         self.done = False
-        self.buf_size = self.chunk_size * 10
+        self.i = 0
+        self.sum = 0
+        self.last = -1
+        self.initial = self.window_size
         return self
 
     def next(self):
-        o = 0
         if self.done:
             raise StopIteration
-        if self.extra:
-            self.done = True
-            return self.extra
         while True:
-            if self.i >  self.buf_size - self.chunk_size:
-                self.data = self.data[self.i - o:]
-                self.i = o
-            if len(self.data) - self.i < self.chunk_size:
+            if self.i == self.buf_size:
+                diff = self.last + 1 - self.window_size
+                if diff < 0:
+                    import ipdb
+                    ipdb.set_trace()
+                self.data = self.data[diff:]
+                self.last -= diff
+                self.i -= diff
+            if self.i == len(self.data):
                 self.data += self.fd.read(self.buf_size - len(self.data))
-            if len(self.data) == self.i:
+            if self.i == len(self.data):
+                if self.last < self.i - 1:
+                    self.done = True
+                    return self.data[self.last + 1:]
                 raise StopIteration
-            if len(self.data) - self.i < self.chunk_size:  # EOF?
-                if o == 1:
-                    self.done = True
-                    return self.data[self.i - 1:]
-                elif o > 1:
-                    self.extra = self.data[-self.chunk_size:]
-                    return self.data[-self.chunk_size - o + 1:-self.chunk_size]
-                else:
-                    self.done = True
-                    return self.data[self.i:]
-            elif o == self.chunk_size:
-                return self.data[self.i-self.chunk_size:self.i]
-            if self.full_sum or len(self.data) - self.i < self.chunk_size:
-                self.sum = checksum(self.data[self.i:self.i + self.chunk_size])
-                self.full_sum = False
-                self.remove = self.data[self.i]
+            if self.initial:
+                self.initial -= 1
+                self.sum = checksum(self.data[self.i], self.sum)
             else:
-                self.sum = roll_checksum(self.sum, self.remove, self.data[self.i + self.chunk_size - 1], 
-                                         self.chunk_size)
-                self.remove = self.data[self.i]
-            if self.sum in self.chunks:
-                if o > 0:
-                    chunk = self.data[self.i - o:self.i]
-                else:
-                    chunk = self.data[self.i:self.i + self.chunk_size]
-                    self.i += self.chunk_size
-                self.full_sum = True
-                return chunk
-            else:
-                self.i += 1
-                o += 1
+                self.sum = roll_checksum(self.sum,
+                                         self.data[self.i - self.window_size],
+                                         self.data[self.i],
+                                         self.window_size)
+            self.i += 1
+            if self.i == self.buf_size and self.last == self.window_size - 1:
+                old_last = self.last
+                self.last = self.i - 1
+                return self.data[old_last + 1:self.last + 1]
+            elif self.sum % self.chunk_size == 0:
+                old_last = self.last
+                self.last = self.i - 1
+                return self.data[old_last + 1:self.last + 1]
 
 
 def chunkify(fd, chunk_size, chunks):
     """
-    >>> list(chunkify(StringIO.StringIO('A'), 4, {}))
+    >>> list(chunkify(StringIO.StringIO(''), 5, 3))
+    []
+    >>> list(chunkify(StringIO.StringIO('A'), 5, 3))
     ['A']
-    >>> list(chunkify(StringIO.StringIO('AB'), 4, {}))
+    >>> list(chunkify(StringIO.StringIO('AB'), 5, 3))
     ['AB']
-    >>> list(chunkify(StringIO.StringIO('ABC'), 4, {}))
-    ['ABC']
-    >>> list(chunkify(StringIO.StringIO('ABCD'), 4, {}))
-    ['ABCD']
-    >>> list(chunkify(StringIO.StringIO('ABCDE'), 4, {}))
-    ['A', 'BCDE']
-    >>> list(chunkify(StringIO.StringIO('ABCDEF'), 4, {}))
-    ['AB', 'CDEF']
-    >>> list(chunkify(StringIO.StringIO('ABCDEFG'), 4, {}))
-    ['ABC', 'DEFG']
-    >>> list(chunkify(StringIO.StringIO('ABCDEFGH'), 4, {}))
-    ['ABCD', 'EFGH']
-    >>> list(chunkify(StringIO.StringIO('ABCDEFGHI'), 4, {}))
-    ['ABCD', 'E', 'FGHI']
-
-    >>> list(chunkify(StringIO.StringIO('ABCDEFGHIJKLMN'), 4, {}))
-    ['ABCD', 'EFGH', 'IJ', 'KLMN']
-
-    >>> chunks = {44564754: True} # 'BCDE'
-    >>> list(chunkify(StringIO.StringIO('ABCDEFGHIJKLMN'), 4, chunks))
-    ['A', 'BCDE', 'FGHI', 'J', 'KLMN']
-
-    >>> chunks = {44564754: True, 48496938: True} # 'BCDE', 'HIJK'
-    >>> list(chunkify(StringIO.StringIO('ABCDEFGHIJKLMN'), 4, chunks))
-    ['A', 'BCDE', 'FG', 'HIJK', 'LMN']
-
-    >>> chunks = {43909390: True, 50463030: True} # 'ABCD', 'KLMN'
-    >>> list(chunkify(StringIO.StringIO('ABCDEFGHIJKLMN'), 4, chunks))
-    ['ABCD', 'EFGH', 'IJ', 'KLMN']
+    >>> list(chunkify(StringIO.StringIO('1B'), 5, 3))
+    ['1', 'B']
+    >>> list(chunkify(StringIO.StringIO('ABCDEFGHIJKLMNOPQ'), 5, 3))
+    ['ABCD', 'EFGHI', 'JKLMN', 'OPQ']
+    >>> list(chunkify(StringIO.StringIO('1ABCDEFGHIJKLMNOPQ'), 5, 3))
+    ['1', 'ABCD', 'EFGHI', 'JKLMN', 'OPQ']
+    >>> list(chunkify(StringIO.StringIO('12ABCDEFGHIJKLMNOPQ'), 5, 3))
+    ['1', '2A', 'BCD', 'EFGHI', 'JKLMN', 'OPQ']
+    >>> list(chunkify(StringIO.StringIO('12ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 5, 3))
+    ['1', '2A', 'BCD', 'EFGHI', 'JKLMN', 'OPQRS', 'TUVWX', 'YZ']
+    >>> list(chunkify(StringIO.StringIO('12ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 5, 3))
+    ['1', '2A', 'BCD', 'EFGHI', 'JKLMN', 'OPQRS', 'TUVWX', 'YZ']
     """
     return ChunkifyIter(fd, chunk_size, chunks)
 
@@ -142,4 +118,5 @@ except ImportError:
 
 if __name__ == '__main__':
     import doctest
+    import StringIO
     doctest.testmod()

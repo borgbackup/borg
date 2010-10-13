@@ -4,8 +4,6 @@ import os
 import sys
 import zlib
 
-from chunkifier import checksum
-
 NS_ARCHIVES = 'ARCHIVES'
 NS_CHUNKS = 'CHUNKS'
 
@@ -16,10 +14,12 @@ class Cache(object):
 
     def __init__(self, store):
         self.store = store
-        self.path = os.path.join(os.path.expanduser('~'), '.dedupestore', 'cache', 
+        self.path = os.path.join(os.path.expanduser('~'), '.dedupestore', 'cache',
                                  '%s.cache' % self.store.uuid)
         self.tid = -1
         self.open()
+        self.total = 0
+        self.max = 0
         if self.tid != self.store.tid:
             self.init()
 
@@ -32,7 +32,6 @@ class Cache(object):
             print >> sys.stderr, 'Cache UUID mismatch'
             return
         self.chunkmap = data['chunkmap']
-        self.summap = data['summap']
         self.archives = data['archives']
         self.tid = data['tid']
         print 'done'
@@ -56,14 +55,14 @@ class Cache(object):
                 if self.seen_chunk(id):
                     self.chunk_incref(id)
                 else:
-                    self.init_chunk(id, sum, csize, osize)
+                    self.init_chunk(id, csize, osize)
         print 'done'
 
     def save(self):
         assert self.store.state == self.store.OPEN
         print 'saving cache'
         data = {'uuid': self.store.uuid,
-                'chunkmap': self.chunkmap, 'summap': self.summap,
+                'chunkmap': self.chunkmap,
                 'tid': self.store.tid, 'archives': self.archives}
         print 'Saving cache as:', self.path
         cachedir = os.path.dirname(self.path)
@@ -74,41 +73,40 @@ class Cache(object):
         print 'done'
 
     def add_chunk(self, data):
-        sum = checksum(data)
         osize = len(data)
         data = zlib.compress(data)
         id = hashlib.sha1(data).digest()
+        self.total += 1
+        if osize == 55001* 4:
+            self.max += 1
+            print 'rate = %.2f' % (100.*self.max/self.total)
         if self.seen_chunk(id):
+            print 'yay %d bytes' % osize
             return self.chunk_incref(id)
         csize = len(data)
         self.store.put(NS_CHUNKS, id, data)
-        return self.init_chunk(id, sum, csize, osize)
+        return self.init_chunk(id, csize, osize)
 
-    def init_chunk(self, id, sum, csize, osize):
-        self.chunkmap[id] = (1, sum, csize, osize)
-        self.summap[sum] = self.summap.get(sum, 0) + 1
-        return id, sum, csize, osize
+    def init_chunk(self, id, csize, osize):
+        self.chunkmap[id] = (1, csize, osize)
+        return id, csize, osize
 
     def seen_chunk(self, id):
-        count, sum, csize, osize = self.chunkmap.get(id, (0, 0, 0, 0))
+        count, csize, osize = self.chunkmap.get(id, (0, 0, 0))
         return count
 
     def chunk_incref(self, id):
-        count, sum, csize, osize = self.chunkmap[id]
-        self.chunkmap[id] = (count + 1, sum, csize, osize)
-        self.summap[sum] += 1
-        return id, sum, csize, osize
+        count, csize, osize = self.chunkmap[id]
+        self.chunkmap[id] = (count + 1, csize, osize)
+        return id, csize, osize
 
     def chunk_decref(self, id):
-        count, sum, csize, osize = self.chunkmap[id]
-        sumcount = self.summap[sum]
-        if sumcount == 1:
-            del self.summap[sum]
-        else:
-            self.summap[sum] = sumcount - 1
+        count, csize, osize = self.chunkmap[id]
         if count == 1:
             del self.chunkmap[id]
             print 'deleting chunk: ', id.encode('hex')
             self.store.delete(NS_CHUNKS, id)
         else:
-            self.chunkmap[id] = (count - 1, sum, csize, osize)
+            self.chunkmap[id] = (count - 1, csize, osize)
+
+

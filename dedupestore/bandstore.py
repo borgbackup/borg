@@ -35,6 +35,10 @@ class BandStore(object):
         self.state = self.OPEN
         self.band = None
         self.to_delete = set()
+        band = self.next_band
+        while os.path.exists(self.band_filename(band)):
+            os.unlink(self.band_filename(band))
+            band += 1
 
     def create(self, path):
         os.mkdir(path)
@@ -84,18 +88,21 @@ class BandStore(object):
         else:
             raise self.DoesNotExist
 
+    def band_filename(self, band):
+        return os.path.join(self.path, 'bands', str(band))
+
     def retrieve_data(self, band, offset, size):
-        with open(os.path.join(self.path, 'bands', str(band)), 'rb') as fd:
+        with open(self.band_filename(band), 'rb') as fd:
             fd.seek(offset)
             return fd.read(size)
 
     def store_data(self, data):
         if self.band is None:
             self.band = self.next_band
-            assert not os.path.exists(os.path.join(self.path, 'bands', str(self.band)))
+            assert not os.path.exists(self.band_filename(self.band))
             self.next_band += 1
         band = self.band
-        with open(os.path.join(self.path, 'bands', str(band)), 'ab') as fd:
+        with open(self.band_filename(band), 'ab') as fd:
             offset = fd.tell()
             fd.write(data)
             if offset + len(data) > self.BAND_LIMIT:

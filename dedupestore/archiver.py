@@ -1,15 +1,14 @@
 import os
-import sys
 import hashlib
 import logging
 import zlib
 import cPickle
-from optparse import OptionParser
+import argparse
 
 from chunkifier import chunkify
 from cache import Cache, NS_ARCHIVES, NS_CHUNKS
-#from sqlitestore import SqliteStore
 from bandstore import BandStore
+from helpers import location_validator
 
 CHUNK_SIZE = 55001
 
@@ -69,18 +68,19 @@ class Archive(object):
         for item in self.items:
             print item['path']
 
-    def extract(self):
+    def extract(self, dest=None):
+        dest = dest or os.getcwdu()
         for item in self.items:
             assert item['path'][0] not in ('/', '\\', ':')
-            logging.info(item['path'])
+            path = os.path.join(dest, item['path'])
+            logging.info(path)
             if item['type'] == 'DIR':
-                if not os.path.exists(item['path']):
-                    os.makedirs(item['path'])
+                if not os.path.exists(path):
+                    os.makedirs(path)
             if item['type'] == 'FILE':
-                path = item['path']
                 if not os.path.exists(os.path.dirname(path)):
                     os.makedirs(os.path.dirname(path))
-                with open(item['path'], 'wb') as fd:
+                with open(path, 'wb') as fd:
                     for chunk in item['chunks']:
                         id = self.chunk_idx[chunk]
                         data = self.store.get(NS_CHUNKS, id)
@@ -160,87 +160,100 @@ class Archiver(object):
         else:
             return str(v)
 
-    def create_archive(self, name, paths):
-        archive = Archive(self.store)
-        archive.create(name, paths, self.cache)
+    def open_store(self, location):
+        store = BandStore(location.path)
+        cache = Cache(store)
+        return store, cache
 
-    def delete_archive(self, archive_name):
-        archive = Archive(self.store, archive_name)
-        archive.delete(self.cache)
+    def do_create(self, args):
+        store, cache = self.open_store(args.archive)
+        archive = Archive(store)
+        archive.create(args.archive.archive, args.paths, cache)
 
-    def list_archives(self):
-        print 'Archives:'
-        for archive in sorted(self.cache.archives):
-            print archive
+    def do_extract(self, args):
+        store, cache = self.open_store(args.archive)
+        archive = Archive(store, args.archive.archive)
+        archive.extract(args.dest)
 
-    def list_archive(self, archive_name):
-        archive = Archive(self.store, archive_name)
-        archive.list()
+    def do_delete(self, args):
+        store, cache = self.open_store(args.archive)
+        archive = Archive(store, args.archive.archive)
+        archive.delete(cache)
 
-    def verify_archive(self, archive_name):
-        archive = Archive(self.store, archive_name)
+    def do_list(self, args):
+        store, cache = self.open_store(args.src)
+        if args.src.archive:
+            archive = Archive(store, args.src.archive)
+            archive.list()
+        else:
+            for archive in sorted(cache.archives):
+                print archive
+
+    def do_verify(self, args):
+        store, cache = self.open_store(args.archive)
+        archive = Archive(store, args.archive.archive)
         archive.verify()
 
-    def extract_archive(self, archive_name):
-        archive = Archive(self.store, archive_name)
-        archive.extract()
-
-    def archive_stats(self, archive_name):
-        archive = Archive(self.store, archive_name)
-        stats = archive.stats(self.cache)
+    def do_info(self, args):
+        store, cache = self.open_store(args.archive)
+        archive = Archive(store, args.archive.archive)
+        stats = archive.stats(cache)
         print 'Original size:', self.pretty_size(stats['osize'])
         print 'Compressed size:', self.pretty_size(stats['csize'])
         print 'Unique data:', self.pretty_size(stats['usize'])
 
     def run(self):
-        parser = OptionParser()
-        parser.add_option("-v", "--verbose",
-                          action="store_true", dest="verbose", default=False,
-                          help="Print status messages to stdout")
-        parser.add_option("-s", "--store", dest="store",
-                          help="path to dedupe store", metavar="STORE")
-        parser.add_option("-c", "--create", dest="create_archive",
-                          help="create ARCHIVE", metavar="ARCHIVE")
-        parser.add_option("-d", "--delete", dest="delete_archive",
-                          help="delete ARCHIVE", metavar="ARCHIVE")
-        parser.add_option("-l", "--list-archives", dest="list_archives",
-                        action="store_true", default=False,
-                        help="list archives")
-        parser.add_option("-V", "--verify", dest="verify_archive",
-                        help="verify archive consistency")
-        parser.add_option("-e", "--extract", dest="extract_archive",
-                        help="extract ARCHIVE")
-        parser.add_option("-L", "--list-archive", dest="list_archive",
-                        help="verify archive consistency", metavar="ARCHIVE")
-        parser.add_option("-S", "--stats", dest="archive_stats",
-                        help="Display archive statistics", metavar="ARCHIVE")
-        (options, args) = parser.parse_args()
-        if options.verbose:
+        parser = argparse.ArgumentParser(description='Dedupestore')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
+                            default=False,
+                            help='Verbose output')
+
+        subparsers = parser.add_subparsers(title='Available subcommands')
+        subparser = subparsers.add_parser('create')
+        subparser.set_defaults(func=self.do_create)
+        subparser.add_argument('archive', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='Archive to create')
+        subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
+                               help='Paths to add to archive')
+
+        subparser = subparsers.add_parser('extract')
+        subparser.set_defaults(func=self.do_extract)
+        subparser.add_argument('archive', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='Archive to create')
+        subparser.add_argument('dest', metavar='DEST', type=str, nargs='?',
+                               help='Where to extract files')
+
+        subparser = subparsers.add_parser('delete')
+        subparser.set_defaults(func=self.do_delete)
+        subparser.add_argument('archive', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='Archive to delete')
+
+        subparser = subparsers.add_parser('list')
+        subparser.set_defaults(func=self.do_list)
+        subparser.add_argument('src', metavar='SRC', type=location_validator(),
+                               help='Store/Archive to list contents of')
+
+        subparser= subparsers.add_parser('verify')
+        subparser.set_defaults(func=self.do_verify)
+        subparser.add_argument('archive', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='Archive to verity integrity of')
+
+        subparser= subparsers.add_parser('info')
+        subparser.set_defaults(func=self.do_info)
+        subparser.add_argument('archive', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='Archive to display information about')
+
+        args = parser.parse_args()
+        if args.verbose:
             logging.basicConfig(level=logging.INFO, format='%(message)s')
         else:
             logging.basicConfig(level=logging.WARNING, format='%(message)s')
-        if options.store:
-            self.store = BandStore(options.store)
-        else:
-            parser.error('No store path specified')
-        self.cache = Cache(self.store)
-        if options.list_archives and not args:
-            self.list_archives()
-        elif options.list_archive and not args:
-            self.list_archive(options.list_archive)
-        elif options.verify_archive and not args:
-            self.verify_archive(options.verify_archive)
-        elif options.extract_archive and not args:
-            self.extract_archive(options.extract_archive)
-        elif options.delete_archive and not args:
-            self.delete_archive(options.delete_archive)
-        elif options.create_archive:
-            self.create_archive(options.create_archive, args)
-        elif options.archive_stats and not args:
-            self.archive_stats(options.archive_stats)
-        else:
-            parser.error('Invalid usage')
-            sys.exit(1)
+        args.func(args)
 
 def main():
     archiver = Archiver()

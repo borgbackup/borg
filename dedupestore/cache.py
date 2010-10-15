@@ -37,17 +37,16 @@ class Cache(object):
     def init(self):
         """Initializes cache by fetching and reading all archive indicies
         """
-        self.summap = {}
         self.chunkmap = {}
         self.archives = []
         self.tid = self.store.tid
         if self.store.tid == 0:
             return
         print 'Recreating cache...'
-        for id in self.store.list(NS_ARCHIVES):
+        for id in list(self.store.list(NS_ARCHIVES)):
             archive = cPickle.loads(zlib.decompress(self.store.get(NS_ARCHIVES, id)))
             self.archives.append(archive['name'])
-            for id, sum, csize, osize in archive['chunks']:
+            for id, csize, osize in archive['chunks']:
                 if self.seen_chunk(id):
                     self.chunk_incref(id)
                 else:

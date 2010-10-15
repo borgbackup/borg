@@ -15,13 +15,33 @@ CHUNK_SIZE = 55001
 
 class Archive(object):
 
-    def __init__(self, store, name=None):
+    def __init__(self, store, cache, name=None):
         self.store = store
+        self.cache = cache
         self.items = []
         self.chunks = []
         self.chunk_idx = {}
         if name:
             self.open(name)
+
+    def open(self, name):
+        id = self.cache.archives[name]
+        data = self.store.get(NS_ARCHIVES, id)
+        if hashlib.sha256(data).digest() != id:
+            raise Exception('Archive hash did not match')
+        archive = cPickle.loads(zlib.decompress(data))
+        self.items = archive['items']
+        self.name = archive['name']
+        self.chunks = archive['chunks']
+        for i, (id, csize, osize) in enumerate(archive['chunks']):
+            self.chunk_idx[i] = id
+
+    def save(self, name):
+        archive = {'name': name, 'items': self.items, 'chunks': self.chunks}
+        data = zlib.compress(cPickle.dumps(archive))
+        self.id = hashlib.sha256(data).digest()
+        self.store.put(NS_ARCHIVES, self.id, data)
+        self.store.commit()
 
     def add_chunk(self, id, csize, osize):
         try:
@@ -31,19 +51,6 @@ class Archive(object):
             self.chunks.append((id, csize, osize))
             self.chunk_idx[id] = idx
             return idx
-
-    def open(self, name):
-        archive = cPickle.loads(zlib.decompress(self.store.get(NS_ARCHIVES, name)))
-        self.items = archive['items']
-        self.name = archive['name']
-        self.chunks = archive['chunks']
-        for i, (id, csize, osize) in enumerate(archive['chunks']):
-            self.chunk_idx[i] = id
-
-    def save(self, name):
-        archive = {'name': name, 'items': self.items, 'chunks': self.chunks}
-        self.store.put(NS_ARCHIVES, name, zlib.compress(cPickle.dumps(archive)))
-        self.store.commit()
 
     def stats(self, cache):
         total_osize = 0
@@ -84,7 +91,11 @@ class Archive(object):
                     for chunk in item['chunks']:
                         id = self.chunk_idx[chunk]
                         data = self.store.get(NS_CHUNKS, id)
-                        if hashlib.sha1(data).digest() != id:
+                        cid = data[:32]
+                        data = data[32:]
+                        if hashlib.sha256(data).digest() != cid:
+                            raise Exception('Invalid chunk checksum')
+                        if hashlib.sha256(zlib.decompress(data)).digest() != id:
                             raise Exception('Invalid chunk checksum')
                         fd.write(zlib.decompress(data))
 
@@ -94,24 +105,30 @@ class Archive(object):
                 for chunk in item['chunks']:
                     id = self.chunk_idx[chunk]
                     data = self.store.get(NS_CHUNKS, id)
-                    if hashlib.sha1(data).digest() != id:
-                        logging.ERROR('%s ... ERROR', item['path'])
+                    data = self.store.get(NS_CHUNKS, id)
+                    cid = data[:32]
+                    data = data[32:]
+                    if (hashlib.sha256(data).digest() != cid or
+                        hashlib.sha256(zlib.decompress(data)).digest() != id):
+                        logging.error('%s ... ERROR', item['path'])
                         break
                 else:
                     logging.info('%s ... OK', item['path'])
 
     def delete(self, cache):
-        self.store.delete(NS_ARCHIVES, self.name)
+        self.store.delete(NS_ARCHIVES, self.cache.archives[self.name])
         for item in self.items:
             if item['type'] == 'FILE':
                 for c in item['chunks']:
                     id = self.chunk_idx[c]
                     cache.chunk_decref(id)
         self.store.commit()
-        cache.archives.remove(self.name)
+        del cache.archives[self.name]
         cache.save()
 
     def create(self, name, paths, cache):
+        if name in cache.archives:
+            raise NameError('Archive already exists')
         for path in paths:
             for root, dirs, files in os.walk(path):
                 for d in dirs:
@@ -123,7 +140,7 @@ class Archive(object):
                     if entry:
                         self.items.append(entry)
         self.save(name)
-        cache.archives.append(name)
+        cache.archives[name] = self.id
         cache.save()
 
     def process_dir(self, path, cache):
@@ -167,23 +184,23 @@ class Archiver(object):
 
     def do_create(self, args):
         store, cache = self.open_store(args.archive)
-        archive = Archive(store)
+        archive = Archive(store, cache)
         archive.create(args.archive.archive, args.paths, cache)
 
     def do_extract(self, args):
         store, cache = self.open_store(args.archive)
-        archive = Archive(store, args.archive.archive)
+        archive = Archive(store, cache, args.archive.archive)
         archive.extract(args.dest)
 
     def do_delete(self, args):
         store, cache = self.open_store(args.archive)
-        archive = Archive(store, args.archive.archive)
+        archive = Archive(store, cache, args.archive.archive)
         archive.delete(cache)
 
     def do_list(self, args):
         store, cache = self.open_store(args.src)
         if args.src.archive:
-            archive = Archive(store, args.src.archive)
+            archive = Archive(store, cache, args.src.archive)
             archive.list()
         else:
             for archive in sorted(cache.archives):
@@ -191,12 +208,12 @@ class Archiver(object):
 
     def do_verify(self, args):
         store, cache = self.open_store(args.archive)
-        archive = Archive(store, args.archive.archive)
+        archive = Archive(store, cache, args.archive.archive)
         archive.verify()
 
     def do_info(self, args):
         store, cache = self.open_store(args.archive)
-        archive = Archive(store, args.archive.archive)
+        archive = Archive(store, cache, args.archive.archive)
         stats = archive.stats(cache)
         print 'Original size:', self.pretty_size(stats['osize'])
         print 'Compressed size:', self.pretty_size(stats['csize'])

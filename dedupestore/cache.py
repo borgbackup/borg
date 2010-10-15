@@ -24,55 +24,58 @@ class Cache(object):
     def open(self):
         if not os.path.exists(self.path):
             return
-        print 'Loading cache: ', self.path, '...'
-        data = cPickle.loads(zlib.decompress(open(self.path, 'rb').read()))
+        data = open(self.path, 'rb').read()
+        id = data[:32]
+        data = data[32:]
+        if hashlib.sha256(data).digest() != id:
+            raise Exception('Cache hash did not match')
+        data = cPickle.loads(zlib.decompress(data))
         if data['uuid'] != self.store.uuid:
-            print >> sys.stderr, 'Cache UUID mismatch'
-            return
+            raise Exception('Cache UUID mismatch')
         self.chunkmap = data['chunkmap']
         self.archives = data['archives']
         self.tid = data['tid']
-        print 'done'
 
     def init(self):
         """Initializes cache by fetching and reading all archive indicies
         """
         self.chunkmap = {}
-        self.archives = []
+        self.archives = {}
         self.tid = self.store.tid
         if self.store.tid == 0:
             return
-        print 'Recreating cache...'
         for id in list(self.store.list(NS_ARCHIVES)):
-            archive = cPickle.loads(zlib.decompress(self.store.get(NS_ARCHIVES, id)))
-            self.archives.append(archive['name'])
+            data = self.store.get(NS_ARCHIVES, id)
+            if hashlib.sha256(data).digest() != id:
+                raise Exception('Archive hash did not match')
+            archive = cPickle.loads(zlib.decompress(data))
+            self.archives[archive['name']] = id
             for id, csize, osize in archive['chunks']:
                 if self.seen_chunk(id):
                     self.chunk_incref(id)
                 else:
                     self.init_chunk(id, csize, osize)
-        print 'done'
 
     def save(self):
         assert self.store.state == self.store.OPEN
-        print 'saving cache'
         data = {'uuid': self.store.uuid,
                 'chunkmap': self.chunkmap,
                 'tid': self.store.tid, 'archives': self.archives}
-        print 'Saving cache as:', self.path
         cachedir = os.path.dirname(self.path)
         if not os.path.exists(cachedir):
             os.makedirs(cachedir)
         with open(self.path, 'wb') as fd:
-            fd.write(zlib.compress(cPickle.dumps(data)))
-        print 'done'
+            data = zlib.compress(cPickle.dumps(data))
+            id = hashlib.sha256(data).digest()
+            fd.write(id + data)
 
     def add_chunk(self, data):
-        osize = len(data)
-        data = zlib.compress(data)
-        id = hashlib.sha1(data).digest()
+        id = hashlib.sha256(data).digest()
         if self.seen_chunk(id):
             return self.chunk_incref(id)
+        osize = len(data)
+        data = zlib.compress(data)
+        data = hashlib.sha256(data).digest() + data
         csize = len(data)
         self.store.put(NS_CHUNKS, id, data)
         return self.init_chunk(id, csize, osize)

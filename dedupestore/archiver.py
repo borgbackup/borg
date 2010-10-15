@@ -8,7 +8,7 @@ import argparse
 from chunkifier import chunkify
 from cache import Cache, NS_ARCHIVES, NS_CHUNKS
 from bandstore import BandStore
-from helpers import location_validator
+from helpers import location_validator, pretty_size
 
 CHUNK_SIZE = 55001
 
@@ -167,16 +167,6 @@ class Archive(object):
 
 class Archiver(object):
 
-    def pretty_size(self, v):
-        if v > 1024 * 1024 * 1024:
-            return '%.2f GB' % (v / 1024. / 1024. / 1024.)
-        elif v > 1024 * 1024:
-            return '%.2f MB' % (v / 1024. / 1024.)
-        elif v > 1024:
-            return '%.2f kB' % (v / 1024.)
-        else:
-            return str(v)
-
     def open_store(self, location):
         store = BandStore(location.path)
         cache = Cache(store)
@@ -215,9 +205,9 @@ class Archiver(object):
         store, cache = self.open_store(args.archive)
         archive = Archive(store, cache, args.archive.archive)
         stats = archive.stats(cache)
-        print 'Original size:', self.pretty_size(stats['osize'])
-        print 'Compressed size:', self.pretty_size(stats['csize'])
-        print 'Unique data:', self.pretty_size(stats['usize'])
+        print 'Original size:', pretty_size(stats['osize'])
+        print 'Compressed size:', pretty_size(stats['csize'])
+        print 'Unique data:', pretty_size(stats['usize'])
 
     def run(self):
         parser = argparse.ArgumentParser(description='Dedupestore')

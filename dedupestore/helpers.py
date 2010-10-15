@@ -49,3 +49,14 @@ def location_validator(archive=None):
     return validator
 
 
+def pretty_size(v):
+    if v > 1024 * 1024 * 1024:
+        return '%.2f GB' % (v / 1024. / 1024. / 1024.)
+    elif v > 1024 * 1024:
+        return '%.2f MB' % (v / 1024. / 1024.)
+    elif v > 1024:
+        return '%.2f kB' % (v / 1024.)
+    else:
+        return str(v)
+
+

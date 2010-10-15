@@ -5,6 +5,7 @@ import shutil
 import unittest
 import sqlite3
 import uuid
+import fcntl
 
 
 class BandStore(object):
@@ -20,22 +21,35 @@ class BandStore(object):
     IDLE = 'Idle'
     OPEN = 'Open'
     ACTIVE = 'Active'
-    BAND_LIMIT = 1024 * 1024 * 10
+    BAND_LIMIT = 10 * 1024 * 1024
 
     def __init__(self, path):
         if not os.path.exists(path):
             self.create(path)
+        self.open(path)
+
+    def open(self, path):
+        if not os.path.isdir(path):
+            raise Exception('%s Does not look like a store')
+        db_path = os.path.join(path, 'dedupestore.db')
+        if not os.path.exists(db_path):
+            raise Exception('%s Does not look like a store2')
+        self.lock_fd = open(os.path.join(path, 'lock'), 'w')
+        fcntl.flock(self.lock_fd, fcntl.LOCK_EX)
         self.path = path
-        self.cnx = sqlite3.connect(os.path.join(path, 'index.db'))
+        self.cnx = sqlite3.connect(db_path)
         self.cursor = self.cnx.cursor()
         self._begin()
 
     def _begin(self):
-        self.uuid, self.tid, self.next_band = self.cursor.execute('SELECT uuid, tid, nextband FROM system').fetchone()
+        row = self.cursor.execute('SELECT uuid, tid, nextband, version, '
+                                  'bandlimit FROM system').fetchone()
+        self.uuid, self.tid, self.nextband, version, self.bandlimit = row
+        assert version == 1
         self.state = self.OPEN
         self.band = None
         self.to_delete = set()
-        band = self.next_band
+        band = self.nextband
         while os.path.exists(self.band_filename(band)):
             os.unlink(self.band_filename(band))
             band += 1
@@ -43,15 +57,19 @@ class BandStore(object):
     def create(self, path):
         os.mkdir(path)
         os.mkdir(os.path.join(path, 'bands'))
-        cnx = sqlite3.connect(os.path.join(path, 'index.db'))
+        cnx = sqlite3.connect(os.path.join(path, 'dedupestore.db'))
         cnx.execute('CREATE TABLE objects(ns TEXT NOT NULL, id NOT NULL, '
                     'band NOT NULL, offset NOT NULL, size NOT NULL)')
-        cnx.execute('CREATE TABLE system(uuid NOT NULL, tid NOT NULL, nextband NOT NULL)')
-        cnx.execute('INSERT INTO system VALUES(?,?,?)', (uuid.uuid1().hex, 0, 0))
+        cnx.execute('CREATE TABLE system(uuid NOT NULL, tid NOT NULL, '
+                    'nextband NOT NULL, version NOT NULL, bandlimit NOT NULL)')
+        cnx.execute('INSERT INTO system VALUES(?,?,?,?,?)',
+                    (uuid.uuid1().hex, 0, 0, 1, self.BAND_LIMIT))
         cnx.execute('CREATE UNIQUE INDEX objects_pk ON objects(ns, id)')
 
     def close(self):
         self.cnx.close()
+        self.lock_fd.close()
+        os.unlink(os.path.join(self.path, 'lock'))
 
     def commit(self):
         """
@@ -66,7 +84,7 @@ class BandStore(object):
                                     'WHERE ns=? AND id=?', (band, offset, size, o[0], o[1]))
             os.unlink(os.path.join(self.path, 'bands', str(b)))
         self.cursor.execute('UPDATE system SET tid=tid+1, nextband=?',
-                            (self.next_band,))
+                            (self.nextband,))
         self.cnx.commit()
         self.tid += 1
         self._begin()
@@ -98,14 +116,14 @@ class BandStore(object):
 
     def store_data(self, data):
         if self.band is None:
-            self.band = self.next_band
+            self.band = self.nextband
             assert not os.path.exists(self.band_filename(self.band))
-            self.next_band += 1
+            self.nextband += 1
         band = self.band
         with open(self.band_filename(band), 'ab') as fd:
             offset = fd.tell()
             fd.write(data)
-            if offset + len(data) > self.BAND_LIMIT:
+            if offset + len(data) > self.bandlimit:
                 self.band = None
         return band, offset, len(data)
 

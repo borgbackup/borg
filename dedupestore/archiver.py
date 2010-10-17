@@ -2,10 +2,14 @@ import os
 import hashlib
 import logging
 import zlib
-import cPickle
 import argparse
 import sys
+from cStringIO import StringIO
+from datetime import datetime
 
+from avro import io
+
+from dedupestore import archive_schema
 from chunkifier import chunkify
 from cache import Cache, NS_ARCHIVES, NS_CHUNKS
 from bandstore import BandStore
@@ -41,26 +45,39 @@ class Archive(object):
         data = self.store.get(NS_ARCHIVES, id)
         if hashlib.sha256(data).digest() != id:
             raise Exception('Archive hash did not match')
-        archive = cPickle.loads(zlib.decompress(data))
+        buffer = StringIO(zlib.decompress(data))
+        reader = io.DatumReader(archive_schema)
+        decoder = io.BinaryDecoder(buffer)
+        archive = reader.read(decoder)
         self.items = archive['items']
         self.name = archive['name']
         self.chunks = archive['chunks']
-        for i, (id, csize, osize) in enumerate(archive['chunks']):
-            self.chunk_idx[i] = id
+        for i, chunk in enumerate(archive['chunks']):
+            self.chunk_idx[i] = chunk['id']
 
     def save(self, name):
-        archive = {'name': name, 'items': self.items, 'chunks': self.chunks}
-        data = zlib.compress(cPickle.dumps(archive))
+        archive = {
+            'name': name,
+            'ts': datetime.utcnow().isoformat(),
+            'items': self.items,
+            'chunks': self.chunks
+        }
+        writer = StringIO()
+        encoder = io.BinaryEncoder(writer)
+        datum_writer = io.DatumWriter(archive_schema)
+        datum_writer.write(archive, encoder)
+        data = zlib.compress(writer.getvalue())
+        print 'archive size: %d' % len(data)
         self.id = hashlib.sha256(data).digest()
         self.store.put(NS_ARCHIVES, self.id, data)
         self.store.commit()
 
-    def add_chunk(self, id, csize, osize):
+    def add_chunk(self, id, size):
         try:
             return self.chunk_idx[id]
         except KeyError:
             idx = len(self.chunks)
-            self.chunks.append((id, csize, osize))
+            self.chunks.append(dict(id=id, size=size))
             self.chunk_idx[id] = idx
             return idx
 
@@ -77,10 +94,10 @@ class Archive(object):
                     chunk_count.setdefault(id, 0)
                     chunk_count[id] += 1
         for id, c in chunk_count.items():
-            count, csize, osize = cache.chunkmap[id]
-            total_csize += csize
+            count, size = cache.chunkmap[id]
+            total_csize += size
             if  c == count:
-                total_usize += csize
+                total_usize += size
         return dict(osize=total_osize, csize=total_csize, usize=total_usize)
 
     def list(self):
@@ -93,7 +110,7 @@ class Archive(object):
             assert item['path'][0] not in ('/', '\\', ':')
             path = os.path.join(dest, item['path'])
             logging.info(path)
-            if item['type'] == 'DIR':
+            if item['type'] == 'DIRECTORY':
                 if not os.path.exists(path):
                     os.makedirs(path)
             if item['type'] == 'FILE':
@@ -142,7 +159,7 @@ class Archive(object):
         if name in cache.archives:
             raise NameError('Archive already exists')
         for path in paths:
-            for root, dirs, files in os.walk(path):
+            for root, dirs, files in os.walk(unicode(path)):
                 for d in dirs:
                     p = os.path.join(root, d)
                     self.items.append(self.process_dir(p, cache))
@@ -158,7 +175,7 @@ class Archive(object):
     def process_dir(self, path, cache):
         path = path.lstrip('/\\:')
         logging.info(path)
-        return {'type': 'DIR', 'path': path}
+        return {'type': 'DIRECTORY', 'path': path}
 
     def process_file(self, path, cache):
         try:

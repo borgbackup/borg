@@ -1,8 +1,11 @@
-import cPickle
 import hashlib
 import os
-import sys
 import zlib
+from avro import io
+from cStringIO import StringIO
+import cPickle
+
+from dedupestore import archive_schema
 
 NS_ARCHIVES = 'ARCHIVES'
 NS_CHUNKS = 'CHUNKS'
@@ -48,13 +51,17 @@ class Cache(object):
             data = self.store.get(NS_ARCHIVES, id)
             if hashlib.sha256(data).digest() != id:
                 raise Exception('Archive hash did not match')
-            archive = cPickle.loads(zlib.decompress(data))
+
+            buffer = StringIO(zlib.decompress(data))
+            reader = io.DatumReader(archive_schema)
+            decoder = io.BinaryDecoder(buffer)
+            archive = reader.read(decoder)
             self.archives[archive['name']] = id
-            for id, csize, osize in archive['chunks']:
+            for id, size in archive['chunks']:
                 if self.seen_chunk(id):
                     self.chunk_incref(id)
                 else:
-                    self.init_chunk(id, csize, osize)
+                    self.init_chunk(id, size)
 
     def save(self):
         assert self.store.state == self.store.OPEN
@@ -78,27 +85,27 @@ class Cache(object):
         data = hashlib.sha256(data).digest() + data
         csize = len(data)
         self.store.put(NS_CHUNKS, id, data)
-        return self.init_chunk(id, csize, osize)
+        return self.init_chunk(id, csize)
 
-    def init_chunk(self, id, csize, osize):
-        self.chunkmap[id] = (1, csize, osize)
-        return id, csize, osize
+    def init_chunk(self, id, size):
+        self.chunkmap[id] = (1, size)
+        return id, size
 
     def seen_chunk(self, id):
-        count, csize, osize = self.chunkmap.get(id, (0, 0, 0))
+        count, size = self.chunkmap.get(id, (0, 0))
         return count
 
     def chunk_incref(self, id):
-        count, csize, osize = self.chunkmap[id]
-        self.chunkmap[id] = (count + 1, csize, osize)
-        return id, csize, osize
+        count, size = self.chunkmap[id]
+        self.chunkmap[id] = (count + 1, size)
+        return id, size
 
     def chunk_decref(self, id):
-        count, csize, osize = self.chunkmap[id]
+        count, size = self.chunkmap[id]
         if count == 1:
             del self.chunkmap[id]
             self.store.delete(NS_CHUNKS, id)
         else:
-            self.chunkmap[id] = (count - 1, csize, osize)
+            self.chunkmap[id] = (count - 1, size)
 
 

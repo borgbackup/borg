@@ -21,9 +21,10 @@ class BandStore(object):
     IDLE = 'Idle'
     OPEN = 'Open'
     ACTIVE = 'Active'
-    BAND_LIMIT = 10 * 1024 * 1024
+    BAND_LIMIT = 1 * 1024 * 1024
 
     def __init__(self, path):
+        self.band_fd = None
         if not os.path.exists(path):
             self.create(path)
         self.open(path)
@@ -42,6 +43,9 @@ class BandStore(object):
         self._begin()
 
     def _begin(self):
+        if self.band_fd:
+            self.band_fd.close()
+            self.band_fd = None
         row = self.cursor.execute('SELECT uuid, tid, nextband, version, '
                                   'bandlimit FROM system').fetchone()
         self.uuid, self.tid, self.nextband, version, self.bandlimit = row
@@ -67,6 +71,7 @@ class BandStore(object):
         cnx.execute('CREATE UNIQUE INDEX objects_pk ON objects(ns, id)')
 
     def close(self):
+        self.rollback()
         self.cnx.close()
         self.lock_fd.close()
         os.unlink(os.path.join(self.path, 'lock'))
@@ -77,12 +82,13 @@ class BandStore(object):
         self.band = None
         for b in self.to_delete:
             objects = self.cursor.execute('SELECT ns, id, offset, size '
-                                          'FROM objects WHERE band=?', (b,)).fetchall()
+                                          'FROM objects WHERE band=? ORDER BY offset',
+                                          (b,)).fetchall()
             for o in objects:
                 band, offset, size = self.store_data(self.retrieve_data(b, *o[2:]))
                 self.cursor.execute('UPDATE objects SET band=?, offset=?, size=? '
                                     'WHERE ns=? AND id=?', (band, offset, size, o[0], o[1]))
-            os.unlink(os.path.join(self.path, 'bands', str(b)))
+            os.unlink(self.band_filename(b))
         self.cursor.execute('UPDATE system SET tid=tid+1, nextband=?',
                             (self.nextband,))
         self.cnx.commit()
@@ -107,25 +113,29 @@ class BandStore(object):
             raise self.DoesNotExist
 
     def band_filename(self, band):
-        return os.path.join(self.path, 'bands', str(band))
+        return os.path.join(self.path, 'bands', str(band / 1000), str(band))
 
     def retrieve_data(self, band, offset, size):
-        with open(self.band_filename(band), 'rb') as fd:
-            fd.seek(offset)
-            return fd.read(size)
+        if self.band != band:
+            self.band = band
+            self.band_fd = open(self.band_filename(band), 'rb')
+        self.band_fd.seek(offset)
+        return self.band_fd.read(size)
 
     def store_data(self, data):
-        if self.band is None:
+        if self.band_fd is None:
             self.band = self.nextband
-            assert not os.path.exists(self.band_filename(self.band))
             self.nextband += 1
-        band = self.band
-        with open(self.band_filename(band), 'ab') as fd:
-            offset = fd.tell()
-            fd.write(data)
-            if offset + len(data) > self.bandlimit:
-                self.band = None
-        return band, offset, len(data)
+            if self.band % 1000 == 0:
+                os.mkdir(os.path.join(self.path, 'bands', str(self.band / 1000)))
+            assert not os.path.exists(self.band_filename(self.band))
+            self.band_fd = open(self.band_filename(self.band), 'ab')
+        offset = self.band_fd.tell()
+        self.band_fd.write(data)
+        if offset + len(data) > self.bandlimit:
+            self.band_fd.close()
+            self.band_fd = None
+        return self.band, offset, len(data)
 
     def put(self, ns, id, data):
         """

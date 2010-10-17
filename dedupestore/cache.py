@@ -1,11 +1,7 @@
 import hashlib
 import os
 import zlib
-from avro import io
-from cStringIO import StringIO
-import cPickle
-
-from dedupestore import archive_schema
+import msgpack
 
 NS_ARCHIVES = 'ARCHIVES'
 NS_CHUNKS = 'CHUNKS'
@@ -32,7 +28,7 @@ class Cache(object):
         data = data[32:]
         if hashlib.sha256(data).digest() != id:
             raise Exception('Cache hash did not match')
-        data = cPickle.loads(zlib.decompress(data))
+        data = msgpack.unpackb(zlib.decompress(data))
         if data['uuid'] != self.store.uuid:
             raise Exception('Cache UUID mismatch')
         self.chunkmap = data['chunkmap']
@@ -51,23 +47,19 @@ class Cache(object):
             data = self.store.get(NS_ARCHIVES, id)
             if hashlib.sha256(data).digest() != id:
                 raise Exception('Archive hash did not match')
-
-            buffer = StringIO(zlib.decompress(data))
-            reader = io.DatumReader(archive_schema)
-            decoder = io.BinaryDecoder(buffer)
-            archive = reader.read(decoder)
+            archive = msgpack.unpackb(zlib.decompress(data))
             self.archives[archive['name']] = id
             for item in archive['items']:
                 if item['type'] != 'FILE':
                     continue
                 for idx in item['chunks']:
-                    chunk = archive['chunks'][idx]
-                    id = chunk['id']
+                    id, size = archive['chunks'][idx]
                     if self.seen_chunk(id):
                         self.chunk_incref(id)
                     else:
-                        self.init_chunk(id, chunk['size'])
-            self.save()
+                        self.init_chunk(id, size)
+        self.save()
+
 
     def save(self):
         assert self.store.state == self.store.OPEN
@@ -78,7 +70,7 @@ class Cache(object):
         if not os.path.exists(cachedir):
             os.makedirs(cachedir)
         with open(self.path, 'wb') as fd:
-            data = zlib.compress(cPickle.dumps(data))
+            data = zlib.compress(msgpack.packb(data))
             id = hashlib.sha256(data).digest()
             fd.write(id + data)
 

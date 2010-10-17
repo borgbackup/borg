@@ -4,12 +4,9 @@ import logging
 import zlib
 import argparse
 import sys
-from cStringIO import StringIO
 from datetime import datetime
 
-from avro import io
-
-from dedupestore import archive_schema
+import msgpack
 from chunkifier import chunkify
 from cache import Cache, NS_ARCHIVES, NS_CHUNKS
 from bandstore import BandStore
@@ -45,15 +42,12 @@ class Archive(object):
         data = self.store.get(NS_ARCHIVES, id)
         if hashlib.sha256(data).digest() != id:
             raise Exception('Archive hash did not match')
-        buffer = StringIO(zlib.decompress(data))
-        reader = io.DatumReader(archive_schema)
-        decoder = io.BinaryDecoder(buffer)
-        archive = reader.read(decoder)
+        archive = msgpack.unpackb(zlib.decompress(data))
         self.items = archive['items']
         self.name = archive['name']
         self.chunks = archive['chunks']
         for i, chunk in enumerate(archive['chunks']):
-            self.chunk_idx[i] = chunk['id']
+            self.chunk_idx[i] = chunk[0]
 
     def save(self, name):
         archive = {
@@ -62,11 +56,7 @@ class Archive(object):
             'items': self.items,
             'chunks': self.chunks
         }
-        writer = StringIO()
-        encoder = io.BinaryEncoder(writer)
-        datum_writer = io.DatumWriter(archive_schema)
-        datum_writer.write(archive, encoder)
-        data = zlib.compress(writer.getvalue())
+        data = zlib.compress(msgpack.packb(archive))
         self.id = hashlib.sha256(data).digest()
         self.store.put(NS_ARCHIVES, self.id, data)
         self.store.commit()
@@ -76,7 +66,7 @@ class Archive(object):
             return self.chunk_idx[id]
         except KeyError:
             idx = len(self.chunks)
-            self.chunks.append(dict(id=id, size=size))
+            self.chunks.append((id, size))
             self.chunk_idx[id] = idx
             return idx
 

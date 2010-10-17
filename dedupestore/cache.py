@@ -57,11 +57,17 @@ class Cache(object):
             decoder = io.BinaryDecoder(buffer)
             archive = reader.read(decoder)
             self.archives[archive['name']] = id
-            for id, size in archive['chunks']:
-                if self.seen_chunk(id):
-                    self.chunk_incref(id)
-                else:
-                    self.init_chunk(id, size)
+            for item in archive['items']:
+                if item['type'] != 'FILE':
+                    continue
+                for idx in item['chunks']:
+                    chunk = archive['chunks'][idx]
+                    id = chunk['id']
+                    if self.seen_chunk(id):
+                        self.chunk_incref(id)
+                    else:
+                        self.init_chunk(id, chunk['size'])
+            self.save()
 
     def save(self):
         assert self.store.state == self.store.OPEN

@@ -67,7 +67,6 @@ class Archive(object):
         datum_writer = io.DatumWriter(archive_schema)
         datum_writer.write(archive, encoder)
         data = zlib.compress(writer.getvalue())
-        print 'archive size: %d' % len(data)
         self.id = hashlib.sha256(data).digest()
         self.store.put(NS_ARCHIVES, self.id, data)
         self.store.commit()

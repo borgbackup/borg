@@ -24,7 +24,8 @@ class BandStore(object):
     BAND_LIMIT = 1 * 1024 * 1024
 
     def __init__(self, path):
-        self.band_fd = None
+        self.read_fd = None
+        self.write_fd = None
         if not os.path.exists(path):
             self.create(path)
         self.open(path)
@@ -43,15 +44,19 @@ class BandStore(object):
         self._begin()
 
     def _begin(self):
-        if self.band_fd:
-            self.band_fd.close()
-            self.band_fd = None
+        if self.read_fd:
+            self.read_fd.close()
+            self.read_fd = None
+        if self.write_fd:
+            self.write_fd.close()
+            self.write_fd = None
         row = self.cursor.execute('SELECT uuid, tid, nextband, version, '
                                   'bandlimit FROM system').fetchone()
         self.uuid, self.tid, self.nextband, version, self.bandlimit = row
         assert version == 1
         self.state = self.OPEN
-        self.band = None
+        self.read_band = None
+        self.write_band = None
         self.to_delete = set()
         band = self.nextband
         while os.path.exists(self.band_filename(band)):
@@ -88,6 +93,7 @@ class BandStore(object):
                 band, offset, size = self.store_data(self.retrieve_data(b, *o[2:]))
                 self.cursor.execute('UPDATE objects SET band=?, offset=?, size=? '
                                     'WHERE ns=? AND id=?', (band, offset, size, o[0], o[1]))
+            self.cnx.commit()
             os.unlink(self.band_filename(b))
         self.cursor.execute('UPDATE system SET tid=tid+1, nextband=?',
                             (self.nextband,))
@@ -116,26 +122,28 @@ class BandStore(object):
         return os.path.join(self.path, 'bands', str(band / 1000), str(band))
 
     def retrieve_data(self, band, offset, size):
-        if self.band != band:
-            self.band = band
-            self.band_fd = open(self.band_filename(band), 'rb')
-        self.band_fd.seek(offset)
-        return self.band_fd.read(size)
+        if self.read_band != band:
+            self.read_band = band
+            if self.read_fd:
+                self.read_fd.close()
+            self.read_fd = open(self.band_filename(band), 'rb')
+        self.read_fd.seek(offset)
+        return self.read_fd.read(size)
 
     def store_data(self, data):
-        if self.band_fd is None:
-            self.band = self.nextband
+        if self.write_band is None:
+            self.write_band = self.nextband
             self.nextband += 1
-            if self.band % 1000 == 0:
-                os.mkdir(os.path.join(self.path, 'bands', str(self.band / 1000)))
-            assert not os.path.exists(self.band_filename(self.band))
-            self.band_fd = open(self.band_filename(self.band), 'ab')
-        offset = self.band_fd.tell()
-        self.band_fd.write(data)
+            if self.write_band % 1000 == 0:
+                os.mkdir(os.path.join(self.path, 'bands', str(self.write_band / 1000)))
+            assert not os.path.exists(self.band_filename(self.write_band))
+            self.write_fd = open(self.band_filename(self.write_band), 'ab')
+        band = self.write_band
+        offset = self.write_fd.tell()
+        self.write_fd.write(data)
         if offset + len(data) > self.bandlimit:
-            self.band_fd.close()
-            self.band_fd = None
-        return self.band, offset, len(data)
+            self.write_band = None
+        return band, offset, len(data)
 
     def put(self, ns, id, data):
         """

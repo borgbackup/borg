@@ -62,6 +62,7 @@ class BandStore(object):
         while os.path.exists(self.band_filename(band)):
             os.unlink(self.band_filename(band))
             band += 1
+        self.delete_bands()
 
     def create(self, path):
         os.mkdir(path)
@@ -69,11 +70,14 @@ class BandStore(object):
         cnx = sqlite3.connect(os.path.join(path, 'dedupestore.db'))
         cnx.execute('CREATE TABLE objects(ns TEXT NOT NULL, id NOT NULL, '
                     'band NOT NULL, offset NOT NULL, size NOT NULL)')
+        cnx.execute('CREATE UNIQUE INDEX objects_pk ON objects(ns, id)')
+        cnx.execute('CREATE TABLE to_delete(band NOT NULL)')
+        cnx.execute('CREATE UNIQUE INDEX to_delete_pk ON to_delete(band)')
         cnx.execute('CREATE TABLE system(uuid NOT NULL, tid NOT NULL, '
                     'nextband NOT NULL, version NOT NULL, bandlimit NOT NULL)')
         cnx.execute('INSERT INTO system VALUES(?,?,?,?,?)',
                     (uuid.uuid1().hex, 0, 0, 1, self.BAND_LIMIT))
-        cnx.execute('CREATE UNIQUE INDEX objects_pk ON objects(ns, id)')
+        cnx.commit()
 
     def close(self):
         self.rollback()
@@ -85,7 +89,18 @@ class BandStore(object):
         """
         """
         self.band = None
-        for b in self.to_delete:
+        self.cursor.executemany('INSERT INTO to_delete(band) VALUES(?)',
+                                [[d] for d in self.to_delete])
+        self.cursor.execute('UPDATE system SET tid=tid+1, nextband=?',
+                            (self.nextband,))
+        self.cnx.commit()
+        self.tid += 1
+        self._begin()
+
+    def delete_bands(self):
+        self.cursor.execute('SELECT band FROM to_delete')
+        to_delete = [r[0] for r in self.cursor.fetchall()]
+        for b in to_delete:
             objects = self.cursor.execute('SELECT ns, id, offset, size '
                                           'FROM objects WHERE band=? ORDER BY offset',
                                           (b,)).fetchall()
@@ -93,13 +108,10 @@ class BandStore(object):
                 band, offset, size = self.store_data(self.retrieve_data(b, *o[2:]))
                 self.cursor.execute('UPDATE objects SET band=?, offset=?, size=? '
                                     'WHERE ns=? AND id=?', (band, offset, size, o[0], o[1]))
+            self.cursor.execute('DELETE FROM to_delete WHERE band=?', (b,))
+            self.cursor.execute('UPDATE system SET nextband=?', (self.nextband,))
             self.cnx.commit()
             os.unlink(self.band_filename(b))
-        self.cursor.execute('UPDATE system SET tid=tid+1, nextband=?',
-                            (self.nextband,))
-        self.cnx.commit()
-        self.tid += 1
-        self._begin()
 
     def rollback(self):
         """

@@ -98,7 +98,7 @@ class Archive(object):
         dest = dest or os.getcwdu()
         for item in self.items:
             assert item['path'][0] not in ('/', '\\', ':')
-            path = os.path.join(dest, item['path'])
+            path = os.path.join(dest, item['path'].decode('utf-8'))
             if item['type'] == 'DIRECTORY':
                 logging.info(path)
                 if not os.path.exists(path):
@@ -127,6 +127,7 @@ class Archive(object):
     def verify(self):
         for item in self.items:
             if item['type'] == 'FILE':
+                item['path'] = item['path'].decode('utf-8')
                 for chunk in item['chunks']:
                     id = self.chunk_idx[chunk]
                     data = self.store.get(NS_CHUNKS, id)

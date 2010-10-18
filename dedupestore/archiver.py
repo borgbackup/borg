@@ -17,7 +17,7 @@ CHUNK_SIZE = 55001
 class LevelFilter(logging.Filter):
 
     def __init__(self, *args, **kwargs):
-        super(LevelFilter, self).__init__(args, **kwargs)
+        logging.Filter.__init__(self, *args, **kwargs)
         self.count = {}
 
     def filter(self, record):

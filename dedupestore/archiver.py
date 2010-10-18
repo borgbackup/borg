@@ -120,9 +120,10 @@ class Archive(object):
                         data = data[32:]
                         if hashlib.sha256(data).digest() != cid:
                             raise Exception('Invalid chunk checksum')
-                        if hashlib.sha256(zlib.decompress(data)).digest() != id:
-                            raise Exception('Invalid chunk checksum')
-                        fd.write(zlib.decompress(data))
+                        data = zlib.decompress(data)
+#                        if hashlib.sha256(data).digest() != id:
+#                            raise Exception('Invalid chunk checksum')
+                        fd.write(data)
 
     def verify(self):
         for item in self.items:
@@ -134,10 +135,13 @@ class Archive(object):
                     data = self.store.get(NS_CHUNKS, id)
                     cid = data[:32]
                     data = data[32:]
-                    if (hashlib.sha256(data).digest() != cid or
-                        hashlib.sha256(zlib.decompress(data)).digest() != id):
+                    if (hashlib.sha256(data).digest() != cid):
                         logging.error('%s ... ERROR', item['path'])
                         break
+#                    if (hashlib.sha256(data).digest() != cid or
+#                        hashlib.sha256(zlib.decompress(data)).digest() != id):
+#                        logging.error('%s ... ERROR', item['path'])
+#                        break
                 else:
                     logging.info('%s ... OK', item['path'])
 

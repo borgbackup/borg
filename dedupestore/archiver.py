@@ -4,6 +4,7 @@ import logging
 import zlib
 import argparse
 import sys
+import stat
 from datetime import datetime
 
 import msgpack
@@ -98,11 +99,17 @@ class Archive(object):
         for item in self.items:
             assert item['path'][0] not in ('/', '\\', ':')
             path = os.path.join(dest, item['path'])
-            logging.info(path)
             if item['type'] == 'DIRECTORY':
+                logging.info(path)
                 if not os.path.exists(path):
                     os.makedirs(path)
-            if item['type'] == 'FILE':
+            elif item['type'] == 'SYMLINK':
+                logging.info('%s => %s', path, item['source'])
+                if not os.path.exists(os.path.dirname(path)):
+                    os.makedirs(os.path.dirname(path))
+                os.symlink(item['source'], path)
+            elif item['type'] == 'FILE':
+                logging.info(path)
                 if not os.path.exists(os.path.dirname(path)):
                     os.makedirs(os.path.dirname(path))
                 with open(path, 'wb') as fd:
@@ -144,34 +151,48 @@ class Archive(object):
         del cache.archives[self.name]
         cache.save()
 
+    def walk(self, path):
+        st = os.lstat(path)
+        if stat.S_ISDIR(st.st_mode):
+            for f in os.listdir(path):
+                for x in self.walk(os.path.join(path, f)):
+                    yield x
+        else:
+            yield path, st
+
     def create(self, name, paths, cache):
         if name in cache.archives:
             raise NameError('Archive already exists')
         for path in paths:
-            for root, dirs, files in os.walk(unicode(path)):
-                for d in dirs:
-                    p = os.path.join(root, d)
-                    self.items.append(self.process_dir(p, cache))
-                for f in files:
-                    p = os.path.join(root, f)
-                    entry = self.process_file(p, cache)
-                    if entry:
-                        self.items.append(entry)
+            for path, st in self.walk(unicode(path)):
+                if stat.S_ISDIR(st.st_mode):
+                    self.process_dir(path, st)
+                elif stat.S_ISLNK(st.st_mode):
+                    self.process_link(path, st)
+                elif stat.S_ISREG(st.st_mode):
+                    self.process_file(path, st)
+                else:
+                    logging.error('Unknown file type: %s', path)
         self.save(name)
         cache.archives[name] = self.id
         cache.save()
 
-    def process_dir(self, path, cache):
+    def process_dir(self, path, st):
         path = path.lstrip('/\\:')
         logging.info(path)
-        return {'type': 'DIRECTORY', 'path': path}
+        self.items.append({'type': 'DIRECTORY', 'path': path})
 
-    def process_file(self, path, cache):
+    def process_link(self, path, st):
+        source = os.readlink(path)
+        path = path.lstrip('/\\:')
+        logging.info('%s => %s', path, source)
+        self.items.append({'type': 'SYMLINK', 'path': path, 'source': source})
+
+    def process_file(self, path, st):
         try:
             fd = open(path, 'rb')
         except IOError, e:
             logging.error(e)
-            return
         with fd:
             path = path.lstrip('/\\:')
             logging.info(path)
@@ -179,8 +200,8 @@ class Archive(object):
             size = 0
             for chunk in chunkify(fd, CHUNK_SIZE, 30):
                 size += len(chunk)
-                chunks.append(self.add_chunk(*cache.add_chunk(chunk)))
-        return {'type': 'FILE', 'path': path, 'chunks': chunks, 'size': size}
+                chunks.append(self.add_chunk(*self.cache.add_chunk(chunk)))
+        self.items.append({'type': 'FILE', 'path': path, 'chunks': chunks, 'size': size})
 
 
 class Archiver(object):

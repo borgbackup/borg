@@ -42,6 +42,17 @@ class Test(unittest.TestCase):
         fd.close()
         self.dedupestore('verify', self.store_path + '::test', exit_code=1)
 
+    def test_symlinks(self):
+        testdir = os.path.join(self.tmpdir, 'linktest')
+        os.mkdir(testdir)
+        os.symlink('/tmp/somewhere', os.path.join(testdir, 'link'))
+        self.dedupestore('create', self.store_path + '::symlinktest', testdir)
+        dest_dir = os.path.join(self.tmpdir, 'dest')
+        self.dedupestore('extract', self.store_path + '::symlinktest', dest_dir)
+        dest = os.path.join(dest_dir, testdir[1:])
+        self.assertEqual(os.path.islink(os.path.join(dest, 'link')), True)
+        self.assertEqual(os.readlink(os.path.join(dest, 'link')), '/tmp/somewhere')
+
 
 if __name__ == '__main__':
     unittest.main()

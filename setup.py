@@ -8,7 +8,7 @@ setup(name='Dedupestore',
       author=u'Jonas Borgström',
       author_email='jonas@borgstrom.se',
       packages=['dedupestore'],
-      ext_modules=[Extension('_speedups', ['dedupestore/_speedups.c'])],
+      ext_modules=[Extension('dedupestore._speedups', ['dedupestore/_speedups.c'])],
       entry_points = {
         'console_scripts': [
             'dedupestore = dedupestore.archiver:main',

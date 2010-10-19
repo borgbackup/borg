@@ -73,7 +73,7 @@ class ChunkifyIter(object):
                                          self.data[self.i],
                                          self.window_size)
             self.i += 1
-            if self.i == self.buf_size and self.last == self.window_size - 1:
+            if self.i == self.buf_size and self.last == -1:
                 old_last = self.last
                 self.last = self.i - 1
                 return self.data[old_last + 1:self.last + 1]

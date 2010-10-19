@@ -111,11 +111,10 @@ ChunkifyIter_iternext(PyObject *self)
                                    c->window_size);
         }
         c->i++;
-        if(c->i == c->buf_size && c->last == c->window_size - 1)
+        if(c->i == c->buf_size && c->last == -1)
         {
             int old_last = c->last;
             c->last = c->i - 1;
-            printf("Max chunk size reached %d\n", c->last - old_last);
             return PyString_FromStringAndSize((char *)(c->data + old_last + 1),
                                               c->last - old_last);
         }

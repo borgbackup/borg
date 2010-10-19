@@ -11,7 +11,8 @@ import msgpack
 from .chunkifier import chunkify
 from .cache import Cache, NS_ARCHIVES, NS_CHUNKS
 from .bandstore import BandStore
-from .helpers import location_validator, pretty_size, LevelFilter
+from .helpers import location_validator, pretty_size, LevelFilter, \
+    uid2user, user2uid, gid2group, group2gid
 
 CHUNK_SIZE = 55001
 
@@ -110,6 +111,14 @@ class Archive(object):
                             raise Exception('Invalid chunk checksum')
                         data = zlib.decompress(data)
                         fd.write(data)
+                os.chmod(path, item['mode'])
+                uid = user2uid(item['user']) or item['uid']
+                gid = group2gid(item['group']) or item['gid']
+                try:
+                    os.chown(path, uid, gid)
+                except OSError:
+                    pass
+                os.utime(path, (item['ctime'], item['mtime']))
 
     def verify(self):
         for item in self.items:
@@ -189,7 +198,13 @@ class Archive(object):
             for chunk in chunkify(fd, CHUNK_SIZE, 30):
                 size += len(chunk)
                 chunks.append(self.add_chunk(*self.cache.add_chunk(chunk)))
-        self.items.append({'type': 'FILE', 'path': path, 'chunks': chunks, 'size': size})
+        self.items.append({
+            'type': 'FILE', 'path': path, 'chunks': chunks, 'size': size,
+            'mode': st.st_mode,
+            'uid': st.st_uid, 'user': uid2user(st.st_uid),
+            'gid': st.st_gid, 'group': gid2group(st.st_gid),
+            'ctime': st.st_ctime, 'mtime': st.st_mtime,
+        })
 
 
 class Archiver(object):

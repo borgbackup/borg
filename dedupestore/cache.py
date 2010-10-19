@@ -3,8 +3,8 @@ import os
 import zlib
 import msgpack
 
-NS_ARCHIVES = 'ARCHIVES'
-NS_CHUNKS = 'CHUNKS'
+NS_ARCHIVES = 'A'
+NS_CHUNKS = 'C'
 
 
 class Cache(object):

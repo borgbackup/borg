@@ -2,7 +2,9 @@ import os
 import shutil
 import tempfile
 import unittest
-from archiver import Archiver
+
+from .archiver import Archiver
+from . import bandstore
 
 
 class Test(unittest.TestCase):
@@ -54,5 +56,11 @@ class Test(unittest.TestCase):
         self.assertEqual(os.readlink(os.path.join(dest, 'link')), '/tmp/somewhere')
 
 
+def suite():
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.TestLoader().loadTestsFromTestCase(Test))
+    suite.addTest(bandstore.suite())
+    return suite
+
 if __name__ == '__main__':
-    unittest.main()
+    unittest.TextTestRunner(verbosity=2).run(suite())

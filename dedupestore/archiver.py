@@ -121,8 +121,6 @@ class Archive(object):
                         if hashlib.sha256(data).digest() != cid:
                             raise Exception('Invalid chunk checksum')
                         data = zlib.decompress(data)
-#                        if hashlib.sha256(data).digest() != id:
-#                            raise Exception('Invalid chunk checksum')
                         fd.write(data)
 
     def verify(self):
@@ -138,10 +136,6 @@ class Archive(object):
                     if (hashlib.sha256(data).digest() != cid):
                         logging.error('%s ... ERROR', item['path'])
                         break
-#                    if (hashlib.sha256(data).digest() != cid or
-#                        hashlib.sha256(zlib.decompress(data)).digest() != id):
-#                        logging.error('%s ... ERROR', item['path'])
-#                        break
                 else:
                     logging.info('%s ... OK', item['path'])
 
@@ -198,6 +192,7 @@ class Archive(object):
             fd = open(path, 'rb')
         except IOError, e:
             logging.error(e)
+            return
         with fd:
             path = path.lstrip('/\\:')
             logging.info(path)

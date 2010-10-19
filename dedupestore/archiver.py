@@ -8,24 +8,12 @@ import stat
 from datetime import datetime
 
 import msgpack
-from chunkifier import chunkify
-from cache import Cache, NS_ARCHIVES, NS_CHUNKS
-from bandstore import BandStore
-from helpers import location_validator, pretty_size
+from .chunkifier import chunkify
+from .cache import Cache, NS_ARCHIVES, NS_CHUNKS
+from .bandstore import BandStore
+from .helpers import location_validator, pretty_size, LevelFilter
 
 CHUNK_SIZE = 55001
-
-class LevelFilter(logging.Filter):
-
-    def __init__(self, *args, **kwargs):
-        logging.Filter.__init__(self, *args, **kwargs)
-        self.count = {}
-
-    def filter(self, record):
-        self.count.setdefault(record.levelname, 0)
-        self.count[record.levelname] += 1
-        return record
-
 
 class Archive(object):
 

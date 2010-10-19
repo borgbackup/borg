@@ -1,5 +1,19 @@
+import logging
 import argparse
 import re
+
+
+class LevelFilter(logging.Filter):
+
+    def __init__(self, *args, **kwargs):
+        logging.Filter.__init__(self, *args, **kwargs)
+        self.count = {}
+
+    def filter(self, record):
+        self.count.setdefault(record.levelname, 0)
+        self.count[record.levelname] += 1
+        return record
+
 
 
 class Location(object):

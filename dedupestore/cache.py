@@ -1,7 +1,7 @@
 import hashlib
 import os
-import zlib
 import msgpack
+import zlib
 
 NS_ARCHIVES = 'A'
 NS_CHUNKS = 'C'

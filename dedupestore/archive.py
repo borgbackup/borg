@@ -22,6 +22,7 @@ class Archive(object):
         self.items = []
         self.chunks = []
         self.chunk_idx = {}
+        self.hard_links = {}
         if name:
             self.open(name)
 
@@ -80,6 +81,7 @@ class Archive(object):
 
     def extract(self, dest=None):
         dest = dest or os.getcwdu()
+        dir_stat_queue = []
         for item in self.items:
             assert item['path'][0] not in ('/', '\\', ':')
             path = os.path.join(dest, item['path'].decode('utf-8'))
@@ -87,11 +89,25 @@ class Archive(object):
                 logging.info(path)
                 if not os.path.exists(path):
                     os.makedirs(path)
+                dir_stat_queue.append((path, item))
+                continue
             elif item['type'] == 'SYMLINK':
-                logging.info('%s => %s', path, item['source'])
                 if not os.path.exists(os.path.dirname(path)):
                     os.makedirs(os.path.dirname(path))
-                os.symlink(item['source'], path)
+                source = item['source']
+                logging.info('%s -> %s', path, source)
+                if os.path.exists(path):
+                    os.unlink(path)
+                os.symlink(source, path)
+                self.restore_stat(path, item, call_utime=False)
+            elif item['type'] == 'HARDLINK':
+                if not os.path.exists(os.path.dirname(path)):
+                    os.makedirs(os.path.dirname(path))
+                source = os.path.join(dest, item['source'])
+                logging.info('%s => %s', path, source)
+                if os.path.exists(path):
+                    os.unlink(path)
+                os.link(source, path)
             elif item['type'] == 'FILE':
                 logging.info(path)
                 if not os.path.exists(os.path.dirname(path)):
@@ -106,14 +122,23 @@ class Archive(object):
                             raise Exception('Invalid chunk checksum')
                         data = zlib.decompress(data)
                         fd.write(data)
-                os.chmod(path, item['mode'])
-                uid = user2uid(item['user']) or item['uid']
-                gid = group2gid(item['group']) or item['gid']
-                try:
-                    os.chown(path, uid, gid)
-                except OSError:
-                    pass
-                os.utime(path, (item['ctime'], item['mtime']))
+                self.restore_stat(path, item)
+            else:
+                raise Exception('Unknown archive item type %r' % item['type'])
+            if dir_stat_queue and not path.startswith(dir_stat_queue[-1][0]):
+                self.restore_stat(*dir_stat_queue.pop())
+
+    def restore_stat(self, path, item, call_utime=True):
+        os.lchmod(path, item['mode'])
+        uid = user2uid(item['user']) or item['uid']
+        gid = group2gid(item['group']) or item['gid']
+        try:
+            os.lchown(path, uid, gid)
+        except OSError:
+            pass
+        if call_utime:
+            # FIXME: We should really call futimes here (c extension required)
+            os.utime(path, (item['ctime'], item['mtime']))
 
     def verify(self):
         for item in self.items:
@@ -140,12 +165,11 @@ class Archive(object):
 
     def _walk(self, path):
         st = os.lstat(path)
+        yield path, st
         if stat.S_ISDIR(st.st_mode):
             for f in os.listdir(path):
                 for x in self._walk(os.path.join(path, f)):
                     yield x
-        else:
-            yield path, st
 
     def create(self, name, paths, cache):
         if name in cache.archives:
@@ -155,7 +179,7 @@ class Archive(object):
                 if stat.S_ISDIR(st.st_mode):
                     self.process_dir(path, st)
                 elif stat.S_ISLNK(st.st_mode):
-                    self.process_link(path, st)
+                    self.process_symlink(path, st)
                 elif stat.S_ISREG(st.st_mode):
                     self.process_file(path, st)
                 else:
@@ -167,30 +191,50 @@ class Archive(object):
     def process_dir(self, path, st):
         path = path.lstrip('/\\:')
         logging.info(path)
-        self.items.append({'type': 'DIRECTORY', 'path': path})
+        self.items.append({
+            'type': 'DIRECTORY', 'path': path,
+            'mode': st.st_mode,
+            'uid': st.st_uid, 'user': uid2user(st.st_uid),
+            'gid': st.st_gid, 'group': gid2group(st.st_gid),
+            'ctime': st.st_ctime, 'mtime': st.st_mtime,
+        })
 
-    def process_link(self, path, st):
+    def process_symlink(self, path, st):
         source = os.readlink(path)
         path = path.lstrip('/\\:')
-        logging.info('%s => %s', path, source)
-        self.items.append({'type': 'SYMLINK', 'path': path, 'source': source})
-
+        logging.info('%s -> %s', path, source)
+        self.items.append({
+            'type': 'SYMLINK', 'path': path, 'source': source,
+            'mode': st.st_mode,
+            'uid': st.st_uid, 'user': uid2user(st.st_uid),
+            'gid': st.st_gid, 'group': gid2group(st.st_gid),
+            'ctime': st.st_ctime, 'mtime': st.st_mtime,
+        })
     def process_file(self, path, st):
+        safe_path = path.lstrip('/\\:')
+        if st.st_nlink > 1:
+            source = self.hard_links.get((st.st_ino, st.st_dev))
+            if (st.st_ino, st.st_dev) in self.hard_links:
+                logging.info('%s => %s', path, source)
+                self.items.append({ 'type': 'HARDLINK',
+                                    'path': path, 'source': source})
+                return
+            else:
+                self.hard_links[st.st_ino, st.st_dev] = safe_path
         try:
             fd = open(path, 'rb')
         except IOError, e:
             logging.error(e)
             return
         with fd:
-            path = path.lstrip('/\\:')
-            logging.info(path)
+            logging.info(safe_path)
             chunks = []
             size = 0
             for chunk in chunkify(fd, CHUNK_SIZE, 30):
                 chunks.append(self.process_chunk(chunk))
                 size += len(chunk)
         self.items.append({
-            'type': 'FILE', 'path': path, 'chunks': chunks, 'size': size,
+            'type': 'FILE', 'path': safe_path, 'chunks': chunks, 'size': size,
             'mode': st.st_mode,
             'uid': st.st_uid, 'user': uid2user(st.st_uid),
             'gid': st.st_gid, 'group': gid2group(st.st_gid),
@@ -207,6 +251,4 @@ class Archive(object):
             self.chunks.append((id, size))
             self.chunk_idx[idx] = id
             return idx
-
-
 

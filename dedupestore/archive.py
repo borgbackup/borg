@@ -61,18 +61,12 @@ class Archive(object):
         total_osize = 0
         total_csize = 0
         total_usize = 0
-        chunk_count = {}
         for item in self.items:
             if item['type'] == 'FILE':
                 total_osize += item['size']
-                for idx in item['chunks']:
-                    id = self.chunk_idx[idx]
-                    chunk_count.setdefault(id, 0)
-                    chunk_count[id] += 1
-        for id, c in chunk_count.items():
-            count, size = cache.chunkmap[id]
+        for id, size in self.chunks:
             total_csize += size
-            if  c == count:
+            if self.cache.seen_chunk(id) == 1:
                 total_usize += size
         return dict(osize=total_osize, csize=total_csize, usize=total_usize)
 
@@ -124,7 +118,6 @@ class Archive(object):
                 for chunk in item['chunks']:
                     id = self.chunk_idx[chunk]
                     data = self.store.get(NS_CHUNKS, id)
-                    data = self.store.get(NS_CHUNKS, id)
                     cid = data[:32]
                     data = data[32:]
                     if (hashlib.sha256(data).digest() != cid):
@@ -135,20 +128,17 @@ class Archive(object):
 
     def delete(self, cache):
         self.store.delete(NS_ARCHIVES, self.cache.archives[self.name])
-        for item in self.items:
-            if item['type'] == 'FILE':
-                for c in item['chunks']:
-                    id = self.chunk_idx[c]
-                    cache.chunk_decref(id)
+        for id, size in self.chunks:
+            cache.chunk_decref(id)
         self.store.commit()
         del cache.archives[self.name]
         cache.save()
 
-    def walk(self, path):
+    def _walk(self, path):
         st = os.lstat(path)
         if stat.S_ISDIR(st.st_mode):
             for f in os.listdir(path):
-                for x in self.walk(os.path.join(path, f)):
+                for x in self._walk(os.path.join(path, f)):
                     yield x
         else:
             yield path, st
@@ -157,7 +147,7 @@ class Archive(object):
         if name in cache.archives:
             raise NameError('Archive already exists')
         for path in paths:
-            for path, st in self.walk(unicode(path)):
+            for path, st in self._walk(unicode(path)):
                 if stat.S_ISDIR(st.st_mode):
                     self.process_dir(path, st)
                 elif stat.S_ISLNK(st.st_mode):
@@ -193,8 +183,8 @@ class Archive(object):
             chunks = []
             size = 0
             for chunk in chunkify(fd, CHUNK_SIZE, 30):
+                chunks.append(self.process_chunk(chunk))
                 size += len(chunk)
-                chunks.append(self.add_chunk(*self.cache.add_chunk(chunk)))
         self.items.append({
             'type': 'FILE', 'path': path, 'chunks': chunks, 'size': size,
             'mode': st.st_mode,
@@ -202,6 +192,17 @@ class Archive(object):
             'gid': st.st_gid, 'group': gid2group(st.st_gid),
             'ctime': st.st_ctime, 'mtime': st.st_mtime,
         })
+
+    def process_chunk(self, data):
+        id = hashlib.sha256(data).digest()
+        try:
+            return self.chunk_idx[id]
+        except KeyError:
+            idx = len(self.chunks)
+            size = self.cache.add_chunk(id, data)
+            self.chunks.append((id, size))
+            self.chunk_idx[idx] = id
+            return idx
 
 
 

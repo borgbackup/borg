@@ -49,17 +49,13 @@ class Cache(object):
                 raise Exception('Archive hash did not match')
             archive = msgpack.unpackb(zlib.decompress(data))
             self.archives[archive['name']] = id
-            for item in archive['items']:
-                if item['type'] != 'FILE':
-                    continue
-                for idx in item['chunks']:
-                    id, size = archive['chunks'][idx]
-                    if self.seen_chunk(id):
-                        self.chunk_incref(id)
-                    else:
-                        self.init_chunk(id, size)
+            for id, size in archive['chunks']:
+                try:
+                    count, size = self.chunkmap[id]
+                    self.chunkmap[id] = count + 1, size
+                except KeyError:
+                    self.chunkmap[id] = 1, size
         self.save()
-
 
     def save(self):
         assert self.store.state == self.store.OPEN
@@ -74,16 +70,14 @@ class Cache(object):
             id = hashlib.sha256(data).digest()
             fd.write(id + data)
 
-    def add_chunk(self, data):
-        id = hashlib.sha256(data).digest()
+    def add_chunk(self, id, data):
         if self.seen_chunk(id):
             return self.chunk_incref(id)
-        osize = len(data)
         data = zlib.compress(data)
         data = hashlib.sha256(data).digest() + data
         csize = len(data)
         self.store.put(NS_CHUNKS, id, data)
-        return self.init_chunk(id, csize)
+        return self.init_chunk(id, csize)[1]
 
     def init_chunk(self, id, size):
         self.chunkmap[id] = (1, size)
@@ -96,7 +90,7 @@ class Cache(object):
     def chunk_incref(self, id):
         count, size = self.chunkmap[id]
         self.chunkmap[id] = (count + 1, size)
-        return id, size
+        return size
 
     def chunk_decref(self, id):
         count, size = self.chunkmap[id]

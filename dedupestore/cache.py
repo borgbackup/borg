@@ -1,6 +1,7 @@
 import hashlib
-import os
+import logging
 import msgpack
+import os
 import zlib
 
 NS_ARCHIVES = 'A'
@@ -29,7 +30,11 @@ class Cache(object):
         if hashlib.sha256(data).digest() != id:
             raise Exception('Cache hash did not match')
         data = msgpack.unpackb(zlib.decompress(data))
-        if data['uuid'] != self.store.uuid:
+        version = data.get('version')
+        if version != 1:
+            logging.error('Unsupported cache version %r' % version)
+            return
+        if data['store'] != self.store.uuid:
             raise Exception('Cache UUID mismatch')
         self.chunkmap = data['chunkmap']
         self.archives = data['archives']
@@ -38,6 +43,7 @@ class Cache(object):
     def init(self):
         """Initializes cache by fetching and reading all archive indicies
         """
+        logging.info('Initialzing cache...')
         self.chunkmap = {}
         self.archives = {}
         self.tid = self.store.tid
@@ -59,7 +65,8 @@ class Cache(object):
 
     def save(self):
         assert self.store.state == self.store.OPEN
-        data = {'uuid': self.store.uuid,
+        data = {'version': 1,
+                'store': self.store.uuid,
                 'chunkmap': self.chunkmap,
                 'tid': self.store.tid, 'archives': self.archives}
         cachedir = os.path.dirname(self.path)
@@ -77,11 +84,8 @@ class Cache(object):
         data = hashlib.sha256(data).digest() + data
         csize = len(data)
         self.store.put(NS_CHUNKS, id, data)
-        return self.init_chunk(id, csize)[1]
-
-    def init_chunk(self, id, size):
-        self.chunkmap[id] = (1, size)
-        return id, size
+        self.chunkmap[id] = (1, csize)
+        return csize
 
     def seen_chunk(self, id):
         count, size = self.chunkmap.get(id, (0, 0))

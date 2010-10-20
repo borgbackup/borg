@@ -4,6 +4,7 @@ import logging
 import msgpack
 import os
 import stat
+import sys
 import zlib
 
 from .cache import NS_ARCHIVES, NS_CHUNKS
@@ -30,6 +31,9 @@ class Archive(object):
         if hashlib.sha256(data).digest() != id:
             raise Exception('Archive hash did not match')
         archive = msgpack.unpackb(zlib.decompress(data))
+        version = archive.get('version')
+        if version != 1:
+            raise Exception('Archive version %r not supported' % version)
         self.items = archive['items']
         self.name = archive['name']
         self.chunks = archive['chunks']
@@ -38,7 +42,9 @@ class Archive(object):
 
     def save(self, name):
         archive = {
+            'version': 1,
             'name': name,
+            'cmdline': ' '.join(sys.argv),
             'ts': datetime.utcnow().isoformat(),
             'items': self.items,
             'chunks': self.chunks
@@ -58,17 +64,15 @@ class Archive(object):
             return idx
 
     def stats(self, cache):
-        total_osize = 0
-        total_csize = 0
-        total_usize = 0
+        osize = csize = usize = 0
         for item in self.items:
             if item['type'] == 'FILE':
-                total_osize += item['size']
+                osize += item['size']
         for id, size in self.chunks:
-            total_csize += size
+            csize += size
             if self.cache.seen_chunk(id) == 1:
-                total_usize += size
-        return dict(osize=total_osize, csize=total_csize, usize=total_usize)
+                usize += size
+        return osize, csize, usize
 
     def list(self):
         for item in self.items:

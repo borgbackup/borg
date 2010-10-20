@@ -55,10 +55,10 @@ class Archiver(object):
     def do_info(self, args):
         store, cache = self.open_store(args.archive)
         archive = Archive(store, cache, args.archive.archive)
-        stats = archive.stats(cache)
-        print 'Original size:', pretty_size(stats['osize'])
-        print 'Compressed size:', pretty_size(stats['csize'])
-        print 'Unique data:', pretty_size(stats['usize'])
+        osize, csize, usize = archive.stats(cache)
+        print 'Original size:', pretty_size(osize)
+        print 'Compressed size:', pretty_size(csize)
+        print 'Unique data:', pretty_size(usize)
         return self.exit_code_from_logger()
 
     def run(self, args=None):

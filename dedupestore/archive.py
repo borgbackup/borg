@@ -249,6 +249,6 @@ class Archive(object):
             idx = len(self.chunks)
             size = self.cache.add_chunk(id, data)
             self.chunks.append((id, size))
-            self.chunk_idx[idx] = id
+            self.chunk_idx[id] = idx
             return idx
 

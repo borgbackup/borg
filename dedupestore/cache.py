@@ -28,19 +28,15 @@ class Cache(object):
         if not os.path.exists(self.path):
             return
         data = open(self.path, 'rb').read()
-        id = data[:32]
-        data = data[32:]
-        if hashlib.sha256(data).digest() != id:
-            raise Exception('Cache hash did not match')
-        data = msgpack.unpackb(zlib.decompress(data))
-        version = data.get('version')
+        cache = unpack(data)
+        version = cache.get('version')
         if version != 1:
             logging.error('Unsupported cache version %r' % version)
             return
-        if data['store'] != self.store.uuid:
+        if cache['store'] != self.store.uuid:
             raise Exception('Cache UUID mismatch')
-        self.chunkmap = data['chunkmap']
-        self.tid = data['tid']
+        self.chunkmap = cache['chunkmap']
+        self.tid = cache['tid']
 
     def init(self):
         """Initializes cache by fetching and reading all archive indicies
@@ -62,18 +58,17 @@ class Cache(object):
 
     def save(self):
         assert self.store.state == self.store.OPEN
-        data = {'version': 1,
+        cache = {'version': 1,
                 'store': self.store.uuid,
                 'chunkmap': self.chunkmap,
                 'tid': self.store.tid,
         }
+        _, data = pack(cache)
         cachedir = os.path.dirname(self.path)
         if not os.path.exists(cachedir):
             os.makedirs(cachedir)
         with open(self.path, 'wb') as fd:
-            data = zlib.compress(msgpack.packb(data))
-            id = hashlib.sha256(data).digest()
-            fd.write(id + data)
+            fd.write(data)
 
     def add_chunk(self, id, data):
         if self.seen_chunk(id):

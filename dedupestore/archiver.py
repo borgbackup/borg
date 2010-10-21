@@ -12,49 +12,51 @@ class Archiver(object):
 
     def open_store(self, location):
         store = BandStore(location.path)
-        cache = Cache(store)
-        return store, cache
+        return store
 
     def exit_code_from_logger(self):
         return 1 if self.level_filter.count.get('ERROR') else 0
 
     def do_create(self, args):
-        store, cache = self.open_store(args.archive)
-        archive = Archive(store, cache)
+        store = self.open_store(args.archive)
+        cache = Cache(store)
+        archive = Archive(store)
         archive.create(args.archive.archive, args.paths, cache)
         return self.exit_code_from_logger()
 
     def do_extract(self, args):
-        store, cache = self.open_store(args.archive)
-        archive = Archive(store, cache, args.archive.archive)
+        store = self.open_store(args.archive)
+        archive = Archive(store, args.archive.archive)
         archive.extract(args.dest)
         return self.exit_code_from_logger()
 
     def do_delete(self, args):
-        store, cache = self.open_store(args.archive)
-        archive = Archive(store, cache, args.archive.archive)
+        store = self.open_store(args.archive)
+        cache = Cache(store)
+        archive = Archive(store, args.archive.archive)
         archive.delete(cache)
         return self.exit_code_from_logger()
 
     def do_list(self, args):
-        store, cache = self.open_store(args.src)
+        store = self.open_store(args.src)
         if args.src.archive:
-            archive = Archive(store, cache, args.src.archive)
+            archive = Archive(store, args.src.archive)
             archive.list()
         else:
-            for archive in sorted(cache.archives):
+            for archive in Archive.list_archives(store):
                 print archive
         return self.exit_code_from_logger()
 
     def do_verify(self, args):
-        store, cache = self.open_store(args.archive)
-        archive = Archive(store, cache, args.archive.archive)
+        store = self.open_store(args.archive)
+        archive = Archive(store, args.archive.archive)
         archive.verify()
         return self.exit_code_from_logger()
 
     def do_info(self, args):
-        store, cache = self.open_store(args.archive)
-        archive = Archive(store, cache, args.archive.archive)
+        store = self.open_store(args.archive)
+        cache = Cache(store)
+        archive = Archive(store, args.archive.archive)
         osize, csize, usize = archive.stats(cache)
         print 'Original size:', pretty_size(osize)
         print 'Compressed size:', pretty_size(csize)

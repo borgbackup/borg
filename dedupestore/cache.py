@@ -4,8 +4,11 @@ import msgpack
 import os
 import zlib
 
+from .helpers import pack, unpack
+
 NS_ARCHIVES = 'A'
 NS_CHUNKS = 'C'
+NS_CINDEX = 'I'
 
 
 class Cache(object):
@@ -37,25 +40,19 @@ class Cache(object):
         if data['store'] != self.store.uuid:
             raise Exception('Cache UUID mismatch')
         self.chunkmap = data['chunkmap']
-        self.archives = data['archives']
         self.tid = data['tid']
 
     def init(self):
         """Initializes cache by fetching and reading all archive indicies
         """
-        logging.info('Initialzing cache...')
+        logging.info('Initializing cache...')
         self.chunkmap = {}
-        self.archives = {}
         self.tid = self.store.tid
         if self.store.tid == 0:
             return
-        for id in list(self.store.list(NS_ARCHIVES)):
-            data = self.store.get(NS_ARCHIVES, id)
-            if hashlib.sha256(data).digest() != id:
-                raise Exception('Archive hash did not match')
-            archive = msgpack.unpackb(zlib.decompress(data))
-            self.archives[archive['name']] = id
-            for id, size in archive['chunks']:
+        for id in list(self.store.list(NS_CINDEX)):
+            cindex = unpack(self.store.get(NS_CINDEX, id))
+            for id, size in cindex['chunks']:
                 try:
                     count, size = self.chunkmap[id]
                     self.chunkmap[id] = count + 1, size
@@ -68,7 +65,8 @@ class Cache(object):
         data = {'version': 1,
                 'store': self.store.uuid,
                 'chunkmap': self.chunkmap,
-                'tid': self.store.tid, 'archives': self.archives}
+                'tid': self.store.tid,
+        }
         cachedir = os.path.dirname(self.path)
         if not os.path.exists(cachedir):
             os.makedirs(cachedir)
@@ -80,8 +78,7 @@ class Cache(object):
     def add_chunk(self, id, data):
         if self.seen_chunk(id):
             return self.chunk_incref(id)
-        data = zlib.compress(data)
-        data = hashlib.sha256(data).digest() + data
+        _, data = pack(data)
         csize = len(data)
         self.store.put(NS_CHUNKS, id, data)
         self.chunkmap[id] = (1, csize)

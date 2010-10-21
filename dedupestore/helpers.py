@@ -1,26 +1,8 @@
 import argparse
 import grp
-import hashlib
 import logging
-import msgpack
 import pwd
 import re
-import zlib
-
-
-def pack(data):
-    data = zlib.compress(msgpack.packb(data))
-    id = hashlib.sha256(data).digest()
-    tid = 0
-    return id, msgpack.packb((1, tid, id, data))
-
-
-def unpack(data):
-    version, tid, id, data = msgpack.unpackb(data)
-    assert version == 1
-    if hashlib.sha256(data).digest() != id:
-        raise ValueError
-    return msgpack.unpackb(zlib.decompress(data))
 
 
 def memoize(function):

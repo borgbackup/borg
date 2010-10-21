@@ -1,10 +1,6 @@
-import hashlib
 import logging
 import msgpack
 import os
-import zlib
-
-from .helpers import pack, unpack
 
 NS_ARCHIVES = 'A'
 NS_CHUNKS = 'C'
@@ -15,20 +11,19 @@ class Cache(object):
     """Client Side cache
     """
 
-    def __init__(self, store):
+    def __init__(self, store, crypt):
         self.store = store
         self.path = os.path.join(os.path.expanduser('~'), '.dedupestore', 'cache',
                                  '%s.cache' % self.store.uuid)
         self.tid = -1
         self.open()
         if self.tid != self.store.tid:
-            self.init()
+            self.init(crypt)
 
     def open(self):
         if not os.path.exists(self.path):
             return
-        data = open(self.path, 'rb').read()
-        cache = unpack(data)
+        cache = msgpack.unpackb(open(self.path, 'rb').read())
         version = cache.get('version')
         if version != 1:
             logging.error('Unsupported cache version %r' % version)
@@ -38,7 +33,7 @@ class Cache(object):
         self.chunkmap = cache['chunkmap']
         self.tid = cache['tid']
 
-    def init(self):
+    def init(self, crypt):
         """Initializes cache by fetching and reading all archive indicies
         """
         logging.info('Initializing cache...')
@@ -47,7 +42,7 @@ class Cache(object):
         if self.store.tid == 0:
             return
         for id in list(self.store.list(NS_CINDEX)):
-            cindex = unpack(self.store.get(NS_CINDEX, id))
+            cindex = crypt.unpack_create(self.store.get(NS_CINDEX, id))
             for id, size in cindex['chunks']:
                 try:
                     count, size = self.chunkmap[id]
@@ -63,17 +58,17 @@ class Cache(object):
                 'chunkmap': self.chunkmap,
                 'tid': self.store.tid,
         }
-        _, data = pack(cache)
+        data = msgpack.packb(cache)
         cachedir = os.path.dirname(self.path)
         if not os.path.exists(cachedir):
             os.makedirs(cachedir)
         with open(self.path, 'wb') as fd:
             fd.write(data)
 
-    def add_chunk(self, id, data):
+    def add_chunk(self, id, data, crypt):
         if self.seen_chunk(id):
             return self.chunk_incref(id)
-        _, data = pack(data)
+        data = crypt.pack_read(data)
         csize = len(data)
         self.store.put(NS_CHUNKS, id, data)
         self.chunkmap[id] = (1, csize)

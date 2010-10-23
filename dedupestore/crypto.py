@@ -1,19 +1,18 @@
-import hashlib
-import hmac
-import msgpack
 import os
 import zlib
 
 from Crypto.Cipher import AES
+from Crypto.Hash import SHA256, HMAC
+from Crypto.Util.number import bytes_to_long, long_to_bytes
+
+from .helpers import IntegrityError
+from .oaep import OAEP
 
 
 class CryptoManager(object):
 
-    KEY_CREATE = 1
-    KEY_READ = 2
-    KEY_ID = 3
-    KEY_ARCHIVE = 4
-    KEY_CINDEX = 5
+    CREATE = '\1'
+    READ = '\2'
 
     def __init__(self, store):
         self.key_cache = {}
@@ -22,61 +21,47 @@ class CryptoManager(object):
         self.id_key = '0' * 32
         self.read_key = os.urandom(32)
         self.create_key = os.urandom(32)
-
-    def get_key(self, tid):
-        try:
-            return self.key_cache[tid]
-        except KeyError:
-            keys = self.load_key(tid)
-            self.key_cache[tid] = keys
-            return keys
-
-    def load_key(self, tid):
-        data = self.store.get('K', str(tid))
-        id = data[:32]
-        if self.id_hash(data[32:]) != id:
-            raise Exception('Invalid key object found')
-        key = msgpack.unpackb(data[32:])
-        return key['create'], key['read']
-
-    def store_key(self):
-        key = {
-            'version': 1,
-            'read': self.read_key,
-            'create': self.create_key,
-        }
-        data = msgpack.packb(key)
-        id = self.id_hash(data)
-        self.store.put('K', str(self.tid), id + data)
+        self.read_encrypted = OAEP(256, hash=SHA256).encode(self.read_key, os.urandom(32))
+        self.create_encrypted = OAEP(256, hash=SHA256).encode(self.create_key, os.urandom(32))
 
     def id_hash(self, data):
-        return hmac.new(self.id_key, data, hashlib.sha256).digest()
+        return HMAC.new(self.id_key, data, SHA256).digest()
 
-    def pack(self, data, key):
-        data = zlib.compress(msgpack.packb(data))
-        id = hmac.new(key, data, hashlib.sha256).digest()
-        data = AES.new(key, AES.MODE_CFB, id[:16]).encrypt(data)
-        return id + msgpack.packb((1, self.tid, data))
+    def encrypt_read(self, data):
+        key_data = OAEP(256, hash=SHA256).encode(self.read_key, os.urandom(32))
+        #key_data = self.rsa_create.encrypt(key_data)
+        data = zlib.compress(data)
+        hash = SHA256.new(data).digest()
+        data = AES.new(self.read_key, AES.MODE_CFB, hash[:16]).encrypt(data)
+        return ''.join((self.READ, self.read_encrypted, hash, data))
 
-    def pack_read(self, data):
-        return self.pack(data, self.read_key)
+    def encrypt_create(self, data):
+        key_data = OAEP(256, hash=SHA256).encode(self.create_key, os.urandom(32))
+        #key_data = self.rsa_create.encrypt(key_data)
+        data = zlib.compress(data)
+        hash = SHA256.new(data).digest()
+        data = AES.new(self.create_key, AES.MODE_CFB, hash[:16]).encrypt(data)
+        return ''.join((self.CREATE, self.create_encrypted, hash, data))
 
-    def pack_create(self, data):
-        return self.pack(data, self.create_key)
-
-    def unpack(self, data, key_idx):
-        id = data[:32]
-        version, tid, data = msgpack.unpackb(data[32:])
-        assert version == 1
-        key = self.get_key(tid)[key_idx]
-        data = AES.new(key, AES.MODE_CFB, id[:16]).decrypt(data)
-        if hmac.new(key, data, hashlib.sha256).digest() != id:
-            raise ValueError
-        return msgpack.unpackb(zlib.decompress(data))
-
-    def unpack_read(self, data):
-        return self.unpack(data, 1)
-
-    def unpack_create(self, data):
-        return self.unpack(data, 0)
-
+    def decrypt(self, data):
+        type = data[0]
+        if type == self.READ:
+            key_data = data[1:257]
+            hash = data[257:289]
+            #key_data = self.rsa_create.decrypt(key_data)
+            key = OAEP(256, hash=SHA256).decode(key_data)
+            data = AES.new(key, AES.MODE_CFB, hash[:16]).decrypt(data[289:])
+            if SHA256.new(data).digest() != hash:
+                raise IntegrityError('decryption failed')
+            return zlib.decompress(data)
+        elif type == self.CREATE:
+            key_data = data[1:257]
+            hash = data[257:289]
+            #key_data = self.rsa_create.decrypt(key_data)
+            key = OAEP(256, hash=SHA256).decode(key_data)
+            data = AES.new(key, AES.MODE_CFB, hash[:16]).decrypt(data[289:])
+            if SHA256.new(data).digest() != hash:
+                raise IntegrityError('decryption failed')
+            return zlib.decompress(data)
+        else:
+            raise Exception('Unknown pack type %d found' % ord(type))

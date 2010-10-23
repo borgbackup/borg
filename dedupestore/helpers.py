@@ -5,6 +5,11 @@ import pwd
 import re
 
 
+class IntegrityError(Exception):
+    """
+    """
+
+
 def memoize(function):
     cache = {}
     def decorated_function(*args):

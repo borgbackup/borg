@@ -1,5 +1,6 @@
 from datetime import datetime
 import logging
+import msgpack
 import os
 import stat
 import sys
@@ -7,7 +8,7 @@ import sys
 from .cache import NS_ARCHIVES, NS_CHUNKS, NS_CINDEX
 from .chunkifier import chunkify
 from .crypto import CryptoManager
-from .helpers import uid2user, user2uid, gid2group, group2gid
+from .helpers import uid2user, user2uid, gid2group, group2gid, IntegrityError
 
 CHUNK_SIZE = 55001
 
@@ -26,12 +27,12 @@ class Archive(object):
 
     def load(self, id):
         self.id = id
-        archive = self.crypto.unpack_read(self.store.get(NS_ARCHIVES, self.id))
+        archive = msgpack.unpackb(self.crypto.decrypt(self.store.get(NS_ARCHIVES, self.id)))
         if archive['version'] != 1:
             raise Exception('Archive version %r not supported' % archive['version'])
         self.items = archive['items']
         self.name = archive['name']
-        cindex = self.crypto.unpack_create(self.store.get(NS_CINDEX, self.id))
+        cindex = msgpack.unpackb(self.crypto.decrypt(self.store.get(NS_CINDEX, self.id)))
         assert cindex['version'] == 1
         self.chunks = cindex['chunks']
         for i, chunk in enumerate(self.chunks):
@@ -46,15 +47,14 @@ class Archive(object):
             'ts': datetime.utcnow().isoformat(),
             'items': self.items,
         }
-        data = self.crypto.pack_read(archive)
+        data = self.crypto.encrypt_read(msgpack.packb(archive))
         self.store.put(NS_ARCHIVES, self.id, data)
         cindex = {
             'version': 1,
             'chunks': self.chunks,
         }
-        data = self.crypto.pack_create(cindex)
+        data = self.crypto.encrypt_create(msgpack.packb(cindex))
         self.store.put(NS_CINDEX, self.id, data)
-        self.crypto.store_key()
         self.store.commit()
 
     def add_chunk(self, id, size):
@@ -118,7 +118,7 @@ class Archive(object):
                     for chunk in item['chunks']:
                         id = self.chunk_idx[chunk]
                         try:
-                            fd.write(self.crypto.unpack_read(self.store.get(NS_CHUNKS, id)))
+                            fd.write(self.crypto.decrypt(self.store.get(NS_CHUNKS, id)))
                         except ValueError:
                             raise Exception('Invalid chunk checksum')
                 self.restore_stat(path, item)
@@ -146,8 +146,8 @@ class Archive(object):
                 for chunk in item['chunks']:
                     id = self.chunk_idx[chunk]
                     try:
-                        self.crypto.unpack_read(self.store.get(NS_CHUNKS, id))
-                    except ValueError:
+                        self.crypto.decrypt(self.store.get(NS_CHUNKS, id))
+                    except IntegrityError:
                         logging.error('%s ... ERROR', item['path'])
                         break
                     else:

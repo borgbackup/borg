@@ -7,7 +7,6 @@ import sys
 
 from .cache import NS_ARCHIVES, NS_CHUNKS, NS_CINDEX
 from .chunkifier import chunkify
-from .crypto import CryptoManager
 from .helpers import uid2user, user2uid, gid2group, group2gid, IntegrityError
 
 CHUNK_SIZE = 55001
@@ -15,8 +14,8 @@ CHUNK_SIZE = 55001
 
 class Archive(object):
 
-    def __init__(self, store, name=None):
-        self.crypto = CryptoManager(store)
+    def __init__(self, store, crypto, name=None):
+        self.crypto = crypto
         self.store = store
         self.items = []
         self.chunks = []
@@ -150,8 +149,8 @@ class Archive(object):
                     except IntegrityError:
                         logging.error('%s ... ERROR', item['path'])
                         break
-                    else:
-                        logging.info('%s ... OK', item['path'])
+                else:
+                    logging.info('%s ... OK', item['path'])
 
     def delete(self, cache):
         self.store.delete(NS_ARCHIVES, self.id)
@@ -254,8 +253,8 @@ class Archive(object):
             return idx
 
     @staticmethod
-    def list_archives(store):
+    def list_archives(store, crypto):
         for id in store.list(NS_ARCHIVES):
-            archive = Archive(store)
+            archive = Archive(store, crypto)
             archive.load(id)
             yield archive

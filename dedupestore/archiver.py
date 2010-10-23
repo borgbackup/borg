@@ -5,6 +5,7 @@ import sys
 from .archive import Archive
 from .bandstore import BandStore
 from .cache import Cache
+from .crypto import CryptoManager, KeyChain
 from .helpers import location_validator, pretty_size, LevelFilter
 
 
@@ -19,43 +20,55 @@ class Archiver(object):
 
     def do_create(self, args):
         store = self.open_store(args.archive)
-        archive = Archive(store)
+        keychain = KeyChain(args.keychain)
+        crypto = CryptoManager(keychain)
+        archive = Archive(store, crypto)
         cache = Cache(store, archive.crypto)
         archive.create(args.archive.archive, args.paths, cache)
         return self.exit_code_from_logger()
 
     def do_extract(self, args):
         store = self.open_store(args.archive)
-        archive = Archive(store, args.archive.archive)
+        keychain = KeyChain(args.keychain)
+        crypto = CryptoManager(keychain)
+        archive = Archive(store, crypto, args.archive.archive)
         archive.extract(args.dest)
         return self.exit_code_from_logger()
 
     def do_delete(self, args):
         store = self.open_store(args.archive)
-        archive = Archive(store, args.archive.archive)
+        keychain = KeyChain(args.keychain)
+        crypto = CryptoManager(keychain)
+        archive = Archive(store, crypto, args.archive.archive)
         cache = Cache(store, archive.crypto)
         archive.delete(cache)
         return self.exit_code_from_logger()
 
     def do_list(self, args):
         store = self.open_store(args.src)
+        keychain = KeyChain(args.keychain)
+        crypto = CryptoManager(keychain)
         if args.src.archive:
-            archive = Archive(store, args.src.archive)
+            archive = Archive(store, crypto, args.src.archive)
             archive.list()
         else:
-            for archive in Archive.list_archives(store):
+            for archive in Archive.list_archives(store, crypto):
                 print archive
         return self.exit_code_from_logger()
 
     def do_verify(self, args):
         store = self.open_store(args.archive)
-        archive = Archive(store, args.archive.archive)
+        keychain = KeyChain(args.keychain)
+        crypto = CryptoManager(keychain)
+        archive = Archive(store, crypto, args.archive.archive)
         archive.verify()
         return self.exit_code_from_logger()
 
     def do_info(self, args):
         store = self.open_store(args.archive)
-        archive = Archive(store, args.archive.archive)
+        keychain = KeyChain(args.keychain)
+        crypto = CryptoManager(keychain)
+        archive = Archive(store, crypto, args.archive.archive)
         cache = Cache(store, archive.crypto)
         osize, csize, usize = archive.stats(cache)
         print 'Original size:', pretty_size(osize)
@@ -63,13 +76,28 @@ class Archiver(object):
         print 'Unique data:', pretty_size(usize)
         return self.exit_code_from_logger()
 
+    def do_keychain_generate(self, args):
+        keychain = KeyChain.generate()
+        keychain.save(args.path)
+        return 0
+
     def run(self, args=None):
         parser = argparse.ArgumentParser(description='Dedupestore')
+        parser.add_argument('-k', '--key-chain', dest='keychain', type=str,
+                            help='Key chain')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
                             default=False,
                             help='Verbose output')
 
+
         subparsers = parser.add_subparsers(title='Available subcommands')
+        subparser = subparsers.add_parser('keychain')
+        subsubparsers = subparser.add_subparsers(title='Available subcommands')
+        subparser = subsubparsers.add_parser('generate')
+        subparser.add_argument('path', metavar='PATH', type=str,
+                               help='Path to keychain')
+        subparser.set_defaults(func=self.do_keychain_generate)
+
         subparser = subparsers.add_parser('create')
         subparser.set_defaults(func=self.do_create)
         subparser.add_argument('archive', metavar='ARCHIVE',

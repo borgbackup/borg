@@ -11,14 +11,14 @@ class Cache(object):
     """Client Side cache
     """
 
-    def __init__(self, store, crypt):
+    def __init__(self, store, crypto):
         self.store = store
         self.path = os.path.join(os.path.expanduser('~'), '.dedupestore', 'cache',
                                  '%s.cache' % self.store.uuid)
         self.tid = -1
         self.open()
         if self.tid != self.store.tid:
-            self.init(crypt)
+            self.init(crypto)
 
     def open(self):
         if not os.path.exists(self.path):
@@ -33,7 +33,7 @@ class Cache(object):
         self.chunkmap = cache['chunkmap']
         self.tid = cache['tid']
 
-    def init(self, crypt):
+    def init(self, crypto):
         """Initializes cache by fetching and reading all archive indicies
         """
         logging.info('Initializing cache...')
@@ -42,7 +42,7 @@ class Cache(object):
         if self.store.tid == 0:
             return
         for id in list(self.store.list(NS_CINDEX)):
-            cindex = crypt.unpack_create(self.store.get(NS_CINDEX, id))
+            cindex = crypto.unpack_create(self.store.get(NS_CINDEX, id))
             for id, size in cindex['chunks']:
                 try:
                     count, size = self.chunkmap[id]

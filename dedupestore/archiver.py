@@ -20,7 +20,7 @@ class Archiver(object):
     def do_create(self, args):
         store = self.open_store(args.archive)
         archive = Archive(store)
-        cache = Cache(store, archive.crypt)
+        cache = Cache(store, archive.crypto)
         archive.create(args.archive.archive, args.paths, cache)
         return self.exit_code_from_logger()
 
@@ -33,7 +33,7 @@ class Archiver(object):
     def do_delete(self, args):
         store = self.open_store(args.archive)
         archive = Archive(store, args.archive.archive)
-        cache = Cache(store, archive.crypt)
+        cache = Cache(store, archive.crypto)
         archive.delete(cache)
         return self.exit_code_from_logger()
 
@@ -56,7 +56,7 @@ class Archiver(object):
     def do_info(self, args):
         store = self.open_store(args.archive)
         archive = Archive(store, args.archive.archive)
-        cache = Cache(store, archive.crypt)
+        cache = Cache(store, archive.crypto)
         osize, csize, usize = archive.stats(cache)
         print 'Original size:', pretty_size(osize)
         print 'Compressed size:', pretty_size(csize)

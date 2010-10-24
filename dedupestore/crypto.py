@@ -28,10 +28,10 @@ class KeyChain(object):
             cdata = fd.read()
         data = self.decrypt(cdata, '')
         while not data:
-            password = getpass('Keychain password: ')
-            if not password:
+            self.password = getpass('Keychain password: ')
+            if not self.password:
                 raise Exception('Keychain decryption failed')
-            data = self.decrypt(cdata, password)
+            data = self.decrypt(cdata, self.password)
             if not data:
                 logging.error('Incorrect password')
         chain = msgpack.unpackb(data)
@@ -79,15 +79,33 @@ class KeyChain(object):
             fd.write(data)
             logging.info('Key chain "%s" saved', path)
 
+    def restrict(self, path):
+        if os.path.exists(path):
+            logging.error('%s already exists', path)
+            return 1
+        self.rsa_read = self.rsa_read.publickey()
+        self.save(path, self.password)
+        return 0
+
     @staticmethod
-    def generate(path, password):
+    def generate(path):
+        if os.path.exists(path):
+            logging.error('%s already exists', path)
+            return 1
+        password = ''
+        password2 = 'x'
+        while password != password2:
+            password = getpass('Keychain password: ')
+            password2 = getpass('Keychain password again: ')
+            if password != password2:
+                logging.error('Passwords do not match')
         chain = KeyChain()
         logging.info('Generating keys')
         chain.aes_id = os.urandom(32)
         chain.rsa_read = RSA.generate(2048)
         chain.rsa_create = RSA.generate(2048)
         chain.save(path, password)
-        return chain
+        return 0
 
 class CryptoManager(object):
 

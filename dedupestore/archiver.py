@@ -78,15 +78,10 @@ class Archiver(object):
         return self.exit_code_from_logger()
 
     def do_keychain_generate(self, args):
-        password = ''
-        password2 = 'x'
-        while password != password2:
-            password = getpass('Keychain password: ')
-            password2 = getpass('Keychain password again: ')
-            if password != password2:
-                logging.error('Passwords do not match')
-        keychain = KeyChain.generate(args.path, password)
-        return 0
+        return KeyChain.generate(args.path)
+
+    def do_keychain_restrict(self, args):
+        return KeyChain(args.input).restrict(args.output)
 
     def run(self, args=None):
         parser = argparse.ArgumentParser(description='Dedupestore')
@@ -104,6 +99,12 @@ class Archiver(object):
         subparser.add_argument('path', metavar='PATH', type=str,
                                help='Path to keychain')
         subparser.set_defaults(func=self.do_keychain_generate)
+        subparser = subsubparsers.add_parser('restrict')
+        subparser.add_argument('input', metavar='INPUT', type=str,
+                               help='Existing keychain')
+        subparser.add_argument('output', metavar='OUTPUT', type=str,
+                               help='Keychain to create')
+        subparser.set_defaults(func=self.do_keychain_restrict)
 
         subparser = subparsers.add_parser('create')
         subparser.set_defaults(func=self.do_create)

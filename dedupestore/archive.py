@@ -109,7 +109,7 @@ class Archive(object):
                 if os.path.exists(path):
                     os.unlink(path)
                 os.symlink(source, path)
-                self.restore_stat(path, item, call_utime=False)
+                self.restore_stat(path, item, symlink=True)
             elif item['type'] == 'HARDLINK':
                 if not os.path.exists(os.path.dirname(path)):
                     os.makedirs(os.path.dirname(path))
@@ -138,15 +138,18 @@ class Archive(object):
             if dir_stat_queue and not path.startswith(dir_stat_queue[-1][0]):
                 self.restore_stat(*dir_stat_queue.pop())
 
-    def restore_stat(self, path, item, call_utime=True):
+    def restore_stat(self, path, item, symlink=False):
         os.lchmod(path, item['mode'])
         uid = user2uid(item['user']) or item['uid']
         gid = group2gid(item['group']) or item['gid']
         try:
-            os.lchown(path, uid, gid)
+            if hasattr(os, 'lchown'):  # Not available on Linux
+                os.lchown(path, uid, gid)
+            elif not symlink:
+                os.chown(path, uid, gid)
         except OSError:
             pass
-        if call_utime:
+        if not symlink:
             # FIXME: We should really call futimes here (c extension required)
             os.utime(path, (item['ctime'], item['mtime']))
 

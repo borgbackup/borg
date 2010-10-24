@@ -1,4 +1,5 @@
 from datetime import datetime
+from getpass import getuser
 import logging
 import msgpack
 import os
@@ -56,6 +57,7 @@ class Archive(object):
             'cindex': cindex_hash,
             'cmdline': sys.argv,
             'hostname': socket.gethostname(),
+            'username': getuser(),
             'ts': datetime.utcnow().isoformat(),
             'items': self.items,
         }

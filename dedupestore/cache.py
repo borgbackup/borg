@@ -42,7 +42,8 @@ class Cache(object):
         if self.store.tid == 0:
             return
         for id in list(self.store.list(NS_CINDEX)):
-            cindex = msgpack.unpackb(crypto.decrypt(self.store.get(NS_CINDEX, id)))
+            data, hash = crypto.decrypt(self.store.get(NS_CINDEX, id))
+            cindex = msgpack.unpackb(data)
             for id, size in cindex['chunks']:
                 try:
                     count, size = self.chunkmap[id]
@@ -68,7 +69,7 @@ class Cache(object):
     def add_chunk(self, id, data, crypto):
         if self.seen_chunk(id):
             return self.chunk_incref(id)
-        data = crypto.encrypt_read(data)
+        data, hash = crypto.encrypt_read(data)
         csize = len(data)
         self.store.put(NS_CHUNKS, id, data)
         self.chunkmap[id] = (1, csize)

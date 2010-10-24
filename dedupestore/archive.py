@@ -2,6 +2,7 @@ from datetime import datetime
 import logging
 import msgpack
 import os
+import socket
 import stat
 import sys
 
@@ -26,34 +27,40 @@ class Archive(object):
 
     def load(self, id):
         self.id = id
-        archive = msgpack.unpackb(self.crypto.decrypt(self.store.get(NS_ARCHIVES, self.id)))
+        data, hash = self.crypto.decrypt(self.store.get(NS_ARCHIVES, self.id))
+        archive = msgpack.unpackb(data)
         if archive['version'] != 1:
             raise Exception('Archive version %r not supported' % archive['version'])
         self.items = archive['items']
         self.name = archive['name']
-        cindex = msgpack.unpackb(self.crypto.decrypt(self.store.get(NS_CINDEX, self.id)))
+        data, hash = self.crypto.decrypt(self.store.get(NS_CINDEX, self.id))
+        cindex = msgpack.unpackb(data)
         assert cindex['version'] == 1
+        if archive['cindex'] != hash:
+            raise Exception('decryption failed')
         self.chunks = cindex['chunks']
         for i, chunk in enumerate(self.chunks):
             self.chunk_idx[i] = chunk[0]
 
     def save(self, name):
         self.id = self.crypto.id_hash(name)
-        archive = {
-            'version': 1,
-            'name': name,
-            'cmdline': sys.argv,
-            'ts': datetime.utcnow().isoformat(),
-            'items': self.items,
-        }
-        data = self.crypto.encrypt_read(msgpack.packb(archive))
-        self.store.put(NS_ARCHIVES, self.id, data)
         cindex = {
             'version': 1,
             'chunks': self.chunks,
         }
-        data = self.crypto.encrypt_create(msgpack.packb(cindex))
+        data, cindex_hash = self.crypto.encrypt_create(msgpack.packb(cindex))
         self.store.put(NS_CINDEX, self.id, data)
+        archive = {
+            'version': 1,
+            'name': name,
+            'cindex': cindex_hash,
+            'cmdline': sys.argv,
+            'hostname': socket.gethostname(),
+            'ts': datetime.utcnow().isoformat(),
+            'items': self.items,
+        }
+        data, hash = self.crypto.encrypt_read(msgpack.packb(archive))
+        self.store.put(NS_ARCHIVES, self.id, data)
         self.store.commit()
 
     def add_chunk(self, id, size):
@@ -117,7 +124,10 @@ class Archive(object):
                     for chunk in item['chunks']:
                         id = self.chunk_idx[chunk]
                         try:
-                            fd.write(self.crypto.decrypt(self.store.get(NS_CHUNKS, id)))
+                            data, hash = self.crypto.decrypt(self.store.get(NS_CHUNKS, id))
+                            if self.crypto.id_hash(data) != id:
+                                raise IntegrityError('chunk id did not match')
+                            fd.write(data)
                         except ValueError:
                             raise Exception('Invalid chunk checksum')
                 self.restore_stat(path, item)
@@ -145,7 +155,9 @@ class Archive(object):
                 for chunk in item['chunks']:
                     id = self.chunk_idx[chunk]
                     try:
-                        self.crypto.decrypt(self.store.get(NS_CHUNKS, id))
+                        data, hash = self.crypto.decrypt(self.store.get(NS_CHUNKS, id))
+                        if self.crypto.id_hash(data) != id:
+                            raise IntegrityError('chunk id did not match')
                     except IntegrityError:
                         logging.error('%s ... ERROR', item['path'])
                         break

@@ -68,17 +68,17 @@ class CryptoManager(object):
 
     def encrypt_read(self, data):
         data = zlib.compress(data)
-        hash = SHA256.new(data).digest()
+        hash = self.id_hash(data)
         counter = Counter.new(128, initial_value=bytes_to_long(hash[:16]), allow_wraparound=True)
         data = AES.new(self.read_key, AES.MODE_CTR, '', counter=counter).encrypt(data)
-        return ''.join((self.READ, self.read_encrypted, hash, data))
+        return ''.join((self.READ, self.read_encrypted, hash, data)), hash
 
     def encrypt_create(self, data):
         data = zlib.compress(data)
-        hash = SHA256.new(data).digest()
+        hash = self.id_hash(data)
         counter = Counter.new(128, initial_value=bytes_to_long(hash[:16]), allow_wraparound=True)
         data = AES.new(self.create_key, AES.MODE_CTR, '', counter=counter).encrypt(data)
-        return ''.join((self.CREATE, self.create_encrypted, hash, data))
+        return ''.join((self.CREATE, self.create_encrypted, hash, data)), hash
 
     def decrypt_key(self, data, rsa_key):
         try:
@@ -94,16 +94,17 @@ class CryptoManager(object):
             hash = data[257:289]
             counter = Counter.new(128, initial_value=bytes_to_long(hash[:16]), allow_wraparound=True)
             data = AES.new(key, AES.MODE_CTR, counter=counter).decrypt(data[289:])
-            if SHA256.new(data).digest() != hash:
+            if self.id_hash(data) != hash:
                 raise IntegrityError('decryption failed')
-            return zlib.decompress(data)
+            return zlib.decompress(data), hash
         elif type == self.CREATE:
             key = self.decrypt_key(data[1:257], self.keychain.rsa_create)
             hash = data[257:289]
             counter = Counter.new(128, initial_value=bytes_to_long(hash[:16]), allow_wraparound=True)
             data = AES.new(key, AES.MODE_CTR, '', counter=counter).decrypt(data[289:])
-            if SHA256.new(data).digest() != hash:
+            if self.id_hash(data) != hash:
                 raise IntegrityError('decryption failed')
-            return zlib.decompress(data)
+            return zlib.decompress(data), hash
         else:
             raise Exception('Unknown pack type %d found' % ord(type))
+

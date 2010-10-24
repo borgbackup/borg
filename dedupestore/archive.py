@@ -59,7 +59,7 @@ class Archive(object):
             'ts': datetime.utcnow().isoformat(),
             'items': self.items,
         }
-        data, hash = self.crypto.encrypt_read(msgpack.packb(archive))
+        data, self.hash = self.crypto.encrypt_read(msgpack.packb(archive))
         self.store.put(NS_ARCHIVES, self.id, data)
         self.store.commit()
 
@@ -181,8 +181,9 @@ class Archive(object):
                     yield x
 
     def create(self, name, paths, cache):
+        id = self.crypto.id_hash(name)
         try:
-            self.store.get(NS_ARCHIVES, name)
+            self.store.get(NS_ARCHIVES, id)
         except self.store.DoesNotExist:
             pass
         else:

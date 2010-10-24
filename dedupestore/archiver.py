@@ -1,4 +1,5 @@
 import argparse
+from getpass import getpass
 import logging
 import sys
 
@@ -77,8 +78,14 @@ class Archiver(object):
         return self.exit_code_from_logger()
 
     def do_keychain_generate(self, args):
-        keychain = KeyChain.generate()
-        keychain.save(args.path)
+        password = ''
+        password2 = 'x'
+        while password != password2:
+            password = getpass('Keychain password: ')
+            password2 = getpass('Keychain password again: ')
+            if password != password2:
+                logging.error('Passwords do not match')
+        keychain = KeyChain.generate(args.path, password)
         return 0
 
     def run(self, args=None):

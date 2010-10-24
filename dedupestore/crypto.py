@@ -1,8 +1,11 @@
+from getpass import getpass
+import hashlib
 import os
 import logging
 import msgpack
 import zlib
 
+from pbkdf2 import pbkdf2
 from Crypto.Cipher import AES
 from Crypto.Hash import SHA256, HMAC
 from Crypto.PublicKey import RSA
@@ -22,30 +25,68 @@ class KeyChain(object):
 
     def open(self, path):
         with open(path, 'rb') as fd:
-            chain = msgpack.unpackb(fd.read())
+            cdata = fd.read()
+        data = self.decrypt(cdata, '')
+        while not data:
+            password = getpass('Keychain password: ')
+            if not password:
+                raise Exception('Keychain decryption failed')
+            data = self.decrypt(cdata, password)
+            if not data:
+                logging.error('Incorrect password')
+        chain = msgpack.unpackb(data)
         logging.info('Key chain "%s" opened', path)
         assert chain['version'] == 1
         self.aes_id = chain['aes_id']
         self.rsa_read = RSA.importKey(chain['rsa_read'])
         self.rsa_create = RSA.importKey(chain['rsa_create'])
 
-    def save(self, path):
+    def encrypt(self, data, password):
+        salt = os.urandom(32)
+        iterations = 2000
+        key = pbkdf2(password, salt, 32, iterations, hashlib.sha256)
+        hash = HMAC.new(key, data, SHA256).digest()
+        cdata = AES.new(key, AES.MODE_CTR, counter=Counter.new(128)).encrypt(data)
+        d = {
+            'version': 1,
+            'salt': salt,
+            'iterations': iterations,
+            'algorithm': 'SHA256',
+            'hash': hash,
+            'data': cdata,
+        }
+        return msgpack.packb(d)
+
+    def decrypt(self, data, password):
+        d = msgpack.unpackb(data)
+        assert d['version'] == 1
+        assert d['algorithm'] == 'SHA256'
+        key = pbkdf2(password, d['salt'], 32, d['iterations'], hashlib.sha256)
+        data = AES.new(key, AES.MODE_CTR, counter=Counter.new(128)).decrypt(d['data'])
+        if HMAC.new(key, data, SHA256).digest() != d['hash']:
+            return None
+        return data
+
+    def save(self, path, password):
         chain = {
             'version': 1,
             'aes_id': self.aes_id,
             'rsa_read': self.rsa_read.exportKey('PEM'),
             'rsa_create': self.rsa_create.exportKey('PEM'),
         }
+        data = self.encrypt(msgpack.packb(chain), password)
         with open(path, 'wb') as fd:
-            fd.write(msgpack.packb(chain))
+            fd.write(data)
             logging.info('Key chain "%s" saved', path)
 
     @staticmethod
-    def generate():
+    def generate(path, password):
         chain = KeyChain()
+        logging.info('Generating keys')
         chain.aes_id = os.urandom(32)
         chain.rsa_read = RSA.generate(2048)
         chain.rsa_create = RSA.generate(2048)
+        chain.save(path, password)
         return chain
 
 class CryptoManager(object):

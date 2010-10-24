@@ -83,6 +83,10 @@ class Archiver(object):
     def do_keychain_restrict(self, args):
         return KeyChain(args.input).restrict(args.output)
 
+    def do_keychain_chpass(self, args):
+        return KeyChain(args.keychain).chpass()
+
+
     def run(self, args=None):
         parser = argparse.ArgumentParser(description='Dedupestore')
         parser.add_argument('-k', '--key-chain', dest='keychain', type=str,
@@ -105,6 +109,10 @@ class Archiver(object):
         subparser.add_argument('output', metavar='OUTPUT', type=str,
                                help='Keychain to create')
         subparser.set_defaults(func=self.do_keychain_restrict)
+        subparser = subsubparsers.add_parser('chpass')
+        subparser.add_argument('keychain', metavar='KEYCHAIN', type=str,
+                               help='Path to keychain')
+        subparser.set_defaults(func=self.do_keychain_chpass)
 
         subparser = subparsers.add_parser('create')
         subparser.set_defaults(func=self.do_create)

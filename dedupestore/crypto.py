@@ -20,6 +20,7 @@ class KeyChain(object):
 
     def __init__(self, path=None):
         self.aes_id = self.rsa_read = self.rsa_create = None
+        self.path = path
         if path:
             self.open(path)
 
@@ -87,13 +88,23 @@ class KeyChain(object):
         self.save(path, self.password)
         return 0
 
+    def chpass(self):
+        self.rsa_read = self.rsa_read.publickey()
+        password, password2 = 1, 2
+        while password != password2:
+            password = getpass('New password: ')
+            password2 = getpass('New password again: ')
+            if password != password2:
+                logging.error('Passwords do not match')
+        self.save(self.path, password)
+        return 0
+
     @staticmethod
     def generate(path):
         if os.path.exists(path):
             logging.error('%s already exists', path)
             return 1
-        password = ''
-        password2 = 'x'
+        password, password2 = 1, 2
         while password != password2:
             password = getpass('Keychain password: ')
             password2 = getpass('Keychain password again: ')

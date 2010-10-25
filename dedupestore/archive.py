@@ -92,7 +92,11 @@ class Archive(object):
     def list(self):
         self.get_items()
         for item in self.items:
-            print item['path']
+            mode = str(item['mode'])
+            size = item.get('size', 0)
+            mtime = datetime.fromtimestamp(item['mtime'])
+            print '%s %-6s %-6s %8d %s %s' % (mode, item['user'], item['group'],
+                                              size, mtime, item['path'])
 
     def extract(self, dest=None):
         self.get_items()

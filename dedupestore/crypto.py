@@ -93,7 +93,6 @@ class KeyChain(object):
         return 0
 
     def chpass(self):
-        self.rsa_read = self.rsa_read.publickey()
         password, password2 = 1, 2
         while password != password2:
             password = getpass('New password: ')

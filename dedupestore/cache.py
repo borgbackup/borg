@@ -2,9 +2,7 @@ import logging
 import msgpack
 import os
 
-NS_ARCHIVES = 'A'
-NS_CHUNKS = 'C'
-NS_CINDEX = 'I'
+from . import NS_ARCHIVE_CHUNKS, NS_CHUNK
 
 
 class Cache(object):
@@ -41,8 +39,8 @@ class Cache(object):
         self.tid = self.store.tid
         if self.store.tid == 0:
             return
-        for id in list(self.store.list(NS_CINDEX)):
-            data, hash = crypto.decrypt(self.store.get(NS_CINDEX, id))
+        for id in list(self.store.list(NS_ARCHIVE_CHUNKS)):
+            data, hash = crypto.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, id))
             cindex = msgpack.unpackb(data)
             for id, size in cindex['chunks']:
                 try:
@@ -71,7 +69,7 @@ class Cache(object):
             return self.chunk_incref(id)
         data, hash = crypto.encrypt_read(data)
         csize = len(data)
-        self.store.put(NS_CHUNKS, id, data)
+        self.store.put(NS_CHUNK, id, data)
         self.chunkmap[id] = (1, csize)
         return csize
 
@@ -88,7 +86,7 @@ class Cache(object):
         count, size = self.chunkmap[id]
         if count == 1:
             del self.chunkmap[id]
-            self.store.delete(NS_CHUNKS, id)
+            self.store.delete(NS_CHUNK, id)
         else:
             self.chunkmap[id] = (count - 1, size)
 

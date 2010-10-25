@@ -53,7 +53,7 @@ class Archiver(object):
             archive.list()
         else:
             for archive in Archive.list_archives(store, crypto):
-                print archive.name
+                print archive.metadata['name']
         return self.exit_code_from_logger()
 
     def do_verify(self, args):

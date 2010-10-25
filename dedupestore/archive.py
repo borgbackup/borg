@@ -7,7 +7,7 @@ import socket
 import stat
 import sys
 
-from .cache import NS_ARCHIVES, NS_CHUNKS, NS_CINDEX
+from . import NS_ARCHIVE_METADATA, NS_ARCHIVE_ITEMS, NS_ARCHIVE_CHUNKS, NS_CHUNK
 from .chunkifier import chunkify
 from .helpers import uid2user, user2uid, gid2group, group2gid, IntegrityError
 
@@ -28,41 +28,44 @@ class Archive(object):
 
     def load(self, id):
         self.id = id
-        data, hash = self.crypto.decrypt(self.store.get(NS_ARCHIVES, self.id))
-        archive = msgpack.unpackb(data)
-        if archive['version'] != 1:
-            raise Exception('Archive version %r not supported' % archive['version'])
-        self.items = archive['items']
-        self.name = archive['name']
-        data, hash = self.crypto.decrypt(self.store.get(NS_CINDEX, self.id))
-        cindex = msgpack.unpackb(data)
-        assert cindex['version'] == 1
-        if archive['cindex'] != hash:
-            raise Exception('decryption failed')
-        self.chunks = cindex['chunks']
+        data, hash = self.crypto.decrypt(self.store.get(NS_ARCHIVE_METADATA, self.id))
+        self.metadata = msgpack.unpackb(data)
+        assert self.metadata['version'] == 1
+
+    def get_items(self):
+        data, chunks_hash = self.crypto.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, self.id))
+        chunks = msgpack.unpackb(data)
+        assert chunks['version'] == 1
+        assert self.metadata['chunks_hash'] == chunks_hash
+        self.chunks = chunks['chunks']
+        data, items_hash = self.crypto.decrypt(self.store.get(NS_ARCHIVE_ITEMS, self.id))
+        items = msgpack.unpackb(data)
+        assert items['version'] == 1
+        assert self.metadata['items_hash'] == items_hash
+        self.items = items['items']
         for i, chunk in enumerate(self.chunks):
             self.chunk_idx[i] = chunk[0]
 
     def save(self, name):
         self.id = self.crypto.id_hash(name)
-        cindex = {
-            'version': 1,
-            'chunks': self.chunks,
-        }
-        data, cindex_hash = self.crypto.encrypt_create(msgpack.packb(cindex))
-        self.store.put(NS_CINDEX, self.id, data)
-        archive = {
+        chunks = {'version': 1, 'chunks': self.chunks}
+        data, chunks_hash = self.crypto.encrypt_create(msgpack.packb(chunks))
+        self.store.put(NS_ARCHIVE_CHUNKS, self.id, data)
+        items = {'version': 1, 'items': self.items}
+        data, items_hash = self.crypto.encrypt_read(msgpack.packb(items))
+        self.store.put(NS_ARCHIVE_ITEMS, self.id, data)
+        metadata = {
             'version': 1,
             'name': name,
-            'cindex': cindex_hash,
+            'chunks_hash': chunks_hash,
+            'items_hash': items_hash,
             'cmdline': sys.argv,
             'hostname': socket.gethostname(),
             'username': getuser(),
-            'ts': datetime.utcnow().isoformat(),
-            'items': self.items,
+            'time': datetime.utcnow().isoformat(),
         }
-        data, self.hash = self.crypto.encrypt_read(msgpack.packb(archive))
-        self.store.put(NS_ARCHIVES, self.id, data)
+        data, self.hash = self.crypto.encrypt_read(msgpack.packb(metadata))
+        self.store.put(NS_ARCHIVE_METADATA, self.id, data)
         self.store.commit()
 
     def add_chunk(self, id, size):
@@ -75,6 +78,7 @@ class Archive(object):
             return idx
 
     def stats(self, cache):
+        self.get_items()
         osize = csize = usize = 0
         for item in self.items:
             if item['type'] == 'FILE':
@@ -90,6 +94,7 @@ class Archive(object):
             print item['path']
 
     def extract(self, dest=None):
+        self.get_items()
         dest = dest or os.getcwdu()
         dir_stat_queue = []
         for item in self.items:
@@ -126,7 +131,7 @@ class Archive(object):
                     for chunk in item['chunks']:
                         id = self.chunk_idx[chunk]
                         try:
-                            data, hash = self.crypto.decrypt(self.store.get(NS_CHUNKS, id))
+                            data, hash = self.crypto.decrypt(self.store.get(NS_CHUNK, id))
                             if self.crypto.id_hash(data) != id:
                                 raise IntegrityError('chunk id did not match')
                             fd.write(data)
@@ -154,13 +159,14 @@ class Archive(object):
             os.utime(path, (item['ctime'], item['mtime']))
 
     def verify(self):
+        self.get_items()
         for item in self.items:
             if item['type'] == 'FILE':
                 item['path'] = item['path'].decode('utf-8')
                 for chunk in item['chunks']:
                     id = self.chunk_idx[chunk]
                     try:
-                        data, hash = self.crypto.decrypt(self.store.get(NS_CHUNKS, id))
+                        data, hash = self.crypto.decrypt(self.store.get(NS_CHUNK, id))
                         if self.crypto.id_hash(data) != id:
                             raise IntegrityError('chunk id did not match')
                     except IntegrityError:
@@ -170,8 +176,10 @@ class Archive(object):
                     logging.info('%s ... OK', item['path'])
 
     def delete(self, cache):
-        self.store.delete(NS_ARCHIVES, self.id)
-        self.store.delete(NS_CINDEX, self.id)
+        self.get_items()
+        self.store.delete(NS_ARCHIVE_CHUNKS, self.id)
+        self.store.delete(NS_ARCHIVE_ITEMS, self.id)
+        self.store.delete(NS_ARCHIVE_METADATA, self.id)
         for id, size in self.chunks:
             cache.chunk_decref(id)
         self.store.commit()
@@ -188,7 +196,7 @@ class Archive(object):
     def create(self, name, paths, cache):
         id = self.crypto.id_hash(name)
         try:
-            self.store.get(NS_ARCHIVES, id)
+            self.store.get(NS_ARCHIVE_METADATA, id)
         except self.store.DoesNotExist:
             pass
         else:
@@ -272,7 +280,7 @@ class Archive(object):
 
     @staticmethod
     def list_archives(store, crypto):
-        for id in list(store.list(NS_ARCHIVES)):
+        for id in list(store.list(NS_ARCHIVE_METADATA)):
             archive = Archive(store, crypto)
             archive.load(id)
             yield archive

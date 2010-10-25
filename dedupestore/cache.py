@@ -14,6 +14,7 @@ class Cache(object):
         self.path = os.path.join(os.path.expanduser('~'), '.dedupestore', 'cache',
                                  '%s.cache' % self.store.uuid)
         self.tid = -1
+        self.file_chunks = {}
         self.open()
         if self.tid != self.store.tid:
             self.init(crypto)
@@ -22,13 +23,15 @@ class Cache(object):
         if not os.path.exists(self.path):
             return
         cache = msgpack.unpackb(open(self.path, 'rb').read())
-        version = cache.get('version')
-        if version != 1:
-            logging.error('Unsupported cache version %r' % version)
-            return
+        assert cache['version'] == 1
         if cache['store'] != self.store.uuid:
             raise Exception('Cache UUID mismatch')
         self.chunkmap = cache['chunkmap']
+        # Discard old file_chunks entries
+        for hash, entry in cache['file_chunks'].iteritems():
+            count = entry[0]
+            if count < 8:
+                self.file_chunks[hash] = [count + 1] + list(entry[1:])
         self.tid = cache['tid']
 
     def init(self, crypto):
@@ -56,6 +59,7 @@ class Cache(object):
                 'store': self.store.uuid,
                 'chunkmap': self.chunkmap,
                 'tid': self.store.tid,
+                'file_chunks': self.file_chunks,
         }
         data = msgpack.packb(cache)
         cachedir = os.path.dirname(self.path)
@@ -90,4 +94,16 @@ class Cache(object):
         else:
             self.chunkmap[id] = (count - 1, size)
 
+    def file_known_and_unchanged(self, path_hash, st):
+        entry = self.file_chunks.get(path_hash)
+        if (entry and entry[1] == st.st_ino
+            and entry[2] == st.st_size and entry[3] == st.st_mtime):
+            entry[0] = 0 # reset entry age
+            return entry[4], entry[2]
+        else:
+            return None, 0
+
+    def memorize_file_chunks(self, path_hash, st, ids):
+        # Entry: Age, inode, size, mtime, chunk ids
+        self.file_chunks[path_hash] = 0, st.st_ino, st.st_size, st.st_mtime, ids
 

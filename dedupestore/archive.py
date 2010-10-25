@@ -243,6 +243,7 @@ class Archive(object):
         })
     def process_file(self, path, st, cache):
         safe_path = path.lstrip('/\\:')
+        # Is it a hard link?
         if st.st_nlink > 1:
             source = self.hard_links.get((st.st_ino, st.st_dev))
             if (st.st_ino, st.st_dev) in self.hard_links:
@@ -252,18 +253,34 @@ class Archive(object):
                 return
             else:
                 self.hard_links[st.st_ino, st.st_dev] = safe_path
-        try:
-            fd = open(path, 'rb')
-        except IOError, e:
-            logging.error(e)
-            return
-        with fd:
-            logging.info(safe_path)
-            chunks = []
-            size = 0
-            for chunk in chunkify(fd, CHUNK_SIZE, 30):
-                chunks.append(self.process_chunk(chunk, cache))
-                size += len(chunk)
+        logging.info(safe_path)
+        path_hash = self.crypto.id_hash(path.encode('utf-8'))
+        ids, size = cache.file_known_and_unchanged(path_hash, st)
+        if ids is not None:
+            # Make sure all ids are available
+            for id in ids:
+                if not cache.seen_chunk(id):
+                    ids = None
+                    break
+            else:
+                chunks = [self.process_chunk2(id, cache) for id in ids]
+        # Only chunkify the file if needed
+        if ids is None:
+            try:
+                fd = open(path, 'rb')
+            except IOError, e:
+                logging.error(e)
+                return
+            with fd:
+                size = 0
+                ids = []
+                chunks = []
+                for chunk in chunkify(fd, CHUNK_SIZE, 30):
+                    ids.append(self.crypto.id_hash(chunk))
+                    chunks.append(chunk)
+                    size += len(chunk)
+            cache.memorize_file_chunks(path_hash, st, ids)
+            chunks = [self.process_chunk(chunk, cache) for chunk in chunks]
         self.items.append({
             'type': 'FILE', 'path': safe_path, 'chunks': chunks, 'size': size,
             'mode': st.st_mode,
@@ -271,6 +288,16 @@ class Archive(object):
             'gid': st.st_gid, 'group': gid2group(st.st_gid),
             'ctime': st.st_ctime, 'mtime': st.st_mtime,
         })
+
+    def process_chunk2(self, id, cache):
+        try:
+            return self.chunk_idx[id]
+        except KeyError:
+            idx = len(self.chunks)
+            size = cache.chunk_incref(id)
+            self.chunks.append((id, size))
+            self.chunk_idx[id] = idx
+            return idx
 
     def process_chunk(self, data, cache):
         id = self.crypto.id_hash(data)

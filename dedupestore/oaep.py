@@ -1,10 +1,10 @@
-from operator import xor
 from Crypto.Util.number import long_to_bytes
 from Crypto.Hash import SHA
 
+from .helpers import IntegrityError
 
 def _xor_bytes(a, b):
-    return ''.join(chr(xor(ord(x[0]), ord(x[1]))) for x in zip(a, b))
+    return ''.join(chr(ord(x[0]) ^ ord(x[1])) for x in zip(a, b))
 
 
 def MGF1(seed, mask_len, hash=SHA):
@@ -51,7 +51,7 @@ class OAEP(object):
         if (ciphertext[0] != '\0' or
             label_hash != label_hash2 or
             data[0] != '\1'):
-            raise ValueError('decryption error')
+            raise IntegrityError('decryption error')
         return data[1:]
 
 

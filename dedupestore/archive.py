@@ -272,7 +272,7 @@ class Archive(object):
 
     @staticmethod
     def list_archives(store, crypto):
-        for id in store.list(NS_ARCHIVES):
+        for id in list(store.list(NS_ARCHIVES)):
             archive = Archive(store, crypto)
             archive.load(id)
             yield archive

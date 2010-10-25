@@ -1,5 +1,4 @@
 import argparse
-from getpass import getpass
 import logging
 import sys
 
@@ -54,7 +53,7 @@ class Archiver(object):
             archive.list()
         else:
             for archive in Archive.list_archives(store, crypto):
-                print archive
+                print archive.name
         return self.exit_code_from_logger()
 
     def do_verify(self, args):

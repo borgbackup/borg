@@ -90,6 +90,7 @@ class Archive(object):
         return osize, csize, usize
 
     def list(self):
+        self.get_items()
         for item in self.items:
             print item['path']
 

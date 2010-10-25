@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 import sys
 
 from .archive import Archive
@@ -83,19 +84,21 @@ class Archiver(object):
         return self.exit_code_from_logger()
 
     def do_keychain_generate(self, args):
-        return KeyChain.generate(args.path)
+        return KeyChain.generate(args.keychain)
 
     def do_keychain_restrict(self, args):
-        return KeyChain(args.input).restrict(args.output)
+        return KeyChain(args.keychain).restrict(args.output)
 
     def do_keychain_chpass(self, args):
         return KeyChain(args.keychain).chpass()
 
-
     def run(self, args=None):
+        default_keychain = os.path.join(os.path.expanduser('~'),
+                                        '.dedupestore', 'keychain')
         parser = argparse.ArgumentParser(description='Dedupestore')
-        parser.add_argument('-k', '--key-chain', dest='keychain', type=str,
-                            help='Key chain')
+        parser.add_argument('-k', '--keychain', dest='keychain', type=str,
+                            default=default_keychain,
+                            help='Keychain to use')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
                             default=False,
                             help='Verbose output')
@@ -105,18 +108,12 @@ class Archiver(object):
         subparser = subparsers.add_parser('keychain')
         subsubparsers = subparser.add_subparsers(title='Available subcommands')
         subparser = subsubparsers.add_parser('generate')
-        subparser.add_argument('path', metavar='PATH', type=str,
-                               help='Path to keychain')
         subparser.set_defaults(func=self.do_keychain_generate)
         subparser = subsubparsers.add_parser('restrict')
-        subparser.add_argument('input', metavar='INPUT', type=str,
-                               help='Existing keychain')
         subparser.add_argument('output', metavar='OUTPUT', type=str,
                                help='Keychain to create')
         subparser.set_defaults(func=self.do_keychain_restrict)
-        subparser = subsubparsers.add_parser('chpass')
-        subparser.add_argument('keychain', metavar='KEYCHAIN', type=str,
-                               help='Path to keychain')
+        subparser = subsubparsers.add_parser('change-password')
         subparser.set_defaults(func=self.do_keychain_chpass)
 
         subparser = subparsers.add_parser('create')

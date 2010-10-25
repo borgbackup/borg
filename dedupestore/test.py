@@ -15,14 +15,14 @@ class Test(unittest.TestCase):
         self.store_path = os.path.join(self.tmpdir, 'store')
         self.keychain = '/tmp/_test_dedupstore.keychain'
         if not os.path.exists(self.keychain):
-            self.dedupestore('keychain', 'generate', self.keychain)
+            self.dedupestore('keychain', 'generate')
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
 
     def dedupestore(self, *args, **kwargs):
         exit_code = kwargs.get('exit_code', 0)
-        args = ['--key-chain', self.keychain] + list(args)
+        args = ['--keychain', self.keychain] + list(args)
         self.assertEqual(exit_code, self.archiver.run(args))
 
     def create_src_archive(self, name):

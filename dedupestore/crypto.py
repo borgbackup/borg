@@ -17,6 +17,7 @@ from .oaep import OAEP
 
 
 class KeyChain(object):
+    FILE_ID = 'DDS KEYCHAIN'
 
     def __init__(self, path=None):
         self.aes_id = self.rsa_read = self.rsa_create = None
@@ -25,7 +26,10 @@ class KeyChain(object):
             self.open(path)
 
     def open(self, path):
+        logging.info('Opening keychain "%s"', path)
         with open(path, 'rb') as fd:
+            if fd.read(len(self.FILE_ID)) != self.FILE_ID:
+                raise ValueError('Not a keychain')
             cdata = fd.read()
         data = self.decrypt(cdata, '')
         while not data:
@@ -36,7 +40,6 @@ class KeyChain(object):
             if not data:
                 logging.error('Incorrect password')
         chain = msgpack.unpackb(data)
-        logging.info('Key chain "%s" opened', path)
         assert chain['version'] == 1
         self.aes_id = chain['aes_id']
         self.rsa_read = RSA.importKey(chain['rsa_read'])
@@ -77,6 +80,7 @@ class KeyChain(object):
         }
         data = self.encrypt(msgpack.packb(chain), password)
         with open(path, 'wb') as fd:
+            fd.write(self.FILE_ID)
             fd.write(data)
             logging.info('Key chain "%s" saved', path)
 

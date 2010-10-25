@@ -28,7 +28,7 @@ class Archive(object):
 
     def load(self, id):
         self.id = id
-        data, hash = self.crypto.decrypt(self.store.get(NS_ARCHIVE_METADATA, self.id))
+        data, self.hash = self.crypto.decrypt(self.store.get(NS_ARCHIVE_METADATA, self.id))
         self.metadata = msgpack.unpackb(data)
         assert self.metadata['version'] == 1
 

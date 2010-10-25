@@ -71,6 +71,12 @@ class Archiver(object):
         archive = Archive(store, crypto, args.archive.archive)
         cache = Cache(store, archive.crypto)
         osize, csize, usize = archive.stats(cache)
+        print 'Name:', archive.metadata['name']
+        print 'Hostname:', archive.metadata['hostname']
+        print 'Username:', archive.metadata['username']
+        print 'Time:', archive.metadata['time']
+        print 'Command line:', ' '.join(archive.metadata['cmdline'])
+        print 'Number of Files:', len(archive.items)
         print 'Original size:', pretty_size(osize)
         print 'Compressed size:', pretty_size(csize)
         print 'Unique data:', pretty_size(usize)

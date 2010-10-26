@@ -2,6 +2,7 @@ import argparse
 import grp
 import logging
 import pwd
+import stat
 import re
 
 
@@ -120,3 +121,7 @@ def pretty_size(v):
         return str(v)
 
 
+def mod_to_str(mod):
+    def x(v):
+        return ''.join(v & m and s or '-' for m, s in ((4, 'r'), (2, 'w'), (1, 'x')))
+    return '%s%s%s' % (x(mod / 64), x(mod / 8), x(mod))

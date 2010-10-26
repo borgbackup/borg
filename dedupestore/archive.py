@@ -9,7 +9,7 @@ import sys
 
 from . import NS_ARCHIVE_METADATA, NS_ARCHIVE_ITEMS, NS_ARCHIVE_CHUNKS, NS_CHUNK
 from .chunkifier import chunkify
-from .helpers import uid2user, user2uid, gid2group, group2gid, IntegrityError
+from .helpers import uid2user, user2uid, gid2group, group2gid, IntegrityError, mod_to_str
 
 CHUNK_SIZE = 55001
 
@@ -90,13 +90,15 @@ class Archive(object):
         return osize, csize, usize
 
     def list(self):
+        tmap = dict(FILE='-', DIRECTORY='d', SYMLINK='l')
         self.get_items()
         for item in self.items:
-            mode = str(item['mode'])
+            type = tmap[item['type']]
+            mode = mod_to_str(item['mode'])
             size = item.get('size', 0)
             mtime = datetime.fromtimestamp(item['mtime'])
-            print '%s %-6s %-6s %8d %s %s' % (mode, item['user'], item['group'],
-                                              size, mtime, item['path'])
+            print '%s%s %-6s %-6s %8d %s %s' % (type, mode, item['user'],
+                                              item['group'], size, mtime, item['path'])
 
     def extract(self, dest=None):
         self.get_items()

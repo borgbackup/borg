@@ -276,11 +276,14 @@ class Archive(object):
                 ids = []
                 chunks = []
                 for chunk in chunkify(fd, CHUNK_SIZE, 30):
-                    ids.append(self.crypto.id_hash(chunk))
-                    chunks.append(chunk)
+                    id = self.crypto.id_hash(chunk)
+                    ids.append(id)
+                    try:
+                        chunks.append(self.chunk_idx[id])
+                    except KeyError:
+                        chunks.append(self.process_chunk(id, chunk, cache))
                     size += len(chunk)
             cache.memorize_file_chunks(path_hash, st, ids)
-            chunks = [self.process_chunk(chunk, cache) for chunk in chunks]
         self.items.append({
             'type': 'FILE', 'path': safe_path, 'chunks': chunks, 'size': size,
             'mode': st.st_mode,
@@ -299,16 +302,12 @@ class Archive(object):
             self.chunk_idx[id] = idx
             return idx
 
-    def process_chunk(self, data, cache):
-        id = self.crypto.id_hash(data)
-        try:
-            return self.chunk_idx[id]
-        except KeyError:
-            idx = len(self.chunks)
-            size = cache.add_chunk(id, data, self.crypto)
-            self.chunks.append((id, size))
-            self.chunk_idx[id] = idx
-            return idx
+    def process_chunk(self, id, data, cache):
+        idx = len(self.chunks)
+        size = cache.add_chunk(id, data, self.crypto)
+        self.chunks.append((id, size))
+        self.chunk_idx[id] = idx
+        return idx
 
     @staticmethod
     def list_archives(store, crypto):

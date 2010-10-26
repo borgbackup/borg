@@ -18,6 +18,10 @@ class Archiver(object):
     def exit_code_from_logger(self):
         return 1 if self.level_filter.count.get('ERROR') else 0
 
+    def do_init(self, args):
+        Store(args.store.path, create=True)
+        return self.exit_code_from_logger()
+
     def do_create(self, args):
         store = self.open_store(args.archive)
         keychain = KeyChain(args.keychain)
@@ -114,6 +118,12 @@ class Archiver(object):
         subparser.set_defaults(func=self.do_keychain_restrict)
         subparser = subsubparsers.add_parser('change-password')
         subparser.set_defaults(func=self.do_keychain_chpass)
+
+        subparser = subparsers.add_parser('init')
+        subparser.set_defaults(func=self.do_init)
+        subparser.add_argument('store', metavar='STORE',
+                               type=location_validator(archive=False),
+                               help='Store to initialize')
 
         subparser = subparsers.add_parser('create')
         subparser.set_defaults(func=self.do_create)

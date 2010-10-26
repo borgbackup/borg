@@ -23,16 +23,24 @@ class Store(object):
     ACTIVE = 'Active'
     BAND_LIMIT = 1 * 1024 * 1024
 
-    def __init__(self, path):
+    def __init__(self, path, create=False):
         self.read_fd = None
         self.write_fd = None
-        if not os.path.exists(path):
+        if create:
             self.create(path)
         self.open(path)
 
+    def get_option(self, key):
+        return self.cursor.execute('SELECT value FROM system WHERE key=?', (key,)) \
+            .fetchone()[0]
+
+    def set_option(self, key, value):
+        return self.cursor.execute('UPDATE system SET value=? WHERE key=?',
+                                   (value, key))
+
     def open(self, path):
         if not os.path.isdir(path):
-            raise Exception('%s Does not look like a store')
+            raise Exception('%s Does not look like a store' % path)
         db_path = os.path.join(path, 'dedupestore.db')
         if not os.path.exists(db_path):
             raise Exception('%s Does not look like a store2')
@@ -43,15 +51,6 @@ class Store(object):
         self.cnx.text_factory = str
         self.cursor = self.cnx.cursor()
         self._begin()
-
-    def get_option(self, key):
-        return self.cursor.execute('SELECT value FROM system WHERE key=?', (key,)) \
-            .fetchone()[0]
-
-    def set_option(self, key, value):
-        return self.cursor.execute('UPDATE system SET value=? WHERE key=?',
-                                   (value, key))
-
 
     def _begin(self):
         if self.read_fd:
@@ -76,7 +75,10 @@ class Store(object):
             band += 1
 
     def create(self, path):
-        os.mkdir(path)
+        if os.path.exists(path) and (not os.path.isdir(path) or os.listdir(path)):
+            raise Exception('Path "%s" already exists' % path)
+        if not os.path.exists(path):
+            os.mkdir(path)
         os.mkdir(os.path.join(path, 'bands'))
         cnx = sqlite3.connect(os.path.join(path, 'dedupestore.db'))
         cnx.execute('CREATE TABLE objects(ns BINARY NOT NULL, id BINARY NOT NULL, '
@@ -212,7 +214,7 @@ class StoreTestCase(unittest.TestCase):
 
     def setUp(self):
         self.tmppath = tempfile.mkdtemp()
-        self.store = Store(os.path.join(self.tmppath, 'store'))
+        self.store = Store(os.path.join(self.tmppath, 'store'), create=True)
 
     def tearDown(self):
         shutil.rmtree(self.tmppath)

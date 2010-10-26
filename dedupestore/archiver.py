@@ -4,7 +4,7 @@ import os
 import sys
 
 from .archive import Archive
-from .bandstore import BandStore
+from .store import Store
 from .cache import Cache
 from .crypto import CryptoManager, KeyChain
 from .helpers import location_validator, pretty_size, LevelFilter
@@ -13,8 +13,7 @@ from .helpers import location_validator, pretty_size, LevelFilter
 class Archiver(object):
 
     def open_store(self, location):
-        store = BandStore(location.path)
-        return store
+        return Store(location.path)
 
     def exit_code_from_logger(self):
         return 1 if self.level_filter.count.get('ERROR') else 0

@@ -4,7 +4,7 @@ import tempfile
 import unittest
 
 from .archiver import Archiver
-from . import bandstore
+from . import store
 
 
 class Test(unittest.TestCase):
@@ -63,7 +63,7 @@ class Test(unittest.TestCase):
 def suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.TestLoader().loadTestsFromTestCase(Test))
-    suite.addTest(bandstore.suite())
+    suite.addTest(store.suite())
     return suite
 
 if __name__ == '__main__':

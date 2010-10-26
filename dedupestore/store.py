@@ -3,13 +3,12 @@ import tempfile
 import shutil
 import unittest
 import sqlite3
-import uuid
 import fcntl
 
 Binary = sqlite3.Binary
 
 
-class BandStore(object):
+class Store(object):
     """
     """
 
@@ -45,6 +44,15 @@ class BandStore(object):
         self.cursor = self.cnx.cursor()
         self._begin()
 
+    def get_option(self, key):
+        return self.cursor.execute('SELECT value FROM system WHERE key=?', (key,)) \
+            .fetchone()[0]
+
+    def set_option(self, key, value):
+        return self.cursor.execute('UPDATE system SET value=? WHERE key=?',
+                                   (value, key))
+
+
     def _begin(self):
         if self.read_fd:
             self.read_fd.close()
@@ -52,10 +60,12 @@ class BandStore(object):
         if self.write_fd:
             self.write_fd.close()
             self.write_fd = None
-        row = self.cursor.execute('SELECT uuid, tid, nextband, version, '
-                                  'bandlimit FROM system').fetchone()
-        self.uuid, self.tid, self.nextband, version, self.bandlimit = row
-        assert version == 1
+        self.version = self.get_option('version')
+        self.id = self.get_option('id').decode('hex')
+        self.tid = self.get_option('tid')
+        self.nextband = self.get_option('nextband')
+        self.bandlimit = self.get_option('bandlimit')
+        assert self.version == 1
         self.state = self.OPEN
         self.read_band = None
         self.write_band = None
@@ -72,10 +82,13 @@ class BandStore(object):
         cnx.execute('CREATE TABLE objects(ns BINARY NOT NULL, id BINARY NOT NULL, '
                     'band NOT NULL, offset NOT NULL, size NOT NULL)')
         cnx.execute('CREATE UNIQUE INDEX objects_pk ON objects(ns, id)')
-        cnx.execute('CREATE TABLE system(uuid NOT NULL, tid NOT NULL, '
-                    'nextband NOT NULL, version NOT NULL, bandlimit NOT NULL)')
-        cnx.execute('INSERT INTO system VALUES(?,?,?,?,?)',
-                    (uuid.uuid1().hex, 0, 0, 1, self.BAND_LIMIT))
+        cnx.execute('CREATE TABLE system(key UNIQUE NOT NULL, value)')
+        cnx.executemany('INSERT INTO system VALUES(?, ?)',
+                        (('id', os.urandom(32).encode('hex')),
+                         ('version', 1),
+                         ('tid', 0),
+                         ('nextband', 0),
+                         ('bandlimit', self.BAND_LIMIT)))
         cnx.commit()
 
     def close(self):
@@ -102,8 +115,8 @@ class BandStore(object):
                 self.cursor.execute('UPDATE objects SET band=?, offset=?, size=? '
                                     'WHERE ns=? AND id=?', (band, offset, size,
                                     Binary(o[0]), Binary(o[1])))
-        self.cursor.execute('UPDATE system SET tid=tid+1, nextband=?',
-                            (self.nextband,))
+        self.set_option('tid', self.tid + 1)
+        self.set_option('nextband', self.nextband)
         self.cnx.commit()
         for b in self.to_delete:
             os.unlink(self.band_filename(b))
@@ -195,11 +208,11 @@ class BandStore(object):
             yield str(row[0])
 
 
-class BandStoreTestCase(unittest.TestCase):
+class StoreTestCase(unittest.TestCase):
 
     def setUp(self):
         self.tmppath = tempfile.mkdtemp()
-        self.store = BandStore(os.path.join(self.tmppath, 'store'))
+        self.store = Store(os.path.join(self.tmppath, 'store'))
 
     def tearDown(self):
         shutil.rmtree(self.tmppath)
@@ -249,7 +262,7 @@ class BandStoreTestCase(unittest.TestCase):
 
 
 def suite():
-    return unittest.TestLoader().loadTestsFromTestCase(BandStoreTestCase)
+    return unittest.TestLoader().loadTestsFromTestCase(StoreTestCase)
 
 if __name__ == '__main__':
     unittest.main()

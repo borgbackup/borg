@@ -13,7 +13,7 @@ class Cache(object):
     def __init__(self, store, crypto):
         self.store = store
         self.path = os.path.join(os.path.expanduser('~'), '.dedupestore', 'cache',
-                                 '%s.cache' % self.store.uuid)
+                                 '%s.cache' % self.store.id.encode('hex'))
         self.tid = -1
         self.open()
         if self.tid != self.store.tid:

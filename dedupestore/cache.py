@@ -12,24 +12,26 @@ class Cache(object):
 
     def __init__(self, store, crypto):
         self.store = store
+        self.crypto = crypto
         self.path = os.path.join(os.path.expanduser('~'), '.dedupestore', 'cache',
                                  '%s.cache' % self.store.id.encode('hex'))
         self.tid = -1
         self.open()
         if self.tid != self.store.tid:
-            self.init(crypto)
+            self.init()
 
     def open(self):
         if not os.path.exists(self.path):
             return
-        cache = msgpack.unpackb(open(self.path, 'rb').read())
+        with open(self.path, 'rb') as fd:
+            data, hash = self.crypto.decrypt(fd.read())
+            cache = msgpack.unpackb(data)
         assert cache['version'] == 1
         self.chunk_counts = cache['chunk_counts']
-        # Discard old file_chunks entries
         self.file_chunks = cache['file_chunks']
         self.tid = cache['tid']
 
-    def init(self, crypto):
+    def init(self):
         """Initializes cache by fetching and reading all archive indicies
         """
         logging.info('Initializing cache...')
@@ -39,7 +41,7 @@ class Cache(object):
         if self.store.tid == 0:
             return
         for id in list(self.store.list(NS_ARCHIVE_CHUNKS)):
-            data, hash = crypto.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, id))
+            data, hash = self.crypto.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, id))
             cindex = msgpack.unpackb(data)
             for id, size in cindex['chunks']:
                 try:
@@ -57,17 +59,17 @@ class Cache(object):
                 'file_chunks': dict(ifilter(lambda i: i[1][0] < 8,
                                             self.file_chunks.iteritems())),
         }
-        data = msgpack.packb(cache)
+        data, hash = self.crypto.encrypt_create(msgpack.packb(cache))
         cachedir = os.path.dirname(self.path)
         if not os.path.exists(cachedir):
             os.makedirs(cachedir)
         with open(self.path, 'wb') as fd:
             fd.write(data)
 
-    def add_chunk(self, id, data, crypto):
+    def add_chunk(self, id, data):
         if self.seen_chunk(id):
             return self.chunk_incref(id)
-        data, hash = crypto.encrypt_read(data)
+        data, hash = self.crypto.encrypt_read(data)
         csize = len(data)
         self.store.put(NS_CHUNK, id, data)
         self.chunk_counts[id] = (1, csize)

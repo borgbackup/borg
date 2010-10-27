@@ -1,15 +1,43 @@
 import argparse
+from datetime import datetime
 import grp
 import logging
 import pwd
-import stat
 import re
 
+
+def format_time(t):
+    """Format datetime suitable for fixed length list output
+    """
+    if (datetime.now() - t).days < 365:
+        return t.strftime('%b %d %H:%M')
+    else:
+        return t.strftime('%d %d  %Y')
+
+
+def format_file_mode(mod):
+    """Format file mode bits for list output
+    """
+    def x(v):
+        return ''.join(v & m and s or '-'
+                       for m, s in ((4, 'r'), (2, 'w'), (1, 'x')))
+    return '%s%s%s' % (x(mod / 64), x(mod / 8), x(mod))
+
+def format_file_size(v):
+    """Format file size into a human friendly format
+    """
+    if v > 1024 * 1024 * 1024:
+        return '%.2f GB' % (v / 1024. / 1024. / 1024.)
+    elif v > 1024 * 1024:
+        return '%.2f MB' % (v / 1024. / 1024.)
+    elif v > 1024:
+        return '%.2f kB' % (v / 1024.)
+    else:
+        return str(v)
 
 class IntegrityError(Exception):
     """
     """
-
 
 def memoize(function):
     cache = {}
@@ -49,6 +77,7 @@ def group2gid(group):
         return grp.getgrnam(group).gr_gid
     except KeyError:
         return None
+
 
 class LevelFilter(logging.Filter):
     """Filter that counts record levels
@@ -110,18 +139,3 @@ def location_validator(archive=None):
     return validator
 
 
-def pretty_size(v):
-    if v > 1024 * 1024 * 1024:
-        return '%.2f GB' % (v / 1024. / 1024. / 1024.)
-    elif v > 1024 * 1024:
-        return '%.2f MB' % (v / 1024. / 1024.)
-    elif v > 1024:
-        return '%.2f kB' % (v / 1024.)
-    else:
-        return str(v)
-
-
-def mod_to_str(mod):
-    def x(v):
-        return ''.join(v & m and s or '-' for m, s in ((4, 'r'), (2, 'w'), (1, 'x')))
-    return '%s%s%s' % (x(mod / 64), x(mod / 8), x(mod))

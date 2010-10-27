@@ -9,9 +9,12 @@ import sys
 
 from . import NS_ARCHIVE_METADATA, NS_ARCHIVE_ITEMS, NS_ARCHIVE_CHUNKS, NS_CHUNK
 from .chunkifier import chunkify
-from .helpers import uid2user, user2uid, gid2group, group2gid, IntegrityError, mod_to_str
+from .helpers import uid2user, user2uid, gid2group, group2gid, \
+    IntegrityError, format_file_mode, format_time
 
 CHUNK_SIZE = 55001
+
+have_lchmod = hasattr(os, 'lchmod')
 
 
 class Archive(object):
@@ -94,9 +97,9 @@ class Archive(object):
         self.get_items()
         for item in self.items:
             type = tmap[item['type']]
-            mode = mod_to_str(item['mode'])
+            mode = format_file_mode(item['mode'])
             size = item.get('size', 0)
-            mtime = datetime.fromtimestamp(item['mtime'])
+            mtime = format_time(datetime.fromtimestamp(item['mtime']))
             print '%s%s %-6s %-6s %8d %s %s' % (type, mode, item['user'],
                                               item['group'], size, mtime, item['path'])
 
@@ -151,14 +154,14 @@ class Archive(object):
                 self.restore_stat(*dir_stat_queue.pop())
 
     def restore_stat(self, path, item, symlink=False):
-        os.lchmod(path, item['mode'])
+        if have_lchmod:
+            os.lchmod(path, item['mode'])
+        elif not symlink:
+            os.chmod(path, item['mode'])
         uid = user2uid(item['user']) or item['uid']
         gid = group2gid(item['group']) or item['gid']
         try:
-            if hasattr(os, 'lchown'):  # Not available on Linux
-                os.lchown(path, uid, gid)
-            elif not symlink:
-                os.chown(path, uid, gid)
+            os.lchown(path, uid, gid)
         except OSError:
             pass
         if not symlink:
@@ -306,7 +309,7 @@ class Archive(object):
 
     def process_chunk(self, id, data, cache):
         idx = len(self.chunks)
-        size = cache.add_chunk(id, data, self.crypto)
+        size = cache.add_chunk(id, data)
         self.chunks.append((id, size))
         self.chunk_idx[id] = idx
         return idx

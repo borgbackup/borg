@@ -7,7 +7,7 @@ from .archive import Archive
 from .store import Store
 from .cache import Cache
 from .crypto import CryptoManager, KeyChain
-from .helpers import location_validator, pretty_size, LevelFilter
+from .helpers import location_validator, format_file_size, LevelFilter
 
 
 class Archiver(object):
@@ -81,9 +81,9 @@ class Archiver(object):
         print 'Time:', archive.metadata['time']
         print 'Command line:', ' '.join(archive.metadata['cmdline'])
         print 'Number of Files:', len(archive.items)
-        print 'Original size:', pretty_size(osize)
-        print 'Compressed size:', pretty_size(csize)
-        print 'Unique data:', pretty_size(usize)
+        print 'Original size:', format_file_size(osize)
+        print 'Compressed size:', format_file_size(csize)
+        print 'Unique data:', format_file_size(usize)
         return self.exit_code_from_logger()
 
     def do_keychain_generate(self, args):

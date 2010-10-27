@@ -17,7 +17,7 @@ from .oaep import OAEP
 
 
 class KeyChain(object):
-    FILE_ID = 'DDS KEYCHAIN'
+    FILE_ID = 'DARC KEYCHAIN'
 
     def __init__(self, path=None):
         self.aes_id = self.rsa_read = self.rsa_create = None

@@ -3,15 +3,16 @@
 
 from setuptools import setup, Extension
 
-setup(name='Dedupestore',
+setup(name='darc',
       version='0.1',
       author=u'Jonas Borgström',
       author_email='jonas@borgstrom.se',
-      packages=['dedupestore'],
-      ext_modules=[Extension('dedupestore._speedups', ['dedupestore/_speedups.c'])],
+      packages=['darc'],
+      ext_modules=[Extension('darc._speedups', ['darc/_speedups.c'])],
+      install_requires=['pycrypto', 'msgpack-python', 'pbkdf2.py'],
       entry_points = {
         'console_scripts': [
-            'dedupestore = dedupestore.archiver:main',
+            'darc = darc.archiver:main',
         ]
     })
 

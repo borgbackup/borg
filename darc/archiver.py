@@ -97,8 +97,8 @@ class Archiver(object):
 
     def run(self, args=None):
         default_keychain = os.path.join(os.path.expanduser('~'),
-                                        '.dedupestore', 'keychain')
-        parser = argparse.ArgumentParser(description='Dedupestore')
+                                        '.darc', 'keychain')
+        parser = argparse.ArgumentParser(description='DARC - Deduplicating Archiver')
         parser.add_argument('-k', '--keychain', dest='keychain', type=str,
                             default=default_keychain,
                             help='Keychain to use')

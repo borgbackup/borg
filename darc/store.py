@@ -40,10 +40,10 @@ class Store(object):
 
     def open(self, path):
         if not os.path.isdir(path):
-            raise Exception('%s Does not look like a store' % path)
-        db_path = os.path.join(path, 'dedupestore.db')
+            raise Exception('%s Does not look like a darc store' % path)
+        db_path = os.path.join(path, 'darcstore.db')
         if not os.path.exists(db_path):
-            raise Exception('%s Does not look like a store2')
+            raise Exception('%s Does not look like a darc store')
         self.lock_fd = open(os.path.join(path, 'lock'), 'w')
         fcntl.flock(self.lock_fd, fcntl.LOCK_EX)
         self.path = path
@@ -80,7 +80,7 @@ class Store(object):
         if not os.path.exists(path):
             os.mkdir(path)
         os.mkdir(os.path.join(path, 'bands'))
-        cnx = sqlite3.connect(os.path.join(path, 'dedupestore.db'))
+        cnx = sqlite3.connect(os.path.join(path, 'darcstore.db'))
         cnx.execute('CREATE TABLE objects(ns BINARY NOT NULL, id BINARY NOT NULL, '
                     'band NOT NULL, offset NOT NULL, size NOT NULL)')
         cnx.execute('CREATE UNIQUE INDEX objects_pk ON objects(ns, id)')

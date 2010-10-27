@@ -1,15 +1,21 @@
-"""
-Dedupstore
-==========
+chunk_cache
+bandstore
+dedupestore => dds
+init command
+
 
 TODO
 ----
-* Symbolic links
-* Owner, group, mode
-* msgpack
+* Remote stores
+* Stat and chunk cache
+
+DONE
+----
+* Encryption
 * Hard links
-
-
+* cache redesign
+* Symbolic links
+* Owner, group, mode, ctime, mtime
 
 cache = Cache(path,)
 

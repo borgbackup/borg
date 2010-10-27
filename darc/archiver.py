@@ -57,7 +57,7 @@ class Archiver(object):
             archive.list()
         else:
             for archive in Archive.list_archives(store, crypto):
-                print archive.metadata['name']
+                print '%(name)-20s %(time)s' % archive.metadata
         return self.exit_code_from_logger()
 
     def do_verify(self, args):

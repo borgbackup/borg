@@ -51,13 +51,17 @@ class Cache(object):
                     self.chunk_counts[id] = 1, size
         self.save()
 
+    def filter_file_chunks(self):
+        for key, value in self.file_chunks.iteritems():
+            if value[0] < 8:
+                yield key, (value[0] + 1,) + value[1:]
+
     def save(self):
         assert self.store.state == self.store.OPEN
         cache = {'version': 1,
                 'tid': self.store.tid,
                 'chunk_counts': self.chunk_counts,
-                'file_chunks': dict(ifilter(lambda i: i[1][0] < 8,
-                                            self.file_chunks.iteritems())),
+                'file_chunks': dict(self.filter_file_chunks()),
         }
         data, hash = self.crypto.encrypt_create(msgpack.packb(cache))
         cachedir = os.path.dirname(self.path)

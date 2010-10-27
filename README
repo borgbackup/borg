@@ -1,0 +1,41 @@
+Basic Usage
+===========
+
+Generate keychain
+-----------------
+All data stored using darc is protected by 256 bit AES encryption. This means
+that a keychain file needs to be created before any archives can be created:
+
+$ darc init-keychain
+
+This will create a password protected keychain in ~/.darc/keychain
+
+Create an empty darc store
+--------------------------
+
+$ darc init /path/store
+
+Create an archive
+-----------------
+
+$ darc create /path/store::MyBackup ~/Documents ~/src
+
+List store contents
+-------------------
+
+$ darc list /path/store
+
+List archive contents
+---------------------
+
+$ darc list /path/store::MyBackup
+
+Extract archive
+---------------
+
+$ darc extract /path/store::MyBackup /destination
+
+Delete archive
+--------------
+
+$ darc delete /path/store::MyBackup

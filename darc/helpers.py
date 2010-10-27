@@ -12,7 +12,7 @@ def format_time(t):
     if (datetime.now() - t).days < 365:
         return t.strftime('%b %d %H:%M')
     else:
-        return t.strftime('%d %d  %Y')
+        return t.strftime('%b %d  %Y')
 
 
 def format_file_mode(mod):

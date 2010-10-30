@@ -1,43 +1,89 @@
 import argparse
-import logging
+from datetime import datetime
 import os
+import stat
 import sys
 
 from .archive import Archive
 from .store import Store
 from .cache import Cache
 from .crypto import CryptoManager, KeyChain
-from .helpers import location_validator, format_file_size, LevelFilter
+from .helpers import location_validator, format_file_size, format_time, format_file_mode
 
 
 class Archiver(object):
 
+    def __init__(self):
+        self.exit_code = 0
+
     def open_store(self, location):
         return Store(location.path)
 
-    def exit_code_from_logger(self):
-        return 1 if self.level_filter.count.get('ERROR') else 0
+    def print_error(self, msg, *args):
+        msg = args and msg % args or msg
+        self.exit_code = 1
+        print >> sys.stderr, msg
+
+    def print_verbose(self, msg, *args, **kw):
+        if self.verbose:
+            msg = args and msg % args or msg
+            if kw.get('newline', True):
+                print msg
+            else:
+                print msg,
+
+    def _walk(self, path):
+        st = os.lstat(path)
+        yield path, st
+        if stat.S_ISDIR(st.st_mode):
+            for f in os.listdir(path):
+                for x in self._walk(os.path.join(path, f)):
+                    yield x
 
     def do_init(self, args):
         Store(args.store.path, create=True)
-        return self.exit_code_from_logger()
+        return self.exit_code
 
     def do_create(self, args):
         store = self.open_store(args.archive)
         keychain = KeyChain(args.keychain)
         crypto = CryptoManager(keychain)
+        try:
+            Archive(store, crypto, args.archive.archive)
+        except Archive.DoesNotExist:
+            pass
+        else:
+            self.print_error('Archive already exists')
+            return self.exit_code
         archive = Archive(store, crypto)
         cache = Cache(store, archive.crypto)
-        archive.create(args.archive.archive, args.paths, cache)
-        return self.exit_code_from_logger()
+        for path in args.paths:
+            for path, st in self._walk(unicode(path)):
+                if stat.S_ISDIR(st.st_mode):
+                    archive.process_dir(path, st)
+                elif stat.S_ISLNK(st.st_mode):
+                    archive.process_symlink(path, st)
+                elif stat.S_ISREG(st.st_mode):
+                    try:
+                        archive.process_file(path, st, cache)
+                    except IOError, e:
+                        self.print_error('%s: %s', path, e)
+                else:
+                    self.print_error('Unknown file type: %s', path)
+        archive.save(args.archive.archive)
+        cache.save()
+        return self.exit_code
 
     def do_extract(self, args):
         store = self.open_store(args.archive)
         keychain = KeyChain(args.keychain)
         crypto = CryptoManager(keychain)
         archive = Archive(store, crypto, args.archive.archive)
-        archive.extract(args.dest)
-        return self.exit_code_from_logger()
+        archive.get_items()
+        for item in archive.items:
+            self.print_verbose(item['path'])
+            archive.extract_item(item, args.dest)
+        return self.exit_code
 
     def do_delete(self, args):
         store = self.open_store(args.archive)
@@ -46,27 +92,43 @@ class Archiver(object):
         archive = Archive(store, crypto, args.archive.archive)
         cache = Cache(store, archive.crypto)
         archive.delete(cache)
-        return self.exit_code_from_logger()
+        return self.exit_code
 
     def do_list(self, args):
         store = self.open_store(args.src)
         keychain = KeyChain(args.keychain)
         crypto = CryptoManager(keychain)
         if args.src.archive:
+            tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 010: '-', 012: 'l', 014: 's'}
             archive = Archive(store, crypto, args.src.archive)
-            archive.list()
+            archive.get_items()
+            for item in archive.items:
+                type = tmap.get(item['mode'] / 4096, '?')
+                mode = format_file_mode(item['mode'])
+                size = item.get('size', 0)
+                mtime = format_time(datetime.fromtimestamp(item['mtime']))
+                print '%s%s %-6s %-6s %8d %s %s' % (type, mode, item['user'],
+                                                  item['group'], size, mtime, item['path'])
         else:
             for archive in Archive.list_archives(store, crypto):
                 print '%(name)-20s %(time)s' % archive.metadata
-        return self.exit_code_from_logger()
+        return self.exit_code
 
     def do_verify(self, args):
         store = self.open_store(args.archive)
         keychain = KeyChain(args.keychain)
         crypto = CryptoManager(keychain)
         archive = Archive(store, crypto, args.archive.archive)
-        archive.verify()
-        return self.exit_code_from_logger()
+        archive.get_items()
+        for item in archive.items:
+            if stat.S_ISREG(item['mode']) and not 'source' in item:
+                self.print_verbose('%s ...', item['path'], newline=False)
+                if archive.verify_file(item):
+                    self.print_verbose('OK')
+                else:
+                    self.print_verbose('ERROR')
+                    self.print_error('%s: verification failed' % item['path'])
+        return self.exit_code
 
     def do_info(self, args):
         store = self.open_store(args.archive)
@@ -84,7 +146,7 @@ class Archiver(object):
         print 'Original size:', format_file_size(osize)
         print 'Compressed size:', format_file_size(csize)
         print 'Unique data:', format_file_size(usize)
-        return self.exit_code_from_logger()
+        return self.exit_code
 
     def do_keychain_generate(self, args):
         return KeyChain.generate(args.keychain)
@@ -165,12 +227,7 @@ class Archiver(object):
                                help='Archive to display information about')
 
         args = parser.parse_args(args)
-        if args.verbose:
-            logging.basicConfig(level=logging.INFO, format='%(message)s')
-        else:
-            logging.basicConfig(level=logging.WARNING, format='%(message)s')
-        self.level_filter = LevelFilter()
-        logging.getLogger('').addFilter(self.level_filter)
+        self.verbose = args.verbose
         return args.func(args)
 
 def main():

@@ -1,7 +1,6 @@
 import argparse
 from datetime import datetime
 import grp
-import logging
 import pwd
 import re
 
@@ -77,19 +76,6 @@ def group2gid(group):
         return grp.getgrnam(group).gr_gid
     except KeyError:
         return None
-
-
-class LevelFilter(logging.Filter):
-    """Filter that counts record levels
-    """
-    def __init__(self, *args, **kwargs):
-        logging.Filter.__init__(self, *args, **kwargs)
-        self.count = {}
-
-    def filter(self, record):
-        self.count.setdefault(record.levelname, 0)
-        self.count[record.levelname] += 1
-        return record
 
 
 class Location(object):

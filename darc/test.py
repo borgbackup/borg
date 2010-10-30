@@ -1,4 +1,6 @@
 import os
+from StringIO import StringIO
+import sys
 import shutil
 import tempfile
 import unittest
@@ -24,7 +26,14 @@ class Test(unittest.TestCase):
     def darc(self, *args, **kwargs):
         exit_code = kwargs.get('exit_code', 0)
         args = ['--keychain', self.keychain] + list(args)
-        self.assertEqual(exit_code, self.archiver.run(args))
+        try:
+            stdout, stderr = sys.stdout, sys.stderr
+            output = StringIO()
+            sys.stdout = sys.stderr = output
+            self.assertEqual(exit_code, self.archiver.run(args))
+            return output.getvalue()
+        finally:
+            sys.stdout, sys.stderr = stdout, stderr
 
     def create_src_archive(self, name):
         src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__))

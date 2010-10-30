@@ -1,7 +1,6 @@
 from getpass import getpass
 import hashlib
 import os
-import logging
 import msgpack
 import zlib
 
@@ -26,7 +25,7 @@ class KeyChain(object):
             self.open(path)
 
     def open(self, path):
-        logging.info('Opening keychain "%s"', path)
+        print 'Opening keychain "%s"' % path
         with open(path, 'rb') as fd:
             if fd.read(len(self.FILE_ID)) != self.FILE_ID:
                 raise ValueError('Not a keychain')
@@ -38,7 +37,7 @@ class KeyChain(object):
                 raise Exception('Keychain decryption failed')
             data = self.decrypt(cdata, self.password)
             if not data:
-                logging.error('Incorrect password')
+                print 'Incorrect password'
         chain = msgpack.unpackb(data)
         assert chain['version'] == 1
         self.aes_id = chain['aes_id']
@@ -82,11 +81,11 @@ class KeyChain(object):
         with open(path, 'wb') as fd:
             fd.write(self.FILE_ID)
             fd.write(data)
-            logging.info('Key chain "%s" saved', path)
+            print 'Key chain "%s" saved' % path
 
     def restrict(self, path):
         if os.path.exists(path):
-            logging.error('%s already exists', path)
+            print '%s already exists' % path
             return 1
         self.rsa_read = self.rsa_read.publickey()
         self.save(path, self.password)
@@ -98,23 +97,23 @@ class KeyChain(object):
             password = getpass('New password: ')
             password2 = getpass('New password again: ')
             if password != password2:
-                logging.error('Passwords do not match')
+                print 'Passwords do not match'
         self.save(self.path, password)
         return 0
 
     @staticmethod
     def generate(path):
         if os.path.exists(path):
-            logging.error('%s already exists', path)
+            print '%s already exists' % path
             return 1
         password, password2 = 1, 2
         while password != password2:
             password = getpass('Keychain password: ')
             password2 = getpass('Keychain password again: ')
             if password != password2:
-                logging.error('Passwords do not match')
+                print 'Passwords do not match'
         chain = KeyChain()
-        logging.info('Generating keys')
+        print 'Generating keychain'
         chain.aes_id = os.urandom(32)
         chain.rsa_read = RSA.generate(2048)
         chain.rsa_create = RSA.generate(2048)

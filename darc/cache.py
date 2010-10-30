@@ -1,5 +1,3 @@
-from itertools import ifilter
-import logging
 import msgpack
 import os
 
@@ -34,7 +32,7 @@ class Cache(object):
     def init(self):
         """Initializes cache by fetching and reading all archive indicies
         """
-        logging.info('Initializing cache...')
+        print 'Initializing cache...'
         self.chunk_counts = {}
         self.file_chunks = {}
         self.tid = self.store.tid

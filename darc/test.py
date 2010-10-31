@@ -6,6 +6,7 @@ import sys
 import shutil
 import tempfile
 import unittest
+from xattr import xattr, XATTR_NOFOLLOW
 
 from . import store
 from .archiver import Archiver
@@ -57,25 +58,37 @@ class Test(unittest.TestCase):
         with open(filename, 'wb') as fd:
             fd.write('X' * size)
 
+    def get_xattrs(self, path):
+        try:
+            return dict(xattr(path, XATTR_NOFOLLOW))
+        except IOError:
+            return {}
+
     def diff_dirs(self, dir1, dir2):
         diff = filecmp.dircmp(dir1, dir2)
         self.assertEqual(diff.left_only, [])
         self.assertEqual(diff.right_only, [])
         self.assertEqual(diff.diff_files, [])
         for filename in diff.common:
-            s1 = os.lstat(os.path.join(dir1, filename))
-            s2 = os.lstat(os.path.join(dir2, filename))
+            path1 = os.path.join(dir1, filename)
+            path2 = os.path.join(dir2, filename)
+            s1 = os.lstat(path1)
+            s2 = os.lstat(path2)
             attrs = ['st_mode', 'st_uid', 'st_gid']
             # We can't restore symlink atime/mtime right now
-            if not os.path.islink(os.path.join(dir1, filename)):
+            if not os.path.islink(path1):
                 attrs.append('st_mtime')
             d1 = [filename] + [getattr(s1, a) for a in attrs]
             d2 = [filename] + [getattr(s2, a) for a in attrs]
+            d1.append(self.get_xattrs(path1))
+            d2.append(self.get_xattrs(path2))
             self.assertEqual(d1, d2)
 
     def test_basic_functionality(self):
         self.create_regual_file('file1', size=1024*80)
         self.create_regual_file('dir2/file2', size=1024*80)
+        x = xattr(os.path.join(self.input_path, 'file1'))
+        x.set('user:foo', 'bar')
         os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
         os.mkfifo(os.path.join(self.input_path, 'fifo1'))
         self.darc('create', self.store_path + '::test', 'input')
@@ -87,7 +100,7 @@ class Test(unittest.TestCase):
         self.create_src_archive('test')
         self.darc('verify', self.store_path + '::test')
         fd = open(os.path.join(self.tmpdir, 'store', 'bands', '0', '0'), 'r+')
-        fd.seek(1000)
+        fd.seek(100)
         fd.write('X')
         fd.close()
         self.darc('verify', self.store_path + '::test', exit_code=1)

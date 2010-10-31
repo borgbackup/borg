@@ -5,6 +5,7 @@ import os
 import socket
 import stat
 import sys
+from xattr import xattr, XATTR_NOFOLLOW
 
 from . import NS_ARCHIVE_METADATA, NS_ARCHIVE_ITEMS, NS_ARCHIVE_CHUNKS, NS_CHUNK
 from .chunkifier import chunkify
@@ -144,6 +145,13 @@ class Archive(object):
             raise Exception('Unknown archive item type %r' % item['mode'])
 
     def restore_attrs(self, path, item, symlink=False):
+        if item['xattrs']:
+            try:
+                xa = xattr(path, XATTR_NOFOLLOW)
+                for k, v in item['xattrs'].items():
+                    xa.set(k, v)
+            except IOError:
+                pass
         if have_lchmod:
             os.lchmod(path, item['mode'])
         elif not symlink:
@@ -179,28 +187,33 @@ class Archive(object):
         self.store.commit()
         cache.save()
 
-    def stat_attrs(self, st):
+    def stat_attrs(self, st, path):
+        try:
+            xattrs = dict(xattr(path, XATTR_NOFOLLOW))
+        except IOError:
+            xattrs = None
         return {
             'mode': st.st_mode,
             'uid': st.st_uid, 'user': uid2user(st.st_uid),
             'gid': st.st_gid, 'group': gid2group(st.st_gid),
             'atime': st.st_atime, 'mtime': st.st_mtime,
+            'xattrs': xattrs,
         }
 
     def process_dir(self, path, st):
         item = {'path': path.lstrip('/\\:')}
-        item.update(self.stat_attrs(st))
+        item.update(self.stat_attrs(st, path))
         self.items.append(item)
 
     def process_fifo(self, path, st):
         item = {'path': path.lstrip('/\\:')}
-        item.update(self.stat_attrs(st))
+        item.update(self.stat_attrs(st, path))
         self.items.append(item)
 
     def process_symlink(self, path, st):
         source = os.readlink(path)
         item = {'path': path.lstrip('/\\:'), 'source': source}
-        item.update(self.stat_attrs(st))
+        item.update(self.stat_attrs(st, path))
         self.items.append(item)
 
     def process_file(self, path, st, cache):
@@ -240,7 +253,7 @@ class Archive(object):
                     size += len(chunk)
             cache.memorize_file_chunks(path_hash, st, ids)
         item = {'path': safe_path, 'chunks': chunks, 'size': size}
-        item.update(self.stat_attrs(st))
+        item.update(self.stat_attrs(st, path))
         self.items.append(item)
 
     def process_chunk2(self, id, cache):

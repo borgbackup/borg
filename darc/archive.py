@@ -21,32 +21,32 @@ class Archive(object):
     class DoesNotExist(Exception):
         pass
 
-    def __init__(self, store, crypto, name=None):
-        self.crypto = crypto
+    def __init__(self, store, keychain, name=None):
+        self.keychain = keychain
         self.store = store
         self.items = []
         self.chunks = []
         self.chunk_idx = {}
         self.hard_links = {}
         if name:
-            self.load(self.crypto.id_hash(name))
+            self.load(self.keychain.id_hash(name))
 
     def load(self, id):
         self.id = id
         try:
-            data, self.hash = self.crypto.decrypt(self.store.get(NS_ARCHIVE_METADATA, self.id))
+            data, self.hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_METADATA, self.id))
         except self.store.DoesNotExist:
             raise self.DoesNotExist
         self.metadata = msgpack.unpackb(data)
         assert self.metadata['version'] == 1
 
     def get_items(self):
-        data, chunks_hash = self.crypto.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, self.id))
+        data, chunks_hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, self.id))
         chunks = msgpack.unpackb(data)
         assert chunks['version'] == 1
         assert self.metadata['chunks_hash'] == chunks_hash
         self.chunks = chunks['chunks']
-        data, items_hash = self.crypto.decrypt(self.store.get(NS_ARCHIVE_ITEMS, self.id))
+        data, items_hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_ITEMS, self.id))
         items = msgpack.unpackb(data)
         assert items['version'] == 1
         assert self.metadata['items_hash'] == items_hash
@@ -55,12 +55,12 @@ class Archive(object):
             self.chunk_idx[i] = chunk[0]
 
     def save(self, name):
-        self.id = self.crypto.id_hash(name)
+        self.id = self.keychain.id_hash(name)
         chunks = {'version': 1, 'chunks': self.chunks}
-        data, chunks_hash = self.crypto.encrypt_create(msgpack.packb(chunks))
+        data, chunks_hash = self.keychain.encrypt_create(msgpack.packb(chunks))
         self.store.put(NS_ARCHIVE_CHUNKS, self.id, data)
         items = {'version': 1, 'items': self.items}
-        data, items_hash = self.crypto.encrypt_read(msgpack.packb(items))
+        data, items_hash = self.keychain.encrypt_read(msgpack.packb(items))
         self.store.put(NS_ARCHIVE_ITEMS, self.id, data)
         metadata = {
             'version': 1,
@@ -72,7 +72,7 @@ class Archive(object):
             'username': getuser(),
             'time': datetime.utcnow().isoformat(),
         }
-        data, self.hash = self.crypto.encrypt_read(msgpack.packb(metadata))
+        data, self.hash = self.keychain.encrypt_read(msgpack.packb(metadata))
         self.store.put(NS_ARCHIVE_METADATA, self.id, data)
         self.store.commit()
 
@@ -134,8 +134,8 @@ class Archive(object):
                     for chunk in item['chunks']:
                         id = self.chunk_idx[chunk]
                         try:
-                            data, hash = self.crypto.decrypt(self.store.get(NS_CHUNK, id))
-                            if self.crypto.id_hash(data) != id:
+                            data, hash = self.keychain.decrypt(self.store.get(NS_CHUNK, id))
+                            if self.keychain.id_hash(data) != id:
                                 raise IntegrityError('chunk id did not match')
                             fd.write(data)
                         except ValueError:
@@ -171,8 +171,8 @@ class Archive(object):
         for chunk in item['chunks']:
             id = self.chunk_idx[chunk]
             try:
-                data, hash = self.crypto.decrypt(self.store.get(NS_CHUNK, id))
-                if self.crypto.id_hash(data) != id:
+                data, hash = self.keychain.decrypt(self.store.get(NS_CHUNK, id))
+                if self.keychain.id_hash(data) != id:
                     raise IntegrityError('chunk id did not match')
             except IntegrityError:
                 return False
@@ -227,7 +227,7 @@ class Archive(object):
                 return
             else:
                 self.hard_links[st.st_ino, st.st_dev] = safe_path
-        path_hash = self.crypto.id_hash(path.encode('utf-8'))
+        path_hash = self.keychain.id_hash(path.encode('utf-8'))
         ids, size = cache.file_known_and_unchanged(path_hash, st)
         if ids is not None:
             # Make sure all ids are available
@@ -245,7 +245,7 @@ class Archive(object):
                 ids = []
                 chunks = []
                 for chunk in chunkify(fd, CHUNK_SIZE, 30):
-                    id = self.crypto.id_hash(chunk)
+                    id = self.keychain.id_hash(chunk)
                     ids.append(id)
                     try:
                         chunks.append(self.chunk_idx[id])
@@ -275,8 +275,8 @@ class Archive(object):
         return idx
 
     @staticmethod
-    def list_archives(store, crypto):
+    def list_archives(store, keychain):
         for id in list(store.list(NS_ARCHIVE_METADATA)):
-            archive = Archive(store, crypto)
+            archive = Archive(store, keychain)
             archive.load(id)
             yield archive

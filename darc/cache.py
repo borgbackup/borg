@@ -8,9 +8,9 @@ class Cache(object):
     """Client Side cache
     """
 
-    def __init__(self, store, crypto):
+    def __init__(self, store, keychain):
         self.store = store
-        self.crypto = crypto
+        self.keychain = keychain
         self.path = os.path.join(os.path.expanduser('~'), '.darc', 'cache',
                                  '%s.cache' % self.store.id.encode('hex'))
         self.tid = -1
@@ -22,7 +22,7 @@ class Cache(object):
         if not os.path.exists(self.path):
             return
         with open(self.path, 'rb') as fd:
-            data, hash = self.crypto.decrypt(fd.read())
+            data, hash = self.keychain.decrypt(fd.read())
             cache = msgpack.unpackb(data)
         assert cache['version'] == 1
         self.chunk_counts = cache['chunk_counts']
@@ -39,7 +39,7 @@ class Cache(object):
         if self.store.tid == 0:
             return
         for id in list(self.store.list(NS_ARCHIVE_CHUNKS)):
-            data, hash = self.crypto.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, id))
+            data, hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, id))
             cindex = msgpack.unpackb(data)
             for id, size in cindex['chunks']:
                 try:
@@ -61,7 +61,7 @@ class Cache(object):
                 'chunk_counts': self.chunk_counts,
                 'file_chunks': dict(self.filter_file_chunks()),
         }
-        data, hash = self.crypto.encrypt_create(msgpack.packb(cache))
+        data, hash = self.keychain.encrypt_create(msgpack.packb(cache))
         cachedir = os.path.dirname(self.path)
         if not os.path.exists(cachedir):
             os.makedirs(cachedir)
@@ -71,7 +71,7 @@ class Cache(object):
     def add_chunk(self, id, data):
         if self.seen_chunk(id):
             return self.chunk_incref(id)
-        data, hash = self.crypto.encrypt_read(data)
+        data, hash = self.keychain.encrypt_read(data)
         csize = len(data)
         self.store.put(NS_CHUNK, id, data)
         self.chunk_counts[id] = (1, csize)

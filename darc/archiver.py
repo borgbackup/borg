@@ -7,7 +7,7 @@ import sys
 from .archive import Archive
 from .store import Store
 from .cache import Cache
-from .crypto import CryptoManager, KeyChain
+from .keychain import Keychain
 from .helpers import location_validator, format_file_size, format_time, format_file_mode, walk_dir
 
 
@@ -38,17 +38,16 @@ class Archiver(object):
 
     def do_create(self, args):
         store = self.open_store(args.archive)
-        keychain = KeyChain(args.keychain)
-        crypto = CryptoManager(keychain)
+        keychain = Keychain(args.keychain)
         try:
-            Archive(store, crypto, args.archive.archive)
+            Archive(store, keychain, args.archive.archive)
         except Archive.DoesNotExist:
             pass
         else:
             self.print_error('Archive already exists')
             return self.exit_code
-        archive = Archive(store, crypto)
-        cache = Cache(store, archive.crypto)
+        archive = Archive(store, keychain)
+        cache = Cache(store, keychain)
         for path in args.paths:
             for path, st in walk_dir(unicode(path)):
                 if stat.S_ISDIR(st.st_mode):
@@ -70,9 +69,8 @@ class Archiver(object):
 
     def do_extract(self, args):
         store = self.open_store(args.archive)
-        keychain = KeyChain(args.keychain)
-        crypto = CryptoManager(keychain)
-        archive = Archive(store, crypto, args.archive.archive)
+        keychain = Keychain(args.keychain)
+        archive = Archive(store, keychain, args.archive.archive)
         archive.get_items()
         dirs = []
         for item in archive.items:
@@ -89,20 +87,18 @@ class Archiver(object):
 
     def do_delete(self, args):
         store = self.open_store(args.archive)
-        keychain = KeyChain(args.keychain)
-        crypto = CryptoManager(keychain)
-        archive = Archive(store, crypto, args.archive.archive)
-        cache = Cache(store, archive.crypto)
+        keychain = Keychain(args.keychain)
+        archive = Archive(store, keychain, args.archive.archive)
+        cache = Cache(store, keychain)
         archive.delete(cache)
         return self.exit_code
 
     def do_list(self, args):
         store = self.open_store(args.src)
-        keychain = KeyChain(args.keychain)
-        crypto = CryptoManager(keychain)
+        keychain = Keychain(args.keychain)
         if args.src.archive:
             tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 010: '-', 012: 'l', 014: 's'}
-            archive = Archive(store, crypto, args.src.archive)
+            archive = Archive(store, keychain, args.src.archive)
             archive.get_items()
             for item in archive.items:
                 type = tmap.get(item['mode'] / 4096, '?')
@@ -112,15 +108,14 @@ class Archiver(object):
                 print '%s%s %-6s %-6s %8d %s %s' % (type, mode, item['user'],
                                                   item['group'], size, mtime, item['path'])
         else:
-            for archive in Archive.list_archives(store, crypto):
+            for archive in Archive.list_archives(store, keychain):
                 print '%(name)-20s %(time)s' % archive.metadata
         return self.exit_code
 
     def do_verify(self, args):
         store = self.open_store(args.archive)
-        keychain = KeyChain(args.keychain)
-        crypto = CryptoManager(keychain)
-        archive = Archive(store, crypto, args.archive.archive)
+        keychain = Keychain(args.keychain)
+        archive = Archive(store, keychain, args.archive.archive)
         archive.get_items()
         for item in archive.items:
             if stat.S_ISREG(item['mode']) and not 'source' in item:
@@ -134,10 +129,9 @@ class Archiver(object):
 
     def do_info(self, args):
         store = self.open_store(args.archive)
-        keychain = KeyChain(args.keychain)
-        crypto = CryptoManager(keychain)
-        archive = Archive(store, crypto, args.archive.archive)
-        cache = Cache(store, archive.crypto)
+        keychain = Keychain(args.keychain)
+        archive = Archive(store, keychain, args.archive.archive)
+        cache = Cache(store, keychain)
         osize, csize, usize = archive.stats(cache)
         print 'Name:', archive.metadata['name']
         print 'Hostname:', archive.metadata['hostname']
@@ -151,15 +145,15 @@ class Archiver(object):
         return self.exit_code
 
     def do_init_keychain(self, args):
-        return KeyChain.generate(args.keychain)
+        return Keychain.generate(args.keychain)
 
     def do_export_restricted(self, args):
-        keychain = KeyChain(args.keychain)
+        keychain = Keychain(args.keychain)
         keychain.restrict(args.output)
         return self.exit_code
 
     def do_keychain_chpass(self, args):
-        return KeyChain(args.keychain).chpass()
+        return Keychain(args.keychain).chpass()
 
     def run(self, args=None):
         default_keychain = os.path.join(os.path.expanduser('~'),

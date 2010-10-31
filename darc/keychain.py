@@ -15,10 +15,16 @@ from .helpers import IntegrityError
 from .oaep import OAEP
 
 
-class KeyChain(object):
+class Keychain(object):
     FILE_ID = 'DARC KEYCHAIN'
 
+    CREATE = '\1'
+    READ = '\2'
+
     def __init__(self, path=None):
+        self._key_cache = {}
+        self.read_key = os.urandom(32)
+        self.create_key = os.urandom(32)
         self.aes_id = self.rsa_read = self.rsa_create = None
         self.path = path
         if path:
@@ -31,7 +37,7 @@ class KeyChain(object):
                 raise ValueError('Not a keychain')
             cdata = fd.read()
         self.password = ''
-        data = self.decrypt(cdata, '')
+        data = self._decrypt(cdata, '')
         while not data:
             self.password = getpass('Keychain password: ')
             if not self.password:
@@ -44,6 +50,10 @@ class KeyChain(object):
         self.aes_id = chain['aes_id']
         self.rsa_read = RSA.importKey(chain['rsa_read'])
         self.rsa_create = RSA.importKey(chain['rsa_create'])
+        self.read_encrypted = OAEP(256, hash=SHA256).encode(self.read_key, os.urandom(32))
+        self.read_encrypted = self.rsa_read.encrypt(self.read_encrypted, '')[0]
+        self.create_encrypted = OAEP(256, hash=SHA256).encode(self.create_key, os.urandom(32))
+        self.create_encrypted = self.rsa_create.encrypt(self.create_encrypted, '')[0]
 
     def encrypt(self, data, password):
         salt = os.urandom(32)
@@ -61,7 +71,7 @@ class KeyChain(object):
         }
         return msgpack.packb(d)
 
-    def decrypt(self, data, password):
+    def _decrypt(self, data, password):
         d = msgpack.unpackb(data)
         assert d['version'] == 1
         assert d['algorithm'] == 'SHA256'
@@ -113,7 +123,7 @@ class KeyChain(object):
             password2 = getpass('Keychain password again: ')
             if password != password2:
                 print 'Passwords do not match'
-        chain = KeyChain()
+        chain = Keychain()
         print 'Generating keychain'
         chain.aes_id = os.urandom(32)
         chain.rsa_read = RSA.generate(2048)
@@ -121,23 +131,8 @@ class KeyChain(object):
         chain.save(path, password)
         return 0
 
-class CryptoManager(object):
-
-    CREATE = '\1'
-    READ = '\2'
-
-    def __init__(self, keychain):
-        self._key_cache = {}
-        self.keychain = keychain
-        self.read_key = os.urandom(32)
-        self.create_key = os.urandom(32)
-        self.read_encrypted = OAEP(256, hash=SHA256).encode(self.read_key, os.urandom(32))
-        self.read_encrypted = keychain.rsa_read.encrypt(self.read_encrypted, '')[0]
-        self.create_encrypted = OAEP(256, hash=SHA256).encode(self.create_key, os.urandom(32))
-        self.create_encrypted = keychain.rsa_create.encrypt(self.create_encrypted, '')[0]
-
     def id_hash(self, data):
-        return HMAC.new(self.keychain.aes_id, data, SHA256).digest()
+        return HMAC.new(self.aes_id, data, SHA256).digest()
 
     def encrypt_read(self, data):
         data = zlib.compress(data)
@@ -163,7 +158,7 @@ class CryptoManager(object):
     def decrypt(self, data):
         type = data[0]
         if type == self.READ:
-            key = self.decrypt_key(data[1:257], self.keychain.rsa_read)
+            key = self.decrypt_key(data[1:257], self.rsa_read)
             hash = data[257:289]
             counter = Counter.new(128, initial_value=bytes_to_long(hash[:16]), allow_wraparound=True)
             data = AES.new(key, AES.MODE_CTR, counter=counter).decrypt(data[289:])
@@ -171,7 +166,7 @@ class CryptoManager(object):
                 raise IntegrityError('decryption failed')
             return zlib.decompress(data), hash
         elif type == self.CREATE:
-            key = self.decrypt_key(data[1:257], self.keychain.rsa_create)
+            key = self.decrypt_key(data[1:257], self.rsa_create)
             hash = data[257:289]
             counter = Counter.new(128, initial_value=bytes_to_long(hash[:16]), allow_wraparound=True)
             data = AES.new(key, AES.MODE_CTR, '', counter=counter).decrypt(data[289:])
@@ -180,4 +175,6 @@ class CryptoManager(object):
             return zlib.decompress(data), hash
         else:
             raise Exception('Unknown pack type %d found' % ord(type))
+
+
 

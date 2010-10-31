@@ -150,11 +150,13 @@ class Archiver(object):
         print 'Unique data:', format_file_size(usize)
         return self.exit_code
 
-    def do_keychain_generate(self, args):
+    def do_init_keychain(self, args):
         return KeyChain.generate(args.keychain)
 
-    def do_keychain_restrict(self, args):
-        return KeyChain(args.keychain).restrict(args.output)
+    def do_export_restricted(self, args):
+        keychain = KeyChain(args.keychain)
+        keychain.restrict(args.output)
+        return self.exit_code
 
     def do_keychain_chpass(self, args):
         return KeyChain(args.keychain).chpass()
@@ -172,15 +174,13 @@ class Archiver(object):
 
 
         subparsers = parser.add_subparsers(title='Available subcommands')
-        subparser = subparsers.add_parser('keychain')
-        subsubparsers = subparser.add_subparsers(title='Available subcommands')
-        subparser = subsubparsers.add_parser('generate')
-        subparser.set_defaults(func=self.do_keychain_generate)
-        subparser = subsubparsers.add_parser('restrict')
+        subparser = subparsers.add_parser('init-keychain')
+        subparser.set_defaults(func=self.do_init_keychain)
+        subparser = subparsers.add_parser('export-restricted')
         subparser.add_argument('output', metavar='OUTPUT', type=str,
                                help='Keychain to create')
-        subparser.set_defaults(func=self.do_keychain_restrict)
-        subparser = subsubparsers.add_parser('change-password')
+        subparser.set_defaults(func=self.do_export_restricted)
+        subparser = subparsers.add_parser('change-password')
         subparser.set_defaults(func=self.do_keychain_chpass)
 
         subparser = subparsers.add_parser('init')

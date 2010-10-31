@@ -1,6 +1,5 @@
 import filecmp
 import os
-import time
 from StringIO import StringIO
 import sys
 import shutil
@@ -25,7 +24,7 @@ class Test(unittest.TestCase):
         os.chdir(self.tmpdir)
         self.keychain = '/tmp/_test_dedupstore.keychain'
         if not os.path.exists(self.keychain):
-            self.darc('keychain', 'generate')
+            self.darc('init-keychain')
         self.darc('init', self.store_path)
 
     def tearDown(self):
@@ -92,7 +91,6 @@ class Test(unittest.TestCase):
         os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
         os.mkfifo(os.path.join(self.input_path, 'fifo1'))
         self.darc('create', self.store_path + '::test', 'input')
-        time.sleep(1)
         self.darc('extract', self.store_path + '::test', 'output')
         self.diff_dirs('input', 'output/input')
 
@@ -104,6 +102,11 @@ class Test(unittest.TestCase):
         fd.write('X')
         fd.close()
         self.darc('verify', self.store_path + '::test', exit_code=1)
+
+    def test_keychain(self):
+        keychain = os.path.join(self.tmpdir, 'keychain')
+        self.darc('-k', keychain, 'init-keychain')
+
 
 def suite():
     suite = unittest.TestSuite()

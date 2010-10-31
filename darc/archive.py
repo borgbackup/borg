@@ -145,10 +145,11 @@ class Archive(object):
             raise Exception('Unknown archive item type %r' % item['mode'])
 
     def restore_attrs(self, path, item, symlink=False):
-        if item['xattrs']:
+        xattrs = item.get('xattrs')
+        if xattrs:
             try:
                 xa = xattr(path, XATTR_NOFOLLOW)
-                for k, v in item['xattrs'].items():
+                for k, v in xattrs.items():
                     xa.set(k, v)
             except IOError:
                 pass
@@ -188,17 +189,17 @@ class Archive(object):
         cache.save()
 
     def stat_attrs(self, st, path):
-        try:
-            xattrs = dict(xattr(path, XATTR_NOFOLLOW))
-        except IOError:
-            xattrs = None
-        return {
+        item = {
             'mode': st.st_mode,
             'uid': st.st_uid, 'user': uid2user(st.st_uid),
             'gid': st.st_gid, 'group': gid2group(st.st_gid),
             'atime': st.st_atime, 'mtime': st.st_mtime,
-            'xattrs': xattrs,
         }
+        try:
+            item['xattrs'] = dict(xattr(path, XATTR_NOFOLLOW))
+        except IOError:
+            pass
+        return item
 
     def process_dir(self, path, st):
         item = {'path': path.lstrip('/\\:')}

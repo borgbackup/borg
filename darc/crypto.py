@@ -30,6 +30,7 @@ class KeyChain(object):
             if fd.read(len(self.FILE_ID)) != self.FILE_ID:
                 raise ValueError('Not a keychain')
             cdata = fd.read()
+        self.password = ''
         data = self.decrypt(cdata, '')
         while not data:
             self.password = getpass('Keychain password: ')

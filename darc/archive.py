@@ -105,6 +105,12 @@ class Archive(object):
         if stat.S_ISDIR(mode):
             if not os.path.exists(path):
                 os.makedirs(path)
+            self.restore_attrs(path, item)
+        elif stat.S_ISFIFO(mode):
+            if not os.path.exists(os.path.dirname(path)):
+                os.makedirs(os.path.dirname(path))
+            os.mkfifo(path)
+            self.restore_attrs(path, item)
         elif stat.S_ISLNK(mode):
             if not os.path.exists(os.path.dirname(path)):
                 os.makedirs(os.path.dirname(path))
@@ -150,7 +156,7 @@ class Archive(object):
             pass
         if not symlink:
             # FIXME: We should really call futimes here (c extension required)
-            os.utime(path, (item['ctime'], item['mtime']))
+            os.utime(path, (item['atime'], item['mtime']))
 
     def verify_file(self, item):
         for chunk in item['chunks']:
@@ -178,10 +184,15 @@ class Archive(object):
             'mode': st.st_mode,
             'uid': st.st_uid, 'user': uid2user(st.st_uid),
             'gid': st.st_gid, 'group': gid2group(st.st_gid),
-            'ctime': st.st_ctime, 'mtime': st.st_mtime,
+            'atime': st.st_atime, 'mtime': st.st_mtime,
         }
 
     def process_dir(self, path, st):
+        item = {'path': path.lstrip('/\\:')}
+        item.update(self.stat_attrs(st))
+        self.items.append(item)
+
+    def process_fifo(self, path, st):
         item = {'path': path.lstrip('/\\:')}
         item.update(self.stat_attrs(st))
         self.items.append(item)

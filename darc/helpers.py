@@ -1,8 +1,19 @@
 import argparse
 from datetime import datetime
 import grp
+import os
 import pwd
 import re
+import stat
+
+
+def walk_dir(path):
+    st = os.lstat(path)
+    yield path, st
+    if stat.S_ISDIR(st.st_mode):
+        for f in os.listdir(path):
+            for x in walk_dir(os.path.join(path, f)):
+                yield x
 
 
 def format_time(t):

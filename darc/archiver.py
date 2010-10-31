@@ -8,7 +8,7 @@ from .archive import Archive
 from .store import Store
 from .cache import Cache
 from .crypto import CryptoManager, KeyChain
-from .helpers import location_validator, format_file_size, format_time, format_file_mode
+from .helpers import location_validator, format_file_size, format_time, format_file_mode, walk_dir
 
 
 class Archiver(object):
@@ -32,14 +32,6 @@ class Archiver(object):
             else:
                 print msg,
 
-    def _walk(self, path):
-        st = os.lstat(path)
-        yield path, st
-        if stat.S_ISDIR(st.st_mode):
-            for f in os.listdir(path):
-                for x in self._walk(os.path.join(path, f)):
-                    yield x
-
     def do_init(self, args):
         Store(args.store.path, create=True)
         return self.exit_code
@@ -58,11 +50,13 @@ class Archiver(object):
         archive = Archive(store, crypto)
         cache = Cache(store, archive.crypto)
         for path in args.paths:
-            for path, st in self._walk(unicode(path)):
+            for path, st in walk_dir(unicode(path)):
                 if stat.S_ISDIR(st.st_mode):
                     archive.process_dir(path, st)
                 elif stat.S_ISLNK(st.st_mode):
                     archive.process_symlink(path, st)
+                elif stat.S_ISFIFO(st.st_mode):
+                    archive.process_fifo(path, st)
                 elif stat.S_ISREG(st.st_mode):
                     try:
                         archive.process_file(path, st, cache)
@@ -80,9 +74,17 @@ class Archiver(object):
         crypto = CryptoManager(keychain)
         archive = Archive(store, crypto, args.archive.archive)
         archive.get_items()
+        dirs = []
         for item in archive.items:
             self.print_verbose(item['path'])
             archive.extract_item(item, args.dest)
+            if stat.S_ISDIR(item['mode']):
+                dirs.append(item)
+            if dirs and not item['path'].startswith(dirs[-1]['path']):
+                # Extract directories twice to make sure mtime is correctly restored
+                archive.extract_item(dirs.pop(-1), args.dest)
+        while dirs:
+            archive.extract_item(dirs.pop(-1), args.dest)
         return self.exit_code
 
     def do_delete(self, args):

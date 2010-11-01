@@ -14,6 +14,7 @@ from .helpers import uid2user, user2uid, gid2group, group2gid, IntegrityError
 CHUNK_SIZE = 55001
 
 have_lchmod = hasattr(os, 'lchmod')
+linux = sys.platform == 'linux'
 
 
 class Archive(object):
@@ -147,12 +148,12 @@ class Archive(object):
     def restore_attrs(self, path, item, symlink=False):
         xattrs = item.get('xattrs')
         if xattrs:
-            try:
-                xa = xattr(path, XATTR_NOFOLLOW)
-                for k, v in xattrs.items():
+            xa = xattr(path, XATTR_NOFOLLOW)
+            for k, v in xattrs.items():
+                try:
                     xa.set(k, v)
-            except IOError:
-                pass
+                except KeyError:
+                    pass
         if have_lchmod:
             os.lchmod(path, item['mode'])
         elif not symlink:
@@ -196,7 +197,15 @@ class Archive(object):
             'atime': st.st_atime, 'mtime': st.st_mtime,
         }
         try:
-            item['xattrs'] = dict(xattr(path, XATTR_NOFOLLOW))
+            xa = xattr(path, XATTR_NOFOLLOW)
+            xattrs = {}
+            for key in xa:
+                # Only store the user namespace on Linux
+                if linux and not key.startswith('user'):
+                    continue
+                xattrs[key] = xa[key]
+            if xattrs:
+                item['xattrs'] = xattrs
         except IOError:
             pass
         return item

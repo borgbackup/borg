@@ -1,3 +1,4 @@
+import doctest
 import filecmp
 import os
 from StringIO import StringIO
@@ -10,7 +11,7 @@ from xattr import xattr, XATTR_NOFOLLOW
 import getpass
 getpass.getpass = lambda m: 'abc123'
 
-from . import store
+from . import store, helpers
 from .archiver import Archiver
 
 
@@ -118,6 +119,7 @@ def suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.TestLoader().loadTestsFromTestCase(Test))
     suite.addTest(store.suite())
+    suite.addTest(doctest.DocTestSuite(helpers))
     return suite
 
 if __name__ == '__main__':

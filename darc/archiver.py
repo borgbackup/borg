@@ -8,7 +8,8 @@ from .archive import Archive
 from .store import Store
 from .cache import Cache
 from .keychain import Keychain
-from .helpers import location_validator, format_file_size, format_time, format_file_mode, walk_dir
+from .helpers import location_validator, format_file_size, format_time,\
+    format_file_mode, walk_dir, IncludePattern, ExcludePattern, exclude_path
 
 
 class Archiver(object):
@@ -50,6 +51,8 @@ class Archiver(object):
         cache = Cache(store, keychain)
         for path in args.paths:
             for path, st in walk_dir(unicode(path)):
+                if exclude_path(path, args.patterns):
+                    continue
                 self.print_verbose(path)
                 if stat.S_ISDIR(st.st_mode):
                     archive.process_dir(path, st)
@@ -75,6 +78,8 @@ class Archiver(object):
         archive.get_items()
         dirs = []
         for item in archive.items:
+            if exclude_path(item['path'], args.patterns):
+                continue
             self.print_verbose(item['path'])
             archive.extract_item(item, args.dest)
             if stat.S_ISDIR(item['mode']):
@@ -186,6 +191,12 @@ class Archiver(object):
 
         subparser = subparsers.add_parser('create')
         subparser.set_defaults(func=self.do_create)
+        subparser.add_argument('-i', '--include', dest='patterns',
+                               type=IncludePattern, action='append',
+                               help='Include condition')
+        subparser.add_argument('-e', '--exclude', dest='patterns',
+                               type=ExcludePattern, action='append',
+                               help='Include condition')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='Archive to create')
@@ -194,6 +205,12 @@ class Archiver(object):
 
         subparser = subparsers.add_parser('extract')
         subparser.set_defaults(func=self.do_extract)
+        subparser.add_argument('-i', '--include', dest='patterns',
+                               type=IncludePattern, action='append',
+                               help='Include condition')
+        subparser.add_argument('-e', '--exclude', dest='patterns',
+                               type=ExcludePattern, action='append',
+                               help='Include condition')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='Archive to create')

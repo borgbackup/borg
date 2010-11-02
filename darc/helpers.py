@@ -1,10 +1,55 @@
 import argparse
 from datetime import datetime
+from fnmatch import fnmatchcase
 import grp
 import os
 import pwd
 import re
 import stat
+
+
+def exclude_path(path, patterns):
+    """Used by create and extract sub-commands to determine
+    if an item should be processed or not
+    """
+    for pattern in (patterns or []):
+        if pattern.match(path):
+            return isinstance(pattern, ExcludePattern)
+    return False
+
+
+class IncludePattern(object):
+    """--include PATTERN
+
+    >>> py = IncludePattern('*.py')
+    >>> foo = IncludePattern('/foo')
+    >>> py.match('/foo/foo.py')
+    True
+    >>> py.match('/bar/foo.java')
+    False
+    >>> foo.match('/foo/foo.py')
+    True
+    >>> foo.match('/bar/foo.java')
+    False
+    >>> foo.match('/foobar/foo.py')
+    False
+    """
+    def __init__(self, pattern):
+        self.pattern = self.dirpattern = pattern
+        if not pattern.endswith(os.path.sep):
+            self.dirpattern += os.path.sep
+
+    def match(self, path):
+        dir, name = os.path.split(path)
+        return (dir + os.path.sep).startswith(self.dirpattern) or fnmatchcase(name, self.pattern)
+
+    def __repr__(self):
+        return '%s(%s)' % (type(self), self.pattern)
+
+
+class ExcludePattern(IncludePattern):
+    """
+    """
 
 
 def walk_dir(path):

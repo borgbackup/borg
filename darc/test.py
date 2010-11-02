@@ -7,6 +7,9 @@ import tempfile
 import unittest
 from xattr import xattr, XATTR_NOFOLLOW
 
+import getpass
+getpass.getpass = lambda m: 'abc123'
+
 from . import store
 from .archiver import Archiver
 
@@ -105,7 +108,10 @@ class Test(unittest.TestCase):
 
     def test_keychain(self):
         keychain = os.path.join(self.tmpdir, 'keychain')
+        keychain2 = os.path.join(self.tmpdir, 'keychain2')
         self.darc('-k', keychain, 'init-keychain')
+        self.darc('-k', keychain, 'change-password')
+        self.darc('-k', keychain, 'export-restricted', keychain2)
 
 
 def suite():

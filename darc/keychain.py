@@ -37,12 +37,12 @@ class Keychain(object):
                 raise ValueError('Not a keychain')
             cdata = fd.read()
         self.password = ''
-        data = self._decrypt(cdata, '')
+        data = self.decrypt_keychain(cdata, '')
         while not data:
             self.password = getpass('Keychain password: ')
             if not self.password:
                 raise Exception('Keychain decryption failed')
-            data = self.decrypt(cdata, self.password)
+            data = self.decrypt_keychain(cdata, self.password)
             if not data:
                 print 'Incorrect password'
         chain = msgpack.unpackb(data)
@@ -71,7 +71,7 @@ class Keychain(object):
         }
         return msgpack.packb(d)
 
-    def _decrypt(self, data, password):
+    def decrypt_keychain(self, data, password):
         d = msgpack.unpackb(data)
         assert d['version'] == 1
         assert d['algorithm'] == 'SHA256'

@@ -14,7 +14,7 @@ from .helpers import uid2user, user2uid, gid2group, group2gid, IntegrityError
 CHUNK_SIZE = 55001
 
 have_lchmod = hasattr(os, 'lchmod')
-linux = sys.platform == 'linux'
+linux = sys.platform == 'linux2'
 
 
 class Archive(object):

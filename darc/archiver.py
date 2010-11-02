@@ -50,6 +50,7 @@ class Archiver(object):
         cache = Cache(store, keychain)
         for path in args.paths:
             for path, st in walk_dir(unicode(path)):
+                self.print_verbose(path)
                 if stat.S_ISDIR(st.st_mode):
                     archive.process_dir(path, st)
                 elif stat.S_ISLNK(st.st_mode):

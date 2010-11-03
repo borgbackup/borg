@@ -11,7 +11,7 @@ from Crypto.PublicKey import RSA
 from Crypto.Util import Counter
 from Crypto.Util.number import bytes_to_long
 
-from .helpers import IntegrityError
+from .helpers import IntegrityError, zero_pad
 from .oaep import OAEP
 
 
@@ -51,9 +51,9 @@ class Keychain(object):
         self.rsa_read = RSA.importKey(chain['rsa_read'])
         self.rsa_create = RSA.importKey(chain['rsa_create'])
         self.read_encrypted = OAEP(256, hash=SHA256).encode(self.read_key, os.urandom(32))
-        self.read_encrypted = self.rsa_read.encrypt(self.read_encrypted, '')[0]
+        self.read_encrypted = zero_pad(self.rsa_read.encrypt(self.read_encrypted, '')[0], 256)
         self.create_encrypted = OAEP(256, hash=SHA256).encode(self.create_key, os.urandom(32))
-        self.create_encrypted = self.rsa_create.encrypt(self.create_encrypted, '')[0]
+        self.create_encrypted = zero_pad(self.rsa_create.encrypt(self.create_encrypted, '')[0], 256)
 
     def encrypt(self, data, password):
         salt = os.urandom(32)

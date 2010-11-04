@@ -118,14 +118,8 @@ ChunkifyIter_iternext(PyObject *self)
                                    c->window_size);
             c->i++;
         }
-        if((c->sum % c->chunk_size) == c->seed)
-        {
-            int old_last = c->last;
-            c->last = c->i;
-            return PyString_FromStringAndSize((char *)(c->data + old_last),
-                                              c->last - old_last);
-        }
-        if(c->i == c->buf_size && c->last <= c->window_size)
+        if((c->sum % c->chunk_size) == c->seed ||
+           (c->i == c->buf_size && c->last <= c->window_size))
         {
             int old_last = c->last;
             c->last = c->i;
@@ -196,43 +190,9 @@ chunkify(PyObject *self, PyObject *args)
     return (PyObject *)c;
 }
 
-static PyObject *
-py_checksum(PyObject *self, PyObject *args)
-{
-    PyObject *data;
-    unsigned long int sum = 0;
-    if(!PyArg_ParseTuple(args, "O|k", &data, &sum))  return NULL;
-    if(!PyString_Check(data))
-    {
-        PyErr_SetNone(PyExc_TypeError);
-        return NULL;
-    }
-    return PyInt_FromLong(checksum((unsigned char *)PyString_AsString(data),
-                                   PyString_Size(data), sum));
-}
-
-static PyObject *
-py_roll_checksum(PyObject *self, PyObject *args)
-{
-    unsigned long int sum = 0, len, a, r;
-    PyObject *add, *remove;
-    if (!PyArg_ParseTuple(args, "kOOk", &sum, &remove, &add, &len))  return NULL;
-    if(!PyString_Check(remove) || !PyString_Check(add) || 
-        PyString_Size(remove) != 1 || PyString_Size(add) != 1)
-    {
-        PyErr_SetNone(PyExc_TypeError);
-        return NULL;
-    }
-    a = *((const unsigned char *)PyString_AsString(add));
-    r = *((const unsigned char *)PyString_AsString(remove));
-    return PyInt_FromLong(roll_checksum(sum, r, a, len));
-}
-
 
 static PyMethodDef ChunkifierMethods[] = {
     {"chunkify",  chunkify, METH_VARARGS, ""},
-    {"checksum",  py_checksum, METH_VARARGS, ""},
-    {"roll_checksum",  py_roll_checksum, METH_VARARGS, ""},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
@@ -245,7 +205,4 @@ init_speedups(void)
   if (PyType_Ready(&ChunkifyIterType) < 0)  return;
 
   m = Py_InitModule("_speedups", ChunkifierMethods);
-
-  Py_INCREF(&ChunkifyIterType);
-  PyModule_AddObject(m, "_ChunkifyIter", (PyObject *)&ChunkifyIterType);
 }

@@ -8,10 +8,11 @@ import sys
 from xattr import xattr, XATTR_NOFOLLOW
 
 from . import NS_ARCHIVE_METADATA, NS_ARCHIVE_ITEMS, NS_ARCHIVE_CHUNKS, NS_CHUNK
-from .chunkifier import chunkify
+from ._speedups import chunkify
 from .helpers import uid2user, user2uid, gid2group, group2gid, IntegrityError
 
-CHUNK_SIZE = 55001
+CHUNK_SIZE = 64 * 1024
+WINDOW_SIZE = 4096
 
 have_lchmod = hasattr(os, 'lchmod')
 linux = sys.platform == 'linux2'
@@ -253,7 +254,8 @@ class Archive(object):
                 size = 0
                 ids = []
                 chunks = []
-                for chunk in chunkify(fd, CHUNK_SIZE, 30):
+                for chunk in chunkify(fd, CHUNK_SIZE, WINDOW_SIZE,
+                                      self.keychain.get_chunkify_seed()):
                     id = self.keychain.id_hash(chunk)
                     ids.append(id)
                     try:

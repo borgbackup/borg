@@ -22,12 +22,16 @@ class Archiver(object):
 
     def print_error(self, msg, *args):
         msg = args and msg % args or msg
+        if hasattr(sys.stderr, 'encoding'):
+            msg = msg.encode(sys.stderr.encoding, 'ignore')
         self.exit_code = 1
         print >> sys.stderr, msg
 
     def print_verbose(self, msg, *args, **kw):
         if self.verbose:
             msg = args and msg % args or msg
+            if hasattr(sys.stdout, 'encoding'):
+                msg = msg.encode(sys.stdout.encoding, 'ignore')
             if kw.get('newline', True):
                 print msg
             else:

@@ -84,7 +84,7 @@ class Archiver(object):
         for item in archive.items:
             if exclude_path(item['path'], args.patterns):
                 continue
-            self.print_verbose(item['path'])
+            self.print_verbose(item['path'].decode('utf-8'))
             archive.extract_item(item, args.dest)
             if stat.S_ISDIR(item['mode']):
                 dirs.append(item)

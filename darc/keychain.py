@@ -184,7 +184,7 @@ class Keychain(object):
         if type == self.READ:
             key = self._decrypt_key(data[41:297], self.rsa_read)
         elif type == self.CREATE:
-            key = self.decrypt_key(data[41:297], self.rsa_create)
+            key = self._decrypt_key(data[41:297], self.rsa_create)
         else:
             raise Exception('Unknown pack type %d found' % ord(type))
         data = AES.new(key, AES.MODE_CTR, counter=counter).decrypt(data[297:])

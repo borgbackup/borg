@@ -8,6 +8,29 @@ import re
 import stat
 
 
+def encode_long(v):
+    bytes = []
+    while True:
+        if v > 0x7f:
+            bytes.append(0x80 | (v % 0x80))
+            v >>= 7
+        else:
+            bytes.append(v)
+            return ''.join(chr(x) for x in bytes)
+
+
+def decode_long(bytes):
+    v = 0
+    base = 0
+    for x in bytes:
+        b = ord(x)
+        if b & 0x80:
+            v += (b & 0x7f) << base
+            base += 7
+        else:
+            return v + (b << base)
+
+
 def zero_pad(data, length):
     """Make sure data is `length` bytes long by prepending zero bytes
 
@@ -63,12 +86,14 @@ class ExcludePattern(IncludePattern):
     """
 
 
-def walk_dir(path):
+def walk_path(path, skip_inodes=None):
     st = os.lstat(path)
+    if skip_inodes and (st.st_ino, st.st_dev) in skip_inodes:
+        return
     yield path, st
     if stat.S_ISDIR(st.st_mode):
         for f in os.listdir(path):
-            for x in walk_dir(os.path.join(path, f)):
+            for x in walk_path(os.path.join(path, f), skip_inodes):
                 yield x
 
 

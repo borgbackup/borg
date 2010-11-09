@@ -11,12 +11,17 @@ class Cache(object):
     def __init__(self, store, keychain):
         self.store = store
         self.keychain = keychain
-        self.path = os.path.join(os.path.expanduser('~'), '.darc', 'cache',
+        self.path = os.path.join(Cache.cache_dir_path(),
                                  '%s.cache' % self.store.id.encode('hex'))
         self.tid = -1
         self.open()
         if self.tid != self.store.tid:
             self.init()
+
+    @staticmethod
+    def cache_dir_path():
+        """Return path to directory used for storing users cache files"""
+        return os.path.join(os.path.expanduser('~'), '.darc', 'cache')
 
     def open(self):
         if not os.path.exists(self.path):

@@ -9,7 +9,7 @@ from .store import Store
 from .cache import Cache
 from .keychain import Keychain
 from .helpers import location_validator, format_file_size, format_time,\
-    format_file_mode, walk_dir, IncludePattern, ExcludePattern, exclude_path
+    format_file_mode, walk_path, IncludePattern, ExcludePattern, exclude_path
 
 
 class Archiver(object):
@@ -53,8 +53,22 @@ class Archiver(object):
             return self.exit_code
         archive = Archive(store, keychain)
         cache = Cache(store, keychain)
+        # Add darc cache dir to inode_skip list
+        skip_inodes = []
+        try:
+            st = os.stat(Cache.cache_dir_path())
+            skip_inodes.append((st.st_ino, st.st_dev))
+        except IOError:
+            pass
+        # Add local store dir to inode_skip list
+        if not args.archive.host:
+            try:
+                st = os.stat(args.archive.path)
+                skip_inodes.append((st.st_ino, st.st_dev))
+            except IOError:
+                pass
         for path in args.paths:
-            for path, st in walk_dir(unicode(path)):
+            for path, st in walk_path(unicode(path)):
                 if exclude_path(path, args.patterns):
                     continue
                 self.print_verbose(path)

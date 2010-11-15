@@ -206,8 +206,7 @@ class Store(object):
         if marker:
             sql += ' AND id >= :marker'
             args['marker'] = Binary(marker)
-        for row in self.cursor.execute(sql + ' LIMIT ' + str(max_keys), args):
-            yield str(row[0])
+        return list(str(row[0]) for row in self.cursor.execute(sql + ' LIMIT ' + str(max_keys), args))
 
 
 class StoreTestCase(unittest.TestCase):

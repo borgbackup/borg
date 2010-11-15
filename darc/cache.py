@@ -60,7 +60,6 @@ class Cache(object):
                 yield key, (value[0] + 1,) + value[1:]
 
     def save(self):
-        assert self.store.state == self.store.OPEN
         cache = {'version': 1,
                 'tid': self.store.tid,
                 'chunk_counts': self.chunk_counts,

@@ -10,15 +10,18 @@ from .cache import Cache
 from .keychain import Keychain
 from .helpers import location_validator, format_file_size, format_time,\
     format_file_mode, walk_path, IncludePattern, ExcludePattern, exclude_path
-
+from .remote import StoreServer, RemoteStore
 
 class Archiver(object):
 
     def __init__(self):
         self.exit_code = 0
 
-    def open_store(self, location):
-        return Store(location.path)
+    def open_store(self, location, create=False):
+        if location.host:
+            return RemoteStore(location, create=create)
+        else:
+            return Store(location.path, create=create)
 
     def print_error(self, msg, *args):
         msg = args and msg % args or msg
@@ -38,8 +41,15 @@ class Archiver(object):
                 print msg,
 
     def do_init(self, args):
-        Store(args.store.path, create=True)
+        self.open_store(args.store, create=True)
         return self.exit_code
+
+    def do_serve(self, args):
+        try:
+            return StoreServer().serve()
+        except Exception, e:
+            self.print_error('eek', repr(e))
+            return 1
 
     def do_create(self, args):
         store = self.open_store(args.archive)
@@ -143,7 +153,7 @@ class Archiver(object):
         archive.get_items()
         for item in archive.items:
             if stat.S_ISREG(item['mode']) and not 'source' in item:
-                self.print_verbose('%s ...', item['path'], newline=False)
+                self.print_verbose('%s ...', item['path'].decode('utf-8'), newline=False)
                 if archive.verify_file(item):
                     self.print_verbose('OK')
                 else:
@@ -206,6 +216,9 @@ class Archiver(object):
         subparser.add_argument('store', metavar='STORE',
                                type=location_validator(archive=False),
                                help='Store to initialize')
+
+        subparser = subparsers.add_parser('serve')
+        subparser.set_defaults(func=self.do_serve)
 
         subparser = subparsers.add_parser('create')
         subparser.set_defaults(func=self.do_create)

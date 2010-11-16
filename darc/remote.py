@@ -85,7 +85,7 @@ class RemoteStore(object):
             r, w, e = select.select([self.channel], [], [self.channel], 10)
             if r:
                 if self.channel.recv_stderr_ready():
-                    raise Exception(self.channel.recv_stderr(BUFSIZE))
+                    print >> sys.stderr, self.channel.recv_stderr(BUFSIZE)
                 elif self.channel.recv_ready():
                     self.unpacker.feed(self.channel.recv(BUFSIZE))
                     for type, msgid, error, res in self.unpacker:

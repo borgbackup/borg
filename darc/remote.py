@@ -31,11 +31,11 @@ class StoreServer(object):
                 unpacker.feed(data)
                 for type, msgid, method, args in unpacker:
                     try:
-                        if method == 'open':
-                            self.store = Store(*args)
-                            res = self.store.id, self.store.tid
-                        else:
-                            res = getattr(self.store, method)(*args)
+                        try:
+                            f = getattr(self, method)
+                        except AttributeError:
+                            f = getattr(self.store, method)
+                        res = f(*args)
                     except Exception, e:
                         sys.stdout.write(msgpack.packb((1, msgid, e.__class__.__name__, None)))
                     else:
@@ -43,6 +43,12 @@ class StoreServer(object):
                     sys.stdout.flush()
             if es:
                 return
+
+    def open(self, path, create=False):
+        if path.startswith('/~'):
+            path = path[1:]
+        self.store = Store(os.path.expanduser(path), create)
+        return self.store.id, self.store.tid
 
 
 class RemoteStore(object):
@@ -84,16 +90,16 @@ class RemoteStore(object):
         while True:
             r, w, e = select.select([self.channel], [], [self.channel], 10)
             if r:
+                if self.channel.closed:
+                    raise Exception('Connection closed')
                 if self.channel.recv_stderr_ready():
-                    print >> sys.stderr, self.channel.recv_stderr(BUFSIZE)
+                    print >> sys.stderr, 'remote stderr:', self.channel.recv_stderr(BUFSIZE)
                 elif self.channel.recv_ready():
                     self.unpacker.feed(self.channel.recv(BUFSIZE))
                     for type, msgid, error, res in self.unpacker:
                         if error:
                             raise self.RPCError(error)
                         return res
-                else:
-                    raise Exception('Read event but no data?!?')
             if e:
                 raise Exception('ssh channel error')
 

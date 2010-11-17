@@ -45,11 +45,7 @@ class Archiver(object):
         return self.exit_code
 
     def do_serve(self, args):
-        try:
-            return StoreServer().serve()
-        except Exception, e:
-            self.print_error('eek', repr(e))
-            return 1
+        return StoreServer().serve()
 
     def do_create(self, args):
         store = self.open_store(args.archive)

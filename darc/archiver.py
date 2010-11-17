@@ -18,7 +18,7 @@ class Archiver(object):
         self.exit_code = 0
 
     def open_store(self, location, create=False):
-        if location.host:
+        if location.proto == 'ssh':
             return RemoteStore(location, create=create)
         else:
             return Store(location.path, create=create)

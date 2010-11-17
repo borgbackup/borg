@@ -171,36 +171,70 @@ def group2gid(group):
 
 
 class Location(object):
+    """Object representing a store / archive location
 
-    loc_re = re.compile(r'^((?:(?P<user>[^@]+)@)?(?P<host>[^:]+):)?'
-                        r'(?P<path>[^:]*)(?:::(?P<archive>[^:]+))?$')
+    >>> Location('ssh://user@host:1234/some/path::archive')
+    Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive='archive')
+    >>> Location('file:///some/path::archive')
+    Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')
+    >>> Location('user@host:/some/path::archive')
+    Location(proto='ssh', user='user', host='host', port=22, path='/some/path', archive='archive')
+    >>> Location('/some/path::archive')
+    Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')
+    """
+    proto = user = host = port = path = archive = None
+    ssh_re = re.compile(r'(?P<proto>ssh)://(?:(?P<user>[^@]+)@)?'
+                        r'(?P<host>[^:/#]+)(?::(?P<port>\d+))?'
+                        r'(?P<path>[^:]*)(?:::(?P<archive>.+))?')
+    file_re = re.compile(r'(?P<proto>file)://'
+                         r'(?P<path>[^:]*)(?:::(?P<archive>.+))?')
+    scp_re = re.compile(r'((?:(?P<user>[^@]+)@)?(?P<host>[^:/]+):)?'
+                        r'(?P<path>[^:]*)(?:::(?P<archive>.+))?')
 
     def __init__(self, text):
-        loc = self.loc_re.match(text)
-        loc = loc and loc.groupdict()
-        if not loc:
+        if not self.parse(text):
             raise ValueError
-        self.user = loc['user']
-        self.host = loc['host']
-        self.path = loc['path']
-        if not self.host and not self.path:
-            raise ValueError
-        self.archive = loc['archive']
+
+    def parse(self, text):
+        m = self.ssh_re.match(text)
+        if m:
+            self.proto = m.group('proto')
+            self.user = m.group('user')
+            self.host = m.group('host')
+            self.port = m.group('port') and int(m.group('port')) or 22
+            self.path = m.group('path')
+            self.archive = m.group('archive')
+            return True
+        m = self.file_re.match(text)
+        if m:
+            self.proto = m.group('proto')
+            self.path = m.group('path')
+            self.archive = m.group('archive')
+            return True
+        m = self.scp_re.match(text)
+        if m:
+            self.user = m.group('user')
+            self.host = m.group('host')
+            self.path = m.group('path')
+            self.archive = m.group('archive')
+            self.proto = self.host and 'ssh' or 'file'
+            if self.proto == 'ssh':
+                self.port = 22
+            return True
+        return False
 
     def __str__(self):
-        text = ''
-        if self.user:
-            text += '%s@' % self.user
-        if self.host:
-            text += '%s::' % self.host
-        if self.path:
-            text += self.path
-        if self.archive:
-            text += ':%s' % self.archive
-        return text
+        items = []
+        items.append('proto=%r' % self.proto)
+        items.append('user=%r' % self.user)
+        items.append('host=%r' % self.host)
+        items.append('port=%r' % self.port)
+        items.append('path=%r'% self.path)
+        items.append('archive=%r' % self.archive)
+        return ', '.join(items)
 
     def __repr__(self):
-        return "Location('%s')" % self
+        return "Location(%s)" % self
 
 
 def location_validator(archive=None):

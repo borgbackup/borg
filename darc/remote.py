@@ -63,7 +63,7 @@ class RemoteStore(object):
         self.client = paramiko.SSHClient()
         self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         params = {'username': location.user or getpass.getuser(),
-                  'hostname': location.host}
+                  'hostname': location.host, 'port': location.port}
         while True:
             try:
                 self.client.connect(**params)

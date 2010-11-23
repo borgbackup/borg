@@ -67,6 +67,8 @@ class IncludePattern(object):
     False
     >>> foo.match('/foobar/foo.py')
     False
+    >>> foo.match('/foo')
+    True
     """
     def __init__(self, pattern):
         self.pattern = self.dirpattern = pattern
@@ -75,7 +77,9 @@ class IncludePattern(object):
 
     def match(self, path):
         dir, name = os.path.split(path)
-        return (dir + os.path.sep).startswith(self.dirpattern) or fnmatchcase(name, self.pattern)
+        return (path == self.pattern
+                or (dir + os.path.sep).startswith(self.dirpattern)
+                or fnmatchcase(name, self.pattern))
 
     def __repr__(self):
         return '%s(%s)' % (type(self), self.pattern)

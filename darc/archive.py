@@ -224,7 +224,9 @@ class Archive(object):
         if st.st_nlink > 1:
             source = self.hard_links.get((st.st_ino, st.st_dev))
             if (st.st_ino, st.st_dev) in self.hard_links:
-                self.items.append({'path': path, 'source': source})
+                self.items.append({'mode': st.st_mode,
+                                   'path': path,
+                                   'source': source})
                 return
             else:
                 self.hard_links[st.st_ino, st.st_dev] = safe_path

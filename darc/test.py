@@ -92,6 +92,8 @@ class Test(unittest.TestCase):
         self.create_regual_file('dir2/file2', size=1024*80)
         x = xattr(os.path.join(self.input_path, 'file1'))
         x.set('user.foo', 'bar')
+        os.link(os.path.join(self.input_path, 'file1'), 
+                os.path.join(self.input_path, 'hardlink'))
         os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
         os.mkfifo(os.path.join(self.input_path, 'fifo1'))
         self.darc('create', self.store_path + '::test', 'input')

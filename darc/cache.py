@@ -79,7 +79,7 @@ class Cache(object):
         csize = len(data)
         self.store.put(NS_CHUNK, id, data)
         self.chunk_counts[id] = (1, csize)
-        return csize
+        return id, csize
 
     def seen_chunk(self, id):
         return self.chunk_counts.get(id, (0, 0))[0]
@@ -87,7 +87,7 @@ class Cache(object):
     def chunk_incref(self, id):
         count, size = self.chunk_counts[id]
         self.chunk_counts[id] = (count + 1, size)
-        return size
+        return id, size
 
     def chunk_decref(self, id):
         count, size = self.chunk_counts[id]

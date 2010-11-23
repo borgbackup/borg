@@ -78,15 +78,6 @@ class Archive(object):
         self.store.put(NS_ARCHIVE_METADATA, self.id, data)
         self.store.commit()
 
-    def add_chunk(self, id, size):
-        try:
-            return self.chunk_idx[id]
-        except KeyError:
-            idx = len(self.chunks)
-            self.chunks.append((id, size))
-            self.chunk_idx[id] = idx
-            return idx
-
     def stats(self, cache):
         self.get_items()
         osize = csize = usize = 0
@@ -273,14 +264,14 @@ class Archive(object):
             return self.chunk_idx[id]
         except KeyError:
             idx = len(self.chunks)
-            size = cache.chunk_incref(id)
+            id, size = cache.chunk_incref(id)
             self.chunks.append((id, size))
             self.chunk_idx[id] = idx
             return idx
 
     def process_chunk(self, id, data, cache):
         idx = len(self.chunks)
-        size = cache.add_chunk(id, data)
+        id, size = cache.add_chunk(id, data)
         self.chunks.append((id, size))
         self.chunk_idx[id] = idx
         return idx

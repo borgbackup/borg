@@ -32,7 +32,7 @@ class Keychain(object):
             self.open(path)
 
     def get_chunkify_seed(self):
-        return bytes_to_long(self.aes_id[:4])
+        return bytes_to_long(self.aes_id[:4]) & 0x7fffffff
 
     def open(self, path):
         print 'Opening keychain "%s"' % path

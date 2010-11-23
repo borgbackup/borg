@@ -97,6 +97,7 @@ class Test(unittest.TestCase):
         os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
         os.mkfifo(os.path.join(self.input_path, 'fifo1'))
         self.darc('create', self.store_path + '::test', 'input')
+        self.darc('create', self.store_path + '::test.2', 'input')
         self.darc('extract', self.store_path + '::test', 'output')
         self.diff_dirs('input', 'output/input')
 

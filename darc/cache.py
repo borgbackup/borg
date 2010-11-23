@@ -60,6 +60,10 @@ class Cache(object):
                 yield key, (value[0] + 1,) + value[1:]
 
     def save(self):
+        for id, (count, size) in self.chunk_counts.iteritems():
+            if count > 1000000:
+                self.chunk_counts[id] = count - 1000000, size
+
         cache = {'version': 1,
                 'tid': self.store.tid,
                 'chunk_counts': self.chunk_counts,
@@ -78,16 +82,17 @@ class Cache(object):
         data, hash = self.keychain.encrypt_read(data)
         csize = len(data)
         self.store.put(NS_CHUNK, id, data)
-        self.chunk_counts[id] = (1, csize)
-        return id, csize
+        self.chunk_counts[id] = (1000001, csize)
+        return id
 
     def seen_chunk(self, id):
         return self.chunk_counts.get(id, (0, 0))[0]
 
     def chunk_incref(self, id):
         count, size = self.chunk_counts[id]
-        self.chunk_counts[id] = (count + 1, size)
-        return id, size
+        if count < 1000000:
+            self.chunk_counts[id] = (count + 1000001, size)
+        return id
 
     def chunk_decref(self, id):
         count, size = self.chunk_counts[id]

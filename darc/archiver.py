@@ -75,7 +75,7 @@ class Archiver(object):
                 pass
         for path in args.paths:
             self._process(archive, cache, args.patterns, unicode(path))
-        archive.save(args.archive.archive)
+        archive.save(args.archive.archive, cache)
         cache.save()
         return self.exit_code
 

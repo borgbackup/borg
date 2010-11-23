@@ -27,8 +27,6 @@ class Archive(object):
         self.keychain = keychain
         self.store = store
         self.items = []
-        self.chunks = []
-        self.chunk_idx = {}
         self.hard_links = {}
         if name:
             self.load(self.keychain.id_hash(name))
@@ -53,11 +51,10 @@ class Archive(object):
         assert items['version'] == 1
         assert self.metadata['items_hash'] == items_hash
         self.items = items['items']
-        for i, chunk in enumerate(self.chunks):
-            self.chunk_idx[i] = chunk[0]
 
-    def save(self, name):
+    def save(self, name, cache):
         self.id = self.keychain.id_hash(name)
+        self.chunks = [(id, size) for (id, (count, size)) in cache.chunk_counts.iteritems() if count > 1000000]
         chunks = {'version': 1, 'chunks': self.chunks}
         data, chunks_hash = self.keychain.encrypt_create(msgpack.packb(chunks))
         self.store.put(NS_ARCHIVE_CHUNKS, self.id, data)
@@ -124,12 +121,11 @@ class Archive(object):
                 os.link(source, path)
             else:
                 with open(path, 'wb') as fd:
-                    for chunk in item['chunks']:
-                        id = self.chunk_idx[chunk]
+                    for id in item['chunks']:
                         try:
                             data, hash = self.keychain.decrypt(self.store.get(NS_CHUNK, id))
                             if self.keychain.id_hash(data) != id:
-                                raise IntegrityError('chunk id did not match')
+                                raise IntegrityError('chunk hash did not match')
                             fd.write(data)
                         except ValueError:
                             raise Exception('Invalid chunk checksum')
@@ -161,8 +157,7 @@ class Archive(object):
             os.utime(path, (item['atime'], item['mtime']))
 
     def verify_file(self, item):
-        for chunk in item['chunks']:
-            id = self.chunk_idx[chunk]
+        for id in item['chunks']:
             try:
                 data, hash = self.keychain.decrypt(self.store.get(NS_CHUNK, id))
                 if self.keychain.id_hash(data) != id:
@@ -239,44 +234,21 @@ class Archive(object):
                     ids = None
                     break
             else:
-                chunks = [self.process_chunk2(id, cache) for id in ids]
+                for id in ids:
+                    cache.chunk_incref(id)
         # Only chunkify the file if needed
         if ids is None:
-            fd = open(path, 'rb')
             with open(path, 'rb') as fd:
                 size = 0
                 ids = []
-                chunks = []
                 for chunk in chunkify(fd, CHUNK_SIZE, WINDOW_SIZE,
                                       self.keychain.get_chunkify_seed()):
-                    id = self.keychain.id_hash(chunk)
-                    ids.append(id)
-                    try:
-                        chunks.append(self.chunk_idx[id])
-                    except KeyError:
-                        chunks.append(self.process_chunk(id, chunk, cache))
+                    ids.append(cache.add_chunk(self.keychain.id_hash(chunk), chunk))
                     size += len(chunk)
             cache.memorize_file_chunks(path_hash, st, ids)
-        item = {'path': safe_path, 'chunks': chunks, 'size': size}
+        item = {'path': safe_path, 'chunks': ids, 'size': size}
         item.update(self.stat_attrs(st, path))
         self.items.append(item)
-
-    def process_chunk2(self, id, cache):
-        try:
-            return self.chunk_idx[id]
-        except KeyError:
-            idx = len(self.chunks)
-            id, size = cache.chunk_incref(id)
-            self.chunks.append((id, size))
-            self.chunk_idx[id] = idx
-            return idx
-
-    def process_chunk(self, id, data, cache):
-        idx = len(self.chunks)
-        id, size = cache.add_chunk(id, data)
-        self.chunks.append((id, size))
-        self.chunk_idx[id] = idx
-        return idx
 
     @staticmethod
     def list_archives(store, keychain):

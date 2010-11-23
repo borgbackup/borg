@@ -9,7 +9,7 @@ from .store import Store
 from .cache import Cache
 from .keychain import Keychain
 from .helpers import location_validator, format_file_size, format_time,\
-    format_file_mode, walk_path, IncludePattern, ExcludePattern, exclude_path
+    format_file_mode, IncludePattern, ExcludePattern, exclude_path
 from .remote import StoreServer, RemoteStore
 
 class Archiver(object):
@@ -74,26 +74,41 @@ class Archiver(object):
             except IOError:
                 pass
         for path in args.paths:
-            for path, st in walk_path(unicode(path)):
-                if exclude_path(path, args.patterns):
-                    continue
-                self.print_verbose(path)
-                if stat.S_ISDIR(st.st_mode):
-                    archive.process_dir(path, st)
-                elif stat.S_ISLNK(st.st_mode):
-                    archive.process_symlink(path, st)
-                elif stat.S_ISFIFO(st.st_mode):
-                    archive.process_fifo(path, st)
-                elif stat.S_ISREG(st.st_mode):
-                    try:
-                        archive.process_file(path, st, cache)
-                    except IOError, e:
-                        self.print_error('%s: %s', path, e)
-                else:
-                    self.print_error('Unknown file type: %s', path)
+            self._process(archive, cache, args.patterns, unicode(path))
         archive.save(args.archive.archive)
         cache.save()
         return self.exit_code
+
+    def _process(self, archive, cache, patterns, path):
+        if exclude_path(path, patterns):
+            return
+        try:
+            st = os.lstat(path)
+        except OSError, e:
+            self.print_error('%s: %s', path, e)
+            return
+        self.print_verbose(path)
+        if stat.S_ISDIR(st.st_mode):
+            archive.process_dir(path, st)
+            try:
+                entries = os.listdir(path)
+            except OSError, e:
+                self.print_error('%s: %s', path, e)
+            else:
+                for filename in entries:
+                    self._process(archive, cache, patterns,
+                                  os.path.join(path, filename))
+        elif stat.S_ISLNK(st.st_mode):
+            archive.process_symlink(path, st)
+        elif stat.S_ISFIFO(st.st_mode):
+            archive.process_fifo(path, st)
+        elif stat.S_ISREG(st.st_mode):
+            try:
+                archive.process_file(path, st, cache)
+            except IOError, e:
+                self.print_error('%s: %s', path, e)
+        else:
+            self.print_error('Unknown file type: %s', path)
 
     def do_extract(self, args):
         store = self.open_store(args.archive)

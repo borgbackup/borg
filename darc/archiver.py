@@ -156,8 +156,6 @@ class Archiver(object):
         return self.exit_code
 
     def do_verify(self, args):
-        import ipdb
-        ipdb.set_trace()
         store = self.open_store(args.archive)
         keychain = Keychain(args.keychain)
         archive = Archive(store, keychain, args.archive.archive)
@@ -182,7 +180,6 @@ class Archiver(object):
         print 'Username:', archive.metadata['username']
         print 'Time:', archive.metadata['time']
         print 'Command line:', ' '.join(archive.metadata['cmdline'])
-        print 'Number of Files:', len(archive.get_items())
         print 'Original size:', format_file_size(osize)
         print 'Compressed size:', format_file_size(csize)
         print 'Unique data:', format_file_size(usize)

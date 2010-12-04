@@ -9,13 +9,13 @@ class Cache(object):
     """
 
     def __init__(self, store, keychain):
+        self.tid = -1
         self.store = store
         self.keychain = keychain
         self.path = os.path.join(Cache.cache_dir_path(),
                                  '%s.cache' % self.store.id.encode('hex'))
-        self.tid = -1
         self.open()
-        if self.tid != self.store.tid:
+        if self.tid != store.tid:
             self.init()
 
     @staticmethod
@@ -40,10 +40,10 @@ class Cache(object):
         print 'Initializing cache...'
         self.chunk_counts = {}
         self.file_chunks = {}
-        self.tid = self.store.tid
-        if self.store.tid == 0:
-            return
-        for id in list(self.store.list(NS_ARCHIVE_CHUNKS)):
+        for id in self.store.list(NS_ARCHIVE_CHUNKS):
+            if len(id) != 32:
+                import ipdb
+                ipdb.set_trace()
             data, hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, id))
             cindex = msgpack.unpackb(data)
             for id, size in cindex['chunks']:

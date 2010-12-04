@@ -11,7 +11,7 @@ from xattr import xattr, XATTR_NOFOLLOW
 import getpass
 getpass.getpass = lambda m: 'abc123'
 
-from . import store, helpers
+from . import store, helpers, lrucache
 from .archiver import Archiver
 
 
@@ -123,6 +123,7 @@ def suite():
     suite.addTest(unittest.TestLoader().loadTestsFromTestCase(Test))
     suite.addTest(store.suite())
     suite.addTest(doctest.DocTestSuite(helpers))
+    suite.addTest(lrucache.suite())
     return suite
 
 if __name__ == '__main__':

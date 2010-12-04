@@ -42,11 +42,13 @@ class Archive(object):
         assert self.metadata['version'] == 1
 
     def get_chunks(self):
-        data, chunks_hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, self.id))
-        chunks = msgpack.unpackb(data)
-        assert chunks['version'] == 1
-        assert self.metadata['chunks_hash'] == chunks_hash
-        return chunks['chunks']
+        for id in self.metadata['chunks_ids']:
+            data, items_hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, id))
+            assert items_hash == id
+            items = msgpack.unpackb(data)
+            assert items['version'] == 1
+            for item in items['chunks']:
+                yield item
 
     def get_items(self):
         for id in self.metadata['items_ids']:
@@ -69,17 +71,31 @@ class Archive(object):
         self.items = []
         self.items_ids.append(items_hash)
 
+    def save_chunks(self, cache):
+        chunks = []
+        ids = []
+        def flush(chunks):
+            data = { 'version': 1, 'chunks': chunks }
+            data, chunks_hash = self.keychain.encrypt_create(msgpack.packb(data))
+            self.store.put(NS_ARCHIVE_CHUNKS, chunks_hash, data)
+            ids.append(chunks_hash)
+        for id, (count, size) in cache.chunk_counts.iteritems():
+            if count > 1000000:
+                chunks.append((id, size))
+            if len(chunks) > 100000:
+                flush(chunks)
+                chunks = []
+        flush(chunks)
+        return ids
+
     def save(self, name, cache):
         self.id = self.keychain.id_hash(name)
-        self.chunks = [(id, size) for (id, (count, size)) in cache.chunk_counts.iteritems() if count > 1000000]
-        chunks = {'version': 1, 'chunks': self.chunks}
-        data, chunks_hash = self.keychain.encrypt_create(msgpack.packb(chunks))
-        self.store.put(NS_ARCHIVE_CHUNKS, self.id, data)
+        chunks_ids = self.save_chunks(cache)
         self.flush_items()
         metadata = {
             'version': 1,
             'name': name,
-            'chunks_hash': chunks_hash,
+            'chunks_ids': chunks_ids,
             'items_ids': self.items_ids,
             'cmdline': sys.argv,
             'hostname': socket.gethostname(),
@@ -181,11 +197,13 @@ class Archive(object):
         return True
 
     def delete(self, cache):
-        self.store.delete(NS_ARCHIVE_CHUNKS, self.id)
-        self.store.delete(NS_ARCHIVE_ITEMS, self.id)
-        self.store.delete(NS_ARCHIVE_METADATA, self.id)
         for id, size in self.get_chunks():
             cache.chunk_decref(id)
+        self.store.delete(NS_ARCHIVE_METADATA, self.id)
+        for id in self.metadata['chunks_ids']:
+            self.store.delete(NS_ARCHIVE_CHUNKS, id)
+        for id in self.metadata['items_ids']:
+            self.store.delete(NS_ARCHIVE_ITEMS, id)
         self.store.commit()
         cache.save()
 

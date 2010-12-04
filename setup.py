@@ -3,7 +3,7 @@
 import sys
 from setuptools import setup, Extension
 
-dependencies = ['pycrypto', 'msgpack-python', 'pbkdf2.py', 'xattr', 'paramiko']
+dependencies = ['pycrypto', 'msgpack-python', 'pbkdf2.py', 'xattr', 'paramiko', 'numpy']
 if sys.version_info < (2, 7):
     dependencies.append('argparse')
 

@@ -43,20 +43,18 @@ class Archive(object):
 
     def get_chunks(self):
         for id in self.metadata['chunks_ids']:
-            data, items_hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, id))
-            assert items_hash == id
-            items = msgpack.unpackb(data)
-            assert items['version'] == 1
-            for item in items['chunks']:
-                yield item
+            data, hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, id))
+            assert hash == id
+            chunks = msgpack.unpackb(data)
+            for chunk in chunks:
+                yield chunk
 
     def get_items(self):
         for id in self.metadata['items_ids']:
             data, items_hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_ITEMS, id))
             assert items_hash == id
             items = msgpack.unpackb(data)
-            assert items['version'] == 1
-            for item in items['items']:
+            for item in items:
                 yield item
 
     def add_item(self, item):
@@ -65,20 +63,18 @@ class Archive(object):
             self.flush_items()
 
     def flush_items(self):
-        items = {'version': 1, 'items': self.items}
-        data, items_hash = self.keychain.encrypt_read(msgpack.packb(items))
-        self.store.put(NS_ARCHIVE_ITEMS, items_hash, data)
+        data, hash = self.keychain.encrypt_read(msgpack.packb(self.items))
+        self.store.put(NS_ARCHIVE_ITEMS, hash, data)
+        self.items_ids.append(hash)
         self.items = []
-        self.items_ids.append(items_hash)
 
     def save_chunks(self, cache):
         chunks = []
         ids = []
         def flush(chunks):
-            data = { 'version': 1, 'chunks': chunks }
-            data, chunks_hash = self.keychain.encrypt_create(msgpack.packb(data))
-            self.store.put(NS_ARCHIVE_CHUNKS, chunks_hash, data)
-            ids.append(chunks_hash)
+            data, hash = self.keychain.encrypt_create(msgpack.packb(chunks))
+            self.store.put(NS_ARCHIVE_CHUNKS, hash, data)
+            ids.append(hash)
         for id, (count, size) in cache.chunk_counts.iteritems():
             if count > 1000000:
                 chunks.append((id, size))

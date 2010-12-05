@@ -45,8 +45,8 @@ class Cache(object):
                 import ipdb
                 ipdb.set_trace()
             data, hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, id))
-            cindex = msgpack.unpackb(data)
-            for id, size in cindex['chunks']:
+            chunks = msgpack.unpackb(data)
+            for id, size in chunks:
                 try:
                     count, size = self.chunk_counts[id]
                     self.chunk_counts[id] = count + 1, size

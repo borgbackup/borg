@@ -1,7 +1,7 @@
 import msgpack
 import os
 
-from . import NS_ARCHIVE_CHUNKS, NS_CHUNK
+from . import NS_ARCHIVE_CHUNKS, NS_CHUNK, PACKET_ARCHIVE_CHUNKS, PACKET_CHUNK
 
 
 class Cache(object):
@@ -27,8 +27,8 @@ class Cache(object):
         if not os.path.exists(self.path):
             return
         with open(self.path, 'rb') as fd:
-            data, hash = self.keychain.decrypt(fd.read())
-            cache = msgpack.unpackb(data)
+            #data, hash = self.keychain.decrypt(fd.read())
+            cache = msgpack.unpackb(fd.read())
         assert cache['version'] == 1
         self.chunk_counts = cache['chunk_counts']
         self.file_chunks = cache['file_chunks']
@@ -44,7 +44,8 @@ class Cache(object):
             if len(id) != 32:
                 import ipdb
                 ipdb.set_trace()
-            data, hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, id))
+            magic, data, hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, id))
+            assert magic == PACKET_ARCHIVE_CHUNKS
             chunks = msgpack.unpackb(data)
             for id, size in chunks:
                 try:
@@ -69,17 +70,17 @@ class Cache(object):
                 'chunk_counts': self.chunk_counts,
                 'file_chunks': dict(self.filter_file_chunks()),
         }
-        data, hash = self.keychain.encrypt_create(msgpack.packb(cache))
+#        data, hash = self.keychain.encrypt_create(msgpack.packb(cache))
         cachedir = os.path.dirname(self.path)
         if not os.path.exists(cachedir):
             os.makedirs(cachedir)
         with open(self.path, 'wb') as fd:
-            fd.write(data)
+            fd.write(msgpack.packb(cache))
 
     def add_chunk(self, id, data):
         if self.seen_chunk(id):
             return self.chunk_incref(id)
-        data, hash = self.keychain.encrypt_read(data)
+        data, hash = self.keychain.encrypt(PACKET_CHUNK, data)
         csize = len(data)
         self.store.put(NS_CHUNK, id, data)
         self.chunk_counts[id] = (1000001, csize)

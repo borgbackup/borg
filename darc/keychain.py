@@ -11,6 +11,7 @@ from Crypto.PublicKey import RSA
 from Crypto.Util import Counter
 from Crypto.Util.number import bytes_to_long, long_to_bytes
 
+from . import PACKET_ENCRYPT_READ, PACKET_ENCRYPT_CREATE
 from .helpers import IntegrityError, zero_pad
 from .oaep import OAEP
 
@@ -140,28 +141,21 @@ class Keychain(object):
         """
         return HMAC.new(self.aes_id, data, SHA256).digest()
 
-    def _encrypt(self, id, rsa_key, key, data):
+    def encrypt(self, magic, data):
         """Helper function used by `encrypt_read` and `encrypt_create`
         """
         data = zlib.compress(data)
         nonce = long_to_bytes(self.counter.next_value(), 8)
-        data = nonce + rsa_key + AES.new(key, AES.MODE_CTR, '', counter=self.counter).encrypt(data)
+        if magic & PACKET_ENCRYPT_READ:
+            data = ''.join((nonce, self.read_encrypted,
+                            AES.new(self.read_key, AES.MODE_CTR, '',
+                                    counter=self.counter).encrypt(data)))
+        elif magic & PACKET_ENCRYPT_CREATE:
+            data = ''.join((nonce, self.create_encrypted,
+                            AES.new(self.create_key, AES.MODE_CTR, '',
+                                    counter=self.counter).encrypt(data)))
         hash = self.id_hash(data)
-        return ''.join((id, hash, data)), hash
-
-    def encrypt_read(self, data):
-        """Encrypt `data` using the AES "read" key
-
-        An RSA encrypted version of the AES key is included in the header
-        """
-        return self._encrypt(self.READ, self.read_encrypted, self.read_key, data)
-
-    def encrypt_create(self, data, iv=None):
-        """Encrypt `data` using the AES "create" key
-
-        An RSA encrypted version of the AES key is included in the header
-        """
-        return self._encrypt(self.CREATE, self.create_encrypted, self.create_key, data)
+        return ''.join((chr(magic), hash, data)), hash
 
     def _decrypt_key(self, data, rsa_key):
         """Helper function used by `decrypt`
@@ -175,20 +169,20 @@ class Keychain(object):
     def decrypt(self, data):
         """Decrypt `data` previously encrypted by `encrypt_create` or `encrypt_read`
         """
-        type = data[0]
+        magic = ord(data[0])
         hash = data[1:33]
         if self.id_hash(data[33:]) != hash:
             raise IntegrityError('Encryption integrity error')
         nonce = bytes_to_long(data[33:41])
         counter = Counter.new(64, prefix='\0' * 8, initial_value=nonce)
-        if type == self.READ:
+        if magic & PACKET_ENCRYPT_READ:
             key = self._decrypt_key(data[41:297], self.rsa_read)
-        elif type == self.CREATE:
+        elif magic & PACKET_ENCRYPT_CREATE:
             key = self._decrypt_key(data[41:297], self.rsa_create)
         else:
-            raise Exception('Unknown pack type %d found' % ord(type))
+            raise Exception('Unknown pack magic %d found' % magic)
         data = AES.new(key, AES.MODE_CTR, counter=counter).decrypt(data[297:])
-        return zlib.decompress(data), hash
+        return magic, zlib.decompress(data), hash
 
 
 

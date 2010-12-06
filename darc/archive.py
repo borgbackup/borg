@@ -7,7 +7,8 @@ import stat
 import sys
 from xattr import xattr, XATTR_NOFOLLOW
 
-from . import NS_ARCHIVE_METADATA, NS_ARCHIVE_ITEMS, NS_ARCHIVE_CHUNKS, NS_CHUNK
+from . import NS_ARCHIVE_METADATA, NS_ARCHIVE_ITEMS, NS_ARCHIVE_CHUNKS, NS_CHUNK, \
+    PACKET_ARCHIVE_METADATA, PACKET_ARCHIVE_ITEMS, PACKET_ARCHIVE_CHUNKS, PACKET_CHUNK
 from ._speedups import chunkify
 from .helpers import uid2user, user2uid, gid2group, group2gid, IntegrityError
 
@@ -35,15 +36,17 @@ class Archive(object):
     def load(self, id):
         self.id = id
         try:
-            data, self.hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_METADATA, self.id))
+            kind, data, self.hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_METADATA, self.id))
         except self.store.DoesNotExist:
             raise self.DoesNotExist
+        assert kind == PACKET_ARCHIVE_METADATA
         self.metadata = msgpack.unpackb(data)
         assert self.metadata['version'] == 1
 
     def get_chunks(self):
         for id in self.metadata['chunks_ids']:
-            data, hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, id))
+            magic, data, hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, id))
+            assert magic == PACKET_ARCHIVE_CHUNKS
             assert hash == id
             chunks = msgpack.unpackb(data)
             for chunk in chunks:
@@ -51,7 +54,8 @@ class Archive(object):
 
     def get_items(self):
         for id in self.metadata['items_ids']:
-            data, items_hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_ITEMS, id))
+            magic, data, items_hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_ITEMS, id))
+            assert magic == PACKET_ARCHIVE_ITEMS
             assert items_hash == id
             items = msgpack.unpackb(data)
             for item in items:
@@ -63,7 +67,7 @@ class Archive(object):
             self.flush_items()
 
     def flush_items(self):
-        data, hash = self.keychain.encrypt_read(msgpack.packb(self.items))
+        data, hash = self.keychain.encrypt(PACKET_ARCHIVE_ITEMS, msgpack.packb(self.items))
         self.store.put(NS_ARCHIVE_ITEMS, hash, data)
         self.items_ids.append(hash)
         self.items = []
@@ -72,7 +76,7 @@ class Archive(object):
         chunks = []
         ids = []
         def flush(chunks):
-            data, hash = self.keychain.encrypt_create(msgpack.packb(chunks))
+            data, hash = self.keychain.encrypt(PACKET_ARCHIVE_CHUNKS, msgpack.packb(chunks))
             self.store.put(NS_ARCHIVE_CHUNKS, hash, data)
             ids.append(hash)
         for id, (count, size) in cache.chunk_counts.iteritems():
@@ -98,7 +102,7 @@ class Archive(object):
             'username': getuser(),
             'time': datetime.utcnow().isoformat(),
         }
-        data, self.hash = self.keychain.encrypt_read(msgpack.packb(metadata))
+        data, self.hash = self.keychain.encrypt(PACKET_ARCHIVE_METADATA, msgpack.packb(metadata))
         self.store.put(NS_ARCHIVE_METADATA, self.id, data)
         self.store.commit()
 
@@ -149,7 +153,8 @@ class Archive(object):
                 with open(path, 'wb') as fd:
                     for id in item['chunks']:
                         try:
-                            data, hash = self.keychain.decrypt(self.store.get(NS_CHUNK, id))
+                            magic, data, hash = self.keychain.decrypt(self.store.get(NS_CHUNK, id))
+                            assert magic == PACKET_CHUNK
                             if self.keychain.id_hash(data) != id:
                                 raise IntegrityError('chunk hash did not match')
                             fd.write(data)
@@ -185,7 +190,8 @@ class Archive(object):
     def verify_file(self, item):
         for id in item['chunks']:
             try:
-                data, hash = self.keychain.decrypt(self.store.get(NS_CHUNK, id))
+                magic, data, hash = self.keychain.decrypt(self.store.get(NS_CHUNK, id))
+                assert magic == PACKET_CHUNK
                 if self.keychain.id_hash(data) != id:
                     raise IntegrityError('chunk id did not match')
             except IntegrityError:

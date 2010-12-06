@@ -66,7 +66,7 @@ class Store(object):
         self.config.read(os.path.join(path, 'config'))
         if self.config.getint('store', 'version') != 1:
             raise Exception('%s Does not look like a darc store')
-        self.id = self.config.get('store', 'id')
+        self.id = self.config.get('store', 'id').decode('hex')
         self.tid = self.config.getint('state', 'tid')
         next_band = self.config.getint('state', 'next_band')
         max_band_size = self.config.getint('store', 'max_band_size')
@@ -287,7 +287,6 @@ class HashIndex(DictMixin):
 
     def resize(self, capacity=0):
         capacity = capacity or self.buckets.size * 2
-        print 'resizing to', capacity
         if capacity < self.num_entries:
             raise ValueError('HashIndex full')
         new = HashIndex.create(self.path + '.tmp', capacity)
@@ -341,6 +340,7 @@ class BandIO(object):
         fd.seek(offset)
         data = fd.read(self.header_fmt.size)
         size, magic, ns, id = self.header_fmt.unpack(data)
+        assert magic == 0
         return fd.read(size - self.header_fmt.size)
 
     def iter_objects(self, band):

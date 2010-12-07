@@ -112,12 +112,11 @@ class Store(object):
         if not self.compact:
             return
         self.io.close_band()
+        def lookup(ns, key):
+            return key in self.indexes[ns]
         for band in self.compact:
-            for ns, key, offset, size in self.io.iter_objects(band):
-                if key in self.indexes[ns]:
-                    del self.indexes[ns][key]
-                    data = self.io.read(band, offset)
-                    self.indexes[ns][key] = self.io.write(ns, key, data)
+            for ns, key, data in self.io.iter_objects(band, lookup):
+                self.indexes[ns][key] = self.io.write(ns, key, data)
         for band in self.compact:
             self.io.delete_band(band)
 
@@ -343,7 +342,7 @@ class BandIO(object):
         assert magic == 0
         return fd.read(size - self.header_fmt.size)
 
-    def iter_objects(self, band):
+    def iter_objects(self, band, lookup):
         fd = self.get_fd(band)
         fd.seek(0)
         assert fd.read(8) == 'DARCBAND'
@@ -351,10 +350,11 @@ class BandIO(object):
         data = fd.read(self.header_fmt.size)
         while data:
             size, magic, ns, key = self.header_fmt.unpack(data)
-            size -= self.header_fmt.size
-            yield ns, key, offset, size
-            offset += size + self.header_fmt.size
-            fd.seek(offset)
+            offset += size
+            if lookup(ns, key):
+                yield ns, key, fd.read(size - self.header_fmt.size)
+            else:
+                fd.seek(offset)
             data = fd.read(self.header_fmt.size)
 
     def write(self, ns, id, data):

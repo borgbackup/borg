@@ -184,7 +184,7 @@ class HashIndex(DictMixin):
 
     i_fmt    = struct.Struct('<i')
     assert i_fmt.size == 4
-    idx_type = numpy.dtype('<i,<i,V32')
+    idx_type = numpy.dtype('V32,<i,<i')
     assert idx_type.itemsize == 40
 
     def __init__(self, path):
@@ -207,7 +207,7 @@ class HashIndex(DictMixin):
             fd.write('DARCHASH\0\0\0\0')
             a = numpy.zeros(capacity, cls.idx_type)
             for i in xrange(capacity):
-                a[i][0] = cls.EMPTY
+                a[i][1] = cls.EMPTY
             a.tofile(fd)
         return cls(path)
 
@@ -219,16 +219,16 @@ class HashIndex(DictMixin):
         didx = -1
         idx = self.index(key)
         while True:
-            while self.buckets[idx][0] == self.DELETED:
+            while self.buckets[idx][1] == self.DELETED:
                 if didx == -1:
                     didx = idx
                 idx = (idx + 1) % self.buckets.size
-            if self.buckets[idx][0] == self.EMPTY:
+            if self.buckets[idx][1] == self.EMPTY:
                 raise KeyError
-            if str(self.buckets[idx][2]) == key:
+            if str(self.buckets[idx][0]) == key:
                 if didx != -1:
                     self.buckets[didx] = self.buckets[idx]
-                    self.buckets[idx][0] = self.DELETED
+                    self.buckets[idx][1] = self.DELETED
                     idx = didx
                 return idx
             idx = (idx + 1) % self.buckets.size
@@ -242,17 +242,17 @@ class HashIndex(DictMixin):
 
     def pop(self, key):
         idx = self.lookup(key)
-        band = self.buckets[idx][0]
-        self.buckets[idx][0] = self.DELETED
+        band = self.buckets[idx][1]
+        self.buckets[idx][1] = self.DELETED
         self.num_entries -= 1
-        return band, self.buckets[idx][1]
+        return band, self.buckets[idx][2]
 
     def __getitem__(self, key):
         idx = self.lookup(key)
-        return self.buckets[idx][0], self.buckets[idx][1]
+        return self.buckets[idx][1], self.buckets[idx][2]
 
     def __delitem__(self, key):
-        self.buckets[self.lookup(key)][0] = self.DELETED
+        self.buckets[self.lookup(key)][1] = self.DELETED
         self.num_entries -= 1
 
     def __setitem__(self, key, value):
@@ -260,27 +260,27 @@ class HashIndex(DictMixin):
             self.resize()
         try:
             idx = self.lookup(key)
-            self.buckets[idx][0], self.buckets[idx][1] = value
+            self.buckets[idx][1], self.buckets[idx][2] = value
             return
         except KeyError:
             idx = self.index(key)
-            while self.buckets[idx][0] not in self.FREE:
+            while self.buckets[idx][1] not in self.FREE:
                 idx = (idx + 1) % self.buckets.size
-            self.buckets[idx][0], self.buckets[idx][1] = value
-            self.buckets[idx][2] = key
+            self.buckets[idx][1], self.buckets[idx][2] = value
+            self.buckets[idx][0] = key
             self.num_entries += 1
 
     def iteritems(self, limit=0, marker=None):
         n = 0
         for idx in xrange(self.buckets.size):
-            if self.buckets[idx][0] in self.FREE:
+            if self.buckets[idx][1] in self.FREE:
                 continue
-            key = str(self.buckets[idx][2])
+            key = str(self.buckets[idx][0])
             if marker and key != marker:
                 continue
             elif marker:
                 marker = None
-            yield key, (self.buckets[idx][0], self.buckets[idx][1])
+            yield key, (self.buckets[idx][1], self.buckets[idx][2])
             n += 1
             if n == limit:
                 return

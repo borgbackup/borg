@@ -31,20 +31,18 @@ roll_checksum(unsigned long int sum, unsigned char remove, unsigned char add, in
 
 typedef struct {
     PyObject_HEAD
-    int chunk_size, window_size, i, last, done, buf_size, data_len, seed;
+    int chunk_size, window_size, last, done, buf_size, seed, remaining, position;
     PyObject *chunks, *fd;
-    unsigned long int sum;
-    unsigned char *data, add, remove;
+    unsigned char *data;
 } ChunkifyIter;
 
 static PyObject*
 ChunkifyIter_iter(PyObject *self)
 {
     ChunkifyIter *c = (ChunkifyIter *)self;
-    c->data_len = 0;
+    c->remaining = 0;
+    c->position = 0;
     c->done = 0;
-    c->i = 0;
-    c->sum = 0;
     c->last = 0;
     Py_INCREF(self);
     return self;
@@ -59,73 +57,53 @@ ChunkifyIter_dealloc(PyObject *self)
     self->ob_type->tp_free(self);
 }
 
+static void
+ChunkifyIter_fill(PyObject *self)
+{
+    ChunkifyIter *c = (ChunkifyIter *)self;
+    memmove(c->data, c->data + c->last, c->position + c->remaining - c->last);
+    c->position -= c->last;
+    c->last = 0;
+    PyObject *data = PyObject_CallMethod(c->fd, "read", "i", c->buf_size - c->position - c->remaining);
+    int n = PyString_Size(data);
+    memcpy(c->data + c->position + c->remaining, PyString_AsString(data), n);
+    c->remaining += n;
+    Py_DECREF(data);
+}
+
 static PyObject*
 ChunkifyIter_iternext(PyObject *self)
 {
     ChunkifyIter *c = (ChunkifyIter *)self;
-    int initial = c->window_size;
+    unsigned long int sum;
 
-    if(c->done)
-    {
+    if(c->done) {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
     }
-    for(;;)
-    {
-        if(c->i == c->buf_size)
-        {
-            int diff = c->last + 1 - c->window_size;
-            assert(diff >= 0);
-            memmove(c->data, c->data + diff, c->buf_size - diff);
-            c->i -= diff;
-            c->last -= diff;
-            c->data_len -= diff;
-            assert(c->i >= 0);
-            assert(c->last >= -1);
-            assert(c->data_len >= 0);
-        }
-        if(c->i == c->data_len)
-        {
-            PyObject *data = PyObject_CallMethod(c->fd, "read", "i", c->buf_size - c->data_len);
-            int n = PyString_Size(data);
-            memcpy(c->data + c->data_len, PyString_AsString(data), n);
-            c->data_len += n;
-            Py_DECREF(data);
-        }
-        if(c->i == c->data_len)
-        {
-            if(c->last < c->i) {
-                c->done = 1;
-                return PyBuffer_FromMemory(c->data + c->last, c->data_len - c->last);
-            }
-            PyErr_SetNone(PyExc_StopIteration);
-            return NULL;
-        }
-        if(initial)
-        {
-            int bytes = MIN(initial, c->data_len - c->i);
-            initial -= bytes;
-            c->sum = checksum(c->data + c->i, bytes, 0);
-            c->i += bytes;
-        }
-        else
-        {
-            c->sum = roll_checksum(c->sum,
-                                   c->data[c->i - c->window_size],
-                                   c->data[c->i],
-                                   c->window_size);
-            c->i++;
-        }
-        if((c->sum % c->chunk_size) == c->seed ||
-           (c->i == c->buf_size && c->last <= c->window_size))
-        {
-            int old_last = c->last;
-            c->last = c->i;
-            return PyBuffer_FromMemory(c->data + old_last, c->last - old_last);
+    if(c->remaining <= c->window_size) {
+        ChunkifyIter_fill(self);
+    }
+    if(c->remaining < c->window_size) {
+        c->done = 1;
+        return PyBuffer_FromMemory(c->data + c->position, c->remaining);
+    }
+    sum = checksum(c->data + c->position, c->window_size, 0);
+    c->remaining -= c->window_size;
+    c->position += c->window_size;
+    while(c->remaining && (sum & 0xffff) != c->seed) {
+        sum = roll_checksum(sum, c->data[c->position - c->window_size],
+                            c->data[c->position],
+                            c->window_size);
+        c->position++;
+        c->remaining--;
+        if(c->remaining == 0) {
+            ChunkifyIter_fill(self);
         }
     }
-    PyErr_SetNone(PyExc_StopIteration);
-    return NULL;
+    int old_last = c->last;
+    c->last = c->position;
+    return PyBuffer_FromMemory(c->data + old_last, c->last - old_last);
 }
 
 static PyTypeObject ChunkifyIterType = {

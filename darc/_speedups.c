@@ -31,7 +31,7 @@ roll_checksum(unsigned long int sum, unsigned char remove, unsigned char add, in
 
 typedef struct {
     PyObject_HEAD
-    int chunk_size, window_size, i, last, eof, done, buf_size, data_len, seed;
+    int chunk_size, window_size, i, last, done, buf_size, data_len, seed;
     PyObject *chunks, *fd;
     unsigned long int sum;
     unsigned char *data, add, remove;
@@ -43,7 +43,6 @@ ChunkifyIter_iter(PyObject *self)
     ChunkifyIter *c = (ChunkifyIter *)self;
     c->data_len = 0;
     c->done = 0;
-    c->eof = 0;
     c->i = 0;
     c->sum = 0;
     c->last = 0;
@@ -97,8 +96,7 @@ ChunkifyIter_iternext(PyObject *self)
         {
             if(c->last < c->i) {
                 c->done = 1;
-                return PyString_FromStringAndSize((char *)(c->data + c->last),
-                                                  c->data_len - c->last);
+                return PyBuffer_FromMemory(c->data + c->last, c->data_len - c->last);
             }
             PyErr_SetNone(PyExc_StopIteration);
             return NULL;
@@ -123,8 +121,7 @@ ChunkifyIter_iternext(PyObject *self)
         {
             int old_last = c->last;
             c->last = c->i;
-            return PyString_FromStringAndSize((char *)(c->data + old_last),
-                                              c->last - old_last);
+            return PyBuffer_FromMemory(c->data + old_last, c->last - old_last);
         }
     }
     PyErr_SetNone(PyExc_StopIteration);

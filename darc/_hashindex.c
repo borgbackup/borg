@@ -71,7 +71,6 @@ hashindex_lookup(HashIndex *index, const void *key)
 static void
 hashindex_resize(HashIndex *index, int capacity)
 {
-    printf("Resizing => %d\n", capacity);
     char *new_path = malloc(strlen(index->path) + 5);
     strcpy(new_path, index->path);
     strcat(new_path, ".tmp");
@@ -99,14 +98,14 @@ hashindex_open(const char *path)
 {
     int fd = open(path, O_RDWR);
     if(fd < 0) {
-        printf("Failed to open %s\n", path);
+        fprintf(stderr, "Failed to open %s\n", path);
         return NULL;
     }
     off_t length = lseek(fd, 0, SEEK_END);
     void *addr = mmap(0, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     close(fd);
     if(addr == MAP_FAILED) {
-        printf("Failed to mmap %s", path);
+        fprintf(stderr, "Failed to mmap %s", path);
     }
     HashHeader *header = (HashHeader *)addr;
     HashIndex *index = malloc(sizeof(HashIndex));
@@ -130,7 +129,7 @@ hashindex_create(const char *path, int capacity, int key_size, int value_size)
     FILE *fd;
     int i;
     if(!(fd = fopen(path, "w"))) {
-        printf("Failed to create %s\n", path);
+        fprintf(stderr, "Failed to create %s\n", path);
         return NULL;
     }
     HashHeader header;

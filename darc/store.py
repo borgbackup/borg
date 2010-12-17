@@ -5,9 +5,11 @@ import shutil
 import struct
 import tempfile
 import unittest
+from zlib import crc32
 
-from .lrucache import LRUCache
 from .hashindex import NSIndex, BandIndex
+from .helpers import IntegrityError
+from .lrucache import LRUCache
 
 
 class Store(object):
@@ -189,8 +191,8 @@ class Store(object):
 
 class BandIO(object):
 
-    header_fmt = struct.Struct('<iBB32s')
-    assert header_fmt.size == 38
+    header_fmt = struct.Struct('<iBiB32s')
+    assert header_fmt.size == 42
 
     def __init__(self, path, nextband, limit, bands_per_dir, capacity=100):
         self.path = path
@@ -226,9 +228,12 @@ class BandIO(object):
         fd = self.get_fd(band)
         fd.seek(offset)
         data = fd.read(self.header_fmt.size)
-        size, magic, ns, id = self.header_fmt.unpack(data)
+        size, magic, hash, ns, id = self.header_fmt.unpack(data)
         assert magic == 0
-        return fd.read(size - self.header_fmt.size)
+        data = fd.read(size - self.header_fmt.size)
+        if crc32(data) != hash:
+            raise IntegrityError('Band checksum mismatch')
+        return data
 
     def iter_objects(self, band, lookup):
         fd = self.get_fd(band)
@@ -237,10 +242,14 @@ class BandIO(object):
         offset = 8
         data = fd.read(self.header_fmt.size)
         while data:
-            size, magic, ns, key = self.header_fmt.unpack(data)
+            size, magic, hash, ns, key = self.header_fmt.unpack(data)
+            assert magic == 0
             offset += size
             if lookup(ns, key):
-                yield ns, key, fd.read(size - self.header_fmt.size)
+                data = fd.read(size - self.header_fmt.size)
+                if crc32(data) != hash:
+                    raise IntegrityError('Band checksum mismatch')
+                yield ns, key, data
             else:
                 fd.seek(offset)
             data = fd.read(self.header_fmt.size)
@@ -255,7 +264,8 @@ class BandIO(object):
             fd.write('DARCBAND')
             self.offset = 8
         offset = self.offset
-        fd.write(self.header_fmt.pack(size, 0, ns, id))
+        hash = crc32(data)
+        fd.write(self.header_fmt.pack(size, 0, hash, ns, id))
         fd.write(data)
         self.offset += size
         return self.band, offset

@@ -6,6 +6,22 @@ import os
 import pwd
 import re
 import stat
+import struct
+
+
+def read_set(path):
+    """Read set from disk (as int32s)
+    """
+    with open(path, 'rb') as fd:
+        data = fd.read()
+        return set(struct.unpack('<%di' % (len(data) / 4), data))
+
+
+def write_set(s, path):
+    """Write set to disk (as int32s)
+    """
+    with open(path, 'wb') as fd:
+        fd.write(struct.pack('<%di' % len(s), *s))
 
 
 def encode_long(v):

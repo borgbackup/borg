@@ -33,6 +33,12 @@ cdef class IndexBase:
         if not key in self:
             self[key] = value
 
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
     def pop(self, key):
         value = self[key]
         del self[key]

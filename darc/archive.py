@@ -79,7 +79,7 @@ class Archive(object):
             data, hash = self.keychain.encrypt(PACKET_ARCHIVE_CHUNKS, msgpack.packb(chunks))
             self.store.put(NS_ARCHIVE_CHUNKS, hash, data)
             ids.append(hash)
-        for id, (count, size) in cache.chunk_counts.iteritems():
+        for id, (count, size) in cache.chunks.iteritems():
             if count > 1000000:
                 chunks.append((id, size))
             if len(chunks) > 100000:
@@ -105,6 +105,7 @@ class Archive(object):
         data, self.hash = self.keychain.encrypt(PACKET_ARCHIVE_METADATA, msgpack.packb(metadata))
         self.store.put(NS_ARCHIVE_METADATA, self.id, data)
         self.store.commit()
+        cache.commit()
 
     def stats(self, cache):
         osize = csize = usize = 0
@@ -207,7 +208,7 @@ class Archive(object):
         for id in self.metadata['items_ids']:
             self.store.delete(NS_ARCHIVE_ITEMS, id)
         self.store.commit()
-        cache.save()
+        cache.commit()
 
     def stat_attrs(self, st, path):
         item = {
@@ -277,7 +278,7 @@ class Archive(object):
                                       self.keychain.get_chunkify_seed()):
                     ids.append(cache.add_chunk(self.keychain.id_hash(chunk), chunk))
                     size += len(chunk)
-            cache.memorize_file_chunks(path_hash, st, ids)
+            cache.memorize_file(path_hash, st, ids)
         item = {'path': safe_path, 'chunks': ids, 'size': size}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)

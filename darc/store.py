@@ -64,6 +64,7 @@ class Store(object):
             raise Exception('%s Does not look like a darc store' % path)
         self.lock_fd = open(os.path.join(path, 'README'), 'r+')
         fcntl.flock(self.lock_fd, fcntl.LOCK_EX)
+        self.rollback()
         self.config = RawConfigParser()
         self.config.read(os.path.join(path, 'config'))
         if self.config.getint('store', 'version') != 1:
@@ -73,7 +74,6 @@ class Store(object):
         next_band = self.config.getint('state', 'next_band')
         max_band_size = self.config.getint('store', 'max_band_size')
         bands_per_dir = self.config.getint('store', 'bands_per_dir')
-        self.rollback()
         self.io = BandIO(self.path, next_band, max_band_size, bands_per_dir)
 
     def delete_bands(self):
@@ -130,7 +130,7 @@ class Store(object):
             return
         self.io.close_band()
         def lookup(ns, key):
-            return key in self.indexes[ns]
+            return key in self.get_index(ns)
         for band in self.compact:
             if self.bands[band] > 0:
                 for ns, key, data in self.io.iter_objects(band, lookup):

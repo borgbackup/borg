@@ -44,19 +44,19 @@ static int
 hashindex_lookup(HashIndex *index, const void *key)
 {
     int didx = -1;
-    int idx = hashindex_index(index, key);
+    int start = hashindex_index(index, key);
+    int idx = start;
     for(;;) {
-        while(BUCKET_IS_DELETED(index, idx)) {
-            if(didx == -1) {
-                didx = idx;
-            }
-            idx = (idx + 1) % index->num_buckets;
-        }
         if(BUCKET_IS_EMPTY(index, idx))
         {
             return -1;
         }
-        if(BUCKET_MATCHES_KEY(index, idx, key)) {
+        if(BUCKET_IS_DELETED(index, idx)) {
+            if(didx == -1) {
+                didx = idx;
+            }
+        }
+        else if(BUCKET_MATCHES_KEY(index, idx, key)) {
             if (didx != -1) {
                 memcpy(BUCKET_ADDR(index, didx), BUCKET_ADDR(index, idx), index->bucket_size);
                 BUCKET_MARK_DELETED(index, idx);
@@ -65,6 +65,9 @@ hashindex_lookup(HashIndex *index, const void *key)
             return idx;
         }
         idx = (idx + 1) % index->num_buckets;
+        if(idx == start) {
+            return -1;
+        }
     }
 }
 

@@ -32,7 +32,7 @@ class Cache(object):
     def create(self):
         """Create a new empty store at `path`
         """
-        os.mkdir(self.path)
+        os.makedirs(self.path)
         with open(os.path.join(self.path, 'README'), 'wb') as fd:
             fd.write('This is a DARC cache')
         config = RawConfigParser()

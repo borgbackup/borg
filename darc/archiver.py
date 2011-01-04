@@ -196,6 +196,9 @@ class Archiver(object):
         return Keychain(args.keychain).chpass()
 
     def run(self, args=None):
+        dot_path = os.path.join(os.path.expanduser('~'), '.darc')
+        if not os.path.exists(dot_path):
+            os.mkdir(dot_path)
         default_keychain = os.path.join(os.path.expanduser('~'),
                                         '.darc', 'keychain')
         parser = argparse.ArgumentParser(description='DARC - Deduplicating Archiver')

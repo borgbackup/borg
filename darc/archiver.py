@@ -60,31 +60,33 @@ class Archiver(object):
         archive = Archive(store, keychain)
         cache = Cache(store, keychain)
         # Add darc cache dir to inode_skip list
-        skip_inodes = []
+        skip_inodes = set()
         try:
             st = os.stat(Cache.cache_dir_path())
-            skip_inodes.append((st.st_ino, st.st_dev))
+            skip_inodes.add((st.st_ino, st.st_dev))
         except IOError:
             pass
         # Add local store dir to inode_skip list
         if not args.archive.host:
             try:
                 st = os.stat(args.archive.path)
-                skip_inodes.append((st.st_ino, st.st_dev))
+                skip_inodes.add((st.st_ino, st.st_dev))
             except IOError:
                 pass
         for path in args.paths:
-            self._process(archive, cache, args.patterns, unicode(path))
+            self._process(archive, cache, args.patterns, skip_inodes, unicode(path))
         archive.save(args.archive.archive, cache)
         return self.exit_code
 
-    def _process(self, archive, cache, patterns, path):
+    def _process(self, archive, cache, patterns, skip_inodes, path):
         if exclude_path(path, patterns):
             return
         try:
             st = os.lstat(path)
         except OSError, e:
             self.print_error('%s: %s', path, e)
+            return
+        if (st.st_ino, st.st_dev) in skip_inodes:
             return
         self.print_verbose(path)
         if stat.S_ISDIR(st.st_mode):
@@ -95,7 +97,7 @@ class Archiver(object):
                 self.print_error('%s: %s', path, e)
             else:
                 for filename in entries:
-                    self._process(archive, cache, patterns,
+                    self._process(archive, cache, patterns, skip_inodes,
                                   os.path.join(path, filename))
         elif stat.S_ISLNK(st.st_mode):
             archive.process_symlink(path, st)

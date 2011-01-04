@@ -85,6 +85,8 @@ class Cache(object):
     def commit(self):
         """Commit transaction
         """
+        if not self.txn_active:
+            return
         with open(os.path.join(self.path, 'files'), 'wb') as fd:
             for item in self.files.iteritems():
                 msgpack.pack(item, fd)

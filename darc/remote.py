@@ -74,8 +74,13 @@ class RemoteStore(object):
             try:
                 self.client.connect(**params)
                 break
-            except paramiko.PasswordRequiredException:
-                params['password'] = getpass.getpass('Password for %(username)s@%(hostname)s:' % params)
+            except (paramiko.PasswordRequiredException,
+		    paramiko.AuthenticationException,
+		    paramiko.SSHException):
+		if not 'password' in params:
+			params['password'] = getpass.getpass('Password for %(username)s@%(hostname)s:' % params)
+		else:
+		    raise
 
         self.unpacker = msgpack.Unpacker()
         self.transport = self.client.get_transport()

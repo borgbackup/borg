@@ -43,6 +43,11 @@ class Archive(object):
         self.metadata = msgpack.unpackb(data)
         assert self.metadata['version'] == 1
 
+    @property
+    def ts(self):
+        """Timestamp of archive creation in UTC"""
+        return datetime.strptime(self.metadata['time'], '%Y-%m-%dT%H:%M:%S.%f')
+
     def get_chunks(self):
         for id in self.metadata['chunks_ids']:
             magic, data, hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, id))

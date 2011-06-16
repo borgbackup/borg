@@ -1,5 +1,5 @@
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 from fnmatch import fnmatchcase
 import grp
 import os
@@ -7,7 +7,11 @@ import pwd
 import re
 import stat
 import struct
+import time
 
+def to_localtime(ts):
+    """Convert datetime object from UTC to local time zone"""
+    return ts - timedelta(seconds=time.altzone)
 
 def read_set(path):
     """Read set from disk (as int32s)

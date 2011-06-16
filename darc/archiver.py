@@ -1,5 +1,6 @@
 import argparse
 from datetime import datetime
+from operator import attrgetter
 import os
 import stat
 import sys
@@ -9,7 +10,7 @@ from .store import Store
 from .cache import Cache
 from .keychain import Keychain
 from .helpers import location_validator, format_file_size, format_time,\
-    format_file_mode, IncludePattern, ExcludePattern, exclude_path
+    format_file_mode, IncludePattern, ExcludePattern, exclude_path, to_localtime
 from .remote import StoreServer, RemoteStore
 
 class Archiver(object):
@@ -152,8 +153,8 @@ class Archiver(object):
                 print '%s%s %-6s %-6s %8d %s %s' % (type, mode, item['user'],
                                                   item['group'], size, mtime, item['path'])
         else:
-            for archive in Archive.list_archives(store, keychain):
-                print '%(name)-20s %(time)s' % archive.metadata
+            for archive in sorted(Archive.list_archives(store, keychain), key=attrgetter('ts')):
+                print '%-20s %s' % (archive.metadata['name'], to_localtime(archive.ts).strftime('%c'))
         return self.exit_code
 
     def do_verify(self, args):

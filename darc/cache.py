@@ -122,6 +122,7 @@ class Cache(object):
         """
         self.begin_txn()
         print 'Initializing cache...'
+        self.chunks.clear()
         for id in self.store.list(NS_ARCHIVE_CHUNKS):
             magic, data, hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, id))
             assert magic == PACKET_ARCHIVE_CHUNKS

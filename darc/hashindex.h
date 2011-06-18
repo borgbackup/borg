@@ -16,6 +16,7 @@ typedef struct {
 
 HashIndex *hashindex_open(const char *path);
 void hashindex_close(HashIndex *index);
+void hashindex_clear(HashIndex *index);
 void hashindex_flush(HashIndex *index);
 HashIndex *hashindex_create(const char *path, int capacity, int key_size, int value_size);
 const void *hashindex_get(HashIndex *index, const void *key);

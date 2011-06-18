@@ -7,6 +7,7 @@ cdef extern from "hashindex.h":
     HashIndex *hashindex_open(char *path)
     HashIndex *hashindex_create(char *path, int capacity, int key_size, int value_size)
     int hashindex_get_size(HashIndex *index)
+    void hashindex_clear(HashIndex *index)
     void hashindex_close(HashIndex *index)
     void hashindex_flush(HashIndex *index)
     void *hashindex_get(HashIndex *index, void *key)
@@ -14,6 +15,7 @@ cdef extern from "hashindex.h":
     void hashindex_delete(HashIndex *index, void *key)
     void hashindex_set(HashIndex *index, void *key, void *value)
 
+_NoDefault = object()
 
 cdef class IndexBase:
     cdef HashIndex *index
@@ -25,6 +27,9 @@ cdef class IndexBase:
 
     def __dealloc__(self):
         hashindex_close(self.index)
+
+    def clear(self):
+        hashindex_clear(self.index)
 
     def flush(self):
         hashindex_flush(self.index)
@@ -39,10 +44,15 @@ cdef class IndexBase:
         except KeyError:
             return default
 
-    def pop(self, key):
-        value = self[key]
-        del self[key]
-        return value
+    def pop(self, key, default=_NoDefault):
+        try:
+            value = self[key]
+            del self[key]
+            return value
+        except KeyError:
+            if default != _NoDefault:
+                return default
+            raise
 
     def __len__(self):
         return hashindex_get_size(self.index)

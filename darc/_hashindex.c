@@ -160,6 +160,17 @@ error:
 }
 
 void
+hashindex_clear(HashIndex *index)
+{
+    int i;
+    for(i = 0; i < index->num_buckets; i++) {
+        BUCKET_MARK_DELETED(index, i);
+    }
+    index->num_entries = 0;
+    hashindex_resize(index, 16);
+}
+
+void
 hashindex_flush(HashIndex *index)
 {
     *((int32_t *)(index->map_addr + 8)) = index->num_entries;

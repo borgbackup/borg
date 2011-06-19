@@ -150,8 +150,17 @@ class Archiver(object):
                 mode = format_file_mode(item['mode'])
                 size = item.get('size', 0)
                 mtime = format_time(datetime.fromtimestamp(item['mtime']))
-                print '%s%s %-6s %-6s %8d %s %s' % (type, mode, item['user'],
-                                                  item['group'], size, mtime, item['path'])
+                if 'source' in item:
+                    if type == 'l':
+                        extra = ' -> %s' % item['source']
+                    else:
+                        type = 'h'
+                        extra = ' link to %s' % item['source']
+                else:
+                    extra = ''
+                print '%s%s %-6s %-6s %8d %s %s%s' % (type, mode, item['user'],
+                                                  item['group'], size, mtime,
+                                                  item['path'], extra)
         else:
             for archive in sorted(Archive.list_archives(store, keychain), key=attrgetter('ts')):
                 print '%-20s %s' % (archive.metadata['name'], to_localtime(archive.ts).strftime('%c'))

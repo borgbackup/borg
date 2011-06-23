@@ -1,3 +1,4 @@
+from __future__ import with_statement
 from ConfigParser import RawConfigParser
 import errno
 import fcntl
@@ -210,7 +211,7 @@ class Store(object):
 
 class BandIO(object):
 
-    header_fmt = struct.Struct('<iBiB32s')
+    header_fmt = struct.Struct('<IBIB32s')
     assert header_fmt.size == 42
 
     def __init__(self, path, nextband, limit, bands_per_dir, capacity=100):
@@ -265,7 +266,7 @@ class BandIO(object):
         size, magic, hash, ns, id = self.header_fmt.unpack(data)
         assert magic == 0
         data = fd.read(size - self.header_fmt.size)
-        if crc32(data) != hash:
+        if crc32(data) & 0xffffffff != hash:
             raise IntegrityError('Band checksum mismatch')
         return data
 
@@ -281,7 +282,7 @@ class BandIO(object):
             offset += size
             if lookup(ns, key):
                 data = fd.read(size - self.header_fmt.size)
-                if crc32(data) != hash:
+                if crc32(data) & 0xffffffff != hash:
                     raise IntegrityError('Band checksum mismatch')
                 yield ns, key, data
             else:
@@ -298,7 +299,7 @@ class BandIO(object):
             fd.write('DARCBAND')
             self.offset = 8
         offset = self.offset
-        hash = crc32(data)
+        hash = crc32(data) & 0xffffffff
         fd.write(self.header_fmt.pack(size, 0, hash, ns, id))
         fd.write(data)
         self.offset += size

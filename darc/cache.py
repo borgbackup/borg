@@ -1,3 +1,4 @@
+from __future__ import with_statement
 from ConfigParser import RawConfigParser
 import fcntl
 import msgpack

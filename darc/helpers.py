@@ -1,3 +1,4 @@
+from __future__ import with_statement
 import argparse
 from datetime import datetime, timedelta
 from fnmatch import fnmatchcase

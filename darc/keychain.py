@@ -1,3 +1,4 @@
+from __future__ import with_statement
 from getpass import getpass
 import hashlib
 import os

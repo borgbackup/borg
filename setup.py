@@ -4,14 +4,14 @@ import sys
 from setuptools import setup, Extension
 from Cython.Distutils import build_ext
 
-dependencies = ['pycrypto', 'msgpack-python', 'pbkdf2.py', 'xattr', 'paramiko']
+dependencies = ['pycrypto', 'msgpack-python', 'pbkdf2.py', 'xattr', 'paramiko', 'Pyrex', 'Cython']
 if sys.version_info < (2, 7):
     dependencies.append('argparse')
 
 
 setup(name='darc',
       version='0.1',
-      author=u'Jonas Borgström',
+      author='Jonas Borgström',
       author_email='jonas@borgstrom.se',
       packages=['darc'],
       cmdclass = {'build_ext': build_ext},

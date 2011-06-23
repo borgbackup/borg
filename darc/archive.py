@@ -259,7 +259,7 @@ class Archive(object):
             source = self.hard_links.get((st.st_ino, st.st_dev))
             if (st.st_ino, st.st_dev) in self.hard_links:
                 item = self.stat_attrs(st, path)
-                item.update({'path': path, 'source': source})
+                item.update({'path': safe_path, 'source': source})
                 self.add_item(item)
                 return
             else:

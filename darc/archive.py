@@ -152,7 +152,7 @@ class Archive(object):
                 os.makedirs(os.path.dirname(path))
             # Hard link?
             if 'source' in item:
-                source = os.path.join(dest, item['source'])
+                source = os.path.join(dest, item['source'].decode('utf-8'))
                 if os.path.exists(path):
                     os.unlink(path)
                 os.link(source, path)

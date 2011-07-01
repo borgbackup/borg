@@ -27,7 +27,7 @@ class Archiver(object):
     def print_error(self, msg, *args):
         msg = args and msg % args or msg
         if hasattr(sys.stderr, 'encoding'):
-            msg = msg.encode(sys.stderr.encoding, 'ignore')
+            msg = msg.encode(sys.stderr.encoding or 'utf-8', 'ignore')
         self.exit_code = 1
         print >> sys.stderr, msg
 
@@ -35,7 +35,7 @@ class Archiver(object):
         if self.verbose:
             msg = args and msg % args or msg
             if hasattr(sys.stdout, 'encoding'):
-                msg = msg.encode(sys.stdout.encoding, 'ignore')
+                msg = msg.encode(sys.stdout.encoding or 'utf-8', 'ignore')
             if kw.get('newline', True):
                 print msg
             else:

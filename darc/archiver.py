@@ -97,7 +97,7 @@ class Archiver(object):
             except OSError, e:
                 self.print_error('%s: %s', path, e)
             else:
-                for filename in entries:
+                for filename in sorted(entries):
                     self._process(archive, cache, patterns, skip_inodes,
                                   os.path.join(path, filename))
         elif stat.S_ISLNK(st.st_mode):

@@ -1,5 +1,5 @@
 from __future__ import with_statement
-from datetime import datetime
+from datetime import datetime, timedelta
 from getpass import getuser
 import msgpack
 import os
@@ -47,7 +47,8 @@ class Archive(object):
     @property
     def ts(self):
         """Timestamp of archive creation in UTC"""
-        return datetime.strptime(self.metadata['time'], '%Y-%m-%dT%H:%M:%S.%f')
+        t, f = self.metadata['time'].split('.', 1)
+        return datetime.strptime(t, '%Y-%m-%dT%H:%M:%S') + timedelta(int(f) / 100)
 
     def get_chunks(self):
         for id in self.metadata['chunks_ids']:

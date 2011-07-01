@@ -48,7 +48,7 @@ class Archive(object):
     def ts(self):
         """Timestamp of archive creation in UTC"""
         t, f = self.metadata['time'].split('.', 1)
-        return datetime.strptime(t, '%Y-%m-%dT%H:%M:%S') + timedelta(int(f) / 100)
+        return datetime.strptime(t, '%Y-%m-%dT%H:%M:%S') + timedelta(seconds=float('.' + f))
 
     def get_chunks(self):
         for id in self.metadata['chunks_ids']:

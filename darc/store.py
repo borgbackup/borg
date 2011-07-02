@@ -181,7 +181,7 @@ class Store(object):
     def get(self, ns, id):
         try:
             band, offset = self.get_index(ns)[id]
-            return self.io.read(band, offset)
+            return self.io.read(band, offset, ns, id)
         except KeyError:
             raise self.DoesNotExist
 
@@ -205,8 +205,8 @@ class Store(object):
             raise self.DoesNotExist
 
     def list(self, ns, marker=None, limit=1000000):
-        return [key for (key, value) in
-                self.get_index(ns).iteritems(marker=marker, limit=limit)]
+        return (key for (key, value) in
+                self.get_index(ns).iteritems(marker=marker, limit=limit))
 
 
 class BandIO(object):
@@ -259,12 +259,14 @@ class BandIO(object):
             if not missing_ok or e.errno != errno.ENOENT:
                 raise
 
-    def read(self, band, offset):
+    def read(self, band, offset, ns, id):
         fd = self.get_fd(band)
         fd.seek(offset)
         data = fd.read(self.header_fmt.size)
-        size, magic, hash, ns, id = self.header_fmt.unpack(data)
+        size, magic, hash, ns_, id_ = self.header_fmt.unpack(data)
         assert magic == 0
+        assert ns == ns_
+        assert id == id_
         data = fd.read(size - self.header_fmt.size)
         if crc32(data) & 0xffffffff != hash:
             raise IntegrityError('Band checksum mismatch')

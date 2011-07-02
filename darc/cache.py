@@ -60,8 +60,10 @@ class Cache(object):
         self.id = self.config.get('cache', 'store_id').decode('hex')
         self.tid = self.config.getint('cache', 'tid')
         self.chunks = NSIndex(os.path.join(self.path, 'chunks'))
+        self.files = {}
+
+    def _read_files(self):
         with open(os.path.join(self.path, 'files'), 'rb') as fd:
-            self.files = {}
             u = msgpack.Unpacker()
             while True:
                 data = fd.read(64 * 1024)
@@ -168,6 +170,8 @@ class Cache(object):
             self.chunks[id] = (count - 1, size)
 
     def file_known_and_unchanged(self, path_hash, st):
+        if not self.files:
+            self._read_files()
         entry = self.files.get(path_hash)
         if (entry and entry[3] == st.st_mtime
             and entry[2] == st.st_size and entry[1] == st.st_ino):

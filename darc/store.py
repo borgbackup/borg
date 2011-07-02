@@ -205,8 +205,8 @@ class Store(object):
             raise self.DoesNotExist
 
     def list(self, ns, marker=None, limit=1000000):
-        return (key for (key, value) in
-                self.get_index(ns).iteritems(marker=marker, limit=limit))
+        for key, value in self.get_index(ns).iteritems(marker=marker, limit=limit):
+            yield key
 
 
 class BandIO(object):
@@ -334,7 +334,7 @@ class StoreTestCase(unittest.TestCase):
         self.store.close()
         store2 = Store(os.path.join(self.tmppath, 'store'))
         self.assertEqual(store2.tid, 1)
-        keys = store2.list(0)
+        keys = list(store2.list(0))
         for x in range(50):
             key = '%-32d' % x
             self.assertEqual(store2.get(0, key), 'SOMEDATA')
@@ -348,11 +348,11 @@ class StoreTestCase(unittest.TestCase):
         for x in range(50):
             key = '%-32d' % x
             store2.delete(0, key)
-        self.assertEqual(len(store2.list(0)), 49)
+        self.assertEqual(len(list(store2.list(0))), 49)
         for x in range(51, 100):
             key = '%-32d' % x
             store2.delete(0, key)
-        self.assertEqual(len(store2.list(0)), 0)
+        self.assertEqual(len(list(store2.list(0))), 0)
 
 
 def suite():

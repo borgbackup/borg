@@ -32,7 +32,7 @@ class Store(object):
 
     def __init__(self, path, create=False):
         self.txn_active = False
-        if create:
+        if not os.path.exists(path) and create:
             self.create(path)
         self.open(path)
 

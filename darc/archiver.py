@@ -41,15 +41,11 @@ class Archiver(object):
             else:
                 print msg,
 
-    def do_init(self, args):
-        self.open_store(args.store, create=True)
-        return self.exit_code
-
     def do_serve(self, args):
         return StoreServer().serve()
 
     def do_create(self, args):
-        store = self.open_store(args.archive)
+        store = self.open_store(args.archive, create=True)
         keychain = Keychain(args.keychain)
         try:
             Archive(store, keychain, args.archive.archive)
@@ -233,12 +229,6 @@ class Archiver(object):
         subparser.set_defaults(func=self.do_export_restricted)
         subparser = subparsers.add_parser('change-password')
         subparser.set_defaults(func=self.do_keychain_chpass)
-
-        subparser = subparsers.add_parser('init')
-        subparser.set_defaults(func=self.do_init)
-        subparser.add_argument('store', metavar='STORE',
-                               type=location_validator(archive=False),
-                               help='Store to initialize')
 
         subparser = subparsers.add_parser('serve')
         subparser.set_defaults(func=self.do_serve)

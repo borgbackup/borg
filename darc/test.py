@@ -30,7 +30,6 @@ class Test(unittest.TestCase):
         self.keychain = '/tmp/_test_dedupstore.keychain'
         if not os.path.exists(self.keychain):
             self.darc('init-keychain')
-        self.darc('init', self.store_path)
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)

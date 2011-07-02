@@ -171,6 +171,8 @@ class Archiver(object):
         keychain = Keychain(args.keychain)
         archive = Archive(store, keychain, args.archive.archive)
         for item in archive.get_items():
+            if exclude_path(item['path'], args.patterns):
+                continue
             if stat.S_ISREG(item['mode']) and not 'source' in item:
                 self.print_verbose('%s ...', item['path'].decode('utf-8'), newline=False)
                 if archive.verify_file(item):
@@ -282,6 +284,12 @@ class Archiver(object):
 
         subparser= subparsers.add_parser('verify')
         subparser.set_defaults(func=self.do_verify)
+        subparser.add_argument('-i', '--include', dest='patterns',
+                               type=IncludePattern, action='append',
+                               help='Include condition')
+        subparser.add_argument('-e', '--exclude', dest='patterns',
+                               type=ExcludePattern, action='append',
+                               help='Include condition')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='Archive to verity integrity of')

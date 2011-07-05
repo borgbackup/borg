@@ -205,8 +205,7 @@ class Store(object):
             raise self.DoesNotExist
 
     def list(self, ns, marker=None, limit=1000000):
-        for key, value in self.get_index(ns).iteritems(marker=marker, limit=limit):
-            yield key
+        return [key for key, value in self.get_index(ns).iteritems(marker=marker, limit=limit)]
 
 
 class BandIO(object):

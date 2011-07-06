@@ -185,6 +185,10 @@ class Store(object):
         except KeyError:
             raise self.DoesNotExist
 
+    def get_many(self, ns, ids):
+        for id in ids:
+            yield self.get(ns, id)
+
     def put(self, ns, id, data):
         if not self.txn_active:
             self.begin_txn()

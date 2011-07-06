@@ -6,6 +6,7 @@ import os
 import socket
 import stat
 import sys
+from itertools import izip
 from xattr import xattr, XATTR_NOFOLLOW
 
 from . import NS_ARCHIVE_METADATA, NS_ARCHIVE_ITEMS, NS_ARCHIVE_CHUNKS, NS_CHUNK, \
@@ -196,14 +197,14 @@ class Archive(object):
             os.utime(path, (item['atime'], item['mtime']))
 
     def verify_file(self, item):
-        for id in item['chunks']:
-            try:
-                magic, data, hash = self.keychain.decrypt(self.store.get(NS_CHUNK, id))
+        try:
+            for id, chunk in izip(item['chunks'], self.store.get_many(NS_CHUNK, item['chunks'])):
+                magic, data, hash = self.keychain.decrypt(chunk)
                 assert magic == PACKET_CHUNK
                 if self.keychain.id_hash(data) != id:
                     raise IntegrityError('chunk id did not match')
-            except IntegrityError:
-                return False
+        except IntegrityError:
+            return False
         return True
 
     def delete(self, cache):

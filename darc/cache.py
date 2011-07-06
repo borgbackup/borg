@@ -63,6 +63,7 @@ class Cache(object):
         self.files = None
 
     def _read_files(self):
+        self.files = {}
         with open(os.path.join(self.path, 'files'), 'rb') as fd:
             u = msgpack.Unpacker()
             while True:

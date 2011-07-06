@@ -60,7 +60,7 @@ class Cache(object):
         self.id = self.config.get('cache', 'store_id').decode('hex')
         self.tid = self.config.getint('cache', 'tid')
         self.chunks = NSIndex(os.path.join(self.path, 'chunks'))
-        self.files = {}
+        self.files = None
 
     def _read_files(self):
         with open(os.path.join(self.path, 'files'), 'rb') as fd:
@@ -90,9 +90,10 @@ class Cache(object):
         """
         if not self.txn_active:
             return
-        with open(os.path.join(self.path, 'files'), 'wb') as fd:
-            for item in self.files.iteritems():
-                msgpack.pack(item, fd)
+        if self.files is not None:
+            with open(os.path.join(self.path, 'files'), 'wb') as fd:
+                for item in self.files.iteritems():
+                    msgpack.pack(item, fd)
         for id, (count, size) in self.chunks.iteritems():
             if count > 1000000:
                 self.chunks[id] = count - 1000000, size
@@ -170,7 +171,7 @@ class Cache(object):
             self.chunks[id] = (count - 1, size)
 
     def file_known_and_unchanged(self, path_hash, st):
-        if not self.files:
+        if self.files is None:
             self._read_files()
         entry = self.files.get(path_hash)
         if (entry and entry[3] == st.st_mtime

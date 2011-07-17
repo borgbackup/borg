@@ -86,7 +86,13 @@ ChunkifyIter_iternext(PyObject *self)
     }
     if(c->remaining < c->window_size) {
         c->done = 1;
-        return PyBuffer_FromMemory(c->data + c->position, c->remaining);
+        if(c->remaining) {
+            return PyBuffer_FromMemory(c->data + c->position, c->remaining);
+        }
+        else {
+            PyErr_SetNone(PyExc_StopIteration);
+            return NULL;
+        }
     }
     sum = checksum(c->data + c->position, c->window_size, 0);
     c->remaining -= c->window_size;

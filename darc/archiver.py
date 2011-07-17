@@ -109,6 +109,8 @@ class Archiver(object):
             self.print_error('Unknown file type: %s', path)
 
     def do_extract(self, args):
+        def start_cb(item):
+            self.print_verbose(item['path'].decode('utf-8'))
         store = self.open_store(args.archive)
         keychain = Keychain(args.keychain)
         archive = Archive(store, keychain, args.archive.archive)
@@ -116,13 +118,13 @@ class Archiver(object):
         for item in archive.get_items():
             if exclude_path(item['path'], args.patterns):
                 continue
-            self.print_verbose(item['path'].decode('utf-8'))
-            archive.extract_item(item, args.dest)
+            archive.extract_item(item, args.dest, start_cb)
             if stat.S_ISDIR(item['mode']):
                 dirs.append(item)
             if dirs and not item['path'].startswith(dirs[-1]['path']):
                 # Extract directories twice to make sure mtime is correctly restored
                 archive.extract_item(dirs.pop(-1), args.dest)
+        store.flush_rpc()
         while dirs:
             archive.extract_item(dirs.pop(-1), args.dest)
         return self.exit_code
@@ -166,16 +168,21 @@ class Archiver(object):
         store = self.open_store(args.archive)
         keychain = Keychain(args.keychain)
         archive = Archive(store, keychain, args.archive.archive)
+        def start_cb(item):
+            self.print_verbose('%s ...', item['path'].decode('utf-8'), newline=False)
+        def result_cb(item, success):
+            if success:
+                self.print_verbose('OK')
+            else:
+                self.print_verbose('ERROR')
+                self.print_error('%s: verification failed' % item['path'])
+
         for item in archive.get_items():
             if exclude_path(item['path'], args.patterns):
                 continue
             if stat.S_ISREG(item['mode']) and not 'source' in item:
-                self.print_verbose('%s ...', item['path'].decode('utf-8'), newline=False)
-                if archive.verify_file(item):
-                    self.print_verbose('OK')
-                else:
-                    self.print_verbose('ERROR')
-                    self.print_error('%s: verification failed' % item['path'])
+                archive.verify_file(item, start_cb, result_cb)
+        store.flush_rpc()
         return self.exit_code
 
     def do_info(self, args):

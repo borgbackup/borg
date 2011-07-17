@@ -126,7 +126,7 @@ class Archive(object):
                 usize += size
         return osize, csize, usize
 
-    def extract_item(self, item, dest=None):
+    def extract_item(self, item, dest=None, start_cb=None):
         dest = dest or os.getcwdu()
         dir_stat_queue = []
         assert item['path'][0] not in ('/', '\\', ':')
@@ -159,17 +159,29 @@ class Archive(object):
                     os.unlink(path)
                 os.link(source, path)
             else:
-                with open(path, 'wb') as fd:
-                    for id in item['chunks']:
-                        try:
-                            magic, data, hash = self.keychain.decrypt(self.store.get(NS_CHUNK, id))
-                            assert magic == PACKET_CHUNK
-                            if self.keychain.id_hash(data) != id:
-                                raise IntegrityError('chunk hash did not match')
-                            fd.write(data)
-                        except ValueError:
-                            raise Exception('Invalid chunk checksum')
-                self.restore_attrs(path, item)
+                def extract_cb(chunk, error, (id, i, last)):
+                    if i==0:
+                        start_cb(item)
+                    assert not error
+                    magic, data, hash = self.keychain.decrypt(chunk)
+                    assert magic == PACKET_CHUNK
+                    if self.keychain.id_hash(data) != id:
+                        raise IntegrityError('chunk hash did not match')
+                    fd.write(data)
+                    if last:
+                        self.restore_attrs(path, item)
+                        fd.close()
+
+                fd = open(path, 'wb')
+                n = len(item['chunks'])
+                if n == 0:
+                    start_cb(item)
+                    self.restore_attrs(path, item)
+                    fd.close()
+                else:
+                    for i, id in enumerate(item['chunks']):
+                        self.store.get(NS_CHUNK, id, callback=extract_cb, callback_data=(id, i, i==n-1))
+
         else:
             raise Exception('Unknown archive item type %r' % item['mode'])
 
@@ -196,22 +208,24 @@ class Archive(object):
             # FIXME: We should really call futimes here (c extension required)
             os.utime(path, (item['atime'], item['mtime']))
 
-    def verify_file(self, item):
-        def verify_chunk(chunk, error, id):
+    def verify_file(self, item, start, result):
+        def verify_chunk(chunk, error, (id, i, last)):
+            if i == 0:
+                start(item)
             assert not error
             magic, data, hash = self.keychain.decrypt(chunk)
             assert magic == PACKET_CHUNK
             if self.keychain.id_hash(data) != id:
-                raise IntegrityError()
-        try:
-            for id in item['chunks'][:-1]:
-                self.store.get(NS_CHUNK, id, callback=verify_chunk, callback_data=id)
-            last = item['chunks'][-1]
-            chunk = self.store.get(NS_CHUNK, last)
-            verify_chunk(chunk, None, last)
-            return True
-        except IntegrityError:
-            return False
+                result(item, False)
+            elif last:
+                result(item, True)
+        n = len(item['chunks'])
+        if n == 0:
+            start(item)
+            result(item, True)
+        else:
+            for i, id in enumerate(item['chunks']):
+                self.store.get(NS_CHUNK, id, callback=verify_chunk, callback_data=(id, i, i==n-1))
 
     def delete(self, cache):
         for id, size in self.get_chunks():

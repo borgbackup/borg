@@ -108,21 +108,22 @@ class RemoteStore(object):
         self.msgid = 0
         self.id, self.tid = self.cmd('open', (location.path, create))
 
+    def wait(self):
+        with self.channel.lock:
+            if (self.channel.out_window_size == 0 and
+                not self.channel.recv_ready() and
+                not self.channel.recv_stderr_ready()):
+                self.channel.out_buffer_cv.wait(10)
+
     def cmd(self, cmd, args, callback=None, callback_data=None):
         self.msgid += 1
         self.notifier.enabled += 1
+        odata = msgpack.packb((0, self.msgid, cmd, args))
         if callback:
             self.callbacks[self.msgid] = callback, callback_data
-        odata = msgpack.packb((0, self.msgid, cmd, args))
         while True:
             if self.channel.closed:
                 raise Exception('Connection closed')
-            if odata and self.channel.send_ready():
-                n = self.channel.send(odata)
-                if n > 0:
-                    odata = odata[n:]
-                if not odata and callback:
-                    return
             elif self.channel.recv_stderr_ready():
                 print >> sys.stderr, 'remote stderr:', self.channel.recv_stderr(BUFSIZE)
             elif self.channel.recv_ready():
@@ -137,12 +138,14 @@ class RemoteStore(object):
                         c, d = self.callbacks.pop(msgid, (None, None))
                         if c:
                             c(res, error, d)
+            elif odata and self.channel.send_ready():
+                n = self.channel.send(odata)
+                if n > 0:
+                    odata = odata[n:]
+                if not odata and callback:
+                    return
             else:
-                with self.channel.lock:
-                    if (self.channel.out_window_size == 0 and
-                        not self.channel.recv_ready() and
-                        not self.channel.recv_stderr_ready()):
-                        self.channel.out_buffer_cv.wait(10)
+                self.wait()
 
     def commit(self, *args):
         self.cmd('commit', args)
@@ -173,3 +176,20 @@ class RemoteStore(object):
     def list(self, *args):
         return self.cmd('list', args)
 
+    def flush_rpc(self):
+        while True:
+            if self.channel.closed:
+                raise Exception('Connection closed')
+            elif self.channel.recv_stderr_ready():
+                print >> sys.stderr, 'remote stderr:', self.channel.recv_stderr(BUFSIZE)
+            elif self.channel.recv_ready():
+                self.unpacker.feed(self.channel.recv(BUFSIZE))
+                for type, msgid, error, res in self.unpacker:
+                    self.notifier.enabled -= 1
+                    c, d = self.callbacks.pop(msgid, (None, None))
+                    if c:
+                        c(res, error, d)
+                    if msgid == self.msgid:
+                        return
+            else:
+                self.wait()

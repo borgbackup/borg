@@ -54,13 +54,7 @@ class StoreServer(object):
                     except Exception, e:
                         sys.stdout.write(msgpack.packb((1, msgid, e.__class__.__name__, None)))
                     else:
-                        if method not in ('put', 'delete'):
-                            if hasattr(res, 'next'):
-                                for r in res:
-                                    sys.stdout.write(msgpack.packb((1, msgid, None, r)))
-                                sys.stdout.write(msgpack.packb((2, msgid, None, None)))
-                            else:
-                                sys.stdout.write(msgpack.packb((1, msgid, None, res)))
+                        sys.stdout.write(msgpack.packb((1, msgid, None, res)))
                     sys.stdout.flush()
             if es:
                 return
@@ -110,13 +104,16 @@ class RemoteStore(object):
         self.channel.in_buffer.set_event(self.notifier)
         self.channel.in_stderr_buffer.set_event(self.notifier)
         self.channel.exec_command('darc serve')
+        self.callbacks = {}
         self.msgid = 0
         self.id, self.tid = self.cmd('open', (location.path, create))
 
-    def cmd(self, cmd, args, defer=False):
+    def cmd(self, cmd, args, callback=None, callback_data=None):
         self.msgid += 1
-        odata = msgpack.packb((0, self.msgid, cmd, args))
         self.notifier.enabled += 1
+        if callback:
+            self.callbacks[self.msgid] = callback, callback_data
+        odata = msgpack.packb((0, self.msgid, cmd, args))
         while True:
             if self.channel.closed:
                 raise Exception('Connection closed')
@@ -124,52 +121,28 @@ class RemoteStore(object):
                 n = self.channel.send(odata)
                 if n > 0:
                     odata = odata[n:]
-                if not odata and defer:
-                    self.notifier.enabled -= 1
+                if not odata and callback:
                     return
             elif self.channel.recv_stderr_ready():
                 print >> sys.stderr, 'remote stderr:', self.channel.recv_stderr(BUFSIZE)
             elif self.channel.recv_ready():
                 self.unpacker.feed(self.channel.recv(BUFSIZE))
                 for type, msgid, error, res in self.unpacker:
-                    if error:
-                        raise self.RPCError(error)
                     self.notifier.enabled -= 1
-                    return res
-            else:
-                with self.channel.lock:
-                    self.channel.out_buffer_cv.wait(10)
-
-    def cmd_iter(self, cmd, args):
-        self.msgid += 1
-        odata = msgpack.packb((0, self.msgid, cmd, args))
-        self.notifier.enabled += 1
-        try:
-            while True:
-                if self.channel.closed:
-                    raise Exception('Connection closed')
-                if odata and self.channel.send_ready():
-                    n = self.channel.send(odata)
-                    if n > 0:
-                        odata = odata[n:]
-                if self.channel.recv_stderr_ready():
-                    print >> sys.stderr, 'remote stderr:', self.channel.recv_stderr(BUFSIZE)
-                elif self.channel.recv_ready():
-                    self.unpacker.feed(self.channel.recv(BUFSIZE))
-                    for type, msgid, error, res in self.unpacker:
-                        if msgid < self.msgid:
-                            continue
+                    if msgid == self.msgid:
                         if error:
                             raise self.RPCError(error)
-                        if type == 1:
-                            yield res
-                        else:
-                            return
-                else:
-                    with self.channel.lock:
+                        return res
+                    else:
+                        c, d = self.callbacks.pop(msgid, (None, None))
+                        if c:
+                            c(res, error, d)
+            else:
+                with self.channel.lock:
+                    if (self.channel.out_window_size == 0 and
+                        not self.channel.recv_ready() and
+                        not self.channel.recv_stderr_ready()):
                         self.channel.out_buffer_cv.wait(10)
-        finally:
-            self.notifier.enabled -= 1
 
     def commit(self, *args):
         self.cmd('commit', args)
@@ -178,32 +151,24 @@ class RemoteStore(object):
     def rollback(self, *args):
         return self.cmd('rollback', args)
 
-    def get(self, *args):
+    def get(self, ns, id, callback=None, callback_data=None):
         try:
-            return self.cmd('get', args)
+            return self.cmd('get', (ns, id), callback, callback_data)
         except self.RPCError, e:
             print e.name
             if e.name == 'DoesNotExist':
                 raise self.DoesNotExist
             raise
 
-    def get_many(self, *args):
+    def put(self, ns, id, data, callback=None, callback_data=None):
         try:
-            return self.cmd_iter('get_many', args)
-        except self.RPCError, e:
-            if e.name == 'DoesNotExist':
-                raise self.DoesNotExist
-            raise
-
-    def put(self, *args):
-        try:
-            return self.cmd('put', args, defer=True)
+            return self.cmd('put', (ns, id, data), callback, callback_data)
         except self.RPCError, e:
             if e.name == 'AlreadyExists':
                 raise self.AlreadyExists
 
-    def delete(self, *args):
-        return self.cmd('delete', args, defer=True)
+    def delete(self, ns, id, callback=None, callback_data=None):
+        return self.cmd('delete', (ns, id), callback, callback_data)
 
     def list(self, *args):
         return self.cmd('list', args)

@@ -197,15 +197,21 @@ class Archive(object):
             os.utime(path, (item['atime'], item['mtime']))
 
     def verify_file(self, item):
+        def verify_chunk(chunk, error, id):
+            assert not error
+            magic, data, hash = self.keychain.decrypt(chunk)
+            assert magic == PACKET_CHUNK
+            if self.keychain.id_hash(data) != id:
+                raise IntegrityError()
         try:
-            for id, chunk in izip(item['chunks'], self.store.get_many(NS_CHUNK, item['chunks'])):
-                magic, data, hash = self.keychain.decrypt(chunk)
-                assert magic == PACKET_CHUNK
-                if self.keychain.id_hash(data) != id:
-                    raise IntegrityError('chunk id did not match')
+            for id in item['chunks'][:-1]:
+                self.store.get(NS_CHUNK, id, callback=verify_chunk, callback_data=id)
+            last = item['chunks'][-1]
+            chunk = self.store.get(NS_CHUNK, last)
+            verify_chunk(chunk, None, last)
+            return True
         except IntegrityError:
             return False
-        return True
 
     def delete(self, cache):
         for id, size in self.get_chunks():

@@ -6,6 +6,7 @@ import os
 import shutil
 
 from . import NS_ARCHIVE_CHUNKS, NS_CHUNK, PACKET_ARCHIVE_CHUNKS, PACKET_CHUNK
+from .helpers import error_callback
 from .hashindex import NSIndex
 
 
@@ -146,7 +147,7 @@ class Cache(object):
             return self.chunk_incref(id)
         data, hash = self.keychain.encrypt(PACKET_CHUNK, data)
         csize = len(data)
-        self.store.put(NS_CHUNK, id, data)
+        self.store.put(NS_CHUNK, id, data, callback=error_callback)
         self.chunks[id] = (1000001, csize)
         return id
 
@@ -167,7 +168,7 @@ class Cache(object):
         count, size = self.chunks[id]
         if count == 1:
             del self.chunks[id]
-            self.store.delete(NS_CHUNK, id)
+            self.store.delete(NS_CHUNK, id, callback=error_callback)
         else:
             self.chunks[id] = (count - 1, size)
 

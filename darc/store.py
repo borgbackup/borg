@@ -10,7 +10,7 @@ import unittest
 from zlib import crc32
 
 from .hashindex import NSIndex, BandIndex
-from .helpers import IntegrityError, read_set, write_set
+from .helpers import IntegrityError, read_set, write_set, deferrable
 from .lrucache import LRUCache
 
 
@@ -178,6 +178,7 @@ class Store(object):
                 self.indexes[ns] = cls.create(filename)
             return self.indexes[ns]
 
+    @deferrable
     def get(self, ns, id):
         try:
             band, offset = self.get_index(ns)[id]
@@ -185,10 +186,7 @@ class Store(object):
         except KeyError:
             raise self.DoesNotExist
 
-    def get_many(self, ns, ids):
-        for id in ids:
-            yield self.get(ns, id)
-
+    @deferrable
     def put(self, ns, id, data):
         if not self.txn_active:
             self.begin_txn()
@@ -198,6 +196,7 @@ class Store(object):
         bands[band] += 1
         self.get_index(ns)[id] = band, offset
 
+    @deferrable
     def delete(self, ns, id):
         if not self.txn_active:
             self.begin_txn()
@@ -208,6 +207,7 @@ class Store(object):
         except KeyError:
             raise self.DoesNotExist
 
+    @deferrable
     def list(self, ns, marker=None, limit=1000000):
         return [key for key, value in self.get_index(ns).iteritems(marker=marker, limit=limit)]
 

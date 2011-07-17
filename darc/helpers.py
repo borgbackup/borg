@@ -10,6 +10,24 @@ import stat
 import struct
 import time
 
+
+def deferrable(f):
+    def wrapper(*args, **kw):
+        callback = kw.pop('callback', None)
+        if callback:
+            data = kw.pop('callback_data', None)
+            try:
+                callback(f(*args, **kw), None, data)
+            except Exception, e:
+                callback(None, e, data)
+        else:
+            return f(*args, **kw)
+    return wrapper
+
+def error_callback(res, error, data):
+    if res:
+        raise res
+
 def to_localtime(ts):
     """Convert datetime object from UTC to local time zone"""
     return ts - timedelta(seconds=time.altzone)

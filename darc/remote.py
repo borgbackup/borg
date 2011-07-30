@@ -108,9 +108,9 @@ class RemoteStore(object):
         self.msgid = 0
         self.id, self.tid = self.cmd('open', (location.path, create))
 
-    def wait(self):
+    def wait(self, write=True):
         with self.channel.lock:
-            if (self.channel.out_window_size == 0 and
+            if ((not write or self.channel.out_window_size == 0) and
                 not self.channel.recv_ready() and
                 not self.channel.recv_stderr_ready()):
                 self.channel.out_buffer_cv.wait(10)
@@ -145,7 +145,7 @@ class RemoteStore(object):
                 if not odata and callback:
                     return
             else:
-                self.wait()
+                self.wait(odata)
 
     def commit(self, *args):
         self.cmd('commit', args)

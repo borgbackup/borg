@@ -196,15 +196,15 @@ class Archiver(object):
         key = Key(store)
         cache = Cache(store, key)
         archive = Archive(store, key, args.archive.archive, cache=cache)
-        osize, csize, usize = archive.stats(cache)
+        stats = archive.stats(cache)
         print 'Name:', archive.metadata['name']
         print 'Hostname:', archive.metadata['hostname']
         print 'Username:', archive.metadata['username']
         print 'Time:', archive.metadata['time']
         print 'Command line:', ' '.join(archive.metadata['cmdline'])
-        print 'Original size:', format_file_size(osize)
-        print 'Compressed size:', format_file_size(csize)
-        print 'Unique data:', format_file_size(usize)
+        print 'Original size:', format_file_size(stats['osize'])
+        print 'Compressed size:', format_file_size(stats['csize'])
+        print 'Unique data:', format_file_size(stats['usize'])
         return self.exit_code
 
     def run(self, args=None):

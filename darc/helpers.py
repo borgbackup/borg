@@ -70,17 +70,6 @@ def decode_long(bytes):
             return v + (b << base)
 
 
-def zero_pad(data, length):
-    """Make sure data is `length` bytes long by prepending zero bytes
-
-    >>> zero_pad('foo', 5)
-    '\\x00\\x00foo'
-    >>> zero_pad('foo', 3)
-    'foo'
-    """
-    return '\0' * (length - len(data)) + data
-
-
 def exclude_path(path, patterns):
     """Used by create and extract sub-commands to determine
     if an item should be processed or not

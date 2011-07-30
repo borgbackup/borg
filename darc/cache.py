@@ -5,19 +5,19 @@ import msgpack
 import os
 import shutil
 
-from . import NS_ARCHIVE_CHUNKS, NS_CHUNK, PACKET_ARCHIVE_CHUNKS, PACKET_CHUNK
+from . import NS_CHUNK, NS_ARCHIVE_METADATA
 from .helpers import error_callback
-from .hashindex import NSIndex
+from .hashindex import ChunkIndex
 
 
 class Cache(object):
     """Client Side cache
     """
 
-    def __init__(self, store, keychain):
+    def __init__(self, store, key):
         self.txn_active = False
         self.store = store
-        self.keychain = keychain
+        self.key = key
         self.path = os.path.join(Cache.cache_dir_path(), self.store.id.encode('hex'))
         if not os.path.exists(self.path):
             self.create()
@@ -25,6 +25,7 @@ class Cache(object):
         assert self.id == store.id
         if self.tid != store.tid:
             self.sync()
+            self.commit()
 
     @staticmethod
     def cache_dir_path():
@@ -44,7 +45,7 @@ class Cache(object):
         config.set('cache', 'tid', '0')
         with open(os.path.join(self.path, 'config'), 'wb') as fd:
             config.write(fd)
-        NSIndex.create(os.path.join(self.path, 'chunks'))
+        ChunkIndex.create(os.path.join(self.path, 'chunks'))
         with open(os.path.join(self.path, 'files'), 'wb') as fd:
             pass # empty file
 
@@ -60,7 +61,7 @@ class Cache(object):
             raise Exception('%s Does not look like a darc cache')
         self.id = self.config.get('cache', 'store_id').decode('hex')
         self.tid = self.config.getint('cache', 'tid')
-        self.chunks = NSIndex(os.path.join(self.path, 'chunks'))
+        self.chunks = ChunkIndex(os.path.join(self.path, 'chunks'))
         self.files = None
 
     def _read_files(self):
@@ -96,9 +97,6 @@ class Cache(object):
             with open(os.path.join(self.path, 'files'), 'wb') as fd:
                 for item in self.files.iteritems():
                     msgpack.pack(item, fd)
-        for id, (count, size) in self.chunks.iteritems():
-            if count > 1000000:
-                self.chunks[id] = count - 1000000, size
         self.config.set('cache', 'tid', self.store.tid)
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             self.config.write(fd)
@@ -129,48 +127,63 @@ class Cache(object):
         self.begin_txn()
         print 'Initializing cache...'
         self.chunks.clear()
-        for id in self.store.list(NS_ARCHIVE_CHUNKS):
-            magic, data, hash = self.keychain.decrypt(self.store.get(NS_ARCHIVE_CHUNKS, id))
-            assert magic == PACKET_ARCHIVE_CHUNKS
-            chunks = msgpack.unpackb(data)
-            for id, size in chunks:
+        unpacker = msgpack.Unpacker()
+        for id in self.store.list(NS_ARCHIVE_METADATA):
+            data, hash = self.key.decrypt(self.store.get(NS_ARCHIVE_METADATA, id))
+            archive = msgpack.unpackb(data)
+            print 'Analyzing archive:', archive['name']
+            for id, size, csize in archive['items']:
+                data, hash = self.key.decrypt(self.store.get(NS_CHUNK, id))
+                assert self.key.id_hash(data) == id
                 try:
-                    count, size = self.chunks[id]
-                    self.chunks[id] = count + 1, size
+                    count, size, csize = self.chunks[id]
+                    self.chunks[id] = count + 1, size, csize
                 except KeyError:
-                    self.chunks[id] = 1, size
+                    self.chunks[id] = 1, size, csize
+                    unpacker.feed(data)
+                    for item in unpacker:
+                        try:
+                            for id, size, csize in item['chunks']:
+                                try:
+                                    count, size, csize = self.chunks[id]
+                                    self.chunks[id] = count + 1, size, csize
+                                except KeyError:
+                                    self.chunks[id] = 1, size, csize
+                                pass
+                        except KeyError:
+                            pass
 
     def add_chunk(self, id, data):
         if not self.txn_active:
             self.begin_txn()
         if self.seen_chunk(id):
             return self.chunk_incref(id)
-        data, hash = self.keychain.encrypt(PACKET_CHUNK, data)
+        size = len(data)
+        data, hash = self.key.encrypt(data)
         csize = len(data)
         self.store.put(NS_CHUNK, id, data, callback=error_callback)
-        self.chunks[id] = (1000001, csize)
-        return id
+        self.chunks[id] = (1, size, csize)
+        return id, size, csize
 
     def seen_chunk(self, id):
-        return self.chunks.get(id, (0, 0))[0]
+        return self.chunks.get(id, (0, 0, 0))[0]
 
     def chunk_incref(self, id):
         if not self.txn_active:
             self.begin_txn()
-        count, size = self.chunks[id]
-        if count < 1000000:
-            self.chunks[id] = (count + 1000001, size)
-        return id
+        count, size, csize = self.chunks[id]
+        self.chunks[id] = (count + 1, size, csize)
+        return id, size, csize
 
     def chunk_decref(self, id):
         if not self.txn_active:
             self.begin_txn()
-        count, size = self.chunks[id]
+        count, size, csize = self.chunks[id]
         if count == 1:
             del self.chunks[id]
             self.store.delete(NS_CHUNK, id, callback=error_callback)
         else:
-            self.chunks[id] = (count - 1, size)
+            self.chunks[id] = (count - 1, size, csize)
 
     def file_known_and_unchanged(self, path_hash, st):
         if self.files is None:
@@ -180,9 +193,9 @@ class Cache(object):
             and entry[2] == st.st_size and entry[1] == st.st_ino):
             # reset entry age
             self.files[path_hash] = (0,) + entry[1:]
-            return entry[4], entry[2]
+            return entry[4]
         else:
-            return None, 0
+            return None
 
     def memorize_file(self, path_hash, st, ids):
         # Entry: Age, inode, size, mtime, chunk ids

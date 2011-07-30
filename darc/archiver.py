@@ -8,7 +8,7 @@ import sys
 from .archive import Archive
 from .store import Store
 from .cache import Cache
-from .keychain import Keychain
+from .key import Key
 from .helpers import location_validator, format_file_size, format_time,\
     format_file_mode, IncludePattern, ExcludePattern, exclude_path, to_localtime
 from .remote import StoreServer, RemoteStore
@@ -44,18 +44,22 @@ class Archiver(object):
     def do_serve(self, args):
         return StoreServer().serve()
 
+    def do_init(self, args):
+        store = self.open_store(args.store, create=True)
+        key = Key.create(store)
+
     def do_create(self, args):
-        store = self.open_store(args.archive, create=True)
-        keychain = Keychain(args.keychain)
+        store = self.open_store(args.archive)
+        key = Key(store)
         try:
-            Archive(store, keychain, args.archive.archive)
+            Archive(store, key, args.archive.archive)
         except Archive.DoesNotExist:
             pass
         else:
             self.print_error('Archive already exists')
             return self.exit_code
-        archive = Archive(store, keychain)
-        cache = Cache(store, keychain)
+        cache = Cache(store, key)
+        archive = Archive(store, key, cache=cache)
         # Add darc cache dir to inode_skip list
         skip_inodes = set()
         try:
@@ -112,8 +116,8 @@ class Archiver(object):
         def start_cb(item):
             self.print_verbose(item['path'].decode('utf-8'))
         store = self.open_store(args.archive)
-        keychain = Keychain(args.keychain)
-        archive = Archive(store, keychain, args.archive.archive)
+        key = Key(store)
+        archive = Archive(store, key, args.archive.archive)
         dirs = []
         for item in archive.get_items():
             if exclude_path(item['path'], args.patterns):
@@ -131,22 +135,24 @@ class Archiver(object):
 
     def do_delete(self, args):
         store = self.open_store(args.archive)
-        keychain = Keychain(args.keychain)
-        archive = Archive(store, keychain, args.archive.archive)
-        cache = Cache(store, keychain)
+        key = Key(store)
+        cache = Cache(store, key)
+        archive = Archive(store, key, args.archive.archive, cache=cache)
         archive.delete(cache)
         return self.exit_code
 
     def do_list(self, args):
         store = self.open_store(args.src)
-        keychain = Keychain(args.keychain)
+        key = Key(store)
         if args.src.archive:
             tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 010: '-', 012: 'l', 014: 's'}
-            archive = Archive(store, keychain, args.src.archive)
+            archive = Archive(store, key, args.src.archive)
             for item in archive.get_items():
                 type = tmap.get(item['mode'] / 4096, '?')
                 mode = format_file_mode(item['mode'])
-                size = item.get('size', 0)
+                size = 0
+                if type == '-':
+                    size = sum(size for _, size, _ in item['chunks'])
                 mtime = format_time(datetime.fromtimestamp(item['mtime']))
                 if 'source' in item:
                     if type == 'l':
@@ -160,14 +166,14 @@ class Archiver(object):
                                                   item['group'], size, mtime,
                                                   item['path'], extra)
         else:
-            for archive in sorted(Archive.list_archives(store, keychain), key=attrgetter('ts')):
+            for archive in sorted(Archive.list_archives(store, key), key=attrgetter('ts')):
                 print '%-20s %s' % (archive.metadata['name'], to_localtime(archive.ts).strftime('%c'))
         return self.exit_code
 
     def do_verify(self, args):
         store = self.open_store(args.archive)
-        keychain = Keychain(args.keychain)
-        archive = Archive(store, keychain, args.archive.archive)
+        key = Key(store)
+        archive = Archive(store, key, args.archive.archive)
         def start_cb(item):
             self.print_verbose('%s ...', item['path'].decode('utf-8'), newline=False)
         def result_cb(item, success):
@@ -187,9 +193,9 @@ class Archiver(object):
 
     def do_info(self, args):
         store = self.open_store(args.archive)
-        keychain = Keychain(args.keychain)
-        archive = Archive(store, keychain, args.archive.archive)
-        cache = Cache(store, keychain)
+        key = Key(store)
+        cache = Cache(store, key)
+        archive = Archive(store, key, args.archive.archive, cache=cache)
         osize, csize, usize = archive.stats(cache)
         print 'Name:', archive.metadata['name']
         print 'Hostname:', archive.metadata['hostname']
@@ -201,44 +207,27 @@ class Archiver(object):
         print 'Unique data:', format_file_size(usize)
         return self.exit_code
 
-    def do_init_keychain(self, args):
-        return Keychain.generate(args.keychain)
-
-    def do_export_restricted(self, args):
-        keychain = Keychain(args.keychain)
-        keychain.restrict(args.output)
-        return self.exit_code
-
-    def do_keychain_chpass(self, args):
-        return Keychain(args.keychain).chpass()
-
     def run(self, args=None):
         dot_path = os.path.join(os.path.expanduser('~'), '.darc')
         if not os.path.exists(dot_path):
             os.mkdir(dot_path)
-        default_keychain = os.path.join(os.path.expanduser('~'),
-                                        '.darc', 'keychain')
+            os.mkdir(os.path.join(dot_path, 'keys'))
+            os.mkdir(os.path.join(dot_path, 'cache'))
         parser = argparse.ArgumentParser(description='DARC - Deduplicating Archiver')
-        parser.add_argument('-k', '--keychain', dest='keychain', type=str,
-                            default=default_keychain,
-                            help='Keychain to use')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
                             default=False,
                             help='Verbose output')
 
-
         subparsers = parser.add_subparsers(title='Available subcommands')
-        subparser = subparsers.add_parser('init-keychain')
-        subparser.set_defaults(func=self.do_init_keychain)
-        subparser = subparsers.add_parser('export-restricted')
-        subparser.add_argument('output', metavar='OUTPUT', type=str,
-                               help='Keychain to create')
-        subparser.set_defaults(func=self.do_export_restricted)
-        subparser = subparsers.add_parser('change-password')
-        subparser.set_defaults(func=self.do_keychain_chpass)
 
         subparser = subparsers.add_parser('serve')
         subparser.set_defaults(func=self.do_serve)
+
+        subparser = subparsers.add_parser('init')
+        subparser.set_defaults(func=self.do_init)
+        subparser.add_argument('store', metavar='ARCHIVE',
+                               type=location_validator(archive=False),
+                               help='Store to create')
 
         subparser = subparsers.add_parser('create')
         subparser.set_defaults(func=self.do_create)

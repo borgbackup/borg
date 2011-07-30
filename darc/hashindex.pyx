@@ -113,6 +113,62 @@ cdef class NSKeyIterator:
         return self.key[:32], (value[0], value[1])
 
 
+cdef class ChunkIndex(IndexBase):
+
+    @classmethod
+    def create(cls, path, capacity=16):
+        index = hashindex_create(path, capacity, 32, 12)
+        hashindex_close(index)
+        return cls(path)
+
+    def __getitem__(self, key):
+        assert len(key) == 32
+        data = <int *>hashindex_get(self.index, <char *>key)
+        if not data:
+            raise KeyError
+        return data[0], data[1], data[2]
+
+    def __delitem__(self, key):
+        assert len(key) == 32
+        hashindex_delete(self.index, <char *>key)
+
+    def __setitem__(self, key, value):
+        assert len(key) == 32
+        cdef int[3] data
+        data[0] = value[0]
+        data[1] = value[1]
+        data[2] = value[2]
+        hashindex_set(self.index, <char *>key, data)
+
+    def __contains__(self, key):
+        assert len(key) == 32
+        data = <int *>hashindex_get(self.index, <char *>key)
+        return data != NULL
+
+    def iteritems(self, marker=None, limit=0):
+        iter = ChunkKeyIterator()
+        iter.index = self.index
+        return iter
+
+
+cdef class ChunkKeyIterator:
+    cdef HashIndex *index
+    cdef char *key
+
+    def __cinit__(self):
+        self.key = NULL
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        self.key = <char *>hashindex_next_key(self.index, <char *>self.key)
+        if not self.key:
+            raise StopIteration
+        cdef int *value = <int *>(self.key + 32)
+        return self.key[:32], (value[0], value[1], value[2])
+
+
 cdef class BandIndex(IndexBase):
 
     @classmethod

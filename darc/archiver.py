@@ -115,19 +115,20 @@ class Archiver(object):
     def do_extract(self, args):
         def start_cb(item):
             self.print_verbose(item['path'].decode('utf-8'))
-        store = self.open_store(args.archive)
-        key = Key(store)
-        archive = Archive(store, key, args.archive.archive)
-        dirs = []
-        for item in archive.get_items():
+        def extract_cb(item):
             if exclude_path(item['path'], args.patterns):
-                continue
+                return
             archive.extract_item(item, args.dest, start_cb)
             if stat.S_ISDIR(item['mode']):
                 dirs.append(item)
             if dirs and not item['path'].startswith(dirs[-1]['path']):
                 # Extract directories twice to make sure mtime is correctly restored
                 archive.extract_item(dirs.pop(-1), args.dest)
+        store = self.open_store(args.archive)
+        key = Key(store)
+        archive = Archive(store, key, args.archive.archive)
+        dirs = []
+        archive.iter_items(extract_cb)
         store.flush_rpc()
         while dirs:
             archive.extract_item(dirs.pop(-1), args.dest)
@@ -142,29 +143,35 @@ class Archiver(object):
         return self.exit_code
 
     def do_list(self, args):
+        def callback(item):
+            type = tmap.get(item['mode'] / 4096, '?')
+            mode = format_file_mode(item['mode'])
+            size = 0
+            if type == '-':
+                try:
+                    size = sum(size for _, size, _ in item['chunks'])
+                except KeyError:
+                    pass
+            mtime = format_time(datetime.fromtimestamp(item['mtime']))
+            if 'source' in item:
+                if type == 'l':
+                    extra = ' -> %s' % item['source']
+                else:
+                    type = 'h'
+                    extra = ' link to %s' % item['source']
+            else:
+                extra = ''
+            print '%s%s %-6s %-6s %8d %s %s%s' % (type, mode, item['user'],
+                                              item['group'], size, mtime,
+                                              item['path'], extra)
+
         store = self.open_store(args.src)
         key = Key(store)
         if args.src.archive:
             tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 010: '-', 012: 'l', 014: 's'}
             archive = Archive(store, key, args.src.archive)
-            for item in archive.get_items():
-                type = tmap.get(item['mode'] / 4096, '?')
-                mode = format_file_mode(item['mode'])
-                size = 0
-                if type == '-':
-                    size = sum(size for _, size, _ in item['chunks'])
-                mtime = format_time(datetime.fromtimestamp(item['mtime']))
-                if 'source' in item:
-                    if type == 'l':
-                        extra = ' -> %s' % item['source']
-                    else:
-                        type = 'h'
-                        extra = ' link to %s' % item['source']
-                else:
-                    extra = ''
-                print '%s%s %-6s %-6s %8d %s %s%s' % (type, mode, item['user'],
-                                                  item['group'], size, mtime,
-                                                  item['path'], extra)
+            archive.iter_items(callback)
+            store.flush_rpc()
         else:
             for archive in sorted(Archive.list_archives(store, key), key=attrgetter('ts')):
                 print '%-20s %s' % (archive.metadata['name'], to_localtime(archive.ts).strftime('%c'))
@@ -182,12 +189,12 @@ class Archiver(object):
             else:
                 self.print_verbose('ERROR')
                 self.print_error('%s: verification failed' % item['path'])
-
-        for item in archive.get_items():
+        def callback(item):
             if exclude_path(item['path'], args.patterns):
-                continue
-            if stat.S_ISREG(item['mode']) and not 'source' in item:
+                return
+            if stat.S_ISREG(item['mode']) and 'chunks' in item:
                 archive.verify_file(item, start_cb, result_cb)
+        archive.iter_items(callback)
         store.flush_rpc()
         return self.exit_code
 

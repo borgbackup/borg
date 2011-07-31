@@ -52,14 +52,16 @@ class Archive(object):
         t, f = self.metadata['time'].split('.', 1)
         return datetime.strptime(t, '%Y-%m-%dT%H:%M:%S') + timedelta(seconds=float('.' + f))
 
-    def get_items(self):
+    def iter_items(self, callback):
         unpacker = msgpack.Unpacker()
-        for id, size, csize in self.metadata['items']:
-            data, items_hash = self.key.decrypt(self.store.get(NS_CHUNK, id))
+        def cb(chunk, error, id):
+            data, items_hash = self.key.decrypt(chunk)
             assert self.key.id_hash(data) == id
             unpacker.feed(data)
             for item in unpacker:
-                yield item
+                callback(item)
+        for id, size, csize in self.metadata['items']:
+            self.store.get(NS_CHUNK, id, callback=cb, callback_data=id)
 
     def add_item(self, item, refs=None):
         data = msgpack.packb(item)
@@ -236,7 +238,7 @@ class Archive(object):
                 self.store.get(NS_CHUNK, id, callback=verify_chunk, callback_data=(id, i, i==n-1))
 
     def delete(self, cache):
-        def cb(chunk, error, id):
+        def callback(chunk, error, id):
             assert not error
             data, items_hash = self.key.decrypt(chunk)
             assert self.key.id_hash(data) == id
@@ -251,7 +253,7 @@ class Archive(object):
         unpacker = msgpack.Unpacker()
         for id, size, csize in self.metadata['items']:
             if self.cache.seen_chunk(id) == 1:
-                self.store.get(NS_CHUNK, id, callback=cb, callback_data=id)
+                self.store.get(NS_CHUNK, id, callback=callback, callback_data=id)
             else:
                 self.cache.chunk_decref(id)
         self.store.flush_rpc()

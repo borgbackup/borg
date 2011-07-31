@@ -111,8 +111,8 @@ class RemoteStore(object):
     def wait(self, write=True):
         with self.channel.lock:
             if ((not write or self.channel.out_window_size == 0) and
-                not self.channel.recv_ready() and
-                not self.channel.recv_stderr_ready()):
+                len(self.channel.in_buffer._buffer) == 0 and
+                len(self.channel.in_stderr_buffer._buffer) == 0):
                 self.channel.out_buffer_cv.wait(10)
 
     def cmd(self, cmd, args, callback=None, callback_data=None):

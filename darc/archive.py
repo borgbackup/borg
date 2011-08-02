@@ -6,12 +6,12 @@ import os
 import socket
 import stat
 import sys
-from os.path import dirname
+from zlib import crc32
 from xattr import xattr, XATTR_NOFOLLOW
 
 from . import NS_ARCHIVE_METADATA, NS_CHUNK
 from ._speedups import chunkify
-from .helpers import uid2user, user2uid, gid2group, group2gid, IntegrityError
+from .helpers import uid2user, user2uid, gid2group, group2gid, IntegrityError, Counter
 
 CHUNK_SIZE = 64 * 1024
 WINDOW_SIZE = 4096
@@ -31,7 +31,6 @@ class Archive(object):
         self.cache = cache
         self.items = ''
         self.items_refs = []
-        self.items_prefix = ''
         self.items_ids = []
         self.hard_links = {}
         if name:
@@ -54,28 +53,33 @@ class Archive(object):
 
     def iter_items(self, callback):
         unpacker = msgpack.Unpacker()
+        counter = Counter(0)
         def cb(chunk, error, id):
+            counter.dec()
+            print len(chunk)
             data, items_hash = self.key.decrypt(chunk)
             assert self.key.id_hash(data) == id
             unpacker.feed(data)
             for item in unpacker:
                 callback(item)
         for id, size, csize in self.metadata['items']:
+            # Limit the number of concurrent items requests to 3
+            self.store.flush_rpc(counter, 10)
+            counter.inc()
             self.store.get(NS_CHUNK, id, callback=cb, callback_data=id)
 
     def add_item(self, item, refs=None):
         data = msgpack.packb(item)
-        prefix = dirname(item['path'])
-        if self.items_prefix and self.items_prefix != prefix:
+        if crc32(item['path'].encode('utf-8')) % 1000 == 0:
             self.flush_items()
         if refs:
             self.items_refs += refs
         self.items += data
-        self.items_prefix = prefix
 
     def flush_items(self):
         if not self.items:
             return
+        print 'flush', len(self.items)
         id = self.key.id_hash(self.items)
         if self.cache.seen_chunk(id):
             self.items_ids.append(self.cache.chunk_incref(id))
@@ -85,7 +89,6 @@ class Archive(object):
             self.items_ids.append(self.cache.add_chunk(id, self.items))
         self.items = ''
         self.items_refs = []
-        self.items_prefix = ''
 
     def save(self, name, cache):
         self.id = self.key.archive_hash(name)
@@ -171,27 +174,28 @@ class Archive(object):
                     os.unlink(path)
                 os.link(source, path)
             else:
-                def extract_cb(chunk, error, (id, i, last)):
-                    if i==0:
+                def extract_cb(chunk, error, (id, i)):
+                    if i == 0:
+                        state['fd'] = open(path, 'wb')
                         start_cb(item)
                     assert not error
                     data, hash = self.key.decrypt(chunk)
                     if self.key.id_hash(data) != id:
                         raise IntegrityError('chunk hash did not match')
-                    fd.write(data)
-                    if last:
-                        fd.close()
+                    state['fd'].write(data)
+                    if i == n - 1:
+                        state['fd'].close()
                         self.restore_attrs(path, item)
-
-                fd = open(path, 'wb')
+                state = {}
                 n = len(item['chunks'])
+                ## 0 chunks indicates an empty (0 bytes) file
                 if n == 0:
+                    open(path, 'wb').close()
                     start_cb(item)
                     self.restore_attrs(path, item)
-                    fd.close()
                 else:
                     for i, (id, size, csize) in enumerate(item['chunks']):
-                        self.store.get(NS_CHUNK, id, callback=extract_cb, callback_data=(id, i, i==n-1))
+                        self.store.get(NS_CHUNK, id, callback=extract_cb, callback_data=(id, i))
 
         else:
             raise Exception('Unknown archive item type %r' % item['mode'])

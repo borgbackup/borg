@@ -10,6 +10,25 @@ import stat
 import struct
 import time
 
+class Counter(object):
+
+    __slots__ = ('v',)
+
+    def __init__(self, value=0):
+        self.v = value
+
+    def inc(self, amount=1):
+        self.v += amount
+
+    def dec(self, amount=1):
+        self.v -= amount
+
+    def __cmp__(self, x):
+        return cmp(self.v, x)
+
+    def __repr__(self):
+        return '<Counter(%r)>' % self.v
+
 
 def deferrable(f):
     def wrapper(*args, **kw):

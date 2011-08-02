@@ -7,6 +7,7 @@ import sys
 import getpass
 
 from .store import Store
+from .helpers import Counter
 
 
 BUFSIZE = 1024 * 1024
@@ -16,10 +17,10 @@ class ChannelNotifyer(object):
 
     def __init__(self, channel):
         self.channel = channel
-        self.enabled = 0
+        self.enabled = Counter()
 
     def set(self):
-        if self.enabled:
+        if self.enabled > 0:
             with self.channel.lock:
                 self.channel.out_buffer_cv.notifyAll()
 
@@ -106,6 +107,8 @@ class RemoteStore(object):
         self.channel.exec_command('darc serve')
         self.callbacks = {}
         self.msgid = 0
+        self.recursion = 0
+        self.odata = ''
         self.id, self.tid = self.cmd('open', (location.path, create))
 
     def wait(self, write=True):
@@ -113,39 +116,46 @@ class RemoteStore(object):
             if ((not write or self.channel.out_window_size == 0) and
                 len(self.channel.in_buffer._buffer) == 0 and
                 len(self.channel.in_stderr_buffer._buffer) == 0):
-                self.channel.out_buffer_cv.wait(10)
+                self.channel.out_buffer_cv.wait(1)
 
     def cmd(self, cmd, args, callback=None, callback_data=None):
         self.msgid += 1
-        self.notifier.enabled += 1
-        odata = msgpack.packb((0, self.msgid, cmd, args))
+        self.notifier.enabled.inc()
+        self.odata += msgpack.packb((0, self.msgid, cmd, args))
+        self.recursion += 1
         if callback:
             self.callbacks[self.msgid] = callback, callback_data
+            if self.recursion > 1:
+                self.recursion -= 1
+                return
         while True:
             if self.channel.closed:
+                self.recursion -= 1
                 raise Exception('Connection closed')
             elif self.channel.recv_stderr_ready():
                 print >> sys.stderr, 'remote stderr:', self.channel.recv_stderr(BUFSIZE)
             elif self.channel.recv_ready():
                 self.unpacker.feed(self.channel.recv(BUFSIZE))
                 for type, msgid, error, res in self.unpacker:
-                    self.notifier.enabled -= 1
+                    self.notifier.enabled.dec()
                     if msgid == self.msgid:
                         if error:
                             raise self.RPCError(error)
+                        self.recursion -= 1
                         return res
                     else:
                         c, d = self.callbacks.pop(msgid, (None, None))
                         if c:
                             c(res, error, d)
-            elif odata and self.channel.send_ready():
-                n = self.channel.send(odata)
+            elif self.odata and self.channel.send_ready():
+                n = self.channel.send(self.odata)
                 if n > 0:
-                    odata = odata[n:]
-                if not odata and callback:
+                    self.odata = self.odata[n:]
+                if not self.odata and callback:
+                    self.recursion -= 1
                     return
             else:
-                self.wait(odata)
+                self.wait(self.odata)
 
     def commit(self, *args):
         self.cmd('commit', args)
@@ -176,20 +186,26 @@ class RemoteStore(object):
     def list(self, *args):
         return self.cmd('list', args)
 
-    def flush_rpc(self):
-        while True:
+    def flush_rpc(self, counter=None, backlog=0):
+        counter = counter or self.notifier.enabled
+        while counter > backlog:
             if self.channel.closed:
                 raise Exception('Connection closed')
+            elif self.odata and self.channel.send_ready():
+                n = self.channel.send(self.odata)
+                if n > 0:
+                    self.odata = self.odata[n:]
             elif self.channel.recv_stderr_ready():
                 print >> sys.stderr, 'remote stderr:', self.channel.recv_stderr(BUFSIZE)
             elif self.channel.recv_ready():
                 self.unpacker.feed(self.channel.recv(BUFSIZE))
                 for type, msgid, error, res in self.unpacker:
-                    self.notifier.enabled -= 1
+                    self.notifier.enabled.dec()
                     c, d = self.callbacks.pop(msgid, (None, None))
                     if c:
                         c(res, error, d)
                     if msgid == self.msgid:
                         return
             else:
-                self.wait()
+                self.wait(self.odata)
+

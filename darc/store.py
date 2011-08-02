@@ -211,7 +211,7 @@ class Store(object):
     def list(self, ns, marker=None, limit=1000000):
         return [key for key, value in self.get_index(ns).iteritems(marker=marker, limit=limit)]
 
-    def flush_rpc(self):
+    def flush_rpc(self, *args):
         pass
 
 

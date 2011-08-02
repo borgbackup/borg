@@ -6,7 +6,7 @@ import os
 import socket
 import stat
 import sys
-from zlib import crc32
+from cStringIO import StringIO
 from xattr import xattr, XATTR_NOFOLLOW
 
 from . import NS_ARCHIVE_METADATA, NS_CHUNK
@@ -29,8 +29,7 @@ class Archive(object):
         self.key = key
         self.store = store
         self.cache = cache
-        self.items = ''
-        self.items_refs = []
+        self.items = StringIO()
         self.items_ids = []
         self.hard_links = {}
         if name:
@@ -55,44 +54,41 @@ class Archive(object):
         unpacker = msgpack.Unpacker()
         counter = Counter(0)
         def cb(chunk, error, id):
+            assert not error
             counter.dec()
-            print len(chunk)
             data, items_hash = self.key.decrypt(chunk)
             assert self.key.id_hash(data) == id
             unpacker.feed(data)
             for item in unpacker:
                 callback(item)
         for id, size, csize in self.metadata['items']:
-            # Limit the number of concurrent items requests to 3
+            # Limit the number of concurrent items requests to 10
             self.store.flush_rpc(counter, 10)
             counter.inc()
             self.store.get(NS_CHUNK, id, callback=cb, callback_data=id)
 
-    def add_item(self, item, refs=None):
-        data = msgpack.packb(item)
-        if crc32(item['path'].encode('utf-8')) % 1000 == 0:
+    def add_item(self, item):
+        self.items.write(msgpack.packb(item))
+        if self.items.tell() > 1024 * 1024:
             self.flush_items()
-        if refs:
-            self.items_refs += refs
-        self.items += data
 
-    def flush_items(self):
-        if not self.items:
+    def flush_items(self, flush=False):
+        if self.items.tell() == 0:
             return
-        print 'flush', len(self.items)
-        id = self.key.id_hash(self.items)
-        if self.cache.seen_chunk(id):
-            self.items_ids.append(self.cache.chunk_incref(id))
-            for id in self.items_refs:
-                self.cache.chunk_decref(id)
+        self.items.seek(0)
+        chunks = list(str(s) for s in chunkify(self.items, CHUNK_SIZE, WINDOW_SIZE, self.key.chunk_seed))
+        self.items.seek(0)
+        self.items.truncate()
+        for chunk in chunks[:-1]:
+            self.items_ids.append(self.cache.add_chunk(self.key.id_hash(chunk), chunk))
+        if flush or len(chunks) == 1:
+            self.items_ids.append(self.cache.add_chunk(self.key.id_hash(chunks[-1]), chunks[-1]))
         else:
-            self.items_ids.append(self.cache.add_chunk(id, self.items))
-        self.items = ''
-        self.items_refs = []
+            self.items.write(chunks[-1])
 
     def save(self, name, cache):
         self.id = self.key.archive_hash(name)
-        self.flush_items()
+        self.flush_items(flush=True)
         metadata = {
             'version': 1,
             'name': name,
@@ -110,7 +106,7 @@ class Archive(object):
     def stats(self, cache):
         # This function is a bit evil since it abuses the cache to calculate
         # the stats. The cache transaction must be rolled back afterwards
-        def cb(chunk, error, (id, unique)):
+        def cb(chunk, error, id):
             assert not error
             data, items_hash = self.key.decrypt(chunk)
             assert self.key.id_hash(data) == id
@@ -121,7 +117,7 @@ class Archive(object):
                         count, _, _ = self.cache.chunks[id]
                         stats['osize'] += size
                         stats['csize'] += csize
-                        if unique and count == 1:
+                        if count == 1:
                             stats['usize'] += csize
                         self.cache.chunks[id] = count - 1, size, csize
                 except KeyError:
@@ -132,10 +128,9 @@ class Archive(object):
         for id, size, csize in self.metadata['items']:
             stats['osize'] += size
             stats['csize'] += csize
-            unique = self.cache.seen_chunk(id) == 1
-            if unique:
+            if self.cache.seen_chunk(id) == 1:
                 stats['usize'] += csize
-            self.store.get(NS_CHUNK, id, callback=cb, callback_data=(id, unique))
+            self.store.get(NS_CHUNK, id, callback=cb, callback_data=id)
             self.cache.chunk_decref(id)
         self.store.flush_rpc()
         cache.rollback()
@@ -256,10 +251,7 @@ class Archive(object):
             self.cache.chunk_decref(id)
         unpacker = msgpack.Unpacker()
         for id, size, csize in self.metadata['items']:
-            if self.cache.seen_chunk(id) == 1:
-                self.store.get(NS_CHUNK, id, callback=callback, callback_data=id)
-            else:
-                self.cache.chunk_decref(id)
+            self.store.get(NS_CHUNK, id, callback=callback, callback_data=id)
         self.store.flush_rpc()
         self.store.delete(NS_ARCHIVE_METADATA, self.id)
         self.store.commit()
@@ -335,7 +327,7 @@ class Archive(object):
             cache.memorize_file(path_hash, st, ids)
         item = {'path': safe_path, 'chunks': chunks}
         item.update(self.stat_attrs(st, path))
-        self.add_item(item, ids)
+        self.add_item(item)
 
     @staticmethod
     def list_archives(store, key):

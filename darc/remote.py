@@ -1,3 +1,4 @@
+from __future__ import with_statement
 import fcntl
 import msgpack
 import os

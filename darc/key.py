@@ -20,12 +20,21 @@ class Key(object):
 
     def __init__(self, store=None):
         if store:
-            self.open(store)
+            self.open(self.find_key_file(store))
 
-    def open(self, store):
-        path = os.path.join(os.path.expanduser('~'),
-                            '.darc', 'keys', store.id.encode('hex'))
-        with open(path, 'rb') as fd:
+    def find_key_file(self, store):
+        id = store.id.encode('hex')
+        keys_dir = os.path.join(os.path.expanduser('~'), '.darc', 'keys')
+        for name in os.listdir(keys_dir):
+            filename = os.path.join(keys_dir, name)
+            with open(filename, 'rb') as fd:
+                line = fd.readline().strip()
+                if line and line.startswith(self.FILE_ID) and line[9:] == id:
+                    return filename
+        raise Exception('Key file for store with ID %s not found' % id)
+
+    def open(self, filename):
+        with open(filename, 'rb') as fd:
             lines = fd.readlines()
             if not lines[0].startswith(self.FILE_ID) != self.FILE_ID:
                 raise ValueError('Not a DARC key file')
@@ -90,7 +99,7 @@ class Key(object):
         with open(path, 'wb') as fd:
             fd.write('%s %s\n' % (self.FILE_ID, self.store_id.encode('hex')))
             fd.write(data.encode('base64'))
-            print 'Key chain "%s" created' % path
+            print 'Key file "%s" created' % path
 
     def chpass(self):
         password, password2 = 1, 2
@@ -103,12 +112,12 @@ class Key(object):
         return 0
 
     @staticmethod
-    def create(store):
-        path = os.path.join(os.path.expanduser('~'),
-                            '.darc', 'keys', store.id.encode('hex'))
-        if os.path.exists(path):
-            print '%s already exists' % path
-            return 1
+    def create(store, filename):
+        i = 1
+        path = filename
+        while os.path.exists(path):
+            i += 1
+            path = filename + '.%d' % i
         password, password2 = 1, 2
         while password != password2:
             password = getpass('Keychain password: ')

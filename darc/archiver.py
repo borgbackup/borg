@@ -46,7 +46,7 @@ class Archiver(object):
 
     def do_init(self, args):
         store = self.open_store(args.store, create=True)
-        key = Key.create(store)
+        key = Key.create(store, args.store.to_key_filename())
 
     def do_create(self, args):
         store = self.open_store(args.archive)

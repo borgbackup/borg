@@ -284,6 +284,12 @@ class Location(object):
         items.append('archive=%r' % self.archive)
         return ', '.join(items)
 
+    def to_key_filename(self):
+        name = re.sub('[^\w]', '_', self.path).strip('_')
+        if self.proto != 'file':
+            name = self.host + '__' + name
+        return os.path.join(os.path.expanduser('~'), '.darc', 'keys', name)
+
     def __repr__(self):
         return "Location(%s)" % self
 

@@ -202,7 +202,7 @@ class Archive(object):
             for k, v in xattrs.items():
                 try:
                     xa.set(k, v)
-                except KeyError:
+                except (IOError, KeyError):
                     pass
         if have_lchmod:
             os.lchmod(path, item['mode'])

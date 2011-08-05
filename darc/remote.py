@@ -109,7 +109,7 @@ class RemoteStore(object):
         self.callbacks = {}
         self.msgid = 0
         self.recursion = 0
-        self.odata = ''
+        self.odata = []
         self.id, self.tid = self.cmd('open', (location.path, create))
 
     def wait(self, write=True):
@@ -122,7 +122,7 @@ class RemoteStore(object):
     def cmd(self, cmd, args, callback=None, callback_data=None):
         self.msgid += 1
         self.notifier.enabled.inc()
-        self.odata += msgpack.packb((0, self.msgid, cmd, args))
+        self.odata.append(msgpack.packb((1, self.msgid, cmd, args)))
         self.recursion += 1
         if callback:
             self.callbacks[self.msgid] = callback, callback_data
@@ -141,6 +141,7 @@ class RemoteStore(object):
                     self.notifier.enabled.dec()
                     if msgid == self.msgid:
                         if error:
+                            self.recursion -= 1
                             raise self.RPCError(error)
                         self.recursion -= 1
                         return res
@@ -149,9 +150,10 @@ class RemoteStore(object):
                         if c:
                             c(res, error, d)
             elif self.odata and self.channel.send_ready():
-                n = self.channel.send(self.odata)
-                if n > 0:
-                    self.odata = self.odata[n:]
+                data = self.odata.pop(0)
+                n = self.channel.send(data)
+                if n != len(data):
+                    self.odata.insert(0, data[n:])
                 if not self.odata and callback:
                     self.recursion -= 1
                     return

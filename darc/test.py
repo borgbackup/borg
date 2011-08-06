@@ -24,19 +24,22 @@ class Test(unittest.TestCase):
         self.store_path = os.path.join(self.tmpdir, 'store')
         self.input_path = os.path.join(self.tmpdir, 'input')
         self.output_path = os.path.join(self.tmpdir, 'output')
+        self.keys_path = os.path.join(self.tmpdir, 'keys')
+        self.cache_path = os.path.join(self.tmpdir, 'cache')
+        os.environ['DARC_KEYS_DIR'] = self.keys_path
+        os.environ['DARC_CACHE_DIR'] = self.cache_path
         os.mkdir(self.input_path)
         os.mkdir(self.output_path)
+        os.mkdir(self.keys_path)
+        os.mkdir(self.cache_path)
         os.chdir(self.tmpdir)
-        self.keychain = '/tmp/_test_dedupstore.keychain'
-        if not os.path.exists(self.keychain):
-            self.darc('init-keychain')
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
 
     def darc(self, *args, **kwargs):
         exit_code = kwargs.get('exit_code', 0)
-        args = ['--keychain', self.keychain] + list(args)
+        args = list(args)
         try:
             stdout, stderr = sys.stdout, sys.stderr
             output = StringIO()
@@ -52,6 +55,7 @@ class Test(unittest.TestCase):
 
     def create_src_archive(self, name):
         src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__))
+        self.darc('init', '--password', '', self.store_path)
         self.darc('create', self.store_path + '::' + name, src_dir)
 
     def create_regual_file(self, name, size=0):
@@ -96,6 +100,7 @@ class Test(unittest.TestCase):
                 os.path.join(self.input_path, 'hardlink'))
         os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
         os.mkfifo(os.path.join(self.input_path, 'fifo1'))
+        self.darc('init', '-p', '', self.store_path)
         self.darc('create', self.store_path + '::test', 'input')
         self.darc('create', self.store_path + '::test.2', 'input')
         self.darc('extract', self.store_path + '::test', 'output')
@@ -109,13 +114,6 @@ class Test(unittest.TestCase):
         fd.write('X')
         fd.close()
         self.darc('verify', self.store_path + '::test', exit_code=1)
-
-    def test_keychain(self):
-        keychain = os.path.join(self.tmpdir, 'keychain')
-        keychain2 = os.path.join(self.tmpdir, 'keychain2')
-        self.darc('-k', keychain, 'init-keychain')
-        self.darc('-k', keychain, 'change-password')
-        self.darc('-k', keychain, 'export-restricted', keychain2)
 
 
 def suite():

@@ -12,7 +12,7 @@ from Crypto.Util import Counter
 from Crypto.Util.number import bytes_to_long, long_to_bytes
 from Crypto.Random import get_random_bytes
 
-from .helpers import IntegrityError
+from .helpers import IntegrityError, get_keys_dir
 
 
 class Key(object):
@@ -24,7 +24,7 @@ class Key(object):
 
     def find_key_file(self, store):
         id = store.id.encode('hex')
-        keys_dir = os.path.join(os.path.expanduser('~'), '.darc', 'keys')
+        keys_dir = get_keys_dir()
         for name in os.listdir(keys_dir):
             filename = os.path.join(keys_dir, name)
             with open(filename, 'rb') as fd:
@@ -112,13 +112,16 @@ class Key(object):
         return 0
 
     @staticmethod
-    def create(store, filename):
+    def create(store, filename, password=None):
         i = 1
         path = filename
         while os.path.exists(path):
             i += 1
             path = filename + '.%d' % i
-        password, password2 = 1, 2
+        if password is not None:
+            password2 = password
+        else:
+            password, password2 = 1, 2
         while password != password2:
             password = getpass('Keychain password: ')
             password2 = getpass('Keychain password again: ')

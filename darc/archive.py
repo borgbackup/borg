@@ -54,6 +54,8 @@ class Archive(object):
         unpacker = msgpack.Unpacker()
         counter = Counter(0)
         def cb(chunk, error, id):
+            if error:
+                raise error
             assert not error
             counter.dec()
             data, items_hash = self.key.decrypt(chunk)
@@ -220,9 +222,10 @@ class Archive(object):
 
     def verify_file(self, item, start, result):
         def verify_chunk(chunk, error, (id, i, last)):
+            if error:
+                raise error
             if i == 0:
                 start(item)
-            assert not error
             data, hash = self.key.decrypt(chunk)
             if self.key.id_hash(data) != id:
                 result(item, False)

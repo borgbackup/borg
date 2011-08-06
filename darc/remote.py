@@ -171,7 +171,6 @@ class RemoteStore(object):
         try:
             return self.cmd('get', (ns, id), callback, callback_data)
         except self.RPCError, e:
-            print e.name
             if e.name == 'DoesNotExist':
                 raise self.DoesNotExist
             raise

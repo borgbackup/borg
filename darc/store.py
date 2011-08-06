@@ -270,9 +270,8 @@ class BandIO(object):
         fd.seek(offset)
         data = fd.read(self.header_fmt.size)
         size, magic, hash, ns_, id_ = self.header_fmt.unpack(data)
-        assert magic == 0
-        assert ns == ns_
-        assert id == id_
+        if magic != 0 or ns != ns_ or id != id_:
+            raise IntegrityError('Invalid band entry header')
         data = fd.read(size - self.header_fmt.size)
         if crc32(data) & 0xffffffff != hash:
             raise IntegrityError('Band checksum mismatch')
@@ -281,12 +280,14 @@ class BandIO(object):
     def iter_objects(self, band, lookup):
         fd = self.get_fd(band)
         fd.seek(0)
-        assert fd.read(8) == 'DARCBAND'
+        if fd.read(8) != 'DARCBAND':
+            raise IntegrityError('Invalid band header')
         offset = 8
         data = fd.read(self.header_fmt.size)
         while data:
             size, magic, hash, ns, key = self.header_fmt.unpack(data)
-            assert magic == 0
+            if magic != 0:
+                raise IntegrityError('Unknown band entry header')
             offset += size
             if lookup(ns, key):
                 data = fd.read(size - self.header_fmt.size)

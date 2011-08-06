@@ -30,15 +30,28 @@ class Counter(object):
         return '<Counter(%r)>' % self.v
 
 
+def get_keys_dir():
+    """Determine where to store keys and cache"""
+    return os.environ.get('DARC_KEYS_DIR',
+                          os.path.join(os.path.expanduser('~'), '.darc', 'keys'))
+
+def get_cache_dir():
+    """Determine where to store keys and cache"""
+    return os.environ.get('DARC_CACHE_DIR',
+                          os.path.join(os.path.expanduser('~'), '.darc', 'cache'))
+
+
 def deferrable(f):
     def wrapper(*args, **kw):
         callback = kw.pop('callback', None)
         if callback:
             data = kw.pop('callback_data', None)
             try:
-                callback(f(*args, **kw), None, data)
+                res = f(*args, **kw)
             except Exception, e:
                 callback(None, e, data)
+            else:
+                callback(res, None, data)
         else:
             return f(*args, **kw)
     return wrapper
@@ -288,7 +301,7 @@ class Location(object):
         name = re.sub('[^\w]', '_', self.path).strip('_')
         if self.proto != 'file':
             name = self.host + '__' + name
-        return os.path.join(os.path.expanduser('~'), '.darc', 'keys', name)
+        return os.path.join(get_keys_dir(), name)
 
     def __repr__(self):
         return "Location(%s)" % self

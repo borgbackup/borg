@@ -6,7 +6,7 @@ import os
 import shutil
 
 from . import NS_CHUNK, NS_ARCHIVE_METADATA
-from .helpers import error_callback
+from .helpers import error_callback, get_cache_dir
 from .hashindex import ChunkIndex
 
 
@@ -18,7 +18,7 @@ class Cache(object):
         self.txn_active = False
         self.store = store
         self.key = key
-        self.path = os.path.join(Cache.cache_dir_path(), self.store.id.encode('hex'))
+        self.path = os.path.join(get_cache_dir(), self.store.id.encode('hex'))
         if not os.path.exists(self.path):
             self.create()
         self.open()
@@ -26,11 +26,6 @@ class Cache(object):
         if self.tid != store.tid:
             self.sync()
             self.commit()
-
-    @staticmethod
-    def cache_dir_path():
-        """Return path to directory used for storing users cache files"""
-        return os.path.join(os.path.expanduser('~'), '.darc', 'cache')
 
     def create(self):
         """Create a new empty store at `path`

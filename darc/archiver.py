@@ -10,7 +10,8 @@ from .store import Store
 from .cache import Cache
 from .key import Key
 from .helpers import location_validator, format_file_size, format_time,\
-    format_file_mode, IncludePattern, ExcludePattern, exclude_path, to_localtime
+    format_file_mode, IncludePattern, ExcludePattern, exclude_path, to_localtime, \
+    get_cache_dir
 from .remote import StoreServer, RemoteStore
 
 class Archiver(object):
@@ -46,7 +47,9 @@ class Archiver(object):
 
     def do_init(self, args):
         store = self.open_store(args.store, create=True)
-        key = Key.create(store, args.store.to_key_filename())
+        key = Key.create(store, args.store.to_key_filename(),
+                         password=args.password)
+        return self.exit_code
 
     def do_create(self, args):
         store = self.open_store(args.archive)
@@ -63,7 +66,7 @@ class Archiver(object):
         # Add darc cache dir to inode_skip list
         skip_inodes = set()
         try:
-            st = os.stat(Cache.cache_dir_path())
+            st = os.stat(get_cache_dir())
             skip_inodes.add((st.st_ino, st.st_dev))
         except IOError:
             pass
@@ -232,7 +235,9 @@ class Archiver(object):
 
         subparser = subparsers.add_parser('init')
         subparser.set_defaults(func=self.do_init)
-        subparser.add_argument('store', metavar='ARCHIVE',
+        subparser.add_argument('-p', '--password', dest='password',
+                               help='Protect store key with password (Default: prompt)')
+        subparser.add_argument('store',
                                type=location_validator(archive=False),
                                help='Store to create')
 

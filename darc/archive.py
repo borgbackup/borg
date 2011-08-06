@@ -221,7 +221,7 @@ class Archive(object):
             os.utime(path, (item['mtime'], item['mtime']))
 
     def verify_file(self, item, start, result):
-        def verify_chunk(chunk, error, (id, i, last)):
+        def verify_chunk(chunk, error, (id, i)):
             if error:
                 raise error
             if i == 0:
@@ -229,7 +229,7 @@ class Archive(object):
             data, hash = self.key.decrypt(chunk)
             if self.key.id_hash(data) != id:
                 result(item, False)
-            elif last:
+            elif i == n - 1:
                 result(item, True)
         n = len(item['chunks'])
         if n == 0:
@@ -237,13 +237,14 @@ class Archive(object):
             result(item, True)
         else:
             for i, (id, size, csize) in enumerate(item['chunks']):
-                self.store.get(NS_CHUNK, id, callback=verify_chunk, callback_data=(id, i, i==n-1))
+                self.store.get(NS_CHUNK, id, callback=verify_chunk, callback_data=(id, i))
 
     def delete(self, cache):
         def callback(chunk, error, id):
             assert not error
             data, items_hash = self.key.decrypt(chunk)
-            assert self.key.id_hash(data) == id
+            if self.key.id_hash(data) != id:
+                raise IntegrityError('Chunk checksum mismatch')
             unpacker.feed(data)
             for item in unpacker:
                 try:

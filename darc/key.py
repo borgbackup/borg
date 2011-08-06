@@ -50,7 +50,8 @@ class Key(object):
             if not data:
                 print 'Incorrect password'
         key = msgpack.unpackb(data)
-        assert key['version'] == 1
+        if key['version'] != 1:
+            raise IntegrityError('Invalid key file header')
         self.store_id = key['store_id']
         self.enc_key = key['enc_key']
         self.enc_hmac_key = key['enc_hmac_key']
@@ -161,10 +162,11 @@ class Key(object):
         return ''.join(('\0', hash, data)), hash
 
     def decrypt(self, data):
-        assert data[0] == '\0'
+        if data[0] != '\0':
+            raise IntegrityError('Invalid encryption envelope')
         hash = data[1:33]
         if HMAC.new(self.enc_hmac_key, data[33:], SHA256).digest() != hash:
-            raise IntegrityError('Encryption integrity error')
+            raise IntegrityError('Encryption envelope checksum mismatch')
         nonce = bytes_to_long(data[33:49])
         counter = Counter.new(128, initial_value=nonce, allow_wraparound=True)
         data = AES.new(self.enc_key, AES.MODE_CTR, counter=counter).decrypt(data[49:])

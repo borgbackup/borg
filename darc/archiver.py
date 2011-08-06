@@ -233,7 +233,7 @@ class Archiver(object):
         t0 = date.today() + timedelta(days=1) # Tomorrow
         daily = weekly = monthly = 0
         for archive in archives:
-            t = archive.ts.date()
+            t = to_localtime(archive.ts).date()
             if daily < args.daily and t < t0:
                 daily += 1
                 self.print_verbose('Archive "%s" is daily archive number %d',

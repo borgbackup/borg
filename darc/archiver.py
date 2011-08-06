@@ -1,5 +1,5 @@
 import argparse
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from operator import attrgetter
 import os
 import stat
@@ -217,6 +217,48 @@ class Archiver(object):
         print 'Unique data:', format_file_size(stats['usize'])
         return self.exit_code
 
+    def do_purge(self, args):
+        store = self.open_store(args.store)
+        key = Key(store)
+        cache = Cache(store, key)
+        archives = list(sorted(Archive.list_archives(store, key, cache),
+                               key=attrgetter('ts'), reverse=True))
+        num_daily = args.daily
+        num_weekly = args.weekly
+        num_monthly = args.monthly
+        if args.daily + args.weekly + args.monthly == 0:
+            self.print_error('At least one of the "daily", "weekly", "monthly" '
+                             'settings must be specified')
+            return 1
+        t0 = date.today() + timedelta(days=1) # Tomorrow
+        daily = weekly = monthly = 0
+        for archive in archives:
+            t = archive.ts.date()
+            if daily < args.daily and t < t0:
+                daily += 1
+                self.print_verbose('Archive "%s" is daily archive number %d',
+                                   archive.metadata['name'], daily)
+                t0 = t
+            elif weekly < args.weekly and t < t0 and t.weekday() == 1:
+                weekly += 1
+                self.print_verbose('Archive "%s" is weekly archive number %d',
+                                   archive.metadata['name'], weekly)
+                t0 = t
+            elif monthly < args.monthly and t < t0 and t.day == 1:
+                num_weekly += 1
+                self.print_verbose('Archive "%s" is monthly archive number %d',
+                                   archive.metadata['name'], monthly)
+                t0 = t
+            else:
+                self.print_verbose('Purging archive %s', archive.metadata['name'])
+                if args.really:
+                    archive.delete(cache)
+                else:
+                    print ('Archive "%s" marked for deletion. '
+                           'Use the "--really" option to actually delete it'
+                           % archive.metadata['name'])
+        return self.exit_code
+
     def run(self, args=None):
         dot_path = os.path.join(os.path.expanduser('~'), '.darc')
         if not os.path.exists(dot_path):
@@ -292,11 +334,26 @@ class Archiver(object):
                                type=location_validator(archive=True),
                                help='Archive to verity integrity of')
 
-        subparser= subparsers.add_parser('info')
+        subparser = subparsers.add_parser('info')
         subparser.set_defaults(func=self.do_info)
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='Archive to display information about')
+
+        subparser = subparsers.add_parser('purge')
+        subparser.set_defaults(func=self.do_purge)
+        subparser.add_argument('-d', '--daily', dest='daily', type=int, default=0,
+                               help='Number of daily archives to keep')
+        subparser.add_argument('-w', '--weekly', dest='weekly', type=int, default=0,
+                               help='Number of daily archives to keep')
+        subparser.add_argument('-m', '--monthly', dest='monthly', type=int, default=0,
+                               help='Number of monthly archives to keep')
+        subparser.add_argument('-r', '--really', dest='really',
+                               action='store_true', default=False,
+                               help='Actually delete archives')
+        subparser.add_argument('store', metavar='STORE',
+                               type=location_validator(archive=False),
+                               help='Store to purge')
 
         args = parser.parse_args(args)
         self.verbose = args.verbose

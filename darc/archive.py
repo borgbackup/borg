@@ -334,9 +334,9 @@ class Archive(object):
         self.add_item(item)
 
     @staticmethod
-    def list_archives(store, key):
+    def list_archives(store, key, cache=None):
         for id in list(store.list(NS_ARCHIVE_METADATA)):
-            archive = Archive(store, key)
+            archive = Archive(store, key, cache=cache)
             archive.load(id)
             yield archive
 

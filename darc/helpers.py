@@ -8,7 +8,20 @@ import pwd
 import re
 import stat
 import struct
+import sys
 import time
+import urllib
+
+# OSX filenames are UTF-8 Only so any non-utf8 filenames are url encoded
+if sys.platform == 'darwin':
+    def encode_filename(name):
+        try:
+            name.decode('utf-8')
+            return name
+        except UnicodeDecodeError:
+            return urllib.quote(name)
+else:
+    encode_filename = str
 
 class Counter(object):
 

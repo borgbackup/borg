@@ -27,16 +27,12 @@ class Archiver(object):
 
     def print_error(self, msg, *args):
         msg = args and msg % args or msg
-        if hasattr(sys.stderr, 'encoding'):
-            msg = msg.encode(sys.stderr.encoding or 'utf-8', 'ignore')
         self.exit_code = 1
         print >> sys.stderr, msg
 
     def print_verbose(self, msg, *args, **kw):
         if self.verbose:
             msg = args and msg % args or msg
-            if hasattr(sys.stdout, 'encoding'):
-                msg = msg.encode(sys.stdout.encoding or 'utf-8', 'ignore')
             if kw.get('newline', True):
                 print msg
             else:
@@ -78,7 +74,7 @@ class Archiver(object):
             except IOError:
                 pass
         for path in args.paths:
-            self._process(archive, cache, args.patterns, skip_inodes, unicode(path))
+            self._process(archive, cache, args.patterns, skip_inodes, path)
         archive.save(args.archive.archive, cache)
         return self.exit_code
 
@@ -117,7 +113,7 @@ class Archiver(object):
 
     def do_extract(self, args):
         def start_cb(item):
-            self.print_verbose(item['path'].decode('utf-8'))
+            self.print_verbose(item['path'])
         def extract_cb(item):
             if exclude_path(item['path'], args.patterns):
                 return
@@ -185,7 +181,7 @@ class Archiver(object):
         key = Key(store)
         archive = Archive(store, key, args.archive.archive)
         def start_cb(item):
-            self.print_verbose('%s ...', item['path'].decode('utf-8'), newline=False)
+            self.print_verbose('%s ...', item['path'], newline=False)
         def result_cb(item, success):
             if success:
                 self.print_verbose('OK')

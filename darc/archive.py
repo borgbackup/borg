@@ -11,7 +11,8 @@ from xattr import xattr, XATTR_NOFOLLOW
 
 from . import NS_ARCHIVE_METADATA, NS_CHUNK
 from ._speedups import chunkify
-from .helpers import uid2user, user2uid, gid2group, group2gid, IntegrityError, Counter
+from .helpers import uid2user, user2uid, gid2group, group2gid, IntegrityError, \
+    Counter, encode_filename
 
 CHUNK_SIZE = 64 * 1024
 WINDOW_SIZE = 4096
@@ -142,7 +143,7 @@ class Archive(object):
         dest = dest or os.getcwdu()
         dir_stat_queue = []
         assert item['path'][0] not in ('/', '\\', ':')
-        path = os.path.join(dest, item['path'].decode('utf-8'))
+        path = os.path.join(dest, encode_filename(item['path']))
         mode = item['mode']
         if stat.S_ISDIR(mode):
             if not os.path.exists(path):
@@ -166,7 +167,7 @@ class Archive(object):
                 os.makedirs(os.path.dirname(path))
             # Hard link?
             if 'source' in item:
-                source = os.path.join(dest, item['source'].decode('utf-8'))
+                source = os.path.join(dest, item['source'])
                 if os.path.exists(path):
                     os.unlink(path)
                 os.link(source, path)
@@ -310,7 +311,7 @@ class Archive(object):
                 return
             else:
                 self.hard_links[st.st_ino, st.st_dev] = safe_path
-        path_hash = self.key.id_hash(path.encode('utf-8'))
+        path_hash = self.key.id_hash(path)
         ids = cache.file_known_and_unchanged(path_hash, st)
         chunks = None
         if ids is not None:

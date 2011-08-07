@@ -11,7 +11,7 @@ from .cache import Cache
 from .key import Key
 from .helpers import location_validator, format_file_size, format_time,\
     format_file_mode, IncludePattern, ExcludePattern, exclude_path, to_localtime, \
-    get_cache_dir
+    get_cache_dir, day_of_year
 from .remote import StoreServer, RemoteStore
 
 class Archiver(object):
@@ -224,31 +224,39 @@ class Archiver(object):
         num_daily = args.daily
         num_weekly = args.weekly
         num_monthly = args.monthly
-        if args.daily + args.weekly + args.monthly == 0:
-            self.print_error('At least one of the "daily", "weekly", "monthly" '
+        num_yearly = args.yearly
+        if args.daily + args.weekly + args.monthly + args.yearly == 0:
+            self.print_error('At least one of the "daily", "weekly", "monthly" or "yearly" '
                              'settings must be specified')
             return 1
         t0 = date.today() + timedelta(days=1) # Tomorrow
-        daily = weekly = monthly = 0
+        daily = weekly = monthly = yearly = 0
         for archive in archives:
+            if args.prefix and not archive.name.startswith(args.prefix):
+                continue
             t = to_localtime(archive.ts).date()
             if daily < args.daily and t < t0:
                 daily += 1
                 self.print_verbose('Archive "%s" is daily archive number %d',
-                                   archive.metadata['name'], daily)
+                                   archive.name, daily)
                 t0 = t
             elif weekly < args.weekly and t < t0 and t.weekday() == 1:
                 weekly += 1
                 self.print_verbose('Archive "%s" is weekly archive number %d',
-                                   archive.metadata['name'], weekly)
+                                   archive.name, weekly)
                 t0 = t
             elif monthly < args.monthly and t < t0 and t.day == 1:
-                num_weekly += 1
+                monthly += 1
                 self.print_verbose('Archive "%s" is monthly archive number %d',
-                                   archive.metadata['name'], monthly)
+                                   archive.name, monthly)
+                t0 = t
+            elif yearly < args.yearly and t < t0 and day_of_year(t) == 1:
+                yearly += 1
+                self.print_verbose('Archive "%s" is yearly archive number %d',
+                                   archive.name, yearly)
                 t0 = t
             else:
-                self.print_verbose('Purging archive %s', archive.metadata['name'])
+                self.print_verbose('Purging archive %s', archive.name)
                 if args.really:
                     archive.delete(cache)
                 else:
@@ -346,6 +354,10 @@ class Archiver(object):
                                help='Number of daily archives to keep')
         subparser.add_argument('-m', '--monthly', dest='monthly', type=int, default=0,
                                help='Number of monthly archives to keep')
+        subparser.add_argument('-y', '--yearly', dest='yearly', type=int, default=0,
+                               help='Number of yearly archives to keep')
+        subparser.add_argument('-p', '--prefix', dest='prefix', type=str,
+                               help='Only consider archive names starting with this prefix')
         subparser.add_argument('-r', '--really', dest='really',
                                action='store_true', default=False,
                                help='Actually delete archives')

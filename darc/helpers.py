@@ -12,6 +12,12 @@ import sys
 import time
 import urllib
 
+
+def day_of_year(d):
+    """Calculate the "day of year" from a date object"""
+    return int(d.strftime('%j'))
+
+
 # OSX filenames are UTF-8 Only so any non-utf8 filenames are url encoded
 if sys.platform == 'darwin':
     def encode_filename(name):
@@ -22,6 +28,7 @@ if sys.platform == 'darwin':
             return urllib.quote(name)
 else:
     encode_filename = str
+
 
 class Counter(object):
 
@@ -48,6 +55,7 @@ def get_keys_dir():
     return os.environ.get('DARC_KEYS_DIR',
                           os.path.join(os.path.expanduser('~'), '.darc', 'keys'))
 
+
 def get_cache_dir():
     """Determine where to store keys and cache"""
     return os.environ.get('DARC_CACHE_DIR',
@@ -69,13 +77,16 @@ def deferrable(f):
             return f(*args, **kw)
     return wrapper
 
+
 def error_callback(res, error, data):
     if res:
         raise res
 
+
 def to_localtime(ts):
     """Convert datetime object from UTC to local time zone"""
     return ts - timedelta(seconds=time.altzone)
+
 
 def read_set(path):
     """Read set from disk (as int32s)

@@ -43,7 +43,9 @@ class Archive(object):
         except self.store.DoesNotExist:
             raise self.DoesNotExist
         self.metadata = msgpack.unpackb(data)
-        assert self.metadata['version'] == 1
+        if self.metadata['version'] != 1:
+            raise Exception('Unknown archive metadata version')
+        self.name = self.metadata['name']
 
     @property
     def ts(self):

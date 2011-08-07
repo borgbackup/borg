@@ -82,6 +82,7 @@ class Archiver(object):
             diff = t - t0
             print '-' * 40
             print 'Archive name: %s' % args.archive.archive
+            print 'Archive fingerprint: %s' % archive.hash.encode('hex')
             print 'Start time: %s' % t0.strftime('%c')
             print 'End time: %s' % t.strftime('%c')
             print 'Duration: %.2f (%s)' % (diff.total_seconds(), format_timedelta(diff))
@@ -219,10 +220,11 @@ class Archiver(object):
         cache = Cache(store, key)
         archive = Archive(store, key, args.archive.archive, cache=cache)
         stats = archive.calc_stats(cache)
-        print 'Name:', archive.metadata['name']
+        print 'Name:', archive.name
+        print 'Fingerprint: %s' % archive.hash.encode('hex')
         print 'Hostname:', archive.metadata['hostname']
         print 'Username:', archive.metadata['username']
-        print 'Time:', archive.metadata['time']
+        print 'Time:', to_localtime(archive.ts).strftime('%c')
         print 'Command line:', ' '.join(archive.metadata['cmdline'])
         stats.print_()
         return self.exit_code

@@ -16,7 +16,7 @@ import urllib
 class Statistics(object):
 
     def __init__(self):
-        self.osize = self.csize = self.usize = 0
+        self.osize = self.csize = self.usize = self.nfiles = 0
 
     def update(self, size, csize, unique):
         self.osize += size
@@ -25,6 +25,7 @@ class Statistics(object):
             self.usize += csize
 
     def print_(self):
+        print 'Number of files: %d' % self.nfiles
         print 'Original size: %d (%s)' % (self.osize, format_file_size(self.osize))
         print 'Compressed size: %s (%s)'% (self.csize, format_file_size(self.csize))
         print 'Unique data: %d (%s)' % (self.usize, format_file_size(self.usize))

@@ -125,6 +125,7 @@ class Archive(object):
                     for id, size, csize in item['chunks']:
                         count, _, _ = self.cache.chunks[id]
                         stats.update(size, csize, count==1)
+                        stats.nfiles += 1
                         self.cache.chunks[id] = count - 1, size, csize
                 except KeyError:
                     pass
@@ -333,6 +334,7 @@ class Archive(object):
             cache.memorize_file(path_hash, st, ids)
         item = {'path': safe_path, 'chunks': chunks}
         item.update(self.stat_attrs(st, path))
+        self.stats.nfiles += 1
         self.add_item(item)
 
     @staticmethod

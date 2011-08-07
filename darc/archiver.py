@@ -117,9 +117,11 @@ class Archiver(object):
         def extract_cb(item):
             if exclude_path(item['path'], args.patterns):
                 return
-            archive.extract_item(item, args.dest, start_cb)
             if stat.S_ISDIR(item['mode']):
                 dirs.append(item)
+                archive.extract_item(item, args.dest, start_cb, restore_attrs=False)
+            else:
+                archive.extract_item(item, args.dest, start_cb)
             if dirs and not item['path'].startswith(dirs[-1]['path']):
                 # Extract directories twice to make sure mtime is correctly restored
                 archive.extract_item(dirs.pop(-1), args.dest)

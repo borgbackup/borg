@@ -139,7 +139,7 @@ class Archive(object):
         cache.rollback()
         return stats
 
-    def extract_item(self, item, dest=None, start_cb=None):
+    def extract_item(self, item, dest=None, start_cb=None, restore_attrs=True):
         dest = dest or os.getcwdu()
         dir_stat_queue = []
         assert item['path'][0] not in ('/', '\\', ':')
@@ -148,7 +148,8 @@ class Archive(object):
         if stat.S_ISDIR(mode):
             if not os.path.exists(path):
                 os.makedirs(path)
-            self.restore_attrs(path, item)
+            if restore_attrs:
+                self.restore_attrs(path, item)
         elif stat.S_ISFIFO(mode):
             if not os.path.exists(os.path.dirname(path)):
                 os.makedirs(os.path.dirname(path))

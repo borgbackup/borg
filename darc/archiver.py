@@ -99,6 +99,9 @@ class Archiver(object):
             return
         if (st.st_ino, st.st_dev) in skip_inodes:
             return
+        # Ignore unix sockets
+        if stat.S_ISSOCK(st.st_mode):
+            return
         self.print_verbose(path)
         if stat.S_ISDIR(st.st_mode):
             archive.process_dir(path, st)

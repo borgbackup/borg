@@ -152,26 +152,28 @@ class Cache(object):
                 self.store.get(NS_CHUNK, id, callback=cb, callback_data=id)
             self.store.flush_rpc()
 
-    def add_chunk(self, id, data):
+    def add_chunk(self, id, data, stats):
         if not self.txn_active:
             self.begin_txn()
         if self.seen_chunk(id):
-            return self.chunk_incref(id)
+            return self.chunk_incref(id, stats)
         size = len(data)
         data, hash = self.key.encrypt(data)
         csize = len(data)
         self.store.put(NS_CHUNK, id, data, callback=error_callback)
         self.chunks[id] = (1, size, csize)
+        stats.update(size, csize, True)
         return id, size, csize
 
     def seen_chunk(self, id):
         return self.chunks.get(id, (0, 0, 0))[0]
 
-    def chunk_incref(self, id):
+    def chunk_incref(self, id, stats):
         if not self.txn_active:
             self.begin_txn()
         count, size, csize = self.chunks[id]
         self.chunks[id] = (count + 1, size, csize)
+        stats.update(size, csize, False)
         return id, size, csize
 
     def chunk_decref(self, id):

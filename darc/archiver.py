@@ -11,7 +11,7 @@ from .cache import Cache
 from .key import Key
 from .helpers import location_validator, format_file_size, format_time,\
     format_file_mode, IncludePattern, ExcludePattern, exclude_path, to_localtime, \
-    get_cache_dir, day_of_year
+    get_cache_dir, day_of_year, format_timedelta
 from .remote import StoreServer, RemoteStore
 
 class Archiver(object):
@@ -48,6 +48,7 @@ class Archiver(object):
         return self.exit_code
 
     def do_create(self, args):
+        t0 = datetime.now()
         store = self.open_store(args.archive)
         key = Key(store)
         try:
@@ -76,6 +77,16 @@ class Archiver(object):
         for path in args.paths:
             self._process(archive, cache, args.patterns, skip_inodes, path)
         archive.save(args.archive.archive, cache)
+        if args.stats:
+            t = datetime.now()
+            diff = t - t0
+            print '-' * 40
+            print 'Archive name: %s' % args.archive.archive
+            print 'Start time: %s' % t0.strftime('%c')
+            print 'End time: %s' % t.strftime('%c')
+            print 'Duration: %.2f (%s)' % (diff.total_seconds(), format_timedelta(diff))
+            archive.stats.print_()
+            print '-' * 40
         return self.exit_code
 
     def _process(self, archive, cache, patterns, skip_inodes, path):
@@ -204,15 +215,13 @@ class Archiver(object):
         key = Key(store)
         cache = Cache(store, key)
         archive = Archive(store, key, args.archive.archive, cache=cache)
-        stats = archive.stats(cache)
+        stats = archive.calc_stats(cache)
         print 'Name:', archive.metadata['name']
         print 'Hostname:', archive.metadata['hostname']
         print 'Username:', archive.metadata['username']
         print 'Time:', archive.metadata['time']
         print 'Command line:', ' '.join(archive.metadata['cmdline'])
-        print 'Original size:', format_file_size(stats['osize'])
-        print 'Compressed size:', format_file_size(stats['csize'])
-        print 'Unique data:', format_file_size(stats['usize'])
+        stats.print_()
         return self.exit_code
 
     def do_purge(self, args):
@@ -291,6 +300,9 @@ class Archiver(object):
 
         subparser = subparsers.add_parser('create')
         subparser.set_defaults(func=self.do_create)
+        subparser.add_argument('-s', '--stats', dest='stats',
+                               action='store_true', default=False,
+                               help='Print statistics for the created archive')
         subparser.add_argument('-i', '--include', dest='patterns',
                                type=IncludePattern, action='append',
                                help='Include condition')

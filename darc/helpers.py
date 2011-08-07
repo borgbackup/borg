@@ -13,6 +13,22 @@ import time
 import urllib
 
 
+class Statistics(object):
+
+    def __init__(self):
+        self.osize = self.csize = self.usize = 0
+
+    def update(self, size, csize, unique):
+        self.osize += size
+        self.csize += csize
+        if unique:
+            self.usize += csize
+
+    def print_(self):
+        print 'Original size: %d (%s)' % (self.osize, format_file_size(self.osize))
+        print 'Compressed size: %s (%s)'% (self.csize, format_file_size(self.csize))
+        print 'Unique data: %d (%s)' % (self.usize, format_file_size(self.usize))
+
 def day_of_year(d):
     """Calculate the "day of year" from a date object"""
     return int(d.strftime('%j'))
@@ -192,6 +208,22 @@ def format_time(t):
         return t.strftime('%b %d %H:%M')
     else:
         return t.strftime('%b %d  %Y')
+
+
+def format_timedelta(td):
+    """Format timedelta in a human friendly format"""
+    ts = td.total_seconds()
+    s = ts % 60
+    m = int(ts / 60) % 60
+    h = int(ts / 3600) % 24
+    txt = '%.2f seconds' % s
+    if m:
+        txt = '%d minutes %s' % (m, txt)
+    if h:
+        txt = '%d hours %s' % (h, txt)
+    if td.days:
+        txt = '%d days %s' % (td.days, txt)
+    return txt
 
 
 def format_file_mode(mod):

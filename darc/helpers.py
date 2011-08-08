@@ -212,8 +212,16 @@ def format_time(t):
 
 
 def format_timedelta(td):
-    """Format timedelta in a human friendly format"""
-    ts = td.total_seconds()
+    """Format timedelta in a human friendly format
+
+    >>> from datetime import datetime
+    >>> t0 = datetime(2001, 1, 1, 10, 20, 3, 0)
+    >>> t1 = datetime(2001, 1, 1, 12, 20, 4, 100000)
+    >>> format_timedelta(t1 - t0)
+    '2 hours 1.10 seconds'
+    """
+    # Since td.total_seconds() requires python 2.7
+    ts = (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / float(10**6)
     s = ts % 60
     m = int(ts / 60) % 60
     h = int(ts / 3600) % 24

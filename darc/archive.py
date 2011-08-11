@@ -55,6 +55,9 @@ class Archive(object):
         t, f = self.metadata['time'].split('.', 1)
         return datetime.strptime(t, '%Y-%m-%dT%H:%M:%S') + timedelta(seconds=float('.' + f))
 
+    def __repr__(self):
+        return 'Archive(%r)' % self.name
+
     def iter_items(self, callback):
         unpacker = msgpack.Unpacker()
         counter = Counter(0)

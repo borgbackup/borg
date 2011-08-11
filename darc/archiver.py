@@ -1,5 +1,5 @@
 import argparse
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta
 from operator import attrgetter
 import os
 import stat
@@ -9,9 +9,9 @@ from .archive import Archive
 from .store import Store
 from .cache import Cache
 from .key import Key
-from .helpers import location_validator, format_file_size, format_time,\
+from .helpers import location_validator, format_time, \
     format_file_mode, IncludePattern, ExcludePattern, exclude_path, to_localtime, \
-    get_cache_dir, day_of_year, format_timedelta
+    get_cache_dir, format_timedelta, Purger
 from .remote import StoreServer, RemoteStore
 
 class Archiver(object):
@@ -85,7 +85,7 @@ class Archiver(object):
             print 'Archive fingerprint: %s' % archive.hash.encode('hex')
             print 'Start time: %s' % t0.strftime('%c')
             print 'End time: %s' % t.strftime('%c')
-            print 'Duration: %.2f (%s)' % (diff.total_seconds(), format_timedelta(diff))
+            print 'Duration: %s' % format_timedelta(diff)
             archive.stats.print_()
             print '-' * 40
         return self.exit_code
@@ -235,48 +235,57 @@ class Archiver(object):
         cache = Cache(store, key)
         archives = list(sorted(Archive.list_archives(store, key, cache),
                                key=attrgetter('ts'), reverse=True))
-        num_daily = args.daily
-        num_weekly = args.weekly
-        num_monthly = args.monthly
-        num_yearly = args.yearly
+        daily = []
+        weekly = []
+        monthly = []
+        yearly = []
         if args.daily + args.weekly + args.monthly + args.yearly == 0:
             self.print_error('At least one of the "daily", "weekly", "monthly" or "yearly" '
                              'settings must be specified')
             return 1
-        t0 = date.today() + timedelta(days=1) # Tomorrow
-        daily = weekly = monthly = yearly = 0
+
+        if args.prefix:
+            archives = [archive for archive in archives if archive.name.startswith(args.prefix)]
+        purger = Purger()
         for archive in archives:
-            if args.prefix and not archive.name.startswith(args.prefix):
-                continue
-            t = to_localtime(archive.ts).date()
-            if daily < args.daily and t < t0:
-                daily += 1
-                self.print_verbose('Archive "%s" is daily archive number %d',
-                                   archive.name, daily)
-                t0 = t
-            elif weekly < args.weekly and t < t0 and t.weekday() == 1:
-                weekly += 1
-                self.print_verbose('Archive "%s" is weekly archive number %d',
-                                   archive.name, weekly)
-                t0 = t
-            elif monthly < args.monthly and t < t0 and t.day == 1:
-                monthly += 1
-                self.print_verbose('Archive "%s" is monthly archive number %d',
-                                   archive.name, monthly)
-                t0 = t
-            elif yearly < args.yearly and t < t0 and day_of_year(t) == 1:
-                yearly += 1
-                self.print_verbose('Archive "%s" is yearly archive number %d',
-                                   archive.name, yearly)
-                t0 = t
+            purger.insert(to_localtime(archive.ts).date(), archive)
+        archives, to_delete = purger.purge(len(purger.items))
+        if args.yearly:
+            purger = Purger()
+            for archive in archives:
+                purger.insert(to_localtime(archive.ts).strftime('%Y'), archive)
+            yearly, archives = purger.purge(args.yearly)
+        if args.monthly:
+            purger = Purger()
+            for archive in archives:
+                purger.insert(to_localtime(archive.ts).strftime('%Y-%m'), archive)
+            monthly, archives = purger.purge(args.monthly)
+        if args.weekly:
+            purger = Purger()
+            for archive in archives:
+                purger.insert(to_localtime(archive.ts).strftime('%Y-%V'), archive)
+            weekly, archives = purger.purge(args.weekly)
+        if args.daily:
+            daily = archives[-args.daily:]
+            archives = archives[:-args.daily]
+        to_delete += archives
+
+        for i, archive in enumerate(yearly):
+            self.print_verbose('Keeping "%s" as yearly archive %d' % (archive.name, i + 1))
+        for i, archive in enumerate(monthly):
+            self.print_verbose('Keeping "%s" as monthly archive %d' % (archive.name, i + 1))
+        for i, archive in enumerate(weekly):
+            self.print_verbose('Keeping "%s" as weekly archive %d' % (archive.name, i + 1))
+        for i, archive in enumerate(daily):
+            self.print_verbose('Keeping "%s" as daily archive %d' % (archive.name, i + 1))
+        for archive in to_delete:
+            if args.really:
+                self.print_verbose('Purging archive "%s"', archive.name)
+                archive.delete(cache)
             else:
-                self.print_verbose('Purging archive %s', archive.name)
-                if args.really:
-                    archive.delete(cache)
-                else:
-                    print ('Archive "%s" marked for deletion. '
-                           'Use the "--really" option to actually delete it'
-                           % archive.metadata['name'])
+                print ('Archive "%s" marked for deletion. '
+                       'Use the "--really" option to actually delete it'
+                       % archive.metadata['name'])
         return self.exit_code
 
     def run(self, args=None):

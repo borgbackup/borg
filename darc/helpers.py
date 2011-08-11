@@ -2,6 +2,7 @@ from __future__ import with_statement
 import argparse
 from datetime import datetime, timedelta
 from fnmatch import fnmatchcase
+from operator import attrgetter
 import grp
 import os
 import pwd
@@ -11,6 +12,30 @@ import struct
 import sys
 import time
 import urllib
+
+
+class Purger(object):
+    """Purging helper"""
+
+    def __init__(self):
+        self.items = {}
+
+    def insert(self, key, value):
+        self.items.setdefault(key, [])
+        self.items[key].append(value)
+
+    def purge(self, n, reverse=False):
+        keep = []
+        delete = []
+        for key, values in sorted(self.items.items(), reverse=reverse):
+            if n:
+                values.sort(key=attrgetter('ts'), reverse=reverse)
+                keep.append(values[0])
+                delete += values[1:]
+                n -= 1
+            else:
+                delete += values
+        return keep, delete
 
 
 class Statistics(object):
@@ -29,10 +54,6 @@ class Statistics(object):
         print 'Original size: %d (%s)' % (self.osize, format_file_size(self.osize))
         print 'Compressed size: %s (%s)'% (self.csize, format_file_size(self.csize))
         print 'Unique data: %d (%s)' % (self.usize, format_file_size(self.usize))
-
-def day_of_year(d):
-    """Calculate the "day of year" from a date object"""
-    return int(d.strftime('%j'))
 
 
 # OSX filenames are UTF-8 Only so any non-utf8 filenames are url encoded

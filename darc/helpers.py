@@ -14,28 +14,23 @@ import time
 import urllib
 
 
-class Purger(object):
-    """Purging helper"""
-
-    def __init__(self):
-        self.items = {}
-
-    def insert(self, key, value):
-        self.items.setdefault(key, [])
-        self.items[key].append(value)
-
-    def purge(self, n, reverse=False):
-        keep = []
-        delete = []
-        for key, values in sorted(self.items.items(), reverse=reverse):
-            if n:
-                values.sort(key=attrgetter('ts'), reverse=reverse)
-                keep.append(values[0])
-                delete += values[1:]
-                n -= 1
-            else:
-                delete += values
-        return keep, delete
+def purge_split(archives, pattern, n, reverse=False):
+    items = {}
+    keep = []
+    delete = []
+    for a in archives:
+        key = to_localtime(a.ts).strftime(pattern)
+        items.setdefault(key, [])
+        items[key].append(a)
+    for key, values in sorted(items.items(), reverse=reverse):
+        if n:
+            values.sort(key=attrgetter('ts'), reverse=reverse)
+            keep.append(values[0])
+            delete += values[1:]
+            n -= 1
+        else:
+            delete += values
+    return keep, delete
 
 
 class Statistics(object):

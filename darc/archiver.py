@@ -1,5 +1,5 @@
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime
 from operator import attrgetter
 import os
 import stat
@@ -11,7 +11,7 @@ from .cache import Cache
 from .key import Key
 from .helpers import location_validator, format_time, \
     format_file_mode, IncludePattern, ExcludePattern, exclude_path, to_localtime, \
-    get_cache_dir, format_timedelta, Purger
+    get_cache_dir, format_timedelta, purge_split
 from .remote import StoreServer, RemoteStore
 
 class Archiver(object):
@@ -246,38 +246,24 @@ class Archiver(object):
 
         if args.prefix:
             archives = [archive for archive in archives if archive.name.startswith(args.prefix)]
-        purger = Purger()
-        for archive in archives:
-            purger.insert(to_localtime(archive.ts).date(), archive)
-        archives, to_delete = purger.purge(len(purger.items))
-        if args.yearly:
-            purger = Purger()
-            for archive in archives:
-                purger.insert(to_localtime(archive.ts).strftime('%Y'), archive)
-            yearly, archives = purger.purge(args.yearly)
-        if args.monthly:
-            purger = Purger()
-            for archive in archives:
-                purger.insert(to_localtime(archive.ts).strftime('%Y-%m'), archive)
-            monthly, archives = purger.purge(args.monthly)
-        if args.weekly:
-            purger = Purger()
-            for archive in archives:
-                purger.insert(to_localtime(archive.ts).strftime('%Y-%V'), archive)
-            weekly, archives = purger.purge(args.weekly)
         if args.daily:
-            daily = archives[-args.daily:]
-            archives = archives[:-args.daily]
-        to_delete += archives
+            daily, archives = purge_split(archives, '%Y-%m-%d', args.daily, reverse=True)
+        if args.weekly:
+            weekly, archives = purge_split(archives, '%Y-%V', args.weekly, reverse=True)
+        if args.monthly:
+            monthly, archives = purge_split(archives, '%Y-%m', args.monthly, reverse=True)
+        if args.yearly:
+            yearly, archives = purge_split(archives, '%Y', args.weekly, reverse=True)
+        to_delete = archives
 
-        for i, archive in enumerate(yearly):
-            self.print_verbose('Keeping "%s" as yearly archive %d' % (archive.name, i + 1))
-        for i, archive in enumerate(monthly):
-            self.print_verbose('Keeping "%s" as monthly archive %d' % (archive.name, i + 1))
-        for i, archive in enumerate(weekly):
-            self.print_verbose('Keeping "%s" as weekly archive %d' % (archive.name, i + 1))
         for i, archive in enumerate(daily):
             self.print_verbose('Keeping "%s" as daily archive %d' % (archive.name, i + 1))
+        for i, archive in enumerate(weekly):
+            self.print_verbose('Keeping "%s" as weekly archive %d' % (archive.name, i + 1))
+        for i, archive in enumerate(monthly):
+            self.print_verbose('Keeping "%s" as monthly archive %d' % (archive.name, i + 1))
+        for i, archive in enumerate(yearly):
+            self.print_verbose('Keeping "%s" as yearly archive %d' % (archive.name, i + 1))
         for archive in to_delete:
             if args.really:
                 self.print_verbose('Purging archive "%s"', archive.name)

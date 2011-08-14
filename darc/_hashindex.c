@@ -23,14 +23,15 @@ typedef struct {
 #define MAGIC "DARCHASH"
 #define EMPTY ((int32_t)-1)
 #define DELETED ((int32_t)-2)
-#define BUCKET_ADDR(index, idx) (index->buckets + (idx * index->bucket_size))
+#define BUCKET_ADDR_READ(index, idx) (index->buckets + (idx * index->bucket_size))
+#define BUCKET_ADDR_WRITE(index, idx) (index->buckets + (idx * index->bucket_size))
 
-#define BUCKET_IS_DELETED(index, idx) (*((int32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) == DELETED)
-#define BUCKET_IS_EMPTY(index, idx) (*((int32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) == EMPTY)
+#define BUCKET_IS_DELETED(index, idx) (*((int32_t *)(BUCKET_ADDR_READ(index, idx) + index->key_size)) == DELETED)
+#define BUCKET_IS_EMPTY(index, idx) (*((int32_t *)(BUCKET_ADDR_READ(index, idx) + index->key_size)) == EMPTY)
 
-#define BUCKET_MATCHES_KEY(index, idx, key) (memcmp(key, BUCKET_ADDR(index, idx), index->key_size) == 0)
+#define BUCKET_MATCHES_KEY(index, idx, key) (memcmp(key, BUCKET_ADDR_READ(index, idx), index->key_size) == 0)
 
-#define BUCKET_MARK_DELETED(index, idx) (*((int32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) = DELETED)
+#define BUCKET_MARK_DELETED(index, idx) (*((int32_t *)(BUCKET_ADDR_WRITE(index, idx) + index->key_size)) = DELETED)
 
 
 /* Private API */
@@ -58,7 +59,7 @@ hashindex_lookup(HashIndex *index, const void *key)
         }
         else if(BUCKET_MATCHES_KEY(index, idx, key)) {
             if (didx != -1) {
-                memcpy(BUCKET_ADDR(index, didx), BUCKET_ADDR(index, idx), index->bucket_size);
+                memcpy(BUCKET_ADDR_WRITE(index, didx), BUCKET_ADDR_READ(index, idx), index->bucket_size);
                 BUCKET_MARK_DELETED(index, idx);
                 idx = didx;
             }
@@ -194,13 +195,14 @@ hashindex_get(HashIndex *index, const void *key)
     if(idx < 0) {
         return NULL;
     }
-    return BUCKET_ADDR(index, idx) + index->key_size;
+    return BUCKET_ADDR_READ(index, idx) + index->key_size;
 }
 
 void
 hashindex_set(HashIndex *index, const void *key, const void *value)
 {
     int idx = hashindex_lookup(index, key);
+    uint8_t *ptr;
     if(idx < 0)
     {
         if(index->num_entries > index->limit) {
@@ -210,13 +212,14 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
         while(!BUCKET_IS_EMPTY(index, idx) && !BUCKET_IS_DELETED(index, idx)) {
             idx = (idx + 1) % index->num_buckets;
         }
-        memcpy(BUCKET_ADDR(index, idx), key, index->key_size);
-        memcpy(BUCKET_ADDR(index, idx) + index->key_size, value, index->value_size);
+        ptr = BUCKET_ADDR_WRITE(index, idx);
+        memcpy(ptr, key, index->key_size);
+        memcpy(ptr + index->key_size, value, index->value_size);
         index->num_entries += 1;
     }
     else
     {
-        memcpy(BUCKET_ADDR(index, idx) + index->key_size, value, index->value_size);
+        memcpy(BUCKET_ADDR_WRITE(index, idx) + index->key_size, value, index->value_size);
     }
 }
 
@@ -245,7 +248,7 @@ hashindex_next_key(HashIndex *index, const void *key)
         if (idx == index->num_buckets)
             return NULL;
     }
-    return BUCKET_ADDR(index, idx);
+    return BUCKET_ADDR_READ(index, idx);
 }
 
 int

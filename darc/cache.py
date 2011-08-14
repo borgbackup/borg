@@ -69,7 +69,7 @@ class Cache(object):
                     break
                 u.feed(data)
                 for hash, item in u:
-                    if item[0] < 8:
+                    if item[0] < 10:
                         self.files[hash] = (item[0] + 1,) + item[1:]
 
     def begin_txn(self):
@@ -104,16 +104,16 @@ class Cache(object):
     def rollback(self):
         """Roll back partial and aborted transactions
         """
-        # Remove partial transaction
-        if os.path.exists(os.path.join(self.path, 'txn.tmp')):
-            shutil.rmtree(os.path.join(self.path, 'txn.tmp'))
         # Roll back active transaction
         txn_dir = os.path.join(self.path, 'txn.active')
         if os.path.exists(txn_dir):
             shutil.copy(os.path.join(txn_dir, 'config'), self.path)
             shutil.copy(os.path.join(txn_dir, 'chunks'), self.path)
             shutil.copy(os.path.join(txn_dir, 'files'), self.path)
-            shutil.rmtree(txn_dir)
+            os.rename(txn_dir, os.path.join(self.path, 'txn.tmp'))
+        # Remove partial transaction
+        if os.path.exists(os.path.join(self.path, 'txn.tmp')):
+            shutil.rmtree(os.path.join(self.path, 'txn.tmp'))
         self.txn_active = False
 
     def sync(self):

@@ -9,9 +9,8 @@ import sys
 from cStringIO import StringIO
 from xattr import xattr, XATTR_NOFOLLOW
 
-from . import NS_ARCHIVE_METADATA, NS_CHUNK
 from ._speedups import chunkify
-from .helpers import uid2user, user2uid, gid2group, group2gid, IntegrityError, \
+from .helpers import uid2user, user2uid, gid2group, group2gid, \
     Counter, encode_filename, Statistics
 
 ITEMS_BUFFER = 1024 * 1024
@@ -36,14 +35,37 @@ class Archive(object):
         self.hard_links = {}
         self.stats = Statistics()
         if name:
-            self.load(self.key.archive_hash(name))
+            manifest = Archive.read_manifest(self.store, self.key)
+            try:
+                id, ts = manifest[name]
+            except KeyError:
+                raise Archive.DoesNotExist
+            self.load(id)
+
+    @staticmethod
+    def read_manifest(store, key):
+        mid = store.meta['manifest']
+        if not mid:
+            return {}
+        mid = mid.decode('hex')
+        data = key.decrypt(mid, store.get(mid))
+        return msgpack.unpackb(data)
+
+    def write_manifest(self, manifest):
+        mid = self.store.meta['manifest']
+        if mid:
+            self.cache.chunk_decref(mid.decode('hex'))
+        if manifest:
+            data = msgpack.packb(manifest)
+            mid = self.key.id_hash(data)
+            self.cache.add_chunk(mid, data, self.stats)
+            self.store.meta['manifest'] = mid.encode('hex')
+        else:
+            self.store.meta['manifest'] = ''
 
     def load(self, id):
         self.id = id
-        try:
-            data, self.hash = self.key.decrypt(self.store.get(NS_ARCHIVE_METADATA, self.id))
-        except self.store.DoesNotExist:
-            raise self.DoesNotExist
+        data = self.key.decrypt(self.id, self.store.get(self.id))
         self.metadata = msgpack.unpackb(data)
         if self.metadata['version'] != 1:
             raise Exception('Unknown archive metadata version')
@@ -66,16 +88,15 @@ class Archive(object):
                 raise error
             assert not error
             counter.dec()
-            data, items_hash = self.key.decrypt(chunk)
-            assert self.key.id_hash(data) == id
+            data = self.key.decrypt(id, chunk)
             unpacker.feed(data)
             for item in unpacker:
                 callback(item)
-        for id, size, csize in self.metadata['items']:
+        for id in self.metadata['items']:
             # Limit the number of concurrent items requests to 10
             self.store.flush_rpc(counter, 10)
             counter.inc()
-            self.store.get(NS_CHUNK, id, callback=cb, callback_data=id)
+            self.store.get(id, callback=cb, callback_data=id)
 
     def add_item(self, item):
         self.items.write(msgpack.packb(item))
@@ -90,16 +111,15 @@ class Archive(object):
         self.items.seek(0)
         self.items.truncate()
         for chunk in chunks[:-1]:
-            self.items_ids.append(self.cache.add_chunk(self.key.id_hash(chunk),
-                                  chunk, self.stats))
+            id, _, _ = self.cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats)
+            self.items_ids.append(id)
         if flush or len(chunks) == 1:
-            self.items_ids.append(self.cache.add_chunk(self.key.id_hash(chunks[-1]),
-                                  chunks[-1], self.stats))
+            id, _, _ = self.cache.add_chunk(self.key.id_hash(chunks[-1]), chunks[-1], self.stats)
+            self.items_ids.append(id)
         else:
             self.items.write(chunks[-1])
 
     def save(self, name, cache):
-        self.id = self.key.archive_hash(name)
         self.flush_items(flush=True)
         metadata = {
             'version': 1,
@@ -110,8 +130,13 @@ class Archive(object):
             'username': getuser(),
             'time': datetime.utcnow().isoformat(),
         }
-        data, self.hash = self.key.encrypt(msgpack.packb(metadata))
-        self.store.put(NS_ARCHIVE_METADATA, self.id, data)
+        data = msgpack.packb(metadata)
+        self.id = self.key.id_hash(data)
+        cache.add_chunk(self.id, data, self.stats)
+        manifest = Archive.read_manifest(self.store, self.key)
+        assert not name in manifest
+        manifest[name] = self.id, metadata['time']
+        self.write_manifest(manifest)
         self.store.commit()
         cache.commit()
 
@@ -120,8 +145,7 @@ class Archive(object):
         # the stats. The cache transaction must be rolled back afterwards
         def cb(chunk, error, id):
             assert not error
-            data, items_hash = self.key.decrypt(chunk)
-            assert self.key.id_hash(data) == id
+            data = self.key.decrypt(id, chunk)
             unpacker.feed(data)
             for item in unpacker:
                 try:
@@ -135,10 +159,11 @@ class Archive(object):
         unpacker = msgpack.Unpacker()
         cache.begin_txn()
         stats = Statistics()
-        for id, size, csize in self.metadata['items']:
-            stats.update(size, csize, self.cache.seen_chunk(id) == 1)
-            self.store.get(NS_CHUNK, id, callback=cb, callback_data=id)
-            self.cache.chunk_decref(id)
+        for id in self.metadata['items']:
+            self.store.get(id, callback=cb, callback_data=id)
+            count, size, csize = self.cache.chunks[id]
+            stats.update(size, csize, count==1)
+            self.cache.chunks[id] = count - 1, size, csize
         self.store.flush_rpc()
         cache.rollback()
         return stats
@@ -182,9 +207,7 @@ class Archive(object):
                         state['fd'] = open(path, 'wb')
                         start_cb(item)
                     assert not error
-                    data, hash = self.key.decrypt(chunk)
-                    if self.key.id_hash(data) != id:
-                        raise IntegrityError('chunk hash did not match')
+                    data = self.key.decrypt(id, chunk)
                     state['fd'].write(data)
                     if i == n - 1:
                         state['fd'].close()
@@ -198,7 +221,7 @@ class Archive(object):
                     self.restore_attrs(path, item)
                 else:
                     for i, (id, size, csize) in enumerate(item['chunks']):
-                        self.store.get(NS_CHUNK, id, callback=extract_cb, callback_data=(id, i))
+                        self.store.get(id, callback=extract_cb, callback_data=(id, i))
 
         else:
             raise Exception('Unknown archive item type %r' % item['mode'])
@@ -232,10 +255,8 @@ class Archive(object):
                 raise error
             if i == 0:
                 start(item)
-            data, hash = self.key.decrypt(chunk)
-            if self.key.id_hash(data) != id:
-                result(item, False)
-            elif i == n - 1:
+            data = self.key.decrypt(id, chunk)
+            if i == n - 1:
                 result(item, True)
         n = len(item['chunks'])
         if n == 0:
@@ -243,14 +264,12 @@ class Archive(object):
             result(item, True)
         else:
             for i, (id, size, csize) in enumerate(item['chunks']):
-                self.store.get(NS_CHUNK, id, callback=verify_chunk, callback_data=(id, i))
+                self.store.get(id, callback=verify_chunk, callback_data=(id, i))
 
     def delete(self, cache):
         def callback(chunk, error, id):
             assert not error
-            data, items_hash = self.key.decrypt(chunk)
-            if self.key.id_hash(data) != id:
-                raise IntegrityError('Chunk checksum mismatch')
+            data = self.key.decrypt(id, chunk)
             unpacker.feed(data)
             for item in unpacker:
                 try:
@@ -260,10 +279,14 @@ class Archive(object):
                     pass
             self.cache.chunk_decref(id)
         unpacker = msgpack.Unpacker()
-        for id, size, csize in self.metadata['items']:
-            self.store.get(NS_CHUNK, id, callback=callback, callback_data=id)
+        for id in self.metadata['items']:
+            self.store.get(id, callback=callback, callback_data=id)
         self.store.flush_rpc()
-        self.store.delete(NS_ARCHIVE_METADATA, self.id)
+        self.cache.chunk_decref(self.id)
+        manifest = Archive.read_manifest(self.store, self.key)
+        assert self.name in manifest
+        del manifest[self.name]
+        self.write_manifest(manifest)
         self.store.commit()
         cache.commit()
 
@@ -342,7 +365,8 @@ class Archive(object):
 
     @staticmethod
     def list_archives(store, key, cache=None):
-        for id in list(store.list(NS_ARCHIVE_METADATA)):
+        manifest = Archive.read_manifest(store, key)
+        for name, (id, ts) in manifest.items():
             archive = Archive(store, key, cache=cache)
             archive.load(id)
             yield archive

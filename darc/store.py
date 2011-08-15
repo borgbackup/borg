@@ -3,14 +3,15 @@ from ConfigParser import RawConfigParser
 import errno
 import fcntl
 import os
+import msgpack
 import shutil
 import struct
 import tempfile
 import unittest
 from zlib import crc32
 
-from .hashindex import NSIndex, BandIndex
-from .helpers import IntegrityError, read_set, write_set, deferrable
+from .hashindex import NSIndex
+from .helpers import IntegrityError, deferrable
 from .lrucache import LRUCache
 
 
@@ -21,7 +22,8 @@ class Store(object):
     dir/README
     dir/config
     dir/bands/<X / BANDS_PER_DIR>/<X>
-    dir/indexes/<NS>
+    dir/band
+    dir/index
     """
     DEFAULT_MAX_BAND_SIZE = 5 * 1024 * 1024
     DEFAULT_BANDS_PER_DIR = 10000
@@ -46,16 +48,17 @@ class Store(object):
         with open(os.path.join(path, 'README'), 'wb') as fd:
             fd.write('This is a DARC store')
         os.mkdir(os.path.join(path, 'bands'))
-        os.mkdir(os.path.join(path, 'indexes'))
         config = RawConfigParser()
         config.add_section('store')
         config.set('store', 'version', '1')
-        config.set('store', 'id', os.urandom(32).encode('hex'))
         config.set('store', 'bands_per_dir', self.DEFAULT_BANDS_PER_DIR)
         config.set('store', 'max_band_size', self.DEFAULT_MAX_BAND_SIZE)
-        config.add_section('state')
-        config.set('state', 'next_band', '0')
-        config.set('state', 'tid', '0')
+        config.set('store', 'next_band', '0')
+        config.add_section('meta')
+        config.set('meta', 'manifest', '')
+        config.set('meta', 'id', os.urandom(32).encode('hex'))
+        NSIndex.create(os.path.join(path, 'index'))
+        self.write_dict(os.path.join(path, 'band'), {})
         with open(os.path.join(path, 'config'), 'w') as fd:
             config.write(fd)
 
@@ -70,30 +73,38 @@ class Store(object):
         self.config.read(os.path.join(path, 'config'))
         if self.config.getint('store', 'version') != 1:
             raise Exception('%s Does not look like a darc store')
-        self.id = self.config.get('store', 'id').decode('hex')
-        self.tid = self.config.getint('state', 'tid')
-        next_band = self.config.getint('state', 'next_band')
+        next_band = self.config.getint('store', 'next_band')
         max_band_size = self.config.getint('store', 'max_band_size')
         bands_per_dir = self.config.getint('store', 'bands_per_dir')
+        self.meta = dict(self.config.items('meta'))
         self.io = BandIO(self.path, next_band, max_band_size, bands_per_dir)
         self.io.cleanup()
 
+    def read_dict(self, filename):
+        with open(filename, 'rb') as fd:
+            return msgpack.unpackb(fd.read())
+
+    def write_dict(self, filename, d):
+        with open(filename, 'wb') as fd:
+            fd.write(msgpack.packb(d))
+
     def delete_bands(self):
-        delete_path = os.path.join(self.path, 'indexes', 'delete')
+        delete_path = os.path.join(self.path, 'delete')
         if os.path.exists(delete_path):
-            bands = self.get_index('bands')
-            for band in read_set(delete_path):
+            bands = self.read_dict(os.path.join(self.path, 'band'))
+            for band in self.read_dict(delete_path):
                 assert bands.pop(band, 0) == 0
                 self.io.delete_band(band, missing_ok=True)
             os.unlink(delete_path)
+            self.write_dict(os.path.join(self.path, 'band'), bands)
 
     def begin_txn(self):
         txn_dir = os.path.join(self.path, 'txn.tmp')
         # Initialize transaction snapshot
         os.mkdir(txn_dir)
-        shutil.copytree(os.path.join(self.path, 'indexes'),
-                        os.path.join(txn_dir, 'indexes'))
         shutil.copy(os.path.join(self.path, 'config'), txn_dir)
+        shutil.copy(os.path.join(self.path, 'index'), txn_dir)
+        shutil.copy(os.path.join(self.path, 'band'), txn_dir)
         os.rename(os.path.join(self.path, 'txn.tmp'),
                   os.path.join(self.path, 'txn.active'))
         self.compact = set()
@@ -103,18 +114,21 @@ class Store(object):
         self.rollback()
         self.lock_fd.close()
 
-    def commit(self):
-        """Commit transaction, `tid` will be increased by 1
+    def commit(self, meta=None):
+        """Commit transaction
         """
+        meta = meta or self.meta
         self.compact_bands()
         self.io.close()
-        self.tid += 1
-        self.config.set('state', 'tid', self.tid)
-        self.config.set('state', 'next_band', self.io.band + 1)
+        self.config.set('store', 'next_band', self.io.band + 1)
+        self.config.remove_section('meta')
+        self.config.add_section('meta')
+        for k, v in meta.items():
+            self.config.set('meta', k, v)
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             self.config.write(fd)
-        for i in self.indexes.values():
-            i.flush()
+        self.index.flush()
+        self.write_dict(os.path.join(self.path, 'band'), self.bands)
         # If we crash before this line, the transaction will be
         # rolled back by open()
         os.rename(os.path.join(self.path, 'txn.active'),
@@ -127,18 +141,18 @@ class Store(object):
         if not self.compact:
             return
         self.io.close_band()
-        def lookup(ns, key):
-            return key in self.get_index(ns)
-        bands = self.get_index('bands')
+        def lookup(key):
+            return key in self.index
+        bands = self.bands
         for band in self.compact:
             if bands[band] > 0:
-                for ns, key, data in self.io.iter_objects(band, lookup):
-                    new_band, offset = self.io.write(ns, key, data)
-                    self.indexes[ns][key] = new_band, offset
+                for key, data in self.io.iter_objects(band, lookup):
+                    new_band, offset = self.io.write(key, data)
+                    self.index[key] = new_band, offset
                     bands[band] -= 1
                     bands.setdefault(new_band, 0)
                     bands[new_band] += 1
-        write_set(self.compact, os.path.join(self.path, 'indexes', 'delete'))
+        self.write_dict(os.path.join(self.path, 'delete'), tuple(self.compact))
 
     def rollback(self):
         """
@@ -151,65 +165,44 @@ class Store(object):
         # Roll back active transaction
         txn_dir = os.path.join(self.path, 'txn.active')
         if os.path.exists(txn_dir):
-            shutil.rmtree(os.path.join(self.path, 'indexes'))
-            shutil.copytree(os.path.join(txn_dir, 'indexes'),
-                            os.path.join(self.path, 'indexes'))
             shutil.copy(os.path.join(txn_dir, 'config'), self.path)
+            shutil.copy(os.path.join(txn_dir, 'index'), self.path)
+            shutil.copy(os.path.join(txn_dir, 'band'), self.path)
             os.rename(txn_dir, os.path.join(self.path, 'txn.tmp'))
         # Remove partially removed transaction
         if os.path.exists(os.path.join(self.path, 'txn.tmp')):
             shutil.rmtree(os.path.join(self.path, 'txn.tmp'))
-        self.indexes = {}
+        self.index = NSIndex(os.path.join(self.path, 'index'))
+        self.bands = self.read_dict(os.path.join(self.path, 'band'))
         self.txn_active = False
 
-    def get_index(self, ns):
-        try:
-            return self.indexes[ns]
-        except KeyError:
-            if ns == 'bands':
-                filename = os.path.join(self.path, 'indexes', 'bands')
-                cls = BandIndex
-            else:
-                filename = os.path.join(self.path, 'indexes', 'ns%d' % ns)
-                cls = NSIndex
-            if os.path.exists(filename):
-                self.indexes[ns] = cls(filename)
-            else:
-                self.indexes[ns] = cls.create(filename)
-            return self.indexes[ns]
-
     @deferrable
-    def get(self, ns, id):
+    def get(self, id):
         try:
-            band, offset = self.get_index(ns)[id]
-            return self.io.read(band, offset, ns, id)
+            band, offset = self.index[id]
+            return self.io.read(band, offset, id)
         except KeyError:
             raise self.DoesNotExist
 
     @deferrable
-    def put(self, ns, id, data):
+    def put(self, id, data):
         if not self.txn_active:
             self.begin_txn()
-        band, offset = self.io.write(ns, id, data)
-        bands = self.get_index('bands')
-        bands.setdefault(band, 0)
-        bands[band] += 1
-        self.get_index(ns)[id] = band, offset
+        band, offset = self.io.write(id, data)
+        self.bands.setdefault(band, 0)
+        self.bands[band] += 1
+        self.index[id] = band, offset
 
     @deferrable
-    def delete(self, ns, id):
+    def delete(self, id):
         if not self.txn_active:
             self.begin_txn()
         try:
-            band, offset = self.get_index(ns).pop(id)
-            self.get_index('bands')[band] -= 1
+            band, offset = self.index.pop(id)
+            self.bands[band] -= 1
             self.compact.add(band)
         except KeyError:
             raise self.DoesNotExist
-
-    @deferrable
-    def list(self, ns, marker=None, limit=1000000):
-        return [key for key, value in self.get_index(ns).iteritems(marker=marker, limit=limit)]
 
     def flush_rpc(self, *args):
         pass
@@ -217,8 +210,8 @@ class Store(object):
 
 class BandIO(object):
 
-    header_fmt = struct.Struct('<IBIB32s')
-    assert header_fmt.size == 42
+    header_fmt = struct.Struct('<IBI32s')
+    assert header_fmt.size == 41
 
     def __init__(self, path, nextband, limit, bands_per_dir, capacity=100):
         self.path = path
@@ -265,12 +258,12 @@ class BandIO(object):
             if not missing_ok or e.errno != errno.ENOENT:
                 raise
 
-    def read(self, band, offset, ns, id):
+    def read(self, band, offset, id):
         fd = self.get_fd(band)
         fd.seek(offset)
         data = fd.read(self.header_fmt.size)
-        size, magic, hash, ns_, id_ = self.header_fmt.unpack(data)
-        if magic != 0 or ns != ns_ or id != id_:
+        size, magic, hash, id_ = self.header_fmt.unpack(data)
+        if magic != 0 or id != id_:
             raise IntegrityError('Invalid band entry header')
         data = fd.read(size - self.header_fmt.size)
         if crc32(data) & 0xffffffff != hash:
@@ -285,20 +278,20 @@ class BandIO(object):
         offset = 8
         data = fd.read(self.header_fmt.size)
         while data:
-            size, magic, hash, ns, key = self.header_fmt.unpack(data)
+            size, magic, hash, key = self.header_fmt.unpack(data)
             if magic != 0:
                 raise IntegrityError('Unknown band entry header')
             offset += size
-            if lookup(ns, key):
+            if lookup(key):
                 data = fd.read(size - self.header_fmt.size)
                 if crc32(data) & 0xffffffff != hash:
                     raise IntegrityError('Band checksum mismatch')
-                yield ns, key, data
+                yield key, data
             else:
                 fd.seek(offset)
             data = fd.read(self.header_fmt.size)
 
-    def write(self, ns, id, data):
+    def write(self, id, data):
         size = len(data) + self.header_fmt.size
         if self.offset and self.offset + size > self.limit:
             self.close_band()
@@ -309,7 +302,7 @@ class BandIO(object):
             self.offset = 8
         offset = self.offset
         hash = crc32(data) & 0xffffffff
-        fd.write(self.header_fmt.pack(size, 0, hash, ns, id))
+        fd.write(self.header_fmt.pack(size, 0, hash, id))
         fd.write(data)
         self.offset += size
         return self.band, offset
@@ -329,37 +322,15 @@ class StoreTestCase(unittest.TestCase):
         shutil.rmtree(self.tmppath)
 
     def test1(self):
-        self.assertEqual(self.store.tid, 0)
         for x in range(100):
-            self.store.put(0, '%-32d' % x, 'SOMEDATA')
+            self.store.put('%-32d' % x, 'SOMEDATA')
         key50 = '%-32d' % 50
-        self.assertEqual(self.store.get(0, key50), 'SOMEDATA')
-        self.store.delete(0, key50)
-        self.assertRaises(self.store.DoesNotExist, lambda: self.store.get(0, key50))
+        self.assertEqual(self.store.get(key50), 'SOMEDATA')
+        self.store.delete(key50)
+        self.assertRaises(self.store.DoesNotExist, lambda: self.store.get(key50))
         self.store.commit()
-        self.assertEqual(self.store.tid, 1)
         self.store.close()
         store2 = Store(os.path.join(self.tmppath, 'store'))
-        self.assertEqual(store2.tid, 1)
-        keys = list(store2.list(0))
-        for x in range(50):
-            key = '%-32d' % x
-            self.assertEqual(store2.get(0, key), 'SOMEDATA')
-        self.assertRaises(store2.DoesNotExist, lambda: store2.get(0, key50))
-        assert key50 not in keys
-        for x in range(51, 100):
-            key = '%-32d' % x
-            assert key in keys
-            self.assertEqual(store2.get(0, key), 'SOMEDATA')
-        self.assertEqual(len(keys), 99)
-        for x in range(50):
-            key = '%-32d' % x
-            store2.delete(0, key)
-        self.assertEqual(len(list(store2.list(0))), 49)
-        for x in range(51, 100):
-            key = '%-32d' % x
-            store2.delete(0, key)
-        self.assertEqual(len(list(store2.list(0))), 0)
 
 
 def suite():

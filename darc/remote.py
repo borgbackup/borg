@@ -65,7 +65,7 @@ class StoreServer(object):
         if path.startswith('/~'):
             path = path[1:]
         self.store = Store(os.path.expanduser(path), create)
-        return self.store.id, self.store.tid
+        return self.store.meta
 
 
 class RemoteStore(object):
@@ -110,7 +110,7 @@ class RemoteStore(object):
         self.msgid = 0
         self.recursion = 0
         self.odata = []
-        self.id, self.tid = self.cmd('open', (location.path, create))
+        self.meta = self.cmd('open', (location.path, create))
 
     def wait(self, write=True):
         with self.channel.lock:
@@ -160,33 +160,35 @@ class RemoteStore(object):
             else:
                 self.wait(self.odata)
 
-    def commit(self, *args):
-        self.cmd('commit', args)
-        self.tid += 1
+    def commit(self):
+        self.cmd('commit', (self.meta,))
 
     def rollback(self, *args):
         return self.cmd('rollback', args)
 
-    def get(self, ns, id, callback=None, callback_data=None):
+    def meta_get(self, *args):
+        return self.cmd('meta_get', args)
+
+    def meta_set(self, *args):
+        return self.cmd('meta_set', args)
+
+    def get(self, id, callback=None, callback_data=None):
         try:
-            return self.cmd('get', (ns, id), callback, callback_data)
+            return self.cmd('get', (id, ), callback, callback_data)
         except self.RPCError, e:
             if e.name == 'DoesNotExist':
                 raise self.DoesNotExist
             raise
 
-    def put(self, ns, id, data, callback=None, callback_data=None):
+    def put(self, id, data, callback=None, callback_data=None):
         try:
-            return self.cmd('put', (ns, id, data), callback, callback_data)
+            return self.cmd('put', (id, data), callback, callback_data)
         except self.RPCError, e:
             if e.name == 'AlreadyExists':
                 raise self.AlreadyExists
 
-    def delete(self, ns, id, callback=None, callback_data=None):
-        return self.cmd('delete', (ns, id), callback, callback_data)
-
-    def list(self, *args):
-        return self.cmd('list', args)
+    def delete(self, id, callback=None, callback_data=None):
+        return self.cmd('delete', (id, ), callback, callback_data)
 
     def flush_rpc(self, counter=None, backlog=0):
         counter = counter or self.notifier.enabled

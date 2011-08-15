@@ -8,7 +8,6 @@ import os
 import pwd
 import re
 import stat
-import struct
 import sys
 import time
 import urllib
@@ -121,44 +120,6 @@ def to_localtime(ts):
     return ts - timedelta(seconds=time.altzone)
 
 
-def read_set(path):
-    """Read set from disk (as int32s)
-    """
-    with open(path, 'rb') as fd:
-        data = fd.read()
-        return set(struct.unpack('<%di' % (len(data) / 4), data))
-
-
-def write_set(s, path):
-    """Write set to disk (as int32s)
-    """
-    with open(path, 'wb') as fd:
-        fd.write(struct.pack('<%di' % len(s), *s))
-
-
-def encode_long(v):
-    bytes = []
-    while True:
-        if v > 0x7f:
-            bytes.append(0x80 | (v % 0x80))
-            v >>= 7
-        else:
-            bytes.append(v)
-            return ''.join(chr(x) for x in bytes)
-
-
-def decode_long(bytes):
-    v = 0
-    base = 0
-    for x in bytes:
-        b = ord(x)
-        if b & 0x80:
-            v += (b & 0x7f) << base
-            base += 7
-        else:
-            return v + (b << base)
-
-
 def exclude_path(path, patterns):
     """Used by create and extract sub-commands to determine
     if an item should be processed or not
@@ -269,7 +230,7 @@ def format_file_size(v):
     elif v > 1024:
         return '%.2f kB' % (v / 1024.)
     else:
-        return str(v)
+        return '%d B' % v
 
 class IntegrityError(Exception):
     """

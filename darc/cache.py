@@ -5,7 +5,7 @@ import msgpack
 import os
 import shutil
 
-from . import NS_CHUNK, NS_ARCHIVE_METADATA
+from .archive import Archive
 from .helpers import error_callback, get_cache_dir
 from .hashindex import ChunkIndex
 
@@ -18,12 +18,11 @@ class Cache(object):
         self.txn_active = False
         self.store = store
         self.key = key
-        self.path = os.path.join(get_cache_dir(), self.store.id.encode('hex'))
+        self.path = os.path.join(get_cache_dir(), store.meta['id'])
         if not os.path.exists(self.path):
             self.create()
         self.open()
-        assert self.id == store.id
-        if self.tid != store.tid:
+        if self.manifest != store.meta['manifest']:
             self.sync()
             self.commit()
 
@@ -36,8 +35,8 @@ class Cache(object):
         config = RawConfigParser()
         config.add_section('cache')
         config.set('cache', 'version', '1')
-        config.set('cache', 'store_id', self.store.id.encode('hex'))
-        config.set('cache', 'tid', '0')
+        config.set('cache', 'store', self.store.meta['id'])
+        config.set('cache', 'manifest', '')
         with open(os.path.join(self.path, 'config'), 'wb') as fd:
             config.write(fd)
         ChunkIndex.create(os.path.join(self.path, 'chunks'))
@@ -54,8 +53,8 @@ class Cache(object):
         self.config.read(os.path.join(self.path, 'config'))
         if self.config.getint('cache', 'version') != 1:
             raise Exception('%s Does not look like a darc cache')
-        self.id = self.config.get('cache', 'store_id').decode('hex')
-        self.tid = self.config.getint('cache', 'tid')
+        self.id = self.config.get('cache', 'store')
+        self.manifest = self.config.get('cache', 'manifest')
         self.chunks = ChunkIndex(os.path.join(self.path, 'chunks'))
         self.files = None
 
@@ -92,7 +91,7 @@ class Cache(object):
             with open(os.path.join(self.path, 'files'), 'wb') as fd:
                 for item in self.files.iteritems():
                     msgpack.pack(item, fd)
-        self.config.set('cache', 'tid', self.store.tid)
+        self.config.set('cache', 'manifest', self.store.meta['manifest'])
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             self.config.write(fd)
         self.chunks.flush()
@@ -121,8 +120,12 @@ class Cache(object):
         """
         def cb(chunk, error, id):
             assert not error
-            data, items_hash = self.key.decrypt(chunk)
-            assert self.key.id_hash(data) == id
+            data = self.key.decrypt(id, chunk)
+            try:
+                count, size, csize = self.chunks[id]
+                self.chunks[id] = count + 1, size, csize
+            except KeyError:
+                self.chunks[id] = 1, len(data), len(chunk)
             unpacker.feed(data)
             for item in unpacker:
                 try:
@@ -138,18 +141,24 @@ class Cache(object):
         self.begin_txn()
         print 'Initializing cache...'
         self.chunks.clear()
+        # Add manifest chunk to chunk index
+        mid = self.store.meta['manifest'].decode('hex')
+        cdata = self.store.get(mid)
+        mdata = self.key.decrypt(mid, cdata)
+        self.chunks[mid] = 1, len(mdata), len(cdata)
         unpacker = msgpack.Unpacker()
-        for id in self.store.list(NS_ARCHIVE_METADATA):
-            data, hash = self.key.decrypt(self.store.get(NS_ARCHIVE_METADATA, id))
+        for name, (id, _) in Archive.read_manifest(self.store, self.key).items():
+            cdata = self.store.get(id)
+            data = self.key.decrypt(id, cdata)
+            try:
+                count, size, csize = self.chunks[id]
+                self.chunks[id] = count + 1, size, csize
+            except KeyError:
+                self.chunks[id] = 1, len(data), len(cdata)
             archive = msgpack.unpackb(data)
             print 'Analyzing archive:', archive['name']
-            for id, size, csize in archive['items']:
-                try:
-                    count, size, csize = self.chunks[id]
-                    self.chunks[id] = count + 1, size, csize
-                except KeyError:
-                    self.chunks[id] = 1, size, csize
-                self.store.get(NS_CHUNK, id, callback=cb, callback_data=id)
+            for id in archive['items']:
+                self.store.get(id, callback=cb, callback_data=id)
             self.store.flush_rpc()
 
     def add_chunk(self, id, data, stats):
@@ -158,9 +167,9 @@ class Cache(object):
         if self.seen_chunk(id):
             return self.chunk_incref(id, stats)
         size = len(data)
-        data, hash = self.key.encrypt(data)
+        data = self.key.encrypt(data)
         csize = len(data)
-        self.store.put(NS_CHUNK, id, data, callback=error_callback)
+        self.store.put(id, data, callback=error_callback)
         self.chunks[id] = (1, size, csize)
         stats.update(size, csize, True)
         return id, size, csize
@@ -182,7 +191,7 @@ class Cache(object):
         count, size, csize = self.chunks[id]
         if count == 1:
             del self.chunks[id]
-            self.store.delete(NS_CHUNK, id, callback=error_callback)
+            self.store.delete(id, callback=error_callback)
         else:
             self.chunks[id] = (count - 1, size, csize)
 

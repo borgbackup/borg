@@ -13,23 +13,19 @@ import time
 import urllib
 
 
-def purge_split(archives, pattern, n, reverse=False):
+def purge_split(archives, pattern, n, skip=[]):
     items = {}
     keep = []
-    delete = []
     for a in archives:
         key = to_localtime(a.ts).strftime(pattern)
         items.setdefault(key, [])
         items[key].append(a)
-    for key, values in sorted(items.items(), reverse=reverse):
-        if n:
-            values.sort(key=attrgetter('ts'), reverse=reverse)
+    for key, values in sorted(items.items(), reverse=True):
+        if n and values[0] not in skip:
+            values.sort(key=attrgetter('ts'), reverse=True)
             keep.append(values[0])
-            delete += values[1:]
             n -= 1
-        else:
-            delete += values
-    return keep, delete
+    return keep
 
 
 class Statistics(object):

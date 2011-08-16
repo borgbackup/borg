@@ -235,35 +235,27 @@ class Archiver(object):
         cache = Cache(store, key)
         archives = list(sorted(Archive.list_archives(store, key, cache),
                                key=attrgetter('ts'), reverse=True))
-        daily = []
-        weekly = []
-        monthly = []
-        yearly = []
         if args.daily + args.weekly + args.monthly + args.yearly == 0:
             self.print_error('At least one of the "daily", "weekly", "monthly" or "yearly" '
                              'settings must be specified')
             return 1
-
         if args.prefix:
             archives = [archive for archive in archives if archive.name.startswith(args.prefix)]
+        keep = []
         if args.daily:
-            daily, archives = purge_split(archives, '%Y-%m-%d', args.daily, reverse=True)
+            keep += purge_split(archives, '%Y-%m-%d', args.daily)
         if args.weekly:
-            weekly, archives = purge_split(archives, '%Y-%V', args.weekly, reverse=True)
+            keep += purge_split(archives, '%Y-%V', args.weekly, keep)
         if args.monthly:
-            monthly, archives = purge_split(archives, '%Y-%m', args.monthly, reverse=True)
+            keep += purge_split(archives, '%Y-%m', args.monthly, keep)
         if args.yearly:
-            yearly, archives = purge_split(archives, '%Y', args.weekly, reverse=True)
-        to_delete = archives
+            keep += purge_split(archives, '%Y', args.weekly, keep)
 
-        for i, archive in enumerate(daily):
-            self.print_verbose('Keeping "%s" as daily archive %d' % (archive.name, i + 1))
-        for i, archive in enumerate(weekly):
-            self.print_verbose('Keeping "%s" as weekly archive %d' % (archive.name, i + 1))
-        for i, archive in enumerate(monthly):
-            self.print_verbose('Keeping "%s" as monthly archive %d' % (archive.name, i + 1))
-        for i, archive in enumerate(yearly):
-            self.print_verbose('Keeping "%s" as yearly archive %d' % (archive.name, i + 1))
+        keep.sort(key=attrgetter('ts'), reverse=True)
+        to_delete = [a for a in archives if a not in keep]
+
+        for archive in keep:
+            self.print_verbose('Keeping archive "%s"' % archive.name)
         for archive in to_delete:
             if args.really:
                 self.print_verbose('Purging archive "%s"', archive.name)

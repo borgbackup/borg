@@ -85,8 +85,9 @@ class Store(object):
             return msgpack.unpackb(fd.read())
 
     def write_dict(self, filename, d):
-        with open(filename, 'wb') as fd:
+        with open(filename+'.tmp', 'wb') as fd:
             fd.write(msgpack.packb(d))
+        os.rename(filename+'.tmp', filename)
 
     def delete_bands(self):
         delete_path = os.path.join(self.path, 'delete')
@@ -95,7 +96,6 @@ class Store(object):
             for band in self.read_dict(delete_path):
                 assert bands.pop(band, 0) == 0
                 self.io.delete_band(band, missing_ok=True)
-            os.unlink(delete_path)
             self.write_dict(os.path.join(self.path, 'band'), bands)
 
     def begin_txn(self):
@@ -162,6 +162,10 @@ class Store(object):
             self.delete_bands()
             os.rename(os.path.join(self.path, 'txn.commit'),
                       os.path.join(self.path, 'txn.tmp'))
+
+        delete_path = os.path.join(self.path, 'delete')
+        if os.path.exists(delete_path):
+            os.unlink(delete_path)
         # Roll back active transaction
         txn_dir = os.path.join(self.path, 'txn.active')
         if os.path.exists(txn_dir):

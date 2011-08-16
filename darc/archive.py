@@ -252,12 +252,16 @@ class Archive(object):
     def verify_file(self, item, start, result):
         def verify_chunk(chunk, error, (id, i)):
             if error:
-                raise error
+                if not state:
+                    result(item, False)
+                    state[True] = True
+                return
             if i == 0:
                 start(item)
             data = self.key.decrypt(id, chunk)
             if i == n - 1:
                 result(item, True)
+        state = {}
         n = len(item['chunks'])
         if n == 0:
             start(item)

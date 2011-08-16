@@ -249,7 +249,7 @@ class Archiver(object):
         if args.monthly:
             keep += purge_split(archives, '%Y-%m', args.monthly, keep)
         if args.yearly:
-            keep += purge_split(archives, '%Y', args.weekly, keep)
+            keep += purge_split(archives, '%Y', args.yearly, keep)
 
         keep.sort(key=attrgetter('ts'), reverse=True)
         to_delete = [a for a in archives if a not in keep]

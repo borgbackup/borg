@@ -37,19 +37,22 @@ class Archive(object):
         if name:
             manifest = Archive.read_manifest(self.store, self.key)
             try:
-                id, ts = manifest[name]
+                info = manifest['archives'][name]
             except KeyError:
                 raise Archive.DoesNotExist
-            self.load(id)
+            self.load(info['id'])
 
     @staticmethod
     def read_manifest(store, key):
         mid = store.meta['manifest']
         if not mid:
-            return {}
+            return {'version': 1, 'archives': {}}
         mid = mid.decode('hex')
         data = key.decrypt(mid, store.get(mid))
-        return msgpack.unpackb(data)
+        manifest = msgpack.unpackb(data)
+        if not manifest.get('version') == 1:
+            raise ValueError('Invalid manifest version')
+        return manifest
 
     def write_manifest(self, manifest):
         mid = self.store.meta['manifest']
@@ -134,8 +137,8 @@ class Archive(object):
         self.id = self.key.id_hash(data)
         cache.add_chunk(self.id, data, self.stats)
         manifest = Archive.read_manifest(self.store, self.key)
-        assert not name in manifest
-        manifest[name] = self.id, metadata['time']
+        assert not name in manifest['archives']
+        manifest['archives'][name] = {'id': self.id, 'time': metadata['time']}
         self.write_manifest(manifest)
         self.store.commit()
         cache.commit()
@@ -288,8 +291,8 @@ class Archive(object):
         self.store.flush_rpc()
         self.cache.chunk_decref(self.id)
         manifest = Archive.read_manifest(self.store, self.key)
-        assert self.name in manifest
-        del manifest[self.name]
+        assert self.name in manifest['archives']
+        del manifest['archives'][self.name]
         self.write_manifest(manifest)
         self.store.commit()
         cache.commit()
@@ -370,8 +373,8 @@ class Archive(object):
     @staticmethod
     def list_archives(store, key, cache=None):
         manifest = Archive.read_manifest(store, key)
-        for name, (id, ts) in manifest.items():
+        for name, info in manifest['archives'].items():
             archive = Archive(store, key, cache=cache)
-            archive.load(id)
+            archive.load(info['id'])
             yield archive
 

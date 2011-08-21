@@ -96,7 +96,7 @@ class Test(unittest.TestCase):
         self.create_regual_file('dir2/file2', size=1024*80)
         x = xattr(os.path.join(self.input_path, 'file1'))
         x.set('user.foo', 'bar')
-        os.link(os.path.join(self.input_path, 'file1'), 
+        os.link(os.path.join(self.input_path, 'file1'),
                 os.path.join(self.input_path, 'hardlink'))
         os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
         os.mkfifo(os.path.join(self.input_path, 'fifo1'))
@@ -105,6 +105,12 @@ class Test(unittest.TestCase):
         self.darc('create', self.store_path + '::test.2', 'input')
         self.darc('extract', self.store_path + '::test', 'output')
         self.diff_dirs('input', 'output/input')
+        info_output = self.darc('info', self.store_path + '::test')
+        shutil.rmtree(self.cache_path)
+        info_output2 = self.darc('info', self.store_path + '::test')
+        # info_output2 starts with some "initializing cache" text but should
+        # end the same way as info_output
+        assert info_output2.endswith(info_output)
 
     def test_corrupted_store(self):
         self.create_src_archive('test')

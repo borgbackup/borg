@@ -147,7 +147,8 @@ class Cache(object):
         mdata = self.key.decrypt(mid, cdata)
         self.chunks[mid] = 1, len(mdata), len(cdata)
         unpacker = msgpack.Unpacker()
-        for name, (id, _) in Archive.read_manifest(self.store, self.key).items():
+        for name, info in Archive.read_manifest(self.store, self.key)['archives'].items():
+            id = info['id']
             cdata = self.store.get(id)
             data = self.key.decrypt(id, cdata)
             try:

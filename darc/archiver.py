@@ -235,15 +235,17 @@ class Archiver(object):
         cache = Cache(store, key)
         archives = list(sorted(Archive.list_archives(store, key, cache),
                                key=attrgetter('ts'), reverse=True))
-        if args.daily + args.weekly + args.monthly + args.yearly == 0:
-            self.print_error('At least one of the "daily", "weekly", "monthly" or "yearly" '
+        if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0:
+            self.print_error('At least one of the "hourly", "daily", "weekly", "monthly" or "yearly" '
                              'settings must be specified')
             return 1
         if args.prefix:
             archives = [archive for archive in archives if archive.name.startswith(args.prefix)]
         keep = []
+        if args.hourly:
+            keep += purge_split(archives, '%Y-%m-%d %H', args.hourly)
         if args.daily:
-            keep += purge_split(archives, '%Y-%m-%d', args.daily)
+            keep += purge_split(archives, '%Y-%m-%d', args.daily, keep)
         if args.weekly:
             keep += purge_split(archives, '%Y-%V', args.weekly, keep)
         if args.monthly:
@@ -352,6 +354,8 @@ class Archiver(object):
 
         subparser = subparsers.add_parser('purge')
         subparser.set_defaults(func=self.do_purge)
+        subparser.add_argument('-H', '--hourly', dest='hourly', type=int, default=0,
+                               help='Number of hourly archives to keep')
         subparser.add_argument('-d', '--daily', dest='daily', type=int, default=0,
                                help='Number of daily archives to keep')
         subparser.add_argument('-w', '--weekly', dest='weekly', type=int, default=0,

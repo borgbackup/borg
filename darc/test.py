@@ -121,6 +121,19 @@ class Test(unittest.TestCase):
         fd.close()
         self.darc('verify', self.store_path + '::test', exit_code=1)
 
+    def test_purge_store(self):
+        src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__))
+        self.darc('init', '-p', '', self.store_path)
+        self.darc('create', self.store_path + '::test1', src_dir)
+        self.darc('create', self.store_path + '::test2', src_dir)
+        self.darc('purge', self.store_path, '--daily=2')
+        output = self.darc('list', self.store_path)
+        assert 'test1' in output
+        assert 'test2' in output
+        self.darc('purge', self.store_path, '--daily=2', '--really')
+        output = self.darc('list', self.store_path)
+        assert 'test1' not in output
+        assert 'test2' in output
 
 def suite():
     suite = unittest.TestSuite()

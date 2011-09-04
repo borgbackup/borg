@@ -5,7 +5,6 @@ import msgpack
 import os
 import shutil
 
-from .archive import Archive
 from .helpers import error_callback, get_cache_dir
 from .hashindex import ChunkIndex
 
@@ -14,15 +13,16 @@ class Cache(object):
     """Client Side cache
     """
 
-    def __init__(self, store, key):
+    def __init__(self, store, key, manifest):
         self.txn_active = False
         self.store = store
         self.key = key
-        self.path = os.path.join(get_cache_dir(), store.meta['id'])
+        self.manifest = manifest
+        self.path = os.path.join(get_cache_dir(), store.id.encode('hex'))
         if not os.path.exists(self.path):
             self.create()
         self.open()
-        if self.manifest != store.meta['manifest']:
+        if self.manifest.id != self.manifest_id:
             self.sync()
             self.commit()
 
@@ -35,7 +35,7 @@ class Cache(object):
         config = RawConfigParser()
         config.add_section('cache')
         config.set('cache', 'version', '1')
-        config.set('cache', 'store', self.store.meta['id'])
+        config.set('cache', 'store', self.store.id.encode('hex'))
         config.set('cache', 'manifest', '')
         with open(os.path.join(self.path, 'config'), 'wb') as fd:
             config.write(fd)
@@ -54,7 +54,7 @@ class Cache(object):
         if self.config.getint('cache', 'version') != 1:
             raise Exception('%s Does not look like a darc cache')
         self.id = self.config.get('cache', 'store')
-        self.manifest = self.config.get('cache', 'manifest')
+        self.manifest_id = self.config.get('cache', 'manifest').decode('hex')
         self.chunks = ChunkIndex(os.path.join(self.path, 'chunks'))
         self.files = None
 
@@ -91,7 +91,7 @@ class Cache(object):
             with open(os.path.join(self.path, 'files'), 'wb') as fd:
                 for item in self.files.iteritems():
                     msgpack.pack(item, fd)
-        self.config.set('cache', 'manifest', self.store.meta['manifest'])
+        self.config.set('cache', 'manifest', self.manifest.id.encode('hex'))
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             self.config.write(fd)
         self.chunks.flush()
@@ -141,13 +141,8 @@ class Cache(object):
         self.begin_txn()
         print 'Initializing cache...'
         self.chunks.clear()
-        # Add manifest chunk to chunk index
-        mid = self.store.meta['manifest'].decode('hex')
-        cdata = self.store.get(mid)
-        mdata = self.key.decrypt(mid, cdata)
-        self.chunks[mid] = 1, len(mdata), len(cdata)
         unpacker = msgpack.Unpacker()
-        for name, info in Archive.read_manifest(self.store, self.key)['archives'].items():
+        for name, info in self.manifest.archives.items():
             id = info['id']
             cdata = self.store.get(id)
             data = self.key.decrypt(id, cdata)

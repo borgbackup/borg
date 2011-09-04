@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from fnmatch import fnmatchcase
 from operator import attrgetter
 import grp
+import msgpack
 import os
 import pwd
 import re
@@ -11,6 +12,38 @@ import stat
 import sys
 import time
 import urllib
+
+class Manifest(object):
+
+    MANIFEST_ID = '\0' * 32
+
+    def __init__(self, store, key, dont_load=False):
+        self.store = store
+        self.key = key
+        self.archives = {}
+        self.config = {}
+        if not dont_load:
+            self.load()
+
+    def load(self):
+        data = self.key.decrypt(None, self.store.get(self.MANIFEST_ID))
+        self.id = self.key.id_hash(data)
+        manifest = msgpack.unpackb(data)
+        if not manifest.get('version') == 1:
+            raise ValueError('Invalid manifest version')
+        self.archives = manifest['archives']
+        self.config = manifest['config']
+        self.key.post_manifest_load(self.config)
+
+    def write(self):
+        self.key.pre_manifest_write(self)
+        data = msgpack.packb({
+            'version': 1,
+            'archives': self.archives,
+            'config': self.config,
+        })
+        self.id = self.key.id_hash(data)
+        self.store.put(self.MANIFEST_ID, self.key.encrypt(data))
 
 
 def purge_split(archives, pattern, n, skip=[]):
@@ -359,3 +392,13 @@ def location_validator(archive=None):
     return validator
 
 
+def read_msgpack(filename):
+    with open(filename, 'rb') as fd:
+        return msgpack.unpack(fd)
+
+def write_msgpack(filename, d):
+    with open(filename+'.tmp', 'wb') as fd:
+        msgpack.pack(d, fd)
+        fd.flush()
+        os.fsync(fd)
+    os.rename(filename+'.tmp', filename)

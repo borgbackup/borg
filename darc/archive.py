@@ -26,45 +26,21 @@ class Archive(object):
     class DoesNotExist(Exception):
         pass
 
-    def __init__(self, store, key, name=None, cache=None):
+    def __init__(self, store, key, manifest, name=None, cache=None):
         self.key = key
         self.store = store
         self.cache = cache
+        self.manifest = manifest
         self.items = StringIO()
         self.items_ids = []
         self.hard_links = {}
         self.stats = Statistics()
         if name:
-            manifest = Archive.read_manifest(self.store, self.key)
             try:
-                info = manifest['archives'][name]
+                info = self.manifest.archives[name]
             except KeyError:
                 raise Archive.DoesNotExist
             self.load(info['id'])
-
-    @staticmethod
-    def read_manifest(store, key):
-        mid = store.meta['manifest']
-        if not mid:
-            return {'version': 1, 'archives': {}}
-        mid = mid.decode('hex')
-        data = key.decrypt(mid, store.get(mid))
-        manifest = msgpack.unpackb(data)
-        if not manifest.get('version') == 1:
-            raise ValueError('Invalid manifest version')
-        return manifest
-
-    def write_manifest(self, manifest):
-        mid = self.store.meta['manifest']
-        if mid:
-            self.cache.chunk_decref(mid.decode('hex'))
-        if manifest:
-            data = msgpack.packb(manifest)
-            mid = self.key.id_hash(data)
-            self.cache.add_chunk(mid, data, self.stats)
-            self.store.meta['manifest'] = mid.encode('hex')
-        else:
-            self.store.meta['manifest'] = ''
 
     def load(self, id):
         self.id = id
@@ -123,6 +99,8 @@ class Archive(object):
             self.items.write(chunks[-1])
 
     def save(self, name, cache):
+        if name in self.manifest.archives:
+            raise ValueError('Archive %s already exists' % name)
         self.flush_items(flush=True)
         metadata = {
             'version': 1,
@@ -136,10 +114,8 @@ class Archive(object):
         data = msgpack.packb(metadata)
         self.id = self.key.id_hash(data)
         cache.add_chunk(self.id, data, self.stats)
-        manifest = Archive.read_manifest(self.store, self.key)
-        assert not name in manifest['archives']
-        manifest['archives'][name] = {'id': self.id, 'time': metadata['time']}
-        self.write_manifest(manifest)
+        self.manifest.archives[name] = {'id': self.id, 'time': metadata['time']}
+        self.manifest.write()
         self.store.commit()
         cache.commit()
 
@@ -290,10 +266,8 @@ class Archive(object):
             self.store.get(id, callback=callback, callback_data=id)
         self.store.flush_rpc()
         self.cache.chunk_decref(self.id)
-        manifest = Archive.read_manifest(self.store, self.key)
-        assert self.name in manifest['archives']
-        del manifest['archives'][self.name]
-        self.write_manifest(manifest)
+        del self.manifest.archives[self.name]
+        self.manifest.write()
         self.store.commit()
         cache.commit()
 
@@ -371,10 +345,9 @@ class Archive(object):
         self.add_item(item)
 
     @staticmethod
-    def list_archives(store, key, cache=None):
-        manifest = Archive.read_manifest(store, key)
-        for name, info in manifest['archives'].items():
-            archive = Archive(store, key, cache=cache)
+    def list_archives(store, key, manifest, cache=None):
+        for name, info in manifest.archives.items():
+            archive = Archive(store, key, manifest, cache=cache)
             archive.load(info['id'])
             yield archive
 

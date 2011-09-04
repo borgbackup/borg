@@ -65,7 +65,7 @@ class StoreServer(object):
         if path.startswith('/~'):
             path = path[1:]
         self.store = Store(os.path.expanduser(path), create)
-        return self.store.meta
+        return self.store.id
 
 
 class RemoteStore(object):
@@ -110,7 +110,7 @@ class RemoteStore(object):
         self.msgid = 0
         self.recursion = 0
         self.odata = []
-        self.meta = self.cmd('open', (location.path, create))
+        self.id = self.cmd('open', (location.path, create))
 
     def wait(self, write=True):
         with self.channel.lock:

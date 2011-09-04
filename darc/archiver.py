@@ -11,7 +11,7 @@ from .cache import Cache
 from .key import Key
 from .helpers import location_validator, format_time, \
     format_file_mode, IncludePattern, ExcludePattern, exclude_path, to_localtime, \
-    get_cache_dir, format_timedelta, purge_split
+    get_cache_dir, format_timedelta, purge_split, Manifest
 from .remote import StoreServer, RemoteStore
 
 class Archiver(object):
@@ -43,23 +43,24 @@ class Archiver(object):
 
     def do_init(self, args):
         store = self.open_store(args.store, create=True)
-        key = Key.create(store, args.store.to_key_filename(),
+        Key.create(store, args.store.to_key_filename(),
                          password=args.password)
+        key = Key(store)
+        manifest = Manifest(store, key, dont_load=True)
+        manifest.write()
+        store.commit()
         return self.exit_code
 
     def do_create(self, args):
         t0 = datetime.now()
         store = self.open_store(args.archive)
         key = Key(store)
-        try:
-            Archive(store, key, args.archive.archive)
-        except Archive.DoesNotExist:
-            pass
-        else:
+        manifest = Manifest(store, key)
+        if args.archive.archive in manifest.archives:
             self.print_error('Archive already exists')
             return self.exit_code
-        cache = Cache(store, key)
-        archive = Archive(store, key, cache=cache)
+        cache = Cache(store, key, manifest)
+        archive = Archive(store, key, manifest, cache=cache)
         # Add darc cache dir to inode_skip list
         skip_inodes = set()
         try:
@@ -142,7 +143,8 @@ class Archiver(object):
                 archive.extract_item(dirs.pop(-1), args.dest)
         store = self.open_store(args.archive)
         key = Key(store)
-        archive = Archive(store, key, args.archive.archive)
+        manifest = Manifest(store, key)
+        archive = Archive(store, key, manifest, args.archive.archive)
         dirs = []
         archive.iter_items(extract_cb)
         store.flush_rpc()
@@ -153,8 +155,9 @@ class Archiver(object):
     def do_delete(self, args):
         store = self.open_store(args.archive)
         key = Key(store)
-        cache = Cache(store, key)
-        archive = Archive(store, key, args.archive.archive, cache=cache)
+        manifest = Manifest(store, key)
+        cache = Cache(store, key, manifest)
+        archive = Archive(store, key, manifest, args.archive.archive, cache=cache)
         archive.delete(cache)
         return self.exit_code
 
@@ -183,20 +186,22 @@ class Archiver(object):
 
         store = self.open_store(args.src)
         key = Key(store)
+        manifest = Manifest(store, key)
         if args.src.archive:
             tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 010: '-', 012: 'l', 014: 's'}
-            archive = Archive(store, key, args.src.archive)
+            archive = Archive(store, key, manifest, args.src.archive)
             archive.iter_items(callback)
             store.flush_rpc()
         else:
-            for archive in sorted(Archive.list_archives(store, key), key=attrgetter('ts')):
+            for archive in sorted(Archive.list_archives(store, key, manifest), key=attrgetter('ts')):
                 print '%-20s %s' % (archive.metadata['name'], to_localtime(archive.ts).strftime('%c'))
         return self.exit_code
 
     def do_verify(self, args):
         store = self.open_store(args.archive)
         key = Key(store)
-        archive = Archive(store, key, args.archive.archive)
+        manifest = Manifest(store, key)
+        archive = Archive(store, key, manifest, args.archive.archive)
         def start_cb(item):
             self.print_verbose('%s ...', item['path'], newline=False)
         def result_cb(item, success):
@@ -217,8 +222,9 @@ class Archiver(object):
     def do_info(self, args):
         store = self.open_store(args.archive)
         key = Key(store)
-        cache = Cache(store, key)
-        archive = Archive(store, key, args.archive.archive, cache=cache)
+        manifest = Manifest(store, key)
+        cache = Cache(store, key, manifest)
+        archive = Archive(store, key, manifest, args.archive.archive, cache=cache)
         stats = archive.calc_stats(cache)
         print 'Name:', archive.name
         print 'Fingerprint: %s' % archive.id.encode('hex')
@@ -232,8 +238,9 @@ class Archiver(object):
     def do_purge(self, args):
         store = self.open_store(args.store)
         key = Key(store)
-        cache = Cache(store, key)
-        archives = list(sorted(Archive.list_archives(store, key, cache),
+        manifest = Manifest(store, key)
+        cache = Cache(store, key, manifest)
+        archives = list(sorted(Archive.list_archives(store, key, manifest, cache),
                                key=attrgetter('ts'), reverse=True))
         if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0:
             self.print_error('At least one of the "hourly", "daily", "weekly", "monthly" or "yearly" '

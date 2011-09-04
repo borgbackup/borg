@@ -1,9 +1,8 @@
 from __future__ import with_statement
 from ConfigParser import RawConfigParser
-import errno
 import fcntl
 import os
-import msgpack
+import re
 import shutil
 import struct
 import tempfile
@@ -11,8 +10,14 @@ import unittest
 from zlib import crc32
 
 from .hashindex import NSIndex
-from .helpers import IntegrityError, deferrable
+from .helpers import IntegrityError, deferrable, read_msgpack, write_msgpack
 from .lrucache import LRUCache
+
+MAX_OBJECT_SIZE = 20 * 1024 * 1024
+
+TAG_PUT = 0
+TAG_DELETE = 1
+TAG_COMMIT = 2
 
 
 class Store(object):
@@ -22,8 +27,8 @@ class Store(object):
     dir/README
     dir/config
     dir/data/<X / SEGMENTS_PER_DIR>/<X>
-    dir/segments
-    dir/index
+    dir/index.X
+    dir/hints.X
     """
     DEFAULT_MAX_SEGMENT_SIZE = 5 * 1024 * 1024
     DEFAULT_SEGMENTS_PER_DIR = 10000
@@ -33,7 +38,6 @@ class Store(object):
 
 
     def __init__(self, path, create=False):
-        self.txn_active = False
         if create:
             self.create(path)
         self.open(path)
@@ -53,132 +57,138 @@ class Store(object):
         config.set('store', 'version', '1')
         config.set('store', 'segments_per_dir', self.DEFAULT_SEGMENTS_PER_DIR)
         config.set('store', 'max_segment_size', self.DEFAULT_MAX_SEGMENT_SIZE)
-        config.set('store', 'next_segment', '0')
-        config.add_section('meta')
-        config.set('meta', 'manifest', '')
-        config.set('meta', 'id', os.urandom(32).encode('hex'))
-        NSIndex.create(os.path.join(path, 'index'))
-        self.write_dict(os.path.join(path, 'segments'), {})
+        config.set('store', 'id', os.urandom(32).encode('hex'))
         with open(os.path.join(path, 'config'), 'w') as fd:
             config.write(fd)
 
     def open(self, path):
+        self.head = None
         self.path = path
         if not os.path.isdir(path):
             raise Exception('%s Does not look like a darc store' % path)
         self.lock_fd = open(os.path.join(path, 'README'), 'r+')
         fcntl.flock(self.lock_fd, fcntl.LOCK_EX)
+        self.config = RawConfigParser()
+        self.config.read(os.path.join(self.path, 'config'))
+        if self.config.getint('store', 'version') != 1:
+            raise Exception('%s Does not look like a darc store')
+        self.max_segment_size = self.config.getint('store', 'max_segment_size')
+        self.segments_per_dir = self.config.getint('store', 'segments_per_dir')
+        self.id = self.config.get('store', 'id').decode('hex')
         self.rollback()
-
-    def read_dict(self, filename):
-        with open(filename, 'rb') as fd:
-            return msgpack.unpackb(fd.read())
-
-    def write_dict(self, filename, d):
-        with open(filename+'.tmp', 'wb') as fd:
-            fd.write(msgpack.packb(d))
-        os.rename(filename+'.tmp', filename)
-
-    def delete_segments(self):
-        delete_path = os.path.join(self.path, 'delete')
-        if os.path.exists(delete_path):
-            segments = self.read_dict(os.path.join(self.path, 'segments'))
-            for segment in self.read_dict(delete_path):
-                assert segments.pop(segment, 0) == 0
-                self.io.delete_segment(segment, missing_ok=True)
-            self.write_dict(os.path.join(self.path, 'segments'), segments)
-
-    def begin_txn(self):
-        txn_dir = os.path.join(self.path, 'txn.tmp')
-        # Initialize transaction snapshot
-        os.mkdir(txn_dir)
-        shutil.copy(os.path.join(self.path, 'config'), txn_dir)
-        shutil.copy(os.path.join(self.path, 'index'), txn_dir)
-        shutil.copy(os.path.join(self.path, 'segments'), txn_dir)
-        os.rename(os.path.join(self.path, 'txn.tmp'),
-                  os.path.join(self.path, 'txn.active'))
-        self.compact = set()
-        self.txn_active = True
 
     def close(self):
-        self.rollback()
         self.lock_fd.close()
 
-    def commit(self, meta=None):
+    def commit(self, rollback=True):
         """Commit transaction
         """
-        meta = meta or self.meta
+        self.io.write_commit()
         self.compact_segments()
-        self.io.close()
-        self.config.set('store', 'next_segment', self.io.segment + 1)
-        self.config.remove_section('meta')
-        self.config.add_section('meta')
-        for k, v in meta.items():
-            self.config.set('meta', k, v)
-        with open(os.path.join(self.path, 'config'), 'w') as fd:
-            self.config.write(fd)
-        self.index.flush()
-        self.write_dict(os.path.join(self.path, 'segments'), self.segments)
-        # If we crash before this line, the transaction will be
-        # rolled back by open()
-        os.rename(os.path.join(self.path, 'txn.active'),
-                  os.path.join(self.path, 'txn.commit'))
+        self.write_index()
         self.rollback()
+
+    def _available_indices(self, reverse=False):
+        names = [int(name[6:]) for name in os.listdir(self.path) if re.match('index\.\d+', name)]
+        names.sort(reverse=reverse)
+        return names
+
+    def open_index(self, head):
+        if head is None:
+            self.index = NSIndex.create(os.path.join(self.path, 'index.tmp'))
+            self.segments = {}
+            self.compact = set()
+        else:
+            shutil.copy(os.path.join(self.path, 'index.%d' % head),
+                        os.path.join(self.path, 'index.tmp'))
+            self.index = NSIndex(os.path.join(self.path, 'index.tmp'))
+            hints = read_msgpack(os.path.join(self.path, 'hints.%d' % head))
+            if hints['version'] != 1:
+                raise ValueError('Unknown hints file version: %d' % hints['version'])
+            self.segments = hints['segments']
+            self.compact = set(hints['compact'])
+
+    def write_index(self):
+        hints = {'version': 1,
+                 'segments': self.segments,
+                 'compact': list(self.compact)}
+        write_msgpack(os.path.join(self.path, 'hints.%d' % self.io.head), hints)
+        self.index.flush()
+        os.rename(os.path.join(self.path, 'index.tmp'),
+                  os.path.join(self.path, 'index.%d' % self.io.head))
+        # Remove old indices
+        current = '.%d' % self.io.head
+        for name in os.listdir(self.path):
+            if not name.startswith('index.') and not name.startswith('hints.'):
+                continue
+            if name.endswith(current):
+                continue
+            os.unlink(os.path.join(self.path, name))
 
     def compact_segments(self):
         """Compact sparse segments by copying data into new segments
         """
         if not self.compact:
             return
-        self.io.close_segment()
-        def lookup(key):
-            return self.index.get(key, (-1, -1))[0] == segment
+        def lookup(tag, key):
+            return tag == TAG_PUT and self.index.get(key, (-1, -1))[0] == segment
         segments = self.segments
         for segment in self.compact:
             if segments[segment] > 0:
-                for key, data in self.io.iter_objects(segment, lookup):
-                    new_segment, offset = self.io.write(key, data)
+                for tag, key, data in self.io.iter_objects(segment, lookup, include_data=True):
+                    new_segment, offset = self.io.write_put(key, data)
                     self.index[key] = new_segment, offset
                     segments.setdefault(new_segment, 0)
                     segments[new_segment] += 1
                     segments[segment] -= 1
-        self.write_dict(os.path.join(self.path, 'delete'), tuple(self.compact))
+                assert segments[segment] == 0
+        self.io.write_commit()
+        for segment in self.compact:
+            assert self.segments.pop(segment) == 0
+            self.io.delete_segment(segment)
+        self.compact = set()
+
+    def recover(self, path):
+        """Recover missing index by replaying logs"""
+        start = None
+        available = self._available_indices()
+        if available:
+            start = available[-1]
+        self.open_index(start)
+        for segment, filename in self.io._segment_names():
+            if start is not None and segment <= start:
+                continue
+            self.segments[segment] = 0
+            for tag, key, offset in self.io.iter_objects(segment):
+                if tag == TAG_PUT:
+                    try:
+                        s, _ = self.index[key]
+                        self.compact.add(s)
+                        self.segments[s] -= 1
+                    except KeyError:
+                        pass
+                    self.index[key] = segment, offset
+                    self.segments[segment] += 1
+                elif tag == TAG_DELETE:
+                    try:
+                        s, _ = self.index.pop(key)
+                        self.segments[s] -= 1
+                        self.compact.add(s)
+                        self.compact.add(segment)
+                    except KeyError:
+                        pass
+            if self.segments[segment] == 0:
+                self.compact.add(segment)
+        if self.io.head is not None:
+            self.write_index()
 
     def rollback(self):
         """
         """
-        # Commit any half committed transaction
-        if os.path.exists(os.path.join(self.path, 'txn.commit')):
-            self.delete_segments()
-            os.rename(os.path.join(self.path, 'txn.commit'),
-                      os.path.join(self.path, 'txn.tmp'))
-
-        delete_path = os.path.join(self.path, 'delete')
-        if os.path.exists(delete_path):
-            os.unlink(delete_path)
-        # Roll back active transaction
-        txn_dir = os.path.join(self.path, 'txn.active')
-        if os.path.exists(txn_dir):
-            shutil.copy(os.path.join(txn_dir, 'config'), self.path)
-            shutil.copy(os.path.join(txn_dir, 'index'), self.path)
-            shutil.copy(os.path.join(txn_dir, 'segments'), self.path)
-            os.rename(txn_dir, os.path.join(self.path, 'txn.tmp'))
-        # Remove partially removed transaction
-        if os.path.exists(os.path.join(self.path, 'txn.tmp')):
-            shutil.rmtree(os.path.join(self.path, 'txn.tmp'))
-        self.index = NSIndex(os.path.join(self.path, 'index'))
-        self.segments = self.read_dict(os.path.join(self.path, 'segments'))
-        self.config = RawConfigParser()
-        self.config.read(os.path.join(self.path, 'config'))
-        if self.config.getint('store', 'version') != 1:
-            raise Exception('%s Does not look like a darc store')
-        next_segment = self.config.getint('store', 'next_segment')
-        max_segment_size = self.config.getint('store', 'max_segment_size')
-        segments_per_dir = self.config.getint('store', 'segments_per_dir')
-        self.meta = dict(self.config.items('meta'))
-        self.io = SegmentIO(self.path, next_segment, max_segment_size, segments_per_dir)
-        self.io.cleanup()
-        self.txn_active = False
+        self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
+        if self.io.head is not None and not os.path.exists(os.path.join(self.path, 'index.%d' % self.io.head)):
+            self.recover(self.path)
+        self.open_index(self.io.head)
 
     @deferrable
     def get(self, id):
@@ -190,27 +200,25 @@ class Store(object):
 
     @deferrable
     def put(self, id, data):
-        if not self.txn_active:
-            self.begin_txn()
         try:
             segment, _ = self.index[id]
             self.segments[segment] -= 1
             self.compact.add(segment)
+            self.compact.add(self.io.write_delete(id))
         except KeyError:
             pass
-        segment, offset = self.io.write(id, data)
+        segment, offset = self.io.write_put(id, data)
         self.segments.setdefault(segment, 0)
         self.segments[segment] += 1
         self.index[id] = segment, offset
 
     @deferrable
     def delete(self, id):
-        if not self.txn_active:
-            self.begin_txn()
         try:
             segment, offset = self.index.pop(id)
             self.segments[segment] -= 1
             self.compact.add(segment)
+            self.compact.add(self.io.write_delete(id))
         except KeyError:
             raise self.DoesNotExist
 
@@ -218,109 +226,169 @@ class Store(object):
         pass
 
 
-class SegmentIO(object):
+class LoggedIO(object):
 
-    header_fmt = struct.Struct('<IBI32s')
-    assert header_fmt.size == 41
+    header_fmt = struct.Struct('<IIB')
+    assert header_fmt.size == 9
+    put_header_fmt = struct.Struct('<IIB32s')
+    assert put_header_fmt.size == 41
+    header_no_crc_fmt = struct.Struct('<IB')
+    assert header_no_crc_fmt.size == 5
+    crc_fmt = struct.Struct('<I')
+    assert crc_fmt.size == 4
 
-    def __init__(self, path, next_segment, limit, segments_per_dir, capacity=100):
+    _commit = header_no_crc_fmt.pack(9, TAG_COMMIT)
+    COMMIT = crc_fmt.pack(crc32(_commit)) + _commit
+
+    def __init__(self, path, limit, segments_per_dir, capacity=100):
         self.path = path
         self.fds = LRUCache(capacity)
-        self.segment = next_segment
+        self.segment = None
         self.limit = limit
         self.segments_per_dir = segments_per_dir
         self.offset = 0
+        self._write_fd = None
+        self.head = None
+        self.cleanup()
 
     def close(self):
         for segment in self.fds.keys():
             self.fds.pop(segment).close()
-	self.fds = None # Just to make sure we're disabled
+        self.close_segment()
+        self.fds = None # Just to make sure we're disabled
+
+    def _segment_names(self, reverse=False):
+        for dirpath, dirs, filenames in os.walk(os.path.join(self.path, 'data')):
+            dirs.sort(lambda a, b: cmp(int(a), int(b)), reverse=reverse)
+            filenames.sort(lambda a, b: cmp(int(a), int(b)), reverse=reverse)
+            for filename in filenames:
+                yield int(filename), os.path.join(dirpath, filename)
 
     def cleanup(self):
         """Delete segment files left by aborted transactions
         """
-        segment = self.segment
-        while True:
-            filename = self.segment_filename(segment)
-            if not os.path.exists(filename):
-                break
-            os.unlink(filename)
-            segment += 1
+        self.head = None
+        self.segment = 0
+        for segment, filename in self._segment_names(reverse=True):
+            if self.is_complete_segment(filename):
+                self.head = segment
+                self.segment = self.head + 1
+                return
+            else:
+                os.unlink(filename)
+
+    def is_complete_segment(self, filename):
+        with open(filename, 'rb') as fd:
+            fd.seek(-self.header_fmt.size, 2)
+            return fd.read(self.header_fmt.size) == self.COMMIT
 
     def segment_filename(self, segment):
         return os.path.join(self.path, 'data', str(segment / self.segments_per_dir), str(segment))
 
-    def get_fd(self, segment, write=False):
+    def get_write_fd(self):
+        if self.offset and self.offset > self.limit:
+            self.close_segment()
+        if not self._write_fd:
+            if self.segment % self.segments_per_dir == 0:
+                dirname = os.path.join(self.path, 'data', str(self.segment / self.segments_per_dir))
+                if not os.path.exists(dirname):
+                    os.mkdir(dirname)
+            self._write_fd = open(self.segment_filename(self.segment), 'ab')
+            self._write_fd.write('DSEGMENT')
+            self.offset = 8
+        return self._write_fd
+
+    def get_fd(self, segment):
         try:
             return self.fds[segment]
         except KeyError:
-            if write and segment % self.segments_per_dir == 0:
-                dirname = os.path.join(self.path, 'data', str(segment / self.segments_per_dir))
-                if not os.path.exists(dirname):
-                    os.mkdir(dirname)
-            fd = open(self.segment_filename(segment), write and 'w+' or 'rb')
+            fd = open(self.segment_filename(segment), 'rb')
             self.fds[segment] = fd
             return fd
 
-    def delete_segment(self, segment, missing_ok=False):
+    def delete_segment(self, segment):
         try:
             os.unlink(self.segment_filename(segment))
         except OSError, e:
-            if not missing_ok or e.errno != errno.ENOENT:
-                raise
+            pass
 
-    def read(self, segment, offset, id):
-        fd = self.get_fd(segment)
-        fd.seek(offset)
-        data = fd.read(self.header_fmt.size)
-        size, magic, hash, id_ = self.header_fmt.unpack(data)
-        if magic != 0 or id != id_:
-            raise IntegrityError('Invalid segment entry header')
-        data = fd.read(size - self.header_fmt.size)
-        if crc32(data) & 0xffffffff != hash:
-            raise IntegrityError('Segment checksum mismatch')
-        return data
-
-    def iter_objects(self, segment, lookup):
+    def iter_objects(self, segment, lookup=None, include_data=False):
         fd = self.get_fd(segment)
         fd.seek(0)
         if fd.read(8) != 'DSEGMENT':
             raise IntegrityError('Invalid segment header')
         offset = 8
-        data = fd.read(self.header_fmt.size)
-        while data:
-            size, magic, hash, key = self.header_fmt.unpack(data)
-            if magic != 0:
-                raise IntegrityError('Unknown segment entry header')
+        header = fd.read(self.header_fmt.size)
+        while header:
+            crc, size, tag = self.header_fmt.unpack(header)
+            if size > MAX_OBJECT_SIZE:
+                raise IntegrityError('Invalid segment object size')
+            rest = fd.read(size - self.header_fmt.size)
+            if crc32(rest, crc32(buffer(header, 4))) & 0xffffffff != crc:
+                raise IntegrityError('Segment checksum mismatch')
+            if tag not in (TAG_PUT, TAG_DELETE, TAG_COMMIT):
+                raise IntegrityError('Invalid segment entry header')
+            key = None
+            if tag in (TAG_PUT, TAG_DELETE):
+                key = rest[:32]
+            if not lookup or lookup(tag, key):
+                if include_data:
+                    yield tag, key, rest[32:]
+                else:
+                    yield tag, key, offset
             offset += size
-            if lookup(key):
-                data = fd.read(size - self.header_fmt.size)
-                if crc32(data) & 0xffffffff != hash:
-                    raise IntegrityError('Segment checksum mismatch')
-                yield key, data
-            else:
-                fd.seek(offset)
-            data = fd.read(self.header_fmt.size)
+            header = fd.read(self.header_fmt.size)
 
-    def write(self, id, data):
-        size = len(data) + self.header_fmt.size
-        if self.offset and self.offset + size > self.limit:
-            self.close_segment()
-        fd = self.get_fd(self.segment, write=True)
-        fd.seek(self.offset)
-        if self.offset == 0:
-            fd.write('DSEGMENT')
-            self.offset = 8
+    def read(self, segment, offset, id):
+        if segment == self.segment:
+            self._write_fd.flush()
+        fd = self.get_fd(segment)
+        fd.seek(offset)
+        header = fd.read(self.put_header_fmt.size)
+        crc, size, tag, key = self.put_header_fmt.unpack(header)
+        if size > MAX_OBJECT_SIZE:
+            raise IntegrityError('Invalid segment object size')
+        data = fd.read(size - self.put_header_fmt.size)
+        if crc32(data, crc32(buffer(header, 4))) & 0xffffffff != crc:
+            raise IntegrityError('Segment checksum mismatch')
+        if tag != TAG_PUT or id != key:
+            raise IntegrityError('Invalid segment entry header')
+        return data
+
+    def write_put(self, id, data):
+        size = len(data) + self.put_header_fmt.size
+        fd = self.get_write_fd()
         offset = self.offset
-        hash = crc32(data) & 0xffffffff
-        fd.write(self.header_fmt.pack(size, 0, hash, id))
-        fd.write(data)
+        header = self.header_no_crc_fmt.pack(size, TAG_PUT)
+        crc = self.crc_fmt.pack(crc32(data, crc32(id, crc32(header))) & 0xffffffff)
+        fd.write(''.join((crc, header, id, data)))
         self.offset += size
         return self.segment, offset
 
+    def write_delete(self, id):
+        fd = self.get_write_fd()
+        offset = self.offset
+        header = self.header_no_crc_fmt.pack(self.put_header_fmt.size, TAG_DELETE)
+        crc = self.crc_fmt.pack(crc32(id, crc32(header)) & 0xffffffff)
+        fd.write(''.join((crc, header, id)))
+        self.offset += self.put_header_fmt.size
+        return self.segment
+
+    def write_commit(self):
+        fd = self.get_write_fd()
+        header = self.header_no_crc_fmt.pack(self.header_fmt.size, TAG_COMMIT)
+        crc = self.crc_fmt.pack(crc32(header) & 0xffffffff)
+        fd.write(''.join((crc, header)))
+        self.head = self.segment
+        self.close_segment()
+
     def close_segment(self):
-        self.segment += 1
-        self.offset = 0
+        if self._write_fd:
+            self.segment += 1
+            self.offset = 0
+            os.fsync(self._write_fd)
+            self._write_fd.close()
+            self._write_fd = None
 
 
 class StoreTestCase(unittest.TestCase):
@@ -342,6 +410,11 @@ class StoreTestCase(unittest.TestCase):
         self.store.commit()
         self.store.close()
         store2 = Store(os.path.join(self.tmppath, 'store'))
+        self.assertRaises(store2.DoesNotExist, lambda: store2.get(key50))
+        for x in range(100):
+            if x == 50:
+                continue
+            self.assertEqual(self.store.get('%-32d' % x), 'SOMEDATA')
 
     def test2(self):
         """Test multiple sequential transactions

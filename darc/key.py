@@ -14,6 +14,7 @@ from Crypto.Random import get_random_bytes
 
 from .helpers import IntegrityError, get_keys_dir
 
+PREFIX = '\0' * 8
 
 class Key(object):
     FILE_ID = 'DARC KEY'
@@ -23,7 +24,7 @@ class Key(object):
             self.open(self.find_key_file(store))
 
     def find_key_file(self, store):
-        id = store.meta['id']
+        id = store.id.encode('hex')
         keys_dir = get_keys_dir()
         for name in os.listdir(keys_dir):
             filename = os.path.join(keys_dir, name)
@@ -57,7 +58,14 @@ class Key(object):
         self.enc_hmac_key = key['enc_hmac_key']
         self.id_key = key['id_key']
         self.chunk_seed = key['chunk_seed']
-        self.counter = Counter.new(128, initial_value=bytes_to_long(os.urandom(16)), allow_wraparound=True)
+        self.counter = Counter.new(64, initial_value=1, prefix=PREFIX)
+
+    def post_manifest_load(self, config):
+        iv = bytes_to_long(config['aes_counter'])+100
+        self.counter = Counter.new(64, initial_value=iv, prefix=PREFIX)
+
+    def pre_manifest_write(self, manifest):
+        manifest.config['aes_counter'] = long_to_bytes(self.counter.next_value(), 8)
 
     def encrypt_key_file(self, data, password):
         salt = get_random_bytes(32)
@@ -127,7 +135,7 @@ class Key(object):
             if password != password2:
                 print 'Passwords do not match'
         key = Key()
-        key.store_id = store.meta['id'].decode('hex')
+        key.store_id = store.id
         # Chunk AES256 encryption key
         key.enc_key = get_random_bytes(32)
         # Chunk encryption HMAC key
@@ -135,7 +143,10 @@ class Key(object):
         # Chunk id HMAC key
         key.id_key = get_random_bytes(32)
         # Chunkifier seed
-        key.chunk_seed = bytes_to_long(get_random_bytes(4)) & 0x7fffffff
+        key.chunk_seed = bytes_to_long(get_random_bytes(4))
+        # Convert to signed int32
+        if key.chunk_seed & 0x80000000:
+            key.chunk_seed = key.chunk_seed - 0xffffffff - 1
         key.save(path, password)
         return 0
 
@@ -146,7 +157,7 @@ class Key(object):
 
     def encrypt(self, data):
         data = zlib.compress(data)
-        nonce = long_to_bytes(self.counter.next_value(), 16)
+        nonce = long_to_bytes(self.counter.next_value(), 8)
         data = ''.join((nonce, AES.new(self.enc_key, AES.MODE_CTR, '',
                                        counter=self.counter).encrypt(data)))
         hash = HMAC.new(self.enc_hmac_key, data, SHA256).digest()
@@ -158,10 +169,10 @@ class Key(object):
         hash = data[1:33]
         if HMAC.new(self.enc_hmac_key, data[33:], SHA256).digest() != hash:
             raise IntegrityError('Encryption envelope checksum mismatch')
-        nonce = bytes_to_long(data[33:49])
-        counter = Counter.new(128, initial_value=nonce, allow_wraparound=True)
-        data = zlib.decompress(AES.new(self.enc_key, AES.MODE_CTR, counter=counter).decrypt(data[49:]))
-        if HMAC.new(self.id_key, data, SHA256).digest() != id:
+        nonce = bytes_to_long(data[33:41])
+        counter = Counter.new(64, initial_value=nonce, prefix=PREFIX)
+        data = zlib.decompress(AES.new(self.enc_key, AES.MODE_CTR, counter=counter).decrypt(data[41:]))
+        if id and HMAC.new(self.id_key, data, SHA256).digest() != id:
             raise IntegrityError('Chunk id verification failed')
         return data
 

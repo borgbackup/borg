@@ -93,15 +93,18 @@ class Store(object):
         names.sort(reverse=reverse)
         return names
 
-    def open_index(self, head):
+    def open_index(self, head, read_only=False):
         if head is None:
             self.index = NSIndex.create(os.path.join(self.path, 'index.tmp'))
             self.segments = {}
             self.compact = set()
         else:
-            shutil.copy(os.path.join(self.path, 'index.%d' % head),
-                        os.path.join(self.path, 'index.tmp'))
-            self.index = NSIndex(os.path.join(self.path, 'index.tmp'))
+            if read_only:
+                self.index = NSIndex(os.path.join(self.path, 'index.%d') % head)
+            else:
+                shutil.copy(os.path.join(self.path, 'index.%d' % head),
+                            os.path.join(self.path, 'index.tmp'))
+                self.index = NSIndex(os.path.join(self.path, 'index.tmp'))
             hints = read_msgpack(os.path.join(self.path, 'hints.%d' % head))
             if hints['version'] != 1:
                 raise ValueError('Unknown hints file version: %d' % hints['version'])
@@ -185,10 +188,11 @@ class Store(object):
     def rollback(self):
         """
         """
+        self._active_txn = False
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
         if self.io.head is not None and not os.path.exists(os.path.join(self.path, 'index.%d' % self.io.head)):
             self.recover(self.path)
-        self.open_index(self.io.head)
+        self.open_index(self.io.head, read_only=True)
 
     @deferrable
     def get(self, id):
@@ -200,6 +204,9 @@ class Store(object):
 
     @deferrable
     def put(self, id, data):
+        if not self._active_txn:
+            self._active_txn = True
+            self.open_index(self.io.head)
         try:
             segment, _ = self.index[id]
             self.segments[segment] -= 1
@@ -214,6 +221,9 @@ class Store(object):
 
     @deferrable
     def delete(self, id):
+        if not self._active_txn:
+            self._active_txn = True
+            self.open_index(self.io.head)
         try:
             segment, offset = self.index.pop(id)
             self.segments[segment] -= 1

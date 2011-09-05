@@ -160,17 +160,11 @@ class RemoteStore(object):
             else:
                 self.wait(self.odata)
 
-    def commit(self):
-        self.cmd('commit', (self.meta,))
+    def commit(self, *args):
+        self.cmd('commit', args)
 
     def rollback(self, *args):
         return self.cmd('rollback', args)
-
-    def meta_get(self, *args):
-        return self.cmd('meta_get', args)
-
-    def meta_set(self, *args):
-        return self.cmd('meta_set', args)
 
     def get(self, id, callback=None, callback_data=None):
         try:

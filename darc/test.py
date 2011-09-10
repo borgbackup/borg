@@ -115,7 +115,8 @@ class Test(unittest.TestCase):
     def test_corrupted_store(self):
         self.create_src_archive('test')
         self.darc('verify', self.store_path + '::test')
-        fd = open(os.path.join(self.tmpdir, 'store', 'data', '0', '2'), 'r+')
+        name = sorted(os.listdir(os.path.join(self.tmpdir, 'store', 'data', '0')), reverse=True)[0]
+        fd = open(os.path.join(self.tmpdir, 'store', 'data', '0', name), 'r+')
         fd.seek(100)
         fd.write('X')
         fd.close()

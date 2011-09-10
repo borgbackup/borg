@@ -56,11 +56,9 @@ class Archiver(object):
         store = self.open_store(args.archive)
         key = Key(store)
         manifest = Manifest(store, key)
-        if args.archive.archive in manifest.archives:
-            self.print_error('Archive already exists')
-            return self.exit_code
         cache = Cache(store, key, manifest)
-        archive = Archive(store, key, manifest, cache=cache)
+        archive = Archive(store, key, manifest, args.archive.archive, cache=cache,
+                          create=True, checkpoint_interval=args.checkpoint_interval)
         # Add darc cache dir to inode_skip list
         skip_inodes = set()
         try:
@@ -77,7 +75,7 @@ class Archiver(object):
                 pass
         for path in args.paths:
             self._process(archive, cache, args.patterns, skip_inodes, path)
-        archive.save(args.archive.archive, cache)
+        archive.save()
         if args.stats:
             t = datetime.now()
             diff = t - t0
@@ -310,6 +308,9 @@ class Archiver(object):
         subparser.add_argument('-e', '--exclude', dest='patterns',
                                type=ExcludePattern, action='append',
                                help='Include condition')
+        subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
+                               type=int, default=300, metavar='SECONDS',
+                               help='Write checkpointe ever SECONDS seconds (Default: 300)')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='Archive to create')

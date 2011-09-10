@@ -279,17 +279,18 @@ class Archiver(object):
             os.mkdir(dot_path)
             os.mkdir(os.path.join(dot_path, 'keys'))
             os.mkdir(os.path.join(dot_path, 'cache'))
-        parser = argparse.ArgumentParser(description='DARC - Deduplicating Archiver')
-        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
+        common_parser = argparse.ArgumentParser(add_help=False)
+        common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
                             default=False,
                             help='Verbose output')
 
+        parser = argparse.ArgumentParser(description='DARC - Deduplicating Archiver')
         subparsers = parser.add_subparsers(title='Available subcommands')
 
-        subparser = subparsers.add_parser('serve')
+        subparser = subparsers.add_parser('serve', parents=[common_parser])
         subparser.set_defaults(func=self.do_serve)
 
-        subparser = subparsers.add_parser('init')
+        subparser = subparsers.add_parser('init', parents=[common_parser])
         subparser.set_defaults(func=self.do_init)
         subparser.add_argument('-p', '--password', dest='password',
                                help='Protect store key with password (Default: prompt)')
@@ -297,7 +298,7 @@ class Archiver(object):
                                type=location_validator(archive=False),
                                help='Store to create')
 
-        subparser = subparsers.add_parser('create')
+        subparser = subparsers.add_parser('create', parents=[common_parser])
         subparser.set_defaults(func=self.do_create)
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
@@ -317,7 +318,7 @@ class Archiver(object):
         subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
                                help='Paths to add to archive')
 
-        subparser = subparsers.add_parser('extract')
+        subparser = subparsers.add_parser('extract', parents=[common_parser])
         subparser.set_defaults(func=self.do_extract)
         subparser.add_argument('-i', '--include', dest='patterns',
                                type=IncludePattern, action='append',
@@ -331,18 +332,18 @@ class Archiver(object):
         subparser.add_argument('dest', metavar='DEST', type=str, nargs='?',
                                help='Where to extract files')
 
-        subparser = subparsers.add_parser('delete')
+        subparser = subparsers.add_parser('delete', parents=[common_parser])
         subparser.set_defaults(func=self.do_delete)
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='Archive to delete')
 
-        subparser = subparsers.add_parser('list')
+        subparser = subparsers.add_parser('list', parents=[common_parser])
         subparser.set_defaults(func=self.do_list)
         subparser.add_argument('src', metavar='SRC', type=location_validator(),
                                help='Store/Archive to list contents of')
 
-        subparser= subparsers.add_parser('verify')
+        subparser= subparsers.add_parser('verify', parents=[common_parser])
         subparser.set_defaults(func=self.do_verify)
         subparser.add_argument('-i', '--include', dest='patterns',
                                type=IncludePattern, action='append',
@@ -354,13 +355,13 @@ class Archiver(object):
                                type=location_validator(archive=True),
                                help='Archive to verity integrity of')
 
-        subparser = subparsers.add_parser('info')
+        subparser = subparsers.add_parser('info', parents=[common_parser])
         subparser.set_defaults(func=self.do_info)
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='Archive to display information about')
 
-        subparser = subparsers.add_parser('purge')
+        subparser = subparsers.add_parser('purge', parents=[common_parser])
         subparser.set_defaults(func=self.do_purge)
         subparser.add_argument('-H', '--hourly', dest='hourly', type=int, default=0,
                                help='Number of hourly archives to keep')

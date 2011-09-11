@@ -130,8 +130,8 @@ class Key(object):
         else:
             password, password2 = 1, 2
         while password != password2:
-            password = getpass('Keychain password: ')
-            password2 = getpass('Keychain password again: ')
+            password = getpass('Key password: ')
+            password2 = getpass('Key password again: ')
             if password != password2:
                 print 'Passwords do not match'
         key = Key()

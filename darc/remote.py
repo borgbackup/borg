@@ -61,6 +61,9 @@ class StoreServer(object):
             if es:
                 return
 
+    def negotiate(self, versions):
+        return 1
+
     def open(self, path, create=False):
         if path.startswith('/~'):
             path = path[1:]
@@ -110,6 +113,10 @@ class RemoteStore(object):
         self.msgid = 0
         self.recursion = 0
         self.odata = []
+        # Negotiate protocol version
+        version = self.cmd('negotiate', (1,))
+        if version != 1:
+            raise Exception('Server insisted on using unsupported protocol version %d' % version)
         self.id = self.cmd('open', (location.path, create))
 
     def wait(self, write=True):

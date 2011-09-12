@@ -9,19 +9,19 @@ import tempfile
 import unittest
 from xattr import xattr, XATTR_NOFOLLOW
 
-import getpass
-getpass.getpass = lambda m: 'abc123'
-
 from . import store, helpers, lrucache
 from .archiver import Archiver
 
 
 class Test(unittest.TestCase):
 
+    prefix = ''
+
     def setUp(self):
         self.archiver = Archiver()
         self.tmpdir = tempfile.mkdtemp()
         self.store_path = os.path.join(self.tmpdir, 'store')
+        self.store_location = self.prefix + self.store_path
         self.input_path = os.path.join(self.tmpdir, 'input')
         self.output_path = os.path.join(self.tmpdir, 'output')
         self.keys_path = os.path.join(self.tmpdir, 'keys')
@@ -55,8 +55,8 @@ class Test(unittest.TestCase):
 
     def create_src_archive(self, name):
         src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__))
-        self.darc('init', '--password', '', self.store_path)
-        self.darc('create', self.store_path + '::' + name, src_dir)
+        self.darc('init', '--password', '', self.store_location)
+        self.darc('create', self.store_location + '::' + name, src_dir)
 
     def create_regual_file(self, name, size=0):
         filename = os.path.join(self.input_path, name)
@@ -100,45 +100,49 @@ class Test(unittest.TestCase):
                 os.path.join(self.input_path, 'hardlink'))
         os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
         os.mkfifo(os.path.join(self.input_path, 'fifo1'))
-        self.darc('init', '-p', '', self.store_path)
-        self.darc('create', self.store_path + '::test', 'input')
-        self.darc('create', self.store_path + '::test.2', 'input')
-        self.darc('extract', self.store_path + '::test', 'output')
+        self.darc('init', '-p', '', self.store_location)
+        self.darc('create', self.store_location + '::test', 'input')
+        self.darc('create', self.store_location + '::test.2', 'input')
+        self.darc('extract', self.store_location + '::test', 'output')
         self.diff_dirs('input', 'output/input')
-        info_output = self.darc('info', self.store_path + '::test')
+        info_output = self.darc('info', self.store_location + '::test')
         shutil.rmtree(self.cache_path)
-        info_output2 = self.darc('info', self.store_path + '::test')
+        info_output2 = self.darc('info', self.store_location + '::test')
         # info_output2 starts with some "initializing cache" text but should
         # end the same way as info_output
         assert info_output2.endswith(info_output)
 
     def test_corrupted_store(self):
         self.create_src_archive('test')
-        self.darc('verify', self.store_path + '::test')
+        self.darc('verify', self.store_location + '::test')
         name = sorted(os.listdir(os.path.join(self.tmpdir, 'store', 'data', '0')), reverse=True)[0]
         fd = open(os.path.join(self.tmpdir, 'store', 'data', '0', name), 'r+')
         fd.seek(100)
         fd.write('X')
         fd.close()
-        self.darc('verify', self.store_path + '::test', exit_code=1)
+        self.darc('verify', self.store_location + '::test', exit_code=1)
 
     def test_purge_store(self):
         src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__))
-        self.darc('init', '-p', '', self.store_path)
-        self.darc('create', self.store_path + '::test1', src_dir)
-        self.darc('create', self.store_path + '::test2', src_dir)
-        self.darc('purge', self.store_path, '--daily=2')
-        output = self.darc('list', self.store_path)
+        self.darc('init', '-p', '', self.store_location)
+        self.darc('create', self.store_location + '::test1', src_dir)
+        self.darc('create', self.store_location + '::test2', src_dir)
+        self.darc('purge', self.store_location, '--daily=2')
+        output = self.darc('list', self.store_location)
         assert 'test1' in output
         assert 'test2' in output
-        self.darc('purge', self.store_path, '--daily=2', '--really')
-        output = self.darc('list', self.store_path)
+        self.darc('purge', self.store_location, '--daily=2', '--really')
+        output = self.darc('list', self.store_location)
         assert 'test1' not in output
         assert 'test2' in output
+
+class RemoteTest(Test):
+    prefix = 'localhost:'
 
 def suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.TestLoader().loadTestsFromTestCase(Test))
+    suite.addTest(unittest.TestLoader().loadTestsFromTestCase(RemoteTest))
     suite.addTest(store.suite())
     suite.addTest(doctest.DocTestSuite(helpers))
     suite.addTest(lrucache.suite())

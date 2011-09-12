@@ -235,6 +235,9 @@ class Store(object):
     def flush_rpc(self, *args):
         pass
 
+    def add_callback(self, cb, data):
+        cb(None, None, data)
+
 
 class LoggedIO(object):
 

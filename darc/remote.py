@@ -125,7 +125,7 @@ class RemoteStore(object):
         self.odata.append(msgpack.packb((1, self.msgid, cmd, args)))
         self.recursion += 1
         if callback:
-            self.callbacks[self.msgid] = callback, callback_data
+            self.add_callback(callback, callback_data)
             if self.recursion > 1:
                 self.recursion -= 1
                 return
@@ -146,8 +146,7 @@ class RemoteStore(object):
                         self.recursion -= 1
                         return res
                     else:
-                        c, d = self.callbacks.pop(msgid, (None, None))
-                        if c:
+                        for c, d in self.callbacks.pop(msgid, []):
                             c(res, error, d)
             elif self.odata and self.channel.send_ready():
                 data = self.odata.pop(0)
@@ -184,6 +183,9 @@ class RemoteStore(object):
     def delete(self, id, callback=None, callback_data=None):
         return self.cmd('delete', (id, ), callback, callback_data)
 
+    def add_callback(self, cb, data):
+        self.callbacks.setdefault(self.msgid, []).append((cb, data))
+
     def flush_rpc(self, counter=None, backlog=0):
         counter = counter or self.notifier.enabled
         while counter > backlog:
@@ -199,8 +201,7 @@ class RemoteStore(object):
                 self.unpacker.feed(self.channel.recv(BUFSIZE))
                 for type, msgid, error, res in self.unpacker:
                     self.notifier.enabled.dec()
-                    c, d = self.callbacks.pop(msgid, (None, None))
-                    if c:
+                    for c, d in self.callbacks.pop(msgid, []):
                         c(res, error, d)
                     if msgid == self.msgid:
                         return

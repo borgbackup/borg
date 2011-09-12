@@ -137,8 +137,10 @@ class Archiver(object):
             else:
                 archive.extract_item(item, args.dest, start_cb)
             if dirs and not item['path'].startswith(dirs[-1]['path']):
-                # Extract directories twice to make sure mtime is correctly restored
-                archive.extract_item(dirs.pop(-1), args.dest)
+                def cb(_, __, item):
+                    # Extract directories twice to make sure mtime is correctly restored
+                    archive.extract_item(item, args.dest)
+                store.add_callback(cb, dirs.pop(-1))
         store = self.open_store(args.archive)
         key = Key(store)
         manifest = Manifest(store, key)
@@ -343,7 +345,7 @@ class Archiver(object):
         subparser.add_argument('src', metavar='SRC', type=location_validator(),
                                help='Store/Archive to list contents of')
 
-        subparser= subparsers.add_parser('verify', parents=[common_parser])
+        subparser = subparsers.add_parser('verify', parents=[common_parser])
         subparser.set_defaults(func=self.do_verify)
         subparser.add_argument('-i', '--include', dest='patterns',
                                type=IncludePattern, action='append',

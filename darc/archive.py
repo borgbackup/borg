@@ -203,10 +203,12 @@ class Archive(object):
                 os.makedirs(os.path.dirname(path))
             # Hard link?
             if 'source' in item:
-                source = os.path.join(dest, item['source'])
-                if os.path.exists(path):
-                    os.unlink(path)
-                os.link(source, path)
+                def link_cb(_, __, item):
+                    source = os.path.join(dest, item['source'])
+                    if os.path.exists(path):
+                        os.unlink(path)
+                    os.link(source, path)
+                self.store.add_callback(link_cb, item)
             else:
                 def extract_cb(chunk, error, (id, i)):
                     if i == 0:

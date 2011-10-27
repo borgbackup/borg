@@ -13,6 +13,7 @@ import sys
 import time
 import urllib
 
+
 class Manifest(object):
 
     MANIFEST_ID = '\0' * 32
@@ -327,6 +328,7 @@ class Location(object):
                         r'(?P<path>[^:]*)(?:::(?P<archive>.+))?')
 
     def __init__(self, text):
+        self.orig = text
         if not self.parse(text):
             raise ValueError
 

@@ -19,9 +19,9 @@ PREFIX = '\0' * 8
 class Key(object):
     FILE_ID = 'DARC KEY'
 
-    def __init__(self, store=None):
+    def __init__(self, store=None, password=None):
         if store:
-            self.open(self.find_key_file(store))
+            self.open(self.find_key_file(store), password=password)
 
     def find_key_file(self, store):
         id = store.id.encode('hex')
@@ -34,17 +34,18 @@ class Key(object):
                     return filename
         raise Exception('Key file for store with ID %s not found' % id)
 
-    def open(self, filename):
+    def open(self, filename, prompt=None, password=None):
+        prompt = prompt or 'Enter password for %s: ' % filename
         with open(filename, 'rb') as fd:
             lines = fd.readlines()
             if not lines[0].startswith(self.FILE_ID) != self.FILE_ID:
                 raise ValueError('Not a DARC key file')
             self.store_id = lines[0][len(self.FILE_ID):].strip().decode('hex')
             cdata = (''.join(lines[1:])).decode('base64')
-        self.password = ''
-        data = self.decrypt_key_file(cdata, '')
+        self.password = password or ''
+        data = self.decrypt_key_file(cdata, self.password)
         while not data:
-            self.password = getpass('Key password: ')
+            self.password = getpass(prompt)
             if not self.password:
                 raise Exception('Key decryption failed')
             data = self.decrypt_key_file(cdata, self.password)
@@ -59,6 +60,7 @@ class Key(object):
         self.id_key = key['id_key']
         self.chunk_seed = key['chunk_seed']
         self.counter = Counter.new(64, initial_value=1, prefix=PREFIX)
+        self.path = filename
 
     def post_manifest_load(self, config):
         iv = bytes_to_long(config['aes_counter'])+100
@@ -69,7 +71,7 @@ class Key(object):
 
     def encrypt_key_file(self, data, password):
         salt = get_random_bytes(32)
-        iterations = 2000
+        iterations = 10000
         key = pbkdf2(password, salt, 32, iterations, hashlib.sha256)
         hash = HMAC.new(key, data, SHA256).digest()
         cdata = AES.new(key, AES.MODE_CTR, counter=Counter.new(128)).encrypt(data)
@@ -106,9 +108,9 @@ class Key(object):
         with open(path, 'wb') as fd:
             fd.write('%s %s\n' % (self.FILE_ID, self.store_id.encode('hex')))
             fd.write(data.encode('base64'))
-            print 'Key file "%s" created' % path
+        self.path = path
 
-    def chpass(self):
+    def chpasswd(self):
         password, password2 = 1, 2
         while password != password2:
             password = getpass('New password: ')
@@ -130,8 +132,8 @@ class Key(object):
         else:
             password, password2 = 1, 2
         while password != password2:
-            password = getpass('Key password: ')
-            password2 = getpass('Key password again: ')
+            password = getpass('Key file password (Leave blank for no password): ')
+            password2 = getpass('Key file password again: ')
             if password != password2:
                 print 'Passwords do not match'
         key = Key()
@@ -148,7 +150,7 @@ class Key(object):
         if key.chunk_seed & 0x80000000:
             key.chunk_seed = key.chunk_seed - 0xffffffff - 1
         key.save(path, password)
-        return 0
+        return Key(store, password=password)
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key

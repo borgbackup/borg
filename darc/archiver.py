@@ -42,13 +42,22 @@ class Archiver(object):
         return StoreServer().serve()
 
     def do_init(self, args):
+        print 'Initializing store "%s"' % args.store.orig
         store = self.open_store(args.store, create=True)
-        Key.create(store, args.store.to_key_filename(),
-                         password=args.password)
-        key = Key(store)
+        key = Key.create(store, args.store.to_key_filename(), password=args.password)
+        print 'Key file "%s" created.' % key.path
+        print 'Remember that this file (and password) is needed to access your data. Keep it safe!'
+        print
         manifest = Manifest(store, key, dont_load=True)
         manifest.write()
         store.commit()
+        return self.exit_code
+
+    def do_chpasswd(self, args):
+        key = Key()
+        key.open(args.store.to_key_filename())
+        key.chpasswd()
+        print 'Key file "%s" updated' % key.path
         return self.exit_code
 
     def do_create(self, args):
@@ -299,6 +308,12 @@ class Archiver(object):
         subparser.add_argument('store',
                                type=location_validator(archive=False),
                                help='Store to create')
+
+        subparser = subparsers.add_parser('change-password', parents=[common_parser])
+        subparser.set_defaults(func=self.do_chpasswd)
+        subparser.add_argument('store', metavar='STORE',
+                               type=location_validator(archive=False),
+                               help='Key file to operate on')
 
         subparser = subparsers.add_parser('create', parents=[common_parser])
         subparser.set_defaults(func=self.do_create)

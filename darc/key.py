@@ -16,6 +16,7 @@ from .helpers import IntegrityError, get_keys_dir
 
 PREFIX = '\0' * 8
 
+
 class Key(object):
     FILE_ID = 'DARC KEY'
 
@@ -63,7 +64,7 @@ class Key(object):
         self.path = filename
 
     def post_manifest_load(self, config):
-        iv = bytes_to_long(config['aes_counter'])+100
+        iv = bytes_to_long(config['aes_counter']) + 100
         self.counter = Counter.new(64, initial_value=iv, prefix=PREFIX)
 
     def pre_manifest_write(self, manifest):

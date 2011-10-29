@@ -36,7 +36,6 @@ class Store(object):
     class DoesNotExist(KeyError):
         """Requested key does not exist"""
 
-
     def __init__(self, path, create=False):
         if create:
             self.create(path)
@@ -133,6 +132,7 @@ class Store(object):
         """
         if not self.compact:
             return
+
         def lookup(tag, key):
             return tag == TAG_PUT and self.index.get(key, (-1, -1))[0] == segment
         segments = self.segments
@@ -268,7 +268,7 @@ class LoggedIO(object):
         for segment in self.fds.keys():
             self.fds.pop(segment).close()
         self.close_segment()
-        self.fds = None # Just to make sure we're disabled
+        self.fds = None  # Just to make sure we're disabled
 
     def _segment_names(self, reverse=False):
         for dirpath, dirs, filenames in os.walk(os.path.join(self.path, 'data')):
@@ -322,7 +322,7 @@ class LoggedIO(object):
     def delete_segment(self, segment):
         try:
             os.unlink(self.segment_filename(segment))
-        except OSError, e:
+        except OSError:
             pass
 
     def iter_objects(self, segment, lookup=None, include_data=False):
@@ -380,7 +380,6 @@ class LoggedIO(object):
 
     def write_delete(self, id):
         fd = self.get_write_fd()
-        offset = self.offset
         header = self.header_no_crc_fmt.pack(self.put_header_fmt.size, TAG_DELETE)
         crc = self.crc_fmt.pack(crc32(id, crc32(header)) & 0xffffffff)
         fd.write(''.join((crc, header, id)))

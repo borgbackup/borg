@@ -30,7 +30,6 @@ class Archive(object):
     class AlreadyExists(Exception):
         pass
 
-
     def __init__(self, store, key, manifest, name, cache=None, create=False, checkpoint_interval=300):
         self.key = key
         self.store = store
@@ -79,6 +78,7 @@ class Archive(object):
     def iter_items(self, callback):
         unpacker = msgpack.Unpacker()
         counter = Counter(0)
+
         def cb(chunk, error, id):
             if error:
                 raise error
@@ -157,7 +157,7 @@ class Archive(object):
                 try:
                     for id, size, csize in item['chunks']:
                         count, _, _ = self.cache.chunks[id]
-                        stats.update(size, csize, count==1)
+                        stats.update(size, csize, count == 1)
                         stats.nfiles += 1
                         self.cache.chunks[id] = count - 1, size, csize
                 except KeyError:
@@ -168,7 +168,7 @@ class Archive(object):
         for id in self.metadata['items']:
             self.store.get(id, callback=cb, callback_data=id)
             count, size, csize = self.cache.chunks[id]
-            stats.update(size, csize, count==1)
+            stats.update(size, csize, count == 1)
             self.cache.chunks[id] = count - 1, size, csize
         self.store.flush_rpc()
         cache.rollback()
@@ -176,7 +176,6 @@ class Archive(object):
 
     def extract_item(self, item, dest=None, start_cb=None, restore_attrs=True):
         dest = dest or os.getcwdu()
-        dir_stat_queue = []
         assert item['path'][0] not in ('/', '\\', ':')
         path = os.path.join(dest, encode_filename(item['path']))
         mode = item['mode']
@@ -266,7 +265,7 @@ class Archive(object):
                 return
             if i == 0:
                 start(item)
-            data = self.key.decrypt(id, chunk)
+            self.key.decrypt(id, chunk)
             if i == n - 1:
                 result(item, True)
         state = {}
@@ -377,4 +376,3 @@ class Archive(object):
     def list_archives(store, key, manifest, cache=None):
         for name, info in manifest.archives.items():
             yield Archive(store, key, manifest, name, cache=cache)
-

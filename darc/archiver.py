@@ -14,6 +14,7 @@ from .helpers import location_validator, format_time, \
     get_cache_dir, format_timedelta, purge_split, Manifest
 from .remote import StoreServer, RemoteStore
 
+
 class Archiver(object):
 
     def __init__(self):
@@ -137,6 +138,7 @@ class Archiver(object):
     def do_extract(self, args):
         def start_cb(item):
             self.print_verbose(item['path'])
+
         def extract_cb(item):
             if exclude_path(item['path'], args.patterns):
                 return
@@ -211,14 +213,17 @@ class Archiver(object):
         key = Key(store)
         manifest = Manifest(store, key)
         archive = Archive(store, key, manifest, args.archive.archive)
+
         def start_cb(item):
             self.print_verbose('%s ...', item['path'], newline=False)
+
         def result_cb(item, success):
             if success:
                 self.print_verbose('OK')
             else:
                 self.print_verbose('ERROR')
                 self.print_error('%s: verification failed' % item['path'])
+
         def callback(item):
             if exclude_path(item['path'], args.patterns):
                 return
@@ -402,6 +407,7 @@ class Archiver(object):
         args = parser.parse_args(args)
         self.verbose = args.verbose
         return args.func(args)
+
 
 def main():
     archiver = Archiver()

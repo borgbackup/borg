@@ -92,8 +92,8 @@ class Test(unittest.TestCase):
             self.assertEqual(d1, d2)
 
     def test_basic_functionality(self):
-        self.create_regual_file('file1', size=1024*80)
-        self.create_regual_file('dir2/file2', size=1024*80)
+        self.create_regual_file('file1', size=1024 * 80)
+        self.create_regual_file('dir2/file2', size=1024 * 80)
         x = xattr(os.path.join(self.input_path, 'file1'))
         x.set('user.foo', 'bar')
         os.link(os.path.join(self.input_path, 'file1'),
@@ -136,8 +136,10 @@ class Test(unittest.TestCase):
         assert 'test1' not in output
         assert 'test2' in output
 
+
 class RemoteTest(Test):
     prefix = 'localhost:'
+
 
 def suite():
     suite = unittest.TestSuite()

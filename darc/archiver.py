@@ -11,7 +11,7 @@ from .cache import Cache
 from .key import Key
 from .helpers import location_validator, format_time, \
     format_file_mode, IncludePattern, ExcludePattern, exclude_path, to_localtime, \
-    get_cache_dir, format_timedelta, purge_split, Manifest
+    get_cache_dir, format_timedelta, purge_split, Manifest, Location
 from .remote import StoreServer, RemoteStore
 
 
@@ -55,8 +55,12 @@ class Archiver(object):
         return self.exit_code
 
     def do_chpasswd(self, args):
+        if os.path.isfile(args.store_or_file):
+            filename = args.store_or_file
+        else:
+            filename = Location(args.store_or_file).to_key_filename()
         key = Key()
-        key.open(args.store.to_key_filename())
+        key.open(filename)
         key.chpasswd()
         print 'Key file "%s" updated' % key.path
         return self.exit_code
@@ -316,8 +320,8 @@ class Archiver(object):
 
         subparser = subparsers.add_parser('change-password', parents=[common_parser])
         subparser.set_defaults(func=self.do_chpasswd)
-        subparser.add_argument('store', metavar='STORE',
-                               type=location_validator(archive=False),
+        subparser.add_argument('store_or_file', metavar='STORE_OR_KEY_FILE',
+                               type=str,
                                help='Key file to operate on')
 
         subparser = subparsers.add_parser('create', parents=[common_parser])

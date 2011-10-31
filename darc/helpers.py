@@ -76,7 +76,7 @@ class Statistics(object):
     def print_(self):
         print 'Number of files: %d' % self.nfiles
         print 'Original size: %d (%s)' % (self.osize, format_file_size(self.osize))
-        print 'Compressed size: %s (%s)'% (self.csize, format_file_size(self.csize))
+        print 'Compressed size: %s (%s)' % (self.csize, format_file_size(self.csize))
         print 'Unique data: %d (%s)' % (self.usize, format_file_size(self.usize))
 
 
@@ -228,7 +228,7 @@ def format_timedelta(td):
     '2 hours 1.10 seconds'
     """
     # Since td.total_seconds() requires python 2.7
-    ts = (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / float(10**6)
+    ts = (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10 ** 6) / float(10 ** 6)
     s = ts % 60
     m = int(ts / 60) % 60
     h = int(ts / 3600) % 24
@@ -250,6 +250,7 @@ def format_file_mode(mod):
                        for m, s in ((4, 'r'), (2, 'w'), (1, 'x')))
     return '%s%s%s' % (x(mod / 64), x(mod / 8), x(mod))
 
+
 def format_file_size(v):
     """Format file size into a human friendly format
     """
@@ -262,12 +263,15 @@ def format_file_size(v):
     else:
         return '%d B' % v
 
+
 class IntegrityError(Exception):
     """
     """
 
+
 def memoize(function):
     cache = {}
+
     def decorated_function(*args):
         try:
             return cache[args]
@@ -277,12 +281,14 @@ def memoize(function):
             return val
     return decorated_function
 
+
 @memoize
 def uid2user(uid):
     try:
         return pwd.getpwuid(uid).pw_name
     except KeyError:
         return None
+
 
 @memoize
 def user2uid(user):
@@ -291,12 +297,14 @@ def user2uid(user):
     except KeyError:
         return None
 
+
 @memoize
 def gid2group(gid):
     try:
         return grp.getgrgid(gid).gr_name
     except KeyError:
         return None
+
 
 @memoize
 def group2gid(group):

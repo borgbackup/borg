@@ -56,11 +56,11 @@ class Archiver(object):
 
     def do_chpasswd(self, args):
         if os.path.isfile(args.store_or_file):
-            filename = args.store_or_file
+            key = Key()
+            key.open(args.store_or_file)
         else:
-            filename = Location(args.store_or_file).to_key_filename()
-        key = Key()
-        key.open(filename)
+            store = self.open_store(Location(args.store_or_file))
+            key = Key(store)
         key.chpasswd()
         print 'Key file "%s" updated' % key.path
         return self.exit_code

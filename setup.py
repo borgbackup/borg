@@ -3,6 +3,13 @@
 import os
 import sys
 from glob import glob
+
+try:
+    import Cython
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "fake_pyrex"))
+except ImportError:
+    pass
+
 from setuptools import setup, Extension
 from setuptools.command.sdist import sdist
 hashindex_sources = ['darc/hashindex.pyx', 'darc/_hashindex.c']
@@ -18,9 +25,10 @@ try:
                                         cython_compiler.default_options)
             sdist.__init__(self, *args, **kwargs)
 
-        def run(self):
-            sdist.run(self)
-            self.filelist.append('darc/hashindex.c', 'darc/hashindex.h')
+        def make_distribution(self):
+            self.filelist.append('darc/hashindex.c')
+            self.filelist.append('darc/hashindex.h')
+            sdist.make_distribution(self)
 
 except ImportError:
     hashindex_sources[0] = hashindex_sources[0].replace('.pyx', '.c')

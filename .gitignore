@@ -1,4 +1,6 @@
+docs/_build
 build
+env
 *.egg-info
 *.pyc
 *.pyo

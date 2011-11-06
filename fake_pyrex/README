@@ -1,0 +1,1 @@
+This workaround is needed for setuptools to work properly with Cython when Pyrex isn't installed.

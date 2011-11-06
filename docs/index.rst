@@ -17,6 +17,15 @@ Secure
     and the data integrity and authenticity is verified using
     `HMAC-SHA256 <http://en.wikipedia.org/wiki/HMAC>`_.
 
+Remote stores
+    Darc can store data on remote hosts over SSH as long as Darc is installed on
+    the remote host. The following syntax is used to specify a remote store::
+
+    $ darc list hostname:path
+    $ darc extract hostname:path::archive-name
+    $ darc extract username@hostname:path::archive-name
+
+
 Definitions
 -----------
 Deduplication
@@ -45,43 +54,95 @@ Requirements
 * msgpack-python
 * paramiko (for remote store support)
 
+
 Installation
 ------------
 
-Usage
------
+The following instructions will install Darc in ``/usr/local/darc/`` without interfering
+with the rest of the system.
 
-Before the first archive can be created a store needs to be initialized.
-A store is directory containing
+1. Initialize a new python environment::
 
-Initialize a new empty store::
+    $ virtualenv /usr/local/darc
+
+2. Extract the source code using GIT or a release tarball::
+
+    $ mkdir /usr/local/darc/src/
+    $ cd /usr/local/darc/src/
+    $ tar -xvzf darc-x.y.tar.gz
+    OR
+    $ git clone git://github.com/jborg/darc.git
+
+3. Install Darc::
+
+    $ cd darc-x.y/
+    $ ../../bin/python setup.py install
+
+4. Add /usr/local/darc/bin to $PATH
+
+
+Basic Usage
+===========
+
+Initializing a store
+--------------------
+Before the first archive can be created a store needs to be initialized::
 
     $ darc init /data/my-backup.darc
     Initializing store "/data/my-backup.darc"
     Key file password (Leave blank for no password): *****
     Key file password again: *****
-    Key file "/Users/jonas/.darc/keys/data_my_backup_darc" created.
+    Key file "/home/YOU/.darc/keys/data_my_backup_darc" created.
     Remember that this file (and password) is needed to access your data. Keep it safe!
 
-Create an archive::
 
-    darc create -v /data/my-backup.darc::backup-2011-09-10 ~/Documents ~/src
+Archive creation
+----------------
+The following command will create a new archive called ``backup-2011-09-10`` containing
+all files in ``~/Documents`` and ``~/src``::
 
-Extract an archive::
+    $ darc create -v /data/my-backup.darc::backup-2011-09-10 ~/Documents ~/src
 
-    darc extract -v /data/my-backup.darc::backup-2011-09-10
+Extract an archive
+------------------
+The following command will extract the archive ``backup-2011-09-10``::
 
-Delete an archive::
+    $ darc extract -v /data/my-backup.darc::backup-2011-09-10
 
-    darc delete /data/my-backup.darc::backup-2011-09-10
+Delete an archive
+-----------------
+The following command will delete archive ``backup-2011-09-10``::
 
-List store contents::
+    $ darc delete /data/my-backup.darc::backup-2011-09-10
 
-    darc list /data/my-backup.darc
+List store contents
+-------------------
+The following command will list the names of all archives in the store::
 
-List archive contents::
+    $ darc list /data/my-backup.darc
+    backup-2011-09-09
+    backup-2011-09-10
+    ...
 
-    darc list /data/my-backup.darc::backup-2011-09-10
+List archive contents
+---------------------
+The following command will list the contents of the ``backup-2011-09-10`` archive::
+
+    $ darc list /data/my-backup.darc::backup-2011-09-10
+    -rw-r--r-- YOU    users       280 May 14  2010 home/YOU/Documents/something.txt
+    -rw-r--r-- YOU    users       280 May 14  2010 home/YOU/Documents/something-else.pdf
+    ...
+
+Purge old archives
+------------------
+When performing automatic backups it is important to periodically purge old backup
+archives to stop the store from growing too big.
+
+The following command will purge old archives and only keep the
+seven latest end of day archives and the five latest end of week archives::
+
+    $ darc purge --daily=7 --weekly=5 /data/my-backup.darc
+
 
 Indices and tables
 ==================

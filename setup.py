@@ -3,6 +3,16 @@
 import os
 import sys
 from glob import glob
+import darc
+
+min_python = (2, 5)
+if sys.version_info < min_python:
+    print "Darc requires Python %d.%d or later" % min_python
+    sys.exit(1)
+
+if sys.version_info >= (3,):
+    print "Darc doesn't support Python 3 (yet)"
+    sys.exit(1)
 
 try:
     import Cython
@@ -17,6 +27,7 @@ hashindex_sources = ['darc/hashindex.pyx', 'darc/_hashindex.c']
 try:
     from Cython.Distutils import build_ext
     import Cython.Compiler.Main as cython_compiler
+
     class Sdist(sdist):
         def __init__(self, *args, **kwargs):
             for src in glob('darc/*.pyx'):
@@ -43,17 +54,17 @@ if sys.version_info < (2, 7):
 
 
 setup(name='darc',
-      version='0.1',
+      version=darc.__version__,
       author='Jonas Borgström',
       author_email='jonas@borgstrom.se',
       url='http://github.com/jborg/darc/',
       packages=['darc'],
-      cmdclass = {'build_ext': build_ext, 'sdist': Sdist},
+      cmdclass={'build_ext': build_ext, 'sdist': Sdist},
       ext_modules=[
       Extension('darc._speedups', ['darc/_speedups.c']),
       Extension('darc.hashindex', hashindex_sources)],
       install_requires=dependencies,
-      entry_points = {
+      entry_points={
         'console_scripts': [
             'darc = darc.archiver:main',
         ]

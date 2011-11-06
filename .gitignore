@@ -1,6 +1,8 @@
 docs/_build
 build
+dist
 env
+hashindex.c
 *.egg-info
 *.pyc
 *.pyo

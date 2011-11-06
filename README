@@ -1,41 +1,41 @@
-Basic Usage
-===========
+.. -*- restructuredtext -*-
 
-Generate keychain
------------------
-All data stored using darc is protected by 256 bit AES encryption. This means
-that a keychain file needs to be created before any archives can be created:
+===============
+README for Darc
+===============
 
-$ darc init-keychain
+Installing
+==========
 
-This will create a password protected keychain in ~/.darc/keychain
+Use ``setup.py``::
 
-Create an empty darc store
---------------------------
+   python setup.py build
+   sudo python setup.py install
 
-$ darc init /path/store
 
-Create an archive
------------------
+Reading the docs
+================
 
-$ darc create /path/store::MyBackup ~/Documents ~/src
+After installing::
 
-List store contents
--------------------
+   cd docs
+   sphinx-build . _build/html
 
-$ darc list /path/store
+Then, direct your browser to ``_build/html/index.html``.
 
-List archive contents
----------------------
+Or read them online at <http://jborg.github.com/darc/>.
 
-$ darc list /path/store::MyBackup
 
-Extract archive
----------------
+Testing
+=======
 
-$ darc extract /path/store::MyBackup /destination
+To run the tests with the interpreter available as ``python``, use::
 
-Delete archive
---------------
+	$ python -m darc.test
 
-$ darc delete /path/store::MyBackup
+
+Contributing
+============
+
+Send wishes, comments, patches, etc. to jonas@borgstrom.se
+

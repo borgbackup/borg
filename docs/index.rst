@@ -133,15 +133,15 @@ The following command will list the contents of the ``backup-2011-09-10`` archiv
     -rw-r--r-- YOU    users       280 May 14  2010 home/YOU/Documents/something-else.pdf
     ...
 
-Purge old archives
+Prune old archives
 ------------------
-When performing automatic backups it is important to periodically purge old backup
+When performing automatic backups it is important to periodically prune old backup
 archives to stop the store from growing too big.
 
-The following command will purge old archives and only keep the
+The following command will prune old archives and only keep the
 seven latest end of day archives and the five latest end of week archives::
 
-    $ darc purge --daily=7 --weekly=5 /data/my-backup.darc
+    $ darc prune --daily=7 --weekly=5 /data/my-backup.darc
 
 
 Indices and tables

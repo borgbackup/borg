@@ -11,7 +11,7 @@ from .cache import Cache
 from .key import Key
 from .helpers import location_validator, format_time, \
     format_file_mode, IncludePattern, ExcludePattern, exclude_path, to_localtime, \
-    get_cache_dir, format_timedelta, purge_split, Manifest, Location
+    get_cache_dir, format_timedelta, prune_split, Manifest, Location
 from .remote import StoreServer, RemoteStore
 
 
@@ -253,7 +253,7 @@ class Archiver(object):
         stats.print_()
         return self.exit_code
 
-    def do_purge(self, args):
+    def do_prune(self, args):
         store = self.open_store(args.store)
         key = Key(store)
         manifest = Manifest(store, key)
@@ -268,15 +268,15 @@ class Archiver(object):
             archives = [archive for archive in archives if archive.name.startswith(args.prefix)]
         keep = []
         if args.hourly:
-            keep += purge_split(archives, '%Y-%m-%d %H', args.hourly)
+            keep += prune_split(archives, '%Y-%m-%d %H', args.hourly)
         if args.daily:
-            keep += purge_split(archives, '%Y-%m-%d', args.daily, keep)
+            keep += prune_split(archives, '%Y-%m-%d', args.daily, keep)
         if args.weekly:
-            keep += purge_split(archives, '%Y-%V', args.weekly, keep)
+            keep += prune_split(archives, '%Y-%V', args.weekly, keep)
         if args.monthly:
-            keep += purge_split(archives, '%Y-%m', args.monthly, keep)
+            keep += prune_split(archives, '%Y-%m', args.monthly, keep)
         if args.yearly:
-            keep += purge_split(archives, '%Y', args.yearly, keep)
+            keep += prune_split(archives, '%Y', args.yearly, keep)
 
         keep.sort(key=attrgetter('ts'), reverse=True)
         to_delete = [a for a in archives if a not in keep]
@@ -387,8 +387,8 @@ class Archiver(object):
                                type=location_validator(archive=True),
                                help='Archive to display information about')
 
-        subparser = subparsers.add_parser('purge', parents=[common_parser])
-        subparser.set_defaults(func=self.do_purge)
+        subparser = subparsers.add_parser('prune', parents=[common_parser])
+        subparser.set_defaults(func=self.do_prune)
         subparser.add_argument('-H', '--hourly', dest='hourly', type=int, default=0,
                                help='Number of hourly archives to keep')
         subparser.add_argument('-d', '--daily', dest='daily', type=int, default=0,
@@ -406,7 +406,7 @@ class Archiver(object):
                                help='Actually delete archives')
         subparser.add_argument('store', metavar='STORE',
                                type=location_validator(archive=False),
-                               help='Store to purge')
+                               help='Store to prune')
 
         args = parser.parse_args(args)
         self.verbose = args.verbose

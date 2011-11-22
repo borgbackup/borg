@@ -47,7 +47,7 @@ class Manifest(object):
         self.store.put(self.MANIFEST_ID, self.key.encrypt(data))
 
 
-def purge_split(archives, pattern, n, skip=[]):
+def prune_split(archives, pattern, n, skip=[]):
     items = {}
     keep = []
     for a in archives:

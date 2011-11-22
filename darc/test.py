@@ -122,16 +122,16 @@ class Test(unittest.TestCase):
         fd.close()
         self.darc('verify', self.store_location + '::test', exit_code=1)
 
-    def test_purge_store(self):
+    def test_prune_store(self):
         src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__))
         self.darc('init', '-p', '', self.store_location)
         self.darc('create', self.store_location + '::test1', src_dir)
         self.darc('create', self.store_location + '::test2', src_dir)
-        self.darc('purge', self.store_location, '--daily=2')
+        self.darc('prune', self.store_location, '--daily=2')
         output = self.darc('list', self.store_location)
         assert 'test1' in output
         assert 'test2' in output
-        self.darc('purge', self.store_location, '--daily=2', '--really')
+        self.darc('prune', self.store_location, '--daily=2', '--really')
         output = self.darc('list', self.store_location)
         assert 'test1' not in output
         assert 'test2' in output

@@ -129,10 +129,6 @@ class Test(unittest.TestCase):
         self.darc('create', self.store_location + '::test2', src_dir)
         self.darc('prune', self.store_location, '--daily=2')
         output = self.darc('list', self.store_location)
-        assert 'test1' in output
-        assert 'test2' in output
-        self.darc('prune', self.store_location, '--daily=2', '--really')
-        output = self.darc('list', self.store_location)
         assert 'test1' not in output
         assert 'test2' in output
 

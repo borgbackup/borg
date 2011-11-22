@@ -284,13 +284,8 @@ class Archiver(object):
         for archive in keep:
             self.print_verbose('Keeping archive "%s"' % archive.name)
         for archive in to_delete:
-            if args.really:
-                self.print_verbose('Purging archive "%s"', archive.name)
-                archive.delete(cache)
-            else:
-                print ('Archive "%s" marked for deletion. '
-                       'Use the "--really" option to actually delete it'
-                       % archive.metadata['name'])
+            self.print_verbose('Purging archive "%s"', archive.name)
+            archive.delete(cache)
         return self.exit_code
 
     def run(self, args=None):
@@ -401,9 +396,6 @@ class Archiver(object):
                                help='Number of yearly archives to keep')
         subparser.add_argument('-p', '--prefix', dest='prefix', type=str,
                                help='Only consider archive names starting with this prefix')
-        subparser.add_argument('-r', '--really', dest='really',
-                               action='store_true', default=False,
-                               help='Actually delete archives')
         subparser.add_argument('store', metavar='STORE',
                                type=location_validator(archive=False),
                                help='Store to prune')

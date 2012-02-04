@@ -88,7 +88,15 @@ class Archiver(object):
             except IOError:
                 pass
         for path in args.paths:
-            self._process(archive, cache, args.patterns, skip_inodes, path)
+            if args.dontcross:
+                try:
+                    restrict_dev = os.lstat(path).st_dev
+                except OSError, e:
+                    self.print_error('%s: %s', path, e)
+                    continue
+            else:
+                restrict_dev = None
+            self._process(archive, cache, args.patterns, skip_inodes, path, restrict_dev)
         archive.save()
         if args.stats:
             t = datetime.now()
@@ -103,7 +111,7 @@ class Archiver(object):
             print '-' * 40
         return self.exit_code
 
-    def _process(self, archive, cache, patterns, skip_inodes, path):
+    def _process(self, archive, cache, patterns, skip_inodes, path, restrict_dev):
         if exclude_path(path, patterns):
             return
         try:
@@ -112,6 +120,9 @@ class Archiver(object):
             self.print_error('%s: %s', path, e)
             return
         if (st.st_ino, st.st_dev) in skip_inodes:
+            return
+        # Entering a new filesystem?
+        if restrict_dev and st.st_dev != restrict_dev:
             return
         # Ignore unix sockets
         if stat.S_ISSOCK(st.st_mode):
@@ -126,7 +137,7 @@ class Archiver(object):
             else:
                 for filename in sorted(entries):
                     self._process(archive, cache, patterns, skip_inodes,
-                                  os.path.join(path, filename))
+                                  os.path.join(path, filename), restrict_dev)
         elif stat.S_ISLNK(st.st_mode):
             archive.process_symlink(path, st)
         elif stat.S_ISFIFO(st.st_mode):
@@ -333,6 +344,9 @@ class Archiver(object):
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                type=int, default=300, metavar='SECONDS',
                                help='Write checkpointe ever SECONDS seconds (Default: 300)')
+        subparser.add_argument('--do-not-cross-mountpoints', dest='dontcross',
+                               action='store_true', default=False,
+                               help='Do not cross mount points')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='Archive to create')

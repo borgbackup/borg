@@ -38,6 +38,9 @@ class StoreServer(object):
         # Make stdin non-blocking
         fl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
         fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, fl | os.O_NONBLOCK)
+        # Make stdout blocking
+        fl = fcntl.fcntl(sys.stdout.fileno(), fcntl.F_GETFL)
+        fcntl.fcntl(sys.stdout.fileno(), fcntl.F_SETFL, fl & ~os.O_NONBLOCK)
         unpacker = msgpack.Unpacker()
         while True:
             r, w, es = select.select([sys.stdin], [], [], 10)

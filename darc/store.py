@@ -136,7 +136,7 @@ class Store(object):
         def lookup(tag, key):
             return tag == TAG_PUT and self.index.get(key, (-1, -1))[0] == segment
         segments = self.segments
-        for segment in self.compact:
+        for segment in sorted(self.compact):
             if segments[segment] > 0:
                 for tag, key, data in self.io.iter_objects(segment, lookup, include_data=True):
                     new_segment, offset = self.io.write_put(key, data)
@@ -298,8 +298,8 @@ class LoggedIO(object):
     def segment_filename(self, segment):
         return os.path.join(self.path, 'data', str(segment / self.segments_per_dir), str(segment))
 
-    def get_write_fd(self):
-        if self.offset and self.offset > self.limit:
+    def get_write_fd(self, no_new=False):
+        if not no_new and self.offset and self.offset > self.limit:
             self.close_segment()
         if not self._write_fd:
             if self.segment % self.segments_per_dir == 0:
@@ -387,7 +387,7 @@ class LoggedIO(object):
         return self.segment
 
     def write_commit(self):
-        fd = self.get_write_fd()
+        fd = self.get_write_fd(no_new=True)
         header = self.header_no_crc_fmt.pack(self.header_fmt.size, TAG_COMMIT)
         crc = self.crc_fmt.pack(crc32(header) & 0xffffffff)
         fd.write(''.join((crc, header)))

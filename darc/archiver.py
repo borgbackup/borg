@@ -72,7 +72,8 @@ class Archiver(object):
         manifest = Manifest(store, key)
         cache = Cache(store, key, manifest)
         archive = Archive(store, key, manifest, args.archive.archive, cache=cache,
-                          create=True, checkpoint_interval=args.checkpoint_interval)
+                          create=True, checkpoint_interval=args.checkpoint_interval,
+                          numeric_owner=args.numeric_owner)
         # Add darc cache dir to inode_skip list
         skip_inodes = set()
         try:
@@ -170,7 +171,8 @@ class Archiver(object):
         store = self.open_store(args.archive)
         key = Key(store)
         manifest = Manifest(store, key)
-        archive = Archive(store, key, manifest, args.archive.archive)
+        archive = Archive(store, key, manifest, args.archive.archive,
+                          numeric_owner=args.numeric_owner)
         dirs = []
         archive.iter_items(extract_cb)
         store.flush_rpc()
@@ -206,8 +208,8 @@ class Archiver(object):
                     extra = ' link to %s' % item['source']
             else:
                 extra = ''
-            print '%s%s %-6s %-6s %8d %s %s%s' % (type, mode, item['user'],
-                                              item['group'], size, mtime,
+            print '%s%s %-6s %-6s %8d %s %s%s' % (type, mode, item['user'] or item['uid'],
+                                              item['group'] or item['gid'], size, mtime,
                                               item['path'], extra)
 
         store = self.open_store(args.src)
@@ -347,6 +349,9 @@ class Archiver(object):
         subparser.add_argument('--do-not-cross-mountpoints', dest='dontcross',
                                action='store_true', default=False,
                                help='Do not cross mount points')
+        subparser.add_argument('--numeric-owner', dest='numeric_owner',
+                               action='store_true', default=False,
+                               help='Only store numeric user and group identifiers')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='Archive to create')
@@ -361,6 +366,9 @@ class Archiver(object):
         subparser.add_argument('-e', '--exclude', dest='patterns',
                                type=ExcludePattern, action='append',
                                help='Include condition')
+        subparser.add_argument('--numeric-owner', dest='numeric_owner',
+                               action='store_true', default=False,
+                               help='Only obey numeric user and group identifiers')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='Archive to create')

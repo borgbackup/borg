@@ -30,7 +30,8 @@ class Archive(object):
     class AlreadyExists(Exception):
         pass
 
-    def __init__(self, store, key, manifest, name, cache=None, create=False, checkpoint_interval=300):
+    def __init__(self, store, key, manifest, name, cache=None, create=False,
+                 checkpoint_interval=300, numeric_owner=False):
         self.key = key
         self.store = store
         self.cache = cache
@@ -41,6 +42,7 @@ class Archive(object):
         self.stats = Statistics()
         self.name = name
         self.checkpoint_interval = checkpoint_interval
+        self.numeric_owner = numeric_owner
         if create:
             if name in manifest.archives:
                 raise self.AlreadyExists
@@ -246,8 +248,12 @@ class Archive(object):
             os.lchmod(path, item['mode'])
         elif not symlink:
             os.chmod(path, item['mode'])
-        uid = user2uid(item['user']) or item['uid']
-        gid = group2gid(item['group']) or item['gid']
+        uid = gid = None
+        if not self.numeric_owner:
+            uid = user2uid(item['user'])
+            gid = group2gid(item['group'])
+        uid = uid or item['uid']
+        gid = gid or item['gid']
         try:
             os.lchown(path, uid, gid)
         except OSError:
@@ -306,6 +312,8 @@ class Archive(object):
             'gid': st.st_gid, 'group': gid2group(st.st_gid),
             'mtime': st.st_mtime,
         }
+        if self.numeric_owner:
+            item['user'] = item['group'] = None
         try:
             xa = xattr(path, XATTR_NOFOLLOW)
             xattrs = {}

@@ -20,8 +20,9 @@ try:
 except ImportError:
     pass
 
-from setuptools import setup, Extension
-from setuptools.command.sdist import sdist
+from distutils.core import setup
+from distutils.extension import Extension
+from distutils.command.sdist import sdist
 hashindex_sources = ['darc/hashindex.pyx', 'darc/_hashindex.c']
 
 try:
@@ -43,15 +44,10 @@ try:
 
 except ImportError:
     hashindex_sources[0] = hashindex_sources[0].replace('.pyx', '.c')
-    from setuptools.command.build_ext import build_ext
+    from distutils.command.build_ext import build_ext
     Sdist = sdist
     if not os.path.exists('darc/hashindex.c'):
         raise ImportError('The GIT version of darc needs Cython. Install Cython or use a released version')
-
-dependencies = ['pycrypto', 'msgpack-python', 'pbkdf2.py', 'xattr', 'paramiko']
-if sys.version_info < (2, 7):
-    dependencies.append('argparse')
-
 
 setup(name='darc',
       version=darc.__version__,
@@ -63,10 +59,6 @@ setup(name='darc',
       ext_modules=[
       Extension('darc._speedups', ['darc/_speedups.c']),
       Extension('darc.hashindex', hashindex_sources)],
-      install_requires=dependencies,
-      entry_points={
-        'console_scripts': [
-            'darc = darc.archiver:main',
-        ]
-    })
+      scripts = ['scripts/darc'],
+    )
 

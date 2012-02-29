@@ -5,16 +5,20 @@ import os
 import msgpack
 import zlib
 
-from pbkdf2 import pbkdf2
 from Crypto.Cipher import AES
 from Crypto.Hash import SHA256, HMAC
 from Crypto.Util import Counter
 from Crypto.Util.number import bytes_to_long, long_to_bytes
 from Crypto.Random import get_random_bytes
+from Crypto.Protocol.KDF import PBKDF2
 
 from .helpers import IntegrityError, get_keys_dir
 
 PREFIX = '\0' * 8
+
+
+def SHA256_PDF(p, s):
+    return HMAC.new(p, s, SHA256).digest()
 
 
 class Key(object):
@@ -73,7 +77,7 @@ class Key(object):
     def encrypt_key_file(self, data, password):
         salt = get_random_bytes(32)
         iterations = 10000
-        key = pbkdf2(password, salt, 32, iterations, hashlib.sha256)
+        key = PBKDF2(password, salt, 32, iterations, SHA256_PDF)
         hash = HMAC.new(key, data, SHA256).digest()
         cdata = AES.new(key, AES.MODE_CTR, counter=Counter.new(128)).encrypt(data)
         d = {
@@ -90,7 +94,7 @@ class Key(object):
         d = msgpack.unpackb(data)
         assert d['version'] == 1
         assert d['algorithm'] == 'SHA256'
-        key = pbkdf2(password, d['salt'], 32, d['iterations'], hashlib.sha256)
+        key = PBKDF2(password, d['salt'], 32, d['iterations'], SHA256_PDF)
         data = AES.new(key, AES.MODE_CTR, counter=Counter.new(128)).decrypt(d['data'])
         if HMAC.new(key, data, SHA256).digest() != d['hash']:
             return None

@@ -186,19 +186,6 @@ class Archive(object):
                 os.makedirs(path)
             if restore_attrs:
                 self.restore_attrs(path, item)
-        elif stat.S_ISFIFO(mode):
-            if not os.path.exists(os.path.dirname(path)):
-                os.makedirs(os.path.dirname(path))
-            os.mkfifo(path)
-            self.restore_attrs(path, item)
-        elif stat.S_ISLNK(mode):
-            if not os.path.exists(os.path.dirname(path)):
-                os.makedirs(os.path.dirname(path))
-            source = item['source']
-            if os.path.exists(path):
-                os.unlink(path)
-            os.symlink(source, path)
-            self.restore_attrs(path, item, symlink=True)
         elif stat.S_ISREG(mode):
             if not os.path.exists(os.path.dirname(path)):
                 os.makedirs(os.path.dirname(path))
@@ -231,7 +218,22 @@ class Archive(object):
                 else:
                     for i, (id, size, csize) in enumerate(item['chunks']):
                         self.store.get(id, callback=extract_cb, callback_data=(id, i))
-
+        elif stat.S_ISFIFO(mode):
+            if not os.path.exists(os.path.dirname(path)):
+                os.makedirs(os.path.dirname(path))
+            os.mkfifo(path)
+            self.restore_attrs(path, item)
+        elif stat.S_ISLNK(mode):
+            if not os.path.exists(os.path.dirname(path)):
+                os.makedirs(os.path.dirname(path))
+            source = item['source']
+            if os.path.exists(path):
+                os.unlink(path)
+            os.symlink(source, path)
+            self.restore_attrs(path, item, symlink=True)
+        elif stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
+            os.mknod(path, item['mode'], item['dev'])
+            self.restore_attrs(path, item)
         else:
             raise Exception('Unknown archive item type %r' % item['mode'])
 
@@ -328,12 +330,7 @@ class Archive(object):
             pass
         return item
 
-    def process_dir(self, path, st):
-        item = {'path': path.lstrip('/\\:')}
-        item.update(self.stat_attrs(st, path))
-        self.add_item(item)
-
-    def process_fifo(self, path, st):
+    def process_item(self, path, st):
         item = {'path': path.lstrip('/\\:')}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)

@@ -130,7 +130,7 @@ class Archiver(object):
             return
         self.print_verbose(path)
         if stat.S_ISDIR(st.st_mode):
-            archive.process_dir(path, st)
+            archive.process_item(path, st)
             try:
                 entries = os.listdir(path)
             except OSError, e:
@@ -139,10 +139,10 @@ class Archiver(object):
                 for filename in sorted(entries):
                     self._process(archive, cache, patterns, skip_inodes,
                                   os.path.join(path, filename), restrict_dev)
+        elif stat.S_ISFIFO(st.st_mode) or stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
+            archive.process_item(path, st)
         elif stat.S_ISLNK(st.st_mode):
             archive.process_symlink(path, st)
-        elif stat.S_ISFIFO(st.st_mode):
-            archive.process_fifo(path, st)
         elif stat.S_ISREG(st.st_mode):
             try:
                 archive.process_file(path, st, cache)

@@ -60,6 +60,7 @@ class Cache(object):
 
     def _read_files(self):
         self.files = {}
+        self._newest_mtime = 0
         with open(os.path.join(self.path, 'files'), 'rb') as fd:
             u = msgpack.Unpacker()
             while True:
@@ -90,7 +91,10 @@ class Cache(object):
         if self.files is not None:
             with open(os.path.join(self.path, 'files'), 'wb') as fd:
                 for item in self.files.iteritems():
-                    msgpack.pack(item, fd)
+                    # Discard cached files with the newest mtime to avoid
+                    # issues with filesystem snapshots and mtime precision
+                    if item[1][3] < self._newest_mtime:
+                        msgpack.pack(item, fd)
         self.config.set('cache', 'manifest', self.manifest.id.encode('hex'))
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             self.config.write(fd)
@@ -206,4 +210,5 @@ class Cache(object):
     def memorize_file(self, path_hash, st, ids):
         # Entry: Age, inode, size, mtime, chunk ids
         self.files[path_hash] = 0, st.st_ino, st.st_size, st.st_mtime, ids
+        self._newest_mtime = max(self._newest_mtime, st.st_mtime)
 

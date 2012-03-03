@@ -355,8 +355,8 @@ class Archiver(object):
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='Archive to create')
-        subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
-                               help='Paths to add to archive')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               default=['.'], help='Paths to add to archive')
 
         subparser = subparsers.add_parser('extract', parents=[common_parser])
         subparser.set_defaults(func=self.do_extract)

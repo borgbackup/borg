@@ -293,7 +293,7 @@ def uid2user(uid):
 @memoize
 def user2uid(user):
     try:
-        return pwd.getpwnam(user).pw_uid
+        return user and pwd.getpwnam(user).pw_uid
     except KeyError:
         return None
 
@@ -309,7 +309,7 @@ def gid2group(gid):
 @memoize
 def group2gid(group):
     try:
-        return grp.getgrnam(group).gr_gid
+        return group and grp.getgrnam(group).gr_gid
     except KeyError:
         return None
 

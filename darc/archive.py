@@ -335,6 +335,11 @@ class Archive(object):
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
 
+    def process_dev(self, path, st):
+        item = {'path': path.lstrip('/\\:'), 'dev': st.st_dev}
+        item.update(self.stat_attrs(st, path))
+        self.add_item(item)
+
     def process_symlink(self, path, st):
         source = os.readlink(path)
         item = {'path': path.lstrip('/\\:'), 'source': source}

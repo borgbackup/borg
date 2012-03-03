@@ -129,7 +129,12 @@ class Archiver(object):
         if stat.S_ISSOCK(st.st_mode):
             return
         self.print_verbose(path)
-        if stat.S_ISDIR(st.st_mode):
+        if stat.S_ISREG(st.st_mode):
+            try:
+                archive.process_file(path, st, cache)
+            except IOError, e:
+                self.print_error('%s: %s', path, e)
+        elif stat.S_ISDIR(st.st_mode):
             archive.process_item(path, st)
             try:
                 entries = os.listdir(path)
@@ -139,15 +144,12 @@ class Archiver(object):
                 for filename in sorted(entries):
                     self._process(archive, cache, patterns, skip_inodes,
                                   os.path.join(path, filename), restrict_dev)
-        elif stat.S_ISFIFO(st.st_mode) or stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
-            archive.process_item(path, st)
         elif stat.S_ISLNK(st.st_mode):
             archive.process_symlink(path, st)
-        elif stat.S_ISREG(st.st_mode):
-            try:
-                archive.process_file(path, st, cache)
-            except IOError, e:
-                self.print_error('%s: %s', path, e)
+        elif stat.S_ISFIFO(st.st_mode):
+            archive.process_item(path, st)
+        elif stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
+            archive.process_dev(path, st)
         else:
             self.print_error('Unknown file type: %s', path)
 

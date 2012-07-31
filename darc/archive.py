@@ -32,6 +32,10 @@ class Archive(object):
 
     def __init__(self, store, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False):
+        if sys.platform == 'darwin':
+            self.cwd = os.getcwdu()
+        else:
+            self.cwd = os.getcwd()
         self.key = key
         self.store = store
         self.cache = cache
@@ -177,7 +181,7 @@ class Archive(object):
         return stats
 
     def extract_item(self, item, dest=None, start_cb=None, restore_attrs=True):
-        dest = dest or os.getcwdu()
+        dest = dest or self.cwd
         assert item['path'][0] not in ('/', '\\', ':')
         path = os.path.join(dest, encode_filename(item['path']))
         mode = item['mode']

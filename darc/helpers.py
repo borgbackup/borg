@@ -374,7 +374,7 @@ class Location(object):
         items.append('user=%r' % self.user)
         items.append('host=%r' % self.host)
         items.append('port=%r' % self.port)
-        items.append('path=%r'% self.path)
+        items.append('path=%r' % self.path)
         items.append('archive=%r' % self.archive)
         return ', '.join(items)
 
@@ -406,9 +406,10 @@ def read_msgpack(filename):
     with open(filename, 'rb') as fd:
         return msgpack.unpack(fd)
 
+
 def write_msgpack(filename, d):
-    with open(filename+'.tmp', 'wb') as fd:
+    with open(filename + '.tmp', 'wb') as fd:
         msgpack.pack(d, fd)
         fd.flush()
         os.fsync(fd)
-    os.rename(filename+'.tmp', filename)
+    os.rename(filename + '.tmp', filename)

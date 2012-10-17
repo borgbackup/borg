@@ -10,7 +10,7 @@ import unittest
 from zlib import crc32
 
 from .hashindex import NSIndex
-from .helpers import IntegrityError, deferrable, read_msgpack, write_msgpack
+from .helpers import IntegrityError, read_msgpack, write_msgpack
 from .lrucache import LRUCache
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
@@ -194,7 +194,6 @@ class Store(object):
             self.recover(self.path)
         self.open_index(self.io.head, read_only=True)
 
-    @deferrable
     def get(self, id):
         try:
             segment, offset = self.index[id]
@@ -202,8 +201,11 @@ class Store(object):
         except KeyError:
             raise self.DoesNotExist
 
-    @deferrable
-    def put(self, id, data):
+    def get_many(self, ids):
+        for id in ids:
+            yield self.get(id)
+
+    def put(self, id, data, wait=True):
         if not self._active_txn:
             self._active_txn = True
             self.open_index(self.io.head)
@@ -219,8 +221,7 @@ class Store(object):
         self.segments[segment] += 1
         self.index[id] = segment, offset
 
-    @deferrable
-    def delete(self, id):
+    def delete(self, id, wait=True):
         if not self._active_txn:
             self._active_txn = True
             self.open_index(self.io.head)
@@ -231,9 +232,6 @@ class Store(object):
             self.compact.add(self.io.write_delete(id))
         except KeyError:
             raise self.DoesNotExist
-
-    def flush_rpc(self, *args):
-        pass
 
     def add_callback(self, cb, data):
         cb(None, None, data)

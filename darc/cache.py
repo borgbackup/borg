@@ -5,7 +5,7 @@ import msgpack
 import os
 import shutil
 
-from .helpers import error_callback, get_cache_dir
+from .helpers import get_cache_dir
 from .hashindex import ChunkIndex
 
 
@@ -41,7 +41,7 @@ class Cache(object):
             config.write(fd)
         ChunkIndex.create(os.path.join(self.path, 'chunks'))
         with open(os.path.join(self.path, 'files'), 'wb') as fd:
-            pass # empty file
+            pass  # empty file
 
     def open(self):
         if not os.path.isdir(self.path):
@@ -158,8 +158,24 @@ class Cache(object):
             archive = msgpack.unpackb(data)
             print 'Analyzing archive:', archive['name']
             for id in archive['items']:
-                self.store.get(id, callback=cb, callback_data=id)
-            self.store.flush_rpc()
+                chunk = self.store.get(id)
+                try:
+                    count, size, csize = self.chunks[id]
+                    self.chunks[id] = count + 1, size, csize
+                except KeyError:
+                    self.chunks[id] = 1, len(data), len(chunk)
+                unpacker.feed(self.key.decrypt(id, chunk))
+                for item in unpacker:
+                    try:
+                        for id, size, csize in item['chunks']:
+                            try:
+                                count, size, csize = self.chunks[id]
+                                self.chunks[id] = count + 1, size, csize
+                            except KeyError:
+                                self.chunks[id] = 1, size, csize
+                            pass
+                    except KeyError:
+                        pass
 
     def add_chunk(self, id, data, stats):
         if not self.txn_active:
@@ -169,7 +185,7 @@ class Cache(object):
         size = len(data)
         data = self.key.encrypt(data)
         csize = len(data)
-        self.store.put(id, data, callback=error_callback)
+        self.store.put(id, data, wait=False)
         self.chunks[id] = (1, size, csize)
         stats.update(size, csize, True)
         return id, size, csize
@@ -191,7 +207,7 @@ class Cache(object):
         count, size, csize = self.chunks[id]
         if count == 1:
             del self.chunks[id]
-            self.store.delete(id, callback=error_callback)
+            self.store.delete(id, wait=False)
         else:
             self.chunks[id] = (count - 1, size, csize)
 

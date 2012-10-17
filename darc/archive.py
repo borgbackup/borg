@@ -1,6 +1,7 @@
 from __future__ import with_statement
 from datetime import datetime, timedelta
 from getpass import getuser
+from itertools import izip
 import msgpack
 import os
 import socket
@@ -12,7 +13,7 @@ from xattr import xattr, XATTR_NOFOLLOW
 
 from ._speedups import chunkify
 from .helpers import uid2user, user2uid, gid2group, group2gid, \
-    Counter, encode_filename, Statistics
+    encode_filename, Statistics
 
 ITEMS_BUFFER = 1024 * 1024
 CHUNK_SIZE = 64 * 1024
@@ -81,24 +82,12 @@ class Archive(object):
     def __repr__(self):
         return 'Archive(%r)' % self.name
 
-    def iter_items(self, callback):
+    def iter_items(self):
         unpacker = msgpack.Unpacker()
-        counter = Counter(0)
-
-        def cb(chunk, error, id):
-            if error:
-                raise error
-            assert not error
-            counter.dec()
-            data = self.key.decrypt(id, chunk)
-            unpacker.feed(data)
-            for item in unpacker:
-                callback(item)
         for id in self.metadata['items']:
-            # Limit the number of concurrent items requests to 10
-            self.store.flush_rpc(counter, 10)
-            counter.inc()
-            self.store.get(id, callback=cb, callback_data=id)
+            unpacker.feed(self.key.decrypt(id, self.store.get(id)))
+            for item in unpacker:
+                yield item
 
     def add_item(self, item):
         self.items.write(msgpack.packb(item))
@@ -155,10 +144,11 @@ class Archive(object):
     def calc_stats(self, cache):
         # This function is a bit evil since it abuses the cache to calculate
         # the stats. The cache transaction must be rolled back afterwards
-        def cb(chunk, error, id):
-            assert not error
-            data = self.key.decrypt(id, chunk)
-            unpacker.feed(data)
+        unpacker = msgpack.Unpacker()
+        cache.begin_txn()
+        stats = Statistics()
+        for id in self.metadata['items']:
+            unpacker.feed(self.key.decrypt(id, self.store.get(id)))
             for item in unpacker:
                 try:
                     for id, size, csize in item['chunks']:
@@ -168,15 +158,9 @@ class Archive(object):
                         self.cache.chunks[id] = count - 1, size, csize
                 except KeyError:
                     pass
-        unpacker = msgpack.Unpacker()
-        cache.begin_txn()
-        stats = Statistics()
-        for id in self.metadata['items']:
-            self.store.get(id, callback=cb, callback_data=id)
             count, size, csize = self.cache.chunks[id]
             stats.update(size, csize, count == 1)
             self.cache.chunks[id] = count - 1, size, csize
-        self.store.flush_rpc()
         cache.rollback()
         return stats
 
@@ -195,33 +179,25 @@ class Archive(object):
                 os.makedirs(os.path.dirname(path))
             # Hard link?
             if 'source' in item:
-                def link_cb(_, __, item):
-                    source = os.path.join(dest, item['source'])
-                    if os.path.exists(path):
-                        os.unlink(path)
-                    os.link(source, path)
-                self.store.add_callback(link_cb, item)
+                source = os.path.join(dest, item['source'])
+                if os.path.exists(path):
+                    os.unlink(path)
+                os.link(source, path)
             else:
-                def extract_cb(chunk, error, (id, i)):
-                    if i == 0:
-                        state['fd'] = open(path, 'wb')
-                        start_cb(item)
-                    assert not error
-                    data = self.key.decrypt(id, chunk)
-                    state['fd'].write(data)
-                    if i == n - 1:
-                        state['fd'].close()
-                        self.restore_attrs(path, item)
-                state = {}
                 n = len(item['chunks'])
                 ## 0 chunks indicates an empty (0 bytes) file
                 if n == 0:
                     open(path, 'wb').close()
                     start_cb(item)
-                    self.restore_attrs(path, item)
                 else:
-                    for i, (id, size, csize) in enumerate(item['chunks']):
-                        self.store.get(id, callback=extract_cb, callback_data=(id, i))
+                    fd = open(path, 'wb')
+                    start_cb(item)
+                    ids = [id for id, size, csize in item['chunks']]
+                    for id, chunk in izip(ids, self.store.get_many(ids)):
+                        data = self.key.decrypt(id, chunk)
+                        fd.write(data)
+                    fd.close()
+                self.restore_attrs(path, item)
         elif stat.S_ISFIFO(mode):
             if not os.path.exists(os.path.dirname(path)):
                 os.makedirs(os.path.dirname(path))
@@ -269,31 +245,24 @@ class Archive(object):
             os.utime(path, (item['mtime'], item['mtime']))
 
     def verify_file(self, item, start, result):
-        def verify_chunk(chunk, error, (id, i)):
-            if error:
-                if not state:
-                    result(item, False)
-                    state[True] = True
-                return
-            if i == 0:
-                start(item)
-            self.key.decrypt(id, chunk)
-            if i == n - 1:
-                result(item, True)
-        state = {}
-        n = len(item['chunks'])
-        if n == 0:
+        if not item['chunks']:
             start(item)
             result(item, True)
         else:
-            for i, (id, size, csize) in enumerate(item['chunks']):
-                self.store.get(id, callback=verify_chunk, callback_data=(id, i))
+            start(item)
+            ids = [id for id, size, csize in item['chunks']]
+            try:
+                for id, chunk in izip(ids, self.store.get_many(ids)):
+                        self.key.decrypt(id, chunk)
+            except Exception:
+                result(item, False)
+                return
+            result(item, True)
 
     def delete(self, cache):
-        def callback(chunk, error, id):
-            assert not error
-            data = self.key.decrypt(id, chunk)
-            unpacker.feed(data)
+        unpacker = msgpack.Unpacker()
+        for id in self.metadata['items']:
+            unpacker.feed(self.key.decrypt(id, self.store.get(id)))
             for item in unpacker:
                 try:
                     for chunk_id, size, csize in item['chunks']:
@@ -301,10 +270,6 @@ class Archive(object):
                 except KeyError:
                     pass
             self.cache.chunk_decref(id)
-        unpacker = msgpack.Unpacker()
-        for id in self.metadata['items']:
-            self.store.get(id, callback=callback, callback_data=id)
-        self.store.flush_rpc()
         self.cache.chunk_decref(self.id)
         del self.manifest.archives[self.name]
         self.manifest.write()

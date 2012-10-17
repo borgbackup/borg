@@ -10,7 +10,7 @@ from .store import Store
 from .cache import Cache
 from .key import Key
 from .helpers import location_validator, format_time, \
-    format_file_mode, IncludePattern, ExcludePattern, exclude_path, to_localtime, \
+    format_file_mode, IncludePattern, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
     get_cache_dir, format_timedelta, prune_split, Manifest, Location
 from .remote import StoreServer, RemoteStore
 
@@ -157,27 +157,22 @@ class Archiver(object):
         def start_cb(item):
             self.print_verbose(item['path'])
 
-        def extract_cb(item):
-            if exclude_path(item['path'], args.patterns):
-                return
-            if stat.S_ISDIR(item['mode']):
-                dirs.append(item)
-                archive.extract_item(item, args.dest, start_cb, restore_attrs=False)
-            else:
-                archive.extract_item(item, args.dest, start_cb)
-            if dirs and not item['path'].startswith(dirs[-1]['path']):
-                def cb(_, __, item):
-                    # Extract directories twice to make sure mtime is correctly restored
-                    archive.extract_item(item, args.dest)
-                store.add_callback(cb, dirs.pop(-1))
         store = self.open_store(args.archive)
         key = Key(store)
         manifest = Manifest(store, key)
         archive = Archive(store, key, manifest, args.archive.archive,
                           numeric_owner=args.numeric_owner)
         dirs = []
-        archive.iter_items(extract_cb)
-        store.flush_rpc()
+        for item in archive.iter_items():
+            if exclude_path(item['path'], args.patterns):
+                continue
+            if stat.S_ISDIR(item['mode']):
+                dirs.append(item)
+                archive.extract_item(item, args.dest, start_cb, restore_attrs=False)
+            else:
+                archive.extract_item(item, args.dest, start_cb)
+            if dirs and not item['path'].startswith(dirs[-1]['path']):
+                archive.extract_item(dirs.pop(-1), args.dest)
         while dirs:
             archive.extract_item(dirs.pop(-1), args.dest)
         return self.exit_code
@@ -192,36 +187,33 @@ class Archiver(object):
         return self.exit_code
 
     def do_list(self, args):
-        def callback(item):
-            type = tmap.get(item['mode'] / 4096, '?')
-            mode = format_file_mode(item['mode'])
-            size = 0
-            if type == '-':
-                try:
-                    size = sum(size for _, size, _ in item['chunks'])
-                except KeyError:
-                    pass
-            mtime = format_time(datetime.fromtimestamp(item['mtime']))
-            if 'source' in item:
-                if type == 'l':
-                    extra = ' -> %s' % item['source']
-                else:
-                    type = 'h'
-                    extra = ' link to %s' % item['source']
-            else:
-                extra = ''
-            print '%s%s %-6s %-6s %8d %s %s%s' % (type, mode, item['user'] or item['uid'],
-                                              item['group'] or item['gid'], size, mtime,
-                                              item['path'], extra)
-
         store = self.open_store(args.src)
         key = Key(store)
         manifest = Manifest(store, key)
         if args.src.archive:
             tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 010: '-', 012: 'l', 014: 's'}
             archive = Archive(store, key, manifest, args.src.archive)
-            archive.iter_items(callback)
-            store.flush_rpc()
+            for item in archive.iter_items():
+                type = tmap.get(item['mode'] / 4096, '?')
+                mode = format_file_mode(item['mode'])
+                size = 0
+                if type == '-':
+                    try:
+                        size = sum(size for _, size, _ in item['chunks'])
+                    except KeyError:
+                        pass
+                mtime = format_time(datetime.fromtimestamp(item['mtime']))
+                if 'source' in item:
+                    if type == 'l':
+                        extra = ' -> %s' % item['source']
+                    else:
+                        type = 'h'
+                        extra = ' link to %s' % item['source']
+                else:
+                    extra = ''
+                print '%s%s %-6s %-6s %8d %s %s%s' % (type, mode, item['user'] or item['uid'],
+                                                  item['group'] or item['gid'], size, mtime,
+                                                  item['path'], extra)
         else:
             for archive in sorted(Archive.list_archives(store, key, manifest), key=attrgetter('ts')):
                 print '%-20s %s' % (archive.metadata['name'], to_localtime(archive.ts).strftime('%c'))
@@ -242,14 +234,11 @@ class Archiver(object):
             else:
                 self.print_verbose('ERROR')
                 self.print_error('%s: verification failed' % item['path'])
-
-        def callback(item):
+        for item in archive.iter_items():
             if exclude_path(item['path'], args.patterns):
                 return
             if stat.S_ISREG(item['mode']) and 'chunks' in item:
                 archive.verify_file(item, start_cb, result_cb)
-        archive.iter_items(callback)
-        store.flush_rpc()
         return self.exit_code
 
     def do_info(self, args):
@@ -425,6 +414,8 @@ class Archiver(object):
                                help='Store to prune')
 
         args = parser.parse_args(args)
+        if getattr(args, 'patterns', None):
+            adjust_patterns(args.patterns)
         self.verbose = args.verbose
         return args.func(args)
 

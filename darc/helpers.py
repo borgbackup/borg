@@ -84,32 +84,11 @@ class Statistics(object):
 if sys.platform == 'darwin':
     def encode_filename(name):
         try:
-            name.decode('utf-8')
-            return name
+            return name.decode('utf-8')
         except UnicodeDecodeError:
             return urllib.quote(name)
 else:
     encode_filename = str
-
-
-class Counter(object):
-
-    __slots__ = ('v',)
-
-    def __init__(self, value=0):
-        self.v = value
-
-    def inc(self, amount=1):
-        self.v += amount
-
-    def dec(self, amount=1):
-        self.v -= amount
-
-    def __cmp__(self, x):
-        return cmp(self.v, x)
-
-    def __repr__(self):
-        return '<Counter(%r)>' % self.v
 
 
 def get_keys_dir():
@@ -124,30 +103,16 @@ def get_cache_dir():
                           os.path.join(os.path.expanduser('~'), '.darc', 'cache'))
 
 
-def deferrable(f):
-    def wrapper(*args, **kw):
-        callback = kw.pop('callback', None)
-        if callback:
-            data = kw.pop('callback_data', None)
-            try:
-                res = f(*args, **kw)
-            except Exception, e:
-                callback(None, e, data)
-            else:
-                callback(res, None, data)
-        else:
-            return f(*args, **kw)
-    return wrapper
-
-
-def error_callback(res, error, data):
-    if res:
-        raise res
-
-
 def to_localtime(ts):
     """Convert datetime object from UTC to local time zone"""
     return ts - timedelta(seconds=time.altzone)
+
+
+def adjust_patterns(patterns):
+    if patterns and isinstance(patterns[-1], IncludePattern):
+        patterns.append(ExcludePattern('*'))
+    elif patterns and isinstance(patterns[-1], ExcludePattern):
+        patterns.append(IncludePattern('*'))
 
 
 def exclude_path(path, patterns):

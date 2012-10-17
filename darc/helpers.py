@@ -109,10 +109,8 @@ def to_localtime(ts):
 
 
 def adjust_patterns(patterns):
-    if patterns and isinstance(patterns[-1], IncludePattern):
+    if patterns and not isinstance(patterns[-1], ExcludePattern):
         patterns.append(ExcludePattern('*'))
-    elif patterns and isinstance(patterns[-1], ExcludePattern):
-        patterns.append(IncludePattern('*'))
 
 
 def exclude_path(path, patterns):

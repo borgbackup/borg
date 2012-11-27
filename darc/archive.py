@@ -23,6 +23,49 @@ have_lchmod = hasattr(os, 'lchmod')
 linux = sys.platform == 'linux2'
 
 
+class ItemIter(object):
+
+    def __init__(self, unpacker, filter):
+        self.unpacker = iter(unpacker)
+        self.filter = filter
+        self.stack = []
+        self._peek = None
+        self._peek_iter = None
+        global foo
+        foo = self
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if self.stack:
+            return self.stack.pop(0)
+        self._peek = None
+        return self.get_next()
+
+    def get_next(self):
+        next = self.unpacker.next()
+        while self.filter and not self.filter(next):
+            next = self.unpacker.next()
+        return next
+
+    def peek(self):
+        while True:
+            while not self._peek or not self._peek_iter:
+                if len(self.stack) > 100:
+                    raise StopIteration
+                self._peek = self.get_next()
+                self.stack.append(self._peek)
+                if 'chunks' in self._peek:
+                    self._peek_iter = iter(self._peek['chunks'])
+                else:
+                    self._peek_iter = None
+            try:
+                return self._peek_iter.next()
+            except StopIteration:
+                self._peek = None
+
+
 class Archive(object):
 
     class DoesNotExist(Exception):
@@ -82,12 +125,13 @@ class Archive(object):
     def __repr__(self):
         return 'Archive(%r)' % self.name
 
-    def iter_items(self):
+    def iter_items(self, filter=None):
         unpacker = msgpack.Unpacker()
         for id in self.metadata['items']:
             unpacker.feed(self.key.decrypt(id, self.store.get(id)))
-            for item in unpacker:
-                yield item
+            iter = ItemIter(unpacker, filter)
+            for item in iter:
+                yield item, iter.peek
 
     def add_item(self, item):
         self.items.write(msgpack.packb(item))
@@ -164,7 +208,7 @@ class Archive(object):
         cache.rollback()
         return stats
 
-    def extract_item(self, item, dest=None, start_cb=None, restore_attrs=True):
+    def extract_item(self, item, dest=None, start_cb=None, restore_attrs=True, peek=None):
         dest = dest or self.cwd
         assert item['path'][0] not in ('/', '\\', ':')
         path = os.path.join(dest, encode_filename(item['path']))
@@ -193,7 +237,7 @@ class Archive(object):
                     fd = open(path, 'wb')
                     start_cb(item)
                     ids = [id for id, size, csize in item['chunks']]
-                    for id, chunk in izip(ids, self.store.get_many(ids)):
+                    for id, chunk in izip(ids, self.store.get_many(ids, peek)):
                         data = self.key.decrypt(id, chunk)
                         fd.write(data)
                     fd.close()
@@ -244,7 +288,7 @@ class Archive(object):
             # FIXME: We should really call futimes here (c extension required)
             os.utime(path, (item['mtime'], item['mtime']))
 
-    def verify_file(self, item, start, result):
+    def verify_file(self, item, start, result, peek=None):
         if not item['chunks']:
             start(item)
             result(item, True)
@@ -252,9 +296,10 @@ class Archive(object):
             start(item)
             ids = [id for id, size, csize in item['chunks']]
             try:
-                for id, chunk in izip(ids, self.store.get_many(ids)):
+                for id, chunk in izip(ids, self.store.get_many(ids, peek)):
+                    if chunk:
                         self.key.decrypt(id, chunk)
-            except Exception:
+            except Exception, e:
                 result(item, False)
                 return
             result(item, True)

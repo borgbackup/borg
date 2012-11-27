@@ -163,14 +163,12 @@ class Archiver(object):
         archive = Archive(store, key, manifest, args.archive.archive,
                           numeric_owner=args.numeric_owner)
         dirs = []
-        for item in archive.iter_items():
-            if exclude_path(item['path'], args.patterns):
-                continue
+        for item, peek in archive.iter_items(lambda item: not exclude_path(item['path'], args.patterns)):
             if stat.S_ISDIR(item['mode']):
                 dirs.append(item)
                 archive.extract_item(item, args.dest, start_cb, restore_attrs=False)
             else:
-                archive.extract_item(item, args.dest, start_cb)
+                archive.extract_item(item, args.dest, start_cb, peek=peek)
             if dirs and not item['path'].startswith(dirs[-1]['path']):
                 archive.extract_item(dirs.pop(-1), args.dest)
         while dirs:
@@ -193,7 +191,7 @@ class Archiver(object):
         if args.src.archive:
             tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 010: '-', 012: 'l', 014: 's'}
             archive = Archive(store, key, manifest, args.src.archive)
-            for item in archive.iter_items():
+            for item, _ in archive.iter_items():
                 type = tmap.get(item['mode'] / 4096, '?')
                 mode = format_file_mode(item['mode'])
                 size = 0
@@ -234,11 +232,9 @@ class Archiver(object):
             else:
                 self.print_verbose('ERROR')
                 self.print_error('%s: verification failed' % item['path'])
-        for item in archive.iter_items():
-            if exclude_path(item['path'], args.patterns):
-                return
+        for item, peek in archive.iter_items(lambda item: not exclude_path(item['path'], args.patterns)):
             if stat.S_ISREG(item['mode']) and 'chunks' in item:
-                archive.verify_file(item, start_cb, result_cb)
+                archive.verify_file(item, start_cb, result_cb, peek=peek)
         return self.exit_code
 
     def do_info(self, args):

@@ -201,7 +201,7 @@ class Store(object):
         except KeyError:
             raise self.DoesNotExist
 
-    def get_many(self, ids):
+    def get_many(self, ids, peek=None):
         for id in ids:
             yield self.get(id)
 

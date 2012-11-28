@@ -1,7 +1,7 @@
 from __future__ import with_statement
 from datetime import datetime, timedelta
 from getpass import getuser
-from itertools import izip
+from itertools import izip_longest
 import msgpack
 import os
 import socket
@@ -29,6 +29,7 @@ class ItemIter(object):
         self.unpacker = iter(unpacker)
         self.filter = filter
         self.stack = []
+        self.peeks = 0
         self._peek = None
         self._peek_iter = None
         global foo
@@ -39,9 +40,12 @@ class ItemIter(object):
 
     def next(self):
         if self.stack:
-            return self.stack.pop(0)
-        self._peek = None
-        return self.get_next()
+            item = self.stack.pop(0)
+        else:
+            self._peek = None
+            item = self.get_next()
+        self.peeks = max(0, self.peeks - len(item.get('chunks', [])))
+        return item
 
     def get_next(self):
         next = self.unpacker.next()
@@ -52,7 +56,7 @@ class ItemIter(object):
     def peek(self):
         while True:
             while not self._peek or not self._peek_iter:
-                if len(self.stack) > 100:
+                if self.peeks > 100:
                     raise StopIteration
                 self._peek = self.get_next()
                 self.stack.append(self._peek)
@@ -61,7 +65,9 @@ class ItemIter(object):
                 else:
                     self._peek_iter = None
             try:
-                return self._peek_iter.next()
+                item = self._peek_iter.next()
+                self.peeks += 1
+                return item
             except StopIteration:
                 self._peek = None
 
@@ -186,25 +192,26 @@ class Archive(object):
         self.cache.commit()
 
     def calc_stats(self, cache):
+        def add(id):
+            count, size, csize = self.cache.chunks[id]
+            stats.update(size, csize, count == 1)
+            self.cache.chunks[id] = count - 1, size, csize
         # This function is a bit evil since it abuses the cache to calculate
         # the stats. The cache transaction must be rolled back afterwards
         unpacker = msgpack.Unpacker()
         cache.begin_txn()
         stats = Statistics()
-        for id in self.metadata['items']:
-            unpacker.feed(self.key.decrypt(id, self.store.get(id)))
+        add(self.id)
+        for id, chunk in izip_longest(self.metadata['items'], self.store.get_many(self.metadata['items'])):
+            unpacker.feed(self.key.decrypt(id, chunk))
             for item in unpacker:
                 try:
                     for id, size, csize in item['chunks']:
-                        count, _, _ = self.cache.chunks[id]
-                        stats.update(size, csize, count == 1)
-                        stats.nfiles += 1
-                        self.cache.chunks[id] = count - 1, size, csize
+                        add(id)
+                    stats.nfiles += 1
                 except KeyError:
                     pass
-            count, size, csize = self.cache.chunks[id]
-            stats.update(size, csize, count == 1)
-            self.cache.chunks[id] = count - 1, size, csize
+            add(id)
         cache.rollback()
         return stats
 
@@ -237,7 +244,7 @@ class Archive(object):
                     fd = open(path, 'wb')
                     start_cb(item)
                     ids = [id for id, size, csize in item['chunks']]
-                    for id, chunk in izip(ids, self.store.get_many(ids, peek)):
+                    for id, chunk in izip_longest(ids, self.store.get_many(ids, peek)):
                         data = self.key.decrypt(id, chunk)
                         fd.write(data)
                     fd.close()
@@ -296,9 +303,8 @@ class Archive(object):
             start(item)
             ids = [id for id, size, csize in item['chunks']]
             try:
-                for id, chunk in izip(ids, self.store.get_many(ids, peek)):
-                    if chunk:
-                        self.key.decrypt(id, chunk)
+                for id, chunk in izip_longest(ids, self.store.get_many(ids, peek)):
+                    self.key.decrypt(id, chunk)
             except Exception, e:
                 result(item, False)
                 return

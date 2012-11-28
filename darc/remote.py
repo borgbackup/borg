@@ -75,7 +75,7 @@ class RemoteStore(object):
         self.cache = LRUCache(200)
         self.to_send = ''
         self.extra = {}
-        self.pending_cache = {}
+        self.pending = {}
         self.unpacker = msgpack.Unpacker()
         self.msgid = 0
         self.received_msgid = 0
@@ -106,13 +106,10 @@ class RemoteStore(object):
             self.received_msgid = msgid
             if error:
                 raise self.RPCError(error)
-            if msgid in self.pending_cache:
-                args = self.pending_cache.pop(msgid)
-                self.cache[args] = msgid, res
-            else:
-                print 'unknown response'
-            for args in self.extra.pop(msgid, []):
-                to_yield.append(self.cache[args][1])
+            args = self.pending.pop(msgid)
+            self.cache[args] = msgid, res
+            for args, resp in self.extra.pop(msgid, []):
+                to_yield.append(resp or self.cache[args][1])
         for res in to_yield:
             yield res
 
@@ -127,12 +124,12 @@ class RemoteStore(object):
             if not args in self.cache:
                 self.msgid += 1
                 msgid = self.msgid
-                self.pending_cache[msgid] = args
+                self.pending[msgid] = args
                 self.cache[args] = msgid, None
                 data.append(msgpack.packb((1, msgid, cmd, args)))
             msgid, resp = self.cache[args]
             m = max(m, msgid)
-            self.extra.setdefault(m, []).append(args)
+            self.extra.setdefault(m, []).append((args, resp))
         return ''.join(data)
 
     def gen_cache_requests(self, cmd, peek):
@@ -146,7 +143,7 @@ class RemoteStore(object):
                 continue
             self.msgid += 1
             msgid = self.msgid
-            self.pending_cache[msgid] = args
+            self.pending[msgid] = args
             self.cache[args] = msgid, None
             data.append(msgpack.packb((1, msgid, cmd, args)))
         return ''.join(data)
@@ -156,9 +153,9 @@ class RemoteStore(object):
         left = len(argsv)
         data = self.gen_request(cmd, argsv)
         self.to_send += data
-        for args in self.extra.pop(self.received_msgid, []):
+        for args, resp in self.extra.pop(self.received_msgid, []):
             left -= 1
-            yield self.cache[args][1]
+            yield resp or self.cache[args][1]
         while left:
             r, w, x = select.select(self.r_fds, w_fds, self.x_fds, 1)
             if x:

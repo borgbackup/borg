@@ -1,11 +1,12 @@
 from __future__ import with_statement
 from ConfigParser import RawConfigParser
 import fcntl
+from itertools import izip_longest
 import msgpack
 import os
 import shutil
 
-from .helpers import get_cache_dir
+from .helpers import get_cache_dir, Manifest
 from .hashindex import ChunkIndex
 
 
@@ -122,26 +123,12 @@ class Cache(object):
     def sync(self):
         """Initializes cache by fetching and reading all archive indicies
         """
-        def cb(chunk, error, id):
-            assert not error
-            data = self.key.decrypt(id, chunk)
+        def add(id, size, csize):
             try:
                 count, size, csize = self.chunks[id]
                 self.chunks[id] = count + 1, size, csize
             except KeyError:
-                self.chunks[id] = 1, len(data), len(chunk)
-            unpacker.feed(data)
-            for item in unpacker:
-                try:
-                    for id, size, csize in item['chunks']:
-                        try:
-                            count, size, csize = self.chunks[id]
-                            self.chunks[id] = count + 1, size, csize
-                        except KeyError:
-                            self.chunks[id] = 1, size, csize
-                        pass
-                except KeyError:
-                    pass
+                self.chunks[id] = 1, size, csize
         self.begin_txn()
         print 'Initializing cache...'
         self.chunks.clear()
@@ -150,30 +137,17 @@ class Cache(object):
             id = info['id']
             cdata = self.store.get(id)
             data = self.key.decrypt(id, cdata)
-            try:
-                count, size, csize = self.chunks[id]
-                self.chunks[id] = count + 1, size, csize
-            except KeyError:
-                self.chunks[id] = 1, len(data), len(cdata)
+            add(id, len(data), len(cdata))
             archive = msgpack.unpackb(data)
             print 'Analyzing archive:', archive['name']
-            for id in archive['items']:
-                chunk = self.store.get(id)
-                try:
-                    count, size, csize = self.chunks[id]
-                    self.chunks[id] = count + 1, size, csize
-                except KeyError:
-                    self.chunks[id] = 1, len(data), len(chunk)
-                unpacker.feed(self.key.decrypt(id, chunk))
+            for id, chunk in izip_longest(archive['items'], self.store.get_many(archive['items'])):
+                data = self.key.decrypt(id, chunk)
+                add(id, len(data), len(chunk))
+                unpacker.feed(data)
                 for item in unpacker:
                     try:
                         for id, size, csize in item['chunks']:
-                            try:
-                                count, size, csize = self.chunks[id]
-                                self.chunks[id] = count + 1, size, csize
-                            except KeyError:
-                                self.chunks[id] = 1, size, csize
-                            pass
+                            add(id, size, csize)
                     except KeyError:
                         pass
 

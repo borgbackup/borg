@@ -203,6 +203,7 @@ class Archive(object):
         stats = Statistics()
         add(self.id)
         for id, chunk in izip_longest(self.metadata['items'], self.store.get_many(self.metadata['items'])):
+            add(id)
             unpacker.feed(self.key.decrypt(id, chunk))
             for item in unpacker:
                 try:
@@ -211,7 +212,6 @@ class Archive(object):
                     stats.nfiles += 1
                 except KeyError:
                     pass
-            add(id)
         cache.rollback()
         return stats
 

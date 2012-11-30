@@ -216,7 +216,9 @@ class Store(object):
             segment, _ = self.index[id]
             self.segments[segment] -= 1
             self.compact.add(segment)
-            self.compact.add(self.io.write_delete(id))
+            segment = self.io.write_delete(id)
+            self.segments.setdefault(segment, 0)
+            self.compact.add(segment)
         except KeyError:
             pass
         segment, offset = self.io.write_put(id, data)
@@ -232,7 +234,9 @@ class Store(object):
             segment, offset = self.index.pop(id)
             self.segments[segment] -= 1
             self.compact.add(segment)
-            self.compact.add(self.io.write_delete(id))
+            segment = self.io.write_delete(id)
+            self.compact.add(segment)
+            self.segments.setdefault(segment, 0)
         except KeyError:
             raise self.DoesNotExist
 
@@ -465,6 +469,22 @@ class StoreTestCase(unittest.TestCase):
         self.assertEqual(self.store.get('00000000000000000000000000000000'), 'foo2')
         self.store.rollback()
         self.assertEqual(self.store.get('00000000000000000000000000000000'), 'foo')
+
+    def test_single_kind_transactions(self):
+        # put
+        self.store.put('00000000000000000000000000000000', 'foo')
+        self.store.commit()
+        self.store.close()
+        # replace
+        self.store = self.open()
+        self.store.put('00000000000000000000000000000000', 'bar')
+        self.store.commit()
+        self.store.close()
+        # delete
+        self.store = self.open()
+        self.store.delete('00000000000000000000000000000000')
+        self.store.commit()
+
 
 
 def suite():

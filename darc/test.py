@@ -9,8 +9,10 @@ import tempfile
 import unittest
 from xattr import xattr, XATTR_NOFOLLOW
 
-from . import store, helpers, lrucache
+from . import helpers, lrucache
 from .archiver import Archiver
+from .store import Store, suite as StoreSuite
+from .remote import Store, suite as RemoteStoreSuite
 
 
 class Test(unittest.TestCase):
@@ -112,6 +114,21 @@ class Test(unittest.TestCase):
         # end the same way as info_output
         assert info_output2.endswith(info_output)
 
+    def test_delete(self):
+        self.create_regual_file('file1', size=1024 * 80)
+        self.create_regual_file('dir2/file2', size=1024 * 80)
+        self.darc('init', '-p', '', self.store_location)
+        self.darc('create', self.store_location + '::test', 'input')
+        self.darc('create', self.store_location + '::test.2', 'input')
+        self.darc('verify', self.store_location + '::test')
+        self.darc('verify', self.store_location + '::test.2')
+        self.darc('delete', self.store_location + '::test')
+        self.darc('verify', self.store_location + '::test.2')
+        self.darc('delete', self.store_location + '::test.2')
+        # Make sure all data except the manifest has been deleted
+        store = Store(self.store_path)
+        self.assertEqual(store._len(), 1)
+
     def test_corrupted_store(self):
         self.create_src_archive('test')
         self.darc('verify', self.store_location + '::test')
@@ -141,7 +158,8 @@ def suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.TestLoader().loadTestsFromTestCase(Test))
     suite.addTest(unittest.TestLoader().loadTestsFromTestCase(RemoteTest))
-    suite.addTest(store.suite())
+    suite.addTest(StoreSuite())
+    suite.addTest(RemoteStoreSuite())
     suite.addTest(doctest.DocTestSuite(helpers))
     suite.addTest(lrucache.suite())
     return suite

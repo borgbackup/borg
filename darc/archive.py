@@ -305,15 +305,15 @@ class Archive(object):
             try:
                 for id, chunk in izip_longest(ids, self.store.get_many(ids, peek)):
                     self.key.decrypt(id, chunk)
-            except Exception, e:
+            except Exception:
                 result(item, False)
                 return
             result(item, True)
 
     def delete(self, cache):
         unpacker = msgpack.Unpacker()
-        for id in self.metadata['items']:
-            unpacker.feed(self.key.decrypt(id, self.store.get(id)))
+        for id, chunk in izip_longest(self.metadata['items'], self.store.get_many(self.metadata['items'])):
+            unpacker.feed(self.key.decrypt(id, chunk))
             for item in unpacker:
                 try:
                     for chunk_id, size, csize in item['chunks']:

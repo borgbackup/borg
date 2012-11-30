@@ -20,12 +20,14 @@ class LRUCache(DictMixin):
         def __cmp__(self, other):
             return cmp(self.t, other.t)
 
-
     def __init__(self, size):
-        self._heap = []
-        self._dict = {}
         self.size = size
         self._t = 0
+        self.clear()
+
+    def clear(self):
+        self._heap = []
+        self._dict = {}
 
     def __setitem__(self, key, value):
         self._t += 1

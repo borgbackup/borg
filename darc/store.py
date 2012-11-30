@@ -194,6 +194,9 @@ class Store(object):
             self.recover(self.path)
         self.open_index(self.io.head, read_only=True)
 
+    def _len(self):
+        return len(self.index)
+
     def get(self, id):
         try:
             segment, offset = self.index[id]
@@ -403,9 +406,12 @@ class LoggedIO(object):
 
 class StoreTestCase(unittest.TestCase):
 
+    def open(self, create=False):
+        return Store(os.path.join(self.tmppath, 'store'), create=create)
+
     def setUp(self):
         self.tmppath = tempfile.mkdtemp()
-        self.store = Store(os.path.join(self.tmppath, 'store'), create=True)
+        self.store = self.open(create=True)
 
     def tearDown(self):
         shutil.rmtree(self.tmppath)
@@ -419,12 +425,12 @@ class StoreTestCase(unittest.TestCase):
         self.assertRaises(self.store.DoesNotExist, lambda: self.store.get(key50))
         self.store.commit()
         self.store.close()
-        store2 = Store(os.path.join(self.tmppath, 'store'))
+        store2 = self.open()
         self.assertRaises(store2.DoesNotExist, lambda: store2.get(key50))
         for x in range(100):
             if x == 50:
                 continue
-            self.assertEqual(self.store.get('%-32d' % x), 'SOMEDATA')
+            self.assertEqual(store2.get('%-32d' % x), 'SOMEDATA')
 
     def test2(self):
         """Test multiple sequential transactions
@@ -436,6 +442,29 @@ class StoreTestCase(unittest.TestCase):
         self.store.put('00000000000000000000000000000001', 'bar')
         self.store.commit()
         self.assertEqual(self.store.get('00000000000000000000000000000001'), 'bar')
+
+    def test_consistency(self):
+        """Test cache consistency
+        """
+        self.store.put('00000000000000000000000000000000', 'foo')
+        self.assertEqual(self.store.get('00000000000000000000000000000000'), 'foo')
+        self.store.put('00000000000000000000000000000000', 'foo2')
+        self.assertEqual(self.store.get('00000000000000000000000000000000'), 'foo2')
+        self.store.put('00000000000000000000000000000000', 'bar')
+        self.assertEqual(self.store.get('00000000000000000000000000000000'), 'bar')
+        self.store.delete('00000000000000000000000000000000')
+        self.assertRaises(self.store.DoesNotExist, lambda: self.store.get('00000000000000000000000000000000'))
+
+    def test_consistency2(self):
+        """Test cache consistency2
+        """
+        self.store.put('00000000000000000000000000000000', 'foo')
+        self.assertEqual(self.store.get('00000000000000000000000000000000'), 'foo')
+        self.store.commit()
+        self.store.put('00000000000000000000000000000000', 'foo2')
+        self.assertEqual(self.store.get('00000000000000000000000000000000'), 'foo2')
+        self.store.rollback()
+        self.assertEqual(self.store.get('00000000000000000000000000000000'), 'foo')
 
 
 def suite():

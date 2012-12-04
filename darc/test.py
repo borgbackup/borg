@@ -11,6 +11,7 @@ from xattr import xattr, XATTR_NOFOLLOW
 
 from . import helpers, lrucache
 from .archiver import Archiver
+from .key import suite as KeySuite
 from .store import Store, suite as StoreSuite
 from .remote import Store, suite as RemoteStoreSuite
 
@@ -40,6 +41,7 @@ class Test(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def darc(self, *args, **kwargs):
+        os.environ['DARC_PASSPHRASE'] = ''
         exit_code = kwargs.get('exit_code', 0)
         args = list(args)
         try:
@@ -57,7 +59,7 @@ class Test(unittest.TestCase):
 
     def create_src_archive(self, name):
         src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__))
-        self.darc('init', '--password', '', self.store_location)
+        self.darc('init', self.store_location)
         self.darc('create', self.store_location + '::' + name, src_dir)
 
     def create_regual_file(self, name, size=0):
@@ -102,7 +104,7 @@ class Test(unittest.TestCase):
                 os.path.join(self.input_path, 'hardlink'))
         os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
         os.mkfifo(os.path.join(self.input_path, 'fifo1'))
-        self.darc('init', '-p', '', self.store_location)
+        self.darc('init', self.store_location)
         self.darc('create', self.store_location + '::test', 'input')
         self.darc('create', self.store_location + '::test.2', 'input')
         self.darc('extract', self.store_location + '::test', 'output')
@@ -117,7 +119,7 @@ class Test(unittest.TestCase):
     def test_delete(self):
         self.create_regual_file('file1', size=1024 * 80)
         self.create_regual_file('dir2/file2', size=1024 * 80)
-        self.darc('init', '-p', '', self.store_location)
+        self.darc('init', self.store_location)
         self.darc('create', self.store_location + '::test', 'input')
         self.darc('create', self.store_location + '::test.2', 'input')
         self.darc('verify', self.store_location + '::test')
@@ -141,7 +143,7 @@ class Test(unittest.TestCase):
 
     def test_prune_store(self):
         src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__))
-        self.darc('init', '-p', '', self.store_location)
+        self.darc('init', self.store_location)
         self.darc('create', self.store_location + '::test1', src_dir)
         self.darc('create', self.store_location + '::test2', src_dir)
         self.darc('prune', self.store_location, '--daily=2')
@@ -158,6 +160,7 @@ def suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.TestLoader().loadTestsFromTestCase(Test))
     suite.addTest(unittest.TestLoader().loadTestsFromTestCase(RemoteTest))
+    suite.addTest(KeySuite())
     suite.addTest(StoreSuite())
     suite.addTest(RemoteStoreSuite())
     suite.addTest(doctest.DocTestSuite(helpers))

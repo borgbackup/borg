@@ -18,23 +18,26 @@ class Manifest(object):
 
     MANIFEST_ID = '\0' * 32
 
-    def __init__(self, store, key, dont_load=False):
-        self.store = store
-        self.key = key
+    def __init__(self):
         self.archives = {}
         self.config = {}
-        if not dont_load:
-            self.load()
 
-    def load(self):
-        data = self.key.decrypt(None, self.store.get(self.MANIFEST_ID))
-        self.id = self.key.id_hash(data)
-        manifest = msgpack.unpackb(data)
-        if not manifest.get('version') == 1:
+    @classmethod
+    def load(cls, store):
+        from .key import key_factory
+        manifest = cls()
+        manifest.store = store
+        cdata = store.get(manifest.MANIFEST_ID)
+        manifest.key = key = key_factory(store, cdata)
+        data = key.decrypt(None, cdata)
+        manifest.id = key.id_hash(data)
+        m = msgpack.unpackb(data)
+        if not m.get('version') == 1:
             raise ValueError('Invalid manifest version')
-        self.archives = manifest['archives']
-        self.config = manifest['config']
-        self.key.post_manifest_load(self.config)
+        manifest.archives = m['archives']
+        manifest.config = m['config']
+        key.post_manifest_load(manifest.config)
+        return manifest, key
 
     def write(self):
         self.key.pre_manifest_write(self)

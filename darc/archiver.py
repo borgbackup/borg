@@ -8,7 +8,7 @@ import sys
 from .archive import Archive
 from .store import Store
 from .cache import Cache
-from .key import Key
+from .key import key_creator
 from .helpers import location_validator, format_time, \
     format_file_mode, IncludePattern, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
     get_cache_dir, format_timedelta, prune_split, Manifest, Location
@@ -22,9 +22,11 @@ class Archiver(object):
 
     def open_store(self, location, create=False):
         if location.proto == 'ssh':
-            return RemoteStore(location, create=create)
+            store = RemoteStore(location, create=create)
         else:
-            return Store(location.path, create=create)
+            store = Store(location.path, create=create)
+        store._location = location
+        return store
 
     def print_error(self, msg, *args):
         msg = args and msg % args or msg
@@ -45,31 +47,24 @@ class Archiver(object):
     def do_init(self, args):
         print 'Initializing store "%s"' % args.store.orig
         store = self.open_store(args.store, create=True)
-        key = Key.create(store, args.store.to_key_filename(), password=args.password)
-        print 'Key file "%s" created.' % key.path
-        print 'Remember that this file (and password) is needed to access your data. Keep it safe!'
-        print
-        manifest = Manifest(store, key, dont_load=True)
+        key = key_creator(store, args)
+        manifest = Manifest()
+        manifest.store = store
+        manifest.key = key
         manifest.write()
         store.commit()
         return self.exit_code
 
-    def do_chpasswd(self, args):
-        if os.path.isfile(args.store_or_file):
-            key = Key()
-            key.open(args.store_or_file)
-        else:
-            store = self.open_store(Location(args.store_or_file))
-            key = Key(store)
-        key.chpasswd()
-        print 'Key file "%s" updated' % key.path
+    def do_change_passphrase(self, args):
+        store = self.open_store(Location(args.store))
+        manifest, key = Manifest.load(store)
+        key.change_passphrase()
         return self.exit_code
 
     def do_create(self, args):
         t0 = datetime.now()
         store = self.open_store(args.archive)
-        key = Key(store)
-        manifest = Manifest(store, key)
+        manifest, key = Manifest.load(store)
         cache = Cache(store, key, manifest)
         archive = Archive(store, key, manifest, args.archive.archive, cache=cache,
                           create=True, checkpoint_interval=args.checkpoint_interval,
@@ -158,8 +153,7 @@ class Archiver(object):
             self.print_verbose(item['path'])
 
         store = self.open_store(args.archive)
-        key = Key(store)
-        manifest = Manifest(store, key)
+        manifest, key = Manifest.load(store)
         archive = Archive(store, key, manifest, args.archive.archive,
                           numeric_owner=args.numeric_owner)
         dirs = []
@@ -177,8 +171,7 @@ class Archiver(object):
 
     def do_delete(self, args):
         store = self.open_store(args.archive)
-        key = Key(store)
-        manifest = Manifest(store, key)
+        manifest, key = Manifest.load(store)
         cache = Cache(store, key, manifest)
         archive = Archive(store, key, manifest, args.archive.archive, cache=cache)
         archive.delete(cache)
@@ -186,8 +179,7 @@ class Archiver(object):
 
     def do_list(self, args):
         store = self.open_store(args.src)
-        key = Key(store)
-        manifest = Manifest(store, key)
+        manifest, key = Manifest.load(store)
         if args.src.archive:
             tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 010: '-', 012: 'l', 014: 's'}
             archive = Archive(store, key, manifest, args.src.archive)
@@ -219,8 +211,7 @@ class Archiver(object):
 
     def do_verify(self, args):
         store = self.open_store(args.archive)
-        key = Key(store)
-        manifest = Manifest(store, key)
+        manifest, key = Manifest.load(store)
         archive = Archive(store, key, manifest, args.archive.archive)
 
         def start_cb(item):
@@ -239,8 +230,7 @@ class Archiver(object):
 
     def do_info(self, args):
         store = self.open_store(args.archive)
-        key = Key(store)
-        manifest = Manifest(store, key)
+        manifest, key = Manifest.load(store)
         cache = Cache(store, key, manifest)
         archive = Archive(store, key, manifest, args.archive.archive, cache=cache)
         stats = archive.calc_stats(cache)
@@ -255,8 +245,7 @@ class Archiver(object):
 
     def do_prune(self, args):
         store = self.open_store(args.store)
-        key = Key(store)
-        manifest = Manifest(store, key)
+        manifest, key = Manifest.load(store)
         cache = Cache(store, key, manifest)
         archives = list(sorted(Archive.list_archives(store, key, manifest, cache),
                                key=attrgetter('ts'), reverse=True))
@@ -284,7 +273,7 @@ class Archiver(object):
         for archive in keep:
             self.print_verbose('Keeping archive "%s"' % archive.name)
         for archive in to_delete:
-            self.print_verbose('Purging archive "%s"', archive.name)
+            self.print_verbose('Pruning archive "%s"', archive.name)
             archive.delete(cache)
         return self.exit_code
 
@@ -307,17 +296,19 @@ class Archiver(object):
 
         subparser = subparsers.add_parser('init', parents=[common_parser])
         subparser.set_defaults(func=self.do_init)
-        subparser.add_argument('-p', '--password', dest='password',
-                               help='Protect store key with password (Default: prompt)')
         subparser.add_argument('store',
                                type=location_validator(archive=False),
                                help='Store to create')
+        subparser.add_argument('--key-file', dest='keyfile',
+                               action='store_true', default=False,
+                               help='Encrypt data using key file')
+        subparser.add_argument('--passphrase', dest='passphrase',
+                               action='store_true', default=False,
+                               help='Encrypt data using passphrase derived key')
 
-        subparser = subparsers.add_parser('change-password', parents=[common_parser])
-        subparser.set_defaults(func=self.do_chpasswd)
-        subparser.add_argument('store_or_file', metavar='STORE_OR_KEY_FILE',
-                               type=str,
-                               help='Key file to operate on')
+        subparser = subparsers.add_parser('change-passphrase', parents=[common_parser])
+        subparser.set_defaults(func=self.do_change_passphrase)
+        subparser.add_argument('store', type=location_validator(archive=False))
 
         subparser = subparsers.add_parser('create', parents=[common_parser])
         subparser.set_defaults(func=self.do_create)

@@ -73,7 +73,7 @@ class RemoteStore(object):
             self.name = name
 
     def __init__(self, location, create=False):
-        self.cache = LRUCache(200)
+        self.cache = LRUCache(256)
         self.to_send = ''
         self.extra = {}
         self.pending = {}
@@ -84,6 +84,8 @@ class RemoteStore(object):
         self.p = Popen(args, bufsize=0, stdin=PIPE, stdout=PIPE)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()
+        fcntl.fcntl(self.stdin_fd, fcntl.F_SETFL, fcntl.fcntl(self.stdin_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
+        fcntl.fcntl(self.stdout_fd, fcntl.F_SETFL, fcntl.fcntl(self.stdout_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
         self.r_fds = [self.stdout_fd]
         self.x_fds = [self.stdin_fd, self.stdout_fd]
 
@@ -97,9 +99,10 @@ class RemoteStore(object):
 
     def call(self, cmd, args, wait=True):
         self.msgid += 1
-        self.p.stdin.write(msgpack.packb((1, self.msgid, cmd, args)))
-        while wait:
-            r, w, x = select.select(self.r_fds, [], self.x_fds, 1)
+        to_send = msgpack.packb((1, self.msgid, cmd, args))
+        w_fds = [self.stdin_fd]
+        while wait or to_send:
+            r, w, x = select.select(self.r_fds, w_fds, self.x_fds, 1)
             if x:
                 raise Exception('FD exception occured')
             if r:
@@ -116,6 +119,13 @@ class RemoteStore(object):
                         args = self.pending.pop(msgid, None)
                         if args is not None:
                             self.cache[args] = msgid, res, error
+            if w:
+                if to_send:
+                    n = os.write(self.stdin_fd, to_send)
+                    assert n > 0
+                    to_send = to_send[n:]
+                else:
+                    w_fds = []
 
     def _read(self):
         data = os.read(self.stdout_fd, BUFSIZE)

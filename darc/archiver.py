@@ -31,7 +31,7 @@ class Archiver(object):
     def print_error(self, msg, *args):
         msg = args and msg % args or msg
         self.exit_code = 1
-        print >> sys.stderr, msg
+        print >> sys.stderr, 'darc: ' + msg
 
     def print_verbose(self, msg, *args, **kw):
         if self.verbose:
@@ -149,22 +149,24 @@ class Archiver(object):
             self.print_error('Unknown file type: %s', path)
 
     def do_extract(self, args):
-        def start_cb(item):
-            self.print_verbose(item['path'])
-
         store = self.open_store(args.archive)
         manifest, key = Manifest.load(store)
         archive = Archive(store, key, manifest, args.archive.archive,
                           numeric_owner=args.numeric_owner)
         dirs = []
         for item, peek in archive.iter_items(lambda item: not exclude_path(item['path'], args.patterns)):
-            if stat.S_ISDIR(item['mode']):
-                dirs.append(item)
-                archive.extract_item(item, args.dest, start_cb, restore_attrs=False)
-            else:
-                archive.extract_item(item, args.dest, start_cb, peek=peek)
-            if dirs and not item['path'].startswith(dirs[-1]['path']):
+            while dirs and not item['path'].startswith(dirs[-1]['path']):
                 archive.extract_item(dirs.pop(-1), args.dest)
+            self.print_verbose(item['path'])
+            try:
+                if stat.S_ISDIR(item['mode']):
+                    dirs.append(item)
+                    archive.extract_item(item, args.dest, restore_attrs=False)
+                else:
+                    archive.extract_item(item, args.dest, peek=peek)
+            except IOError, e:
+                self.print_error('%s: %s', item['path'], e)
+
         while dirs:
             archive.extract_item(dirs.pop(-1), args.dest)
         return self.exit_code
@@ -409,7 +411,10 @@ class Archiver(object):
 
 def main():
     archiver = Archiver()
-    sys.exit(archiver.run())
+    exit_code = archiver.run()
+    if exit_code:
+        archiver.print_error('Exiting with failure statue due to previous errors')
+    sys.exit(exit_code)
 
 if __name__ == '__main__':
     main()

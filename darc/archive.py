@@ -1,7 +1,7 @@
 from __future__ import with_statement
 from datetime import datetime, timedelta
 from getpass import getuser
-from itertools import izip_longest
+from itertools import izip_longest, islice
 import msgpack
 import os
 import socket
@@ -21,6 +21,7 @@ WINDOW_SIZE = 4096
 
 have_lchmod = hasattr(os, 'lchmod')
 linux = sys.platform == 'linux2'
+
 
 
 class ItemIter(object):
@@ -133,11 +134,18 @@ class Archive(object):
 
     def iter_items(self, filter=None):
         unpacker = msgpack.Unpacker()
-        for id in self.metadata['items']:
-            unpacker.feed(self.key.decrypt(id, self.store.get(id)))
-            iter = ItemIter(unpacker, filter)
-            for item in iter:
-                yield item, iter.peek
+        i = 0
+        n = 20
+        while True:
+            items = self.metadata['items'][i:i + n]
+            i += n
+            if not items:
+                break
+            for id, chunk in [(id, chunk) for id, chunk in izip_longest(items, self.store.get_many(items))]:
+                unpacker.feed(self.key.decrypt(id, chunk))
+                iter = ItemIter(unpacker, filter)
+                for item in iter:
+                    yield item, iter.peek
 
     def add_item(self, item):
         self.items.write(msgpack.packb(item))
@@ -215,10 +223,19 @@ class Archive(object):
         cache.rollback()
         return stats
 
-    def extract_item(self, item, dest=None, start_cb=None, restore_attrs=True, peek=None):
+    def extract_item(self, item, dest=None, restore_attrs=True, peek=None):
         dest = dest or self.cwd
         assert item['path'][0] not in ('/', '\\', ':')
         path = os.path.join(dest, encode_filename(item['path']))
+        # Attempt to remove existing files, ignore errors on failure
+        try:
+            st = os.lstat(path)
+            if stat.S_ISDIR(st.st_mode):
+                os.rmdir(path)
+            else:
+                os.unlink(path)
+        except OSError:
+            pass
         mode = item['mode']
         if stat.S_ISDIR(mode):
             if not os.path.exists(path):
@@ -235,19 +252,11 @@ class Archive(object):
                     os.unlink(path)
                 os.link(source, path)
             else:
-                n = len(item['chunks'])
-                ## 0 chunks indicates an empty (0 bytes) file
-                if n == 0:
-                    open(path, 'wb').close()
-                    start_cb(item)
-                else:
-                    fd = open(path, 'wb')
-                    start_cb(item)
+                with open(path, 'wbx') as fd:
                     ids = [id for id, size, csize in item['chunks']]
                     for id, chunk in izip_longest(ids, self.store.get_many(ids, peek)):
                         data = self.key.decrypt(id, chunk)
                         fd.write(data)
-                    fd.close()
                 self.restore_attrs(path, item)
         elif stat.S_ISFIFO(mode):
             if not os.path.exists(os.path.dirname(path)):
@@ -312,8 +321,8 @@ class Archive(object):
 
     def delete(self, cache):
         unpacker = msgpack.Unpacker()
-        for id, chunk in izip_longest(self.metadata['items'], self.store.get_many(self.metadata['items'])):
-            unpacker.feed(self.key.decrypt(id, chunk))
+        for id in self.metadata['items']:
+            unpacker.feed(self.key.decrypt(id, self.store.get(id)))
             for item in unpacker:
                 try:
                     for chunk_id, size, csize in item['chunks']:

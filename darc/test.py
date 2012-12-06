@@ -41,7 +41,6 @@ class Test(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def darc(self, *args, **kwargs):
-        os.environ['DARC_PASSPHRASE'] = ''
         exit_code = kwargs.get('exit_code', 0)
         args = list(args)
         try:
@@ -58,7 +57,7 @@ class Test(unittest.TestCase):
             sys.stdout, sys.stderr = stdout, stderr
 
     def create_src_archive(self, name):
-        src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__))
+        src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__), '..')
         self.darc('init', self.store_location)
         self.darc('create', self.store_location + '::' + name, src_dir)
 
@@ -66,7 +65,7 @@ class Test(unittest.TestCase):
         filename = os.path.join(self.input_path, name)
         if not os.path.exists(os.path.dirname(filename)):
             os.makedirs(os.path.dirname(filename))
-        with open(filename, 'wb') as fd:
+        with open(filename, 'wbx') as fd:
             fd.write('X' * size)
 
     def get_xattrs(self, path):
@@ -98,6 +97,8 @@ class Test(unittest.TestCase):
     def test_basic_functionality(self):
         self.create_regual_file('file1', size=1024 * 80)
         self.create_regual_file('dir2/file2', size=1024 * 80)
+        os.chmod('input/file1', 0600)
+        os.chmod('input/dir2', 0700)
         x = xattr(os.path.join(self.input_path, 'file1'))
         x.set('user.foo', 'bar')
         os.link(os.path.join(self.input_path, 'file1'),
@@ -115,6 +116,23 @@ class Test(unittest.TestCase):
         # info_output2 starts with some "initializing cache" text but should
         # end the same way as info_output
         assert info_output2.endswith(info_output)
+
+    def test_overwrite(self):
+        self.create_regual_file('file1', size=1024 * 80)
+        self.create_regual_file('dir2/file2', size=1024 * 80)
+        self.darc('init', self.store_location)
+        self.darc('create', self.store_location + '::test', 'input')
+        # Overwriting regular files and directories should be supported
+        os.mkdir('output/input')
+        os.mkdir('output/input/file1')
+        os.mkdir('output/input/dir2')
+        self.darc('extract', self.store_location + '::test', 'output')
+        self.diff_dirs('input', 'output/input')
+        # But non-empty dirs should fail
+        os.unlink('output/input/file1')
+        os.mkdir('output/input/file1')
+        os.mkdir('output/input/file1/dir')
+        self.darc('extract', self.store_location + '::test', 'output', exit_code=1)
 
     def test_delete(self):
         self.create_regual_file('file1', size=1024 * 80)

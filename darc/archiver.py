@@ -413,7 +413,7 @@ def main():
     archiver = Archiver()
     exit_code = archiver.run()
     if exit_code:
-        archiver.print_error('Exiting with failure statue due to previous errors')
+        archiver.print_error('Exiting with failure status due to previous errors')
     sys.exit(exit_code)
 
 if __name__ == '__main__':

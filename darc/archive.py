@@ -272,7 +272,7 @@ class Archive(object):
             os.symlink(source, path)
             self.restore_attrs(path, item, symlink=True)
         elif stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
-            os.mknod(path, item['mode'], item['dev'])
+            os.mknod(path, item['mode'], item['rdev'])
             self.restore_attrs(path, item)
         else:
             raise Exception('Unknown archive item type %r' % item['mode'])
@@ -365,7 +365,7 @@ class Archive(object):
         self.add_item(item)
 
     def process_dev(self, path, st):
-        item = {'path': path.lstrip('/\\:'), 'dev': st.st_dev}
+        item = {'path': path.lstrip('/\\:'), 'rdev': st.st_rdev}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
 

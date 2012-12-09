@@ -3,6 +3,7 @@ import doctest
 import filecmp
 import os
 from StringIO import StringIO
+import stat
 import sys
 import shutil
 import tempfile
@@ -84,7 +85,7 @@ class Test(unittest.TestCase):
             path2 = os.path.join(dir2, filename)
             s1 = os.lstat(path1)
             s2 = os.lstat(path2)
-            attrs = ['st_mode', 'st_uid', 'st_gid']
+            attrs = ['st_mode', 'st_uid', 'st_gid', 'st_rdev']
             # We can't restore symlink atime/mtime right now
             if not os.path.islink(path1):
                 attrs.append('st_mtime')
@@ -95,15 +96,28 @@ class Test(unittest.TestCase):
             self.assertEqual(d1, d2)
 
     def test_basic_functionality(self):
+        # File
         self.create_regual_file('file1', size=1024 * 80)
+        # Directory
         self.create_regual_file('dir2/file2', size=1024 * 80)
+        # File owner
+        os.chown('input/file1', 100, 200)
+        # File mode
         os.chmod('input/file1', 0600)
         os.chmod('input/dir2', 0700)
+        # Block device
+        os.mknod('input/bdev', 0600 | stat.S_IFBLK,  os.makedev(10, 20))
+        # Char device
+        os.mknod('input/cdev', 0600 | stat.S_IFCHR,  os.makedev(30, 40))
+        # xattr
         x = xattr(os.path.join(self.input_path, 'file1'))
         x.set('user.foo', 'bar')
+        # Hard link
         os.link(os.path.join(self.input_path, 'file1'),
                 os.path.join(self.input_path, 'hardlink'))
+        # Symlink
         os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
+        # FIFO node
         os.mkfifo(os.path.join(self.input_path, 'fifo1'))
         self.darc('init', self.store_location)
         self.darc('create', self.store_location + '::test', 'input')

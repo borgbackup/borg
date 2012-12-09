@@ -100,7 +100,7 @@ class Archive(object):
         self.numeric_owner = numeric_owner
         if create:
             if name in manifest.archives:
-                raise self.AlreadyExists
+                raise self.AlreadyExists(name)
             self.last_checkpoint = time.time()
             i = 0
             while True:
@@ -112,7 +112,7 @@ class Archive(object):
             try:
                 info = self.manifest.archives[name]
             except KeyError:
-                raise self.DoesNotExist
+                raise self.DoesNotExist(name)
             self.load(info['id'])
 
     def load(self, id):

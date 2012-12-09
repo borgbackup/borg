@@ -36,6 +36,9 @@ class Store(object):
     class DoesNotExist(KeyError):
         """Requested key does not exist"""
 
+    class AlreadyExists(KeyError):
+        """Requested key does not exist"""
+
     def __init__(self, path, create=False):
         if create:
             self.create(path)
@@ -45,7 +48,7 @@ class Store(object):
         """Create a new empty store at `path`
         """
         if os.path.exists(path) and (not os.path.isdir(path) or os.listdir(path)):
-            raise Exception('Path "%s" already exists' % path)
+            raise self.AlreadyExists(path)
         if not os.path.exists(path):
             os.mkdir(path)
         with open(os.path.join(path, 'README'), 'wb') as fd:
@@ -64,7 +67,7 @@ class Store(object):
         self.head = None
         self.path = path
         if not os.path.isdir(path):
-            raise Exception('%s Does not look like a darc store' % path)
+            raise self.DoesNotExist(path)
         self.lock_fd = open(os.path.join(path, 'README'), 'r+')
         fcntl.flock(self.lock_fd, fcntl.LOCK_EX)
         self.config = RawConfigParser()
@@ -426,11 +429,11 @@ class StoreTestCase(unittest.TestCase):
         key50 = '%-32d' % 50
         self.assertEqual(self.store.get(key50), 'SOMEDATA')
         self.store.delete(key50)
-        self.assertRaises(self.store.DoesNotExist, lambda: self.store.get(key50))
+        self.assertRaises(Store.DoesNotExist, lambda: self.store.get(key50))
         self.store.commit()
         self.store.close()
         store2 = self.open()
-        self.assertRaises(store2.DoesNotExist, lambda: store2.get(key50))
+        self.assertRaises(Store.DoesNotExist, lambda: store2.get(key50))
         for x in range(100):
             if x == 50:
                 continue
@@ -457,7 +460,7 @@ class StoreTestCase(unittest.TestCase):
         self.store.put('00000000000000000000000000000000', 'bar')
         self.assertEqual(self.store.get('00000000000000000000000000000000'), 'bar')
         self.store.delete('00000000000000000000000000000000')
-        self.assertRaises(self.store.DoesNotExist, lambda: self.store.get('00000000000000000000000000000000'))
+        self.assertRaises(Store.DoesNotExist, lambda: self.store.get('00000000000000000000000000000000'))
 
     def test_consistency2(self):
         """Test cache consistency2

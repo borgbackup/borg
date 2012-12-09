@@ -411,9 +411,26 @@ class Archiver(object):
 
 def main():
     archiver = Archiver()
-    exit_code = archiver.run()
-    if exit_code:
-        archiver.print_error('Exiting with failure status due to previous errors')
+    try:
+        exit_code = archiver.run()
+    except Store.DoesNotExist:
+        archiver.print_error('Error: Store not found')
+        exit_code = 1
+    except Store.AlreadyExists:
+        archiver.print_error('Error: Store already exists')
+        exit_code = 1
+    except Archive.AlreadyExists, e:
+        archiver.print_error('Error: Archive "%s" already exists', e)
+        exit_code = 1
+    except Archive.DoesNotExist, e:
+        archiver.print_error('Error: Archive "%s" does not exist', e)
+        exit_code = 1
+    except KeyboardInterrupt:
+        archiver.print_error('Error: Keyboard interrupt')
+        exit_code = 1
+    else:
+        if exit_code:
+            archiver.print_error('Exiting with failure status due to previous errors')
     sys.exit(exit_code)
 
 if __name__ == '__main__':

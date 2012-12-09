@@ -61,12 +61,6 @@ class StoreServer(object):
 
 class RemoteStore(object):
 
-    class DoesNotExist(Exception):
-        pass
-
-    class AlreadyExists(Exception):
-        pass
-
     class RPCError(Exception):
 
         def __init__(self, name):
@@ -92,7 +86,13 @@ class RemoteStore(object):
         version = self.call('negotiate', (1,))
         if version != 1:
             raise Exception('Server insisted on using unsupported protocol version %d' % version)
-        self.id = self.call('open', (location.path, create))
+        try:
+            self.id = self.call('open', (location.path, create))
+        except self.RPCError, e:
+            if e.name == 'DoesNotExist':
+                raise Store.DoesNotExist
+            elif e.name == 'AlreadyExists':
+                raise Store.AlreadyExists
 
     def __del__(self):
         self.close()
@@ -106,7 +106,10 @@ class RemoteStore(object):
             if x:
                 raise Exception('FD exception occured')
             if r:
-                self.unpacker.feed(os.read(self.stdout_fd, BUFSIZE))
+                data = os.read(self.stdout_fd, BUFSIZE)
+                if not data:
+                    raise Exception('Remote host closed connection')
+                self.unpacker.feed(data)
                 for type, msgid, error, res in self.unpacker:
                     if msgid == self.msgid:
                         assert msgid == self.msgid
@@ -130,7 +133,7 @@ class RemoteStore(object):
     def _read(self):
         data = os.read(self.stdout_fd, BUFSIZE)
         if not data:
-            raise Exception('EOF')
+            raise Exception('Remote host closed connection')
         self.unpacker.feed(data)
         to_yield = []
         for type, msgid, error, res in self.unpacker:
@@ -229,7 +232,7 @@ class RemoteStore(object):
                 return res
         except self.RPCError, e:
             if e.name == 'DoesNotExist':
-                raise self.DoesNotExist
+                raise Store.DoesNotExist
             raise
 
     def get_many(self, ids, peek=None):
@@ -241,13 +244,9 @@ class RemoteStore(object):
             self.pending.pop(self.cache.pop(key)[0], None)
 
     def put(self, id, data, wait=True):
-        try:
-            resp = self.call('put', (id, data), wait=wait)
-            self._invalidate(id)
-            return resp
-        except self.RPCError, e:
-            if e.name == 'AlreadyExists':
-                raise self.AlreadyExists
+        resp = self.call('put', (id, data), wait=wait)
+        self._invalidate(id)
+        return resp
 
     def delete(self, id, wait=True):
         resp = self.call('delete', (id, ), wait=wait)

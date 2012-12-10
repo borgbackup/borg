@@ -123,6 +123,8 @@ class Test(unittest.TestCase):
         self.darc('create', self.store_location + '::test', 'input')
         self.darc('create', self.store_location + '::test.2', 'input')
         self.darc('extract', self.store_location + '::test', 'output')
+        self.assertEqual(len(self.darc('list', self.store_location).splitlines()), 2)
+        self.assertEqual(len(self.darc('list', self.store_location + '::test').splitlines()), 9)
         self.diff_dirs('input', 'output/input')
         info_output = self.darc('info', self.store_location + '::test')
         shutil.rmtree(self.cache_path)

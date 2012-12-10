@@ -2,6 +2,7 @@ from __future__ import with_statement
 from getpass import getpass
 import os
 import msgpack
+import shutil
 import tempfile
 import unittest
 import zlib
@@ -13,7 +14,7 @@ from Crypto.Util.number import bytes_to_long, long_to_bytes
 from Crypto.Random import get_random_bytes
 from Crypto.Protocol.KDF import PBKDF2
 
-from .helpers import IntegrityError, get_keys_dir
+from .helpers import IntegrityError, get_keys_dir, Location
 
 PREFIX = '\0' * 8
 
@@ -310,6 +311,15 @@ class KeyTestCase(unittest.TestCase):
     class MockStore(object):
         id = '\0' * 32
 
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.keys_path = os.path.join(self.tmpdir, 'keys')
+        os.mkdir(self.keys_path)
+        os.environ['DARC_KEYS_DIR'] = self.keys_path
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
     def test_plaintext(self):
         key = PlaintextKey.create(None, None)
         data = 'foo'
@@ -318,12 +328,10 @@ class KeyTestCase(unittest.TestCase):
 
     def test_keyfile(self):
         class MockArgs(object):
-            class StoreArg(object):
-                def to_key_filename(self):
-                    return tempfile.mkstemp()[1]
-            store = StoreArg()
+            store = Location(tempfile.mkstemp()[1])
         os.environ['DARC_PASSPHRASE'] = 'test'
         key = KeyfileKey.create(self.MockStore(), MockArgs())
+        key = KeyfileKey.detect(self.MockStore(), None)
         data = 'foo'
         self.assertEqual(data, key.decrypt(key.id_hash(data), key.encrypt(data)))
 

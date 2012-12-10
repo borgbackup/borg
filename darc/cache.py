@@ -6,7 +6,7 @@ import msgpack
 import os
 import shutil
 
-from .helpers import get_cache_dir, Manifest
+from .helpers import get_cache_dir
 from .hashindex import ChunkIndex
 
 

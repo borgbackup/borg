@@ -1,7 +1,7 @@
 from __future__ import with_statement
 from datetime import datetime, timedelta
 from getpass import getuser
-from itertools import izip_longest, islice
+from itertools import izip_longest
 import msgpack
 import os
 import socket
@@ -21,7 +21,6 @@ WINDOW_SIZE = 4096
 
 have_lchmod = hasattr(os, 'lchmod')
 linux = sys.platform == 'linux2'
-
 
 
 class ItemIter(object):
@@ -109,10 +108,9 @@ class Archive(object):
                     break
                 i += 1
         else:
-            try:
-                info = self.manifest.archives[name]
-            except KeyError:
+            if name not in self.manifest.archives:
                 raise self.DoesNotExist(name)
+            info = self.manifest.archives[name]
             self.load(info['id'])
 
     def load(self, id):

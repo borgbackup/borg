@@ -263,7 +263,7 @@ class Archiver(object):
         if args.daily:
             keep += prune_split(archives, '%Y-%m-%d', args.daily, keep)
         if args.weekly:
-            keep += prune_split(archives, '%Y-%V', args.weekly, keep)
+            keep += prune_split(archives, '%G-%V', args.weekly, keep)
         if args.monthly:
             keep += prune_split(archives, '%Y-%m', args.monthly, keep)
         if args.yearly:

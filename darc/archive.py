@@ -16,8 +16,9 @@ from .helpers import uid2user, user2uid, gid2group, group2gid, \
     encode_filename, Statistics
 
 ITEMS_BUFFER = 1024 * 1024
-CHUNK_SIZE = 64 * 1024
-WINDOW_SIZE = 4096
+CHUNK_MIN = 1024
+WINDOW_SIZE = 0xfff
+CHUNK_MASK = 0xffff
 
 have_lchmod = hasattr(os, 'lchmod')
 linux = sys.platform == 'linux2'
@@ -158,7 +159,7 @@ class Archive(object):
         if self.items.tell() == 0:
             return
         self.items.seek(0)
-        chunks = list(str(s) for s in chunkify(self.items, CHUNK_SIZE, WINDOW_SIZE, self.key.chunk_seed))
+        chunks = list(str(s) for s in chunkify(self.items, WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, self.key.chunk_seed))
         self.items.seek(0)
         self.items.truncate()
         for chunk in chunks[:-1]:
@@ -399,8 +400,7 @@ class Archive(object):
         if chunks is None:
             with open(path, 'rb') as fd:
                 chunks = []
-                for chunk in chunkify(fd, CHUNK_SIZE, WINDOW_SIZE,
-                                      self.key.chunk_seed):
+                for chunk in chunkify(fd, WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, self.key.chunk_seed):
                     chunks.append(cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats))
             ids = [id for id, _, _ in chunks]
             cache.memorize_file(path_hash, st, ids)

@@ -11,6 +11,7 @@ import unittest
 from xattr import xattr, XATTR_NOFOLLOW
 
 from . import helpers, lrucache
+from ._speedups import buzhash, buzhash_update, chunkify
 from .archiver import Archiver
 from .key import suite as KeySuite
 from .store import Store, suite as StoreSuite
@@ -186,12 +187,37 @@ class Test(unittest.TestCase):
         assert 'test2' in output
 
 
+class ChunkTest(unittest.TestCase):
+
+    def test_chunkify(self):
+        data = '0' * 1024 * 1024 * 15 + 'Y'
+        parts = [str(c) for c in chunkify(StringIO(data), 2, 0x3, 2, 0)]
+        self.assertEqual(len(parts), 2)
+        self.assertEqual(''.join(parts), data)
+        self.assertEqual([str(c) for c in chunkify(StringIO(''), 2, 0x3, 2, 0)], [])
+        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 2, 0x3, 2, 0)], ['fooba', 'rboobaz', 'fooba', 'rboobaz', 'fooba', 'rboobaz'])
+        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 2, 0x3, 2, 1)], ['fo', 'obarb', 'oob', 'azf', 'oobarb', 'oob', 'azf', 'oobarb', 'oobaz'])
+        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 2, 0x3, 2, 2)], ['foob', 'ar', 'boobazfoob', 'ar', 'boobazfoob', 'ar', 'boobaz'])
+        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 3, 0x3, 3, 0)], ['foobarboobaz' * 3])
+        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 3, 0x3, 3, 1)], ['foobar', 'boo', 'bazfo', 'obar', 'boo', 'bazfo', 'obar', 'boobaz'])
+        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 3, 0x3, 3, 2)], ['foo', 'barboobaz', 'foo', 'barboobaz', 'foo', 'barboobaz'])
+        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 3, 0x3, 4, 0)], ['foobarboobaz' * 3])
+        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 3, 0x3, 4, 1)], ['foobar', 'boobazfo', 'obar', 'boobazfo', 'obar', 'boobaz'])
+        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 3, 0x3, 4, 2)], ['foob', 'arboobaz', 'foob', 'arboobaz', 'foob', 'arboobaz'])
+
+    def test_buzhash(self):
+        self.assertEqual(buzhash('abcdefghijklmnop', 0), 3795437769L)
+        self.assertEqual(buzhash('abcdefghijklmnop', 1), 3795400502L)
+        self.assertEqual(buzhash('abcdefghijklmnop', 1), buzhash_update(buzhash('Xabcdefghijklmno', 1), ord('X'), ord('p'), 16, 1))
+
+
 class RemoteTest(Test):
     prefix = 'localhost:'
 
 
 def suite():
     suite = unittest.TestSuite()
+    suite.addTest(unittest.TestLoader().loadTestsFromTestCase(ChunkTest))
     suite.addTest(unittest.TestLoader().loadTestsFromTestCase(Test))
     suite.addTest(unittest.TestLoader().loadTestsFromTestCase(RemoteTest))
     suite.addTest(KeySuite())

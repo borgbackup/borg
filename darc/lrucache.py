@@ -35,6 +35,17 @@ class LRUCache(dict):
             pass
         return super(LRUCache, self).__delitem__(key)
 
+    def pop(self, key, default=None):
+        try:
+            self._lru.remove(key)
+        except ValueError:
+            pass
+        return super(LRUCache, self).pop(key, default)
+
+    def _not_implemented(self, *args, **kw):
+        raise NotImplementedError
+    popitem = setdefault = update = _not_implemented
+
 
 class LRUCacheTestCase(unittest.TestCase):
 
@@ -65,6 +76,13 @@ class LRUCacheTestCase(unittest.TestCase):
         self.assertEqual(len(c), 1)
         self.assertRaises(KeyError, lambda: c['c'])
         self.assertEqual(c['e'], 4)
+
+    def test_pop(self):
+        c = LRUCache(2)
+        c[1] = 1
+        c[2] = 2
+        c.pop(1)
+        c[3] = 3
 
 
 def suite():

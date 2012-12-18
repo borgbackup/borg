@@ -36,11 +36,9 @@ class Manifest(object):
             raise ValueError('Invalid manifest version')
         manifest.archives = m['archives']
         manifest.config = m['config']
-        key.post_manifest_load(manifest.config)
         return manifest, key
 
     def write(self):
-        self.key.pre_manifest_write(self)
         data = msgpack.packb({
             'version': 1,
             'archives': self.archives,

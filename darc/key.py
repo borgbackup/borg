@@ -59,12 +59,6 @@ class KeyBase(object):
     def decrypt(self, id, data):
         pass
 
-    def post_manifest_load(self, config):
-        pass
-
-    def pre_manifest_write(self, manifest):
-        pass
-
 
 class PlaintextKey(KeyBase):
     TYPE = PLAINTEXT
@@ -97,13 +91,6 @@ class PlaintextKey(KeyBase):
 
 class AESKeyBase(KeyBase):
 
-    def post_manifest_load(self, config):
-        iv = bytes_to_long(config['aes_counter']) + 100
-        self.counter = Counter.new(64, initial_value=iv, prefix=PREFIX)
-
-    def pre_manifest_write(self, manifest):
-        manifest.config['aes_counter'] = long_to_bytes(self.counter.next_value(), 8)
-
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
         """
@@ -129,6 +116,12 @@ class AESKeyBase(KeyBase):
         if id and HMAC.new(self.id_key, data, SHA256).digest() != id:
             raise IntegrityError('Chunk id verification failed')
         return data
+
+    def extract_iv(self, payload):
+        if payload[0] != self.TYPE:
+            raise IntegrityError('Invalid encryption envelope')
+        nonce = bytes_to_long(payload[33:41])
+        return nonce
 
     def init_from_random_data(self, data):
         self.enc_key = data[0:32]
@@ -177,6 +170,8 @@ class PassphraseKey(AESKeyBase):
             key.init(store, passphrase)
             try:
                 key.decrypt(None, manifest_data)
+                iv = key.extract_iv(manifest_data)
+                key.counter = Counter.new(64, initial_value=iv + 1000, prefix=PREFIX)
                 return key
             except IntegrityError:
                 passphrase = getpass(prompt)
@@ -197,6 +192,8 @@ class KeyfileKey(AESKeyBase):
         passphrase = os.environ.get('DARC_PASSPHRASE', '')
         while not key.load(path, passphrase):
             passphrase = getpass(prompt)
+        iv = key.extract_iv(manifest_data)
+        key.counter = Counter.new(64, initial_value=iv + 1000, prefix=PREFIX)
         return key
 
     @classmethod
@@ -260,7 +257,7 @@ class KeyfileKey(AESKeyBase):
             'store_id': self.store_id,
             'enc_key': self.enc_key,
             'enc_hmac_key': self.enc_hmac_key,
-            'id_key': self.enc_key,
+            'id_key': self.id_key,
             'chunk_seed': self.chunk_seed,
         }
         data = self.encrypt_key_file(msgpack.packb(key), passphrase)
@@ -308,14 +305,23 @@ class KeyfileKey(AESKeyBase):
 
 class KeyTestCase(unittest.TestCase):
 
+    def setUp(self):
+        self.tmppath = tempfile.mkdtemp()
+        os.environ['DARC_KEYS_DIR'] = self.tmppath
+
+    def tearDown(self):
+        shutil.rmtree(self.tmppath)
+
     class MockStore(object):
+        class _Location(object):
+            orig = '/some/place'
+
+        _location = _Location()
         id = '\0' * 32
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
-        self.keys_path = os.path.join(self.tmpdir, 'keys')
-        os.mkdir(self.keys_path)
-        os.environ['DARC_KEYS_DIR'] = self.keys_path
+        os.environ['DARC_KEYS_DIR'] = self.tmpdir
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
@@ -331,20 +337,36 @@ class KeyTestCase(unittest.TestCase):
             store = Location(tempfile.mkstemp()[1])
         os.environ['DARC_PASSPHRASE'] = 'test'
         key = KeyfileKey.create(self.MockStore(), MockArgs())
-        key = KeyfileKey.detect(self.MockStore(), None)
+        self.assertEqual(bytes_to_long(key.counter()), 1)
+        manifest = key.encrypt('')
+        iv = key.extract_iv(manifest)
+        key2 = KeyfileKey.detect(self.MockStore(), manifest)
+        self.assertEqual(bytes_to_long(key2.counter()), iv + 1000)
+        # Key data sanity check
+        self.assertEqual(len(set([key2.id_key, key2.enc_key, key2.enc_hmac_key])), 3)
+        self.assertEqual(key2.chunk_seed == 0, False)
         data = 'foo'
-        self.assertEqual(data, key.decrypt(key.id_hash(data), key.encrypt(data)))
+        self.assertEqual(data, key2.decrypt(key.id_hash(data), key.encrypt(data)))
 
     def test_passphrase(self):
         os.environ['DARC_PASSPHRASE'] = 'test'
         key = PassphraseKey.create(self.MockStore(), None)
+        self.assertEqual(bytes_to_long(key.counter()), 1)
         self.assertEqual(key.id_key.encode('hex'), 'f28e915da78a972786da47fee6c4bd2960a421b9bdbdb35a7942eb82552e9a72')
         self.assertEqual(key.enc_hmac_key.encode('hex'), '169c6082f209e524ea97e2c75318936f6e93c101b9345942a95491e9ae1738ca')
         self.assertEqual(key.enc_key.encode('hex'), 'c05dd423843d4dd32a52e4dc07bb11acabe215917fc5cf3a3df6c92b47af79ba')
         self.assertEqual(key.chunk_seed, -324662077)
+        manifest = key.encrypt('')
+        iv = key.extract_iv(manifest)
+        key2 = PassphraseKey.detect(self.MockStore(), manifest)
+        self.assertEqual(bytes_to_long(key2.counter()), iv + 1000)
+        self.assertEqual(key.id_key, key2.id_key)
+        self.assertEqual(key.enc_hmac_key, key2.enc_hmac_key)
+        self.assertEqual(key.enc_key, key2.enc_key)
+        self.assertEqual(key.chunk_seed, key2.chunk_seed)
         data = 'foo'
         self.assertEqual(key.id_hash(data).encode('hex'), '016c27cd40dc8e84f196f3b43a9424e8472897e09f6935d0d3a82fb41664bad7')
-        self.assertEqual(data, key.decrypt(key.id_hash(data), key.encrypt(data)))
+        self.assertEqual(data, key2.decrypt(key2.id_hash(data), key.encrypt(data)))
 
 
 def suite():

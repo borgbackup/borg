@@ -132,7 +132,7 @@ class Archive(object):
         return 'Archive(%r)' % self.name
 
     def iter_items(self, filter=None):
-        unpacker = msgpack.Unpacker()
+        unpacker = msgpack.Unpacker(use_list=False)
         i = 0
         n = 20
         while True:
@@ -205,7 +205,7 @@ class Archive(object):
             self.cache.chunks[id] = count - 1, size, csize
         # This function is a bit evil since it abuses the cache to calculate
         # the stats. The cache transaction must be rolled back afterwards
-        unpacker = msgpack.Unpacker()
+        unpacker = msgpack.Unpacker(use_list=False)
         cache.begin_txn()
         stats = Statistics()
         add(self.id)
@@ -319,7 +319,7 @@ class Archive(object):
             result(item, True)
 
     def delete(self, cache):
-        unpacker = msgpack.Unpacker()
+        unpacker = msgpack.Unpacker(use_list=False)
         for id in self.metadata['items']:
             unpacker.feed(self.key.decrypt(id, self.store.get(id)))
             for item in unpacker:

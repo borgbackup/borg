@@ -26,7 +26,7 @@ class StoreServer(object):
         # Make stdout blocking
         fl = fcntl.fcntl(sys.stdout.fileno(), fcntl.F_GETFL)
         fcntl.fcntl(sys.stdout.fileno(), fcntl.F_SETFL, fl & ~os.O_NONBLOCK)
-        unpacker = msgpack.Unpacker()
+        unpacker = msgpack.Unpacker(use_list=False)
         while True:
             r, w, es = select.select([sys.stdin], [], [], 10)
             if r:
@@ -71,7 +71,7 @@ class RemoteStore(object):
         self.to_send = ''
         self.extra = {}
         self.pending = {}
-        self.unpacker = msgpack.Unpacker()
+        self.unpacker = msgpack.Unpacker(use_list=False)
         self.msgid = 0
         self.received_msgid = 0
         args = ['ssh', '-p', str(location.port), '%s@%s' % (location.user or getpass.getuser(), location.host), 'darc', 'serve']

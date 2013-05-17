@@ -63,15 +63,15 @@ class Cache(object):
         self.files = {}
         self._newest_mtime = 0
         with open(os.path.join(self.path, 'files'), 'rb') as fd:
-            u = msgpack.Unpacker()
+            u = msgpack.Unpacker(use_list=True)
             while True:
                 data = fd.read(64 * 1024)
                 if not data:
                     break
                 u.feed(data)
                 for hash, item in u:
-                    if item[0] < 10:
-                        self.files[hash] = (item[0] + 1,) + item[1:]
+                        item[0] += 1
+                        self.files[hash] = item
 
     def begin_txn(self):
         # Initialize transaction snapshot
@@ -94,7 +94,7 @@ class Cache(object):
                 for item in self.files.iteritems():
                     # Discard cached files with the newest mtime to avoid
                     # issues with filesystem snapshots and mtime precision
-                    if item[1][3] < self._newest_mtime:
+                    if item[1][0] < 10 and item[1][3] < self._newest_mtime:
                         msgpack.pack(item, fd)
         self.config.set('cache', 'manifest', self.manifest.id.encode('hex'))
         with open(os.path.join(self.path, 'config'), 'w') as fd:
@@ -192,7 +192,7 @@ class Cache(object):
         if (entry and entry[3] == st.st_mtime
             and entry[2] == st.st_size and entry[1] == st.st_ino):
             # reset entry age
-            self.files[path_hash] = (0,) + entry[1:]
+            self.files[path_hash][0] = 0
             return entry[4]
         else:
             return None

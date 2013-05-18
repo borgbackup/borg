@@ -285,10 +285,6 @@ class Archive(object):
                     xa.set(k, v)
                 except (IOError, KeyError):
                     pass
-        if have_lchmod:
-            os.lchmod(path, item['mode'])
-        elif not symlink:
-            os.chmod(path, item['mode'])
         uid = gid = None
         if not self.numeric_owner:
             uid = user2uid(item['user'])
@@ -299,6 +295,10 @@ class Archive(object):
             os.lchown(path, uid, gid)
         except OSError:
             pass
+        if have_lchmod:
+            os.lchmod(path, item['mode'])
+        elif not symlink:
+            os.chmod(path, item['mode'])
         if not symlink:
             # FIXME: We should really call futimes here (c extension required)
             os.utime(path, (item['mtime'], item['mtime']))

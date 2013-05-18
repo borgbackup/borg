@@ -104,7 +104,7 @@ class Test(unittest.TestCase):
         # File owner
         os.chown('input/file1', 100, 200)
         # File mode
-        os.chmod('input/file1', 0600)
+        os.chmod('input/file1', 7755)
         os.chmod('input/dir2', 0700)
         # Block device
         os.mknod('input/bdev', 0600 | stat.S_IFBLK,  os.makedev(10, 20))

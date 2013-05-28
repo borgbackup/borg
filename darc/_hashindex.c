@@ -9,8 +9,6 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
-#include "hashindex.h"
-
 typedef struct {
     char magic[8];
     int32_t num_entries;
@@ -19,6 +17,18 @@ typedef struct {
     int8_t  value_size;
 } __attribute__((__packed__)) HashHeader;
 
+typedef struct {
+    char *path;
+    void *map_addr;
+    off_t map_length;
+    void *buckets;
+    int num_entries;
+    int num_buckets;
+    int key_size;
+    int value_size;
+    int bucket_size;
+    int limit;
+} HashIndex;
 
 #define MAGIC "DARCHASH"
 #define EMPTY ((int32_t)-1)
@@ -32,6 +42,16 @@ typedef struct {
 #define BUCKET_MATCHES_KEY(index, idx, key) (memcmp(key, BUCKET_ADDR_READ(index, idx), index->key_size) == 0)
 
 #define BUCKET_MARK_DELETED(index, idx) (*((int32_t *)(BUCKET_ADDR_WRITE(index, idx) + index->key_size)) = DELETED)
+
+static HashIndex *hashindex_open(const char *path);
+static void hashindex_close(HashIndex *index);
+static void hashindex_clear(HashIndex *index);
+static void hashindex_flush(HashIndex *index);
+static HashIndex *hashindex_create(const char *path, int capacity, int key_size, int value_size);
+static const void *hashindex_get(HashIndex *index, const void *key);
+static void hashindex_set(HashIndex *index, const void *key, const void *value);
+static void hashindex_delete(HashIndex *index, const void *key);
+static void *hashindex_next_key(HashIndex *index, const void *key);
 
 
 /* Private API */
@@ -97,7 +117,7 @@ hashindex_resize(HashIndex *index, int capacity)
 }
 
 /* Public API */
-HashIndex *
+static HashIndex *
 hashindex_open(const char *path)
 {
     int fd = open(path, O_RDWR);
@@ -127,7 +147,7 @@ hashindex_open(const char *path)
     return index;
 }
 
-HashIndex *
+static HashIndex *
 hashindex_create(const char *path, int capacity, int key_size, int value_size)
 {
     FILE *fd;
@@ -160,7 +180,7 @@ error:
     return NULL;
 }
 
-void
+static void
 hashindex_clear(HashIndex *index)
 {
     int i;
@@ -171,7 +191,7 @@ hashindex_clear(HashIndex *index)
     hashindex_resize(index, 16);
 }
 
-void
+static void
 hashindex_flush(HashIndex *index)
 {
     *((int32_t *)(index->map_addr + 8)) = index->num_entries;
@@ -179,7 +199,7 @@ hashindex_flush(HashIndex *index)
     msync(index->map_addr, index->map_length, MS_SYNC);
 }
 
-void
+static void
 hashindex_close(HashIndex *index)
 {
     hashindex_flush(index);
@@ -188,7 +208,7 @@ hashindex_close(HashIndex *index)
     free(index);
 }
 
-const void *
+static const void *
 hashindex_get(HashIndex *index, const void *key)
 {
     int idx = hashindex_lookup(index, key);
@@ -198,7 +218,7 @@ hashindex_get(HashIndex *index, const void *key)
     return BUCKET_ADDR_READ(index, idx) + index->key_size;
 }
 
-void
+static void
 hashindex_set(HashIndex *index, const void *key, const void *value)
 {
     int idx = hashindex_lookup(index, key);
@@ -223,7 +243,7 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
     }
 }
 
-void
+static void
 hashindex_delete(HashIndex *index, const void *key)
 {
     int idx = hashindex_lookup(index, key);
@@ -234,7 +254,7 @@ hashindex_delete(HashIndex *index, const void *key)
     index->num_entries -= 1;
 }
 
-void *
+static void *
 hashindex_next_key(HashIndex *index, const void *key)
 {
     int idx = 0;
@@ -251,7 +271,7 @@ hashindex_next_key(HashIndex *index, const void *key)
     return BUCKET_ADDR_READ(index, idx);
 }
 
-int
+static int
 hashindex_get_size(HashIndex *index)
 {
     return index->num_entries;

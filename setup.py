@@ -23,7 +23,6 @@ except ImportError:
 from distutils.core import setup
 from distutils.extension import Extension
 from distutils.command.sdist import sdist
-hashindex_sources = ['darc/hashindex.pyx', 'darc/_hashindex.c']
 
 try:
     from Cython.Distutils import build_ext
@@ -57,8 +56,8 @@ setup(name='darc',
       packages=['darc'],
       cmdclass={'build_ext': build_ext, 'sdist': Sdist},
       ext_modules=[
-      Extension('darc._speedups', ['darc/_speedups.c']),
-      Extension('darc.hashindex', hashindex_sources)],
-      scripts = ['scripts/darc'],
+      Extension('darc.chunker', ['darc/chunker.pyx']),
+      Extension('darc.hashindex', ['darc/hashindex.pyx'])],
+      scripts=['scripts/darc'],
     )
 

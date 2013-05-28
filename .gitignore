@@ -3,6 +3,7 @@ build
 dist
 env
 hashindex.c
+chunker.c
 *.egg-info
 *.pyc
 *.pyo

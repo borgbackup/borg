@@ -11,7 +11,7 @@ import unittest
 from xattr import xattr, XATTR_NOFOLLOW
 
 from . import helpers, lrucache
-from ._speedups import buzhash, buzhash_update, chunkify
+from .chunker import chunkify, buzhash, buzhash_update
 from .archiver import Archiver
 from .key import suite as KeySuite
 from .store import Store, suite as StoreSuite

@@ -11,7 +11,7 @@ import time
 from cStringIO import StringIO
 from xattr import xattr, XATTR_NOFOLLOW
 
-from ._speedups import chunkify
+from .chunker import chunkify
 from .helpers import uid2user, user2uid, gid2group, group2gid, \
     encode_filename, Statistics
 

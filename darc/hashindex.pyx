@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-cdef extern from "hashindex.h":
+cdef extern from "_hashindex.c":
     ctypedef struct HashIndex:
         pass
 
@@ -14,6 +14,7 @@ cdef extern from "hashindex.h":
     void *hashindex_next_key(HashIndex *index, void *key)
     void hashindex_delete(HashIndex *index, void *key)
     void hashindex_set(HashIndex *index, void *key, void *value)
+
 
 _NoDefault = object()
 

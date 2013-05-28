@@ -67,6 +67,7 @@ class RemoteStore(object):
             self.name = name
 
     def __init__(self, location, create=False):
+        self.p = None
         self.cache = LRUCache(256)
         self.to_send = ''
         self.extra = {}

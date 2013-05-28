@@ -1,6 +1,4 @@
 #include <Python.h>
-#include <structmember.h>
-#include <stdint.h>
 
 /* Cyclic polynomial / buzhash: https://en.wikipedia.org/wiki/Rolling_hash */
 
@@ -44,7 +42,7 @@ static uint32_t table_base[] =
 
 
 static uint32_t *
-init_buzhash_table(uint32_t seed)
+buzhash_init_table(uint32_t seed)
 {
     int i;
     uint32_t *table = malloc(1024);
@@ -56,9 +54,9 @@ init_buzhash_table(uint32_t seed)
 }
 
 static uint32_t
-buzhash(const unsigned char *data, int len, const uint32_t *h)
+buzhash(const unsigned char *data, size_t len, const uint32_t *h)
 {
-    int i;
+    size_t i;
     uint32_t sum = 0;
     for(i = len - 1; i > 0; i--)
     {
@@ -69,63 +67,72 @@ buzhash(const unsigned char *data, int len, const uint32_t *h)
 }
 
 static uint32_t
-buzhash_update(uint32_t sum, unsigned char remove, unsigned char add, int len, const uint32_t *h)
+buzhash_update(uint32_t sum, unsigned char remove, unsigned char add, size_t len, const uint32_t *h)
 {
     return BARREL_SHIFT(sum, 1) ^ BARREL_SHIFT(h[remove], len) ^ h[add];
 }
 
 typedef struct {
-    PyObject_HEAD
-    int window_size, last, done, buf_size, remaining, position, chunk_mask, min_size;
-    size_t bytes_read, bytes_yielded;
-    uint32_t *h;
-    PyObject *chunks, *fd;
-    unsigned char *data;
-} ChunkifyIter;
+    int window_size, chunk_mask, min_size;
+    size_t buf_size;
+    uint32_t *table;
+    uint8_t *data;
+    PyObject *fd;
+    int done;
+    size_t remaining, bytes_read, bytes_yielded, position, last;
+} Chunker;
 
-static PyObject*
-ChunkifyIter_iter(PyObject *self)
+static Chunker *
+chunker_init(PyObject *fd, int window_size, int chunk_mask, int min_size, uint32_t seed)
 {
-    ChunkifyIter *c = (ChunkifyIter *)self;
-    c->remaining = 0;
-    c->position = 0;
+    Chunker *c = malloc(sizeof(Chunker));
+    c->window_size = window_size;
+    c->chunk_mask = chunk_mask;
+    c->min_size = min_size;
+    c->table = buzhash_init_table(seed);
+    c->buf_size = 10 * 1024 * 1024;
+    c->data = malloc(c->buf_size);
+    c->fd = fd;
+    Py_INCREF(fd);
     c->done = 0;
-    c->last = 0;
+    c->remaining = 0;
     c->bytes_read = 0;
     c->bytes_yielded = 0;
-    Py_INCREF(self);
-    return self;
+    c->position = 0;
+    c->last = 0;
+    return c;
 }
 
 static void
-ChunkifyIter_dealloc(PyObject *self)
+chunker_free(Chunker *c)
 {
-    ChunkifyIter *c = (ChunkifyIter *)self;
     Py_DECREF(c->fd);
+    free(c->table);
     free(c->data);
-    free(c->h);
-    self->ob_type->tp_free(self);
+    free(c);
 }
 
-static void
-ChunkifyIter_fill(PyObject *self)
+static int
+chunker_fill(Chunker *c)
 {
-    ChunkifyIter *c = (ChunkifyIter *)self;
     memmove(c->data, c->data + c->last, c->position + c->remaining - c->last);
     c->position -= c->last;
     c->last = 0;
     PyObject *data = PyObject_CallMethod(c->fd, "read", "i", c->buf_size - c->position - c->remaining);
+    if(!data) {
+        return 0;
+    }
     int n = PyString_Size(data);
     memcpy(c->data + c->position + c->remaining, PyString_AsString(data), n);
     c->remaining += n;
     c->bytes_read += n;
     Py_DECREF(data);
+    return 1;
 }
 
-static PyObject*
-ChunkifyIter_iternext(PyObject *self)
+static PyObject *
+chunker_process(Chunker *c)
 {
-    ChunkifyIter *c = (ChunkifyIter *)self;
     uint32_t sum, chunk_mask = c->chunk_mask, min_size = c->min_size, window_size = c->window_size;
     int n = 0;
 
@@ -137,7 +144,9 @@ ChunkifyIter_iternext(PyObject *self)
         return NULL;
     }
     if(c->remaining <= window_size) {
-        ChunkifyIter_fill(self);
+        if(!chunker_fill(c)) {
+            return NULL;
+        }
     }
     if(c->remaining < window_size) {
         c->done = 1;
@@ -153,16 +162,18 @@ ChunkifyIter_iternext(PyObject *self)
             return NULL;
         }
     }
-    sum = buzhash(c->data + c->position, window_size, c->h);
+    sum = buzhash(c->data + c->position, window_size, c->table);
     while(c->remaining >= c->window_size && ((sum & chunk_mask) || n < min_size)) {
         sum = buzhash_update(sum, c->data[c->position],
                              c->data[c->position + window_size],
-                             window_size, c->h);
+                             window_size, c->table);
         c->position++;
         c->remaining--;
         n++;
         if(c->remaining <= window_size) {
-            ChunkifyIter_fill(self);
+            if(!chunker_fill(c)) {
+                return NULL;
+            }
         }
     }
     if(c->remaining <= window_size) {
@@ -174,117 +185,5 @@ ChunkifyIter_iternext(PyObject *self)
     n = c->last - old_last;
     c->bytes_yielded += n;
     return PyBuffer_FromMemory(c->data + old_last, n);
-}
-
-static PyTypeObject ChunkifyIterType = {
-    PyObject_HEAD_INIT(NULL)
-    0,                         /*ob_size*/
-    "_chunkifier._ChunkifyIter",       /*tp_name*/
-    sizeof(ChunkifyIter),       /*tp_basicsize*/
-    0,                         /*tp_itemsize*/
-    ChunkifyIter_dealloc,      /*tp_dealloc*/
-    0,                         /*tp_print*/
-    0,                         /*tp_getattr*/
-    0,                         /*tp_setattr*/
-    0,                         /*tp_compare*/
-    0,                         /*tp_repr*/
-    0,                         /*tp_as_number*/
-    0,                         /*tp_as_sequence*/
-    0,                         /*tp_as_mapping*/
-    0,                         /*tp_hash */
-    0,                         /*tp_call*/
-    0,                         /*tp_str*/
-    0,                         /*tp_getattro*/
-    0,                         /*tp_setattro*/
-    0,                         /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER,
-      /* tp_flags: Py_TPFLAGS_HAVE_ITER tells python to
-         use tp_iter and tp_iternext fields. */
-    "",           /* tp_doc */
-    0,  /* tp_traverse */
-    0,  /* tp_clear */
-    0,  /* tp_richcompare */
-    0,  /* tp_weaklistoffset */
-    ChunkifyIter_iter,  /* tp_iter: __iter__() method */
-    ChunkifyIter_iternext  /* tp_iternext: next() method */
-};
-
-static PyObject *
-chunkify(PyObject *self, PyObject *args)
-{
-    PyObject *fd;
-    int seed, window_size, chunk_mask, min_size;
-    ChunkifyIter *c;
-
-    if (!PyArg_ParseTuple(args, "Oiiii", &fd, &window_size, &chunk_mask, &min_size, &seed))
-    {
-        return NULL;
-    }
-    if (!(c = PyObject_New(ChunkifyIter, &ChunkifyIterType)))
-    {
-        return NULL;
-    }
-    PyObject_Init((PyObject *)c, &ChunkifyIterType);
-    c->buf_size = 10 * 1024 * 1024;
-    c->data = malloc(c->buf_size);
-    c->h = init_buzhash_table(seed & 0xffffffff);
-    c->fd = fd;
-    c->window_size = window_size;
-    c->chunk_mask = chunk_mask;
-    c->min_size = min_size;
-    Py_INCREF(fd);
-    return (PyObject *)c;
-}
-
-static PyObject *
-do_buzhash(PyObject *self, PyObject *args)
-{
-    unsigned char *data;
-    int len;
-    unsigned long int seed, sum;
-    uint32_t *h;
-
-    if (!PyArg_ParseTuple(args, "s#k", &data, &len, &seed))
-    {
-        return NULL;
-    }
-    h = init_buzhash_table(seed & 0xffffffff);
-    sum = buzhash(data, len, h);
-    free(h);
-    return PyLong_FromUnsignedLong(sum);
-}
-
-static PyObject *
-do_buzhash_update(PyObject *self, PyObject *args)
-{
-    unsigned long int sum, seed;
-    unsigned char remove, add;
-    uint32_t *h;
-    int len;
-
-    if (!PyArg_ParseTuple(args, "kbbik", &sum, &remove, &add, &len, &seed))
-    {
-        return NULL;
-    }
-    h = init_buzhash_table(seed & 0xffffffff);
-    sum = buzhash_update(sum, remove, add, len, h);
-    free(h);
-    return PyLong_FromUnsignedLong(sum);
-}
-
-
-static PyMethodDef ChunkifierMethods[] = {
-    {"chunkify",  chunkify, METH_VARARGS, ""},
-    {"buzhash",   do_buzhash, METH_VARARGS, ""},
-    {"buzhash_update",   do_buzhash_update, METH_VARARGS, ""},
-    {NULL, NULL, 0, NULL}        /* Sentinel */
-};
-
-PyMODINIT_FUNC
-init_speedups(void)
-{
-  ChunkifyIterType.tp_new = PyType_GenericNew;
-  if (PyType_Ready(&ChunkifyIterType) < 0)  return;
-
-  Py_InitModule("_speedups", ChunkifierMethods);
+    
 }

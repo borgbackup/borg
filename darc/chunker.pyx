@@ -10,8 +10,8 @@ cdef extern from "_chunker.c":
     void chunker_free(Chunker *chunker)
     object chunker_process(Chunker *chunker)
     uint32_t *buzhash_init_table(uint32_t seed)
-    uint32_t c_buzhash "buzhash"(const unsigned char *data, size_t len, const uint32_t *h)
-    uint32_t c_buzhash_update  "buzhash_update"(uint32_t sum, unsigned char remove, unsigned char add, size_t len, const uint32_t *h)
+    uint32_t c_buzhash "buzhash"(unsigned char *data, size_t len, uint32_t *h)
+    uint32_t c_buzhash_update  "buzhash_update"(uint32_t sum, unsigned char remove, unsigned char add, size_t len, uint32_t *h)
 
 
 cdef class chunkify:

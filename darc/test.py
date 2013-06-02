@@ -92,6 +92,9 @@ class Test(unittest.TestCase):
                 attrs.append('st_mtime')
             d1 = [filename] + [getattr(s1, a) for a in attrs]
             d2 = [filename] + [getattr(s2, a) for a in attrs]
+            if(len(d1) == 6):
+                d1[-1] = int(d1[-1])
+                d2[-1] = int(d2[-1])
             d1.append(self.get_xattrs(path1))
             d2.append(self.get_xattrs(path2))
             self.assertEqual(d1, d2)

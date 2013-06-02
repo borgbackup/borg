@@ -83,7 +83,7 @@ class PlaintextKey(KeyBase):
     def decrypt(self, id, data):
         if data[0] != self.TYPE:
             raise IntegrityError('Invalid encryption envelope')
-        data = zlib.decompress(data[1:])
+        data = zlib.decompress(buffer(data, 1))
         if id and SHA256.new(data).digest() != id:
             raise IntegrityError('Chunk id verification failed')
         return data
@@ -107,12 +107,12 @@ class AESKeyBase(KeyBase):
     def decrypt(self, id, data):
         if data[0] != self.TYPE:
             raise IntegrityError('Invalid encryption envelope')
-        hash = data[1:33]
-        if HMAC.new(self.enc_hmac_key, data[33:], SHA256).digest() != hash:
+        hash = buffer(data, 1, 32)
+        if buffer(HMAC.new(self.enc_hmac_key, buffer(data, 33), SHA256).digest()) != hash:
             raise IntegrityError('Encryption envelope checksum mismatch')
-        nonce = bytes_to_long(data[33:41])
+        nonce = bytes_to_long(buffer(data, 33, 8))
         counter = Counter.new(64, initial_value=nonce, prefix=PREFIX)
-        data = zlib.decompress(AES.new(self.enc_key, AES.MODE_CTR, counter=counter).decrypt(data[41:]))
+        data = zlib.decompress(AES.new(self.enc_key, AES.MODE_CTR, counter=counter).decrypt(buffer(data, 41)))
         if id and HMAC.new(self.id_key, data, SHA256).digest() != id:
             raise IntegrityError('Chunk id verification failed')
         return data

@@ -127,7 +127,7 @@ class RemoteStore(object):
                 if to_send:
                     n = os.write(self.stdin_fd, to_send)
                     assert n > 0
-                    to_send = to_send[n:]
+                    to_send = buffer(to_send, n)
                 else:
                     w_fds = []
 
@@ -212,7 +212,7 @@ class RemoteStore(object):
                 if self.to_send:
                     n = os.write(self.stdin_fd, self.to_send)
                     assert n > 0
-                    self.to_send = self.to_send[n:]
+                    self.to_send = buffer(self.to_send, n)
                 else:
                     w_fds = []
                     if not wait:

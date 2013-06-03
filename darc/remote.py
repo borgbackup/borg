@@ -1,4 +1,3 @@
-from __future__ import with_statement
 import fcntl
 import msgpack
 import os
@@ -35,16 +34,17 @@ class StoreServer(object):
                     return
                 unpacker.feed(data)
                 for type, msgid, method, args in unpacker:
+                    method = method.decode('ascii')
                     try:
                         try:
                             f = getattr(self, method)
                         except AttributeError:
                             f = getattr(self.store, method)
                         res = f(*args)
-                    except Exception, e:
-                        sys.stdout.write(msgpack.packb((1, msgid, e.__class__.__name__, None)))
+                    except Exception as e:
+                        sys.stdout.buffer.write(msgpack.packb((1, msgid, e.__class__.__name__, None)))
                     else:
-                        sys.stdout.write(msgpack.packb((1, msgid, None, res)))
+                        sys.stdout.buffer.write(msgpack.packb((1, msgid, None, res)))
                     sys.stdout.flush()
             if es:
                 return
@@ -53,6 +53,7 @@ class StoreServer(object):
         return 1
 
     def open(self, path, create=False):
+        path = os.fsdecode(path)
         if path.startswith('/~'):
             path = path[1:]
         self.store = Store(os.path.expanduser(path), create)
@@ -69,7 +70,7 @@ class RemoteStore(object):
     def __init__(self, location, create=False):
         self.p = None
         self.cache = LRUCache(256)
-        self.to_send = ''
+        self.to_send = b''
         self.extra = {}
         self.pending = {}
         self.unpacker = msgpack.Unpacker(use_list=False)
@@ -89,10 +90,10 @@ class RemoteStore(object):
             raise Exception('Server insisted on using unsupported protocol version %d' % version)
         try:
             self.id = self.call('open', (location.path, create))
-        except self.RPCError, e:
-            if e.name == 'DoesNotExist':
+        except self.RPCError as e:
+            if e.name == b'DoesNotExist':
                 raise Store.DoesNotExist
-            elif e.name == 'AlreadyExists':
+            elif e.name == b'AlreadyExists':
                 raise Store.AlreadyExists
 
     def __del__(self):
@@ -127,7 +128,7 @@ class RemoteStore(object):
                 if to_send:
                     n = os.write(self.stdin_fd, to_send)
                     assert n > 0
-                    to_send = buffer(to_send, n)
+                    to_send = memoryview(to_send)[n:]
                 else:
                     w_fds = []
 
@@ -167,7 +168,7 @@ class RemoteStore(object):
                 msgid, resp, error = self.cache[args]
                 m = max(m, msgid)
                 self.extra.setdefault(m, []).append((args, resp, error))
-        return ''.join(data)
+        return b''.join(data)
 
     def gen_cache_requests(self, cmd, peek):
         data = []
@@ -183,7 +184,7 @@ class RemoteStore(object):
             self.pending[msgid] = args
             self.cache[args] = msgid, None, None
             data.append(msgpack.packb((1, msgid, cmd, args)))
-        return ''.join(data)
+        return b''.join(data)
 
     def call_multi(self, cmd, argsv, wait=True, peek=None):
         w_fds = [self.stdin_fd]
@@ -212,7 +213,8 @@ class RemoteStore(object):
                 if self.to_send:
                     n = os.write(self.stdin_fd, self.to_send)
                     assert n > 0
-                    self.to_send = buffer(self.to_send, n)
+#                    self.to_send = memoryview(self.to_send)[n:]
+                    self.to_send = self.to_send[n:]
                 else:
                     w_fds = []
                     if not wait:
@@ -231,8 +233,8 @@ class RemoteStore(object):
         try:
             for res in self.call_multi('get', [(id, )]):
                 return res
-        except self.RPCError, e:
-            if e.name == 'DoesNotExist':
+        except self.RPCError as e:
+            if e.name == b'DoesNotExist':
                 raise Store.DoesNotExist
             raise
 

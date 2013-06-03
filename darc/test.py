@@ -1,14 +1,13 @@
-from __future__ import with_statement
 import doctest
 import filecmp
 import os
-from StringIO import StringIO
+from io import BytesIO, StringIO
 import stat
 import sys
 import shutil
 import tempfile
 import unittest
-from xattr import xattr, XATTR_NOFOLLOW
+import xattr
 
 from . import helpers, lrucache
 from .chunker import chunkify, buzhash, buzhash_update
@@ -16,6 +15,8 @@ from .archiver import Archiver
 from .key import suite as KeySuite
 from .store import Store, suite as StoreSuite
 from .remote import Store, suite as RemoteStoreSuite
+
+utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
 
 
 class Test(unittest.TestCase):
@@ -52,7 +53,7 @@ class Test(unittest.TestCase):
             ret = self.archiver.run(args)
             sys.stdout, sys.stderr = stdout, stderr
             if ret != exit_code:
-                print output.getvalue()
+                print(output.getvalue())
             self.assertEqual(exit_code, ret)
             return output.getvalue()
         finally:
@@ -67,13 +68,13 @@ class Test(unittest.TestCase):
         filename = os.path.join(self.input_path, name)
         if not os.path.exists(os.path.dirname(filename)):
             os.makedirs(os.path.dirname(filename))
-        with open(filename, 'wbx') as fd:
-            fd.write('X' * size)
+        with open(filename, 'wb') as fd:
+            fd.write(b'X' * size)
 
     def get_xattrs(self, path):
         try:
-            return dict(xattr(path, XATTR_NOFOLLOW))
-        except IOError:
+            return xattr.get_all(path, True)
+        except EnvironmentError:
             return {}
 
     def diff_dirs(self, dir1, dir2):
@@ -87,8 +88,7 @@ class Test(unittest.TestCase):
             s1 = os.lstat(path1)
             s2 = os.lstat(path2)
             attrs = ['st_mode', 'st_uid', 'st_gid', 'st_rdev']
-            # We can't restore symlink atime/mtime right now
-            if not os.path.islink(path1):
+            if not os.path.islink(path1) or utime_supports_fd:
                 attrs.append('st_mtime')
             d1 = [filename] + [getattr(s1, a) for a in attrs]
             d2 = [filename] + [getattr(s2, a) for a in attrs]
@@ -107,15 +107,13 @@ class Test(unittest.TestCase):
         # File owner
         os.chown('input/file1', 100, 200)
         # File mode
-        os.chmod('input/file1', 7755)
-        os.chmod('input/dir2', 0700)
+        os.chmod('input/file1', 0o7755)
+        os.chmod('input/dir2', 0o700)
         # Block device
-        os.mknod('input/bdev', 0600 | stat.S_IFBLK,  os.makedev(10, 20))
+        os.mknod('input/bdev', 0o600 | stat.S_IFBLK,  os.makedev(10, 20))
         # Char device
-        os.mknod('input/cdev', 0600 | stat.S_IFCHR,  os.makedev(30, 40))
-        # xattr
-        x = xattr(os.path.join(self.input_path, 'file1'))
-        x.set('user.foo', 'bar')
+        os.mknod('input/cdev', 0o600 | stat.S_IFCHR,  os.makedev(30, 40))
+        xattr.set(os.path.join(self.input_path, 'file1'), 'user.foo', 'bar')
         # Hard link
         os.link(os.path.join(self.input_path, 'file1'),
                 os.path.join(self.input_path, 'hardlink'))
@@ -193,25 +191,25 @@ class Test(unittest.TestCase):
 class ChunkTest(unittest.TestCase):
 
     def test_chunkify(self):
-        data = '0' * 1024 * 1024 * 15 + 'Y'
-        parts = [str(c) for c in chunkify(StringIO(data), 2, 0x3, 2, 0)]
+        data = b'0' * 1024 * 1024 * 15 + b'Y'
+        parts = [bytes(c) for c in chunkify(BytesIO(data), 2, 0x3, 2, 0)]
         self.assertEqual(len(parts), 2)
-        self.assertEqual(''.join(parts), data)
-        self.assertEqual([str(c) for c in chunkify(StringIO(''), 2, 0x3, 2, 0)], [])
-        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 2, 0x3, 2, 0)], ['fooba', 'rboobaz', 'fooba', 'rboobaz', 'fooba', 'rboobaz'])
-        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 2, 0x3, 2, 1)], ['fo', 'obarb', 'oob', 'azf', 'oobarb', 'oob', 'azf', 'oobarb', 'oobaz'])
-        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 2, 0x3, 2, 2)], ['foob', 'ar', 'boobazfoob', 'ar', 'boobazfoob', 'ar', 'boobaz'])
-        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 3, 0x3, 3, 0)], ['foobarboobaz' * 3])
-        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 3, 0x3, 3, 1)], ['foobar', 'boo', 'bazfo', 'obar', 'boo', 'bazfo', 'obar', 'boobaz'])
-        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 3, 0x3, 3, 2)], ['foo', 'barboobaz', 'foo', 'barboobaz', 'foo', 'barboobaz'])
-        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 3, 0x3, 4, 0)], ['foobarboobaz' * 3])
-        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 3, 0x3, 4, 1)], ['foobar', 'boobazfo', 'obar', 'boobazfo', 'obar', 'boobaz'])
-        self.assertEqual([str(c) for c in chunkify(StringIO('foobarboobaz' * 3), 3, 0x3, 4, 2)], ['foob', 'arboobaz', 'foob', 'arboobaz', 'foob', 'arboobaz'])
+        self.assertEqual(b''.join(parts), data)
+        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b''), 2, 0x3, 2, 0)], [])
+        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 2, 0x3, 2, 0)], [b'fooba', b'rboobaz', b'fooba', b'rboobaz', b'fooba', b'rboobaz'])
+        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 2, 0x3, 2, 1)], [b'fo', b'obarb', b'oob', b'azf', b'oobarb', b'oob', b'azf', b'oobarb', b'oobaz'])
+        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 2, 0x3, 2, 2)], [b'foob', b'ar', b'boobazfoob', b'ar', b'boobazfoob', b'ar', b'boobaz'])
+        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 3, 0x3, 3, 0)], [b'foobarboobaz' * 3])
+        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 3, 0x3, 3, 1)], [b'foobar', b'boo', b'bazfo', b'obar', b'boo', b'bazfo', b'obar', b'boobaz'])
+        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 3, 0x3, 3, 2)], [b'foo', b'barboobaz', b'foo', b'barboobaz', b'foo', b'barboobaz'])
+        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 3, 0x3, 4, 0)], [b'foobarboobaz' * 3])
+        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 3, 0x3, 4, 1)], [b'foobar', b'boobazfo', b'obar', b'boobazfo', b'obar', b'boobaz'])
+        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 3, 0x3, 4, 2)], [b'foob', b'arboobaz', b'foob', b'arboobaz', b'foob', b'arboobaz'])
 
     def test_buzhash(self):
-        self.assertEqual(buzhash('abcdefghijklmnop', 0), 3795437769L)
-        self.assertEqual(buzhash('abcdefghijklmnop', 1), 3795400502L)
-        self.assertEqual(buzhash('abcdefghijklmnop', 1), buzhash_update(buzhash('Xabcdefghijklmno', 1), ord('X'), ord('p'), 16, 1))
+        self.assertEqual(buzhash(b'abcdefghijklmnop', 0), 3795437769)
+        self.assertEqual(buzhash(b'abcdefghijklmnop', 1), 3795400502)
+        self.assertEqual(buzhash(b'abcdefghijklmnop', 1), buzhash_update(buzhash(b'Xabcdefghijklmno', 1), ord('X'), ord('p'), 16, 1))
 
 
 class RemoteTest(Test):

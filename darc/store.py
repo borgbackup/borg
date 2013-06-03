@@ -1,5 +1,5 @@
-from __future__ import with_statement
-from ConfigParser import RawConfigParser
+from configparser import RawConfigParser
+from binascii import hexlify, unhexlify
 import fcntl
 import os
 import re
@@ -40,6 +40,7 @@ class Store(object):
         """Requested key does not exist"""
 
     def __init__(self, path, create=False):
+        self.io = None
         if create:
             self.create(path)
         self.open(path)
@@ -51,7 +52,7 @@ class Store(object):
             raise self.AlreadyExists(path)
         if not os.path.exists(path):
             os.mkdir(path)
-        with open(os.path.join(path, 'README'), 'wb') as fd:
+        with open(os.path.join(path, 'README'), 'w') as fd:
             fd.write('This is a DARC store')
         os.mkdir(os.path.join(path, 'data'))
         config = RawConfigParser()
@@ -59,7 +60,7 @@ class Store(object):
         config.set('store', 'version', '1')
         config.set('store', 'segments_per_dir', self.DEFAULT_SEGMENTS_PER_DIR)
         config.set('store', 'max_segment_size', self.DEFAULT_MAX_SEGMENT_SIZE)
-        config.set('store', 'id', os.urandom(32).encode('hex'))
+        config.set('store', 'id', hexlify(os.urandom(32)).decode('ascii'))
         with open(os.path.join(path, 'config'), 'w') as fd:
             config.write(fd)
 
@@ -76,10 +77,11 @@ class Store(object):
             raise Exception('%s Does not look like a darc store')
         self.max_segment_size = self.config.getint('store', 'max_segment_size')
         self.segments_per_dir = self.config.getint('store', 'segments_per_dir')
-        self.id = self.config.get('store', 'id').decode('hex')
+        self.id = unhexlify(self.config.get('store', 'id').strip().encode('ascii'))  # .encode needed for Python 3.[0-2]
         self.rollback()
 
     def close(self):
+        self.rollback()
         self.lock_fd.close()
 
     def commit(self, rollback=True):
@@ -97,26 +99,26 @@ class Store(object):
 
     def open_index(self, head, read_only=False):
         if head is None:
-            self.index = NSIndex.create(os.path.join(self.path, 'index.tmp'))
+            self.index = NSIndex.create(os.path.join(self.path, 'index.tmp').encode('utf-8'))
             self.segments = {}
             self.compact = set()
         else:
             if read_only:
-                self.index = NSIndex(os.path.join(self.path, 'index.%d') % head)
+                self.index = NSIndex((os.path.join(self.path, 'index.%d') % head).encode('utf-8'))
             else:
                 shutil.copy(os.path.join(self.path, 'index.%d' % head),
                             os.path.join(self.path, 'index.tmp'))
-                self.index = NSIndex(os.path.join(self.path, 'index.tmp'))
+                self.index = NSIndex(os.path.join(self.path, 'index.tmp').encode('utf-8'))
             hints = read_msgpack(os.path.join(self.path, 'hints.%d' % head))
-            if hints['version'] != 1:
+            if hints[b'version'] != 1:
                 raise ValueError('Unknown hints file version: %d' % hints['version'])
-            self.segments = hints['segments']
-            self.compact = set(hints['compact'])
+            self.segments = hints[b'segments']
+            self.compact = set(hints[b'compact'])
 
     def write_index(self):
-        hints = {'version': 1,
-                 'segments': self.segments,
-                 'compact': list(self.compact)}
+        hints = {b'version': 1,
+                 b'segments': self.segments,
+                 b'compact': list(self.compact)}
         write_msgpack(os.path.join(self.path, 'hints.%d' % self.io.head), hints)
         self.index.flush()
         os.rename(os.path.join(self.path, 'index.tmp'),
@@ -192,6 +194,8 @@ class Store(object):
         """
         """
         self._active_txn = False
+        if self.io:
+            self.io.close()
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
         if self.io.head is not None and not os.path.exists(os.path.join(self.path, 'index.%d' % self.io.head)):
             self.recover(self.path)
@@ -273,15 +277,15 @@ class LoggedIO(object):
         self.cleanup()
 
     def close(self):
-        for segment in self.fds.keys():
+        for segment in list(self.fds.keys()):
             self.fds.pop(segment).close()
         self.close_segment()
         self.fds = None  # Just to make sure we're disabled
 
     def _segment_names(self, reverse=False):
         for dirpath, dirs, filenames in os.walk(os.path.join(self.path, 'data')):
-            dirs.sort(lambda a, b: cmp(int(a), int(b)), reverse=reverse)
-            filenames.sort(lambda a, b: cmp(int(a), int(b)), reverse=reverse)
+            dirs.sort(key=int, reverse=reverse)
+            filenames.sort(key=int, reverse=reverse)
             for filename in filenames:
                 yield int(filename), os.path.join(dirpath, filename)
 
@@ -304,18 +308,18 @@ class LoggedIO(object):
             return fd.read(self.header_fmt.size) == self.COMMIT
 
     def segment_filename(self, segment):
-        return os.path.join(self.path, 'data', str(segment / self.segments_per_dir), str(segment))
+        return os.path.join(self.path, 'data', str(segment // self.segments_per_dir), str(segment))
 
     def get_write_fd(self, no_new=False):
         if not no_new and self.offset and self.offset > self.limit:
             self.close_segment()
         if not self._write_fd:
             if self.segment % self.segments_per_dir == 0:
-                dirname = os.path.join(self.path, 'data', str(self.segment / self.segments_per_dir))
+                dirname = os.path.join(self.path, 'data', str(self.segment // self.segments_per_dir))
                 if not os.path.exists(dirname):
                     os.mkdir(dirname)
             self._write_fd = open(self.segment_filename(self.segment), 'ab')
-            self._write_fd.write('DSEGMENT')
+            self._write_fd.write(b'DSEGMENT')
             self.offset = 8
         return self._write_fd
 
@@ -336,7 +340,7 @@ class LoggedIO(object):
     def iter_objects(self, segment, lookup=None, include_data=False):
         fd = self.get_fd(segment)
         fd.seek(0)
-        if fd.read(8) != 'DSEGMENT':
+        if fd.read(8) != b'DSEGMENT':
             raise IntegrityError('Invalid segment header')
         offset = 8
         header = fd.read(self.header_fmt.size)
@@ -345,7 +349,7 @@ class LoggedIO(object):
             if size > MAX_OBJECT_SIZE:
                 raise IntegrityError('Invalid segment object size')
             rest = fd.read(size - self.header_fmt.size)
-            if crc32(rest, crc32(buffer(header, 4))) & 0xffffffff != crc:
+            if crc32(rest, crc32(memoryview(header)[4:])) & 0xffffffff != crc:
                 raise IntegrityError('Segment checksum mismatch')
             if tag not in (TAG_PUT, TAG_DELETE, TAG_COMMIT):
                 raise IntegrityError('Invalid segment entry header')
@@ -370,7 +374,7 @@ class LoggedIO(object):
         if size > MAX_OBJECT_SIZE:
             raise IntegrityError('Invalid segment object size')
         data = fd.read(size - self.put_header_fmt.size)
-        if crc32(data, crc32(buffer(header, 4))) & 0xffffffff != crc:
+        if crc32(data, crc32(memoryview(header)[4:])) & 0xffffffff != crc:
             raise IntegrityError('Segment checksum mismatch')
         if tag != TAG_PUT or id != key:
             raise IntegrityError('Invalid segment entry header')
@@ -382,7 +386,7 @@ class LoggedIO(object):
         offset = self.offset
         header = self.header_no_crc_fmt.pack(size, TAG_PUT)
         crc = self.crc_fmt.pack(crc32(data, crc32(id, crc32(header))) & 0xffffffff)
-        fd.write(''.join((crc, header, id, data)))
+        fd.write(b''.join((crc, header, id, data)))
         self.offset += size
         return self.segment, offset
 
@@ -390,7 +394,7 @@ class LoggedIO(object):
         fd = self.get_write_fd()
         header = self.header_no_crc_fmt.pack(self.put_header_fmt.size, TAG_DELETE)
         crc = self.crc_fmt.pack(crc32(id, crc32(header)) & 0xffffffff)
-        fd.write(''.join((crc, header, id)))
+        fd.write(b''.join((crc, header, id)))
         self.offset += self.put_header_fmt.size
         return self.segment
 
@@ -398,7 +402,7 @@ class LoggedIO(object):
         fd = self.get_write_fd(no_new=True)
         header = self.header_no_crc_fmt.pack(self.header_fmt.size, TAG_COMMIT)
         crc = self.crc_fmt.pack(crc32(header) & 0xffffffff)
-        fd.write(''.join((crc, header)))
+        fd.write(b''.join((crc, header)))
         self.head = self.segment
         self.close_segment()
 
@@ -421,13 +425,14 @@ class StoreTestCase(unittest.TestCase):
         self.store = self.open(create=True)
 
     def tearDown(self):
+        self.store.close()
         shutil.rmtree(self.tmppath)
 
     def test1(self):
         for x in range(100):
-            self.store.put('%-32d' % x, 'SOMEDATA')
-        key50 = '%-32d' % 50
-        self.assertEqual(self.store.get(key50), 'SOMEDATA')
+            self.store.put(('%-32d' % x).encode('ascii'), b'SOMEDATA')
+        key50 = ('%-32d' % 50).encode('ascii')
+        self.assertEqual(self.store.get(key50), b'SOMEDATA')
         self.store.delete(key50)
         self.assertRaises(Store.DoesNotExist, lambda: self.store.get(key50))
         self.store.commit()
@@ -437,55 +442,56 @@ class StoreTestCase(unittest.TestCase):
         for x in range(100):
             if x == 50:
                 continue
-            self.assertEqual(store2.get('%-32d' % x), 'SOMEDATA')
+            self.assertEqual(store2.get(('%-32d' % x).encode('ascii')), b'SOMEDATA')
+        store2.close()
 
     def test2(self):
         """Test multiple sequential transactions
         """
-        self.store.put('00000000000000000000000000000000', 'foo')
-        self.store.put('00000000000000000000000000000001', 'foo')
+        self.store.put(b'00000000000000000000000000000000', b'foo')
+        self.store.put(b'00000000000000000000000000000001', b'foo')
         self.store.commit()
-        self.store.delete('00000000000000000000000000000000')
-        self.store.put('00000000000000000000000000000001', 'bar')
+        self.store.delete(b'00000000000000000000000000000000')
+        self.store.put(b'00000000000000000000000000000001', b'bar')
         self.store.commit()
-        self.assertEqual(self.store.get('00000000000000000000000000000001'), 'bar')
+        self.assertEqual(self.store.get(b'00000000000000000000000000000001'), b'bar')
 
     def test_consistency(self):
         """Test cache consistency
         """
-        self.store.put('00000000000000000000000000000000', 'foo')
-        self.assertEqual(self.store.get('00000000000000000000000000000000'), 'foo')
-        self.store.put('00000000000000000000000000000000', 'foo2')
-        self.assertEqual(self.store.get('00000000000000000000000000000000'), 'foo2')
-        self.store.put('00000000000000000000000000000000', 'bar')
-        self.assertEqual(self.store.get('00000000000000000000000000000000'), 'bar')
-        self.store.delete('00000000000000000000000000000000')
-        self.assertRaises(Store.DoesNotExist, lambda: self.store.get('00000000000000000000000000000000'))
+        self.store.put(b'00000000000000000000000000000000', b'foo')
+        self.assertEqual(self.store.get(b'00000000000000000000000000000000'), b'foo')
+        self.store.put(b'00000000000000000000000000000000', b'foo2')
+        self.assertEqual(self.store.get(b'00000000000000000000000000000000'), b'foo2')
+        self.store.put(b'00000000000000000000000000000000', b'bar')
+        self.assertEqual(self.store.get(b'00000000000000000000000000000000'), b'bar')
+        self.store.delete(b'00000000000000000000000000000000')
+        self.assertRaises(Store.DoesNotExist, lambda: self.store.get(b'00000000000000000000000000000000'))
 
     def test_consistency2(self):
         """Test cache consistency2
         """
-        self.store.put('00000000000000000000000000000000', 'foo')
-        self.assertEqual(self.store.get('00000000000000000000000000000000'), 'foo')
+        self.store.put(b'00000000000000000000000000000000', b'foo')
+        self.assertEqual(self.store.get(b'00000000000000000000000000000000'), b'foo')
         self.store.commit()
-        self.store.put('00000000000000000000000000000000', 'foo2')
-        self.assertEqual(self.store.get('00000000000000000000000000000000'), 'foo2')
+        self.store.put(b'00000000000000000000000000000000', b'foo2')
+        self.assertEqual(self.store.get(b'00000000000000000000000000000000'), b'foo2')
         self.store.rollback()
-        self.assertEqual(self.store.get('00000000000000000000000000000000'), 'foo')
+        self.assertEqual(self.store.get(b'00000000000000000000000000000000'), b'foo')
 
     def test_single_kind_transactions(self):
         # put
-        self.store.put('00000000000000000000000000000000', 'foo')
+        self.store.put(b'00000000000000000000000000000000', b'foo')
         self.store.commit()
         self.store.close()
         # replace
         self.store = self.open()
-        self.store.put('00000000000000000000000000000000', 'bar')
+        self.store.put(b'00000000000000000000000000000000', b'bar')
         self.store.commit()
         self.store.close()
         # delete
         self.store = self.open()
-        self.store.delete('00000000000000000000000000000000')
+        self.store.delete(b'00000000000000000000000000000000')
         self.store.commit()
 
 

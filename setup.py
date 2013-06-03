@@ -5,13 +5,9 @@ import sys
 from glob import glob
 import darc
 
-min_python = (2, 5)
+min_python = (3, 2)
 if sys.version_info < min_python:
-    print "Darc requires Python %d.%d or later" % min_python
-    sys.exit(1)
-
-if sys.version_info >= (3,):
-    print "Darc doesn't support Python 3 (yet)"
+    print("Darc requires Python %d.%d or later" % min_python)
     sys.exit(1)
 
 try:
@@ -31,7 +27,6 @@ try:
     class Sdist(sdist):
         def __init__(self, *args, **kwargs):
             for src in glob('darc/*.pyx'):
-                print 'src', src
                 cython_compiler.compile(glob('darc/*.pyx'),
                                         cython_compiler.default_options)
             sdist.__init__(self, *args, **kwargs)

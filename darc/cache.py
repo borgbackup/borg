@@ -1,12 +1,12 @@
-from __future__ import with_statement
-from ConfigParser import RawConfigParser
+from configparser import RawConfigParser
 import fcntl
-from itertools import izip_longest
+from itertools import zip_longest
 import msgpack
 import os
+from binascii import hexlify, unhexlify
 import shutil
 
-from .helpers import get_cache_dir
+from .helpers import get_cache_dir, decode_dict
 from .hashindex import ChunkIndex
 
 
@@ -19,7 +19,7 @@ class Cache(object):
         self.store = store
         self.key = key
         self.manifest = manifest
-        self.path = os.path.join(get_cache_dir(), store.id.encode('hex'))
+        self.path = os.path.join(get_cache_dir(), hexlify(store.id).decode('ascii'))
         if not os.path.exists(self.path):
             self.create()
         self.open()
@@ -31,17 +31,17 @@ class Cache(object):
         """Create a new empty store at `path`
         """
         os.makedirs(self.path)
-        with open(os.path.join(self.path, 'README'), 'wb') as fd:
+        with open(os.path.join(self.path, 'README'), 'w') as fd:
             fd.write('This is a DARC cache')
         config = RawConfigParser()
         config.add_section('cache')
         config.set('cache', 'version', '1')
-        config.set('cache', 'store', self.store.id.encode('hex'))
+        config.set('cache', 'store', hexlify(self.store.id).decode('ascii'))
         config.set('cache', 'manifest', '')
-        with open(os.path.join(self.path, 'config'), 'wb') as fd:
+        with open(os.path.join(self.path, 'config'), 'w') as fd:
             config.write(fd)
-        ChunkIndex.create(os.path.join(self.path, 'chunks'))
-        with open(os.path.join(self.path, 'files'), 'wb') as fd:
+        ChunkIndex.create(os.path.join(self.path, 'chunks').encode('utf-8'))
+        with open(os.path.join(self.path, 'files'), 'w') as fd:
             pass  # empty file
 
     def open(self):
@@ -55,8 +55,8 @@ class Cache(object):
         if self.config.getint('cache', 'version') != 1:
             raise Exception('%s Does not look like a darc cache')
         self.id = self.config.get('cache', 'store')
-        self.manifest_id = self.config.get('cache', 'manifest').decode('hex')
-        self.chunks = ChunkIndex(os.path.join(self.path, 'chunks'))
+        self.manifest_id = unhexlify(self.config.get('cache', 'manifest').encode('ascii'))  # .encode needed for Python 3.[0-2]
+        self.chunks = ChunkIndex(os.path.join(self.path, 'chunks').encode('utf-8'))
         self.files = None
 
     def _read_files(self):
@@ -91,12 +91,12 @@ class Cache(object):
             return
         if self.files is not None:
             with open(os.path.join(self.path, 'files'), 'wb') as fd:
-                for item in self.files.iteritems():
+                for item in self.files.items():
                     # Discard cached files with the newest mtime to avoid
                     # issues with filesystem snapshots and mtime precision
                     if item[1][0] < 10 and item[1][3] < self._newest_mtime:
                         msgpack.pack(item, fd)
-        self.config.set('cache', 'manifest', self.manifest.id.encode('hex'))
+        self.config.set('cache', 'manifest', hexlify(self.manifest.id).decode('ascii'))
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             self.config.write(fd)
         self.chunks.flush()
@@ -130,23 +130,24 @@ class Cache(object):
             except KeyError:
                 self.chunks[id] = 1, size, csize
         self.begin_txn()
-        print 'Initializing cache...'
+        print('Initializing cache...')
         self.chunks.clear()
         unpacker = msgpack.Unpacker()
         for name, info in self.manifest.archives.items():
-            id = info['id']
+            id = info[b'id']
             cdata = self.store.get(id)
             data = self.key.decrypt(id, cdata)
             add(id, len(data), len(cdata))
             archive = msgpack.unpackb(data)
-            print 'Analyzing archive:', archive['name']
-            for id, chunk in izip_longest(archive['items'], self.store.get_many(archive['items'])):
+            decode_dict(archive, (b'name', b'hostname', b'username', b'time'))  # fixme: argv
+            print('Analyzing archive:', archive[b'name'])
+            for id, chunk in zip_longest(archive[b'items'], self.store.get_many(archive[b'items'])):
                 data = self.key.decrypt(id, chunk)
                 add(id, len(data), len(chunk))
                 unpacker.feed(data)
                 for item in unpacker:
                     try:
-                        for id, size, csize in item['chunks']:
+                        for id, size, csize in item[b'chunks']:
                             add(id, size, csize)
                     except KeyError:
                         pass

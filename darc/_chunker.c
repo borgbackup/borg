@@ -122,13 +122,26 @@ chunker_fill(Chunker *c)
     if(!data) {
         return 0;
     }
-    int n = PyString_Size(data);
-    memcpy(c->data + c->position + c->remaining, PyString_AsString(data), n);
+    int n = PyBytes_Size(data);
+    memcpy(c->data + c->position + c->remaining, PyBytes_AsString(data), n);
     c->remaining += n;
     c->bytes_read += n;
     Py_DECREF(data);
     return 1;
 }
+
+PyObject *
+PyBuffer_FromMemory(void *data, Py_ssize_t len)
+{
+    Py_buffer buffer;
+    PyObject *mv;
+
+    PyBuffer_FillInfo(&buffer, NULL, data, len, 1, PyBUF_CONTIG_RO);
+    mv = PyMemoryView_FromBuffer(&buffer);
+    PyBuffer_Release(&buffer);
+    return mv;
+}
+
 
 static PyObject *
 chunker_process(Chunker *c)

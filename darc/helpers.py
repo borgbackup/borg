@@ -1,4 +1,3 @@
-from __future__ import with_statement
 import argparse
 from datetime import datetime, timedelta
 from fnmatch import fnmatchcase
@@ -16,7 +15,7 @@ import urllib
 
 class Manifest(object):
 
-    MANIFEST_ID = '\0' * 32
+    MANIFEST_ID = b'\0' * 32
 
     def __init__(self):
         self.archives = {}
@@ -32,10 +31,10 @@ class Manifest(object):
         data = key.decrypt(None, cdata)
         manifest.id = key.id_hash(data)
         m = msgpack.unpackb(data)
-        if not m.get('version') == 1:
+        if not m.get(b'version') == 1:
             raise ValueError('Invalid manifest version')
-        manifest.archives = m['archives']
-        manifest.config = m['config']
+        manifest.archives = dict((k.decode('utf-8'), v) for k,v in m[b'archives'].items())
+        manifest.config = m[b'config']
         return manifest, key
 
     def write(self):
@@ -75,21 +74,10 @@ class Statistics(object):
             self.usize += csize
 
     def print_(self):
-        print 'Number of files: %d' % self.nfiles
-        print 'Original size: %d (%s)' % (self.osize, format_file_size(self.osize))
-        print 'Compressed size: %s (%s)' % (self.csize, format_file_size(self.csize))
-        print 'Unique data: %d (%s)' % (self.usize, format_file_size(self.usize))
-
-
-# OSX filenames are UTF-8 Only so any non-utf8 filenames are url encoded
-if sys.platform == 'darwin':
-    def encode_filename(name):
-        try:
-            return name.decode('utf-8')
-        except UnicodeDecodeError:
-            return urllib.quote(name)
-else:
-    encode_filename = str
+        print('Number of files: %d' % self.nfiles)
+        print('Original size: %d (%s)' % (self.osize, format_file_size(self.osize)))
+        print('Compressed size: %s (%s)' % (self.csize, format_file_size(self.csize)))
+        print('Unique data: %d (%s)' % (self.usize, format_file_size(self.usize)))
 
 
 def get_keys_dir():
@@ -212,7 +200,7 @@ def format_file_mode(mod):
     def x(v):
         return ''.join(v & m and s or '-'
                        for m, s in ((4, 'r'), (2, 'w'), (1, 'x')))
-    return '%s%s%s' % (x(mod / 64), x(mod / 8), x(mod))
+    return '%s%s%s' % (x(mod // 64), x(mod // 8), x(mod))
 
 
 def format_file_size(v):
@@ -377,3 +365,14 @@ def write_msgpack(filename, d):
         fd.flush()
         os.fsync(fd)
     os.rename(filename + '.tmp', filename)
+
+
+def decode_dict(d, keys, encoding='utf-8', errors='surrogateescape'):
+    for key in keys:
+        if isinstance(d.get(key), bytes):
+            d[key] = d[key].decode(encoding, errors)
+    return d
+
+
+def remove_surrogates(s, errors='replace'):
+    return s.encode('utf-8', errors).decode('utf-8')

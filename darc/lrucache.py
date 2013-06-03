@@ -1,4 +1,3 @@
-from UserDict import DictMixin
 from heapq import heappush, heapify, heapreplace, heappop
 import unittest
 
@@ -56,7 +55,7 @@ class LRUCacheTestCase(unittest.TestCase):
             c[x] = i
         self.assertEqual(len(c), 2)
         self.assertEqual(set(c), set(['b', 'c']))
-        self.assertEqual(set(c.iteritems()), set([('b', 1), ('c', 2)]))
+        self.assertEqual(set(c.items()), set([('b', 1), ('c', 2)]))
         self.assertEqual(False, 'a' in c)
         self.assertEqual(True, 'b' in c)
         self.assertRaises(KeyError, lambda: c['a'])

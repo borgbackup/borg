@@ -1,4 +1,4 @@
-from __future__ import with_statement
+from binascii import hexlify, a2b_base64, b2a_base64
 from getpass import getpass
 import os
 import msgpack
@@ -16,11 +16,11 @@ from Crypto.Protocol.KDF import PBKDF2
 
 from .helpers import IntegrityError, get_keys_dir, Location
 
-PREFIX = '\0' * 8
+PREFIX = b'\0' * 8
 
-KEYFILE = '\0'
-PASSPHRASE = '\1'
-PLAINTEXT = '\2'
+KEYFILE = b'\0'
+PASSPHRASE = b'\1'
+PLAINTEXT = b'\2'
 
 
 def key_creator(store, args):
@@ -33,11 +33,11 @@ def key_creator(store, args):
 
 
 def key_factory(store, manifest_data):
-    if manifest_data[0] == KEYFILE:
+    if manifest_data[:1] == KEYFILE:
         return KeyfileKey.detect(store, manifest_data)
-    elif manifest_data[0] == PASSPHRASE:
+    elif manifest_data[:1] == PASSPHRASE:
         return PassphraseKey.detect(store, manifest_data)
-    elif manifest_data[0] == PLAINTEXT:
+    elif manifest_data[:1] == PLAINTEXT:
         return PlaintextKey.detect(store, manifest_data)
     else:
         raise Exception('Unkown Key type %d' % ord(manifest_data[0]))
@@ -67,7 +67,7 @@ class PlaintextKey(KeyBase):
 
     @classmethod
     def create(cls, store, args):
-        print 'Encryption NOT enabled.\nUse the --key-file or --passphrase options to enable encryption.'
+        print('Encryption NOT enabled.\nUse the --key-file or --passphrase options to enable encryption.')
         return cls()
 
     @classmethod
@@ -78,12 +78,12 @@ class PlaintextKey(KeyBase):
         return SHA256.new(data).digest()
 
     def encrypt(self, data):
-        return ''.join([self.TYPE, zlib.compress(data)])
+        return b''.join([self.TYPE, zlib.compress(data)])
 
     def decrypt(self, id, data):
-        if data[0] != self.TYPE:
+        if data[:1] != self.TYPE:
             raise IntegrityError('Invalid encryption envelope')
-        data = zlib.decompress(buffer(data, 1))
+        data = zlib.decompress(memoryview(data)[1:])
         if id and SHA256.new(data).digest() != id:
             raise IntegrityError('Chunk id verification failed')
         return data
@@ -99,26 +99,26 @@ class AESKeyBase(KeyBase):
     def encrypt(self, data):
         data = zlib.compress(data)
         nonce = long_to_bytes(self.counter.next_value(), 8)
-        data = ''.join((nonce, AES.new(self.enc_key, AES.MODE_CTR, '',
+        data = b''.join((nonce, AES.new(self.enc_key, AES.MODE_CTR, b'',
                                        counter=self.counter).encrypt(data)))
         hash = HMAC.new(self.enc_hmac_key, data, SHA256).digest()
-        return ''.join((self.TYPE, hash, data))
+        return b''.join((self.TYPE, hash, data))
 
     def decrypt(self, id, data):
-        if data[0] != self.TYPE:
+        if data[:1] != self.TYPE:
             raise IntegrityError('Invalid encryption envelope')
-        hash = buffer(data, 1, 32)
-        if buffer(HMAC.new(self.enc_hmac_key, buffer(data, 33), SHA256).digest()) != hash:
+        hash = memoryview(data)[1:33]
+        if memoryview(HMAC.new(self.enc_hmac_key, memoryview(data)[33:], SHA256).digest()) != hash:
             raise IntegrityError('Encryption envelope checksum mismatch')
-        nonce = bytes_to_long(buffer(data, 33, 8))
+        nonce = bytes_to_long(memoryview(data)[33:41])
         counter = Counter.new(64, initial_value=nonce, prefix=PREFIX)
-        data = zlib.decompress(AES.new(self.enc_key, AES.MODE_CTR, counter=counter).decrypt(buffer(data, 41)))
+        data = zlib.decompress(AES.new(self.enc_key, AES.MODE_CTR, counter=counter).decrypt(memoryview(data)[41:]))
         if id and HMAC.new(self.id_key, data, SHA256).digest() != id:
             raise IntegrityError('Chunk id verification failed')
         return data
 
     def extract_iv(self, payload):
-        if payload[0] != self.TYPE:
+        if payload[:1] != self.TYPE:
             raise IntegrityError('Invalid encryption envelope')
         nonce = bytes_to_long(payload[33:41])
         return nonce
@@ -149,14 +149,14 @@ class PassphraseKey(AESKeyBase):
         while passphrase != passphrase2:
             passphrase = getpass('Enter passphrase: ')
             if not passphrase:
-                print 'Passphrase must not be blank'
+                print('Passphrase must not be blank')
                 continue
             passphrase2 = getpass('Enter same passphrase again: ')
             if passphrase != passphrase2:
-                print 'Passphrases do not match'
+                print('Passphrases do not match')
         key.init(store, passphrase)
         if passphrase:
-            print 'Remember your passphrase. Your data will be inaccessible without it.'
+            print('Remember your passphrase. Your data will be inaccessible without it.')
         return key
 
     @classmethod
@@ -198,40 +198,40 @@ class KeyfileKey(AESKeyBase):
 
     @classmethod
     def find_key_file(cls, store):
-        id = store.id.encode('hex')
+        id = hexlify(store.id).decode('ascii')
         keys_dir = get_keys_dir()
         for name in os.listdir(keys_dir):
             filename = os.path.join(keys_dir, name)
-            with open(filename, 'rb') as fd:
+            with open(filename, 'r') as fd:
                 line = fd.readline().strip()
                 if line and line.startswith(cls.FILE_ID) and line[9:] == id:
                     return filename
         raise Exception('Key file for store with ID %s not found' % id)
 
     def load(self, filename, passphrase):
-        with open(filename, 'rb') as fd:
-            cdata = (''.join(fd.readlines()[1:])).decode('base64')
+        with open(filename, 'r') as fd:
+            cdata = a2b_base64(''.join(fd.readlines()[1:]).encode('ascii'))  # .encode needed for Python 3.[0-2]
         data = self.decrypt_key_file(cdata, passphrase)
         if data:
             key = msgpack.unpackb(data)
-            if key['version'] != 1:
+            if key[b'version'] != 1:
                 raise IntegrityError('Invalid key file header')
-            self.store_id = key['store_id']
-            self.enc_key = key['enc_key']
-            self.enc_hmac_key = key['enc_hmac_key']
-            self.id_key = key['id_key']
-            self.chunk_seed = key['chunk_seed']
+            self.store_id = key[b'store_id']
+            self.enc_key = key[b'enc_key']
+            self.enc_hmac_key = key[b'enc_hmac_key']
+            self.id_key = key[b'id_key']
+            self.chunk_seed = key[b'chunk_seed']
             self.counter = Counter.new(64, initial_value=1, prefix=PREFIX)
             self.path = filename
             return True
 
     def decrypt_key_file(self, data, passphrase):
         d = msgpack.unpackb(data)
-        assert d['version'] == 1
-        assert d['algorithm'] == 'SHA256'
-        key = PBKDF2(passphrase, d['salt'], 32, d['iterations'], SHA256_PDF)
-        data = AES.new(key, AES.MODE_CTR, counter=Counter.new(128)).decrypt(d['data'])
-        if HMAC.new(key, data, SHA256).digest() != d['hash']:
+        assert d[b'version'] == 1
+        assert d[b'algorithm'] == b'SHA256'
+        key = PBKDF2(passphrase, d[b'salt'], 32, d[b'iterations'], SHA256_PDF)
+        data = AES.new(key, AES.MODE_CTR, counter=Counter.new(128)).decrypt(d[b'data'])
+        if HMAC.new(key, data, SHA256).digest() != d[b'hash']:
             return None
         return data
 
@@ -261,9 +261,9 @@ class KeyfileKey(AESKeyBase):
             'chunk_seed': self.chunk_seed,
         }
         data = self.encrypt_key_file(msgpack.packb(key), passphrase)
-        with open(path, 'wb') as fd:
-            fd.write('%s %s\n' % (self.FILE_ID, self.store_id.encode('hex')))
-            fd.write(data.encode('base64'))
+        with open(path, 'w') as fd:
+            fd.write('%s %s\n' % (self.FILE_ID, hexlify(self.store_id).decode('ascii')))
+            fd.write(b2a_base64(data).decode('ascii'))
         self.path = path
 
     def change_passphrase(self):
@@ -272,9 +272,9 @@ class KeyfileKey(AESKeyBase):
             passphrase = getpass('New passphrase: ')
             passphrase2 = getpass('Enter same passphrase again: ')
             if passphrase != passphrase2:
-                print 'Passphrases do not match'
+                print('Passphrases do not match')
         self.save(self.path, passphrase)
-        print 'Key file "%s" updated' % self.path
+        print('Key file "%s" updated' % self.path)
 
     @classmethod
     def create(cls, store, args):
@@ -293,13 +293,13 @@ class KeyfileKey(AESKeyBase):
             passphrase = getpass('Enter passphrase (empty for no passphrase):')
             passphrase2 = getpass('Enter same passphrase again: ')
             if passphrase != passphrase2:
-                print 'Passphrases do not match'
+                print('Passphrases do not match')
         key = cls()
         key.store_id = store.id
         key.init_from_random_data(get_random_bytes(100))
         key.save(path, passphrase)
-        print 'Key file "%s" created.' % key.path
-        print 'Keep this file safe. Your data will be inaccessible without it.'
+        print('Key file "%s" created.' % key.path)
+        print('Keep this file safe. Your data will be inaccessible without it.')
         return key
 
 
@@ -317,7 +317,7 @@ class KeyTestCase(unittest.TestCase):
             orig = '/some/place'
 
         _location = _Location()
-        id = '\0' * 32
+        id = b'\0' * 32
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
@@ -328,8 +328,8 @@ class KeyTestCase(unittest.TestCase):
 
     def test_plaintext(self):
         key = PlaintextKey.create(None, None)
-        data = 'foo'
-        self.assertEqual(key.id_hash(data).encode('hex'), '2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae')
+        data = b'foo'
+        self.assertEqual(hexlify(key.id_hash(data)), b'2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae')
         self.assertEqual(data, key.decrypt(key.id_hash(data), key.encrypt(data)))
 
     def test_keyfile(self):
@@ -338,25 +338,25 @@ class KeyTestCase(unittest.TestCase):
         os.environ['DARC_PASSPHRASE'] = 'test'
         key = KeyfileKey.create(self.MockStore(), MockArgs())
         self.assertEqual(bytes_to_long(key.counter()), 1)
-        manifest = key.encrypt('')
+        manifest = key.encrypt(b'')
         iv = key.extract_iv(manifest)
         key2 = KeyfileKey.detect(self.MockStore(), manifest)
         self.assertEqual(bytes_to_long(key2.counter()), iv + 1000)
         # Key data sanity check
         self.assertEqual(len(set([key2.id_key, key2.enc_key, key2.enc_hmac_key])), 3)
         self.assertEqual(key2.chunk_seed == 0, False)
-        data = 'foo'
+        data = b'foo'
         self.assertEqual(data, key2.decrypt(key.id_hash(data), key.encrypt(data)))
 
     def test_passphrase(self):
         os.environ['DARC_PASSPHRASE'] = 'test'
         key = PassphraseKey.create(self.MockStore(), None)
         self.assertEqual(bytes_to_long(key.counter()), 1)
-        self.assertEqual(key.id_key.encode('hex'), 'f28e915da78a972786da47fee6c4bd2960a421b9bdbdb35a7942eb82552e9a72')
-        self.assertEqual(key.enc_hmac_key.encode('hex'), '169c6082f209e524ea97e2c75318936f6e93c101b9345942a95491e9ae1738ca')
-        self.assertEqual(key.enc_key.encode('hex'), 'c05dd423843d4dd32a52e4dc07bb11acabe215917fc5cf3a3df6c92b47af79ba')
+        self.assertEqual(hexlify(key.id_key), b'f28e915da78a972786da47fee6c4bd2960a421b9bdbdb35a7942eb82552e9a72')
+        self.assertEqual(hexlify(key.enc_hmac_key), b'169c6082f209e524ea97e2c75318936f6e93c101b9345942a95491e9ae1738ca')
+        self.assertEqual(hexlify(key.enc_key), b'c05dd423843d4dd32a52e4dc07bb11acabe215917fc5cf3a3df6c92b47af79ba')
         self.assertEqual(key.chunk_seed, -324662077)
-        manifest = key.encrypt('')
+        manifest = key.encrypt(b'')
         iv = key.extract_iv(manifest)
         key2 = PassphraseKey.detect(self.MockStore(), manifest)
         self.assertEqual(bytes_to_long(key2.counter()), iv + 1000)
@@ -364,8 +364,8 @@ class KeyTestCase(unittest.TestCase):
         self.assertEqual(key.enc_hmac_key, key2.enc_hmac_key)
         self.assertEqual(key.enc_key, key2.enc_key)
         self.assertEqual(key.chunk_seed, key2.chunk_seed)
-        data = 'foo'
-        self.assertEqual(key.id_hash(data).encode('hex'), '016c27cd40dc8e84f196f3b43a9424e8472897e09f6935d0d3a82fb41664bad7')
+        data = b'foo'
+        self.assertEqual(hexlify(key.id_hash(data)), b'016c27cd40dc8e84f196f3b43a9424e8472897e09f6935d0d3a82fb41664bad7')
         self.assertEqual(data, key2.decrypt(key2.id_hash(data), key.encrypt(data)))
 
 

@@ -1,27 +1,26 @@
-from __future__ import with_statement
 from datetime import datetime, timedelta
 from getpass import getuser
-from itertools import izip_longest
+from itertools import zip_longest
 import msgpack
 import os
 import socket
 import stat
 import sys
 import time
-from cStringIO import StringIO
-from xattr import xattr, XATTR_NOFOLLOW
+from io import BytesIO
+import xattr
 
 from .chunker import chunkify
 from .helpers import uid2user, user2uid, gid2group, group2gid, \
-    encode_filename, Statistics
+    Statistics, decode_dict
 
 ITEMS_BUFFER = 1024 * 1024
 CHUNK_MIN = 1024
 WINDOW_SIZE = 0xfff
 CHUNK_MASK = 0xffff
 
-have_lchmod = hasattr(os, 'lchmod')
-linux = sys.platform == 'linux2'
+utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
+has_lchmod = hasattr(os, 'lchmod')
 
 
 class ItemIter(object):
@@ -39,20 +38,20 @@ class ItemIter(object):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         if self.stack:
             item = self.stack.pop(0)
         else:
             self._peek = None
             item = self.get_next()
-        self.peeks = max(0, self.peeks - len(item.get('chunks', [])))
+        self.peeks = max(0, self.peeks - len(item.get(b'chunks', [])))
         return item
 
     def get_next(self):
-        next = self.unpacker.next()
-        while self.filter and not self.filter(next):
-            next = self.unpacker.next()
-        return next
+        n = next(self.unpacker)
+        while self.filter and not self.filter(n):
+            n = next(self.unpacker)
+        return n
 
     def peek(self):
         while True:
@@ -61,12 +60,12 @@ class ItemIter(object):
                     raise StopIteration
                 self._peek = self.get_next()
                 self.stack.append(self._peek)
-                if 'chunks' in self._peek:
-                    self._peek_iter = iter(self._peek['chunks'])
+                if b'chunks' in self._peek:
+                    self._peek_iter = iter(self._peek[b'chunks'])
                 else:
                     self._peek_iter = None
             try:
-                item = self._peek_iter.next()
+                item = next(self._peek_iter)
                 self.peeks += 1
                 return item
             except StopIteration:
@@ -83,15 +82,12 @@ class Archive(object):
 
     def __init__(self, store, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False):
-        if sys.platform == 'darwin':
-            self.cwd = os.getcwdu()
-        else:
-            self.cwd = os.getcwd()
+        self.cwd = os.getcwd()
         self.key = key
         self.store = store
         self.cache = cache
         self.manifest = manifest
-        self.items = StringIO()
+        self.items = BytesIO()
         self.items_ids = []
         self.hard_links = {}
         self.stats = Statistics()
@@ -112,20 +108,22 @@ class Archive(object):
             if name not in self.manifest.archives:
                 raise self.DoesNotExist(name)
             info = self.manifest.archives[name]
-            self.load(info['id'])
+            self.load(info[b'id'])
 
     def load(self, id):
         self.id = id
         data = self.key.decrypt(self.id, self.store.get(self.id))
         self.metadata = msgpack.unpackb(data)
-        if self.metadata['version'] != 1:
+        if self.metadata[b'version'] != 1:
             raise Exception('Unknown archive metadata version')
-        self.name = self.metadata['name']
+        decode_dict(self.metadata, (b'name', b'hostname', b'username', b'time'))
+        self.metadata[b'cmdline'] = [arg.decode('utf-8', 'surrogateescape') for arg in self.metadata[b'cmdline']]
+        self.name = self.metadata[b'name']
 
     @property
     def ts(self):
         """Timestamp of archive creation in UTC"""
-        t, f = self.metadata['time'].split('.', 1)
+        t, f = self.metadata[b'time'].split('.', 1)
         return datetime.strptime(t, '%Y-%m-%dT%H:%M:%S') + timedelta(seconds=float('.' + f))
 
     def __repr__(self):
@@ -136,18 +134,19 @@ class Archive(object):
         i = 0
         n = 20
         while True:
-            items = self.metadata['items'][i:i + n]
+            items = self.metadata[b'items'][i:i + n]
             i += n
             if not items:
                 break
-            for id, chunk in [(id, chunk) for id, chunk in izip_longest(items, self.store.get_many(items))]:
+            for id, chunk in [(id, chunk) for id, chunk in zip_longest(items, self.store.get_many(items))]:
                 unpacker.feed(self.key.decrypt(id, chunk))
                 iter = ItemIter(unpacker, filter)
                 for item in iter:
+                    decode_dict(item, (b'path', b'source', b'user', b'group'))
                     yield item, iter.peek
 
     def add_item(self, item):
-        self.items.write(msgpack.packb(item))
+        self.items.write(msgpack.packb(item, unicode_errors='surrogateescape'))
         now = time.time()
         if now - self.last_checkpoint > self.checkpoint_interval:
             self.last_checkpoint = now
@@ -159,7 +158,7 @@ class Archive(object):
         if self.items.tell() == 0:
             return
         self.items.seek(0)
-        chunks = list(str(s) for s in chunkify(self.items, WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, self.key.chunk_seed))
+        chunks = list(bytes(s) for s in chunkify(self.items, WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, self.key.chunk_seed))
         self.items.seek(0)
         self.items.truncate()
         for chunk in chunks[:-1]:
@@ -190,7 +189,7 @@ class Archive(object):
             'username': getuser(),
             'time': datetime.utcnow().isoformat(),
         }
-        data = msgpack.packb(metadata)
+        data = msgpack.packb(metadata, unicode_errors='surrogateescape')
         self.id = self.key.id_hash(data)
         self.cache.add_chunk(self.id, data, self.stats)
         self.manifest.archives[name] = {'id': self.id, 'time': metadata['time']}
@@ -209,12 +208,12 @@ class Archive(object):
         cache.begin_txn()
         stats = Statistics()
         add(self.id)
-        for id, chunk in izip_longest(self.metadata['items'], self.store.get_many(self.metadata['items'])):
+        for id, chunk in zip_longest(self.metadata[b'items'], self.store.get_many(self.metadata[b'items'])):
             add(id)
             unpacker.feed(self.key.decrypt(id, chunk))
             for item in unpacker:
                 try:
-                    for id, size, csize in item['chunks']:
+                    for id, size, csize in item[b'chunks']:
                         add(id)
                     stats.nfiles += 1
                 except KeyError:
@@ -224,8 +223,8 @@ class Archive(object):
 
     def extract_item(self, item, dest=None, restore_attrs=True, peek=None):
         dest = dest or self.cwd
-        assert item['path'][0] not in ('/', '\\', ':')
-        path = os.path.join(dest, encode_filename(item['path']))
+        assert item[b'path'][:1] not in ('/', '\\', ':')
+        path = os.path.join(dest, item[b'path'])
         # Attempt to remove existing files, ignore errors on failure
         try:
             st = os.lstat(path)
@@ -235,7 +234,7 @@ class Archive(object):
                 os.unlink(path)
         except OSError:
             pass
-        mode = item['mode']
+        mode = item[b'mode']
         if stat.S_ISDIR(mode):
             if not os.path.exists(path):
                 os.makedirs(path)
@@ -245,18 +244,18 @@ class Archive(object):
             if not os.path.exists(os.path.dirname(path)):
                 os.makedirs(os.path.dirname(path))
             # Hard link?
-            if 'source' in item:
-                source = os.path.join(dest, item['source'])
+            if b'source' in item:
+                source = os.path.join(dest, item[b'source'])
                 if os.path.exists(path):
                     os.unlink(path)
                 os.link(source, path)
             else:
-                with open(path, 'wbx') as fd:
-                    ids = [id for id, size, csize in item['chunks']]
-                    for id, chunk in izip_longest(ids, self.store.get_many(ids, peek)):
+                with open(path, 'wb') as fd:
+                    ids = [id for id, size, csize in item[b'chunks']]
+                    for id, chunk in zip_longest(ids, self.store.get_many(ids, peek)):
                         data = self.key.decrypt(id, chunk)
                         fd.write(data)
-                self.restore_attrs(path, item)
+                    self.restore_attrs(path, item, fd=fd.fileno())
         elif stat.S_ISFIFO(mode):
             if not os.path.exists(os.path.dirname(path)):
                 os.makedirs(os.path.dirname(path))
@@ -265,53 +264,61 @@ class Archive(object):
         elif stat.S_ISLNK(mode):
             if not os.path.exists(os.path.dirname(path)):
                 os.makedirs(os.path.dirname(path))
-            source = item['source']
+            source = item[b'source']
             if os.path.exists(path):
                 os.unlink(path)
             os.symlink(source, path)
             self.restore_attrs(path, item, symlink=True)
         elif stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
-            os.mknod(path, item['mode'], item['rdev'])
+            os.mknod(path, item[b'mode'], item[b'rdev'])
             self.restore_attrs(path, item)
         else:
-            raise Exception('Unknown archive item type %r' % item['mode'])
+            raise Exception('Unknown archive item type %r' % item[b'mode'])
 
-    def restore_attrs(self, path, item, symlink=False):
-        xattrs = item.get('xattrs')
+    def restore_attrs(self, path, item, symlink=False, fd=None):
+        xattrs = item.get(b'xattrs')
         if xattrs:
-            xa = xattr(path, XATTR_NOFOLLOW)
             for k, v in xattrs.items():
                 try:
-                    xa.set(k, v)
-                except (IOError, KeyError):
+                    xattr.set(fd or path, k, v)
+                except (EnvironmentError):
                     pass
         uid = gid = None
         if not self.numeric_owner:
-            uid = user2uid(item['user'])
-            gid = group2gid(item['group'])
-        uid = uid or item['uid']
-        gid = gid or item['gid']
+            uid = user2uid(item[b'user'])
+            gid = group2gid(item[b'group'])
+        uid = uid or item[b'uid']
+        gid = gid or item[b'gid']
+        # This code is a bit of a mess due to os specific differences
         try:
-            os.lchown(path, uid, gid)
+            if fd:
+                os.fchown(fd, uid, gid)
+            else:
+                os.lchown(path, uid, gid)
         except OSError:
             pass
-        if have_lchmod:
-            os.lchmod(path, item['mode'])
+        if fd:
+            os.fchmod(fd, item[b'mode'])
         elif not symlink:
-            os.chmod(path, item['mode'])
-        if not symlink:
-            # FIXME: We should really call futimes here (c extension required)
-            os.utime(path, (item['mtime'], item['mtime']))
+            os.chmod(path, item[b'mode'])
+        elif has_lchmod:  # Not available on Linux
+            os.lchmod(path, item[b'mode'])
+        if fd and utime_supports_fd:  # Python >= 3.3
+            os.utime(fd, (item[b'mtime'], item[b'mtime']))
+        elif utime_supports_fd:  # Python >= 3.3
+            os.utime(path, (item[b'mtime'], item[b'mtime']), follow_symlinks=False)
+        elif not symlink:
+            os.utime(path, (item[b'mtime'], item[b'mtime']))
 
     def verify_file(self, item, start, result, peek=None):
-        if not item['chunks']:
+        if not item[b'chunks']:
             start(item)
             result(item, True)
         else:
             start(item)
-            ids = [id for id, size, csize in item['chunks']]
+            ids = [id for id, size, csize in item[b'chunks']]
             try:
-                for id, chunk in izip_longest(ids, self.store.get_many(ids, peek)):
+                for id, chunk in zip_longest(ids, self.store.get_many(ids, peek)):
                     self.key.decrypt(id, chunk)
             except Exception:
                 result(item, False)
@@ -320,11 +327,11 @@ class Archive(object):
 
     def delete(self, cache):
         unpacker = msgpack.Unpacker(use_list=False)
-        for id in self.metadata['items']:
+        for id in self.metadata[b'items']:
             unpacker.feed(self.key.decrypt(id, self.store.get(id)))
             for item in unpacker:
                 try:
-                    for chunk_id, size, csize in item['chunks']:
+                    for chunk_id, size, csize in item[b'chunks']:
                         self.cache.chunk_decref(chunk_id)
                 except KeyError:
                     pass
@@ -337,40 +344,34 @@ class Archive(object):
 
     def stat_attrs(self, st, path):
         item = {
-            'mode': st.st_mode,
-            'uid': st.st_uid, 'user': uid2user(st.st_uid),
-            'gid': st.st_gid, 'group': gid2group(st.st_gid),
-            'mtime': st.st_mtime,
+            b'mode': st.st_mode,
+            b'uid': st.st_uid, b'user': uid2user(st.st_uid),
+            b'gid': st.st_gid, b'group': gid2group(st.st_gid),
+            b'mtime': st.st_mtime,
         }
         if self.numeric_owner:
-            item['user'] = item['group'] = None
+            item[b'user'] = item[b'group'] = None
         try:
-            xa = xattr(path, XATTR_NOFOLLOW)
-            xattrs = {}
-            for key in xa:
-                # Only store the user namespace on Linux
-                if linux and not key.startswith('user'):
-                    continue
-                xattrs[key] = xa[key]
+            xattrs = xattr.get_all(path, True)
             if xattrs:
-                item['xattrs'] = xattrs
-        except IOError:
+                item[b'xattrs'] = dict(xattrs)
+        except EnvironmentError:
             pass
         return item
 
     def process_item(self, path, st):
-        item = {'path': path.lstrip('/\\:')}
+        item = {b'path': path.lstrip('/\\:')}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
 
     def process_dev(self, path, st):
-        item = {'path': path.lstrip('/\\:'), 'rdev': st.st_rdev}
+        item = {b'path': path.lstrip('/\\:'), b'rdev': st.st_rdev}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
 
     def process_symlink(self, path, st):
         source = os.readlink(path)
-        item = {'path': path.lstrip('/\\:'), 'source': source}
+        item = {b'path': path.lstrip('/\\:'), b'source': source}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
 
@@ -381,12 +382,12 @@ class Archive(object):
             source = self.hard_links.get((st.st_ino, st.st_dev))
             if (st.st_ino, st.st_dev) in self.hard_links:
                 item = self.stat_attrs(st, path)
-                item.update({'path': safe_path, 'source': source})
+                item.update({b'path': safe_path, b'source': source})
                 self.add_item(item)
                 return
             else:
                 self.hard_links[st.st_ino, st.st_dev] = safe_path
-        path_hash = self.key.id_hash(path)
+        path_hash = self.key.id_hash(path.encode('utf-8', 'surrogateescape'))
         ids = cache.file_known_and_unchanged(path_hash, st)
         chunks = None
         if ids is not None:
@@ -404,7 +405,7 @@ class Archive(object):
                     chunks.append(cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats))
             ids = [id for id, _, _ in chunks]
             cache.memorize_file(path_hash, st, ids)
-        item = {'path': safe_path, 'chunks': chunks}
+        item = {b'path': safe_path, b'chunks': chunks}
         item.update(self.stat_attrs(st, path))
         self.stats.nfiles += 1
         self.add_item(item)

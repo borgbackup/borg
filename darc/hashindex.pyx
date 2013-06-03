@@ -27,7 +27,8 @@ cdef class IndexBase:
             raise Exception('Failed to open %s' % path)
 
     def __dealloc__(self):
-        hashindex_close(self.index)
+        if self.index:
+            hashindex_close(self.index)
 
     def clear(self):
         hashindex_clear(self.index)

@@ -195,7 +195,7 @@ class Archiver(object):
                         size = sum(size for _, size, _ in item[b'chunks'])
                     except KeyError:
                         pass
-                mtime = format_time(datetime.fromtimestamp(item[b'mtime']))
+                mtime = format_time(datetime.fromtimestamp(item[b'mtime'] / 10**9))
                 if b'source' in item:
                     if type == 'l':
                         extra = ' -> %s' % item[b'source']

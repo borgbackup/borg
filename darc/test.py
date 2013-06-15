@@ -16,6 +16,7 @@ from .key import suite as KeySuite
 from .store import Store, suite as StoreSuite
 from .remote import Store, suite as RemoteStoreSuite
 
+has_mtime_ns = sys.version >= '3.3'
 utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
 
 
@@ -89,12 +90,13 @@ class Test(unittest.TestCase):
             s2 = os.lstat(path2)
             attrs = ['st_mode', 'st_uid', 'st_gid', 'st_rdev']
             if not os.path.islink(path1) or utime_supports_fd:
-                attrs.append('st_mtime')
+                attrs.append('st_mtime_ns' if has_mtime_ns else 'st_mtime')
             d1 = [filename] + [getattr(s1, a) for a in attrs]
             d2 = [filename] + [getattr(s2, a) for a in attrs]
-            if(len(d1) == 6):
-                d1[-1] = int(d1[-1])
-                d2[-1] = int(d2[-1])
+            # 'st_mtime precision is limited'
+            if attrs[-1] == 'st_mtime':
+                d1[-1] = round(d1[-1], 4)
+                d2[-1] = round(d2[-1], 4)
             d1.append(self.get_xattrs(path1))
             d2.append(self.get_xattrs(path2))
             self.assertEqual(d1, d2)

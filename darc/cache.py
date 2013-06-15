@@ -6,7 +6,7 @@ import os
 from binascii import hexlify, unhexlify
 import shutil
 
-from .helpers import get_cache_dir, decode_dict
+from .helpers import get_cache_dir, decode_dict, st_mtime_ns
 from .hashindex import ChunkIndex
 
 
@@ -190,7 +190,7 @@ class Cache(object):
         if self.files is None:
             self._read_files()
         entry = self.files.get(path_hash)
-        if (entry and entry[3] == st.st_mtime
+        if (entry and entry[3] == st_mtime_ns(st)
             and entry[2] == st.st_size and entry[1] == st.st_ino):
             # reset entry age
             self.files[path_hash][0] = 0
@@ -200,6 +200,6 @@ class Cache(object):
 
     def memorize_file(self, path_hash, st, ids):
         # Entry: Age, inode, size, mtime, chunk ids
-        self.files[path_hash] = 0, st.st_ino, st.st_size, st.st_mtime, ids
-        self._newest_mtime = max(self._newest_mtime, st.st_mtime)
-
+        mtime_ns = st_mtime_ns(st)
+        self.files[path_hash] = 0, st.st_ino, st.st_size, mtime_ns, ids
+        self._newest_mtime = max(self._newest_mtime, mtime_ns)

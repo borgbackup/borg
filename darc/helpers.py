@@ -376,3 +376,11 @@ def decode_dict(d, keys, encoding='utf-8', errors='surrogateescape'):
 
 def remove_surrogates(s, errors='replace'):
     return s.encode('utf-8', errors).decode('utf-8')
+
+
+if sys.version < '3.3':
+    def st_mtime_ns(st):
+        return int(st.st_mtime * 10**9)
+else:
+    def st_mtime_ns(st):
+        return st.st_mtime_ns

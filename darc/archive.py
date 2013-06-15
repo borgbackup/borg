@@ -12,7 +12,7 @@ import xattr
 
 from .chunker import chunkify
 from .helpers import uid2user, user2uid, gid2group, group2gid, \
-    Statistics, decode_dict
+    Statistics, decode_dict, st_mtime_ns
 
 ITEMS_BUFFER = 1024 * 1024
 CHUNK_MIN = 1024
@@ -20,6 +20,7 @@ WINDOW_SIZE = 0xfff
 CHUNK_MASK = 0xffff
 
 utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
+has_mtime_ns = sys.version >= '3.3'
 has_lchmod = hasattr(os, 'lchmod')
 
 
@@ -304,11 +305,11 @@ class Archive(object):
         elif has_lchmod:  # Not available on Linux
             os.lchmod(path, item[b'mode'])
         if fd and utime_supports_fd:  # Python >= 3.3
-            os.utime(fd, (item[b'mtime'], item[b'mtime']))
+            os.utime(fd, None, ns=(item[b'mtime'], item[b'mtime']))
         elif utime_supports_fd:  # Python >= 3.3
-            os.utime(path, (item[b'mtime'], item[b'mtime']), follow_symlinks=False)
+            os.utime(path, None, ns=(item[b'mtime'], item[b'mtime']), follow_symlinks=False)
         elif not symlink:
-            os.utime(path, (item[b'mtime'], item[b'mtime']))
+            os.utime(path, (item[b'mtime'] / 10**9, item[b'mtime'] / 10**9))
 
     def verify_file(self, item, start, result, peek=None):
         if not item[b'chunks']:
@@ -347,7 +348,7 @@ class Archive(object):
             b'mode': st.st_mode,
             b'uid': st.st_uid, b'user': uid2user(st.st_uid),
             b'gid': st.st_gid, b'group': gid2group(st.st_gid),
-            b'mtime': st.st_mtime,
+            b'mtime': st_mtime_ns(st),
         }
         if self.numeric_owner:
             item[b'user'] = item[b'group'] = None

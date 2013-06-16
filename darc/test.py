@@ -9,7 +9,7 @@ import tempfile
 import unittest
 import xattr
 
-from . import helpers, lrucache
+from . import helpers, lrucache, crypto
 from .chunker import chunkify, buzhash, buzhash_update
 from .archiver import Archiver
 from .key import suite as KeySuite
@@ -228,6 +228,7 @@ def suite():
     suite.addTest(RemoteStoreSuite())
     suite.addTest(doctest.DocTestSuite(helpers))
     suite.addTest(lrucache.suite())
+    suite.addTest(crypto.suite())
     return suite
 
 if __name__ == '__main__':

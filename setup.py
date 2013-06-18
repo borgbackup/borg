@@ -20,6 +20,9 @@ from distutils.core import setup
 from distutils.extension import Extension
 from distutils.command.sdist import sdist
 
+chunker_source = 'darc/chunker.pyx'
+hashindex_source = 'darc/hashindex.pyx'
+
 try:
     from Cython.Distutils import build_ext
     import Cython.Compiler.Main as cython_compiler
@@ -32,15 +35,15 @@ try:
             sdist.__init__(self, *args, **kwargs)
 
         def make_distribution(self):
-            self.filelist.append('darc/hashindex.c')
-            self.filelist.append('darc/hashindex.h')
+            self.filelist += ['darc/chunker.c', 'darc/chunker.h', 'darc/hashindex.c', 'darc/hashindex.h']
             sdist.make_distribution(self)
 
 except ImportError:
-    hashindex_sources[0] = hashindex_sources[0].replace('.pyx', '.c')
+    chunker_source = chunker_source.replace('.pyx', '.c')
+    hashindex_source = hashindex_source.replace('.pyx', '.c')
     from distutils.command.build_ext import build_ext
     Sdist = sdist
-    if not os.path.exists('darc/hashindex.c'):
+    if not os.path.exists(chunker_source) or not os.path.exists(hashindex_source):
         raise ImportError('The GIT version of darc needs Cython. Install Cython or use a released version')
 
 setup(name='darc',
@@ -51,8 +54,8 @@ setup(name='darc',
       packages=['darc'],
       cmdclass={'build_ext': build_ext, 'sdist': Sdist},
       ext_modules=[
-      Extension('darc.chunker', ['darc/chunker.pyx']),
-      Extension('darc.hashindex', ['darc/hashindex.pyx'])],
+      Extension('darc.chunker', [chunker_source]),
+      Extension('darc.hashindex', [hashindex_source])],
       scripts=['scripts/darc'],
     )
 

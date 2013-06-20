@@ -7,13 +7,13 @@ import stat
 import sys
 
 from .archive import Archive
-from .store import Store
+from .repository import Repository
 from .cache import Cache
 from .key import key_creator
 from .helpers import location_validator, format_time, \
     format_file_mode, IncludePattern, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
     get_cache_dir, format_timedelta, prune_split, Manifest, Location, remove_surrogates
-from .remote import StoreServer, RemoteStore
+from .remote import RepositoryServer, RemoteRepository
 
 
 class Archiver(object):
@@ -21,13 +21,13 @@ class Archiver(object):
     def __init__(self):
         self.exit_code = 0
 
-    def open_store(self, location, create=False):
+    def open_repository(self, location, create=False):
         if location.proto == 'ssh':
-            store = RemoteStore(location, create=create)
+            repository = RemoteRepository(location, create=create)
         else:
-            store = Store(location.path, create=create)
-        store._location = location
-        return store
+            repository = Repository(location.path, create=create)
+        repository._location = location
+        return repository
 
     def print_error(self, msg, *args):
         msg = args and msg % args or msg
@@ -43,31 +43,31 @@ class Archiver(object):
                 print(msg, end=' ')
 
     def do_serve(self, args):
-        return StoreServer().serve()
+        return RepositoryServer().serve()
 
     def do_init(self, args):
-        print('Initializing store "%s"' % args.store.orig)
-        store = self.open_store(args.store, create=True)
-        key = key_creator(store, args)
+        print('Initializing repository at "%s"' % args.repository.orig)
+        repository = self.open_repository(args.repository, create=True)
+        key = key_creator(repository, args)
         manifest = Manifest()
-        manifest.store = store
+        manifest.repository = repository
         manifest.key = key
         manifest.write()
-        store.commit()
+        repository.commit()
         return self.exit_code
 
     def do_change_passphrase(self, args):
-        store = self.open_store(Location(args.store))
-        manifest, key = Manifest.load(store)
+        repository = self.open_repository(Location(args.repository))
+        manifest, key = Manifest.load(repository)
         key.change_passphrase()
         return self.exit_code
 
     def do_create(self, args):
         t0 = datetime.now()
-        store = self.open_store(args.archive)
-        manifest, key = Manifest.load(store)
-        cache = Cache(store, key, manifest)
-        archive = Archive(store, key, manifest, args.archive.archive, cache=cache,
+        repository = self.open_repository(args.archive)
+        manifest, key = Manifest.load(repository)
+        cache = Cache(repository, key, manifest)
+        archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
                           create=True, checkpoint_interval=args.checkpoint_interval,
                           numeric_owner=args.numeric_owner)
         # Add darc cache dir to inode_skip list
@@ -77,7 +77,7 @@ class Archiver(object):
             skip_inodes.add((st.st_ino, st.st_dev))
         except IOError:
             pass
-        # Add local store dir to inode_skip list
+        # Add local repository dir to inode_skip list
         if not args.archive.host:
             try:
                 st = os.stat(args.archive.path)
@@ -150,9 +150,9 @@ class Archiver(object):
             self.print_error('Unknown file type: %s', path)
 
     def do_extract(self, args):
-        store = self.open_store(args.archive)
-        manifest, key = Manifest.load(store)
-        archive = Archive(store, key, manifest, args.archive.archive,
+        repository = self.open_repository(args.archive)
+        manifest, key = Manifest.load(repository)
+        archive = Archive(repository, key, manifest, args.archive.archive,
                           numeric_owner=args.numeric_owner)
         dirs = []
         for item, peek in archive.iter_items(lambda item: not exclude_path(item[b'path'], args.patterns)):
@@ -173,19 +173,19 @@ class Archiver(object):
         return self.exit_code
 
     def do_delete(self, args):
-        store = self.open_store(args.archive)
-        manifest, key = Manifest.load(store)
-        cache = Cache(store, key, manifest)
-        archive = Archive(store, key, manifest, args.archive.archive, cache=cache)
+        repository = self.open_repository(args.archive)
+        manifest, key = Manifest.load(repository)
+        cache = Cache(repository, key, manifest)
+        archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
         archive.delete(cache)
         return self.exit_code
 
     def do_list(self, args):
-        store = self.open_store(args.src)
-        manifest, key = Manifest.load(store)
+        repository = self.open_repository(args.src)
+        manifest, key = Manifest.load(repository)
         if args.src.archive:
             tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 0o10: '-', 0o12: 'l', 0o14: 's'}
-            archive = Archive(store, key, manifest, args.src.archive)
+            archive = Archive(repository, key, manifest, args.src.archive)
             for item, _ in archive.iter_items():
                 type = tmap.get(item[b'mode'] // 4096, '?')
                 mode = format_file_mode(item[b'mode'])
@@ -208,14 +208,14 @@ class Archiver(object):
                                                   item[b'group'] or item[b'gid'], size, mtime,
                                                   remove_surrogates(item[b'path']), extra))
         else:
-            for archive in sorted(Archive.list_archives(store, key, manifest), key=attrgetter('ts')):
+            for archive in sorted(Archive.list_archives(repository, key, manifest), key=attrgetter('ts')):
                 print('%-20s %s' % (archive.metadata[b'name'], to_localtime(archive.ts).strftime('%c')))
         return self.exit_code
 
     def do_verify(self, args):
-        store = self.open_store(args.archive)
-        manifest, key = Manifest.load(store)
-        archive = Archive(store, key, manifest, args.archive.archive)
+        repository = self.open_repository(args.archive)
+        manifest, key = Manifest.load(repository)
+        archive = Archive(repository, key, manifest, args.archive.archive)
 
         def start_cb(item):
             self.print_verbose('%s ...', remove_surrogates(item[b'path']), newline=False)
@@ -232,10 +232,10 @@ class Archiver(object):
         return self.exit_code
 
     def do_info(self, args):
-        store = self.open_store(args.archive)
-        manifest, key = Manifest.load(store)
-        cache = Cache(store, key, manifest)
-        archive = Archive(store, key, manifest, args.archive.archive, cache=cache)
+        repository = self.open_repository(args.archive)
+        manifest, key = Manifest.load(repository)
+        cache = Cache(repository, key, manifest)
+        archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
         stats = archive.calc_stats(cache)
         print('Name:', archive.name)
         print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
@@ -247,10 +247,10 @@ class Archiver(object):
         return self.exit_code
 
     def do_prune(self, args):
-        store = self.open_store(args.store)
-        manifest, key = Manifest.load(store)
-        cache = Cache(store, key, manifest)
-        archives = list(sorted(Archive.list_archives(store, key, manifest, cache),
+        repository = self.open_repository(args.repository)
+        manifest, key = Manifest.load(repository)
+        cache = Cache(repository, key, manifest)
+        archives = list(sorted(Archive.list_archives(repository, key, manifest, cache),
                                key=attrgetter('ts'), reverse=True))
         if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0:
             self.print_error('At least one of the "hourly", "daily", "weekly", "monthly" or "yearly" '
@@ -299,9 +299,9 @@ class Archiver(object):
 
         subparser = subparsers.add_parser('init', parents=[common_parser])
         subparser.set_defaults(func=self.do_init)
-        subparser.add_argument('store',
+        subparser.add_argument('repository',
                                type=location_validator(archive=False),
-                               help='Store to create')
+                               help='Repository to create')
         subparser.add_argument('--key-file', dest='keyfile',
                                action='store_true', default=False,
                                help='Encrypt data using key file')
@@ -311,7 +311,7 @@ class Archiver(object):
 
         subparser = subparsers.add_parser('change-passphrase', parents=[common_parser])
         subparser.set_defaults(func=self.do_change_passphrase)
-        subparser.add_argument('store', type=location_validator(archive=False))
+        subparser.add_argument('repository', type=location_validator(archive=False))
 
         subparser = subparsers.add_parser('create', parents=[common_parser])
         subparser.set_defaults(func=self.do_create)
@@ -365,7 +365,7 @@ class Archiver(object):
         subparser = subparsers.add_parser('list', parents=[common_parser])
         subparser.set_defaults(func=self.do_list)
         subparser.add_argument('src', metavar='SRC', type=location_validator(),
-                               help='Store/Archive to list contents of')
+                               help='Repository/Archive to list contents of')
 
         subparser = subparsers.add_parser('verify', parents=[common_parser])
         subparser.set_defaults(func=self.do_verify)
@@ -399,9 +399,9 @@ class Archiver(object):
                                help='Number of yearly archives to keep')
         subparser.add_argument('-p', '--prefix', dest='prefix', type=str,
                                help='Only consider archive names starting with this prefix')
-        subparser.add_argument('store', metavar='STORE',
+        subparser.add_argument('repository', metavar='REPOSITORY',
                                type=location_validator(archive=False),
-                               help='Store to prune')
+                               help='Repository to prune')
 
         args = parser.parse_args(args)
         if getattr(args, 'patterns', None):
@@ -414,11 +414,11 @@ def main():
     archiver = Archiver()
     try:
         exit_code = archiver.run()
-    except Store.DoesNotExist:
-        archiver.print_error('Error: Store not found')
+    except Repository.DoesNotExist:
+        archiver.print_error('Error: Repository not found')
         exit_code = 1
-    except Store.AlreadyExists:
-        archiver.print_error('Error: Store already exists')
+    except Repository.AlreadyExists:
+        archiver.print_error('Error: Repository already exists')
         exit_code = 1
     except Archive.AlreadyExists as e:
         archiver.print_error('Error: Archive "%s" already exists', e)

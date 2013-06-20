@@ -13,8 +13,8 @@ from . import helpers, lrucache, crypto
 from .chunker import chunkify, buzhash, buzhash_update
 from .archiver import Archiver
 from .key import suite as KeySuite
-from .store import Store, suite as StoreSuite
-from .remote import Store, suite as RemoteStoreSuite
+from .repository import Repository, suite as RepositorySuite
+from .remote import Repository, suite as RemoteRepositorySuite
 
 has_mtime_ns = sys.version >= '3.3'
 utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
@@ -27,8 +27,8 @@ class Test(unittest.TestCase):
     def setUp(self):
         self.archiver = Archiver()
         self.tmpdir = tempfile.mkdtemp()
-        self.store_path = os.path.join(self.tmpdir, 'store')
-        self.store_location = self.prefix + self.store_path
+        self.repository_path = os.path.join(self.tmpdir, 'repository')
+        self.repository_location = self.prefix + self.repository_path
         self.input_path = os.path.join(self.tmpdir, 'input')
         self.output_path = os.path.join(self.tmpdir, 'output')
         self.keys_path = os.path.join(self.tmpdir, 'keys')
@@ -62,8 +62,8 @@ class Test(unittest.TestCase):
 
     def create_src_archive(self, name):
         src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__), '..')
-        self.darc('init', self.store_location)
-        self.darc('create', self.store_location + '::' + name, src_dir)
+        self.darc('init', self.repository_location)
+        self.darc('create', self.repository_location + '::' + name, src_dir)
 
     def create_regual_file(self, name, size=0):
         filename = os.path.join(self.input_path, name)
@@ -123,16 +123,16 @@ class Test(unittest.TestCase):
         os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
         # FIFO node
         os.mkfifo(os.path.join(self.input_path, 'fifo1'))
-        self.darc('init', self.store_location)
-        self.darc('create', self.store_location + '::test', 'input')
-        self.darc('create', self.store_location + '::test.2', 'input')
-        self.darc('extract', self.store_location + '::test', 'output')
-        self.assertEqual(len(self.darc('list', self.store_location).splitlines()), 2)
-        self.assertEqual(len(self.darc('list', self.store_location + '::test').splitlines()), 9)
+        self.darc('init', self.repository_location)
+        self.darc('create', self.repository_location + '::test', 'input')
+        self.darc('create', self.repository_location + '::test.2', 'input')
+        self.darc('extract', self.repository_location + '::test', 'output')
+        self.assertEqual(len(self.darc('list', self.repository_location).splitlines()), 2)
+        self.assertEqual(len(self.darc('list', self.repository_location + '::test').splitlines()), 9)
         self.diff_dirs('input', 'output/input')
-        info_output = self.darc('info', self.store_location + '::test')
+        info_output = self.darc('info', self.repository_location + '::test')
         shutil.rmtree(self.cache_path)
-        info_output2 = self.darc('info', self.store_location + '::test')
+        info_output2 = self.darc('info', self.repository_location + '::test')
         # info_output2 starts with some "initializing cache" text but should
         # end the same way as info_output
         assert info_output2.endswith(info_output)
@@ -140,52 +140,52 @@ class Test(unittest.TestCase):
     def test_overwrite(self):
         self.create_regual_file('file1', size=1024 * 80)
         self.create_regual_file('dir2/file2', size=1024 * 80)
-        self.darc('init', self.store_location)
-        self.darc('create', self.store_location + '::test', 'input')
+        self.darc('init', self.repository_location)
+        self.darc('create', self.repository_location + '::test', 'input')
         # Overwriting regular files and directories should be supported
         os.mkdir('output/input')
         os.mkdir('output/input/file1')
         os.mkdir('output/input/dir2')
-        self.darc('extract', self.store_location + '::test', 'output')
+        self.darc('extract', self.repository_location + '::test', 'output')
         self.diff_dirs('input', 'output/input')
         # But non-empty dirs should fail
         os.unlink('output/input/file1')
         os.mkdir('output/input/file1')
         os.mkdir('output/input/file1/dir')
-        self.darc('extract', self.store_location + '::test', 'output', exit_code=1)
+        self.darc('extract', self.repository_location + '::test', 'output', exit_code=1)
 
     def test_delete(self):
         self.create_regual_file('file1', size=1024 * 80)
         self.create_regual_file('dir2/file2', size=1024 * 80)
-        self.darc('init', self.store_location)
-        self.darc('create', self.store_location + '::test', 'input')
-        self.darc('create', self.store_location + '::test.2', 'input')
-        self.darc('verify', self.store_location + '::test')
-        self.darc('verify', self.store_location + '::test.2')
-        self.darc('delete', self.store_location + '::test')
-        self.darc('verify', self.store_location + '::test.2')
-        self.darc('delete', self.store_location + '::test.2')
+        self.darc('init', self.repository_location)
+        self.darc('create', self.repository_location + '::test', 'input')
+        self.darc('create', self.repository_location + '::test.2', 'input')
+        self.darc('verify', self.repository_location + '::test')
+        self.darc('verify', self.repository_location + '::test.2')
+        self.darc('delete', self.repository_location + '::test')
+        self.darc('verify', self.repository_location + '::test.2')
+        self.darc('delete', self.repository_location + '::test.2')
         # Make sure all data except the manifest has been deleted
-        store = Store(self.store_path)
-        self.assertEqual(store._len(), 1)
+        repository = Repository(self.repository_path)
+        self.assertEqual(repository._len(), 1)
 
-    def test_corrupted_store(self):
+    def test_corrupted_repository(self):
         self.create_src_archive('test')
-        self.darc('verify', self.store_location + '::test')
-        name = sorted(os.listdir(os.path.join(self.tmpdir, 'store', 'data', '0')), reverse=True)[0]
-        fd = open(os.path.join(self.tmpdir, 'store', 'data', '0', name), 'r+')
+        self.darc('verify', self.repository_location + '::test')
+        name = sorted(os.listdir(os.path.join(self.tmpdir, 'repository', 'data', '0')), reverse=True)[0]
+        fd = open(os.path.join(self.tmpdir, 'repository', 'data', '0', name), 'r+')
         fd.seek(100)
         fd.write('X')
         fd.close()
-        self.darc('verify', self.store_location + '::test', exit_code=1)
+        self.darc('verify', self.repository_location + '::test', exit_code=1)
 
-    def test_prune_store(self):
+    def test_prune_repository(self):
         src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__))
-        self.darc('init', self.store_location)
-        self.darc('create', self.store_location + '::test1', src_dir)
-        self.darc('create', self.store_location + '::test2', src_dir)
-        self.darc('prune', self.store_location, '--daily=2')
-        output = self.darc('list', self.store_location)
+        self.darc('init', self.repository_location)
+        self.darc('create', self.repository_location + '::test1', src_dir)
+        self.darc('create', self.repository_location + '::test2', src_dir)
+        self.darc('prune', self.repository_location, '--daily=2')
+        output = self.darc('list', self.repository_location)
         assert 'test1' not in output
         assert 'test2' in output
 
@@ -224,8 +224,8 @@ def suite():
     suite.addTest(unittest.TestLoader().loadTestsFromTestCase(Test))
     suite.addTest(unittest.TestLoader().loadTestsFromTestCase(RemoteTest))
     suite.addTest(KeySuite())
-    suite.addTest(StoreSuite())
-    suite.addTest(RemoteStoreSuite())
+    suite.addTest(RepositorySuite())
+    suite.addTest(RemoteRepositorySuite())
     suite.addTest(doctest.DocTestSuite(helpers))
     suite.addTest(lrucache.suite())
     suite.addTest(crypto.suite())

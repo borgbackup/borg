@@ -14,12 +14,12 @@ class Cache(object):
     """Client Side cache
     """
 
-    def __init__(self, store, key, manifest):
+    def __init__(self, repository, key, manifest):
         self.txn_active = False
-        self.store = store
+        self.repository = repository
         self.key = key
         self.manifest = manifest
-        self.path = os.path.join(get_cache_dir(), hexlify(store.id).decode('ascii'))
+        self.path = os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
         if not os.path.exists(self.path):
             self.create()
         self.open()
@@ -28,7 +28,7 @@ class Cache(object):
             self.commit()
 
     def create(self):
-        """Create a new empty store at `path`
+        """Create a new empty repository at `path`
         """
         os.makedirs(self.path)
         with open(os.path.join(self.path, 'README'), 'w') as fd:
@@ -36,7 +36,7 @@ class Cache(object):
         config = RawConfigParser()
         config.add_section('cache')
         config.set('cache', 'version', '1')
-        config.set('cache', 'store', hexlify(self.store.id).decode('ascii'))
+        config.set('cache', 'repository', hexlify(self.repository.id).decode('ascii'))
         config.set('cache', 'manifest', '')
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             config.write(fd)
@@ -54,7 +54,7 @@ class Cache(object):
         self.config.read(os.path.join(self.path, 'config'))
         if self.config.getint('cache', 'version') != 1:
             raise Exception('%s Does not look like a darc cache')
-        self.id = self.config.get('cache', 'store')
+        self.id = self.config.get('cache', 'repository')
         self.manifest_id = unhexlify(self.config.get('cache', 'manifest').encode('ascii'))  # .encode needed for Python 3.[0-2]
         self.chunks = ChunkIndex(os.path.join(self.path, 'chunks').encode('utf-8'))
         self.files = None
@@ -135,13 +135,13 @@ class Cache(object):
         unpacker = msgpack.Unpacker()
         for name, info in self.manifest.archives.items():
             id = info[b'id']
-            cdata = self.store.get(id)
+            cdata = self.repository.get(id)
             data = self.key.decrypt(id, cdata)
             add(id, len(data), len(cdata))
             archive = msgpack.unpackb(data)
             decode_dict(archive, (b'name', b'hostname', b'username', b'time'))  # fixme: argv
             print('Analyzing archive:', archive[b'name'])
-            for id, chunk in zip_longest(archive[b'items'], self.store.get_many(archive[b'items'])):
+            for id, chunk in zip_longest(archive[b'items'], self.repository.get_many(archive[b'items'])):
                 data = self.key.decrypt(id, chunk)
                 add(id, len(data), len(chunk))
                 unpacker.feed(data)
@@ -160,7 +160,7 @@ class Cache(object):
         size = len(data)
         data = self.key.encrypt(data)
         csize = len(data)
-        self.store.put(id, data, wait=False)
+        self.repository.put(id, data, wait=False)
         self.chunks[id] = (1, size, csize)
         stats.update(size, csize, True)
         return id, size, csize
@@ -182,7 +182,7 @@ class Cache(object):
         count, size, csize = self.chunks[id]
         if count == 1:
             del self.chunks[id]
-            self.store.delete(id, wait=False)
+            self.repository.delete(id, wait=False)
         else:
             self.chunks[id] = (count - 1, size, csize)
 

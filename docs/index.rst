@@ -10,16 +10,16 @@ Space efficient storage
    Variable block size `deduplication <http://en.wikipedia.org/wiki/Data_deduplication>`_
    is used to reduce the number of bytes stored by detecting redundant data.
    Each file is split into a number of variable length chunks and only chunks
-   that have never been seen before are added to the store.
+   that have never been seen before are compressed and added to the repository.
 
 Secure
     All data is encrypted using `AES256 <http://en.wikipedia.org/wiki/Advanced_Encryption_Standard>`_
     and the data integrity and authenticity is verified using
     `HMAC-SHA256 <http://en.wikipedia.org/wiki/HMAC>`_.
 
-Remote stores
+Remote repositories
     Darc can store data on remote hosts over SSH as long as Darc is installed on
-    the remote host. The following syntax is used to specify a remote store::
+    the remote host. The following syntax is used to specify a remote repository::
 
     $ darc list hostname:path
     $ darc extract hostname:path::archive-name
@@ -36,8 +36,8 @@ Archive
     A Darc archive is a collection of files along with metadata that include file
     permissions, directory structure and various file attributes.
 
-Store
-    A Darc store is a filesystem directory storing data from zero or more archives.
+Repository
+    A Darc repository is a filesystem directory storing data from zero or more archives.
     The data in a store is both deduplicated and encrypted making it both 
     efficient and safe.
 
@@ -49,10 +49,9 @@ Key file
 
 Requirements
 ------------
-* Python >= 2.5
-* pycrypto
+* Python >= 3.2
 * msgpack-python
-* paramiko (for remote store support)
+* pyxattr
 
 
 Installation
@@ -89,7 +88,7 @@ Initializing a store
 Before the first archive can be created a store needs to be initialized::
 
     $ darc init /data/my-backup.darc
-    Initializing store "/data/my-backup.darc"
+    Initializing repository at "/data/my-backup.darc"
     Key file password (Leave blank for no password): *****
     Key file password again: *****
     Key file "/home/YOU/.darc/keys/data_my_backup_darc" created.

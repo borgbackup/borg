@@ -7,16 +7,16 @@ import sys
 import getpass
 import unittest
 
-from .store import Store, StoreTestCase
+from .repository import Repository, RepositoryTestCase
 from .lrucache import LRUCache
 
 BUFSIZE = 10 * 1024 * 1024
 
 
-class StoreServer(object):
+class RepositoryServer(object):
 
     def __init__(self):
-        self.store = None
+        self.repository = None
 
     def serve(self):
         # Make stdin non-blocking
@@ -39,7 +39,7 @@ class StoreServer(object):
                         try:
                             f = getattr(self, method)
                         except AttributeError:
-                            f = getattr(self.store, method)
+                            f = getattr(self.repository, method)
                         res = f(*args)
                     except Exception as e:
                         sys.stdout.buffer.write(msgpack.packb((1, msgid, e.__class__.__name__, None)))
@@ -56,11 +56,11 @@ class StoreServer(object):
         path = os.fsdecode(path)
         if path.startswith('/~'):
             path = path[1:]
-        self.store = Store(os.path.expanduser(path), create)
-        return self.store.id
+        self.repository = Repository(os.path.expanduser(path), create)
+        return self.repository.id
 
 
-class RemoteStore(object):
+class RemoteRepository(object):
 
     class RPCError(Exception):
 
@@ -92,9 +92,9 @@ class RemoteStore(object):
             self.id = self.call('open', (location.path, create))
         except self.RPCError as e:
             if e.name == b'DoesNotExist':
-                raise Store.DoesNotExist
+                raise Repository.DoesNotExist
             elif e.name == b'AlreadyExists':
-                raise Store.AlreadyExists
+                raise Repository.AlreadyExists
 
     def __del__(self):
         self.close()
@@ -235,7 +235,7 @@ class RemoteStore(object):
                 return res
         except self.RPCError as e:
             if e.name == b'DoesNotExist':
-                raise Store.DoesNotExist
+                raise Repository.DoesNotExist
             raise
 
     def get_many(self, ids, peek=None):
@@ -264,15 +264,15 @@ class RemoteStore(object):
             self.p = None
 
 
-class RemoteStoreTestCase(StoreTestCase):
+class RemoteRepositoryTestCase(RepositoryTestCase):
 
     def open(self, create=False):
         from .helpers import Location
-        return RemoteStore(Location('localhost:' + os.path.join(self.tmppath, 'store')), create=create)
+        return RemoteRepository(Location('localhost:' + os.path.join(self.tmppath, 'repository')), create=create)
 
 
 def suite():
-    return unittest.TestLoader().loadTestsFromTestCase(RemoteStoreTestCase)
+    return unittest.TestLoader().loadTestsFromTestCase(RemoteRepositoryTestCase)
 
 if __name__ == '__main__':
     unittest.main()

@@ -22,12 +22,12 @@ class Manifest(object):
         self.config = {}
 
     @classmethod
-    def load(cls, store):
+    def load(cls, repository):
         from .key import key_factory
         manifest = cls()
-        manifest.store = store
-        cdata = store.get(manifest.MANIFEST_ID)
-        manifest.key = key = key_factory(store, cdata)
+        manifest.repository = repository
+        cdata = repository.get(manifest.MANIFEST_ID)
+        manifest.key = key = key_factory(repository, cdata)
         data = key.decrypt(None, cdata)
         manifest.id = key.id_hash(data)
         m = msgpack.unpackb(data)
@@ -44,7 +44,7 @@ class Manifest(object):
             'config': self.config,
         })
         self.id = self.key.id_hash(data)
-        self.store.put(self.MANIFEST_ID, self.key.encrypt(data))
+        self.repository.put(self.MANIFEST_ID, self.key.encrypt(data))
 
 
 def prune_split(archives, pattern, n, skip=[]):
@@ -81,13 +81,13 @@ class Statistics(object):
 
 
 def get_keys_dir():
-    """Determine where to store keys and cache"""
+    """Determine where to repository keys and cache"""
     return os.environ.get('DARC_KEYS_DIR',
                           os.path.join(os.path.expanduser('~'), '.darc', 'keys'))
 
 
 def get_cache_dir():
-    """Determine where to store keys and cache"""
+    """Determine where to repository keys and cache"""
     return os.environ.get('DARC_CACHE_DIR',
                           os.path.join(os.path.expanduser('~'), '.darc', 'cache'))
 
@@ -267,7 +267,7 @@ def group2gid(group):
 
 
 class Location(object):
-    """Object representing a store / archive location
+    """Object representing a repository / archive location
 
     >>> Location('ssh://user@host:1234/some/path::archive')
     Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive='archive')

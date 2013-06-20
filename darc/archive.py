@@ -81,11 +81,11 @@ class Archive(object):
     class AlreadyExists(Exception):
         pass
 
-    def __init__(self, store, key, manifest, name, cache=None, create=False,
+    def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False):
         self.cwd = os.getcwd()
         self.key = key
-        self.store = store
+        self.repository = repository
         self.cache = cache
         self.manifest = manifest
         self.items = BytesIO()
@@ -113,7 +113,7 @@ class Archive(object):
 
     def load(self, id):
         self.id = id
-        data = self.key.decrypt(self.id, self.store.get(self.id))
+        data = self.key.decrypt(self.id, self.repository.get(self.id))
         self.metadata = msgpack.unpackb(data)
         if self.metadata[b'version'] != 1:
             raise Exception('Unknown archive metadata version')
@@ -139,7 +139,7 @@ class Archive(object):
             i += n
             if not items:
                 break
-            for id, chunk in [(id, chunk) for id, chunk in zip_longest(items, self.store.get_many(items))]:
+            for id, chunk in [(id, chunk) for id, chunk in zip_longest(items, self.repository.get_many(items))]:
                 unpacker.feed(self.key.decrypt(id, chunk))
                 iter = ItemIter(unpacker, filter)
                 for item in iter:
@@ -195,7 +195,7 @@ class Archive(object):
         self.cache.add_chunk(self.id, data, self.stats)
         self.manifest.archives[name] = {'id': self.id, 'time': metadata['time']}
         self.manifest.write()
-        self.store.commit()
+        self.repository.commit()
         self.cache.commit()
 
     def calc_stats(self, cache):
@@ -209,7 +209,7 @@ class Archive(object):
         cache.begin_txn()
         stats = Statistics()
         add(self.id)
-        for id, chunk in zip_longest(self.metadata[b'items'], self.store.get_many(self.metadata[b'items'])):
+        for id, chunk in zip_longest(self.metadata[b'items'], self.repository.get_many(self.metadata[b'items'])):
             add(id)
             unpacker.feed(self.key.decrypt(id, chunk))
             for item in unpacker:
@@ -253,7 +253,7 @@ class Archive(object):
             else:
                 with open(path, 'wb') as fd:
                     ids = [id for id, size, csize in item[b'chunks']]
-                    for id, chunk in zip_longest(ids, self.store.get_many(ids, peek)):
+                    for id, chunk in zip_longest(ids, self.repository.get_many(ids, peek)):
                         data = self.key.decrypt(id, chunk)
                         fd.write(data)
                     self.restore_attrs(path, item, fd=fd.fileno())
@@ -319,7 +319,7 @@ class Archive(object):
             start(item)
             ids = [id for id, size, csize in item[b'chunks']]
             try:
-                for id, chunk in zip_longest(ids, self.store.get_many(ids, peek)):
+                for id, chunk in zip_longest(ids, self.repository.get_many(ids, peek)):
                     self.key.decrypt(id, chunk)
             except Exception:
                 result(item, False)
@@ -329,7 +329,7 @@ class Archive(object):
     def delete(self, cache):
         unpacker = msgpack.Unpacker(use_list=False)
         for id in self.metadata[b'items']:
-            unpacker.feed(self.key.decrypt(id, self.store.get(id)))
+            unpacker.feed(self.key.decrypt(id, self.repository.get(id)))
             for item in unpacker:
                 try:
                     for chunk_id, size, csize in item[b'chunks']:
@@ -340,7 +340,7 @@ class Archive(object):
         self.cache.chunk_decref(self.id)
         del self.manifest.archives[self.name]
         self.manifest.write()
-        self.store.commit()
+        self.repository.commit()
         cache.commit()
 
     def stat_attrs(self, st, path):
@@ -412,6 +412,6 @@ class Archive(object):
         self.add_item(item)
 
     @staticmethod
-    def list_archives(store, key, manifest, cache=None):
+    def list_archives(repository, key, manifest, cache=None):
         for name, info in manifest.archives.items():
-            yield Archive(store, key, manifest, name, cache=cache)
+            yield Archive(repository, key, manifest, name, cache=cache)

@@ -24,22 +24,22 @@ class HMAC(hmac.HMAC):
         self.inner.update(msg)
 
 
-def key_creator(store, args):
+def key_creator(repository, args):
     if args.keyfile:
-        return KeyfileKey.create(store, args)
+        return KeyfileKey.create(repository, args)
     elif args.passphrase:
-        return PassphraseKey.create(store, args)
+        return PassphraseKey.create(repository, args)
     else:
-        return PlaintextKey.create(store, args)
+        return PlaintextKey.create(repository, args)
 
 
-def key_factory(store, manifest_data):
+def key_factory(repository, manifest_data):
     if manifest_data[:1] == KEYFILE:
-        return KeyfileKey.detect(store, manifest_data)
+        return KeyfileKey.detect(repository, manifest_data)
     elif manifest_data[:1] == PASSPHRASE:
-        return PassphraseKey.detect(store, manifest_data)
+        return PassphraseKey.detect(repository, manifest_data)
     elif manifest_data[:1] == PLAINTEXT:
-        return PlaintextKey.detect(store, manifest_data)
+        return PlaintextKey.detect(repository, manifest_data)
     else:
         raise Exception('Unkown Key type %d' % ord(manifest_data[0]))
 
@@ -63,12 +63,12 @@ class PlaintextKey(KeyBase):
     chunk_seed = 0
 
     @classmethod
-    def create(cls, store, args):
+    def create(cls, repository, args):
         print('Encryption NOT enabled.\nUse the --key-file or --passphrase options to enable encryption.')
         return cls()
 
     @classmethod
-    def detect(cls, store, manifest_data):
+    def detect(cls, repository, manifest_data):
         return cls()
 
     def id_hash(self, data):
@@ -137,7 +137,7 @@ class PassphraseKey(AESKeyBase):
     iterations = 10000
 
     @classmethod
-    def create(cls, store, args):
+    def create(cls, repository, args):
         key = cls()
         passphrase = os.environ.get('DARC_PASSPHRASE')
         if passphrase is not None:
@@ -152,20 +152,20 @@ class PassphraseKey(AESKeyBase):
             passphrase2 = getpass('Enter same passphrase again: ')
             if passphrase != passphrase2:
                 print('Passphrases do not match')
-        key.init(store, passphrase)
+        key.init(repository, passphrase)
         if passphrase:
             print('Remember your passphrase. Your data will be inaccessible without it.')
         return key
 
     @classmethod
-    def detect(cls, store, manifest_data):
-        prompt = 'Enter passphrase for %s: ' % store._location.orig
+    def detect(cls, repository, manifest_data):
+        prompt = 'Enter passphrase for %s: ' % repository._location.orig
         key = cls()
         passphrase = os.environ.get('DARC_PASSPHRASE')
         if passphrase is None:
             passphrase = getpass(prompt)
         while True:
-            key.init(store, passphrase)
+            key.init(repository, passphrase)
             try:
                 key.decrypt(None, manifest_data)
                 key.init_ciphers(PREFIX + long_to_bytes(key.extract_iv(manifest_data) + 1000))
@@ -173,8 +173,8 @@ class PassphraseKey(AESKeyBase):
             except IntegrityError:
                 passphrase = getpass(prompt)
 
-    def init(self, store, passphrase):
-        self.init_from_random_data(pbkdf2_sha256(passphrase.encode('utf-8'), store.id, self.iterations, 100))
+    def init(self, repository, passphrase):
+        self.init_from_random_data(pbkdf2_sha256(passphrase.encode('utf-8'), repository.id, self.iterations, 100))
         self.init_ciphers()
 
 
@@ -185,9 +185,9 @@ class KeyfileKey(AESKeyBase):
     IV = PREFIX + long_to_bytes(1)
 
     @classmethod
-    def detect(cls, store, manifest_data):
+    def detect(cls, repository, manifest_data):
         key = cls()
-        path = cls.find_key_file(store)
+        path = cls.find_key_file(repository)
         prompt = 'Enter passphrase for key file %s: ' % path
         passphrase = os.environ.get('DARC_PASSPHRASE', '')
         while not key.load(path, passphrase):
@@ -196,8 +196,8 @@ class KeyfileKey(AESKeyBase):
         return key
 
     @classmethod
-    def find_key_file(cls, store):
-        id = hexlify(store.id).decode('ascii')
+    def find_key_file(cls, repository):
+        id = hexlify(repository.id).decode('ascii')
         keys_dir = get_keys_dir()
         for name in os.listdir(keys_dir):
             filename = os.path.join(keys_dir, name)
@@ -205,7 +205,7 @@ class KeyfileKey(AESKeyBase):
                 line = fd.readline().strip()
                 if line and line.startswith(cls.FILE_ID) and line[9:] == id:
                     return filename
-        raise Exception('Key file for store with ID %s not found' % id)
+        raise Exception('Key file for repository with ID %s not found' % id)
 
     def load(self, filename, passphrase):
         with open(filename, 'r') as fd:
@@ -215,7 +215,7 @@ class KeyfileKey(AESKeyBase):
             key = msgpack.unpackb(data)
             if key[b'version'] != 1:
                 raise IntegrityError('Invalid key file header')
-            self.store_id = key[b'store_id']
+            self.repository_id = key[b'repository_id']
             self.enc_key = key[b'enc_key']
             self.enc_hmac_key = key[b'enc_hmac_key']
             self.id_key = key[b'id_key']
@@ -253,7 +253,7 @@ class KeyfileKey(AESKeyBase):
     def save(self, path, passphrase):
         key = {
             'version': 1,
-            'store_id': self.store_id,
+            'repository_id': self.repository_id,
             'enc_key': self.enc_key,
             'enc_hmac_key': self.enc_hmac_key,
             'id_key': self.id_key,
@@ -261,7 +261,7 @@ class KeyfileKey(AESKeyBase):
         }
         data = self.encrypt_key_file(msgpack.packb(key), passphrase)
         with open(path, 'w') as fd:
-            fd.write('%s %s\n' % (self.FILE_ID, hexlify(self.store_id).decode('ascii')))
+            fd.write('%s %s\n' % (self.FILE_ID, hexlify(self.repository_id).decode('ascii')))
             fd.write(b2a_base64(data).decode('ascii'))
         self.path = path
 
@@ -276,8 +276,8 @@ class KeyfileKey(AESKeyBase):
         print('Key file "%s" updated' % self.path)
 
     @classmethod
-    def create(cls, store, args):
-        filename = args.store.to_key_filename()
+    def create(cls, repository, args):
+        filename = args.repository.to_key_filename()
         path = filename
         i = 1
         while os.path.exists(path):
@@ -294,7 +294,7 @@ class KeyfileKey(AESKeyBase):
             if passphrase != passphrase2:
                 print('Passphrases do not match')
         key = cls()
-        key.store_id = store.id
+        key.repository_id = repository.id
         key.init_from_random_data(get_random_bytes(100))
         key.init_ciphers()
         key.save(path, passphrase)
@@ -312,7 +312,7 @@ class KeyTestCase(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmppath)
 
-    class MockStore(object):
+    class MockRepository(object):
         class _Location(object):
             orig = '/some/place'
 
@@ -334,13 +334,13 @@ class KeyTestCase(unittest.TestCase):
 
     def test_keyfile(self):
         class MockArgs(object):
-            store = Location(tempfile.mkstemp()[1])
+            repository = Location(tempfile.mkstemp()[1])
         os.environ['DARC_PASSPHRASE'] = 'test'
-        key = KeyfileKey.create(self.MockStore(), MockArgs())
+        key = KeyfileKey.create(self.MockRepository(), MockArgs())
         self.assertEqual(bytes_to_long(key.enc_cipher.iv, 8), 0)
         manifest = key.encrypt(b'')
         iv = key.extract_iv(manifest)
-        key2 = KeyfileKey.detect(self.MockStore(), manifest)
+        key2 = KeyfileKey.detect(self.MockRepository(), manifest)
         self.assertEqual(bytes_to_long(key2.enc_cipher.iv, 8), iv + 1000)
         # Key data sanity check
         self.assertEqual(len(set([key2.id_key, key2.enc_key, key2.enc_hmac_key])), 3)
@@ -350,7 +350,7 @@ class KeyTestCase(unittest.TestCase):
 
     def test_passphrase(self):
         os.environ['DARC_PASSPHRASE'] = 'test'
-        key = PassphraseKey.create(self.MockStore(), None)
+        key = PassphraseKey.create(self.MockRepository(), None)
         self.assertEqual(bytes_to_long(key.enc_cipher.iv, 8), 0)
         self.assertEqual(hexlify(key.id_key), b'f28e915da78a972786da47fee6c4bd2960a421b9bdbdb35a7942eb82552e9a72')
         self.assertEqual(hexlify(key.enc_hmac_key), b'169c6082f209e524ea97e2c75318936f6e93c101b9345942a95491e9ae1738ca')
@@ -358,7 +358,7 @@ class KeyTestCase(unittest.TestCase):
         self.assertEqual(key.chunk_seed, -324662077)
         manifest = key.encrypt(b'')
         iv = key.extract_iv(manifest)
-        key2 = PassphraseKey.detect(self.MockStore(), manifest)
+        key2 = PassphraseKey.detect(self.MockRepository(), manifest)
         self.assertEqual(bytes_to_long(key2.enc_cipher.iv, 8), iv + 1000)
         self.assertEqual(key.id_key, key2.id_key)
         self.assertEqual(key.enc_hmac_key, key2.enc_hmac_key)

@@ -4,6 +4,7 @@ import os
 import msgpack
 import shutil
 import tempfile
+import textwrap
 import unittest
 import hmac
 from hashlib import sha256
@@ -182,8 +183,6 @@ class KeyfileKey(AESKeyBase):
     FILE_ID = 'DARC KEY'
     TYPE = KEYFILE
 
-    IV = PREFIX + long_to_bytes(1)
-
     @classmethod
     def detect(cls, repository, manifest_data):
         key = cls()
@@ -226,25 +225,24 @@ class KeyfileKey(AESKeyBase):
     def decrypt_key_file(self, data, passphrase):
         d = msgpack.unpackb(data)
         assert d[b'version'] == 1
-        assert d[b'algorithm'] == b'SHA256'
+        assert d[b'algorithm'] == b'sha256'
         key = pbkdf2_sha256(passphrase.encode('utf-8'), d[b'salt'], d[b'iterations'], 32)
-        data = AES(key, self.IV).decrypt(d[b'data'])
+        data = AES(key).decrypt(d[b'data'])
         if HMAC(key, data, sha256).digest() != d[b'hash']:
             return None
         return data
 
     def encrypt_key_file(self, data, passphrase):
         salt = get_random_bytes(32)
-        iterations = 10000
+        iterations = 100000
         key = pbkdf2_sha256(passphrase.encode('utf-8'), salt, iterations, 32)
         hash = HMAC(key, data, sha256).digest()
-        cdata = AES(key, self.IV).encrypt(data)
-#        cdata = AES.new(key, AES.MODE_CTR, counter=Counter.new(128)).encrypt(data)
+        cdata = AES(key).encrypt(data)
         d = {
             'version': 1,
             'salt': salt,
             'iterations': iterations,
-            'algorithm': 'SHA256',
+            'algorithm': 'sha256',
             'hash': hash,
             'data': cdata,
         }
@@ -262,7 +260,7 @@ class KeyfileKey(AESKeyBase):
         data = self.encrypt_key_file(msgpack.packb(key), passphrase)
         with open(path, 'w') as fd:
             fd.write('%s %s\n' % (self.FILE_ID, hexlify(self.repository_id).decode('ascii')))
-            fd.write(b2a_base64(data).decode('ascii'))
+            fd.write('\n'.join(textwrap.wrap(b2a_base64(data).decode('ascii'))))
         self.path = path
 
     def change_passphrase(self):

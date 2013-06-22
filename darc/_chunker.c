@@ -116,17 +116,19 @@ chunker_free(Chunker *c)
 static int
 chunker_fill(Chunker *c)
 {
+    size_t n;
     memmove(c->data, c->data + c->last, c->position + c->remaining - c->last);
     c->position -= c->last;
     c->last = 0;
-    if(c->eof) {
+    n = c->buf_size - c->position - c->remaining;
+    if(c->eof || n == 0) {
         return 1;
     }
-    PyObject *data = PyObject_CallMethod(c->fd, "read", "i", c->buf_size - c->position - c->remaining);
+    PyObject *data = PyObject_CallMethod(c->fd, "read", "i", n);
     if(!data) {
         return 0;
     }
-    int n = PyBytes_Size(data);
+    n = PyBytes_Size(data);
     if(n) {
         memcpy(c->data + c->position + c->remaining, PyBytes_AsString(data), n);
         c->remaining += n;

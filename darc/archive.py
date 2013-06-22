@@ -49,10 +49,11 @@ class ItemIter(object):
         return item
 
     def get_next(self):
-        n = next(self.unpacker)
-        while self.filter and not self.filter(n):
+        while True:
             n = next(self.unpacker)
-        return n
+            decode_dict(n, (b'path', b'source', b'user', b'group'))
+            if not self.filter or self.filter(n):
+                return n
 
     def peek(self):
         while True:
@@ -143,7 +144,6 @@ class Archive(object):
                 unpacker.feed(self.key.decrypt(id, chunk))
                 iter = ItemIter(unpacker, filter)
                 for item in iter:
-                    decode_dict(item, (b'path', b'source', b'user', b'group'))
                     yield item, iter.peek
 
     def add_item(self, item):

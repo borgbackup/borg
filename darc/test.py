@@ -137,6 +137,18 @@ class Test(unittest.TestCase):
         # end the same way as info_output
         assert info_output2.endswith(info_output)
 
+    def test_extract_include_exclude(self):
+        self.darc('init', self.repository_location)
+        self.create_regual_file('file1', size=1024 * 80)
+        self.create_regual_file('file2', size=1024 * 80)
+        self.create_regual_file('file3', size=1024 * 80)
+        self.create_regual_file('file4', size=1024 * 80)
+        self.darc('create', '--exclude=input/file4', self.repository_location + '::test', 'input')
+        self.darc('extract', '--include=file1', self.repository_location + '::test', 'output')
+        self.assertEqual(sorted(os.listdir('output/input')), ['file1'])
+        self.darc('extract', '--exclude=file2', self.repository_location + '::test', 'output')
+        self.assertEqual(sorted(os.listdir('output/input')), ['file1', 'file3'])
+
     def test_overwrite(self):
         self.create_regual_file('file1', size=1024 * 80)
         self.create_regual_file('dir2/file2', size=1024 * 80)
@@ -222,10 +234,11 @@ def suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.TestLoader().loadTestsFromTestCase(ChunkTest))
     suite.addTest(unittest.TestLoader().loadTestsFromTestCase(Test))
-    suite.addTest(unittest.TestLoader().loadTestsFromTestCase(RemoteTest))
+    if not '--no-remote' in sys.argv:
+        suite.addTest(unittest.TestLoader().loadTestsFromTestCase(RemoteTest))
+        suite.addTest(RemoteRepositorySuite())
     suite.addTest(KeySuite())
     suite.addTest(RepositorySuite())
-    suite.addTest(RemoteRepositorySuite())
     suite.addTest(doctest.DocTestSuite(helpers))
     suite.addTest(lrucache.suite())
     suite.addTest(crypto.suite())

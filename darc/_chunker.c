@@ -78,7 +78,7 @@ typedef struct {
     uint32_t *table;
     uint8_t *data;
     PyObject *fd;
-    int done;
+    int done, eof;
     size_t remaining, bytes_read, bytes_yielded, position, last;
 } Chunker;
 
@@ -100,6 +100,7 @@ chunker_init(PyObject *fd, int window_size, int chunk_mask, int min_size, uint32
     c->bytes_yielded = 0;
     c->position = 0;
     c->last = 0;
+    c->eof = 0;
     return c;
 }
 
@@ -118,14 +119,22 @@ chunker_fill(Chunker *c)
     memmove(c->data, c->data + c->last, c->position + c->remaining - c->last);
     c->position -= c->last;
     c->last = 0;
+    if(c->eof) {
+        return 1;
+    }
     PyObject *data = PyObject_CallMethod(c->fd, "read", "i", c->buf_size - c->position - c->remaining);
     if(!data) {
         return 0;
     }
     int n = PyBytes_Size(data);
-    memcpy(c->data + c->position + c->remaining, PyBytes_AsString(data), n);
-    c->remaining += n;
-    c->bytes_read += n;
+    if(n) {
+        memcpy(c->data + c->position + c->remaining, PyBytes_AsString(data), n);
+        c->remaining += n;
+        c->bytes_read += n;
+    }
+    else {
+        c->eof = 1;
+    }
     Py_DECREF(data);
     return 1;
 }
@@ -176,7 +185,7 @@ chunker_process(Chunker *c)
         }
     }
     sum = buzhash(c->data + c->position, window_size, c->table);
-    while(c->remaining >= c->window_size && ((sum & chunk_mask) || n < min_size)) {
+    while(c->remaining > c->window_size && ((sum & chunk_mask) || n < min_size)) {
         sum = buzhash_update(sum, c->data[c->position],
                              c->data[c->position + window_size],
                              window_size, c->table);

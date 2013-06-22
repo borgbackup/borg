@@ -388,7 +388,7 @@ class Archive(object):
                 return
             else:
                 self.hard_links[st.st_ino, st.st_dev] = safe_path
-        path_hash = self.key.id_hash(path.encode('utf-8', 'surrogateescape'))
+        path_hash = self.key.id_hash(os.path.join(self.cwd, path).encode('utf-8', 'surrogateescape'))
         ids = cache.file_known_and_unchanged(path_hash, st)
         chunks = None
         if ids is not None:

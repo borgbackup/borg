@@ -10,14 +10,9 @@ if sys.version_info < min_python:
     print("Darc requires Python %d.%d or later" % min_python)
     sys.exit(1)
 
-try:
-    import Cython
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "fake_pyrex"))
-except ImportError:
-    pass
-
-from distutils.core import setup
-from distutils.extension import Extension
+#from distutils.core import setup
+#from distutils.extension import Extension
+from setuptools import setup, Extension
 from distutils.command.sdist import sdist
 
 chunker_source = 'darc/chunker.pyx'
@@ -35,27 +30,44 @@ try:
             sdist.__init__(self, *args, **kwargs)
 
         def make_distribution(self):
-            self.filelist += ['darc/chunker.c', 'darc/chunker.h', 'darc/hashindex.c', 'darc/hashindex.h']
-            sdist.make_distribution(self)
+            self.filelist.extend(['darc/chunker.c', 'darc/_chunker.c', 'darc/hashindex.c', 'darc/_hashindex.c'])
+            super(Sdist, self).make_distribution()
 
 except ImportError:
+    class Sdist(sdist):
+        def __init__(self, *args, **kwargs):
+            raise Exception('Cython is required to run sdist')
+
     chunker_source = chunker_source.replace('.pyx', '.c')
     hashindex_source = hashindex_source.replace('.pyx', '.c')
     from distutils.command.build_ext import build_ext
-    Sdist = sdist
     if not os.path.exists(chunker_source) or not os.path.exists(hashindex_source):
         raise ImportError('The GIT version of darc needs Cython. Install Cython or use a released version')
 
-setup(name='darc',
-      version=darc.__version__,
-      author='Jonas Borgström',
-      author_email='jonas@borgstrom.se',
-      url='http://github.com/jborg/darc/',
-      packages=['darc'],
-      cmdclass={'build_ext': build_ext, 'sdist': Sdist},
-      ext_modules=[
-      Extension('darc.chunker', [chunker_source]),
-      Extension('darc.hashindex', [hashindex_source])],
-      scripts=['scripts/darc'],
-    )
-
+setup(
+    name='Darc',
+    version=darc.__version__,
+    author='Jonas Borgström',
+    author_email='jonas@borgstrom.se',
+    url='http://github.com/jborg/darc/',
+    description='Deduplicating ARChiver written in Python',
+    license='BSD',
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Environment :: Console',
+        'Intended Audience :: System Administrators',
+        'License :: OSI Approved :: BSD License',
+        'Operating System :: POSIX',
+        'Programming Language :: Python',
+        'Topic :: Security :: Cryptography',
+        'Topic :: System :: Archiving :: Backup',
+    ],
+    packages=['darc'],
+    scripts=['scripts/darc'],
+    cmdclass={'build_ext': build_ext, 'sdist': Sdist},
+    ext_modules=[
+        Extension('darc.chunker', [chunker_source]),
+        Extension('darc.hashindex', [hashindex_source])
+    ],
+    install_requires=['msgpack-python', 'pyxattr']
+)

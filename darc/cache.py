@@ -27,6 +27,9 @@ class Cache(object):
             self.sync()
             self.commit()
 
+    def __del__(self):
+        self.close()
+
     def create(self):
         """Create a new empty repository at `path`
         """
@@ -58,6 +61,9 @@ class Cache(object):
         self.manifest_id = unhexlify(self.config.get('cache', 'manifest').encode('ascii'))  # .encode needed for Python 3.[0-2]
         self.chunks = ChunkIndex(os.path.join(self.path, 'chunks').encode('utf-8'))
         self.files = None
+
+    def close(self):
+        self.lock_fd.close()
 
     def _read_files(self):
         self.files = {}

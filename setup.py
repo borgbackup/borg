@@ -62,7 +62,7 @@ setup(
         'Topic :: Security :: Cryptography',
         'Topic :: System :: Archiving :: Backup',
     ],
-    packages=['darc'],
+    packages=['darc', 'darc.testsuite'],
     scripts=['scripts/darc'],
     cmdclass={'build_ext': build_ext, 'sdist': Sdist},
     ext_modules=[

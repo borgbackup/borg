@@ -1,5 +1,4 @@
 from heapq import heappush, heapify, heapreplace, heappop
-import unittest
 
 
 class LRUCache(dict):
@@ -44,50 +43,3 @@ class LRUCache(dict):
     def _not_implemented(self, *args, **kw):
         raise NotImplementedError
     popitem = setdefault = update = _not_implemented
-
-
-class LRUCacheTestCase(unittest.TestCase):
-
-    def test(self):
-        c = LRUCache(2)
-        self.assertEqual(len(c), 0)
-        for i, x in enumerate('abc'):
-            c[x] = i
-        self.assertEqual(len(c), 2)
-        self.assertEqual(set(c), set(['b', 'c']))
-        self.assertEqual(set(c.items()), set([('b', 1), ('c', 2)]))
-        self.assertEqual(False, 'a' in c)
-        self.assertEqual(True, 'b' in c)
-        self.assertRaises(KeyError, lambda: c['a'])
-        self.assertEqual(c['b'], 1)
-        self.assertEqual(c['c'], 2)
-        c['d'] = 3
-        self.assertEqual(len(c), 2)
-        self.assertEqual(c['c'], 2)
-        self.assertEqual(c['d'], 3)
-        c['c'] = 22
-        c['e'] = 4
-        self.assertEqual(len(c), 2)
-        self.assertRaises(KeyError, lambda: c['d'])
-        self.assertEqual(c['c'], 22)
-        self.assertEqual(c['e'], 4)
-        del c['c']
-        self.assertEqual(len(c), 1)
-        self.assertRaises(KeyError, lambda: c['c'])
-        self.assertEqual(c['e'], 4)
-
-    def test_pop(self):
-        c = LRUCache(2)
-        c[1] = 1
-        c[2] = 2
-        c.pop(1)
-        c[3] = 3
-
-
-def suite():
-    return unittest.TestLoader().loadTestsFromTestCase(LRUCacheTestCase)
-
-
-if __name__ == '__main__':
-    unittest.main()
-

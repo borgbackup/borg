@@ -5,9 +5,8 @@ import select
 from subprocess import Popen, PIPE
 import sys
 import getpass
-import unittest
 
-from .repository import Repository, RepositoryTestCase
+from .repository import Repository
 from .lrucache import LRUCache
 
 BUFSIZE = 10 * 1024 * 1024
@@ -262,18 +261,3 @@ class RemoteRepository(object):
             self.p.stdout.close()
             self.p.wait()
             self.p = None
-
-
-class RemoteRepositoryTestCase(RepositoryTestCase):
-
-    def open(self, create=False):
-        from .helpers import Location
-        return RemoteRepository(Location('localhost:' + os.path.join(self.tmppath, 'repository')), create=create)
-
-
-def suite():
-    return unittest.TestLoader().loadTestsFromTestCase(RemoteRepositoryTestCase)
-
-if __name__ == '__main__':
-    unittest.main()
-

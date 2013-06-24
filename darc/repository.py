@@ -41,9 +41,13 @@ class Repository(object):
 
     def __init__(self, path, create=False):
         self.io = None
+        self.lock_fd = None
         if create:
             self.create(path)
         self.open(path)
+
+    def __del__(self):
+        self.close()
 
     def create(self, path):
         """Create a new empty repository at `path`
@@ -81,8 +85,10 @@ class Repository(object):
         self.rollback()
 
     def close(self):
-        self.rollback()
-        self.lock_fd.close()
+        if self.lock_fd:
+            self.rollback()
+            self.lock_fd.close()
+            self.lock_fd = None
 
     def commit(self, rollback=True):
         """Commit transaction
@@ -413,91 +419,3 @@ class LoggedIO(object):
             os.fsync(self._write_fd)
             self._write_fd.close()
             self._write_fd = None
-
-
-class RepositoryTestCase(unittest.TestCase):
-
-    def open(self, create=False):
-        return Repository(os.path.join(self.tmppath, 'repository'), create=create)
-
-    def setUp(self):
-        self.tmppath = tempfile.mkdtemp()
-        self.repository = self.open(create=True)
-
-    def tearDown(self):
-        self.repository.close()
-        shutil.rmtree(self.tmppath)
-
-    def test1(self):
-        for x in range(100):
-            self.repository.put(('%-32d' % x).encode('ascii'), b'SOMEDATA')
-        key50 = ('%-32d' % 50).encode('ascii')
-        self.assertEqual(self.repository.get(key50), b'SOMEDATA')
-        self.repository.delete(key50)
-        self.assertRaises(Repository.DoesNotExist, lambda: self.repository.get(key50))
-        self.repository.commit()
-        self.repository.close()
-        repository2 = self.open()
-        self.assertRaises(Repository.DoesNotExist, lambda: repository2.get(key50))
-        for x in range(100):
-            if x == 50:
-                continue
-            self.assertEqual(repository2.get(('%-32d' % x).encode('ascii')), b'SOMEDATA')
-        repository2.close()
-
-    def test2(self):
-        """Test multiple sequential transactions
-        """
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
-        self.repository.put(b'00000000000000000000000000000001', b'foo')
-        self.repository.commit()
-        self.repository.delete(b'00000000000000000000000000000000')
-        self.repository.put(b'00000000000000000000000000000001', b'bar')
-        self.repository.commit()
-        self.assertEqual(self.repository.get(b'00000000000000000000000000000001'), b'bar')
-
-    def test_consistency(self):
-        """Test cache consistency
-        """
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
-        self.assertEqual(self.repository.get(b'00000000000000000000000000000000'), b'foo')
-        self.repository.put(b'00000000000000000000000000000000', b'foo2')
-        self.assertEqual(self.repository.get(b'00000000000000000000000000000000'), b'foo2')
-        self.repository.put(b'00000000000000000000000000000000', b'bar')
-        self.assertEqual(self.repository.get(b'00000000000000000000000000000000'), b'bar')
-        self.repository.delete(b'00000000000000000000000000000000')
-        self.assertRaises(Repository.DoesNotExist, lambda: self.repository.get(b'00000000000000000000000000000000'))
-
-    def test_consistency2(self):
-        """Test cache consistency2
-        """
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
-        self.assertEqual(self.repository.get(b'00000000000000000000000000000000'), b'foo')
-        self.repository.commit()
-        self.repository.put(b'00000000000000000000000000000000', b'foo2')
-        self.assertEqual(self.repository.get(b'00000000000000000000000000000000'), b'foo2')
-        self.repository.rollback()
-        self.assertEqual(self.repository.get(b'00000000000000000000000000000000'), b'foo')
-
-    def test_single_kind_transactions(self):
-        # put
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
-        self.repository.commit()
-        self.repository.close()
-        # replace
-        self.repository = self.open()
-        self.repository.put(b'00000000000000000000000000000000', b'bar')
-        self.repository.commit()
-        self.repository.close()
-        # delete
-        self.repository = self.open()
-        self.repository.delete(b'00000000000000000000000000000000')
-        self.repository.commit()
-
-
-
-def suite():
-    return unittest.TestLoader().loadTestsFromTestCase(RepositoryTestCase)
-
-if __name__ == '__main__':
-    unittest.main()

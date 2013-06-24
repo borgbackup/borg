@@ -114,21 +114,6 @@ def exclude_path(path, patterns):
 
 class IncludePattern(object):
     """--include PATTERN
-
-    >>> py = IncludePattern('*.py')
-    >>> foo = IncludePattern('/foo')
-    >>> py.match('/foo/foo.py')
-    True
-    >>> py.match('/bar/foo.java')
-    False
-    >>> foo.match('/foo/foo.py')
-    True
-    >>> foo.match('/bar/foo.java')
-    False
-    >>> foo.match('/foobar/foo.py')
-    False
-    >>> foo.match('/foo')
-    True
     """
     def __init__(self, pattern):
         self.pattern = self.dirpattern = pattern
@@ -172,12 +157,6 @@ def format_time(t):
 
 def format_timedelta(td):
     """Format timedelta in a human friendly format
-
-    >>> from datetime import datetime
-    >>> t0 = datetime(2001, 1, 1, 10, 20, 3, 0)
-    >>> t1 = datetime(2001, 1, 1, 12, 20, 4, 100000)
-    >>> format_timedelta(t1 - t0)
-    '2 hours 1.10 seconds'
     """
     # Since td.total_seconds() requires python 2.7
     ts = (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10 ** 6) / float(10 ** 6)
@@ -268,15 +247,6 @@ def group2gid(group):
 
 class Location(object):
     """Object representing a repository / archive location
-
-    >>> Location('ssh://user@host:1234/some/path::archive')
-    Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive='archive')
-    >>> Location('file:///some/path::archive')
-    Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')
-    >>> Location('user@host:/some/path::archive')
-    Location(proto='ssh', user='user', host='host', port=22, path='/some/path', archive='archive')
-    >>> Location('/some/path::archive')
-    Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')
     """
     proto = user = host = port = path = archive = None
     ssh_re = re.compile(r'(?P<proto>ssh)://(?:(?P<user>[^@]+)@)?'

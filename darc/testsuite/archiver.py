@@ -1,26 +1,23 @@
-import doctest
 import filecmp
 import os
-from io import BytesIO, StringIO
+from io import StringIO
 import stat
 import sys
 import shutil
 import tempfile
-import unittest
 import xattr
 
-from . import helpers, lrucache, crypto
-from .chunker import chunkify, buzhash, buzhash_update
-from .archiver import Archiver
-from .key import suite as KeySuite
-from .repository import Repository, suite as RepositorySuite
-from .remote import Repository, suite as RemoteRepositorySuite
+from darc.archiver import Archiver
+from darc.repository import Repository
+from darc.testsuite import DarcTestCase
 
 has_mtime_ns = sys.version >= '3.3'
 utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
 
+src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__), '..', '..')
 
-class Test(unittest.TestCase):
+
+class ArchiverTestCase(DarcTestCase):
 
     prefix = ''
 
@@ -55,13 +52,12 @@ class Test(unittest.TestCase):
             sys.stdout, sys.stderr = stdout, stderr
             if ret != exit_code:
                 print(output.getvalue())
-            self.assertEqual(exit_code, ret)
+            self.assert_equal(exit_code, ret)
             return output.getvalue()
         finally:
             sys.stdout, sys.stderr = stdout, stderr
 
     def create_src_archive(self, name):
-        src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__), '..')
         self.darc('init', self.repository_location)
         self.darc('create', self.repository_location + '::' + name, src_dir)
 
@@ -80,9 +76,9 @@ class Test(unittest.TestCase):
 
     def diff_dirs(self, dir1, dir2):
         diff = filecmp.dircmp(dir1, dir2)
-        self.assertEqual(diff.left_only, [])
-        self.assertEqual(diff.right_only, [])
-        self.assertEqual(diff.diff_files, [])
+        self.assert_equal(diff.left_only, [])
+        self.assert_equal(diff.right_only, [])
+        self.assert_equal(diff.diff_files, [])
         for filename in diff.common:
             path1 = os.path.join(dir1, filename)
             path2 = os.path.join(dir2, filename)
@@ -99,7 +95,7 @@ class Test(unittest.TestCase):
                 d2[-1] = round(d2[-1], 4)
             d1.append(self.get_xattrs(path1))
             d2.append(self.get_xattrs(path2))
-            self.assertEqual(d1, d2)
+            self.assert_equal(d1, d2)
 
     def test_basic_functionality(self):
         # File
@@ -127,8 +123,8 @@ class Test(unittest.TestCase):
         self.darc('create', self.repository_location + '::test', 'input')
         self.darc('create', self.repository_location + '::test.2', 'input')
         self.darc('extract', self.repository_location + '::test', 'output')
-        self.assertEqual(len(self.darc('list', self.repository_location).splitlines()), 2)
-        self.assertEqual(len(self.darc('list', self.repository_location + '::test').splitlines()), 9)
+        self.assert_equal(len(self.darc('list', self.repository_location).splitlines()), 2)
+        self.assert_equal(len(self.darc('list', self.repository_location + '::test').splitlines()), 9)
         self.diff_dirs('input', 'output/input')
         info_output = self.darc('info', self.repository_location + '::test')
         shutil.rmtree(self.cache_path)
@@ -145,9 +141,9 @@ class Test(unittest.TestCase):
         self.create_regual_file('file4', size=1024 * 80)
         self.darc('create', '--exclude=input/file4', self.repository_location + '::test', 'input')
         self.darc('extract', '--include=file1', self.repository_location + '::test', 'output')
-        self.assertEqual(sorted(os.listdir('output/input')), ['file1'])
+        self.assert_equal(sorted(os.listdir('output/input')), ['file1'])
         self.darc('extract', '--exclude=file2', self.repository_location + '::test', 'output')
-        self.assertEqual(sorted(os.listdir('output/input')), ['file1', 'file3'])
+        self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file3'])
 
     def test_overwrite(self):
         self.create_regual_file('file1', size=1024 * 80)
@@ -179,7 +175,7 @@ class Test(unittest.TestCase):
         self.darc('delete', self.repository_location + '::test.2')
         # Make sure all data except the manifest has been deleted
         repository = Repository(self.repository_path)
-        self.assertEqual(repository._len(), 1)
+        self.assert_equal(repository._len(), 1)
 
     def test_corrupted_repository(self):
         self.create_src_archive('test')
@@ -192,7 +188,6 @@ class Test(unittest.TestCase):
         self.darc('verify', self.repository_location + '::test', exit_code=1)
 
     def test_prune_repository(self):
-        src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__))
         self.darc('init', self.repository_location)
         self.darc('create', self.repository_location + '::test1', src_dir)
         self.darc('create', self.repository_location + '::test2', src_dir)
@@ -202,47 +197,5 @@ class Test(unittest.TestCase):
         assert 'test2' in output
 
 
-class ChunkTest(unittest.TestCase):
-
-    def test_chunkify(self):
-        data = b'0' * 1024 * 1024 * 15 + b'Y'
-        parts = [bytes(c) for c in chunkify(BytesIO(data), 2, 0x3, 2, 0)]
-        self.assertEqual(len(parts), 2)
-        self.assertEqual(b''.join(parts), data)
-        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b''), 2, 0x3, 2, 0)], [])
-        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 2, 0x3, 2, 0)], [b'fooba', b'rboobaz', b'fooba', b'rboobaz', b'fooba', b'rboobaz'])
-        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 2, 0x3, 2, 1)], [b'fo', b'obarb', b'oob', b'azf', b'oobarb', b'oob', b'azf', b'oobarb', b'oobaz'])
-        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 2, 0x3, 2, 2)], [b'foob', b'ar', b'boobazfoob', b'ar', b'boobazfoob', b'ar', b'boobaz'])
-        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 3, 0x3, 3, 0)], [b'foobarboobaz' * 3])
-        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 3, 0x3, 3, 1)], [b'foobar', b'boo', b'bazfo', b'obar', b'boo', b'bazfo', b'obar', b'boobaz'])
-        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 3, 0x3, 3, 2)], [b'foo', b'barboobaz', b'foo', b'barboobaz', b'foo', b'barboobaz'])
-        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 3, 0x3, 4, 0)], [b'foobarboobaz' * 3])
-        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 3, 0x3, 4, 1)], [b'foobar', b'boobazfo', b'obar', b'boobazfo', b'obar', b'boobaz'])
-        self.assertEqual([bytes(c) for c in chunkify(BytesIO(b'foobarboobaz' * 3), 3, 0x3, 4, 2)], [b'foob', b'arboobaz', b'foob', b'arboobaz', b'foob', b'arboobaz'])
-
-    def test_buzhash(self):
-        self.assertEqual(buzhash(b'abcdefghijklmnop', 0), 3795437769)
-        self.assertEqual(buzhash(b'abcdefghijklmnop', 1), 3795400502)
-        self.assertEqual(buzhash(b'abcdefghijklmnop', 1), buzhash_update(buzhash(b'Xabcdefghijklmno', 1), ord('X'), ord('p'), 16, 1))
-
-
-class RemoteTest(Test):
+class RemoteArchiverTestCase(ArchiverTestCase):
     prefix = 'localhost:'
-
-
-def suite():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.TestLoader().loadTestsFromTestCase(ChunkTest))
-    suite.addTest(unittest.TestLoader().loadTestsFromTestCase(Test))
-    if not '--no-remote' in sys.argv:
-        suite.addTest(unittest.TestLoader().loadTestsFromTestCase(RemoteTest))
-        suite.addTest(RemoteRepositorySuite())
-    suite.addTest(KeySuite())
-    suite.addTest(RepositorySuite())
-    suite.addTest(doctest.DocTestSuite(helpers))
-    suite.addTest(lrucache.suite())
-    suite.addTest(crypto.suite())
-    return suite
-
-if __name__ == '__main__':
-    unittest.TextTestRunner(verbosity=2).run(suite())

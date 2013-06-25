@@ -40,15 +40,15 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Darc - Deduplicating Archiver'
-copyright = u'2010-2011, Jonas Borgström'
+project = 'Darc - Deduplicating Archiver'
+copyright = '2010-2013, Jonas Borgström'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
 # The short X.Y version.
-version = darc.__release__
+version = darc.__version__
 # The full version, including alpha/beta/rc tags.
 release = darc.__release__
 
@@ -178,8 +178,8 @@ htmlhelp_basename = 'Darcdoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'Darc.tex', u'Darc Documentation',
-   u'Jonas Borgström', 'manual'),
+  ('index', 'Darc.tex', 'Darc Documentation',
+   'Jonas Borgström', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -211,6 +211,6 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'darc', u'Darc Documentation',
-     [u'Jonas Borgström'], 1)
+    ('index', 'darc', 'Darc Documentation',
+     ['Jonas Borgström'], 1)
 ]

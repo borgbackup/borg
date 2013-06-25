@@ -46,7 +46,7 @@ except ImportError:
 
 setup(
     name='Darc',
-    version=darc.__version__,
+    version=darc.__release__,
     author='Jonas Borgström',
     author_email='jonas@borgstrom.se',
     url='http://github.com/jborg/darc/',

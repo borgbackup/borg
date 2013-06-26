@@ -128,3 +128,12 @@ doctest:
 	$(SPHINXBUILD) -b doctest $(ALLSPHINXOPTS) $(BUILDDIR)/doctest
 	@echo "Testing of doctests in the sources finished, look at the " \
 	      "results in $(BUILDDIR)/doctest/output.txt."
+
+gh-pages: html
+	GH_PAGES_CLONE="`mktemp -d`" && \
+	git clone --branch gh-pages `git rev-parse --show-toplevel` $$GH_PAGES_CLONE && \
+	(cd $$GH_PAGES_CLONE && git rm -r *) && \
+	cp -r _build/html/* $$GH_PAGES_CLONE && \
+	(cd $$GH_PAGES_CLONE && git add -A && git commit -m 'Updated gh-pages' && git push) && \
+	rm -rf $$GH_PAGES_CLONE
+

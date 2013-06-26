@@ -89,7 +89,7 @@ def get_keys_dir():
 def get_cache_dir():
     """Determine where to repository keys and cache"""
     return os.environ.get('DARC_CACHE_DIR',
-                          os.path.join(os.path.expanduser('~'), '.darc', 'cache'))
+                          os.path.join(os.path.expanduser('~'), '.cache', 'darc'))
 
 
 def to_localtime(ts):

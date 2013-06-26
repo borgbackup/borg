@@ -12,7 +12,7 @@ from .cache import Cache
 from .key import key_creator
 from .helpers import location_validator, format_time, \
     format_file_mode, IncludePattern, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
-    get_cache_dir, format_timedelta, prune_split, Manifest, Location, remove_surrogates
+    get_cache_dir, get_keys_dir, format_timedelta, prune_split, Manifest, Location, remove_surrogates
 from .remote import RepositoryServer, RemoteRepository
 
 
@@ -281,11 +281,14 @@ class Archiver(object):
         return self.exit_code
 
     def run(self, args=None):
-        dot_path = os.path.join(os.path.expanduser('~'), '.darc')
-        if not os.path.exists(dot_path):
-            os.mkdir(dot_path)
-            os.mkdir(os.path.join(dot_path, 'keys'))
-            os.mkdir(os.path.join(dot_path, 'cache'))
+        keys_dir = get_keys_dir()
+        if not os.path.exists(keys_dir):
+            os.makedirs(keys_dir)
+            os.chmod(keys_dir, stat.S_IRWXU)
+        cache_dir = get_cache_dir()
+        if not os.path.exists(cache_dir):
+            os.makedirs(cache_dir)
+            os.chmod(cache_dir, stat.S_IRWXU)
         common_parser = argparse.ArgumentParser(add_help=False)
         common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
                             default=False,

@@ -19,8 +19,16 @@ class LocationTestCase(DarcTestCase):
             "Location(proto='ssh', user='user', host='host', port=22, path='/some/path', archive='archive')"
         )
         self.assert_equal(
-            repr(Location('/some/path::archive')),
-            "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')"
+            repr(Location('mybackup.darc::archive')),
+            "Location(proto='file', user=None, host=None, port=None, path='mybackup.darc', archive='archive')"
+        )
+        self.assert_equal(
+            repr(Location('/some/absolute/path::archive')),
+            "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive='archive')"
+        )
+        self.assert_equal(
+            repr(Location('some/relative/path::archive')),
+            "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='archive')"
         )
 
 

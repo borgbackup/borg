@@ -245,17 +245,17 @@ def group2gid(group):
         return None
 
 
-class Location(object):
+class Location:
     """Object representing a repository / archive location
     """
     proto = user = host = port = path = archive = None
     ssh_re = re.compile(r'(?P<proto>ssh)://(?:(?P<user>[^@]+)@)?'
                         r'(?P<host>[^:/#]+)(?::(?P<port>\d+))?'
-                        r'(?P<path>[^:]*)(?:::(?P<archive>.+))?')
+                        r'(?P<path>[^:]+)(?:::(?P<archive>.+))?')
     file_re = re.compile(r'(?P<proto>file)://'
-                         r'(?P<path>[^:]*)(?:::(?P<archive>.+))?')
+                         r'(?P<path>[^:]+)(?:::(?P<archive>.+))?')
     scp_re = re.compile(r'((?:(?P<user>[^@]+)@)?(?P<host>[^:/]+):)?'
-                        r'(?P<path>[^:]*)(?:::(?P<archive>.+))?')
+                        r'(?P<path>[^:]+)(?:::(?P<archive>.+))?')
 
     def __init__(self, text):
         self.orig = text

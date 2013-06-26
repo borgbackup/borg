@@ -16,7 +16,7 @@ from .helpers import location_validator, format_time, \
 from .remote import RepositoryServer, RemoteRepository
 
 
-class Archiver(object):
+class Archiver:
 
     def __init__(self):
         self.exit_code = 0
@@ -294,7 +294,7 @@ class Archiver(object):
                             default=False,
                             help='Verbose output')
 
-        parser = argparse.ArgumentParser(description='DARC - Deduplicating Archiver')
+        parser = argparse.ArgumentParser(description='Darc - Deduplicating Archiver')
         subparsers = parser.add_subparsers(title='Available subcommands')
 
         subparser = subparsers.add_parser('serve', parents=[common_parser])
@@ -405,8 +405,7 @@ class Archiver(object):
         subparser.add_argument('repository', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='Repository to prune')
-
-        args = parser.parse_args(args)
+        args = parser.parse_args(args or ['-h'])
         if getattr(args, 'patterns', None):
             adjust_patterns(args.patterns)
         self.verbose = args.verbose
@@ -416,7 +415,7 @@ class Archiver(object):
 def main():
     archiver = Archiver()
     try:
-        exit_code = archiver.run()
+        exit_code = archiver.run(sys.argv[1:])
     except Repository.DoesNotExist:
         archiver.print_error('Error: Repository not found')
         exit_code = 1

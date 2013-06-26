@@ -196,6 +196,10 @@ class ArchiverTestCase(DarcTestCase):
         assert 'test1' not in output
         assert 'test2' in output
 
+    def test_usage(self):
+        self.assert_raises(SystemExit, lambda: self.darc())
+        self.assert_raises(SystemExit, lambda: self.darc('-h'))
+
 
 class RemoteArchiverTestCase(ArchiverTestCase):
     prefix = 'localhost:'

@@ -1,5 +1,5 @@
 from configparser import RawConfigParser
-from binascii import hexlify, unhexlify
+from binascii import hexlify
 import fcntl
 import os
 import re
@@ -10,7 +10,7 @@ import unittest
 from zlib import crc32
 
 from .hashindex import NSIndex
-from .helpers import IntegrityError, read_msgpack, write_msgpack
+from .helpers import IntegrityError, read_msgpack, write_msgpack, unhexlify
 from .lrucache import LRUCache
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
@@ -81,7 +81,7 @@ class Repository(object):
             raise Exception('%s Does not look like a darc repository')
         self.max_segment_size = self.config.getint('repository', 'max_segment_size')
         self.segments_per_dir = self.config.getint('repository', 'segments_per_dir')
-        self.id = unhexlify(self.config.get('repository', 'id').strip().encode('ascii'))  # .encode needed for Python 3.[0-2]
+        self.id = unhexlify(self.config.get('repository', 'id').strip())
         self.rollback()
 
     def close(self):

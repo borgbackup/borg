@@ -3,10 +3,10 @@ import fcntl
 from itertools import zip_longest
 import msgpack
 import os
-from binascii import hexlify, unhexlify
+from binascii import hexlify
 import shutil
 
-from .helpers import get_cache_dir, decode_dict, st_mtime_ns
+from .helpers import get_cache_dir, decode_dict, st_mtime_ns, unhexlify
 from .hashindex import ChunkIndex
 
 
@@ -58,7 +58,7 @@ class Cache(object):
         if self.config.getint('cache', 'version') != 1:
             raise Exception('%s Does not look like a darc cache')
         self.id = self.config.get('cache', 'repository')
-        self.manifest_id = unhexlify(self.config.get('cache', 'manifest').encode('ascii'))  # .encode needed for Python 3.[0-2]
+        self.manifest_id = unhexlify(self.config.get('cache', 'manifest'))
         self.chunks = ChunkIndex(os.path.join(self.path, 'chunks').encode('utf-8'))
         self.files = None
 

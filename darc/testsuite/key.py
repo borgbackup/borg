@@ -2,11 +2,11 @@ import os
 import re
 import shutil
 import tempfile
-from binascii import hexlify, unhexlify
+from binascii import hexlify
 from darc.crypto import bytes_to_long
 from darc.testsuite import DarcTestCase
 from darc.key import PlaintextKey, PassphraseKey, KeyfileKey
-from darc.helpers import Location
+from darc.helpers import Location, unhexlify
 
 
 class KeyTestCase(DarcTestCase):

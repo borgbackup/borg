@@ -17,16 +17,16 @@ class XattrTestCase(DarcTestCase):
     def test_low_level(self):
         self.assert_equal(llistxattr(self.tmpfile.name), [])
         self.assert_equal(llistxattr(self.symlink), [])
-        lsetxattr(self.tmpfile.name, b'user.foo', b'bar')
-        self.assert_equal(llistxattr(self.tmpfile.name), [b'user.foo'])
-        self.assert_equal(lgetxattr(self.tmpfile.name, b'user.foo'), b'bar')
+        lsetxattr(self.tmpfile.name, b'foo', b'bar')
+        self.assert_equal(llistxattr(self.tmpfile.name), [b'foo'])
+        self.assert_equal(lgetxattr(self.tmpfile.name, b'foo'), b'bar')
         self.assert_equal(llistxattr(self.symlink), [])
 
     def test_low_level_fileno(self):
         self.assert_equal(flistxattr(self.tmpfile.fileno()), [])
-        fsetxattr(self.tmpfile.fileno(), b'user.foo', b'bar')
-        self.assert_equal(flistxattr(self.tmpfile.fileno()), [b'user.foo'])
-        self.assert_equal(fgetxattr(self.tmpfile.fileno(), b'user.foo'), b'bar')
+        fsetxattr(self.tmpfile.fileno(), b'foo', b'bar')
+        self.assert_equal(flistxattr(self.tmpfile.fileno()), [b'foo'])
+        self.assert_equal(fgetxattr(self.tmpfile.fileno(), b'foo'), b'bar')
 
     def test_high_level(self):
         self.assert_equal(get_all(self.tmpfile.name), {})

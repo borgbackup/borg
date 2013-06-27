@@ -1,4 +1,6 @@
-"""A basic extended attributes (xattr) implementation for Linux
+"""A basic extended attributes (xattr) implementation for Linux and MacOS X
+
+On Linux only the "user." namespace is accessed
 """
 import os
 import sys
@@ -6,6 +8,24 @@ from ctypes import CDLL, create_string_buffer, c_ssize_t, c_size_t, c_char_p, c_
 from ctypes.util import find_library
 
 libc = CDLL(find_library('c'), use_errno=True)
+
+
+def set(path_or_fd, name, value):
+    if isinstance(path_or_fd, int):
+        fsetxattr(path_or_fd, name, value)
+    else:
+        lsetxattr(path_or_fd, name, value)
+
+
+def get_all(path_or_fd):
+    """Return a dictionary with all (user) xattrs for "path_or_fd"
+
+    Symbolic links are not followed
+    """
+    if isinstance(path_or_fd, int):
+        return dict((name, fgetxattr(path_or_fd, name)) for name in flistxattr(path_or_fd))
+    else:
+        return dict((name, lgetxattr(path_or_fd, name)) for name in llistxattr(path_or_fd))
 
 
 def _check(rv, path=None):
@@ -28,22 +48,6 @@ if sys.platform.startswith('linux'):
     libc.fgetxattr.argtypes = (c_int, c_char_p, c_char_p, c_size_t)
     libc.fgetxattr.restype = c_ssize_t
 
-    def set(path_or_fd, name, value):
-        if isinstance(path_or_fd, int):
-            fsetxattr(path_or_fd, b'user.' + name, value)
-        else:
-            lsetxattr(path_or_fd, b'user.' + name, value)
-
-    def get_all(path_or_fd):
-        """Return a dictionary with all (user) xattrs for "path_or_fd"
-
-        Symbolic links are not followed
-        """
-        if isinstance(path_or_fd, int):
-            return dict((name[5:], fgetxattr(path_or_fd, name)) for name in flistxattr(path_or_fd) if name.startswith(b'user.'))
-        else:
-            return dict((name[5:], lgetxattr(path_or_fd, name)) for name in llistxattr(path_or_fd) if name.startswith(b'user.'))
-
     def llistxattr(path):
         path = os.fsencode(path)
         n = _check(libc.llistxattr(path, None, 0), path)
@@ -53,7 +57,7 @@ if sys.platform.startswith('linux'):
         n2 = _check(libc.llistxattr(path, namebuf, n))
         if n2 != n:
             raise Exception('llistxattr failed')
-        return namebuf.raw.split(b'\0')[:-1]
+        return [name[5:] for name in namebuf.raw.split(b'\0')[:-1] if name.startswith(b'user.')]
 
     def flistxattr(fd):
         n = _check(libc.flistxattr(fd, None, 0))
@@ -63,16 +67,17 @@ if sys.platform.startswith('linux'):
         n2 = _check(libc.flistxattr(fd, namebuf, n))
         if n2 != n:
             raise Exception('flistxattr failed')
-        return namebuf.raw.split(b'\0')[:-1]
+        return [name[5:] for name in namebuf.raw.split(b'\0')[:-1] if name.startswith(b'user.')]
 
     def lsetxattr(path, name, value, flags=0):
-        _check(libc.lsetxattr(os.fsencode(path), name, value, len(value), flags), path)
+        _check(libc.lsetxattr(os.fsencode(path), b'user.' + name, value, len(value), flags), path)
 
     def fsetxattr(fd, name, value, flags=0):
-        _check(libc.fsetxattr(fd, name, value, len(value), flags))
+        _check(libc.fsetxattr(fd,  b'user.' + name, value, len(value), flags))
 
     def lgetxattr(path, name):
         path = os.fsencode(path)
+        name =  b'user.' + name
         n = _check(libc.lgetxattr(path, name, None, 0))
         if n == 0:
             return None
@@ -83,6 +88,7 @@ if sys.platform.startswith('linux'):
         return valuebuf.raw
 
     def fgetxattr(fd, name):
+        name =  b'user.' + name
         n = _check(libc.fgetxattr(fd, name, None, 0))
         if n == 0:
             return None
@@ -107,22 +113,6 @@ elif sys.platform == 'darwin':
     libc.fgetxattr.restype = c_ssize_t
 
     XATTR_NOFOLLOW = 0x0001
-
-    def set(path_or_fd, name, value):
-        if isinstance(path_or_fd, int):
-            fsetxattr(path_or_fd, name, value)
-        else:
-            lsetxattr(path_or_fd, name, value)
-
-    def get_all(path_or_fd):
-        """Return a dictionary with all (user) xattrs for "path_or_fd"
-
-        Symbolic links are not followed
-        """
-        if isinstance(path_or_fd, int):
-            return dict((name, fgetxattr(path_or_fd, name)) for name in flistxattr(path_or_fd))
-        else:
-            return dict((name, lgetxattr(path_or_fd, name)) for name in llistxattr(path_or_fd))
 
     def llistxattr(path):
         path = os.fsencode(path)

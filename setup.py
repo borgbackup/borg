@@ -10,12 +10,10 @@ if sys.version_info < min_python:
     print("Darc requires Python %d.%d or later" % min_python)
     sys.exit(1)
 
-#from distutils.core import setup
-#from distutils.extension import Extension
 try:
     from setuptools import setup, Extension
 except ImportError:
-    from distutils.core import setup
+    from distutils.core import setup, Extension
 from distutils.command.sdist import sdist
 
 chunker_source = 'darc/chunker.pyx'
@@ -48,7 +46,7 @@ except ImportError:
         raise ImportError('The GIT version of darc needs Cython. Install Cython or use a released version')
 
 setup(
-    name='Darc',
+    name='darc',
     version=darc.__release__,
     author='Jonas Borgström',
     author_email='jonas@borgstrom.se',

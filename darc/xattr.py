@@ -7,13 +7,14 @@ from ctypes.util import find_library
 
 libc = CDLL(find_library('c'), use_errno=True)
 
+
 def _check(rv, path=None):
     if rv < 0:
         raise OSError(get_errno(), path)
     return rv
 
 
-if sys.platform == 'linux':
+if sys.platform.startswith('linux'):
     libc.llistxattr.argtypes = (c_char_p, c_char_p, c_size_t)
     libc.llistxattr.restype = c_ssize_t
     libc.flistxattr.argtypes = (c_int, c_char_p, c_size_t)
@@ -27,22 +28,21 @@ if sys.platform == 'linux':
     libc.fgetxattr.argtypes = (c_int, c_char_p, c_char_p, c_size_t)
     libc.fgetxattr.restype = c_ssize_t
 
-
     def set(path_or_fd, name, value):
         if isinstance(path_or_fd, int):
             fsetxattr(path_or_fd, b'user.' + name, value)
         else:
             lsetxattr(path_or_fd, b'user.' + name, value)
 
-
     def get_all(path_or_fd):
         """Return a dictionary with all (user) xattrs for "path_or_fd"
+
+        Symbolic links are not followed
         """
         if isinstance(path_or_fd, int):
             return dict((name[5:], fgetxattr(path_or_fd, name)) for name in flistxattr(path_or_fd) if name.startswith(b'user.'))
         else:
             return dict((name[5:], lgetxattr(path_or_fd, name)) for name in llistxattr(path_or_fd) if name.startswith(b'user.'))
-
 
     def llistxattr(path):
         path = os.fsencode(path)
@@ -55,7 +55,6 @@ if sys.platform == 'linux':
             raise Exception('llistxattr failed')
         return namebuf.raw.split(b'\0')[:-1]
 
-
     def flistxattr(fd):
         n = _check(libc.flistxattr(fd, None, 0))
         if n == 0:
@@ -66,14 +65,11 @@ if sys.platform == 'linux':
             raise Exception('flistxattr failed')
         return namebuf.raw.split(b'\0')[:-1]
 
-
     def lsetxattr(path, name, value, flags=0):
         _check(libc.lsetxattr(os.fsencode(path), name, value, len(value), flags), path)
 
-
     def fsetxattr(fd, name, value, flags=0):
         _check(libc.fsetxattr(fd, name, value, len(value), flags))
-
 
     def lgetxattr(path, name):
         path = os.fsencode(path)
@@ -86,7 +82,6 @@ if sys.platform == 'linux':
             raise Exception('lgetxattr failed')
         return valuebuf.raw
 
-
     def fgetxattr(fd, name):
         n = _check(libc.fgetxattr(fd, name, None, 0))
         if n == 0:
@@ -95,6 +90,7 @@ if sys.platform == 'linux':
         n2 = _check(libc.fgetxattr(fd, name, valuebuf, n))
         if n2 != n:
             raise Exception('fgetxattr failed')
+        return valuebuf.raw
 
 elif sys.platform == 'darwin':
     libc.listxattr.argtypes = (c_char_p, c_char_p, c_size_t, c_int)
@@ -118,15 +114,15 @@ elif sys.platform == 'darwin':
         else:
             lsetxattr(path_or_fd, name, value)
 
-
     def get_all(path_or_fd):
         """Return a dictionary with all (user) xattrs for "path_or_fd"
+
+        Symbolic links are not followed
         """
         if isinstance(path_or_fd, int):
             return dict((name, fgetxattr(path_or_fd, name)) for name in flistxattr(path_or_fd))
         else:
             return dict((name, lgetxattr(path_or_fd, name)) for name in llistxattr(path_or_fd))
-
 
     def llistxattr(path):
         path = os.fsencode(path)
@@ -139,7 +135,6 @@ elif sys.platform == 'darwin':
             raise Exception('llistxattr failed')
         return namebuf.raw.split(b'\0')[:-1]
 
-
     def flistxattr(fd):
         n = _check(libc.flistxattr(fd, None, 0, 0))
         if n == 0:
@@ -150,14 +145,11 @@ elif sys.platform == 'darwin':
             raise Exception('flistxattr failed')
         return namebuf.raw.split(b'\0')[:-1]
 
-
     def lsetxattr(path, name, value, flags=XATTR_NOFOLLOW):
-        rv = _check(libc.setxattr(os.fsencode(path), name, value, len(value), 0, flags), path)
-
+        _check(libc.setxattr(os.fsencode(path), name, value, len(value), 0, flags), path)
 
     def fsetxattr(fd, name, value, flags=0):
-        rv = _check(libc.fsetxattr(fd, name, value, len(value), 0, flags))
-
+        _check(libc.fsetxattr(fd, name, value, len(value), 0, flags))
 
     def lgetxattr(path, name):
         path = os.fsencode(path)
@@ -170,7 +162,6 @@ elif sys.platform == 'darwin':
             raise Exception('getxattr failed')
         return valuebuf.raw
 
-
     def fgetxattr(fd, name):
         n = _check(libc.fgetxattr(fd, name, None, 0, 0, 0))
         if n == 0:
@@ -182,4 +173,4 @@ elif sys.platform == 'darwin':
         return valuebuf.raw
 
 else:
-    raise Exception('Unsupported platform')
+    raise Exception('Unsupported platform: %s' % sys.platform)

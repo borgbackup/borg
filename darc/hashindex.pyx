@@ -65,6 +65,8 @@ cdef class NSIndex(IndexBase):
     @classmethod
     def create(cls, path, capacity=16):
         index = hashindex_create(path, capacity, 32, 8)
+        if not index:
+            raise Exception('Failed to create %s' % path)
         hashindex_close(index)
         return cls(path)
 

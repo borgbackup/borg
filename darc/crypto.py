@@ -3,6 +3,9 @@ from ctypes.util import find_library
 import struct
 
 libcrypto = cdll.LoadLibrary(find_library('crypto'))
+# Default libcrypto on OS X is too old, try the brew version
+if not hasattr(libcrypto, 'PKCS5_PBKDF2_HMAC'):
+    libcrypto = cdll.LoadLibrary('/usr/local/opt/openssl/lib/libcrypto.dylib')
 libcrypto.PKCS5_PBKDF2_HMAC.argtypes = (c_char_p, c_int, c_char_p, c_int, c_int, c_void_p, c_int, c_char_p)
 libcrypto.EVP_sha256.restype = c_void_p
 libcrypto.AES_set_encrypt_key.argtypes = (c_char_p, c_int, c_char_p)

@@ -51,7 +51,6 @@ Requirements
 ------------
 * Python >= 3.2
 * msgpack-python
-* pyxattr
 
 
 Installation

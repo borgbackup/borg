@@ -12,7 +12,10 @@ if sys.version_info < min_python:
 
 #from distutils.core import setup
 #from distutils.extension import Extension
-from setuptools import setup, Extension
+try:
+    from setuptools import setup, Extension
+except ImportError:
+    from distutils.core import setup
 from distutils.command.sdist import sdist
 
 chunker_source = 'darc/chunker.pyx'
@@ -69,5 +72,5 @@ setup(
         Extension('darc.chunker', [chunker_source]),
         Extension('darc.hashindex', [hashindex_source])
     ],
-    install_requires=['msgpack-python', 'pyxattr']
+    install_requires=['msgpack-python']
 )

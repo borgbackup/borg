@@ -5,8 +5,7 @@ import stat
 import sys
 import shutil
 import tempfile
-import xattr
-
+from darc import xattr
 from darc.archiver import Archiver
 from darc.repository import Repository
 from darc.testsuite import DarcTestCase
@@ -23,7 +22,7 @@ class ArchiverTestCase(DarcTestCase):
 
     def setUp(self):
         self.archiver = Archiver()
-        self.tmpdir = tempfile.mkdtemp()
+        self.tmpdir = tempfile.mkdtemp(dir=os.getcwd())
         self.repository_path = os.path.join(self.tmpdir, 'repository')
         self.repository_location = self.prefix + self.repository_path
         self.input_path = os.path.join(self.tmpdir, 'input')
@@ -36,10 +35,12 @@ class ArchiverTestCase(DarcTestCase):
         os.mkdir(self.output_path)
         os.mkdir(self.keys_path)
         os.mkdir(self.cache_path)
+        self._old_wd = os.getcwd()
         os.chdir(self.tmpdir)
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
+        os.chdir(self._old_wd)
 
     def darc(self, *args, **kwargs):
         exit_code = kwargs.get('exit_code', 0)
@@ -70,7 +71,7 @@ class ArchiverTestCase(DarcTestCase):
 
     def get_xattrs(self, path):
         try:
-            return xattr.get_all(path, True)
+            return xattr.get_all(path)
         except EnvironmentError:
             return {}
 
@@ -111,7 +112,7 @@ class ArchiverTestCase(DarcTestCase):
         os.mknod('input/bdev', 0o600 | stat.S_IFBLK,  os.makedev(10, 20))
         # Char device
         os.mknod('input/cdev', 0o600 | stat.S_IFCHR,  os.makedev(30, 40))
-        xattr.set(os.path.join(self.input_path, 'file1'), 'user.foo', 'bar')
+        xattr.set(os.path.join(self.input_path, 'file1'), b'foo', b'bar')
         # Hard link
         os.link(os.path.join(self.input_path, 'file1'),
                 os.path.join(self.input_path, 'hardlink'))

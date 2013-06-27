@@ -8,8 +8,7 @@ import stat
 import sys
 import time
 from io import BytesIO
-import xattr
-
+from . import xattr
 from .chunker import chunkify
 from .helpers import uid2user, user2uid, gid2group, group2gid, \
     Statistics, decode_dict, st_mtime_ns
@@ -280,10 +279,7 @@ class Archive(object):
         xattrs = item.get(b'xattrs')
         if xattrs:
             for k, v in xattrs.items():
-                try:
-                    xattr.set(fd or path, k, v)
-                except (EnvironmentError):
-                    pass
+                xattr.set(fd or path, k, v)
         uid = gid = None
         if not self.numeric_owner:
             uid = user2uid(item[b'user'])
@@ -352,12 +348,9 @@ class Archive(object):
         }
         if self.numeric_owner:
             item[b'user'] = item[b'group'] = None
-        try:
-            xattrs = xattr.get_all(path, True)
-            if xattrs:
-                item[b'xattrs'] = dict(xattrs)
-        except EnvironmentError:
-            pass
+        xattrs = xattr.get_all(path)
+        if xattrs:
+            item[b'xattrs'] = xattrs
         return item
 
     def process_item(self, path, st):

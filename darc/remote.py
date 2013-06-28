@@ -12,6 +12,11 @@ from .lrucache import LRUCache
 BUFSIZE = 10 * 1024 * 1024
 
 
+class ConnectionClosed(Exception):
+    """Connection closed by remote host
+    """
+
+
 class RepositoryServer(object):
 
     def __init__(self):
@@ -109,7 +114,7 @@ class RemoteRepository(object):
             if r:
                 data = os.read(self.stdout_fd, BUFSIZE)
                 if not data:
-                    raise Exception('Remote host closed connection')
+                    raise ConnectionClosed()
                 self.unpacker.feed(data)
                 for type, msgid, error, res in self.unpacker:
                     if msgid == self.msgid:

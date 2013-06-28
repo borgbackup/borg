@@ -13,7 +13,7 @@ from .key import key_creator
 from .helpers import location_validator, format_time, \
     format_file_mode, IncludePattern, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_split, Manifest, Location, remove_surrogates
-from .remote import RepositoryServer, RemoteRepository
+from .remote import RepositoryServer, RemoteRepository, ConnectionClosed
 
 
 class Archiver:
@@ -427,6 +427,9 @@ def main():
         exit_code = 1
     except Archive.DoesNotExist as e:
         archiver.print_error('Error: Archive "%s" does not exist', e)
+        exit_code = 1
+    except ConnectionClosed:
+        archiver.print_error('Connection closed by remote host')
         exit_code = 1
     except KeyboardInterrupt:
         archiver.print_error('Error: Keyboard interrupt')

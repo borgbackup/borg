@@ -9,6 +9,10 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
+#if defined(__BYTE_ORDER__)&&(__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#error This code is not big endian safe yet
+#endif
+
 typedef struct {
     char magic[8];
     int32_t num_entries;

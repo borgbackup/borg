@@ -137,3 +137,5 @@ gh-pages: html
 	(cd $$GH_PAGES_CLONE && git add -A && git commit -m 'Updated gh-pages' && git push) && \
 	rm -rf $$GH_PAGES_CLONE
 
+inotify:
+	while inotifywait -r .; do make html ; done

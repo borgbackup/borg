@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import os
+
 
 cdef extern from "_hashindex.c":
     ctypedef struct HashIndex:
@@ -22,7 +24,7 @@ cdef class IndexBase:
     cdef HashIndex *index
 
     def __cinit__(self, path):
-        self.index = hashindex_open(path)
+        self.index = hashindex_open(<bytes>os.fsencode(path))
         if not self.index:
             raise Exception('Failed to open %s' % path)
 
@@ -64,7 +66,7 @@ cdef class NSIndex(IndexBase):
 
     @classmethod
     def create(cls, path, capacity=16):
-        index = hashindex_create(path, capacity, 32, 8)
+        index = hashindex_create(<bytes>os.fsencode(path), capacity, 32, 8)
         if not index:
             raise Exception('Failed to create %s' % path)
         hashindex_close(index)
@@ -121,7 +123,7 @@ cdef class ChunkIndex(IndexBase):
 
     @classmethod
     def create(cls, path, capacity=16):
-        index = hashindex_create(path, capacity, 32, 12)
+        index = hashindex_create(<bytes>os.fsencode(path), capacity, 32, 12)
         hashindex_close(index)
         return cls(path)
 
@@ -171,55 +173,3 @@ cdef class ChunkKeyIterator:
             raise StopIteration
         cdef int *value = <int *>(self.key + 32)
         return self.key[:32], (value[0], value[1], value[2])
-
-
-cdef class BandIndex(IndexBase):
-
-    @classmethod
-    def create(cls, path, capacity=16):
-        index = hashindex_create(path, capacity, 4, 4)
-        hashindex_close(index)
-        return cls(path)
-
-    def __getitem__(self, key):
-        cdef int k = key
-        data = <int *>hashindex_get(self.index, &k)
-        if not data:
-            raise KeyError
-        return data[0]
-
-    def __delitem__(self, key):
-        cdef int k = key
-        hashindex_delete(self.index, &k)
-
-    def __setitem__(self, key, value):
-        cdef int k = key
-        cdef int v = value
-        hashindex_set(self.index, &k, &v)
-
-    def __contains__(self, key):
-        cdef int k = key
-        data = <int *>hashindex_get(self.index, &k)
-        return data != NULL
-
-    def iteritems(self, marker=None, limit=0):
-        iter = BandKeyIterator()
-        iter.index = self.index
-        return iter
-
-
-cdef class BandKeyIterator:
-    cdef HashIndex *index
-    cdef int *key
-
-    def __cinit__(self):
-        self.key = NULL
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        self.key = <int *>hashindex_next_key(self.index, <char *>self.key)
-        if not self.key:
-            raise StopIteration
-        return self.key[0], self.key[1]

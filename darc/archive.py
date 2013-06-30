@@ -221,8 +221,8 @@ class Archive(object):
         cache.rollback()
         return stats
 
-    def extract_item(self, item, dest=None, restore_attrs=True, peek=None):
-        dest = dest or self.cwd
+    def extract_item(self, item, restore_attrs=True, peek=None):
+        dest = self.cwd
         assert item[b'path'][:1] not in ('/', '\\', ':')
         path = os.path.join(dest, item[b'path'])
         # Attempt to remove existing files, ignore errors on failure

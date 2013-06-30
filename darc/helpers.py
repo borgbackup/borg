@@ -97,9 +97,11 @@ def to_localtime(ts):
     return ts - timedelta(seconds=time.altzone)
 
 
-def adjust_patterns(patterns):
-    if patterns and not isinstance(patterns[-1], ExcludePattern):
-        patterns.append(ExcludePattern('*'))
+def adjust_patterns(paths, excludes):
+    if paths:
+        return (excludes or []) + [IncludePattern(path) for path in paths] + [ExcludePattern('*')]
+    else:
+        return excludes
 
 
 def exclude_path(path, patterns):
@@ -116,6 +118,21 @@ class IncludePattern:
     """--include PATTERN
     """
     def __init__(self, pattern):
+        self.pattern = pattern
+
+    def match(self, path):
+        dir, name = os.path.split(path)
+        return (path == self.pattern
+                or (dir + os.path.sep).startswith(self.pattern))
+
+    def __repr__(self):
+        return '%s(%s)' % (type(self), self.pattern)
+
+
+class ExcludePattern(IncludePattern):
+    """
+    """
+    def __init__(self, pattern):
         self.pattern = self.dirpattern = pattern
         if not pattern.endswith(os.path.sep):
             self.dirpattern += os.path.sep
@@ -128,11 +145,6 @@ class IncludePattern:
 
     def __repr__(self):
         return '%s(%s)' % (type(self), self.pattern)
-
-
-class ExcludePattern(IncludePattern):
-    """
-    """
 
 
 def walk_path(path, skip_inodes=None):

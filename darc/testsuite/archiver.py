@@ -15,6 +15,17 @@ utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
 
 src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__), '..', '..')
 
+class changedir:
+    def __init__(self, dir):
+        self.dir = dir
+
+    def __enter__(self):
+        self.old = os.getcwd()
+        os.chdir(self.dir)
+
+    def __exit__(self, *args, **kw):
+        os.chdir(self.old)
+
 
 class ArchiverTestCase(DarcTestCase):
 
@@ -123,7 +134,8 @@ class ArchiverTestCase(DarcTestCase):
         self.darc('init', self.repository_location)
         self.darc('create', self.repository_location + '::test', 'input')
         self.darc('create', self.repository_location + '::test.2', 'input')
-        self.darc('extract', self.repository_location + '::test', 'output')
+        with changedir('output'):
+            self.darc('extract', self.repository_location + '::test')
         self.assert_equal(len(self.darc('list', self.repository_location).splitlines()), 2)
         self.assert_equal(len(self.darc('list', self.repository_location + '::test').splitlines()), 9)
         self.diff_dirs('input', 'output/input')
@@ -141,9 +153,11 @@ class ArchiverTestCase(DarcTestCase):
         self.create_regual_file('file3', size=1024 * 80)
         self.create_regual_file('file4', size=1024 * 80)
         self.darc('create', '--exclude=input/file4', self.repository_location + '::test', 'input')
-        self.darc('extract', '--include=file1', self.repository_location + '::test', 'output')
+        with changedir('output'):
+            self.darc('extract', self.repository_location + '::test', 'input/file1', )
         self.assert_equal(sorted(os.listdir('output/input')), ['file1'])
-        self.darc('extract', '--exclude=file2', self.repository_location + '::test', 'output')
+        with changedir('output'):
+            self.darc('extract', '--exclude=input/file2', self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file3'])
 
     def test_overwrite(self):
@@ -155,13 +169,15 @@ class ArchiverTestCase(DarcTestCase):
         os.mkdir('output/input')
         os.mkdir('output/input/file1')
         os.mkdir('output/input/dir2')
-        self.darc('extract', self.repository_location + '::test', 'output')
+        with changedir('output'):
+            self.darc('extract', self.repository_location + '::test')
         self.diff_dirs('input', 'output/input')
         # But non-empty dirs should fail
         os.unlink('output/input/file1')
         os.mkdir('output/input/file1')
         os.mkdir('output/input/file1/dir')
-        self.darc('extract', self.repository_location + '::test', 'output', exit_code=1)
+        with changedir('output'):
+            self.darc('extract', self.repository_location + '::test', exit_code=1)
 
     def test_delete(self):
         self.create_regual_file('file1', size=1024 * 80)

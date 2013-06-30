@@ -93,7 +93,7 @@ class Archiver:
                     continue
             else:
                 restrict_dev = None
-            self._process(archive, cache, args.patterns, skip_inodes, path, restrict_dev)
+            self._process(archive, cache, args.excludes, skip_inodes, path, restrict_dev)
         archive.save()
         if args.stats:
             t = datetime.now()
@@ -108,8 +108,8 @@ class Archiver:
             print('-' * 40)
         return self.exit_code
 
-    def _process(self, archive, cache, patterns, skip_inodes, path, restrict_dev):
-        if exclude_path(path, patterns):
+    def _process(self, archive, cache, excludes, skip_inodes, path, restrict_dev):
+        if exclude_path(path, excludes):
             return
         try:
             st = os.lstat(path)
@@ -138,7 +138,7 @@ class Archiver:
                 self.print_error('%s: %s', path, e)
             else:
                 for filename in sorted(entries):
-                    self._process(archive, cache, patterns, skip_inodes,
+                    self._process(archive, cache, excludes, skip_inodes,
                                   os.path.join(path, filename), restrict_dev)
         elif stat.S_ISLNK(st.st_mode):
             archive.process_symlink(path, st)
@@ -154,22 +154,23 @@ class Archiver:
         manifest, key = Manifest.load(repository)
         archive = Archive(repository, key, manifest, args.archive.archive,
                           numeric_owner=args.numeric_owner)
+        patterns = adjust_patterns(args.paths, args.excludes)
         dirs = []
-        for item, peek in archive.iter_items(lambda item: not exclude_path(item[b'path'], args.patterns)):
+        for item, peek in archive.iter_items(lambda item: not exclude_path(item[b'path'], patterns)):
             while dirs and not item[b'path'].startswith(dirs[-1][b'path']):
-                archive.extract_item(dirs.pop(-1), args.dest)
+                archive.extract_item(dirs.pop(-1))
             self.print_verbose(remove_surrogates(item[b'path']))
             try:
                 if stat.S_ISDIR(item[b'mode']):
                     dirs.append(item)
-                    archive.extract_item(item, args.dest, restore_attrs=False)
+                    archive.extract_item(item, restore_attrs=False)
                 else:
-                    archive.extract_item(item, args.dest, peek=peek)
+                    archive.extract_item(item, peek=peek)
             except IOError as e:
                 self.print_error('%s: %s', remove_surrogates(item[b'path']), e)
 
         while dirs:
-            archive.extract_item(dirs.pop(-1), args.dest)
+            archive.extract_item(dirs.pop(-1))
         return self.exit_code
 
     def do_delete(self, args):
@@ -216,6 +217,7 @@ class Archiver:
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
         archive = Archive(repository, key, manifest, args.archive.archive)
+        patterns = adjust_patterns(args.paths, args.excludes)
 
         def start_cb(item):
             self.print_verbose('%s ...', remove_surrogates(item[b'path']), newline=False)
@@ -226,7 +228,7 @@ class Archiver:
             else:
                 self.print_verbose('ERROR')
                 self.print_error('%s: verification failed' % remove_surrogates(item[b'path']))
-        for item, peek in archive.iter_items(lambda item: not exclude_path(item[b'path'], args.patterns)):
+        for item, peek in archive.iter_items(lambda item: not exclude_path(item[b'path'], patterns)):
             if stat.S_ISREG(item[b'mode']) and b'chunks' in item:
                 archive.verify_file(item, start_cb, result_cb, peek=peek)
         return self.exit_code
@@ -310,7 +312,7 @@ class Archiver:
                                help='Encrypt data using key file')
         subparser.add_argument('--passphrase', dest='passphrase',
                                action='store_true', default=False,
-                               help='Encrypt data using passphrase derived key')
+                               help='Encrypt data using passphrase derived keys')
 
         subparser = subparsers.add_parser('change-passphrase', parents=[common_parser])
         subparser.set_defaults(func=self.do_change_passphrase)
@@ -321,12 +323,9 @@ class Archiver:
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='Print statistics for the created archive')
-        subparser.add_argument('-i', '--include', dest='patterns',
-                               type=IncludePattern, action='append',
-                               help='Include condition')
-        subparser.add_argument('-e', '--exclude', dest='patterns',
+        subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
-                               help='Include condition')
+                               help='Exclude condition')
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                type=int, default=300, metavar='SECONDS',
                                help='Write checkpointe ever SECONDS seconds (Default: 300)')
@@ -339,25 +338,22 @@ class Archiver:
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='Archive to create')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               default=['.'], help='Paths to add to archive')
+        subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
+                               help='Paths to archive')
 
         subparser = subparsers.add_parser('extract', parents=[common_parser])
         subparser.set_defaults(func=self.do_extract)
-        subparser.add_argument('-i', '--include', dest='patterns',
-                               type=IncludePattern, action='append',
-                               help='Include condition')
-        subparser.add_argument('-e', '--exclude', dest='patterns',
+        subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
-                               help='Include condition')
+                               help='Exclude condition')
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,
                                help='Only obey numeric user and group identifiers')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
-                               help='Archive to create')
-        subparser.add_argument('dest', metavar='DEST', type=str, nargs='?',
-                               help='Where to extract files')
+                               help='Archive to extract')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='Paths to extract')
 
         subparser = subparsers.add_parser('delete', parents=[common_parser])
         subparser.set_defaults(func=self.do_delete)
@@ -372,15 +368,14 @@ class Archiver:
 
         subparser = subparsers.add_parser('verify', parents=[common_parser])
         subparser.set_defaults(func=self.do_verify)
-        subparser.add_argument('-i', '--include', dest='patterns',
-                               type=IncludePattern, action='append',
-                               help='Include condition')
-        subparser.add_argument('-e', '--exclude', dest='patterns',
+        subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
                                help='Include condition')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='Archive to verity integrity of')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='Paths to verify')
 
         subparser = subparsers.add_parser('info', parents=[common_parser])
         subparser.set_defaults(func=self.do_info)
@@ -406,8 +401,6 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='Repository to prune')
         args = parser.parse_args(args or ['-h'])
-        if getattr(args, 'patterns', None):
-            adjust_patterns(args.patterns)
         self.verbose = args.verbose
         return args.func(args)
 

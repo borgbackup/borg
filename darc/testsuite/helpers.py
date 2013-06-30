@@ -1,5 +1,5 @@
 from datetime import datetime
-from darc.helpers import Location, format_timedelta, IncludePattern
+from darc.helpers import Location, format_timedelta, IncludePattern, ExcludePattern
 from darc.testsuite import DarcTestCase
 
 
@@ -46,11 +46,11 @@ class FormatTimedeltaTestCase(DarcTestCase):
 class PatternTestCase(DarcTestCase):
 
     def test(self):
-        py = IncludePattern('*.py')
-        foo = IncludePattern('/foo')
-        self.assert_equal(py.match('/foo/foo.py'), True)
-        self.assert_equal(py.match('/bar/foo.java'), False)
-        self.assert_equal(foo.match('/foo/foo.py'), True)
-        self.assert_equal(foo.match('/bar/foo.java'), False)
-        self.assert_equal(foo.match('/foobar/foo.py'), False)
-        self.assert_equal(foo.match('/foo'), True)
+        self.assert_equal(IncludePattern('/usr').match('/usr'), True)
+        self.assert_equal(IncludePattern('/usr').match('/usr/bin'), True)
+        self.assert_equal(IncludePattern('/usr').match('/usrbin'), False)
+        self.assert_equal(ExcludePattern('*.py').match('foo.py'), True)
+        self.assert_equal(ExcludePattern('*.py').match('foo.pl'), False)
+        self.assert_equal(ExcludePattern('/tmp').match('/tmp'), True)
+        self.assert_equal(ExcludePattern('/tmp').match('/tmp/foo'), True)
+        self.assert_equal(ExcludePattern('/tmp').match('/tmofoo'), False)

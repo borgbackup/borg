@@ -5,3 +5,7 @@
 .. _PBKDF2: https://en.wikipedia.org/wiki/PBKDF2
 .. _ACL: https://en.wikipedia.org/wiki/Access_control_list
 .. _github: https://github.com/jborg/darc
+.. _OpenSSL: https://www.openssl.org/
+.. _Python: http://www.python.org/
+.. _`msgpack-python`: https://pypi.python.org/pypi/msgpack-python/
+.. _homebrew: http://mxcl.github.io/homebrew/

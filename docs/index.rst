@@ -37,7 +37,7 @@ You can use pip to install |project_name| quickly and easily::
 
     $ pip install darc
 
-Python >= 3.2 is required.
+Need more help with installing? See :ref:`installation`
 
 User's Guide
 ============
@@ -45,6 +45,7 @@ User's Guide
 .. toctree::
    :maxdepth: 2
 
+   installation
    generalusage
    faq
    definitions

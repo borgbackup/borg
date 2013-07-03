@@ -90,4 +90,4 @@ class RepositoryTestCase(DarcTestCase):
 class RemoteRepositoryTestCase(RepositoryTestCase):
 
     def open(self, create=False):
-        return RemoteRepository(Location('localhost:' + os.path.join(self.tmppath, 'repository')), create=create)
+        return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')), create=create)

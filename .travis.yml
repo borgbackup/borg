@@ -5,7 +5,8 @@ python:
 # command to install dependencies
 install:
   - "sudo apt-get install fakeroot"
-  - "sudo mount /home -o remount,user_xattr"
+  - "mount"
+  - "sudo mount /home/travis -o remount,user_xattr"
   - "pip install --use-mirrors Cython"
   - "pip install -e ."
 # command to run tests

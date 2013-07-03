@@ -1,41 +1,51 @@
 .. -*- restructuredtext -*-
 
+
+What is darc?
+=============
+Darc is a Deduplicating ARChiver written in Python. The main goal of darc is
+to provide an efficient and secure way to backup data. The data deduplication
+technique used makes darc suitable for taking daily backups.
+
+Main features
+-------------
+Space efficient storage
+  Variable block size deduplication is used to reduce the number of bytes 
+  stored by detecting redundant data. Each file is split into a number of
+  variable length chunks and only chunks that have never been seen before are
+  compressed and added to the repository.
+
+Optional data encryption
+    All data can be protected using 256-bit AES encryption and data integrity
+    and authenticity is verified using HMAC-SHA256.
+
+Off-site backups
+    darc can store data on any remote host accessible over SSH as long as
+    darc is installed.
+
+What do I need?
 ===============
-README for Darc
-===============
+Darc requires Python 3.2 or above to work. Besides Python darc also requires 
+msgpack-python and sufficiently recent OpenSSL (>= 1.0.0).
 
-Installing
-==========
+How do I install it?
+====================
+::
+  $ python setup.py install
 
-Use ``setup.py``::
+Where are the docs?
+===================
+Go to http://pythonhosted.org/darc/ for a prebuilt version of the docs. You
+can also build them yourself form the docs folder.
 
-   python setup.py build
-   sudo python setup.py install
+Where are the tests?
+====================
+The tests are in the darc/testsuite package. To run the test suite use the
+following command::
 
+  $ python -m darc.testsuite.run
 
-Reading the docs
-================
-
-After installing::
-
-   cd docs
-   sphinx-build . _build/html
-
-Then, direct your browser to ``_build/html/index.html``.
-
-Or read them online at <http://jborg.github.com/darc/>.
-
-
-Testing
-=======
-
-To run the tests with the interpreter available as ``python``, use::
-
-	$ python -m darc.test
-
-
-Contributing
-============
+Where can I get help?
+=====================
 
 Send wishes, comments, patches, etc. to jonas@borgstrom.se
-

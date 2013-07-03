@@ -1,0 +1,10 @@
+language: python
+python:
+  - "3.2"
+  - "3.3"
+# command to install dependencies
+install:
+  - "pip install --use-mirrors Cython"
+  - python setup.py install
+# command to run tests
+script: python -m darc.testsuite.run -vb

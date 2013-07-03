@@ -219,4 +219,4 @@ class ArchiverTestCase(DarcTestCase):
 
 
 class RemoteArchiverTestCase(ArchiverTestCase):
-    prefix = 'localhost:'
+    prefix = '__testsuite__:'

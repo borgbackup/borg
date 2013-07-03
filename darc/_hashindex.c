@@ -1,5 +1,4 @@
 #include <assert.h>
-#include <endian.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -154,12 +153,18 @@ hashindex_open(const char *path)
     }
     if((length = lseek(fd, 0, SEEK_END)) < 0) {
         EPRINTF_PATH(path, "lseek failed");
-        close(fd);
+        if(close(fd) < 0) {
+            EPRINTF_PATH(path, "close failed");
+        }
         return NULL;
     }
-    if((addr = mmap(0, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)) == MAP_FAILED) {
+    addr = mmap(0, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if(close(fd) < 0) {
+        EPRINTF_PATH(path, "close failed");
+        return NULL;
+    }
+    if(addr == MAP_FAILED) {
         EPRINTF_PATH(path, "mmap failed");
-        close(fd);
         return NULL;
     }
     header = (HashHeader *)addr;

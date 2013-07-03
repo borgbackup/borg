@@ -41,8 +41,8 @@ class HashIndexTestCase(DarcTestCase):
         self.assert_equal(len(cls(idx_name.name)), 0)
 
     def test_nsindex(self):
-        self._generic_test(NSIndex, lambda x: (x, x), '926af057de19a82903fab517e0813e6fa16e4129df5b7062e9b1f24bbe98fb24')
+        self._generic_test(NSIndex, lambda x: (x, x), '9a6f9cb3c03d83ed611265eeef1f9a9d69c2f0417a35ac14d56ce573d0c8b356')
 
     def test_chunkindex(self):
-        self._generic_test(ChunkIndex, lambda x: (x, x, x), 'cc60ec9265d172b20c33b6c00160abda1a6e881d07088b9d1c5997a82e05f5a7')
+        self._generic_test(ChunkIndex, lambda x: (x, x, x), '9c35f237e533b6d2533d2646da127052d615ab9b66de65a795cd922b337741ca')
 

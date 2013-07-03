@@ -9,19 +9,20 @@ cdef extern from "_hashindex.c":
     HashIndex *hashindex_open(char *path)
     HashIndex *hashindex_create(char *path, int capacity, int key_size, int value_size)
     int hashindex_get_size(HashIndex *index)
-    void hashindex_clear(HashIndex *index)
-    void hashindex_close(HashIndex *index)
-    void hashindex_flush(HashIndex *index)
+    int hashindex_clear(HashIndex *index)
+    int hashindex_close(HashIndex *index)
+    int hashindex_flush(HashIndex *index)
     void *hashindex_get(HashIndex *index, void *key)
     void *hashindex_next_key(HashIndex *index, void *key)
-    void hashindex_delete(HashIndex *index, void *key)
-    void hashindex_set(HashIndex *index, void *key, void *value)
+    int hashindex_delete(HashIndex *index, void *key)
+    int hashindex_set(HashIndex *index, void *key, void *value)
 
 
 _NoDefault = object()
 
 cdef class IndexBase:
     cdef HashIndex *index
+    key_size = 32
 
     def __cinit__(self, path):
         self.index = hashindex_open(<bytes>os.fsencode(path))
@@ -30,17 +31,33 @@ cdef class IndexBase:
 
     def __dealloc__(self):
         if self.index:
-            hashindex_close(self.index)
+            if not hashindex_close(self.index):
+                raise Exception('hashindex_close failed')
+
+    @classmethod
+    def create(cls, path):
+        index = hashindex_create(<bytes>os.fsencode(path), 0, cls.key_size, cls.value_size)
+        if not index:
+            raise Exception('Failed to create %s' % path)
+        hashindex_close(index)
+        return cls(path)
 
     def clear(self):
-        hashindex_clear(self.index)
+        if not hashindex_clear(self.index):
+            raise Exception('hashindex_clear failed')
 
     def flush(self):
-        hashindex_flush(self.index)
+        if not hashindex_flush(self.index):
+            raise Exception('hashindex_flush failed')
 
     def setdefault(self, key, value):
         if not key in self:
             self[key] = value
+
+    def __delitem__(self, key):
+        assert len(key) == 32
+        if not hashindex_delete(self.index, <char *>key):
+            raise Exception('hashindex_delete failed')
 
     def get(self, key, default=None):
         try:
@@ -64,13 +81,7 @@ cdef class IndexBase:
 
 cdef class NSIndex(IndexBase):
 
-    @classmethod
-    def create(cls, path, capacity=16):
-        index = hashindex_create(<bytes>os.fsencode(path), capacity, 32, 8)
-        if not index:
-            raise Exception('Failed to create %s' % path)
-        hashindex_close(index)
-        return cls(path)
+    value_size = 8
 
     def __getitem__(self, key):
         assert len(key) == 32
@@ -79,16 +90,13 @@ cdef class NSIndex(IndexBase):
             raise KeyError
         return data[0], data[1]
 
-    def __delitem__(self, key):
-        assert len(key) == 32
-        hashindex_delete(self.index, <char *>key)
-
     def __setitem__(self, key, value):
         assert len(key) == 32
         cdef int[2] data
         data[0] = value[0]
         data[1] = value[1]
-        hashindex_set(self.index, <char *>key, data)
+        if not hashindex_set(self.index, <char *>key, data):
+            raise Exception('hashindex_set failed')
 
     def __contains__(self, key):
         assert len(key) == 32
@@ -121,11 +129,7 @@ cdef class NSKeyIterator:
 
 cdef class ChunkIndex(IndexBase):
 
-    @classmethod
-    def create(cls, path, capacity=16):
-        index = hashindex_create(<bytes>os.fsencode(path), capacity, 32, 12)
-        hashindex_close(index)
-        return cls(path)
+    value_size = 12
 
     def __getitem__(self, key):
         assert len(key) == 32
@@ -134,17 +138,14 @@ cdef class ChunkIndex(IndexBase):
             raise KeyError
         return data[0], data[1], data[2]
 
-    def __delitem__(self, key):
-        assert len(key) == 32
-        hashindex_delete(self.index, <char *>key)
-
     def __setitem__(self, key, value):
         assert len(key) == 32
         cdef int[3] data
         data[0] = value[0]
         data[1] = value[1]
         data[2] = value[2]
-        hashindex_set(self.index, <char *>key, data)
+        if not hashindex_set(self.index, <char *>key, data):
+            raise Exception('hashindex_set failed')
 
     def __contains__(self, key):
         assert len(key) == 32

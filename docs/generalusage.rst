@@ -4,10 +4,12 @@
 General Usage
 =============
 
-The following examples showcases how to use |project_name| to backup some important files from a users home directory.
+The following examples showcases how to use |project_name| to backup some
+important files from a users home directory.
 
-Initialize a local :ref:`repository <repository_def>` to store backup :ref:`archives <archive_def>` in
-(See :ref:`encrypted_repos` and :ref:`remote_repos` for more details)::
+Initialize a local :ref:`repository <repository_def>` to store backup
+:ref:`archives <archive_def>` in (See :ref:`encrypted_repos` and
+:ref:`remote_repos` for more details)::
 
     $ darc init /somewhere/my-backup.darc
 
@@ -15,9 +17,10 @@ Create an archive containing the ``~/src`` and ``~/Documents`` directories::
 
     $ darc create -v /somwhere/my-backup.darc::first-backup ~/src ~/Documents
 
-Create another archive the next day. This backup will be a lot quicker since only new data is stored.
-The ``--stats`` option tells |project_name| to print statistics about the newly created archive such as
-the amount of unique data (not shared with other archives)::
+Create another archive the next day. This backup will be a lot quicker since
+only new data is stored. The ``--stats`` option tells |project_name| to print
+statistics about the newly created archive such as the amount of unique data
+(not shared with other archives)::
 
     $ darc create -v --stats /somwhere/my-backup.darc::second-backup ~/src ~/Documents
 
@@ -37,8 +40,8 @@ Recover disk space by manually deleting the *first-backup* archive::
 
     $ darc delete /somwhere/my-backup.darc::first-backup
 
-Use the ``prune`` subcommand to delete all archives except a given number of *daily*, *weekly*, 
-*monthly* and *yearly* archives::
+Use the ``prune`` subcommand to delete all archives except a given number of
+*daily*, *weekly*, *monthly* and *yearly* archives::
 
     $ darc prune /somwhere/my-backup.darc --daily=7 --weekly=2 --monthly=6
 
@@ -52,9 +55,8 @@ Repository encryption is enabled at repository encryption time::
 
     $ darc init --passphrase | --key-file
 
-When repository encryption is enabled all data is encrypted using 256-bit
-AES_ encryption and the integrity and authenticity is verified using
-`HMAC-SHA256`_.
+When repository encryption is enabled all data is encrypted using 256-bit AES_
+encryption and the integrity and authenticity is verified using `HMAC-SHA256`_.
 
 |project_name| supports two different methods to derive the AES and HMAC keys.
 
@@ -64,9 +66,8 @@ Passphrase based encryption
     secure as long as a *strong* passphrase is used.
 
 Key file based encryption
-    This method generates random keys at repository initialization time 
-    that are stored in a password protected file in the ``~/.darc/keys/``
-    directory.
+    This method generates random keys at repository initialization time that
+    are stored in a password protected file in the ``~/.darc/keys/`` directory.
     This method is secure and suitable for automated backups.
 
     .. Note::
@@ -79,8 +80,8 @@ Key file based encryption
 Remote repositories
 -------------------
 
-|project_name| can initialize and access repositories on remote hosts as the host
-is accessible using SSH and |project_name| is installed.
+|project_name| can initialize and access repositories on remote hosts as the
+host is accessible using SSH and |project_name| is installed.
 
 The following syntax is used to address remote repositories::
 

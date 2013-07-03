@@ -12,8 +12,8 @@ Currently Linux and MacOS X are supported.
 Can I backup VM disk images?
 ----------------------------
 
-Yes, the :ref:`deduplication <deduplication_def>` technique used by darc
-will make sure only the modified parts of the file is stored.
+Yes, the :ref:`deduplication <deduplication_def>` technique used by darc will
+make sure only the modified parts of the file is stored.
 
 Which file attributes are preserved?
 ------------------------------------

@@ -5,6 +5,6 @@ python:
 # command to install dependencies
 install:
   - "pip install --use-mirrors Cython"
-  - python setup.py install
+  - "pip install -e ."
 # command to run tests
 script: python -m darc.testsuite.run -vb

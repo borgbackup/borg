@@ -4,9 +4,9 @@ python:
   - "3.3"
 # command to install dependencies
 install:
+  - "sudo apt-get install fakeroot"
+  - "sudo mount / -o remount,user_xattr"
   - "pip install --use-mirrors Cython"
   - "pip install -e ."
-  - "apt-get install fakeroot"
-  - "mount / -o remount,user_xattr"
 # command to run tests
 script: fakeroot python -m darc.testsuite.run -vb

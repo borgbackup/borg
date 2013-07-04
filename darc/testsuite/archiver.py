@@ -103,8 +103,8 @@ class ArchiverTestCase(DarcTestCase):
             d2 = [filename] + [getattr(s2, a) for a in attrs]
             # 'st_mtime precision is limited'
             if attrs[-1] == 'st_mtime':
-                d1[-1] = round(d1[-1], 4)
-                d2[-1] = round(d2[-1], 4)
+                d1[-1] = round(d1[-1], 2)
+                d2[-1] = round(d2[-1], 2)
             d1.append(self.get_xattrs(path1))
             d2.append(self.get_xattrs(path2))
             self.assert_equal(d1, d2)

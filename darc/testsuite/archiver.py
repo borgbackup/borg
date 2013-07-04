@@ -33,7 +33,7 @@ class ArchiverTestCase(DarcTestCase):
 
     def setUp(self):
         self.archiver = Archiver()
-        self.tmpdir = tempfile.mkdtemp(dir=os.getcwd())
+        self.tmpdir = tempfile.mkdtemp()
         self.repository_path = os.path.join(self.tmpdir, 'repository')
         self.repository_location = self.prefix + self.repository_path
         self.input_path = os.path.join(self.tmpdir, 'input')
@@ -123,7 +123,8 @@ class ArchiverTestCase(DarcTestCase):
         os.mknod('input/bdev', 0o600 | stat.S_IFBLK,  os.makedev(10, 20))
         # Char device
         os.mknod('input/cdev', 0o600 | stat.S_IFCHR,  os.makedev(30, 40))
-        xattr.set(os.path.join(self.input_path, 'file1'), b'foo', b'bar')
+        if xattr.is_enabled():
+            xattr.set(os.path.join(self.input_path, 'file1'), b'foo', b'bar')
         # Hard link
         os.link(os.path.join(self.input_path, 'file1'),
                 os.path.join(self.input_path, 'hardlink'))

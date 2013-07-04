@@ -1,13 +1,15 @@
-import tempfile
 import os
+import tempfile
+import unittest
 from darc.testsuite import DarcTestCase
-from darc.xattr import lsetxattr, llistxattr, lgetxattr, get_all, set, flistxattr, fgetxattr, fsetxattr
+from darc.xattr import lsetxattr, llistxattr, lgetxattr, get_all, set, flistxattr, fgetxattr, fsetxattr, is_enabled
 
 
+@unittest.skipUnless(is_enabled(), 'xattr not enabled on filesystem')
 class XattrTestCase(DarcTestCase):
 
     def setUp(self):
-        self.tmpfile = tempfile.NamedTemporaryFile(dir=os.getcwd())
+        self.tmpfile = tempfile.NamedTemporaryFile()
         self.symlink = os.path.join(os.path.dirname(self.tmpfile.name), 'symlink')
         os.symlink(self.tmpfile.name, self.symlink)
 

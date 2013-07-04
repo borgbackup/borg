@@ -4,10 +4,22 @@ On Linux only the "user." namespace is accessed
 """
 import os
 import sys
+import tempfile
 from ctypes import CDLL, create_string_buffer, c_ssize_t, c_size_t, c_char_p, c_int, c_uint32, get_errno
 from ctypes.util import find_library
 
 libc = CDLL(find_library('c'), use_errno=True)
+
+
+def is_enabled():
+    """Determine if xattr is enabled on the filesystem
+    """
+    with tempfile.TemporaryFile() as fd:
+        try:
+            set(fd.fileno(), b'name', b'value')
+        except OSError:
+            return False
+        return get_all(fd.fileno()) == {b'name': b'value'}
 
 
 def set(path_or_fd, name, value):

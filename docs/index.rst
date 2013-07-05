@@ -5,7 +5,7 @@ Darc
 |project_name| is a Deduplicating ARChiver written in Python.
 The main goal of |project_name| is to provide an efficient and secure way
 to backup data. The data deduplication technique used makes |project_name|
-suitable for taking daily backups.
+suitable for daily backups since only actual changes are stored.
 
 Main Features
 -------------
@@ -49,8 +49,9 @@ User's Guide
 
    installation
    generalusage
+   detailedusage
    faq
-   definitions
+   terminology
 
 Contribute
 ==========

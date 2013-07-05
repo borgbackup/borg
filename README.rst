@@ -1,14 +1,19 @@
-.. -*- restructuredtext -*-
-
-
 What is darc?
-=============
+-------------
 Darc is a Deduplicating ARChiver written in Python. The main goal of darc is
 to provide an efficient and secure way to backup data. The data deduplication
-technique used makes darc suitable for taking daily backups.
+technique used makes darc suitable for daily backups since only actual changes
+are stored.
+
+Easy to use
+~~~~~~~~~~~
+Initialze backup repository and create a backup archive::
+
+    $ darc init /usbdrive/my-backup.darc
+    $ darc create -v /usbdrive/my-backup.darc::documents ~/Documents
 
 Main features
--------------
+~~~~~~~~~~~~~
 Space efficient storage
   Variable block size deduplication is used to reduce the number of bytes 
   stored by detecting redundant data. Each file is split into a number of
@@ -24,28 +29,28 @@ Off-site backups
     darc is installed.
 
 What do I need?
-===============
+---------------
 Darc requires Python 3.2 or above to work. Besides Python darc also requires 
 msgpack-python and sufficiently recent OpenSSL (>= 1.0.0).
 
 How do I install it?
-====================
+--------------------
 ::
   $ python setup.py install
 
 Where are the docs?
-===================
-Go to http://pythonhosted.org/darc/ for a prebuilt version of the docs. You
+-------------------
+Go to https://pythonhosted.org/darc/ for a prebuilt version of the docs. You
 can also build them yourself form the docs folder.
 
 Where are the tests?
-====================
+--------------------
 The tests are in the darc/testsuite package. To run the test suite use the
 following command::
 
   $ python -m darc.testsuite.run
 
 Where can I get help?
-=====================
-
-Send wishes, comments, patches, etc. to jonas@borgstrom.se
+---------------------
+Send questions, comments, patches, etc. to jonas@borgstrom.se. Issues and
+pull requests can also be created on https://github.com/jborg/darc

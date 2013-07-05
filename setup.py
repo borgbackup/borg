@@ -1,5 +1,4 @@
 # -*- encoding: utf-8 *-*
-#!/usr/bin/env python
 import os
 import sys
 from glob import glob
@@ -45,6 +44,9 @@ except ImportError:
     if not os.path.exists(chunker_source) or not os.path.exists(hashindex_source):
         raise ImportError('The GIT version of darc needs Cython. Install Cython or use a released version')
 
+with open('README.rst', 'r') as fd:
+    long_description = fd.read()
+
 setup(
     name='darc',
     version=darc.__release__,
@@ -52,6 +54,7 @@ setup(
     author_email='jonas@borgstrom.se',
     url='http://github.com/jborg/darc/',
     description='Deduplicating ARChiver written in Python',
+    long_description=long_description,
     license='BSD',
     platforms=['Linux', 'MacOS X'],
     classifiers=[

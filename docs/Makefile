@@ -37,6 +37,7 @@ clean:
 	-rm -rf $(BUILDDIR)/*
 
 html:
+	./update_usage.sh
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
@@ -138,4 +139,4 @@ gh-pages: html
 	rm -rf $$GH_PAGES_CLONE
 
 inotify:
-	while inotifywait -r .; do make html ; done
+	while inotifywait -r . --exclude usage.rst --exclude '_build/*' ; do make html ; done

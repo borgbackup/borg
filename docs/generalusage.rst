@@ -5,7 +5,8 @@ General Usage
 =============
 
 The following examples showcases how to use |project_name| to backup some
-important files from a users home directory.
+important files from a users home directory (for more detailed information
+about each subcommand see the :ref:`detailed_usage` section).
 
 Initialize a local :ref:`repository <repository_def>` to store backup
 :ref:`archives <archive_def>` in (See :ref:`encrypted_repos` and

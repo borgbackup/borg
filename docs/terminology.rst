@@ -1,7 +1,7 @@
-.. _definitions:
+.. _terminology:
 .. include:: global.rst.inc
 
-Definitions
+Terminology
 ===========
 
 .. _deduplication_def:

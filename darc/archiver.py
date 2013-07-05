@@ -46,6 +46,8 @@ class Archiver:
         return RepositoryServer().serve()
 
     def do_init(self, args):
+        """Initialize a new repository
+        """
         print('Initializing repository at "%s"' % args.repository.orig)
         repository = self.open_repository(args.repository, create=True)
         key = key_creator(repository, args)
@@ -57,12 +59,16 @@ class Archiver:
         return self.exit_code
 
     def do_change_passphrase(self, args):
+        """Change passphrase on repository key file
+        """
         repository = self.open_repository(Location(args.repository))
         manifest, key = Manifest.load(repository)
         key.change_passphrase()
         return self.exit_code
 
     def do_create(self, args):
+        """Create new archive
+        """
         t0 = datetime.now()
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
@@ -150,6 +156,8 @@ class Archiver:
             self.print_error('Unknown file type: %s', path)
 
     def do_extract(self, args):
+        """Extract archive contents
+        """
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
         archive = Archive(repository, key, manifest, args.archive.archive,
@@ -174,6 +182,8 @@ class Archiver:
         return self.exit_code
 
     def do_delete(self, args):
+        """Delete archive
+        """
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest)
@@ -182,6 +192,8 @@ class Archiver:
         return self.exit_code
 
     def do_list(self, args):
+        """List archive or repository contents
+        """
         repository = self.open_repository(args.src)
         manifest, key = Manifest.load(repository)
         if args.src.archive:
@@ -214,6 +226,8 @@ class Archiver:
         return self.exit_code
 
     def do_verify(self, args):
+        """Verify archive consistency
+        """
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
         archive = Archive(repository, key, manifest, args.archive.archive)
@@ -234,6 +248,8 @@ class Archiver:
         return self.exit_code
 
     def do_info(self, args):
+        """Show archive details such as disk space used
+        """
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest)
@@ -249,6 +265,8 @@ class Archiver:
         return self.exit_code
 
     def do_prune(self, args):
+        """Prune repository archives according to specified rules
+        """
         repository = self.open_repository(args.repository)
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest)
@@ -294,7 +312,7 @@ class Archiver:
         common_parser = argparse.ArgumentParser(add_help=False)
         common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
                             default=False,
-                            help='Verbose output')
+                            help='verbose output')
 
         parser = argparse.ArgumentParser(description='Darc - Deduplicating Archiver')
         subparsers = parser.add_subparsers(title='Available subcommands')
@@ -302,104 +320,113 @@ class Archiver:
         subparser = subparsers.add_parser('serve', parents=[common_parser])
         subparser.set_defaults(func=self.do_serve)
 
-        subparser = subparsers.add_parser('init', parents=[common_parser])
+        subparser = subparsers.add_parser('init', parents=[common_parser],
+                                          description=self.do_init.__doc__)
         subparser.set_defaults(func=self.do_init)
         subparser.add_argument('repository',
                                type=location_validator(archive=False),
-                               help='Repository to create')
+                               help='repository to create')
         subparser.add_argument('--key-file', dest='keyfile',
                                action='store_true', default=False,
-                               help='Encrypt data using key file')
+                               help='enable key file based encryption')
         subparser.add_argument('--passphrase', dest='passphrase',
                                action='store_true', default=False,
-                               help='Encrypt data using passphrase derived keys')
+                               help='enable passphrase based encryption')
 
-        subparser = subparsers.add_parser('change-passphrase', parents=[common_parser])
+        subparser = subparsers.add_parser('change-passphrase', parents=[common_parser],
+                                          description=self.do_change_passphrase.__doc__)
         subparser.set_defaults(func=self.do_change_passphrase)
         subparser.add_argument('repository', type=location_validator(archive=False))
 
-        subparser = subparsers.add_parser('create', parents=[common_parser])
+        subparser = subparsers.add_parser('create', parents=[common_parser],
+                                          description=self.do_create.__doc__)
         subparser.set_defaults(func=self.do_create)
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
-                               help='Print statistics for the created archive')
+                               help='print statistics for the created archive')
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
-                               help='Exclude condition')
+                               metavar="PATTERN", help='exclude paths matching PATTERN')
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                type=int, default=300, metavar='SECONDS',
-                               help='Write checkpointe ever SECONDS seconds (Default: 300)')
+                               help='write checkpointe ever SECONDS seconds (Default: 300)')
         subparser.add_argument('--do-not-cross-mountpoints', dest='dontcross',
                                action='store_true', default=False,
-                               help='Do not cross mount points')
+                               help='do not cross mount points')
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,
-                               help='Only store numeric user and group identifiers')
+                               help='only store numeric user and group identifiers')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
-                               help='Archive to create')
+                               help='archive to create')
         subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
-                               help='Paths to archive')
+                               help='paths to archive')
 
-        subparser = subparsers.add_parser('extract', parents=[common_parser])
+        subparser = subparsers.add_parser('extract', parents=[common_parser],
+                                          description=self.do_extract.__doc__)
         subparser.set_defaults(func=self.do_extract)
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
-                               help='Exclude condition')
+                               metavar="PATTERN", help='exclude paths matching PATTERN')
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,
-                               help='Only obey numeric user and group identifiers')
+                               help='only obey numeric user and group identifiers')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
-                               help='Archive to extract')
+                               help='archive to extract')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='Paths to extract')
+                               help='paths to extract')
 
-        subparser = subparsers.add_parser('delete', parents=[common_parser])
+        subparser = subparsers.add_parser('delete', parents=[common_parser],
+                                          description=self.do_delete.__doc__)
         subparser.set_defaults(func=self.do_delete)
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
-                               help='Archive to delete')
+                               help='archive to delete')
 
-        subparser = subparsers.add_parser('list', parents=[common_parser])
+        subparser = subparsers.add_parser('list', parents=[common_parser],
+                                          description=self.do_list.__doc__)
         subparser.set_defaults(func=self.do_list)
         subparser.add_argument('src', metavar='SRC', type=location_validator(),
-                               help='Repository/Archive to list contents of')
+                               help='repository/Archive to list contents of')
 
-        subparser = subparsers.add_parser('verify', parents=[common_parser])
+        subparser = subparsers.add_parser('verify', parents=[common_parser],
+                                          description=self.do_verify.__doc__)
         subparser.set_defaults(func=self.do_verify)
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
-                               help='Include condition')
+                               metavar="PATTERN", help='exclude paths matching PATTERN')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
-                               help='Archive to verity integrity of')
+                               help='archive to verity integrity of')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='Paths to verify')
+                               help='paths to verify')
 
-        subparser = subparsers.add_parser('info', parents=[common_parser])
+        subparser = subparsers.add_parser('info', parents=[common_parser],
+                                          description=self.do_info.__doc__)
         subparser.set_defaults(func=self.do_info)
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
-                               help='Archive to display information about')
+                               help='archive to display information about')
 
-        subparser = subparsers.add_parser('prune', parents=[common_parser])
+        subparser = subparsers.add_parser('prune', parents=[common_parser],
+                                          description=self.do_prune.__doc__)
         subparser.set_defaults(func=self.do_prune)
         subparser.add_argument('-H', '--hourly', dest='hourly', type=int, default=0,
-                               help='Number of hourly archives to keep')
+                               help='number of hourly archives to keep')
         subparser.add_argument('-d', '--daily', dest='daily', type=int, default=0,
-                               help='Number of daily archives to keep')
+                               help='number of daily archives to keep')
         subparser.add_argument('-w', '--weekly', dest='weekly', type=int, default=0,
-                               help='Number of daily archives to keep')
+                               help='number of daily archives to keep')
         subparser.add_argument('-m', '--monthly', dest='monthly', type=int, default=0,
-                               help='Number of monthly archives to keep')
+                               help='number of monthly archives to keep')
         subparser.add_argument('-y', '--yearly', dest='yearly', type=int, default=0,
-                               help='Number of yearly archives to keep')
+                               help='number of yearly archives to keep')
         subparser.add_argument('-p', '--prefix', dest='prefix', type=str,
-                               help='Only consider archive names starting with this prefix')
+                               help='only consider archive names starting with this prefix')
         subparser.add_argument('repository', metavar='REPOSITORY',
                                type=location_validator(archive=False),
-                               help='Repository to prune')
+                               help='repository to prune')
         args = parser.parse_args(args or ['-h'])
         self.verbose = args.verbose
         return args.func(args)

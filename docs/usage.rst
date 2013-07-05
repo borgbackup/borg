@@ -1,7 +1,7 @@
 .. _usage_darc_init:
 
 darc init
-~~~~~~
+~~~~~~~~~
 ::
 
 usage: darc init [-h] [-v] [--key-file] [--passphrase] repository
@@ -19,7 +19,7 @@ optional arguments:
 .. _usage_darc_create:
 
 darc create
-~~~~~~
+~~~~~~~~~~~
 ::
 
 usage: darc create [-h] [-v] [-s] [-e PATTERN] [-c SECONDS]
@@ -46,7 +46,7 @@ optional arguments:
 .. _usage_darc_extract:
 
 darc extract
-~~~~~~
+~~~~~~~~~~~~
 ::
 
 usage: darc extract [-h] [-v] [-e PATTERN] [--numeric-owner]
@@ -67,7 +67,7 @@ optional arguments:
 .. _usage_darc_delete:
 
 darc delete
-~~~~~~
+~~~~~~~~~~~
 ::
 
 usage: darc delete [-h] [-v] ARCHIVE
@@ -83,7 +83,7 @@ optional arguments:
 .. _usage_darc_prune:
 
 darc prune
-~~~~~~
+~~~~~~~~~~
 ::
 
 usage: darc prune [-h] [-v] [-H HOURLY] [-d DAILY] [-w WEEKLY] [-m MONTHLY]
@@ -113,7 +113,7 @@ optional arguments:
 .. _usage_darc_verify:
 
 darc verify
-~~~~~~
+~~~~~~~~~~~
 ::
 
 usage: darc verify [-h] [-v] [-e PATTERN] ARCHIVE [PATH [PATH ...]]
@@ -132,7 +132,7 @@ optional arguments:
 .. _usage_darc_change-passphrase:
 
 darc change-passphrase
-~~~~~~
+~~~~~~~~~~~-~~~~~~~~~~
 ::
 
 usage: darc change-passphrase [-h] [-v] repository

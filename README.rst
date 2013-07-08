@@ -35,8 +35,8 @@ msgpack-python and sufficiently recent OpenSSL (>= 1.0.0).
 
 How do I install it?
 --------------------
-
 ::
+
   $ pip install darc
 
 Where are the docs?

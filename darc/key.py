@@ -73,19 +73,12 @@ class PlaintextKey(KeyBase):
         return sha256(data).digest()
 
     def encrypt(self, data):
-        cdata = zlib.compress(data)
-        hash = sha256(cdata).digest()
-        return b''.join([self.TYPE_STR, hash, cdata])
+        return b''.join([self.TYPE_STR, zlib.compress(data)])
 
     def decrypt(self, id, data):
         if data[0] != self.TYPE:
             raise IntegrityError('Invalid encryption envelope')
-        # This is just a hash and not a hmac but it will at least
-        # stop unintentionally corrupted data from hitting zlib.decompress()
-        hash = memoryview(data)[1:33]
-        if memoryview(sha256(memoryview(data)[33:]).digest()) != hash:
-            raise IntegrityError('Payload checksum mismatch')
-        data = zlib.decompress(memoryview(data)[33:])
+        data = zlib.decompress(memoryview(data)[1:])
         if id and sha256(data).digest() != id:
             raise IntegrityError('Chunk id verification failed')
         return data

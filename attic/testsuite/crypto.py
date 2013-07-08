@@ -1,9 +1,9 @@
 from binascii import hexlify
-from darc.testsuite import DarcTestCase
-from darc.crypto import AES, bytes_to_long, bytes_to_int, long_to_bytes, pbkdf2_sha256, get_random_bytes
+from attic.testsuite import AtticTestCase
+from attic.crypto import AES, bytes_to_long, bytes_to_int, long_to_bytes, pbkdf2_sha256, get_random_bytes
 
 
-class CryptoTestCase(DarcTestCase):
+class CryptoTestCase(AtticTestCase):
 
     def test_bytes_to_int(self):
         self.assert_equal(bytes_to_int(b'\0\0\0\1'), 1)

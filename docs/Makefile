@@ -73,17 +73,17 @@ qthelp:
 	@echo
 	@echo "Build finished; now you can run "qcollectiongenerator" with the" \
 	      ".qhcp project file in $(BUILDDIR)/qthelp, like this:"
-	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/Darc.qhcp"
+	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/attic.qhcp"
 	@echo "To view the help file:"
-	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/Darc.qhc"
+	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/attic.qhc"
 
 devhelp:
 	$(SPHINXBUILD) -b devhelp $(ALLSPHINXOPTS) $(BUILDDIR)/devhelp
 	@echo
 	@echo "Build finished."
 	@echo "To view the help file:"
-	@echo "# mkdir -p $$HOME/.local/share/devhelp/Darc"
-	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/Darc"
+	@echo "# mkdir -p $$HOME/.local/share/devhelp/attic"
+	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/attic"
 	@echo "# devhelp"
 
 epub:

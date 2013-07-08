@@ -1,7 +1,7 @@
 import unittest
 
 
-class DarcTestCase(unittest.TestCase):
+class AtticTestCase(unittest.TestCase):
     """
     """
     assert_equal = unittest.TestCase.assertEqual
@@ -25,7 +25,7 @@ class TestLoader(unittest.TestLoader):
     """A customzied test loader that properly detects and filters our test cases
     """
     def loadTestsFromName(self, pattern, module=None):
-        suite = self.discover('darc.testsuite', '*.py')
+        suite = self.discover('attic.testsuite', '*.py')
         tests = unittest.TestSuite()
         for test in get_tests(suite):
             if pattern.lower() in test.id().lower():

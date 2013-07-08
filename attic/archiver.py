@@ -32,7 +32,7 @@ class Archiver:
     def print_error(self, msg, *args):
         msg = args and msg % args or msg
         self.exit_code = 1
-        print('darc: ' + msg, file=sys.stderr)
+        print('attic: ' + msg, file=sys.stderr)
 
     def print_verbose(self, msg, *args, **kw):
         if self.verbose:
@@ -76,7 +76,7 @@ class Archiver:
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
                           create=True, checkpoint_interval=args.checkpoint_interval,
                           numeric_owner=args.numeric_owner)
-        # Add darc cache dir to inode_skip list
+        # Add Attic cache dir to inode_skip list
         skip_inodes = set()
         try:
             st = os.stat(get_cache_dir())
@@ -314,7 +314,7 @@ class Archiver:
                             default=False,
                             help='verbose output')
 
-        parser = argparse.ArgumentParser(description='Darc - Deduplicating Archiver')
+        parser = argparse.ArgumentParser(description='Attic - Deduplicated Backups')
         subparsers = parser.add_subparsers(title='Available subcommands')
 
         subparser = subparsers.add_parser('serve', parents=[common_parser])

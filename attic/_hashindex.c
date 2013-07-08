@@ -35,7 +35,7 @@ typedef struct {
     int upper_limit;
 } HashIndex;
 
-#define MAGIC "DARCHASH"
+#define MAGIC "ATTICIDX"
 #define EMPTY ((int32_t)-1)
 #define DELETED ((int32_t)-2)
 #define MAX_BUCKET_SIZE 512

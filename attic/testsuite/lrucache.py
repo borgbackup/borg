@@ -1,8 +1,8 @@
-from darc.lrucache import LRUCache
-from darc.testsuite import DarcTestCase
+from attic.lrucache import LRUCache
+from attic.testsuite import AtticTestCase
 
 
-class LRUCacheTestCase(DarcTestCase):
+class LRUCacheTestCase(AtticTestCase):
 
     def test(self):
         c = LRUCache(2)

@@ -1,10 +1,10 @@
 import hashlib
 import tempfile
-from darc.hashindex import NSIndex, ChunkIndex
-from darc.testsuite import DarcTestCase
+from attic.hashindex import NSIndex, ChunkIndex
+from attic.testsuite import AtticTestCase
 
 
-class HashIndexTestCase(DarcTestCase):
+class HashIndexTestCase(AtticTestCase):
 
     def _generic_test(self, cls, make_value, sha):
         idx_name = tempfile.NamedTemporaryFile()
@@ -41,8 +41,8 @@ class HashIndexTestCase(DarcTestCase):
         self.assert_equal(len(cls(idx_name.name)), 0)
 
     def test_nsindex(self):
-        self._generic_test(NSIndex, lambda x: (x, x), '9a6f9cb3c03d83ed611265eeef1f9a9d69c2f0417a35ac14d56ce573d0c8b356')
+        self._generic_test(NSIndex, lambda x: (x, x), '369a18ae6a52524eb2884a3c0fdc2824947edd017a2688c5d4d7b3510c245ab9')
 
     def test_chunkindex(self):
-        self._generic_test(ChunkIndex, lambda x: (x, x, x), '9c35f237e533b6d2533d2646da127052d615ab9b66de65a795cd922b337741ca')
+        self._generic_test(ChunkIndex, lambda x: (x, x, x), 'ed22e8a883400453c0ee79a06c54df72c994a54eeefdc6c0989efdc5ee6d07b7')
 

@@ -1,12 +1,12 @@
 import os
 import tempfile
 import unittest
-from darc.testsuite import DarcTestCase
-from darc.xattr import lsetxattr, llistxattr, lgetxattr, get_all, set, flistxattr, fgetxattr, fsetxattr, is_enabled
+from attic.testsuite import AtticTestCase
+from attic.xattr import lsetxattr, llistxattr, lgetxattr, get_all, set, flistxattr, fgetxattr, fsetxattr, is_enabled
 
 
 @unittest.skipUnless(is_enabled(), 'xattr not enabled on filesystem')
-class XattrTestCase(DarcTestCase):
+class XattrTestCase(AtticTestCase):
 
     def setUp(self):
         self.tmpfile = tempfile.NamedTemporaryFile()

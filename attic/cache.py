@@ -35,7 +35,7 @@ class Cache(object):
         """
         os.makedirs(self.path)
         with open(os.path.join(self.path, 'README'), 'w') as fd:
-            fd.write('This is a DARC cache')
+            fd.write('This is an Attic cache')
         config = RawConfigParser()
         config.add_section('cache')
         config.set('cache', 'version', '1')
@@ -49,14 +49,14 @@ class Cache(object):
 
     def open(self):
         if not os.path.isdir(self.path):
-            raise Exception('%s Does not look like a darc cache' % self.path)
+            raise Exception('%s Does not look like an Attic cache' % self.path)
         self.lock_fd = open(os.path.join(self.path, 'README'), 'r+')
         fcntl.flock(self.lock_fd, fcntl.LOCK_EX)
         self.rollback()
         self.config = RawConfigParser()
         self.config.read(os.path.join(self.path, 'config'))
         if self.config.getint('cache', 'version') != 1:
-            raise Exception('%s Does not look like a darc cache')
+            raise Exception('%s Does not look like an Attic cache')
         self.id = self.config.get('cache', 'repository')
         self.manifest_id = unhexlify(self.config.get('cache', 'manifest'))
         self.chunks = ChunkIndex(os.path.join(self.path, 'chunks').encode('utf-8'))

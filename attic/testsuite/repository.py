@@ -1,13 +1,13 @@
 import os
 import shutil
 import tempfile
-from darc.helpers import Location
-from darc.remote import RemoteRepository
-from darc.repository import Repository
-from darc.testsuite import DarcTestCase
+from attic.helpers import Location
+from attic.remote import RemoteRepository
+from attic.repository import Repository
+from attic.testsuite import AtticTestCase
 
 
-class RepositoryTestCase(DarcTestCase):
+class RepositoryTestCase(AtticTestCase):
 
     def open(self, create=False):
         return Repository(os.path.join(self.tmppath, 'repository'), create=create)

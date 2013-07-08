@@ -3,19 +3,19 @@ import re
 import shutil
 import tempfile
 from binascii import hexlify
-from darc.crypto import bytes_to_long
-from darc.testsuite import DarcTestCase
-from darc.key import PlaintextKey, PassphraseKey, KeyfileKey
-from darc.helpers import Location, unhexlify
+from attic.crypto import bytes_to_long
+from attic.testsuite import AtticTestCase
+from attic.key import PlaintextKey, PassphraseKey, KeyfileKey
+from attic.helpers import Location, unhexlify
 
 
-class KeyTestCase(DarcTestCase):
+class KeyTestCase(AtticTestCase):
 
     class MockArgs(object):
         repository = Location(tempfile.mkstemp()[1])
 
     keyfile2_key_file = """
-        DARC KEY 0000000000000000000000000000000000000000000000000000000000000000
+        ATTIC KEY 0000000000000000000000000000000000000000000000000000000000000000
         hqppdGVyYXRpb25zzgABhqCkaGFzaNoAIMyonNI+7Cjv0qHi0AOBM6bLGxACJhfgzVD2oq
         bIS9SFqWFsZ29yaXRobaZzaGEyNTakc2FsdNoAINNK5qqJc1JWSUjACwFEWGTdM7Nd0a5l
         1uBGPEb+9XM9p3ZlcnNpb24BpGRhdGHaANAYDT5yfPpU099oBJwMomsxouKyx/OG4QIXK2
@@ -32,7 +32,7 @@ class KeyTestCase(DarcTestCase):
 
     def setUp(self):
         self.tmppath = tempfile.mkdtemp()
-        os.environ['DARC_KEYS_DIR'] = self.tmppath
+        os.environ['ATTIC_KEYS_DIR'] = self.tmppath
 
     def tearDown(self):
         shutil.rmtree(self.tmppath)
@@ -44,13 +44,6 @@ class KeyTestCase(DarcTestCase):
         _location = _Location()
         id = bytes(32)
 
-    def setUp(self):
-        self.tmpdir = tempfile.mkdtemp()
-        os.environ['DARC_KEYS_DIR'] = self.tmpdir
-
-    def tearDown(self):
-        shutil.rmtree(self.tmpdir)
-
     def test_plaintext(self):
         key = PlaintextKey.create(None, None)
         data = b'foo'
@@ -58,7 +51,7 @@ class KeyTestCase(DarcTestCase):
         self.assert_equal(data, key.decrypt(key.id_hash(data), key.encrypt(data)))
 
     def test_keyfile(self):
-        os.environ['DARC_PASSPHRASE'] = 'test'
+        os.environ['ATTIC_PASSPHRASE'] = 'test'
         key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
         self.assert_equal(bytes_to_long(key.enc_cipher.iv, 8), 0)
         manifest = key.encrypt(b'')
@@ -72,14 +65,14 @@ class KeyTestCase(DarcTestCase):
         self.assert_equal(data, key2.decrypt(key.id_hash(data), key.encrypt(data)))
 
     def test_keyfile2(self):
-        with open(os.path.join(os.environ['DARC_KEYS_DIR'], 'keyfile'), 'w') as fd:
+        with open(os.path.join(os.environ['ATTIC_KEYS_DIR'], 'keyfile'), 'w') as fd:
             fd.write(self.keyfile2_key_file)
-        os.environ['DARC_PASSPHRASE'] = 'passphrase'
+        os.environ['ATTIC_PASSPHRASE'] = 'passphrase'
         key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
         self.assert_equal(key.decrypt(self.keyfile2_id, self.keyfile2_cdata), b'payload')
 
     def test_passphrase(self):
-        os.environ['DARC_PASSPHRASE'] = 'test'
+        os.environ['ATTIC_PASSPHRASE'] = 'test'
         key = PassphraseKey.create(self.MockRepository(), None)
         self.assert_equal(bytes_to_long(key.enc_cipher.iv, 8), 0)
         self.assert_equal(hexlify(key.id_key), b'793b0717f9d8fb01c751a487e9b827897ceea62409870600013fbc6b4d8d7ca6')

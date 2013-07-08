@@ -12,39 +12,39 @@ Initialize a local :ref:`repository <repository_def>` to store backup
 :ref:`archives <archive_def>` in (See :ref:`encrypted_repos` and
 :ref:`remote_repos` for more details)::
 
-    $ darc init /somewhere/my-backup.darc
+    $ attic init /somewhere/my-backup.attic
 
 Create an archive containing the ``~/src`` and ``~/Documents`` directories::
 
-    $ darc create -v /somwhere/my-backup.darc::first-backup ~/src ~/Documents
+    $ attic create -v /somwhere/my-backup.attic::first-backup ~/src ~/Documents
 
 Create another archive the next day. This backup will be a lot quicker since
 only new data is stored. The ``--stats`` option tells |project_name| to print
 statistics about the newly created archive such as the amount of unique data
 (not shared with other archives)::
 
-    $ darc create -v --stats /somwhere/my-backup.darc::second-backup ~/src ~/Documents
+    $ attic create -v --stats /somwhere/my-backup.attic::second-backup ~/src ~/Documents
 
 List all archives in the repository::
 
-    $ darc list /somewhere/my-backup.darc
+    $ attic list /somewhere/my-backup.attic
 
 List the files in the *first-backup* archive::
 
-    $ darc list /somewhere/my-backup.darc::first-backup
+    $ attic list /somewhere/my-backup.attic::first-backup
 
 Restore the *first-backup* archive::
 
-    $ darc extract -v /somwhere/my-backup.darc::first-backup
+    $ attic extract -v /somwhere/my-backup.attic::first-backup
 
 Recover disk space by manually deleting the *first-backup* archive::
 
-    $ darc delete /somwhere/my-backup.darc::first-backup
+    $ attic delete /somwhere/my-backup.attic::first-backup
 
 Use the ``prune`` subcommand to delete all archives except a given number of
 *daily*, *weekly*, *monthly* and *yearly* archives::
 
-    $ darc prune /somwhere/my-backup.darc --daily=7 --weekly=2 --monthly=6
+    $ attic prune /somwhere/my-backup.attic --daily=7 --weekly=2 --monthly=6
 
 
 .. _encrypted_repos:
@@ -54,7 +54,7 @@ Repository encryption
 
 Repository encryption is enabled at repository encryption time::
 
-    $ darc init --passphrase | --key-file
+    $ attic init --passphrase | --key-file
 
 When repository encryption is enabled all data is encrypted using 256-bit AES_
 encryption and the integrity and authenticity is verified using `HMAC-SHA256`_.
@@ -68,7 +68,7 @@ Passphrase based encryption
 
 Key file based encryption
     This method generates random keys at repository initialization time that
-    are stored in a password protected file in the ``~/.darc/keys/`` directory.
+    are stored in a password protected file in the ``~/.attic/keys/`` directory.
     This method is secure and suitable for automated backups.
 
     .. Note::
@@ -86,8 +86,8 @@ host is accessible using SSH and |project_name| is installed.
 
 The following syntax is used to address remote repositories::
 
-  $ darc init user@hostname:repository.darc
+  $ attic init user@hostname:repository.attic
 
 or::
 
-  $ darc init ssh://user@hostname:port/repository.darc
+  $ attic init ssh://user@hostname:port/repository.attic

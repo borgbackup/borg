@@ -5,8 +5,6 @@ import os
 import re
 import shutil
 import struct
-import tempfile
-import unittest
 from zlib import crc32
 
 from .hashindex import NSIndex
@@ -14,7 +12,7 @@ from .helpers import IntegrityError, read_msgpack, write_msgpack, unhexlify
 from .lrucache import LRUCache
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
-
+MAGIC = b'ATTICSEG'
 TAG_PUT = 0
 TAG_DELETE = 1
 TAG_COMMIT = 2
@@ -57,7 +55,7 @@ class Repository(object):
         if not os.path.exists(path):
             os.mkdir(path)
         with open(os.path.join(path, 'README'), 'w') as fd:
-            fd.write('This is a DARC repository\n')
+            fd.write('This is an Attic repository\n')
         os.mkdir(os.path.join(path, 'data'))
         config = RawConfigParser()
         config.add_section('repository')
@@ -78,7 +76,7 @@ class Repository(object):
         self.config = RawConfigParser()
         self.config.read(os.path.join(self.path, 'config'))
         if self.config.getint('repository', 'version') != 1:
-            raise Exception('%s Does not look like a darc repository')
+            raise Exception('%s Does not look like an Attic repository')
         self.max_segment_size = self.config.getint('repository', 'max_segment_size')
         self.segments_per_dir = self.config.getint('repository', 'segments_per_dir')
         self.id = unhexlify(self.config.get('repository', 'id').strip())
@@ -325,7 +323,7 @@ class LoggedIO(object):
                 if not os.path.exists(dirname):
                     os.mkdir(dirname)
             self._write_fd = open(self.segment_filename(self.segment), 'ab')
-            self._write_fd.write(b'DSEGMENT')
+            self._write_fd.write(MAGIC)
             self.offset = 8
         return self._write_fd
 
@@ -346,7 +344,7 @@ class LoggedIO(object):
     def iter_objects(self, segment, lookup=None, include_data=False):
         fd = self.get_fd(segment)
         fd.seek(0)
-        if fd.read(8) != b'DSEGMENT':
+        if fd.read(8) != MAGIC:
             raise IntegrityError('Invalid segment header')
         offset = 8
         header = fd.read(self.header_fmt.size)

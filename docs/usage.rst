@@ -1,10 +1,10 @@
-.. _usage_darc_init:
+.. _usage_attic_init:
 
-darc init
-~~~~~~~~~
+attic init
+~~~~~~~~~~
 ::
 
-usage: darc init [-h] [-v] [--key-file] [--passphrase] repository
+usage: attic init [-h] [-v] [--key-file] [--passphrase] repository
 
 Initialize a new repository
 
@@ -16,15 +16,15 @@ optional arguments:
   -v, --verbose  verbose output
   --key-file     enable key file based encryption
   --passphrase   enable passphrase based encryption
-.. _usage_darc_create:
+.. _usage_attic_create:
 
-darc create
-~~~~~~~~~~~
+attic create
+~~~~~~~~~~~~
 ::
 
-usage: darc create [-h] [-v] [-s] [-e PATTERN] [-c SECONDS]
-                   [--do-not-cross-mountpoints] [--numeric-owner]
-                   ARCHIVE PATH [PATH ...]
+usage: attic create [-h] [-v] [-s] [-e PATTERN] [-c SECONDS]
+                    [--do-not-cross-mountpoints] [--numeric-owner]
+                    ARCHIVE PATH [PATH ...]
 
 Create new archive
 
@@ -43,14 +43,14 @@ optional arguments:
   --do-not-cross-mountpoints
                         do not cross mount points
   --numeric-owner       only store numeric user and group identifiers
-.. _usage_darc_extract:
+.. _usage_attic_extract:
 
-darc extract
-~~~~~~~~~~~~
+attic extract
+~~~~~~~~~~~~~
 ::
 
-usage: darc extract [-h] [-v] [-e PATTERN] [--numeric-owner]
-                    ARCHIVE [PATH [PATH ...]]
+usage: attic extract [-h] [-v] [-e PATTERN] [--numeric-owner]
+                     ARCHIVE [PATH [PATH ...]]
 
 Extract archive contents
 
@@ -64,13 +64,13 @@ optional arguments:
   -e PATTERN, --exclude PATTERN
                         exclude paths matching PATTERN
   --numeric-owner       only obey numeric user and group identifiers
-.. _usage_darc_delete:
+.. _usage_attic_delete:
 
-darc delete
-~~~~~~~~~~~
+attic delete
+~~~~~~~~~~~~
 ::
 
-usage: darc delete [-h] [-v] ARCHIVE
+usage: attic delete [-h] [-v] ARCHIVE
 
 Delete archive
 
@@ -80,15 +80,15 @@ positional arguments:
 optional arguments:
   -h, --help     show this help message and exit
   -v, --verbose  verbose output
-.. _usage_darc_prune:
+.. _usage_attic_prune:
 
-darc prune
-~~~~~~~~~~
+attic prune
+~~~~~~~~~~~
 ::
 
-usage: darc prune [-h] [-v] [-H HOURLY] [-d DAILY] [-w WEEKLY] [-m MONTHLY]
-                  [-y YEARLY] [-p PREFIX]
-                  REPOSITORY
+usage: attic prune [-h] [-v] [-H HOURLY] [-d DAILY] [-w WEEKLY] [-m MONTHLY]
+                   [-y YEARLY] [-p PREFIX]
+                   REPOSITORY
 
 Prune repository archives according to specified rules
 
@@ -110,13 +110,13 @@ optional arguments:
                         number of yearly archives to keep
   -p PREFIX, --prefix PREFIX
                         only consider archive names starting with this prefix
-.. _usage_darc_verify:
+.. _usage_attic_verify:
 
-darc verify
-~~~~~~~~~~~
+attic verify
+~~~~~~~~~~~~
 ::
 
-usage: darc verify [-h] [-v] [-e PATTERN] ARCHIVE [PATH [PATH ...]]
+usage: attic verify [-h] [-v] [-e PATTERN] ARCHIVE [PATH [PATH ...]]
 
 Verify archive consistency
 
@@ -129,13 +129,13 @@ optional arguments:
   -v, --verbose         verbose output
   -e PATTERN, --exclude PATTERN
                         exclude paths matching PATTERN
-.. _usage_darc_change-passphrase:
+.. _usage_attic_change-passphrase:
 
-darc change-passphrase
-~~~~~~~~~~~-~~~~~~~~~~
+attic change-passphrase
+~~~~~~~~~~~~-~~~~~~~~~~
 ::
 
-usage: darc change-passphrase [-h] [-v] repository
+usage: attic change-passphrase [-h] [-v] repository
 
 Change passphrase on repository key file
 

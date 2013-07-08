@@ -1,5 +1,5 @@
 import unittest
-from darc.testsuite import TestLoader
+from attic.testsuite import TestLoader
 
 
 def main():

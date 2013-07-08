@@ -1,9 +1,9 @@
 from datetime import datetime
-from darc.helpers import Location, format_timedelta, IncludePattern, ExcludePattern
-from darc.testsuite import DarcTestCase
+from attic.helpers import Location, format_timedelta, IncludePattern, ExcludePattern
+from attic.testsuite import AtticTestCase
 
 
-class LocationTestCase(DarcTestCase):
+class LocationTestCase(AtticTestCase):
 
     def test(self):
         self.assert_equal(
@@ -19,8 +19,8 @@ class LocationTestCase(DarcTestCase):
             "Location(proto='ssh', user='user', host='host', port=22, path='/some/path', archive='archive')"
         )
         self.assert_equal(
-            repr(Location('mybackup.darc::archive')),
-            "Location(proto='file', user=None, host=None, port=None, path='mybackup.darc', archive='archive')"
+            repr(Location('mybackup.attic::archive')),
+            "Location(proto='file', user=None, host=None, port=None, path='mybackup.attic', archive='archive')"
         )
         self.assert_equal(
             repr(Location('/some/absolute/path::archive')),
@@ -32,7 +32,7 @@ class LocationTestCase(DarcTestCase):
         )
 
 
-class FormatTimedeltaTestCase(DarcTestCase):
+class FormatTimedeltaTestCase(AtticTestCase):
 
     def test(self):
         t0 = datetime(2001, 1, 1, 10, 20, 3, 0)
@@ -43,7 +43,7 @@ class FormatTimedeltaTestCase(DarcTestCase):
         )
 
 
-class PatternTestCase(DarcTestCase):
+class PatternTestCase(AtticTestCase):
 
     def test(self):
         self.assert_equal(IncludePattern('/usr').match('/usr'), True)

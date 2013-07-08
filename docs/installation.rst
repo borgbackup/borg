@@ -20,21 +20,21 @@ Installing from PyPI using pip
 ------------------------------
 ::
 
-    $ pip install darc
+    $ pip install Attic
 
 Installing from source tarballs
 -------------------------------
 .. parsed-literal::
 
     $ curl -O |package_url|
-    $ tar -xvzf darc-|package_filename|
+    $ tar -xvzf |package_filename|
     $ cd |package_dirname|
     $ python setup.py install
 
 Installing from git
 -------------------
-::
+.. parsed-literal::
 
-    $ git clone https://github.com/jborg/darc.git
-    $ cd darc
+    $ git clone |git_url|
+    $ cd attic
     $ python setup.py install

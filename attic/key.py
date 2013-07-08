@@ -137,7 +137,7 @@ class PassphraseKey(AESKeyBase):
     @classmethod
     def create(cls, repository, args):
         key = cls()
-        passphrase = os.environ.get('DARC_PASSPHRASE')
+        passphrase = os.environ.get('ATTIC_PASSPHRASE')
         if passphrase is not None:
             passphrase2 = passphrase
         else:
@@ -159,7 +159,7 @@ class PassphraseKey(AESKeyBase):
     def detect(cls, repository, manifest_data):
         prompt = 'Enter passphrase for %s: ' % repository._location.orig
         key = cls()
-        passphrase = os.environ.get('DARC_PASSPHRASE')
+        passphrase = os.environ.get('ATTIC_PASSPHRASE')
         if passphrase is None:
             passphrase = getpass(prompt)
         while True:
@@ -177,7 +177,7 @@ class PassphraseKey(AESKeyBase):
 
 
 class KeyfileKey(AESKeyBase):
-    FILE_ID = 'DARC KEY'
+    FILE_ID = 'ATTIC KEY'
     TYPE = 0x00
 
     @classmethod
@@ -185,7 +185,7 @@ class KeyfileKey(AESKeyBase):
         key = cls()
         path = cls.find_key_file(repository)
         prompt = 'Enter passphrase for key file %s: ' % path
-        passphrase = os.environ.get('DARC_PASSPHRASE', '')
+        passphrase = os.environ.get('ATTIC_PASSPHRASE', '')
         while not key.load(path, passphrase):
             passphrase = getpass(prompt)
         key.init_ciphers(PREFIX + long_to_bytes(key.extract_iv(manifest_data) + 1000))
@@ -199,7 +199,7 @@ class KeyfileKey(AESKeyBase):
             filename = os.path.join(keys_dir, name)
             with open(filename, 'r') as fd:
                 line = fd.readline().strip()
-                if line and line.startswith(cls.FILE_ID) and line[9:] == id:
+                if line and line.startswith(cls.FILE_ID) and line[10:] == id:
                     return filename
         raise Exception('Key file for repository with ID %s not found' % id)
 
@@ -278,7 +278,7 @@ class KeyfileKey(AESKeyBase):
         while os.path.exists(path):
             i += 1
             path = filename + '.%d' % i
-        passphrase = os.environ.get('DARC_PASSPHRASE')
+        passphrase = os.environ.get('ATTIC_PASSPHRASE')
         if passphrase is not None:
             passphrase2 = passphrase
         else:

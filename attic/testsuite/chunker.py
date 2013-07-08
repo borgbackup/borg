@@ -1,9 +1,9 @@
-from darc.chunker import chunkify, buzhash, buzhash_update
-from darc.testsuite import DarcTestCase
+from attic.chunker import chunkify, buzhash, buzhash_update
+from attic.testsuite import AtticTestCase
 from io import BytesIO
 
 
-class ChunkerTestCase(DarcTestCase):
+class ChunkerTestCase(AtticTestCase):
 
     def test_chunkify(self):
         data = b'0' * 1024 * 1024 * 15 + b'Y'

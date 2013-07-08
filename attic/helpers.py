@@ -82,14 +82,14 @@ class Statistics:
 
 def get_keys_dir():
     """Determine where to repository keys and cache"""
-    return os.environ.get('DARC_KEYS_DIR',
-                          os.path.join(os.path.expanduser('~'), '.darc', 'keys'))
+    return os.environ.get('ATTIC_KEYS_DIR',
+                          os.path.join(os.path.expanduser('~'), '.attic', 'keys'))
 
 
 def get_cache_dir():
     """Determine where to repository keys and cache"""
-    return os.environ.get('DARC_CACHE_DIR',
-                          os.path.join(os.path.expanduser('~'), '.cache', 'darc'))
+    return os.environ.get('ATTIC_CACHE_DIR',
+                          os.path.join(os.path.expanduser('~'), '.cache', 'attic'))
 
 
 def to_localtime(ts):

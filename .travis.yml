@@ -7,4 +7,4 @@ install:
   - "pip install --use-mirrors Cython"
   - "pip install -e ."
 # command to run tests
-script: fakeroot python -m darc.testsuite.run -vb
+script: fakeroot python -m attic.testsuite.run -vb

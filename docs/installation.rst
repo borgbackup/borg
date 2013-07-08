@@ -24,11 +24,11 @@ Installing from PyPI using pip
 
 Installing from source tarballs
 -------------------------------
-::
+.. parsed-literal::
 
-    $ curl -O url
-    $ tar -xvzf darc-version.tar.gz
-    $ cd darc-version
+    $ curl -O |package_url|
+    $ tar -xvzf darc-|package_filename|
+    $ cd |package_dirname|
     $ python setup.py install
 
 Installing from git

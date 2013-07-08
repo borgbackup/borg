@@ -56,9 +56,8 @@ User's Guide
 Contribute
 ==========
 
-Found a bug? Have any ideas to improve |project_name|?
-Head over to |project_name|'s github_ page and create an issue or a pull
-request.
+Found a bug? Have any ideas to improve |project_name|? Add bug reports and
+feature requests to the `issue tracker`_.
 
 You can also ask the author a question directly by
 `email <mailto:jonas@borgstrom.se>`_.

@@ -35,8 +35,9 @@ msgpack-python and sufficiently recent OpenSSL (>= 1.0.0).
 
 How do I install it?
 --------------------
+
 ::
-  $ python setup.py install
+  $ pip install darc
 
 Where are the docs?
 -------------------
@@ -50,7 +51,10 @@ following command::
 
   $ python -m darc.testsuite.run
 
-Where can I get help?
----------------------
-Send questions, comments, patches, etc. to jonas@borgstrom.se. Issues and
-pull requests can also be created on https://github.com/jborg/darc
+Contribute
+----------
+Found a bug? Have any ideas to improve darc? Add bug reports and feature
+requests to the `issue tracker <https://github.com/jborg/darc/issues>`_.
+
+You can also ask the author a question directly by
+`email <mailto:jonas@borgstrom.se>`_.

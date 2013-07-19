@@ -255,6 +255,7 @@ class Archive(object):
                     for id, chunk in zip_longest(ids, self.repository.get_many(ids, peek)):
                         data = self.key.decrypt(id, chunk)
                         fd.write(data)
+                    fd.flush()
                     self.restore_attrs(path, item, fd=fd.fileno())
         elif stat.S_ISFIFO(mode):
             if not os.path.exists(os.path.dirname(path)):

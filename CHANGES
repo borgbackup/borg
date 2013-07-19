@@ -3,6 +3,14 @@ Attic Changelog
 
 Here you can see the full list of changes between each darc release.
 
+Version 0.6.1
+-------------
+
+(bugfix release, released on July 19, 2013)
+
+- Fixed an issue where mtime was not always correctly restored.
+
+
 Version 0.6
 -----------
 

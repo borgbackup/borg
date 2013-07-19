@@ -1,8 +1,8 @@
 .. |project_name| replace:: ``Attic``
-.. |project_version| replace:: 0.6
+.. |project_version| replace:: 0.6.1
 .. |package_dirname| replace:: Attic-|project_version|
 .. |package_filename| replace:: |package_dirname|.tar.gz
-.. |package_url| replace:: https://pypi.python.org/packages/source/A/Attic/Attic-0.6.tar.gz
+.. |package_url| replace:: https://pypi.python.org/packages/source/A/Attic/Attic-0.6.1.tar.gz
 .. |git_url| replace:: https://github.com/jborg/attic.git
 .. _deduplication: https://en.wikipedia.org/wiki/Data_deduplication
 .. _AES: https://en.wikipedia.org/wiki/Advanced_Encryption_Standard

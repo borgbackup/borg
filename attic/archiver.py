@@ -191,6 +191,17 @@ class Archiver:
         archive.delete(cache)
         return self.exit_code
 
+    def do_mount(self, args):
+        """Mount archive
+        """
+        repository = self.open_repository(args.archive)
+        manifest, key = Manifest.load(repository)
+        archive = Archive(repository, key, manifest, args.archive.archive)
+        from attic.fuse import AtticOperations
+
+        operations = AtticOperations(key, repository, archive)
+        return operations.run(args.dir)
+
     def do_list(self, args):
         """List archive or repository contents
         """
@@ -389,6 +400,14 @@ class Archiver:
         subparser.set_defaults(func=self.do_list)
         subparser.add_argument('src', metavar='SRC', type=location_validator(),
                                help='repository/Archive to list contents of')
+
+        subparser = subparsers.add_parser('mount', parents=[common_parser],
+                                          description=self.do_mount.__doc__)
+        subparser.set_defaults(func=self.do_mount)
+        subparser.add_argument('archive', metavar='ARCHIVE', type=location_validator(archive=True),
+                               help='Archive to mount')
+        subparser.add_argument('dir', metavar='DIR', type=str,
+                               help='where to mount archive')
 
         subparser = subparsers.add_parser('verify', parents=[common_parser],
                                           description=self.do_verify.__doc__)

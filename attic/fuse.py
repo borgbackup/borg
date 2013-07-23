@@ -2,11 +2,9 @@ from collections import defaultdict
 import errno
 import llfuse
 import os
+import stat
 import time
 
-# TODO
-# - multi archive
-# hard links
 
 class AtticOperations(llfuse.Operations):
     """
@@ -22,7 +20,7 @@ class AtticOperations(llfuse.Operations):
         self.inode_contents = defaultdict(dict)
 
         for item, _ in archive.iter_items():
-            head, tail = os.path.split(os.path.normpath(os.fsencode(item[b'path'])))
+            head, tail = os.path.split(os.fsencode(os.path.normpath(item[b'path'])))
             segments = head.split(b'/')
             parent = 1
             for segment in segments:
@@ -36,14 +34,23 @@ class AtticOperations(llfuse.Operations):
                     parent = node.st_ino
                 else:
                     parent = self.inode_contents[parent][segment]
-
-            node = self._make_item_inode(item)
+            if b'source' in item and stat.S_ISREG(item[b'mode']):
+                node = self._find_inode(item[b'source'])
+            else:
+                node = self._make_item_inode(item)
+                self.inodes[node.st_ino] = node
+                self.items[node.st_ino] = item
             node.st_nlink += 1
-            self.inodes[node.st_ino] = node
-            self.items[node.st_ino] = item
             self.inode_parent[node.st_ino] = parent
             if tail:
                 self.inode_contents[parent][tail] = node.st_ino
+
+    def _find_inode(self, path):
+        segments = os.fsencode(os.path.normpath(path)).split(b'/')
+        inode = 1
+        for segment in segments:
+            inode = self.inode_contents[inode][segment]
+        return self.inodes[inode]
 
     def _make_directory_inode(self):
         entry = llfuse.EntryAttributes()

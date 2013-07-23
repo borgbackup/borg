@@ -7,7 +7,6 @@ import time
 # TODO
 # - multi archive
 # hard links
-# xattr
 
 class AtticOperations(llfuse.Operations):
     """
@@ -101,8 +100,20 @@ class AtticOperations(llfuse.Operations):
     def getattr(self, inode):
         return self.inodes[inode]
 
+    def listxattr(self, inode):
+        item = self.items[inode]
+        return [b'user.' + name for name in item.get(b'xattrs', {}).keys()]
+
+    def getxattr(self, inode, name):
+        item = self.items[inode]
+        if name.startswith(b'user.'):
+            name = name[5:]
+        try:
+            return item.get(b'xattrs', {})[name]
+        except KeyError:
+            raise llfuse.FUSEError(errno.ENODATA)
+
     def lookup(self, parent_inode, name):
-        print('lookup', parent_inode, name)
         if name == b'.':
             inode = parent_inode
         elif name == b'..':
@@ -121,7 +132,6 @@ class AtticOperations(llfuse.Operations):
         return inode
 
     def read(self, fh, offset, size):
-        print('read', fh, offset, size)
         parts = []
         item = self.items[fh]
         for id, s, csize in item[b'chunks']:

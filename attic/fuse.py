@@ -11,79 +11,65 @@ class AtticOperations(llfuse.Operations):
     """
     def __init__(self, key, repository, archive):
         super(AtticOperations, self).__init__()
-        print('__init__')
+        self._inode_count = 0
         self.key = key
         self.repository = repository
         self.items = {}
-        self.inodes = {}
-        self.inode_parent = {}
-        self.inode_contents = defaultdict(dict)
+        self.parent = {}
+        self.contents = defaultdict(dict)
+        default_dir = {b'mode': 0o40755, b'mtime': 0, b'uid': os.getuid(), b'gid': os.getgid()}
 
         for item, _ in archive.iter_items():
             head, tail = os.path.split(os.fsencode(os.path.normpath(item[b'path'])))
             segments = head.split(b'/')
             parent = 1
             for segment in segments:
-                if not segment:
-                    continue
-                if not segment in self.inode_contents[parent]:
-                    node = self._make_directory_inode()
-                    self.inodes[node.st_ino] = node
-                    self.inode_parent[node.st_ino] = parent
-                    self.inode_contents[parent][segment] = node.st_ino
-                    parent = node.st_ino
+                if not segment in self.contents[parent]:
+                    inode = self.allocate_inode()
+                    self.items[inode] = default_dir
+                    self.parent[inode] = parent
+                    if segment:
+                        self.contents[parent][segment] = inode
+                    parent = inode
                 else:
-                    parent = self.inode_contents[parent][segment]
+                    parent = self.contents[parent][segment]
             if b'source' in item and stat.S_ISREG(item[b'mode']):
-                node = self._find_inode(item[b'source'])
+                inode = self._find_inode(item[b'source'])
+                self.items[inode][b'nlink'] = self.items[inode].get(b'nlink', 1) + 1
             else:
-                node = self._make_item_inode(item)
-                self.inodes[node.st_ino] = node
-                self.items[node.st_ino] = item
-            node.st_nlink += 1
-            self.inode_parent[node.st_ino] = parent
+                inode = self.allocate_inode()
+                self.items[inode] = item
+            self.parent[inode] = parent
             if tail:
-                self.inode_contents[parent][tail] = node.st_ino
+                self.contents[parent][tail] = inode
+            else:
+                self.items[inode] = default_dir
+
+    def allocate_inode(self):
+        self._inode_count += 1
+        return self._inode_count
 
     def _find_inode(self, path):
         segments = os.fsencode(os.path.normpath(path)).split(b'/')
         inode = 1
         for segment in segments:
-            inode = self.inode_contents[inode][segment]
-        return self.inodes[inode]
+            inode = self.contents[inode][segment]
+        return inode
 
-    def _make_directory_inode(self):
-        entry = llfuse.EntryAttributes()
-        entry.st_ino = len(self.inodes) + 1
-        entry.generation = 0
-        entry.entry_timeout = 300
-        entry.attr_timeout = 300
-        entry.st_mode = 0o40755
-        entry.st_nlink = 0
-        entry.st_uid = os.getuid()
-        entry.st_gid = os.getgid()
-        entry.st_rdev = 0
-        entry.st_size = 0
-        entry.st_blksize = 512
-        entry.st_blocks = 1
-        entry.st_atime = time.time()
-        entry.st_mtime = time.time()
-        entry.st_ctime = time.time()
-        return entry
-
-    def _make_item_inode(self, item):
+    def getattr(self, inode):
+        item = self.items[inode]
         size = 0
         try:
             size = sum(size for _, size, _ in item[b'chunks'])
         except KeyError:
             pass
         entry = llfuse.EntryAttributes()
-        entry.st_ino = len(self.inodes) + 1
+        entry.st_ino = inode
         entry.generation = 0
         entry.entry_timeout = 300
         entry.attr_timeout = 300
         entry.st_mode = item[b'mode']
-        entry.st_nlink = 0
+        entry.st_nlink = item.get(b'nlink', 1)
         entry.st_uid = item[b'uid']
         entry.st_gid = item[b'uid']
         entry.st_rdev = item.get(b'rdev', 0)
@@ -94,18 +80,6 @@ class AtticOperations(llfuse.Operations):
         entry.st_mtime = item[b'mtime'] / 1e9
         entry.st_ctime = item[b'mtime'] / 1e9
         return entry
-
-    def run(self, dir):
-        llfuse.init(self, dir, ['fsname=atticfs', 'nonempty'])
-        try:
-            llfuse.main(single=True)
-        except:
-            llfuse.close(unmount=False)
-            raise
-        llfuse.close()
-
-    def getattr(self, inode):
-        return self.inodes[inode]
 
     def listxattr(self, inode):
         item = self.items[inode]
@@ -124,9 +98,9 @@ class AtticOperations(llfuse.Operations):
         if name == b'.':
             inode = parent_inode
         elif name == b'..':
-            inode = self.inode_parent[parent_inode]
+            inode = self.parent[parent_inode]
         else:
-            inode = self.inode_contents[parent_inode].get(name)
+            inode = self.contents[parent_inode].get(name)
             if not inode:
                 raise llfuse.FUSEError(errno.ENOENT)
 
@@ -155,10 +129,19 @@ class AtticOperations(llfuse.Operations):
         return b''.join(parts)
 
     def readdir(self, fh, off):
-        entries = [(b'.', fh), (b'..', self.inode_parent[fh])]
-        entries.extend(self.inode_contents[fh].items())
+        entries = [(b'.', fh), (b'..', self.parent[fh])]
+        entries.extend(self.contents[fh].items())
         for i, (name, inode) in enumerate(entries[off:], off):
             yield name, self.getattr(inode), i + 1
 
     def readlink(self, inode):
         return os.fsencode(self.items[inode][b'source'])
+
+    def run(self, dir):
+        llfuse.init(self, dir, ['fsname=atticfs', 'nonempty'])
+        try:
+            llfuse.main(single=True)
+        except:
+            llfuse.close()
+            raise
+        llfuse.close()

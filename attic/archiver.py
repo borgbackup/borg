@@ -12,7 +12,8 @@ from .cache import Cache
 from .key import key_creator
 from .helpers import location_validator, format_time, \
     format_file_mode, IncludePattern, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
-    get_cache_dir, get_keys_dir, format_timedelta, prune_split, Manifest, Location, remove_surrogates
+    get_cache_dir, get_keys_dir, format_timedelta, prune_split, Manifest, Location, remove_surrogates, \
+    daemonize
 from .remote import RepositoryServer, RemoteRepository, ConnectionClosed
 
 
@@ -194,17 +195,27 @@ class Archiver:
     def do_mount(self, args):
         """Mount archive as a FUSE fileystem
         """
-        if not os.path.isdir(args.dir) or not os.access(args.dir, os.R_OK | os.W_OK | os.X_OK):
-            self.print_error('%s: Mountpoint must be a writable directory' % args.dir)
+        try:
+            from attic.fuse import AtticOperations
+        except ImportError:
+            self.print_error('the "llfuse" module is required to use this feature')
+            return self.exit_code
+
+        if not os.path.isdir(args.mountpoint) or not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
+            self.print_error('%s: Mountpoint must be a writable directory' % args.mountpoint)
             return self.exit_code
 
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
+        self.print_verbose("Loading archive metadata...", newline=False)
         archive = Archive(repository, key, manifest, args.archive.archive)
-        from attic.fuse import AtticOperations
-
+        self.print_verbose('done')
         operations = AtticOperations(key, repository, archive)
-        return operations.run(args.dir)
+        self.print_verbose("Mounting filesystem")
+        if not args.foreground:
+            daemonize()
+        operations.mount(args.mountpoint)
+        return self.exit_code
 
     def do_list(self, args):
         """List archive or repository contents
@@ -403,15 +414,18 @@ class Archiver:
                                           description=self.do_list.__doc__)
         subparser.set_defaults(func=self.do_list)
         subparser.add_argument('src', metavar='SRC', type=location_validator(),
-                               help='repository/Archive to list contents of')
+                               help='repository/archive to list contents of')
 
         subparser = subparsers.add_parser('mount', parents=[common_parser],
                                           description=self.do_mount.__doc__)
         subparser.set_defaults(func=self.do_mount)
         subparser.add_argument('archive', metavar='ARCHIVE', type=location_validator(archive=True),
-                               help='Archive to mount')
-        subparser.add_argument('dir', metavar='DIR', type=str,
+                               help='archive to mount')
+        subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
                                help='where to mount filesystem')
+        subparser.add_argument('-f', '--foreground', dest='foreground',
+                               action='store_true', default=False,
+                               help='stay in foreground, do not daemonize')
 
         subparser = subparsers.add_parser('verify', parents=[common_parser],
                                           description=self.do_verify.__doc__)

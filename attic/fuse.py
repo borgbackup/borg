@@ -141,8 +141,8 @@ class AtticOperations(llfuse.Operations):
     def readlink(self, inode):
         return os.fsencode(self.items[inode][b'source'])
 
-    def run(self, dir):
-        llfuse.init(self, dir, ['fsname=atticfs', 'nonempty'])
+    def mount(self, mountpoint):
+        llfuse.init(self, mountpoint, ['fsname=atticfs', 'nonempty', 'ro'])
         try:
             llfuse.main(single=True)
         except:

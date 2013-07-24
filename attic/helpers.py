@@ -362,6 +362,26 @@ def remove_surrogates(s, errors='replace'):
     return s.encode('utf-8', errors).decode('utf-8')
 
 
+def daemonize():
+    """Detach process from controlling terminal and run in background
+    """
+    pid = os.fork()
+    if pid:
+        os._exit(0)
+    os.setsid()
+    pid = os.fork()
+    if pid:
+        os._exit(0)
+    os.chdir('/')
+    os.close(0)
+    os.close(1)
+    os.close(2)
+    fd = os.open('/dev/null', os.O_RDWR)
+    os.dup2(fd, 0)
+    os.dup2(fd, 1)
+    os.dup2(fd, 2)
+
+
 if sys.version < '3.3':
     # st_mtime_ns attribute only available in 3.3+
     def st_mtime_ns(st):

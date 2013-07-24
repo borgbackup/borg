@@ -192,8 +192,12 @@ class Archiver:
         return self.exit_code
 
     def do_mount(self, args):
-        """Mount archive
+        """Mount archive as a FUSE fileystem
         """
+        if not os.path.isdir(args.dir) or not os.access(args.dir, os.R_OK | os.W_OK | os.X_OK):
+            self.print_error('%s: Mountpoint must be a writable directory' % args.dir)
+            return self.exit_code
+
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
         archive = Archive(repository, key, manifest, args.archive.archive)
@@ -407,7 +411,7 @@ class Archiver:
         subparser.add_argument('archive', metavar='ARCHIVE', type=location_validator(archive=True),
                                help='Archive to mount')
         subparser.add_argument('dir', metavar='DIR', type=str,
-                               help='where to mount archive')
+                               help='where to mount filesystem')
 
         subparser = subparsers.add_parser('verify', parents=[common_parser],
                                           description=self.do_verify.__doc__)

@@ -7,7 +7,7 @@ import time
 
 
 class AtticOperations(llfuse.Operations):
-    """
+    """Export Attic archive as a fuse filesystem
     """
     def __init__(self, key, repository, archive):
         super(AtticOperations, self).__init__()
@@ -17,33 +17,38 @@ class AtticOperations(llfuse.Operations):
         self.items = {}
         self.parent = {}
         self.contents = defaultdict(dict)
-        default_dir = {b'mode': 0o40755, b'mtime': 0, b'uid': os.getuid(), b'gid': os.getgid()}
-
+        default_dir = {b'mode': 0o40755, b'mtime': int(time.time() * 1e9), b'uid': os.getuid(), b'gid': os.getgid()}
+        # Loop through all archive items and assign inode numbers and
+        # extract hierarchy information
         for item, _ in archive.iter_items():
-            head, tail = os.path.split(os.fsencode(os.path.normpath(item[b'path'])))
-            segments = head.split(b'/')
+            segments = os.fsencode(os.path.normpath(item[b'path'])).split(b'/')
+            num_segments = len(segments)
             parent = 1
-            for segment in segments:
-                if not segment in self.contents[parent]:
+            for i, segment in enumerate(segments, 1):
+                # Insert a default root inode if needed
+                if self._inode_count == 0 and segment:
+                    self.items[self.allocate_inode()] = default_dir
+                    self.parent[1] = 1
+                # Leaf segment?
+                if i == num_segments:
+                    if b'source' in item and stat.S_ISREG(item[b'mode']):
+                        inode = self._find_inode(item[b'source'])
+                        self.items[inode][b'nlink'] = self.items[inode].get(b'nlink', 1) + 1
+                    else:
+                        inode = self.allocate_inode()
+                        self.items[inode] = item
+                    self.parent[inode] = parent
+                    if segment:
+                        self.contents[parent][segment] = inode
+                elif segment in self.contents[parent]:
+                    parent = self.contents[parent][segment]
+                else:
                     inode = self.allocate_inode()
                     self.items[inode] = default_dir
                     self.parent[inode] = parent
                     if segment:
                         self.contents[parent][segment] = inode
                     parent = inode
-                else:
-                    parent = self.contents[parent][segment]
-            if b'source' in item and stat.S_ISREG(item[b'mode']):
-                inode = self._find_inode(item[b'source'])
-                self.items[inode][b'nlink'] = self.items[inode].get(b'nlink', 1) + 1
-            else:
-                inode = self.allocate_inode()
-                self.items[inode] = item
-            self.parent[inode] = parent
-            if tail:
-                self.contents[parent][tail] = inode
-            else:
-                self.items[inode] = default_dir
 
     def allocate_inode(self):
         self._inode_count += 1
@@ -103,7 +108,6 @@ class AtticOperations(llfuse.Operations):
             inode = self.contents[parent_inode].get(name)
             if not inode:
                 raise llfuse.FUSEError(errno.ENOENT)
-
         return self.getattr(inode)
 
     def open(self, inode, flags):

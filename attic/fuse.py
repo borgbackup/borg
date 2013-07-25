@@ -76,7 +76,7 @@ class AtticOperations(llfuse.Operations):
         entry.st_mode = item[b'mode']
         entry.st_nlink = item.get(b'nlink', 1)
         entry.st_uid = item[b'uid']
-        entry.st_gid = item[b'uid']
+        entry.st_gid = item[b'gid']
         entry.st_rdev = item.get(b'rdev', 0)
         entry.st_size = size
         entry.st_blksize = 512

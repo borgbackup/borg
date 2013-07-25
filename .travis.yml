@@ -4,7 +4,8 @@ python:
   - "3.3"
 # command to install dependencies
 install:
+  - "pip install --use-mirrors llfuse"
   - "pip install --use-mirrors Cython"
   - "pip install -e ."
 # command to run tests
-script: fakeroot python -m attic.testsuite.run -vb
+script: fakeroot -u python -m attic.testsuite.run -vb

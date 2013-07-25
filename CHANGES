@@ -3,6 +3,15 @@ Attic Changelog
 
 Here you can see the full list of changes between each darc release.
 
+
+Version 0.7
+-----------
+
+(feature release, released on X)
+
+- Experimental: Archives mountable as fuse filesystems.
+
+
 Version 0.6.1
 -------------
 

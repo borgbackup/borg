@@ -4,6 +4,7 @@ python:
   - "3.3"
 # command to install dependencies
 install:
+  - "sudo apt-get install fuse-utils libfuse-dev"
   - "pip install --use-mirrors llfuse"
   - "pip install --use-mirrors Cython"
   - "pip install -e ."

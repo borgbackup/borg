@@ -58,10 +58,9 @@ class AtticTestCase(unittest.TestCase):
     def wait_for_mount(self, path, timeout=5):
         """Wait until a filesystem is mounted on `path`
         """
-        parent_dev = os.stat(os.path.dirname(path)).st_dev
         timeout += time.time()
         while timeout > time.time():
-            if os.stat(path).st_dev != parent_dev:
+            if os.path.ismount(path):
                 return
             time.sleep(.1)
         raise Exception('wait_for_mount(%s) timeout' % path)

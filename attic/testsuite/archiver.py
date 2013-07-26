@@ -1,4 +1,3 @@
-import filecmp
 import os
 from io import StringIO
 import stat
@@ -18,9 +17,6 @@ try:
     has_llfuse = True
 except ImportError:
     has_llfuse = False
-
-has_mtime_ns = sys.version >= '3.3'
-utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
 
 src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__), '..', '..')
 
@@ -103,39 +99,6 @@ class ArchiverTestCase(AtticTestCase):
         with open(filename, 'wb') as fd:
             fd.write(b'X' * size)
 
-    def get_xattrs(self, path):
-        try:
-            return xattr.get_all(path)
-        except EnvironmentError:
-            return {}
-
-    def diff_dirs(self, dir1, dir2, fuse=False):
-        diff = filecmp.dircmp(dir1, dir2)
-        self.assert_equal(diff.left_only, [])
-        self.assert_equal(diff.right_only, [])
-        self.assert_equal(diff.diff_files, [])
-        self.assert_equal(diff.funny_files, [])
-        for filename in diff.common:
-            path1 = os.path.join(dir1, filename)
-            path2 = os.path.join(dir2, filename)
-            s1 = os.lstat(path1)
-            s2 = os.lstat(path2)
-            attrs = ['st_mode', 'st_uid', 'st_gid', 'st_rdev']
-            if not fuse or not os.path.isdir(path1):
-                # dir nlink is always 1 on our fuse fileystem
-                attrs.append('st_nlink')
-            if not os.path.islink(path1) or utime_supports_fd:
-                # Fuse api is does not support ns precision
-                attrs.append('st_mtime_ns' if has_mtime_ns and not fuse else 'st_mtime')
-            d1 = [filename] + [getattr(s1, a) for a in attrs]
-            d2 = [filename] + [getattr(s2, a) for a in attrs]
-            # 'st_mtime precision is limited'
-            if attrs[-1] == 'st_mtime':
-                d1[-1] = round(d1[-1], 2)
-                d2[-1] = round(d2[-1], 2)
-            d1.append(self.get_xattrs(path1))
-            d2.append(self.get_xattrs(path2))
-            self.assert_equal(d1, d2)
 
     def create_test_files(self):
         """Create a minimal test case including all supported file types
@@ -172,7 +135,7 @@ class ArchiverTestCase(AtticTestCase):
             self.attic('extract', self.repository_location + '::test')
         self.assert_equal(len(self.attic('list', self.repository_location).splitlines()), 2)
         self.assert_equal(len(self.attic('list', self.repository_location + '::test').splitlines()), 9)
-        self.diff_dirs('input', 'output/input')
+        self.assert_dirs_equal('input', 'output/input')
         info_output = self.attic('info', self.repository_location + '::test')
         shutil.rmtree(self.cache_path)
         info_output2 = self.attic('info', self.repository_location + '::test')
@@ -205,7 +168,7 @@ class ArchiverTestCase(AtticTestCase):
         os.mkdir('output/input/dir2')
         with changedir('output'):
             self.attic('extract', self.repository_location + '::test')
-        self.diff_dirs('input', 'output/input')
+        self.assert_dirs_equal('input', 'output/input')
         # But non-empty dirs should fail
         os.unlink('output/input/file1')
         os.mkdir('output/input/file1')
@@ -260,9 +223,8 @@ class ArchiverTestCase(AtticTestCase):
         self.attic('create', self.repository_location + '::archive', 'input')
         try:
             self.attic('mount', self.repository_location + '::archive', mountpoint, fork=True)
-            # Give fs some time to appear
-            time.sleep(.2)
-            self.diff_dirs(self.input_path, os.path.join(mountpoint, 'input'), fuse=True)
+            self.wait_for_mount(mountpoint)
+            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'), fuse=True)
         finally:
             os.system('fusermount -u ' + mountpoint)
             os.rmdir(mountpoint)

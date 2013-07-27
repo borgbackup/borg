@@ -280,7 +280,7 @@ class Archive(object):
         xattrs = item.get(b'xattrs')
         if xattrs:
             for k, v in xattrs.items():
-                xattr.set(fd or path, k, v)
+                xattr.setxattr(fd or path, k, v)
         uid = gid = None
         if not self.numeric_owner:
             uid = user2uid(item[b'user'])
@@ -350,7 +350,7 @@ class Archive(object):
         if self.numeric_owner:
             item[b'user'] = item[b'group'] = None
         try:
-            xattrs = xattr.get_all(path)
+            xattrs = xattr.get_all(path, follow_symlinks=False)
             if xattrs:
                 item[b'xattrs'] = xattrs
         except PermissionError:

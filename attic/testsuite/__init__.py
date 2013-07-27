@@ -3,7 +3,8 @@ import os
 import sys
 import time
 import unittest
-from attic import xattr
+from attic.xattr import get_all
+
 
 has_mtime_ns = sys.version >= '3.3'
 utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
@@ -18,7 +19,7 @@ class AtticTestCase(unittest.TestCase):
 
     def _get_xattrs(self, path):
         try:
-            return xattr.get_all(path)
+            return get_all(path, follow_symlinks=False)
         except EnvironmentError:
             return {}
 
@@ -81,6 +82,7 @@ def get_tests(suite):
 class TestLoader(unittest.TestLoader):
     """A customzied test loader that properly detects and filters our test cases
     """
+
     def loadTestsFromName(self, pattern, module=None):
         suite = self.discover('attic.testsuite', '*.py')
         tests = unittest.TestSuite()

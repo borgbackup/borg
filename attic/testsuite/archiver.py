@@ -117,7 +117,7 @@ class ArchiverTestCase(AtticTestCase):
         # Char device
         os.mknod('input/cdev', 0o600 | stat.S_IFCHR,  os.makedev(30, 40))
         if xattr.is_enabled():
-            xattr.set(os.path.join(self.input_path, 'file1'), b'foo', b'bar')
+            xattr.setxattr(os.path.join(self.input_path, 'file1'), 'user.foo', b'bar')
         # Hard link
         os.link(os.path.join(self.input_path, 'file1'),
                 os.path.join(self.input_path, 'hardlink'))

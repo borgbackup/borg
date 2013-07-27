@@ -102,12 +102,10 @@ class AtticOperations(llfuse.Operations):
 
     def listxattr(self, inode):
         item = self.items[inode]
-        return [b'user.' + name for name in item.get(b'xattrs', {}).keys()]
+        return item.get(b'xattrs', {}).keys()
 
     def getxattr(self, inode, name):
         item = self.items[inode]
-        if name.startswith(b'user.'):
-            name = name[5:]
         try:
             return item.get(b'xattrs', {})[name]
         except KeyError:

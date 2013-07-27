@@ -54,6 +54,18 @@ class AtticOperations(llfuse.Operations):
         self._inode_count += 1
         return self._inode_count
 
+    def statfs(self):
+        stat_ = llfuse.StatvfsData()
+        stat_.f_bsize = 512
+        stat_.f_frsize = 512
+        stat_.f_blocks = 0
+        stat_.f_bfree = 0
+        stat_.f_bavail = 0
+        stat_.f_files = 0
+        stat_.f_ffree = 0
+        stat_.f_favail = 0
+        return stat_
+
     def _find_inode(self, path):
         segments = os.fsencode(os.path.normpath(path)).split(b'/')
         inode = 1
@@ -142,7 +154,7 @@ class AtticOperations(llfuse.Operations):
         return os.fsencode(self.items[inode][b'source'])
 
     def mount(self, mountpoint):
-        llfuse.init(self, mountpoint, ['fsname=atticfs', 'nonempty', 'ro'])
+        llfuse.init(self, mountpoint, ['fsname=atticfs', 'ro'])
         try:
             llfuse.main(single=True)
         except:

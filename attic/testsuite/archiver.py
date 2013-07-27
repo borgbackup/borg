@@ -111,7 +111,7 @@ class ArchiverTestCase(AtticTestCase):
         os.chown('input/file1', 100, 200)
         # File mode
         os.chmod('input/file1', 0o7755)
-        os.chmod('input/dir2', 0o700)
+        os.chmod('input/dir2', 0o555)
         # Block device
         os.mknod('input/bdev', 0o600 | stat.S_IFBLK,  os.makedev(10, 20))
         # Char device
@@ -226,7 +226,10 @@ class ArchiverTestCase(AtticTestCase):
             self.wait_for_mount(mountpoint)
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'), fuse=True)
         finally:
-            os.system('fusermount -u ' + mountpoint)
+            if sys.platform.startswith('linux'):
+                os.system('fusermount -u ' + mountpoint)
+            else:
+                os.system('umount ' + mountpoint)
             os.rmdir(mountpoint)
             # Give the daemon some time to exit
             time.sleep(.2)

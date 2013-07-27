@@ -5,6 +5,8 @@ import os
 import stat
 import time
 
+from attic.helpers import daemonize
+
 
 class AtticOperations(llfuse.Operations):
     """Export Attic archive as a fuse filesystem
@@ -153,8 +155,13 @@ class AtticOperations(llfuse.Operations):
     def readlink(self, inode):
         return os.fsencode(self.items[inode][b'source'])
 
-    def mount(self, mountpoint):
-        llfuse.init(self, mountpoint, ['fsname=atticfs', 'ro'])
+    def mount(self, mountpoint, extra_options, foreground=False):
+        options = ['fsname=atticfs', 'ro']
+        if extra_options:
+            options.extend(extra_options.split(','))
+        llfuse.init(self, mountpoint, options)
+        if not foreground:
+            daemonize()
         try:
             llfuse.main(single=True)
         except:

@@ -12,8 +12,7 @@ from .cache import Cache
 from .key import key_creator
 from .helpers import location_validator, format_time, \
     format_file_mode, IncludePattern, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
-    get_cache_dir, get_keys_dir, format_timedelta, prune_split, Manifest, Location, remove_surrogates, \
-    daemonize
+    get_cache_dir, get_keys_dir, format_timedelta, prune_split, Manifest, Location, remove_surrogates
 from .remote import RepositoryServer, RemoteRepository, ConnectionClosed
 
 
@@ -212,9 +211,11 @@ class Archiver:
         self.print_verbose('done')
         operations = AtticOperations(key, repository, archive)
         self.print_verbose("Mounting filesystem")
-        if not args.foreground:
-            daemonize()
-        operations.mount(args.mountpoint)
+        try:
+            operations.mount(args.mountpoint, args.options, args.foreground)
+        except RuntimeError:
+            # Relevant error message already printed to stderr by fuse
+            self.exit_code = 1
         return self.exit_code
 
     def do_list(self, args):
@@ -426,6 +427,8 @@ class Archiver:
         subparser.add_argument('-f', '--foreground', dest='foreground',
                                action='store_true', default=False,
                                help='stay in foreground, do not daemonize')
+        subparser.add_argument('-o', dest='options', type=str,
+                               help='Extra mount options')
 
         subparser = subparsers.add_parser('verify', parents=[common_parser],
                                           description=self.do_verify.__doc__)

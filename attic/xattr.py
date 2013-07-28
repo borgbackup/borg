@@ -1,5 +1,6 @@
 """A basic extended attributes (xattr) implementation for Linux and MacOS X
 """
+import errno
 import os
 import sys
 import tempfile
@@ -8,7 +9,7 @@ import tempfile
 def is_enabled():
     """Determine if xattr is enabled on the filesystem
     """
-    with tempfile.TemporaryFile() as fd:
+    with tempfile.NamedTemporaryFile() as fd:
         try:
             setxattr(fd.fileno(), 'user.name', b'value')
         except OSError:
@@ -164,5 +165,89 @@ except ImportError:
                 flags = XATTR_NOFOLLOW
             _check(func(path, name, value, len(value), 0, flags), path)
 
+    elif sys.platform.startswith('freebsd'):
+        EXTATTR_NAMESPACE_USER = 0x0001
+        libc.extattr_list_fd.argtypes = (c_int, c_int, c_char_p, c_size_t)
+        libc.extattr_list_fd.restype = c_ssize_t
+        libc.extattr_list_link.argtypes = (c_char_p, c_int, c_char_p, c_size_t)
+        libc.extattr_list_link.restype = c_ssize_t
+        libc.extattr_list_file.argtypes = (c_char_p, c_int, c_char_p, c_size_t)
+        libc.extattr_list_file.restype = c_ssize_t
+        libc.extattr_get_fd.argtypes = (c_int, c_int, c_char_p, c_char_p, c_size_t)
+        libc.extattr_get_fd.restype = c_ssize_t
+        libc.extattr_get_link.argtypes = (c_char_p, c_int, c_char_p, c_char_p, c_size_t)
+        libc.extattr_get_link.restype = c_ssize_t
+        libc.extattr_get_file.argtypes = (c_char_p, c_int, c_char_p, c_char_p, c_size_t)
+        libc.extattr_get_file.restype = c_ssize_t
+        libc.extattr_set_fd.argtypes = (c_int, c_int, c_char_p, c_char_p, c_size_t)
+        libc.extattr_set_fd.restype = c_int
+        libc.extattr_set_link.argtypes = (c_char_p, c_int, c_char_p, c_char_p, c_size_t)
+        libc.extattr_set_link.restype = c_int
+        libc.extattr_set_file.argtypes = (c_char_p, c_int, c_char_p, c_char_p, c_size_t)
+        libc.extattr_set_file.restype = c_int
+
+        def listxattr(path, *, follow_symlinks=True):
+            ns = EXTATTR_NAMESPACE_USER
+            if isinstance(path, str):
+                path = os.fsencode(path)
+            if isinstance(path, int):
+                func = libc.extattr_list_fd
+            elif follow_symlinks:
+                func = libc.extattr_list_file
+            else:
+                func = libc.extattr_list_link
+            try:
+                n = _check(func(path, ns, None, 0), path)
+            except OSError as e:
+                if e.errno == errno.ENOTSUP:
+                    return []
+                raise
+            if n == 0:
+                return []
+            namebuf = create_string_buffer(n)
+            n2 = _check(func(path, ns, namebuf, n), path)
+            if n2 != n:
+                raise Exception('listxattr failed')
+            names = []
+            mv = memoryview(namebuf.raw)
+            while mv:
+                names.append(os.fsdecode(bytes(mv[1:1+mv[0]])))
+                mv = mv[1+mv[0]:]
+            return names
+
+        def getxattr(path, name, *, follow_symlinks=True):
+            name = os.fsencode(name)
+            if isinstance(path, str):
+                path = os.fsencode(path)
+            if isinstance(path, int):
+                func = libc.extattr_get_fd
+            elif follow_symlinks:
+                func = libc.extattr_get_file
+            else:
+                func = libc.extattr_get_link
+            n = _check(func(path, EXTATTR_NAMESPACE_USER, name, None, 0))
+            if n == 0:
+                return
+            valuebuf = create_string_buffer(n)
+            n2 = _check(func(path, EXTATTR_NAMESPACE_USER, name, valuebuf, n), path)
+            if n2 != n:
+                raise Exception('getxattr failed')
+            return valuebuf.raw
+
+        def setxattr(path, name, value, *, follow_symlinks=True):
+            name = os.fsencode(name)
+            value = os.fsencode(value)
+            if isinstance(path, str):
+                path = os.fsencode(path)
+            if isinstance(path, int):
+                func = libc.extattr_set_fd
+            elif follow_symlinks:
+                func = libc.extattr_set_file
+            else:
+                func = libc.extattr_set_link
+            _check(func(path, EXTATTR_NAMESPACE_USER, name, value, len(value)), path)
+
     else:
         raise Exception('Unsupported platform: %s' % sys.platform)
+
+

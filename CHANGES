@@ -9,7 +9,9 @@ Version 0.7
 
 (feature release, released on X)
 
+- Ported to FreeBSD
 - Experimental: Archives mountable as fuse filesystems.
+- The "user." prefix is no longer stripped from xattrs on Linux
 
 
 Version 0.6.1

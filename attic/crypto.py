@@ -7,6 +7,8 @@ libcrypto = cdll.LoadLibrary(find_library('crypto'))
 # Default libcrypto on OS X is too old, try the brew version
 if not hasattr(libcrypto, 'PKCS5_PBKDF2_HMAC') and sys.platform == 'darwin':
     libcrypto = cdll.LoadLibrary('/usr/local/opt/openssl/lib/libcrypto.dylib')
+if not hasattr(libcrypto, 'PKCS5_PBKDF2_HMAC') and sys.platform.startswith('freebsd'):
+    libcrypto = cdll.LoadLibrary('/usr/local/lib/libcrypto.so')
 libcrypto.PKCS5_PBKDF2_HMAC.argtypes = (c_char_p, c_int, c_char_p, c_int, c_int, c_void_p, c_int, c_char_p)
 libcrypto.EVP_sha256.restype = c_void_p
 libcrypto.AES_set_encrypt_key.argtypes = (c_char_p, c_int, c_char_p)

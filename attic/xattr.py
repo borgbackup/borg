@@ -138,13 +138,10 @@ except ImportError:
             flags = 0
             if isinstance(path, str):
                 path = os.fsencode(path)
-                func = libc.fgetxattr
             if isinstance(path, int):
                 func = libc.fgetxattr
             elif not follow_symlinks:
                 flags = XATTR_NOFOLLOW
-            else:
-                func = libc.lgetxattr
             n = _check(func(path, name, None, 0, 0, flags))
             if n == 0:
                 return

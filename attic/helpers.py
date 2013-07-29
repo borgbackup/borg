@@ -385,7 +385,7 @@ def daemonize():
 if sys.version < '3.3':
     # st_mtime_ns attribute only available in 3.3+
     def st_mtime_ns(st):
-        return int(st.st_mtime * 10**9)
+        return int(st.st_mtime * 1e9)
 
     # unhexlify in < 3.3 incorrectly only accepts bytes input
     def unhexlify(data):

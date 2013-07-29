@@ -1,9 +1,20 @@
 import filecmp
 import os
+import posix
 import sys
+import sysconfig
 import time
 import unittest
+from attic.helpers import st_mtime_ns
 from attic.xattr import get_all
+
+# The mtime get/set precison varies on different OS and Python versions
+if 'HAVE_FUTIMENS' in posix._have_functions:
+    st_mtime_ns_round = 0
+elif 'HAVE_UTIMES' in sysconfig.get_config_vars():
+    st_mtime_ns_round = -3
+else:
+    st_mtime_ns_round = -9
 
 
 has_mtime_ns = sys.version >= '3.3'
@@ -41,15 +52,16 @@ class AtticTestCase(unittest.TestCase):
             if not fuse or not os.path.isdir(path1):
                 # dir nlink is always 1 on our fuse fileystem
                 attrs.append('st_nlink')
-            if not os.path.islink(path1) or utime_supports_fd:
-                # Fuse api is does not support ns precision
-                attrs.append('st_mtime_ns' if has_mtime_ns and not fuse else 'st_mtime')
             d1 = [filename] + [getattr(s1, a) for a in attrs]
             d2 = [filename] + [getattr(s2, a) for a in attrs]
-            # 'st_mtime precision is limited'
-            if attrs[-1] == 'st_mtime':
-                d1[-1] = round(d1[-1], 2)
-                d2[-1] = round(d2[-1], 2)
+            if not os.path.islink(path1) or utime_supports_fd:
+                # llfuse does not provide ns precision for now
+                if fuse:
+                    d1.append(round(st_mtime_ns(s1), -4))
+                    d2.append(round(st_mtime_ns(s2), -4))
+                else:
+                    d1.append(round(st_mtime_ns(s1), st_mtime_ns_round))
+                    d2.append(round(st_mtime_ns(s2), st_mtime_ns_round))
             d1.append(self._get_xattrs(path1))
             d2.append(self._get_xattrs(path2))
             self.assert_equal(d1, d2)

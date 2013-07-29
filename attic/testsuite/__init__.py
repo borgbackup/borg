@@ -9,10 +9,10 @@ from attic.helpers import st_mtime_ns
 from attic.xattr import get_all
 
 # The mtime get/set precison varies on different OS and Python versions
-if 'HAVE_FUTIMENS' in posix._have_functions:
+if 'HAVE_FUTIMENS' in getattr(posix, '_have_functions', []):
     st_mtime_ns_round = 0
 elif 'HAVE_UTIMES' in sysconfig.get_config_vars():
-    st_mtime_ns_round = -3
+    st_mtime_ns_round = -4
 else:
     st_mtime_ns_round = -9
 

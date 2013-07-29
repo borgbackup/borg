@@ -12,7 +12,7 @@ from attic.xattr import get_all
 if 'HAVE_FUTIMENS' in getattr(posix, '_have_functions', []):
     st_mtime_ns_round = 0
 elif 'HAVE_UTIMES' in sysconfig.get_config_vars():
-    st_mtime_ns_round = -4
+    st_mtime_ns_round = -6
 else:
     st_mtime_ns_round = -9
 

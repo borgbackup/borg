@@ -349,12 +349,9 @@ class Archive(object):
         }
         if self.numeric_owner:
             item[b'user'] = item[b'group'] = None
-        try:
-            xattrs = xattr.get_all(path, follow_symlinks=False)
-            if xattrs:
-                item[b'xattrs'] = xattrs
-        except PermissionError:
-            pass
+        xattrs = xattr.get_all(path, follow_symlinks=False)
+        if xattrs:
+            item[b'xattrs'] = xattrs
         return item
 
     def process_item(self, path, st):

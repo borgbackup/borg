@@ -66,6 +66,10 @@ Passphrase based encryption
     PBKDF2_ key derivation function. This method is convenient to use and
     secure as long as a *strong* passphrase is used.
 
+    .. Note::
+        For automated backups the passphrase can be specified using the
+        `ATTIC_PASSPHRASE` environment variable.
+
 Key file based encryption
     This method generates random keys at repository initialization time that
     are stored in a password protected file in the ``~/.attic/keys/`` directory.

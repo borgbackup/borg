@@ -13,8 +13,8 @@ Other dependencies:
 * `msgpack-python`_ >= 0.1.10
 * OpenSSL_ >= 1.0.0
 
-The OpenSSL provided by Mac OS X is too old so OS X users are recommended
-to install a newer version using homebrew_.
+The OpenSSL version bundled with Mac OS X and FreeBSD is most likey too old.
+Newer versions are available from homebrew_ on OS X and from FreeBSD ports.
 
 Installing from PyPI using pip
 ------------------------------

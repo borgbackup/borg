@@ -1,21 +1,19 @@
-.. _usage_attic_init:
+.. _usage_attic_change-passphrase:
 
-attic init
-~~~~~~~~~~
+attic change-passphrase
+~~~~~~~~~~~~~~~~~~~~~~~
 ::
 
-usage: attic init [-h] [-v] [--key-file] [--passphrase] repository
+usage: attic change-passphrase [-h] [-v] repository
 
-Initialize a new repository
+Change passphrase on repository key file
 
 positional arguments:
-  repository     repository to create
+  repository
 
 optional arguments:
   -h, --help     show this help message and exit
   -v, --verbose  verbose output
-  --key-file     enable key file based encryption
-  --passphrase   enable passphrase based encryption
 .. _usage_attic_create:
 
 attic create
@@ -43,6 +41,22 @@ optional arguments:
   --do-not-cross-mountpoints
                         do not cross mount points
   --numeric-owner       only store numeric user and group identifiers
+.. _usage_attic_delete:
+
+attic delete
+~~~~~~~~~~~~
+::
+
+usage: attic delete [-h] [-v] ARCHIVE
+
+Delete archive
+
+positional arguments:
+  ARCHIVE        archive to delete
+
+optional arguments:
+  -h, --help     show this help message and exit
+  -v, --verbose  verbose output
 .. _usage_attic_extract:
 
 attic extract
@@ -64,22 +78,43 @@ optional arguments:
   -e PATTERN, --exclude PATTERN
                         exclude paths matching PATTERN
   --numeric-owner       only obey numeric user and group identifiers
-.. _usage_attic_delete:
+.. _usage_attic_init:
 
-attic delete
-~~~~~~~~~~~~
+attic init
+~~~~~~~~~~
 ::
 
-usage: attic delete [-h] [-v] ARCHIVE
+usage: attic init [-h] [-v] [--key-file] [--passphrase] repository
 
-Delete archive
+Initialize a new repository
 
 positional arguments:
-  ARCHIVE        archive to delete
+  repository     repository to create
 
 optional arguments:
   -h, --help     show this help message and exit
   -v, --verbose  verbose output
+  --key-file     enable key file based encryption
+  --passphrase   enable passphrase based encryption
+.. _usage_attic_mount:
+
+attic mount
+~~~~~~~~~~~
+::
+
+usage: attic mount [-h] [-v] [-f] [-o OPTIONS] ARCHIVE MOUNTPOINT
+
+Mount archive as a FUSE fileystem
+
+positional arguments:
+  ARCHIVE           archive to mount
+  MOUNTPOINT        where to mount filesystem
+
+optional arguments:
+  -h, --help        show this help message and exit
+  -v, --verbose     verbose output
+  -f, --foreground  stay in foreground, do not daemonize
+  -o OPTIONS        Extra mount options
 .. _usage_attic_prune:
 
 attic prune
@@ -129,19 +164,3 @@ optional arguments:
   -v, --verbose         verbose output
   -e PATTERN, --exclude PATTERN
                         exclude paths matching PATTERN
-.. _usage_attic_change-passphrase:
-
-attic change-passphrase
-~~~~~~~~~~~~-~~~~~~~~~~
-::
-
-usage: attic change-passphrase [-h] [-v] repository
-
-Change passphrase on repository key file
-
-positional arguments:
-  repository
-
-optional arguments:
-  -h, --help     show this help message and exit
-  -v, --verbose  verbose output

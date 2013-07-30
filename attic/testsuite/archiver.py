@@ -224,7 +224,7 @@ class ArchiverTestCase(AtticTestCase):
         try:
             self.attic('mount', self.repository_location + '::archive', mountpoint, fork=True)
             self.wait_for_mount(mountpoint)
-            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'), fuse=True)
+            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'))
         finally:
             if sys.platform.startswith('linux'):
                 os.system('fusermount -u ' + mountpoint)

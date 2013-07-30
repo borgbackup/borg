@@ -6,6 +6,8 @@ import stat
 import time
 
 from attic.helpers import daemonize
+# Does this version of llfuse support ns precision?
+have_fuse_mtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
 
 
 class AtticOperations(llfuse.Operations):
@@ -95,9 +97,14 @@ class AtticOperations(llfuse.Operations):
         entry.st_size = size
         entry.st_blksize = 512
         entry.st_blocks = 1
-        entry.st_atime = item[b'mtime'] / 1e9
-        entry.st_mtime = item[b'mtime'] / 1e9
-        entry.st_ctime = item[b'mtime'] / 1e9
+        if have_fuse_mtime_ns:
+            entry.st_atime_ns = item[b'mtime']
+            entry.st_mtime_ns = item[b'mtime']
+            entry.st_ctime_ns = item[b'mtime']
+        else:
+            entry.st_atime = item[b'mtime'] / 1e9
+            entry.st_mtime = item[b'mtime'] / 1e9
+            entry.st_ctime = item[b'mtime'] / 1e9
         return entry
 
     def listxattr(self, inode):

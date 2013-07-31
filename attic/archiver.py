@@ -46,7 +46,7 @@ class Archiver:
         return RepositoryServer().serve()
 
     def do_init(self, args):
-        """Initialize a new repository
+        """Initialize an empty repository
         """
         print('Initializing repository at "%s"' % args.repository.orig)
         repository = self.open_repository(args.repository, create=True)
@@ -59,9 +59,9 @@ class Archiver:
         return self.exit_code
 
     def do_change_passphrase(self, args):
-        """Change passphrase on repository key file
+        """Change repository key file passphrase
         """
-        repository = self.open_repository(Location(args.repository))
+        repository = self.open_repository(args.repository)
         manifest, key = Manifest.load(repository)
         key.change_passphrase()
         return self.exit_code
@@ -350,7 +350,7 @@ class Archiver:
         subparser = subparsers.add_parser('init', parents=[common_parser],
                                           description=self.do_init.__doc__)
         subparser.set_defaults(func=self.do_init)
-        subparser.add_argument('repository',
+        subparser.add_argument('repository', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to create')
         subparser.add_argument('--key-file', dest='keyfile',
@@ -363,7 +363,8 @@ class Archiver:
         subparser = subparsers.add_parser('change-passphrase', parents=[common_parser],
                                           description=self.do_change_passphrase.__doc__)
         subparser.set_defaults(func=self.do_change_passphrase)
-        subparser.add_argument('repository', type=location_validator(archive=False))
+        subparser.add_argument('repository', metavar='REPOSITORY',
+                               type=location_validator(archive=False))
 
         subparser = subparsers.add_parser('create', parents=[common_parser],
                                           description=self.do_create.__doc__)
@@ -376,7 +377,7 @@ class Archiver:
                                metavar="PATTERN", help='exclude paths matching PATTERN')
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                type=int, default=300, metavar='SECONDS',
-                               help='write checkpointe ever SECONDS seconds (Default: 300)')
+                               help='write checkpoint every SECONDS seconds (Default: 300)')
         subparser.add_argument('--do-not-cross-mountpoints', dest='dontcross',
                                action='store_true', default=False,
                                help='do not cross mount points')
@@ -414,7 +415,7 @@ class Archiver:
         subparser = subparsers.add_parser('list', parents=[common_parser],
                                           description=self.do_list.__doc__)
         subparser.set_defaults(func=self.do_list)
-        subparser.add_argument('src', metavar='SRC', type=location_validator(),
+        subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
                                help='repository/archive to list contents of')
 
         subparser = subparsers.add_parser('mount', parents=[common_parser],

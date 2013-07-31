@@ -138,5 +138,5 @@ gh-pages: html
 	(cd $$GH_PAGES_CLONE && git add -A && git commit -m 'Updated gh-pages' && git push) && \
 	rm -rf $$GH_PAGES_CLONE
 
-inotify:
+inotify: html
 	while inotifywait -r . --exclude usage.rst --exclude '_build/*' ; do make html ; done

@@ -1,3 +1,4 @@
+.. highlight:: bash
 .. |project_name| replace:: ``Attic``
 .. |project_version| replace:: 0.7
 .. |package_dirname| replace:: Attic-|project_version|
@@ -15,3 +16,4 @@
 .. _`msgpack-python`: https://pypi.python.org/pypi/msgpack-python/
 .. _homebrew: http://mxcl.github.io/homebrew/
 .. _issue tracker: https://github.com/jborg/attic/issues
+.. _userspace filesystems: https://en.wikipedia.org/wiki/Filesystem_in_Userspace

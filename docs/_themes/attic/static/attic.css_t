@@ -35,10 +35,14 @@ div.sphinxsidebar {
 }
 
 h1, h2, h3 {
+  font-family: "DejaVu Serif";
   font-weight: normal;
-  color: #444;
+  font-style: italic;
+  color: #333;
 }
-
+h1 { font-size: 200%;}
+h2 { font-size: 140%;}
+h3 { font-size: 100%;}
 ul {
   padding-left: 1.2em;
   margin-bottom: .3em;
@@ -49,7 +53,6 @@ ul ul {
 li {
   margin: .1em 0;
 }
-
 a:link, a:visited {
   color: #00608f;
   text-decoration: none;
@@ -64,6 +67,9 @@ div.sphinxsidebar a:link, div.sphinxsidebar a:visited {
   border-bottom: 1px dotted #555;
 }
 
+div.sphinxsidebar input {
+  border: 1px solid #ccc;
+}
 
 pre {
   border: 1px solid #ccc;
@@ -72,17 +78,32 @@ pre {
   color: #ddd;
   border-radius: .4em;
   box-shadow: 2px 2px #ddd;
-
+  line-height: 1.2em;
+}
+pre a:link,
+pre a:visited {
+  color: #00B0E4;
 }
 
 div.note {
   background-color: #eee;
   border: 1px solid #ccc;
+  border-radius: .4em;
+  box-shadow: 2px 2px #ddd;
 }
 div.sidebarlogo .title {
-  font-size: 250%;
+  font-family: "DejaVu Serif";
+  font-style: italic;
+  font-size: 500%;
 }
 div.sidebarlogo .subtitle {
   font-style: italic;
   color: #777;
+}
+tt span.pre {
+  font-size: 110%;
+}
+dt {
+  font-style: italic;
+  font-size: 95%;
 }

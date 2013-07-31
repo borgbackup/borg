@@ -2,7 +2,7 @@
 .. _installation:
 
 Installation
-=============
+============
 
 |project_name| requires Python_ 3.2 or above to work. Even though Python 3 is
 not the default Python version on most Linux distributions it is usually

@@ -1,51 +1,79 @@
 .. include:: global.rst.inc
-.. _generalusage:
+.. _quickstart:
 
-General Usage
-=============
+Quick Start
+===========
 
-The following examples showcases how to use |project_name| to backup some
-important files from a users home directory (for more detailed information
-about each subcommand see the :ref:`detailed_usage` section).
+This chapter will get you started with |project_name|. The first section
+presents a simple example that uses |project_name| to backup data.
+The next section continues by showing how backups can be automated.
 
-Initialize a local :ref:`repository <repository_def>` to store backup
-:ref:`archives <archive_def>` in (See :ref:`encrypted_repos` and
-:ref:`remote_repos` for more details)::
+A step by step example
+----------------------
+
+1. Before any backup can be made a repository has to be initialized::
 
     $ attic init /somewhere/my-backup.attic
 
-Create an archive containing the ``~/src`` and ``~/Documents`` directories::
+2. Backup the ``~/src`` and ``~/Documents`` directories into an archive called
+   *first-backup*::
 
     $ attic create -v /somwhere/my-backup.attic::first-backup ~/src ~/Documents
 
-Create another archive the next day. This backup will be a lot quicker since
-only new data is stored. The ``--stats`` option tells |project_name| to print
-statistics about the newly created archive such as the amount of unique data
-(not shared with other archives)::
+3. The next day create a new archive called *second-backup*::
 
     $ attic create -v --stats /somwhere/my-backup.attic::second-backup ~/src ~/Documents
 
-List all archives in the repository::
+   This backup will be a lot quicker and a lot smaller since only new never
+   before seen data is stored. The ``--stats`` causes |project_name| to output
+   statistics about the newly created archive such as the amount of unique
+   data (not shared with other archives).
+
+4. List all archives in the repository::
 
     $ attic list /somewhere/my-backup.attic
 
-List the files in the *first-backup* archive::
+5. List the contents of the *first-backup* archive::
 
     $ attic list /somewhere/my-backup.attic::first-backup
 
-Restore the *first-backup* archive::
+6. Restore the *first-backup* archive::
 
     $ attic extract -v /somwhere/my-backup.attic::first-backup
 
-Recover disk space by manually deleting the *first-backup* archive::
+7. Recover disk space by manually deleting the *first-backup* archive::
 
     $ attic delete /somwhere/my-backup.attic::first-backup
 
-Use the ``prune`` subcommand to delete all archives except a given number of
-*daily*, *weekly*, *monthly* and *yearly* archives::
 
-    $ attic prune /somwhere/my-backup.attic --daily=7 --weekly=2 --monthly=6
+Automating backups
+------------------
 
+The following example script backups up ``/home`` and
+``/var/www`` to a remote server. The script also uses the
+:ref:`usage_attic_prune` subcommand to maintain a certain number
+of old archives::
+
+    #!/bin/sh
+    REPOSITORY=username@remoteserver.com:backup.attic
+
+    # Backup all of /home and /var/www except a few
+    # excluded directories
+    attic create --stats                            \
+        $REPOSITORY::hostname-`date +%Y-%m-%d`      \
+        /home                                       \
+        /var/www                                    \
+        --exclude /home/*/.cache                    \
+        --exclude /home/Ben/Music/Justin\ Bieber    \
+        --exclude *.pyc
+
+    # Use the `prune` subcommand to maintain 7 daily, 4 weekly
+    # and 6 monthly archives.
+    attic prune -v $REPOSITORY --daily=7 --weekly=4 --monthly=6
+
+.. Note::
+    This script assumes the repository has already been initalized with
+    :ref:`attic_init`.
 
 .. _encrypted_repos:
 

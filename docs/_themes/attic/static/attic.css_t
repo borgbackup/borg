@@ -1,0 +1,88 @@
+@import url("basic.css");
+
+body {
+  font-family: Arial, Sans-Serif;
+  background-color: white;
+  margin: 0;
+  padding: 0;
+}
+div.related {
+  display: none;
+  background-color: black;
+  padding: .4em;
+  width: 800px;
+  margin: 0 auto;
+}
+div.related a {
+  color: white;
+  text-decoration: none;
+}
+div.document {
+  background-color: white;
+  width: 850px;
+  margin: 0 auto;
+  padding-top: 1em;
+}
+
+div.documentwrapper {
+  float: right;
+  width: 600px;
+}
+div.sphinxsidebar {
+  margin-left: 0;
+  parring-right: 20px;
+  width: 230px;
+}
+
+h1, h2, h3 {
+  font-weight: normal;
+  color: #444;
+}
+
+ul {
+  padding-left: 1.2em;
+  margin-bottom: .3em;
+}
+ul ul {
+  font-size: 95%;
+}
+li {
+  margin: .1em 0;
+}
+
+a:link, a:visited {
+  color: #00608f;
+  text-decoration: none;
+}
+a:hover {
+  color: #00B0E4;
+  border-bottom: 1px dotted #00B0E4;
+}
+
+div.sphinxsidebar a:link, div.sphinxsidebar a:visited {
+  color: #555;
+  border-bottom: 1px dotted #555;
+}
+
+
+pre {
+  border: 1px solid #ccc;
+  padding: .6em;
+  background: black;
+  color: #ddd;
+  border-radius: .4em;
+  box-shadow: 2px 2px #ddd;
+
+}
+
+div.note {
+  background-color: #eee;
+  border: 1px solid #ccc;
+}
+div.sidebarlogo .title {
+  font-size: 250%;
+}
+div.sidebarlogo .subtitle {
+  font-style: italic;
+  color: #777;
+}

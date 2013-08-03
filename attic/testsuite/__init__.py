@@ -32,6 +32,8 @@ utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
 class AtticTestCase(unittest.TestCase):
     """
     """
+    assert_in = unittest.TestCase.assertIn
+    assert_not_in = unittest.TestCase.assertNotIn
     assert_equal = unittest.TestCase.assertEqual
     assert_not_equal = unittest.TestCase.assertNotEqual
     assert_raises = unittest.TestCase.assertRaises

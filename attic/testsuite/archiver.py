@@ -157,6 +157,15 @@ class ArchiverTestCase(AtticTestCase):
             self.attic('extract', '--exclude=input/file2', self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file3'])
 
+    def test_path_normalization(self):
+        self.attic('init', self.repository_location)
+        self.create_regual_file('dir1/dir2/file', size=1024 * 80)
+        with changedir('input/dir1/dir2'):
+            self.attic('create', self.repository_location + '::test', '../../../input/dir1/../dir1/dir2/..')
+        output = self.attic('list', self.repository_location + '::test')
+        self.assert_not_in('..', output)
+        self.assert_in(' input/dir1/dir2/file', output)
+
     def test_overwrite(self):
         self.create_regual_file('file1', size=1024 * 80)
         self.create_regual_file('dir2/file2', size=1024 * 80)

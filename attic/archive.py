@@ -11,7 +11,7 @@ from io import BytesIO
 from . import xattr
 from .chunker import chunkify
 from .helpers import uid2user, user2uid, gid2group, group2gid, \
-    Statistics, decode_dict, st_mtime_ns
+    Statistics, decode_dict, st_mtime_ns, make_path_safe
 
 ITEMS_BUFFER = 1024 * 1024
 CHUNK_MIN = 1024
@@ -223,7 +223,8 @@ class Archive(object):
 
     def extract_item(self, item, restore_attrs=True, peek=None):
         dest = self.cwd
-        assert item[b'path'][:1] not in ('/', '\\', ':')
+        if item[b'path'].startswith('/') or item[b'path'].startswith('..'):
+            raise Exception('Path should be relative and local')
         path = os.path.join(dest, item[b'path'])
         # Attempt to remove existing files, ignore errors on failure
         try:
@@ -355,23 +356,23 @@ class Archive(object):
         return item
 
     def process_item(self, path, st):
-        item = {b'path': path.lstrip('/\\:')}
+        item = {b'path': make_path_safe(path)}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
 
     def process_dev(self, path, st):
-        item = {b'path': path.lstrip('/\\:'), b'rdev': st.st_rdev}
+        item = {b'path': make_path_safe(path), b'rdev': st.st_rdev}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
 
     def process_symlink(self, path, st):
         source = os.readlink(path)
-        item = {b'path': path.lstrip('/\\:'), b'source': source}
+        item = {b'path': make_path_safe(path), b'source': source}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
 
     def process_file(self, path, st, cache):
-        safe_path = path.lstrip('/\\:')
+        safe_path = make_path_safe(path)
         # Is it a hard link?
         if st.st_nlink > 1:
             source = self.hard_links.get((st.st_ino, st.st_dev))

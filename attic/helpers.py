@@ -362,6 +362,15 @@ def remove_surrogates(s, errors='replace'):
     return s.encode('utf-8', errors).decode('utf-8')
 
 
+_safe_re = re.compile('^((..)?/+)+')
+
+
+def make_path_safe(path):
+    """Make path safe by making it relative and local
+    """
+    return _safe_re.sub('', path) or '.'
+
+
 def daemonize():
     """Detach process from controlling terminal and run in background
     """

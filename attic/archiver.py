@@ -91,6 +91,7 @@ class Archiver:
             except IOError:
                 pass
         for path in args.paths:
+            path = os.path.normpath(path)
             if args.dontcross:
                 try:
                     restrict_dev = os.lstat(path).st_dev

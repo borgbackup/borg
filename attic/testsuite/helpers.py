@@ -1,5 +1,5 @@
 from datetime import datetime
-from attic.helpers import Location, format_timedelta, IncludePattern, ExcludePattern
+from attic.helpers import Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe
 from attic.testsuite import AtticTestCase
 
 
@@ -54,3 +54,15 @@ class PatternTestCase(AtticTestCase):
         self.assert_equal(ExcludePattern('/tmp').match('/tmp'), True)
         self.assert_equal(ExcludePattern('/tmp').match('/tmp/foo'), True)
         self.assert_equal(ExcludePattern('/tmp').match('/tmofoo'), False)
+
+
+class MakePathSafeTestCase(AtticTestCase):
+
+    def test(self):
+        self.assert_equal(make_path_safe('/foo/bar'), 'foo/bar')
+        self.assert_equal(make_path_safe('/foo/bar'), 'foo/bar')
+        self.assert_equal(make_path_safe('../foo/bar'), 'foo/bar')
+        self.assert_equal(make_path_safe('../../foo/bar'), 'foo/bar')
+        self.assert_equal(make_path_safe('/'), '.')
+        self.assert_equal(make_path_safe('/'), '.')
+

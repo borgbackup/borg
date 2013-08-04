@@ -1,6 +1,7 @@
-Synopsis
-~~~~~~~~
+attic delete
+------------
 ::
+
 
     usage: attic delete [-h] [-v] ARCHIVE
     
@@ -12,3 +13,8 @@ Synopsis
     optional arguments:
       -h, --help     show this help message and exit
       -v, --verbose  verbose output
+
+Description
+~~~~~~~~~~~
+
+

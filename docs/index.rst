@@ -35,7 +35,7 @@ User's Guide
    foreword
    installation
    quickstart
-   commands
+   usage
    faq
 
 Contribute

@@ -1,6 +1,7 @@
-Synopsis
-~~~~~~~~
+attic extract
+-------------
 ::
+
 
     usage: attic extract [-h] [-v] [-e PATTERN] [--numeric-owner]
                          ARCHIVE [PATH [PATH ...]]
@@ -17,3 +18,8 @@ Synopsis
       -e PATTERN, --exclude PATTERN
                             exclude paths matching PATTERN
       --numeric-owner       only obey numeric user and group identifiers
+
+Description
+~~~~~~~~~~~
+
+

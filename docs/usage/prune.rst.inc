@@ -1,6 +1,7 @@
-Synopsis
-~~~~~~~~
+attic prune
+-----------
 ::
+
 
     usage: attic prune [-h] [-v] [-H HOURLY] [-d DAILY] [-w WEEKLY] [-m MONTHLY]
                        [-y YEARLY] [-p PREFIX]
@@ -26,3 +27,8 @@ Synopsis
                             number of yearly archives to keep
       -p PREFIX, --prefix PREFIX
                             only consider archive names starting with this prefix
+
+Description
+~~~~~~~~~~~
+
+

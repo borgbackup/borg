@@ -1,8 +1,8 @@
 .. include:: global.rst.inc
 .. _detailed_usage:
 
-Commands
-========
+Usage
+=====
 
 |project_name| consists of a number of commands. Each command accepts
 a number of arguments and options. The following sections will describe each
@@ -16,9 +16,6 @@ Like most UNIX commands |project_name| is quiet by default but the ``-v`` or
 messages as it is processing.
 
 .. _attic_init:
-
-attic init
-----------
 
 .. include:: usage/init.rst.inc
 
@@ -40,9 +37,6 @@ Examples
     # Encrypted remote backup repository
     $ attic init --passphrase user@hostname:mybackuprepo.attic
 
-
-attic create
-------------
 
 .. include:: usage/create.rst.inc
 
@@ -70,8 +64,6 @@ Examples
 
 .. _attic_extract:
 
-attic extract
--------------
 
 .. include:: usage/extract.rst.inc
 
@@ -97,9 +89,6 @@ Examples
     $ attic extract /data/myrepo::my-files home/USERNAME/src --exclude *.o
 
 
-attic verify
-------------
-
 .. include:: usage/verify.rst.inc
 
 This command is similar to :ref:`attic_extract` but instead of writing any
@@ -107,9 +96,6 @@ files to disk the command just verifies that all files are extractable and
 not corrupt. |project_name| will not compare the the archived files with the
 files on disk.
 
-
-attic delete
-------------
 
 .. include:: usage/delete.rst.inc
 
@@ -119,8 +105,6 @@ shared with any other existing archive is also reclaimed.
 
 .. _attic_list:
 
-attic list
-----------
 
 .. include:: usage/list.rst.inc
 
@@ -146,9 +130,6 @@ Examples
     ...
 
 
-attic prune
------------
-
 .. include:: usage/prune.rst.inc
 
 The ``prune`` command prunes a repository by deleting archives not matching
@@ -166,9 +147,6 @@ Examples
     # Same as above but only apply to archive names starting with "foo"
     $ attic prune /data/myrepo --daily=7 --weekly=4 --prefix=foo
 
-
-attic info
-----------
 
 .. include:: usage/info.rst.inc
 
@@ -191,9 +169,6 @@ Examples
     Unique data: 64805454 (61.80 MB)
 
 
-attic mount
------------
-
 .. include:: usage/mount.rst.inc
 
 This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -210,9 +185,6 @@ Examples
     bin  boot  etc  lib  lib64  mnt  opt  root  sbin  srv  usr  var
     $ fusermount -u /tmp/mymountpoint
 
-
-attic change-passphrase
------------------------
 
 .. include:: usage/change-passphrase.rst.inc
 

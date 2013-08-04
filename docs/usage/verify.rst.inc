@@ -1,6 +1,7 @@
-Synopsis
-~~~~~~~~
+attic verify
+------------
 ::
+
 
     usage: attic verify [-h] [-v] [-e PATTERN] ARCHIVE [PATH [PATH ...]]
     
@@ -15,3 +16,8 @@ Synopsis
       -v, --verbose         verbose output
       -e PATTERN, --exclude PATTERN
                             exclude paths matching PATTERN
+
+Description
+~~~~~~~~~~~
+
+

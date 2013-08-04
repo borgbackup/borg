@@ -1,6 +1,7 @@
-Synopsis
-~~~~~~~~
+attic list
+----------
 ::
+
 
     usage: attic list [-h] [-v] REPOSITORY_OR_ARCHIVE
     
@@ -13,3 +14,8 @@ Synopsis
     optional arguments:
       -h, --help            show this help message and exit
       -v, --verbose         verbose output
+
+Description
+~~~~~~~~~~~
+
+

@@ -1,6 +1,7 @@
-Synopsis
-~~~~~~~~
+attic init
+----------
 ::
+
 
     usage: attic init [-h] [-v] [--key-file] [--passphrase] REPOSITORY
     
@@ -14,3 +15,8 @@ Synopsis
       -v, --verbose  verbose output
       --key-file     enable key file based encryption
       --passphrase   enable passphrase based encryption
+
+Description
+~~~~~~~~~~~
+
+

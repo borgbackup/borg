@@ -1,6 +1,7 @@
-Synopsis
-~~~~~~~~
+attic mount
+-----------
 ::
+
 
     usage: attic mount [-h] [-v] [-f] [-o OPTIONS] ARCHIVE MOUNTPOINT
     
@@ -15,3 +16,8 @@ Synopsis
       -v, --verbose     verbose output
       -f, --foreground  stay in foreground, do not daemonize
       -o OPTIONS        Extra mount options
+
+Description
+~~~~~~~~~~~
+
+

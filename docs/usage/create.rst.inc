@@ -1,6 +1,7 @@
-Synopsis
-~~~~~~~~
+attic create
+------------
 ::
+
 
     usage: attic create [-h] [-v] [-s] [-e PATTERN] [-c SECONDS]
                         [--do-not-cross-mountpoints] [--numeric-owner]
@@ -23,3 +24,8 @@ Synopsis
       --do-not-cross-mountpoints
                             do not cross mount points
       --numeric-owner       only store numeric user and group identifiers
+
+Description
+~~~~~~~~~~~
+
+

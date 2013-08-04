@@ -15,8 +15,6 @@ Like most UNIX commands |project_name| is quiet by default but the ``-v`` or
 ``--verbose`` option can be used to get the program to output more status
 messages as it is processing.
 
-.. _attic_init:
-
 .. include:: usage/init.rst.inc
 
 This command initializes an empty :ref:`repository <repository_def>`.
@@ -62,8 +60,6 @@ Examples
     NAME="root-`date +%Y-%m-%d`"
     $ attic create /data/myrepo.attic::$NAME / --do-not-cross-mountpoints
 
-.. _attic_extract:
-
 
 .. include:: usage/extract.rst.inc
 
@@ -101,9 +97,6 @@ files on disk.
 
 This command deletes an archive from the repository. Any disk space not
 shared with any other existing archive is also reclaimed.
-
-
-.. _attic_list:
 
 
 .. include:: usage/list.rst.inc

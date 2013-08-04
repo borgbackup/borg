@@ -16,7 +16,7 @@ first backup :ref:`archive <archive_def>` in two lines::
     $ attic init /usbdrive/my-backup.attic
     $ attic create -v /usbdrive/my-backup.attic::documents ~/Documents
 
-See the :ref:`generalusage` section for a more detailed example.
+See the :ref:`quickstart` chapter for a more detailed example.
 
 Easy installation
 -----------------

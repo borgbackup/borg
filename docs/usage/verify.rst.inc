@@ -1,3 +1,5 @@
+.. _attic_verify:
+
 attic verify
 ------------
 ::

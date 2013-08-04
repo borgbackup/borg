@@ -1,3 +1,5 @@
+.. _attic_change-passphrase:
+
 attic change-passphrase
 -----------------------
 ::

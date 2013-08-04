@@ -1,8 +1,12 @@
 .. include:: global.rst.inc
-.. _foreward:
+.. _foreword:
 
 Foreword
 ========
+
+|project_name| is a secure backup program for Linux, FreeBSD and Mac OS X. 
+|project_name| is designed for efficient data storage where only new or
+modified data is stored.
 
 Features
 --------
@@ -22,12 +26,12 @@ Off-site backups
     long as |project_name| is installed.
 
 Backups mountable as filesystems
-    Backup archives are :ref:`mountable <usage_attic_mount>` as
+    Backup archives are :ref:`mountable <attic_mount>` as
     `userspace filesystems`_ for easy backup verification and restores.
 
 
-Terminology
------------
+Glossary
+--------
 
 .. _deduplication_def:
 

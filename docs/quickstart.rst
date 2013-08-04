@@ -5,13 +5,13 @@ Quick Start
 ===========
 
 This chapter will get you started with |project_name|. The first section
-presents a simple example that uses |project_name| to backup data.
+presents a simple step by step example that uses |project_name| to backup data.
 The next section continues by showing how backups can be automated.
 
 A step by step example
 ----------------------
 
-1. Before any backup can be made a repository has to be initialized::
+1. Before any backup can be taken a repository has to be initialized::
 
     $ attic init /somewhere/my-backup.attic
 
@@ -51,7 +51,7 @@ Automating backups
 
 The following example script backups up ``/home`` and
 ``/var/www`` to a remote server. The script also uses the
-:ref:`usage_attic_prune` subcommand to maintain a certain number
+:ref:`attic_prune` subcommand to maintain a certain number
 of old archives::
 
     #!/bin/sh

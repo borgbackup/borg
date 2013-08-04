@@ -1,3 +1,5 @@
+.. _attic_prune:
+
 attic prune
 -----------
 ::

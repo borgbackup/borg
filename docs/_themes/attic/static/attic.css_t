@@ -3,7 +3,7 @@
 body {
   font-family: Arial, Sans-Serif;
   background-color: white;
-  margin: 0;
+  margin: 0 0 4em;
   padding: 0;
 }
 div.related {
@@ -40,9 +40,15 @@ h1, h2, h3 {
   font-style: italic;
   color: #333;
 }
-h1 { font-size: 200%;}
-h2 { font-size: 140%;}
-h3 { font-size: 100%;}
+h1 {
+  margin: .8em 0 .5em;
+}
+h2, h3 {
+  margin: 1.2em 0 .6em;
+}
+h1 { font-size: 260%;}
+h2 { font-size: 180%;}
+h3 { font-size: 130%;}
 ul {
   padding-left: 1.2em;
   margin-bottom: .3em;
@@ -85,12 +91,6 @@ pre a:visited {
   color: #00B0E4;
 }
 
-div.note {
-  background-color: #eee;
-  border: 1px solid #ccc;
-  border-radius: .4em;
-  box-shadow: 2px 2px #ddd;
-}
 div.sidebarlogo .title {
   font-family: "DejaVu Serif";
   font-style: italic;
@@ -106,4 +106,34 @@ tt span.pre {
 dt {
   font-style: italic;
   font-size: 95%;
+}
+
+div.admonition p.admonition-title + p {
+    display: inline;
+}
+
+div.admonition p {
+    margin-bottom: 5px;
+}
+
+p.admonition-title {
+    display: inline;
+}
+
+p.admonition-title:after {
+    content: ":";
+}
+
+div.note {
+  background-color: #eee;
+  border: 1px solid #ccc;
+  border-radius: .4em;
+  box-shadow: 2px 2px #ddd;
+}
+
+div.seealso {
+  background-color: #ffe;
+  border: 1px solid #ff6;
+  border-radius: .4em;
+  box-shadow: 2px 2px #dd6;
 }

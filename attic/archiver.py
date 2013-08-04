@@ -6,14 +6,15 @@ import os
 import stat
 import sys
 
-from .archive import Archive
-from .repository import Repository
-from .cache import Cache
-from .key import key_creator
-from .helpers import location_validator, format_time, \
+from attic import __release__
+from attic.archive import Archive
+from attic.repository import Repository
+from attic.cache import Cache
+from attic.key import key_creator
+from attic.helpers import location_validator, format_time, \
     format_file_mode, IncludePattern, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_split, Manifest, Location, remove_surrogates
-from .remote import RepositoryServer, RemoteRepository, ConnectionClosed
+from attic.remote import RepositoryServer, RemoteRepository, ConnectionClosed
 
 
 class Archiver:
@@ -342,8 +343,8 @@ class Archiver:
                             default=False,
                             help='verbose output')
 
-        parser = argparse.ArgumentParser(description='Attic - Deduplicated Backups')
-        subparsers = parser.add_subparsers(title='Available subcommands')
+        parser = argparse.ArgumentParser(description='Attic %s - Deduplicated Backups' % __release__)
+        subparsers = parser.add_subparsers(title='Available commands')
 
         subparser = subparsers.add_parser('serve', parents=[common_parser])
         subparser.set_defaults(func=self.do_serve)

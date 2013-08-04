@@ -52,7 +52,7 @@ setup(
     version=attic.__release__,
     author='Jonas Borgström',
     author_email='jonas@borgstrom.se',
-    url='http://github.com/jborg/attic/',
+    url='https://pythonhosted.org/Attic/',
     description='Deduplicated backups',
     long_description=long_description,
     license='BSD',

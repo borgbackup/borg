@@ -6,7 +6,7 @@ import os
 import stat
 import sys
 
-from attic import __release__
+from attic import __version__
 from attic.archive import Archive
 from attic.repository import Repository
 from attic.cache import Cache
@@ -343,7 +343,7 @@ class Archiver:
                             default=False,
                             help='verbose output')
 
-        parser = argparse.ArgumentParser(description='Attic %s - Deduplicated Backups' % __release__)
+        parser = argparse.ArgumentParser(description='Attic %s - Deduplicated Backups' % __version__)
         subparsers = parser.add_subparsers(title='Available commands')
 
         subparser = subparsers.add_parser('serve', parents=[common_parser])

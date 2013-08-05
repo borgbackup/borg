@@ -4,6 +4,13 @@ import sys
 from glob import glob
 import attic
 
+import versioneer
+versioneer.versionfile_source = 'attic/_version.py'
+versioneer.versionfile_build = 'attic/_version.py'
+versioneer.tag_prefix = ''
+versioneer.parentdir_prefix = 'Attic-' # dirname like 'myproject-1.2.0'
+
+
 min_python = (3, 2)
 if sys.version_info < min_python:
     print("Attic requires Python %d.%d or later" % min_python)
@@ -13,7 +20,6 @@ try:
     from setuptools import setup, Extension
 except ImportError:
     from distutils.core import setup, Extension
-from distutils.command.sdist import sdist
 
 chunker_source = 'attic/chunker.pyx'
 hashindex_source = 'attic/hashindex.pyx'
@@ -22,19 +28,19 @@ try:
     from Cython.Distutils import build_ext
     import Cython.Compiler.Main as cython_compiler
 
-    class Sdist(sdist):
+    class Sdist(versioneer.cmd_sdist):
         def __init__(self, *args, **kwargs):
             for src in glob('attic/*.pyx'):
                 cython_compiler.compile(glob('attic/*.pyx'),
                                         cython_compiler.default_options)
-            sdist.__init__(self, *args, **kwargs)
+            versioneer.cmd_sdist.__init__(self, *args, **kwargs)
 
         def make_distribution(self):
             self.filelist.extend(['attic/chunker.c', 'attic/_chunker.c', 'attic/hashindex.c', 'attic/_hashindex.c'])
             super(Sdist, self).make_distribution()
 
 except ImportError:
-    class Sdist(sdist):
+    class Sdist(versioneer.cmd_sdist):
         def __init__(self, *args, **kwargs):
             raise Exception('Cython is required to run sdist')
 
@@ -47,9 +53,12 @@ except ImportError:
 with open('README.rst', 'r') as fd:
     long_description = fd.read()
 
+cmdclass = versioneer.get_cmdclass()
+cmdclass.update({'build_ext': build_ext, 'sdist': Sdist})
+
 setup(
     name='Attic',
-    version=attic.__release__,
+    version=versioneer.get_version(),
     author='Jonas Borgström',
     author_email='jonas@borgstrom.se',
     url='https://pythonhosted.org/Attic/',
@@ -71,7 +80,7 @@ setup(
     ],
     packages=['attic', 'attic.testsuite'],
     scripts=['scripts/attic'],
-    cmdclass={'build_ext': build_ext, 'sdist': Sdist},
+    cmdclass=cmdclass,
     ext_modules=[
         Extension('attic.chunker', [chunker_source]),
         Extension('attic.hashindex', [hashindex_source])

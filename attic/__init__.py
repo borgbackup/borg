@@ -1,4 +1,5 @@
 # This is a python package
 
-__version__ = '0.7'
-__release__ = __version__  # + '.dev'
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions

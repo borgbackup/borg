@@ -124,7 +124,12 @@ except ImportError:
                 func = libc.flistxattr
             elif not follow_symlinks:
                 flags = XATTR_NOFOLLOW
-            n = _check(func(path, None, 0, flags), path)
+            try:
+                n = _check(func(path, None, 0, flags), path)
+            except OSError as e:
+                if e.errno == errno.EPERM:
+                    return []
+                raise
             if n == 0:
                 return []
             namebuf = create_string_buffer(n)

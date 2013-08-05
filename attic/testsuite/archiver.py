@@ -206,7 +206,7 @@ class ArchiverTestCase(AtticTestCase):
         name = sorted(os.listdir(os.path.join(self.tmpdir, 'repository', 'data', '0')), reverse=True)[0]
         fd = open(os.path.join(self.tmpdir, 'repository', 'data', '0', name), 'r+')
         fd.seek(100)
-        fd.write('X')
+        fd.write('XXXX')
         fd.close()
         self.attic('verify', self.repository_location + '::test', exit_code=1)
 

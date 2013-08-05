@@ -1,15 +1,16 @@
 Attic Changelog
 ===============
 
-Here you can see the full list of changes between each darc release.
+Here you can see the full list of changes between each Attic release.
 
 
 Version 0.7
 -----------
 
-(feature release, released on X)
+(feature release, released on Aug 5, 2013)
 
 - Ported to FreeBSD
+- Improved documentation
 - Experimental: Archives mountable as fuse filesystems.
 - The "user." prefix is no longer stripped from xattrs on Linux
 

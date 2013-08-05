@@ -28,6 +28,10 @@ Off-site backups
     attic can store data on any remote host accessible over SSH as long as
     attic is installed.
 
+Backups mountable as filesystems
+    Backup archives are mountable as userspace filesystems for easy backup
+    verification and restores.
+
 What do I need?
 ---------------
 Attic requires Python 3.2 or above to work. Besides Python attic also requires 

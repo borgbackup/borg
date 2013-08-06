@@ -38,11 +38,20 @@ User's Guide
    usage
    faq
 
-Contribute
-==========
+Getting help
+============
 
-Found a bug? Have any ideas to improve |project_name|? Add bug reports and
-feature requests to the `issue tracker`_.
+If you've found a bug or have a concrete feature request you can add your bug
+report or feature request directly to the project `issue tracker`_. For more
+general questions or discussions a post to the mailing list is preferred.
 
-You can also ask the author a question directly by
-`email <mailto:jonas@borgstrom.se>`_.
+Mailing list
+------------
+
+There is a mailing list for Attic on librelist_ you can use for feature
+requests and general discussions about Attic. A mailing list archive is
+available `here <http://librelist.com/browser/attic/>`_.
+
+To subscribe to the list send an email to attic@librelist.com and reply
+to the confirmation mail. Likevise To unsubscribe send an email to 
+attic-unsubscribe@librelist.com and reply to the confirmation mail.

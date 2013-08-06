@@ -54,11 +54,3 @@ The tests are in the attic/testsuite package. To run the test suite use the
 following command::
 
   $ python -m attic.testsuite.run
-
-Contribute
-----------
-Found a bug? Have any ideas to improve attic? Add bug reports and feature
-requests to the `issue tracker <https://github.com/jborg/attic/issues>`_.
-
-You can also ask the author a question directly by
-`email <mailto:jonas@borgstrom.se>`_.

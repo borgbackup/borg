@@ -1,9 +1,8 @@
 .. highlight:: bash
 .. |project_name| replace:: ``Attic``
-.. |project_version| replace:: 0.7
-.. |package_dirname| replace:: Attic-|project_version|
+.. |package_dirname| replace:: Attic-|version|
 .. |package_filename| replace:: |package_dirname|.tar.gz
-.. |package_url| replace:: https://pypi.python.org/packages/source/A/Attic/Attic-0.7.tar.gz
+.. |package_url| replace:: https://pypi.python.org/packages/source/A/Attic/|package_filename|
 .. |git_url| replace:: https://github.com/jborg/attic.git
 .. _deduplication: https://en.wikipedia.org/wiki/Data_deduplication
 .. _AES: https://en.wikipedia.org/wiki/Advanced_Encryption_Standard
@@ -17,3 +16,4 @@
 .. _homebrew: http://mxcl.github.io/homebrew/
 .. _issue tracker: https://github.com/jborg/attic/issues
 .. _userspace filesystems: https://en.wikipedia.org/wiki/Filesystem_in_Userspace
+.. _librelist: http://librelist.com/

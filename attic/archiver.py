@@ -43,7 +43,7 @@ class Archiver:
             else:
                 print(msg, end=' ')
 
-    def do_serve(self, args):
+    def do_serve(self):
         return RepositoryServer().serve()
 
     def do_init(self, args):
@@ -343,11 +343,12 @@ class Archiver:
                             default=False,
                             help='verbose output')
 
+        # We can't use argpase for "serve" since we don't want it to show up in "Available commands"
+        if args and args[0] == 'serve':
+            return self.do_serve()
+
         parser = argparse.ArgumentParser(description='Attic %s - Deduplicated Backups' % __version__)
         subparsers = parser.add_subparsers(title='Available commands')
-
-        subparser = subparsers.add_parser('serve', parents=[common_parser])
-        subparser.set_defaults(func=self.do_serve)
 
         subparser = subparsers.add_parser('init', parents=[common_parser],
                                           description=self.do_init.__doc__)

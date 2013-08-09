@@ -492,6 +492,9 @@ def main():
     except Archive.DoesNotExist as e:
         archiver.print_error('Error: Archive "%s" does not exist', e)
         exit_code = 1
+    except Cache.RepositoryReplay:
+        archiver.print_error('Cache is newer than repository, refusing to continue')
+        exit_code = 1
     except ConnectionClosed:
         archiver.print_error('Connection closed by remote host')
         exit_code = 1

@@ -14,7 +14,12 @@ class Cache(object):
     """Client Side cache
     """
 
+    class RepositoryReplay(Exception):
+        """
+        """
+
     def __init__(self, repository, key, manifest):
+        self.timestamp = None
         self.txn_active = False
         self.repository = repository
         self.key = key
@@ -24,6 +29,9 @@ class Cache(object):
             self.create()
         self.open()
         if self.manifest.id != self.manifest_id:
+            # If repository is older than the cache something fishy is going on
+            if self.timestamp and self.timestamp > manifest.timestamp:
+                raise self.RepositoryReplay()
             self.sync()
             self.commit()
 
@@ -31,7 +39,7 @@ class Cache(object):
         self.close()
 
     def create(self):
-        """Create a new empty repository at `path`
+        """Create a new empty cache at `path`
         """
         os.makedirs(self.path)
         with open(os.path.join(self.path, 'README'), 'w') as fd:
@@ -59,6 +67,7 @@ class Cache(object):
             raise Exception('%s Does not look like an Attic cache')
         self.id = self.config.get('cache', 'repository')
         self.manifest_id = unhexlify(self.config.get('cache', 'manifest'))
+        self.timestamp = self.config.get('cache', 'timestamp', fallback=None)
         self.chunks = ChunkIndex(os.path.join(self.path, 'chunks').encode('utf-8'))
         self.files = None
 
@@ -103,6 +112,7 @@ class Cache(object):
                     if item[1][0] < 10 and item[1][3] < self._newest_mtime:
                         msgpack.pack(item, fd)
         self.config.set('cache', 'manifest', hexlify(self.manifest.id).decode('ascii'))
+        self.config.set('cache', 'timestamp', self.manifest.timestamp)
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             self.config.write(fd)
         self.chunks.flush()

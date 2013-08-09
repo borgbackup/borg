@@ -34,13 +34,18 @@ class Manifest:
         if not m.get(b'version') == 1:
             raise ValueError('Invalid manifest version')
         manifest.archives = dict((k.decode('utf-8'), v) for k,v in m[b'archives'].items())
+        manifest.timestamp = m.get(b'timestamp')
+        if manifest.timestamp:
+            manifest.timestamp = manifest.timestamp.decode('ascii')
         manifest.config = m[b'config']
         return manifest, key
 
     def write(self):
+        self.timestamp = datetime.utcnow().isoformat()
         data = msgpack.packb({
             'version': 1,
             'archives': self.archives,
+            'timestamp': self.timestamp,
             'config': self.config,
         })
         self.id = self.key.id_hash(data)

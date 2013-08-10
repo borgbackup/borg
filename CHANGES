@@ -9,6 +9,8 @@ Version 0.8
 
 (feature release, released on X)
 
+- New syntax to enable repository encryption:
+    attic init --encryption="none|passphrase|keyfile"
 - Detect and abort if repository is older than the cache
 
 

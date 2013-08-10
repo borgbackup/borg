@@ -82,7 +82,7 @@ Repository encryption
 
 Repository encryption is enabled at repository encryption time::
 
-    $ attic init --passphrase | --key-file
+    $ attic init --encryption=passphrase|keyfile PATH
 
 When repository encryption is enabled all data is encrypted using 256-bit AES_
 encryption and the integrity and authenticity is verified using `HMAC-SHA256`_.

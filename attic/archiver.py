@@ -356,12 +356,9 @@ class Archiver:
         subparser.add_argument('repository', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to create')
-        subparser.add_argument('--key-file', dest='keyfile',
-                               action='store_true', default=False,
-                               help='enable key file based encryption')
-        subparser.add_argument('--passphrase', dest='passphrase',
-                               action='store_true', default=False,
-                               help='enable passphrase based encryption')
+        subparser.add_argument('-e', '--encryption', dest='encryption',
+                               choices=('none', 'passphrase', 'keyfile'), default='none',
+                               help='select encryption method')
 
         subparser = subparsers.add_parser('change-passphrase', parents=[common_parser],
                                           description=self.do_change_passphrase.__doc__)

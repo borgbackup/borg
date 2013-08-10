@@ -20,9 +20,9 @@ class HMAC(hmac.HMAC):
 
 
 def key_creator(repository, args):
-    if args.keyfile:
+    if args.encryption == 'keyfile':
         return KeyfileKey.create(repository, args)
-    elif args.passphrase:
+    elif args.encryption == 'passphrase':
         return PassphraseKey.create(repository, args)
     else:
         return PlaintextKey.create(repository, args)
@@ -62,7 +62,7 @@ class PlaintextKey(KeyBase):
 
     @classmethod
     def create(cls, repository, args):
-        print('Encryption NOT enabled.\nUse the --key-file or --passphrase options to enable encryption.')
+        print('Encryption NOT enabled.\nUse the "--encryption=passphrase|keyfile" to enable encryption.')
         return cls()
 
     @classmethod

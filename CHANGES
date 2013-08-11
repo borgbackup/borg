@@ -9,9 +9,10 @@ Version 0.8
 
 (feature release, released on X)
 
+- Support access of read only repositories.
 - New syntax to enable repository encryption:
-    attic init --encryption="none|passphrase|keyfile"
-- Detect and abort if repository is older than the cache
+    attic init --encryption="none|passphrase|keyfile".
+- Detect and abort if repository is older than the cache.
 
 
 Version 0.7

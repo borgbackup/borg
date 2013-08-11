@@ -33,6 +33,7 @@ typedef struct {
     int bucket_size;
     int lower_limit;
     int upper_limit;
+    int readonly;
 } HashIndex;
 
 #define MAGIC "ATTICIDX"
@@ -56,7 +57,7 @@ typedef struct {
 #define EPRINTF(msg, ...) EPRINTF_PATH(index->path, msg, ##__VA_ARGS__)
 #define EPRINTF_PATH(path, msg, ...) fprintf(stderr, "hashindex: %s: " msg "\n", path, ##__VA_ARGS__)
 
-static HashIndex *hashindex_open(const char *path);
+static HashIndex *hashindex_open(const char *path, int readonly);
 static int hashindex_close(HashIndex *index);
 static int hashindex_clear(HashIndex *index);
 static int hashindex_flush(HashIndex *index);
@@ -138,15 +139,24 @@ hashindex_resize(HashIndex *index, int capacity)
 
 /* Public API */
 static HashIndex *
-hashindex_open(const char *path)
+hashindex_open(const char *path, int readonly)
 {
     void *addr;
-    int fd;
+    int fd, oflags, prot;
     off_t length;
     HashHeader *header;
     HashIndex *index;
 
-    if((fd = open(path, O_RDWR)) < 0) {
+    if(readonly) {
+        oflags = O_RDONLY;
+        prot = PROT_READ;
+    }
+    else {
+        oflags = O_RDWR;
+        prot = PROT_READ | PROT_WRITE;
+    }
+
+    if((fd = open(path, oflags)) < 0) {
         EPRINTF_PATH(path, "open failed");
         fprintf(stderr, "Failed to open %s\n", path);
         return NULL;
@@ -158,7 +168,7 @@ hashindex_open(const char *path)
         }
         return NULL;
     }
-    addr = mmap(0, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    addr = mmap(0, length, prot, MAP_SHARED, fd, 0);
     if(close(fd) < 0) {
         EPRINTF_PATH(path, "close failed");
         return NULL;
@@ -180,6 +190,7 @@ hashindex_open(const char *path)
         EPRINTF_PATH(path, "malloc failed");
         return NULL;
     }
+    index->readonly = readonly;
     index->map_addr = addr;
     index->map_length = length;
     index->num_entries = header->num_entries;
@@ -228,7 +239,7 @@ hashindex_create(const char *path, int capacity, int key_size, int value_size)
         EPRINTF_PATH(path, "fclose failed");
         return NULL;
     }
-    return hashindex_open(path);
+    return hashindex_open(path, 0);
 error:
     EPRINTF_PATH(path, "fwrite failed");
     if(fclose(fd) < 0) {
@@ -251,6 +262,9 @@ hashindex_clear(HashIndex *index)
 static int
 hashindex_flush(HashIndex *index)
 {
+    if(index->readonly) {
+        return 1;
+    }
     *((int32_t *)(index->map_addr + 8)) = index->num_entries;
     *((int32_t *)(index->map_addr + 12)) = index->num_buckets;
     if(msync(index->map_addr, index->map_length, MS_SYNC) < 0) {
@@ -264,7 +278,6 @@ static int
 hashindex_close(HashIndex *index)
 {
     int rv = 1;
-
     if(hashindex_flush(index) < 0) {
         rv = 0;
     }

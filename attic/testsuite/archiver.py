@@ -210,6 +210,15 @@ class ArchiverTestCase(AtticTestCase):
         fd.close()
         self.attic('verify', self.repository_location + '::test', exit_code=1)
 
+    def test_readonly_repository(self):
+        self.create_src_archive('test')
+        os.system('chmod -R ugo-w ' + self.repository_path)
+        try:
+            self.attic('verify', self.repository_location + '::test')
+        finally:
+            # Restore permissions so shutil.rmtree is able to delete it
+            os.system('chmod -R u+w ' + self.repository_path)
+
     def test_prune_repository(self):
         self.attic('init', self.repository_location)
         self.attic('create', self.repository_location + '::test1', src_dir)

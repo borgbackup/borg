@@ -71,7 +71,7 @@ class Repository(object):
         self.path = path
         if not os.path.isdir(path):
             raise self.DoesNotExist(path)
-        self.lock_fd = open(os.path.join(path, 'README'), 'r+')
+        self.lock_fd = open(os.path.join(path, 'config'), 'r')
         fcntl.flock(self.lock_fd, fcntl.LOCK_EX)
         self.config = RawConfigParser()
         self.config.read(os.path.join(self.path, 'config'))
@@ -108,7 +108,7 @@ class Repository(object):
             self.compact = set()
         else:
             if read_only:
-                self.index = NSIndex((os.path.join(self.path, 'index.%d') % head).encode('utf-8'))
+                self.index = NSIndex((os.path.join(self.path, 'index.%d') % head).encode('utf-8'), readonly=True)
             else:
                 shutil.copy(os.path.join(self.path, 'index.%d' % head),
                             os.path.join(self.path, 'index.tmp'))

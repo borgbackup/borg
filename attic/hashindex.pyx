@@ -6,7 +6,7 @@ cdef extern from "_hashindex.c":
     ctypedef struct HashIndex:
         pass
 
-    HashIndex *hashindex_open(char *path)
+    HashIndex *hashindex_open(char *path, int readonly)
     HashIndex *hashindex_create(char *path, int capacity, int key_size, int value_size)
     int hashindex_get_size(HashIndex *index)
     int hashindex_clear(HashIndex *index)
@@ -24,8 +24,8 @@ cdef class IndexBase:
     cdef HashIndex *index
     key_size = 32
 
-    def __cinit__(self, path):
-        self.index = hashindex_open(<bytes>os.fsencode(path))
+    def __cinit__(self, path, readonly=False):
+        self.index = hashindex_open(<bytes>os.fsencode(path), readonly)
         if not self.index:
             raise Exception('Failed to open %s' % path)
 

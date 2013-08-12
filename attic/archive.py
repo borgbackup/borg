@@ -8,9 +8,9 @@ import stat
 import sys
 import time
 from io import BytesIO
-from . import xattr
-from .chunker import chunkify
-from .helpers import uid2user, user2uid, gid2group, group2gid, \
+from attic import xattr
+from attic.chunker import chunkify
+from attic.helpers import uid2user, user2uid, gid2group, group2gid, \
     Statistics, decode_dict, st_mtime_ns, make_path_safe
 
 ITEMS_BUFFER = 1024 * 1024
@@ -30,10 +30,7 @@ class ItemIter(object):
         self.filter = filter
         self.stack = []
         self.peeks = 0
-        self._peek = None
         self._peek_iter = None
-        global foo
-        foo = self
 
     def __iter__(self):
         return self
@@ -42,7 +39,7 @@ class ItemIter(object):
         if self.stack:
             item = self.stack.pop(0)
         else:
-            self._peek = None
+            self._peek_iter = None
             item = self.get_next()
         self.peeks = max(0, self.peeks - len(item.get(b'chunks', [])))
         return item
@@ -56,13 +53,13 @@ class ItemIter(object):
 
     def peek(self):
         while True:
-            while not self._peek or not self._peek_iter:
+            while not self._peek_iter:
                 if self.peeks > 100:
                     raise StopIteration
-                self._peek = self.get_next()
-                self.stack.append(self._peek)
-                if b'chunks' in self._peek:
-                    self._peek_iter = iter(self._peek[b'chunks'])
+                _peek = self.get_next()
+                self.stack.append(_peek)
+                if b'chunks' in _peek:
+                    self._peek_iter = iter(_peek[b'chunks'])
                 else:
                     self._peek_iter = None
             try:
@@ -70,7 +67,7 @@ class ItemIter(object):
                 self.peeks += 1
                 return item
             except StopIteration:
-                self._peek = None
+                self._peek_iter = None
 
 
 class Archive(object):

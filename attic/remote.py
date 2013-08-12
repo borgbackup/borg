@@ -121,7 +121,6 @@ class RemoteRepository(object):
                 self.unpacker.feed(data)
                 for type, msgid, error, res in self.unpacker:
                     if msgid == self.msgid:
-                        assert msgid == self.msgid
                         self.received_msgid = msgid
                         if error:
                             raise self.RPCError(error)
@@ -136,7 +135,7 @@ class RemoteRepository(object):
                     n = os.write(self.stdin_fd, to_send)
                     assert n > 0
                     to_send = memoryview(to_send)[n:]
-                else:
+                if not to_send:
                     w_fds = []
 
     def _read(self):

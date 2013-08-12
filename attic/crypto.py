@@ -22,6 +22,12 @@ bytes_to_long = lambda x, offset=0: _long.unpack_from(x, offset)[0]
 long_to_bytes = lambda x: _long.pack(x)
 
 
+def num_aes_blocks(length):
+    """Return the number of AES blocks required to encrypt/decrypt *length* bytes of data
+    """
+    return (length + 15) // 16
+
+
 def pbkdf2_sha256(password, salt, iterations, size):
     key = create_string_buffer(size)
     rv = libcrypto.PKCS5_PBKDF2_HMAC(password, len(password), salt, len(salt), iterations, libcrypto.EVP_sha256(), size, key)

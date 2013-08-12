@@ -3,7 +3,7 @@ import re
 import shutil
 import tempfile
 from binascii import hexlify
-from attic.crypto import bytes_to_long
+from attic.crypto import bytes_to_long, num_aes_blocks
 from attic.testsuite import AtticTestCase
 from attic.key import PlaintextKey, PassphraseKey, KeyfileKey
 from attic.helpers import Location, unhexlify
@@ -54,10 +54,15 @@ class KeyTestCase(AtticTestCase):
         os.environ['ATTIC_PASSPHRASE'] = 'test'
         key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
         self.assert_equal(bytes_to_long(key.enc_cipher.iv, 8), 0)
-        manifest = key.encrypt(b'')
-        iv = key.extract_iv(manifest)
+        manifest = key.encrypt(b'XXX')
+        self.assert_equal(key.extract_nonce(manifest), 0)
+        manifest2 = key.encrypt(b'XXX')
+        self.assert_not_equal(manifest, manifest2)
+        self.assert_equal(key.decrypt(None, manifest), key.decrypt(None, manifest2))
+        self.assert_equal(key.extract_nonce(manifest2), 1)
+        iv = key.extract_nonce(manifest)
         key2 = KeyfileKey.detect(self.MockRepository(), manifest)
-        self.assert_equal(bytes_to_long(key2.enc_cipher.iv, 8), iv + 1000)
+        self.assert_equal(bytes_to_long(key2.enc_cipher.iv, 8), iv + num_aes_blocks(len(manifest) - KeyfileKey.PAYLOAD_OVERHEAD))
         # Key data sanity check
         self.assert_equal(len(set([key2.id_key, key2.enc_key, key2.enc_hmac_key])), 3)
         self.assert_equal(key2.chunk_seed == 0, False)
@@ -79,10 +84,15 @@ class KeyTestCase(AtticTestCase):
         self.assert_equal(hexlify(key.enc_hmac_key), b'b885a05d329a086627412a6142aaeb9f6c54ab7950f996dd65587251f6bc0901')
         self.assert_equal(hexlify(key.enc_key), b'2ff3654c6daf7381dbbe718d2b20b4f1ea1e34caa6cc65f6bb3ac376b93fed2a')
         self.assert_equal(key.chunk_seed, -775740477)
-        manifest = key.encrypt(b'')
-        iv = key.extract_iv(manifest)
+        manifest = key.encrypt(b'XXX')
+        self.assert_equal(key.extract_nonce(manifest), 0)
+        manifest2 = key.encrypt(b'XXX')
+        self.assert_not_equal(manifest, manifest2)
+        self.assert_equal(key.decrypt(None, manifest), key.decrypt(None, manifest2))
+        self.assert_equal(key.extract_nonce(manifest2), 1)
+        iv = key.extract_nonce(manifest)
         key2 = PassphraseKey.detect(self.MockRepository(), manifest)
-        self.assert_equal(bytes_to_long(key2.enc_cipher.iv, 8), iv + 1000)
+        self.assert_equal(bytes_to_long(key2.enc_cipher.iv, 8), iv + num_aes_blocks(len(manifest) - PassphraseKey.PAYLOAD_OVERHEAD))
         self.assert_equal(key.id_key, key2.id_key)
         self.assert_equal(key.enc_hmac_key, key2.enc_hmac_key)
         self.assert_equal(key.enc_key, key2.enc_key)

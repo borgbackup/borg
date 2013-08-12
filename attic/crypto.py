@@ -1,3 +1,5 @@
+"""A thin ctypes based wrapper for OpenSSL 1.0
+"""
 import sys
 from ctypes import cdll, c_char_p, c_int, c_uint, c_void_p, POINTER, create_string_buffer
 from ctypes.util import find_library
@@ -7,8 +9,10 @@ libcrypto = cdll.LoadLibrary(find_library('crypto'))
 # Default libcrypto on OS X is too old, try the brew version
 if not hasattr(libcrypto, 'PKCS5_PBKDF2_HMAC') and sys.platform == 'darwin':
     libcrypto = cdll.LoadLibrary('/usr/local/opt/openssl/lib/libcrypto.dylib')
+# Default libcrypto on FreeBSD is too old, try the ports version
 if not hasattr(libcrypto, 'PKCS5_PBKDF2_HMAC') and sys.platform.startswith('freebsd'):
     libcrypto = cdll.LoadLibrary('/usr/local/lib/libcrypto.so')
+
 libcrypto.PKCS5_PBKDF2_HMAC.argtypes = (c_char_p, c_int, c_char_p, c_int, c_int, c_void_p, c_int, c_char_p)
 libcrypto.EVP_sha256.restype = c_void_p
 libcrypto.AES_set_encrypt_key.argtypes = (c_char_p, c_int, c_char_p)
@@ -29,6 +33,8 @@ def num_aes_blocks(length):
 
 
 def pbkdf2_sha256(password, salt, iterations, size):
+    """Password based key derivation function 2 (RFC2898)
+    """
     key = create_string_buffer(size)
     rv = libcrypto.PKCS5_PBKDF2_HMAC(password, len(password), salt, len(salt), iterations, libcrypto.EVP_sha256(), size, key)
     if not rv:
@@ -46,6 +52,8 @@ def get_random_bytes(n):
 
 
 class AES:
+    """A thin wrapper around the OpenSSL AES CTR_MODE cipher
+    """
     def __init__(self, key, iv=None):
         self.key = create_string_buffer(2000)
         self.iv = create_string_buffer(16)

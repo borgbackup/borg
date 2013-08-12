@@ -7,14 +7,15 @@ import hmac
 from hashlib import sha256
 import zlib
 
-from .crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int
-from .helpers import IntegrityError, get_keys_dir
+from attic.crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
+from attic.helpers import IntegrityError, get_keys_dir
 
 PREFIX = b'\0' * 8
 
 
 class HMAC(hmac.HMAC):
-
+    """Workaround a bug in Python < 3.4 Where HMAC does not accept memoryviews
+    """
     def update(self, msg):
         self.inner.update(msg)
 
@@ -85,6 +86,19 @@ class PlaintextKey(KeyBase):
 
 
 class AESKeyBase(KeyBase):
+    """Common base class shared by KeyfileKey and PassphraseKey
+
+    Chunks are encrypted using 256bit AES in Counter Mode (CTR)
+
+    Payload layout: TYPE(1) + HMAC(32) + NONCE(8) + CIPHERTEXT
+
+    To reduce payload size only 8 bytes of the 16 bytes nonce is saved
+    in the payload, the first 8 bytes are always zeros. This does not
+    affect security but limits the maximum repository capacity to
+    only 295 exabytes!
+    """
+
+    PAYLOAD_OVERHEAD = 1 + 32 + 8  # TYPE + HMAC + NONCE
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
@@ -110,7 +124,7 @@ class AESKeyBase(KeyBase):
             raise IntegrityError('Chunk id verification failed')
         return data
 
-    def extract_iv(self, payload):
+    def extract_nonce(self, payload):
         if payload[0] != self.TYPE:
             raise IntegrityError('Invalid encryption envelope')
         nonce = bytes_to_long(payload[33:41])
@@ -166,7 +180,8 @@ class PassphraseKey(AESKeyBase):
             key.init(repository, passphrase)
             try:
                 key.decrypt(None, manifest_data)
-                key.init_ciphers(PREFIX + long_to_bytes(key.extract_iv(manifest_data) + 1000))
+                num_blocks = num_aes_blocks(len(manifest_data) - 41)
+                key.init_ciphers(PREFIX + long_to_bytes(key.extract_nonce(manifest_data) + num_blocks))
                 return key
             except IntegrityError:
                 passphrase = getpass(prompt)
@@ -188,7 +203,8 @@ class KeyfileKey(AESKeyBase):
         passphrase = os.environ.get('ATTIC_PASSPHRASE', '')
         while not key.load(path, passphrase):
             passphrase = getpass(prompt)
-        key.init_ciphers(PREFIX + long_to_bytes(key.extract_iv(manifest_data) + 1000))
+        num_blocks = num_aes_blocks(len(manifest_data) - 41)
+        key.init_ciphers(PREFIX + long_to_bytes(key.extract_nonce(manifest_data) + num_blocks))
         return key
 
     @classmethod

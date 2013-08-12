@@ -267,8 +267,8 @@ class ArchiverTestCase(AtticTestCase):
                 if not hash in seen:
                     seen.add(hash)
                     num_blocks = num_aes_blocks(len(data) - 41)
-                    start = bytes_to_long(data[33:41])
-                    for counter in range(start, start + num_blocks):
+                    nonce = bytes_to_long(data[33:41])
+                    for counter in range(nonce, nonce + num_blocks):
                         self.assert_not_in(counter, used)
                         used.add(counter)
 
@@ -282,6 +282,7 @@ class ArchiverTestCase(AtticTestCase):
         verify_uniqueness()
         self.attic('delete', self.repository_location + '::test.2')
         verify_uniqueness()
+        self.assert_equal(used, set(range(len(used))))
 
     def test_aes_counter_uniqueness_keyfile(self):
         self.verify_aes_counter_uniqueness('keyfile')

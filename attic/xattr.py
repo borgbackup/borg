@@ -18,13 +18,17 @@ def is_enabled():
 
 
 def get_all(path, follow_symlinks=True):
-    return dict((name, getxattr(path, name, follow_symlinks=follow_symlinks))
-                for name in listxattr(path, follow_symlinks=follow_symlinks))
-
+    try:
+        return dict((name, getxattr(path, name, follow_symlinks=follow_symlinks))
+                    for name in listxattr(path, follow_symlinks=follow_symlinks))
+    except OSError as e:
+        if e.errno in (errno.ENOTSUP, errno.EPERM):
+            return {}
 
 try:
     # Currently only available on Python 3.3+ on Linux
-    from os import getxattr, setxattr, listxattr2
+    from os import getxattr, setxattr, listxattr
+
 except ImportError:
     from ctypes import CDLL, create_string_buffer, c_ssize_t, c_size_t, c_char_p, c_int, c_uint32, get_errno
     from ctypes.util import find_library
@@ -124,12 +128,7 @@ except ImportError:
                 func = libc.flistxattr
             elif not follow_symlinks:
                 flags = XATTR_NOFOLLOW
-            try:
-                n = _check(func(path, None, 0, flags), path)
-            except OSError as e:
-                if e.errno == errno.EPERM:
-                    return []
-                raise
+            n = _check(func(path, None, 0, flags), path)
             if n == 0:
                 return []
             namebuf = create_string_buffer(n)
@@ -201,12 +200,7 @@ except ImportError:
                 func = libc.extattr_list_file
             else:
                 func = libc.extattr_list_link
-            try:
-                n = _check(func(path, ns, None, 0), path)
-            except OSError as e:
-                if e.errno == errno.ENOTSUP:
-                    return []
-                raise
+            n = _check(func(path, ns, None, 0), path)
             if n == 0:
                 return []
             namebuf = create_string_buffer(n)

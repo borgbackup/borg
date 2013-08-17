@@ -17,6 +17,8 @@ libcrypto.PKCS5_PBKDF2_HMAC.argtypes = (c_char_p, c_int, c_char_p, c_int, c_int,
 libcrypto.EVP_sha256.restype = c_void_p
 libcrypto.AES_set_encrypt_key.argtypes = (c_char_p, c_int, c_char_p)
 libcrypto.AES_ctr128_encrypt.argtypes = (c_char_p, c_char_p, c_int, c_char_p, c_char_p, c_char_p, POINTER(c_uint))
+libcrypto.RAND_bytes.argtypes = (c_char_p, c_int)
+libcrypto.RAND_bytes.restype = c_int
 
 _int = struct.Struct('>I')
 _long = struct.Struct('>Q')
@@ -46,7 +48,7 @@ def get_random_bytes(n):
     """Return n cryptographically strong pseudo-random bytes
     """
     buf = create_string_buffer(n)
-    if not libcrypto.RAND_bytes(buf, n):
+    if libcrypto.RAND_bytes(buf, n) < 1:
         raise Exception('RAND_bytes failed')
     return buf.raw
 

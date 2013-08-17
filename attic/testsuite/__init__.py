@@ -38,12 +38,6 @@ class AtticTestCase(unittest.TestCase):
     assert_not_equal = unittest.TestCase.assertNotEqual
     assert_raises = unittest.TestCase.assertRaises
 
-    def _get_xattrs(self, path):
-        try:
-            return get_all(path, follow_symlinks=False)
-        except EnvironmentError:
-            return {}
-
     def assert_dirs_equal(self, dir1, dir2):
         diff = filecmp.dircmp(dir1, dir2)
         self._assert_dirs_equal_cmp(diff)
@@ -73,8 +67,8 @@ class AtticTestCase(unittest.TestCase):
                     d2.append(round(st_mtime_ns(s2), -4))
                 d1.append(round(st_mtime_ns(s1), st_mtime_ns_round))
                 d2.append(round(st_mtime_ns(s2), st_mtime_ns_round))
-            d1.append(self._get_xattrs(path1))
-            d2.append(self._get_xattrs(path2))
+            d1.append(get_all(path1, follow_symlinks=False))
+            d2.append(get_all(path2, follow_symlinks=False))
             self.assert_equal(d1, d2)
         for sub_diff in diff.subdirs.values():
             self._assert_dirs_equal_cmp(sub_diff)

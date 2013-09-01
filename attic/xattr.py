@@ -20,8 +20,6 @@ def is_enabled():
 
 
 def get_all(path, follow_symlinks=True):
-    return dict((name, getxattr(path, name, follow_symlinks=follow_symlinks))
-                for name in listxattr(path, follow_symlinks=follow_symlinks))
     try:
         return dict((name, getxattr(path, name, follow_symlinks=follow_symlinks))
                     for name in listxattr(path, follow_symlinks=follow_symlinks))

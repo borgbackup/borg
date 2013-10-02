@@ -37,6 +37,7 @@ class AtticTestCase(unittest.TestCase):
     assert_equal = unittest.TestCase.assertEqual
     assert_not_equal = unittest.TestCase.assertNotEqual
     assert_raises = unittest.TestCase.assertRaises
+    assert_true = unittest.TestCase.assertTrue
 
     def assert_dirs_equal(self, dir1, dir2):
         diff = filecmp.dircmp(dir1, dir2)
@@ -89,7 +90,7 @@ def get_tests(suite):
     """
     for item in suite:
         try:
-            # TODO: This could be "yield from..." with Python 3.3+ 
+            # TODO: This could be "yield from..." with Python 3.3+
             for i in get_tests(item):
                 yield i
         except TypeError:

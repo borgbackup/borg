@@ -1,4 +1,5 @@
 import hashlib
+import os
 import tempfile
 from attic.hashindex import NSIndex, ChunkIndex
 from attic.testsuite import AtticTestCase
@@ -45,4 +46,21 @@ class HashIndexTestCase(AtticTestCase):
 
     def test_chunkindex(self):
         self._generic_test(ChunkIndex, lambda x: (x, x, x), 'ed22e8a883400453c0ee79a06c54df72c994a54eeefdc6c0989efdc5ee6d07b7')
+
+    def test_resize(self):
+        n = 2000  # Must be >= MIN_BUCKETS
+        idx_name = tempfile.NamedTemporaryFile()
+        idx = NSIndex.create(idx_name.name)
+        initial_size = os.path.getsize(idx_name.name)
+        self.assert_equal(len(idx), 0)
+        for x in range(n):
+            idx[bytes('%-32d' % x, 'ascii')] = x, x
+        idx.flush()
+        self.assert_true(initial_size < os.path.getsize(idx_name.name))
+        for x in range(n):
+            del idx[bytes('%-32d' % x, 'ascii')]
+        self.assert_equal(len(idx), 0)
+        idx.flush()
+        self.assert_equal(initial_size, os.path.getsize(idx_name.name))
+
 

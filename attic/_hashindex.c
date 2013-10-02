@@ -110,6 +110,7 @@ static int
 hashindex_resize(HashIndex *index, int capacity)
 {
     char *new_path = malloc(strlen(index->path) + 5);
+    int ret = 0;
     strcpy(new_path, index->path);
     strcat(new_path, ".tmp");
     HashIndex *new;
@@ -129,12 +130,20 @@ hashindex_resize(HashIndex *index, int capacity)
     index->lower_limit = new->lower_limit;
     index->upper_limit = new->upper_limit;
     index->buckets = new->buckets;
-    unlink(index->path);
-    rename(new_path, index->path);
+    if(unlink(index->path) < 0) {
+        EPRINTF("unlink failed");
+        goto out;
+    }
+    if(rename(new_path, index->path) < 0) {
+        EPRINTF_PATH(new_path, "rename failed");
+        goto out;
+    }
+    ret = 1;
+out:
     free(new_path);
     free(new->path);
     free(new);
-    return 1;
+    return ret;
 }
 
 /* Public API */
@@ -237,10 +246,16 @@ hashindex_create(const char *path, int capacity, int key_size, int value_size)
     }
     if(fclose(fd) < 0) {
         EPRINTF_PATH(path, "fclose failed");
+        if(unlink(path) < 0) {
+            EPRINTF_PATH(path, "unlink failed");
+    }
         return NULL;
     }
     return hashindex_open(path, 0);
 error:
+    if(unlink(path) < 0) {
+        EPRINTF_PATH(path, "unlink failed");
+    }
     EPRINTF_PATH(path, "fwrite failed");
     if(fclose(fd) < 0) {
         EPRINTF_PATH(path, "fclose failed");
@@ -338,7 +353,7 @@ hashindex_delete(HashIndex *index, const void *key)
     BUCKET_MARK_DELETED(index, idx);
     index->num_entries -= 1;
     if(index->num_entries < index->lower_limit) {
-        if(!hashindex_resize(index, index->num_buckets * 2)) {
+        if(!hashindex_resize(index, index->num_buckets / 2)) {
             return 0;
         }
     }

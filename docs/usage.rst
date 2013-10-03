@@ -33,7 +33,7 @@ Examples
     $ attic init user@hostname:mybackuprepo.attic
 
     # Encrypted remote backup repository
-    $ attic init --passphrase user@hostname:mybackuprepo.attic
+    $ attic init --encryption=passphrase user@hostname:mybackuprepo.attic
 
 
 .. include:: usage/create.rst.inc

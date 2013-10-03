@@ -7,9 +7,10 @@ Here you can see the full list of changes between each Attic release.
 Version 0.8
 -----------
 
-(feature release, released on X)
+(feature release, released on Oct 3, 2013)
 
 - Fix xattr issue when backing up sshfs filesystems (#4)
+- Fix issue with excessive index file size (#6)
 - Support access of read only repositories.
 - New syntax to enable repository encryption:
     attic init --encryption="none|passphrase|keyfile".

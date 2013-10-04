@@ -92,7 +92,7 @@ hashindex_lookup(HashIndex *index, const void *key)
             }
         }
         else if(BUCKET_MATCHES_KEY(index, idx, key)) {
-            if (didx != -1) {
+            if (didx != -1 && !index->readonly) {
                 memcpy(BUCKET_ADDR_WRITE(index, didx), BUCKET_ADDR_READ(index, idx), index->bucket_size);
                 BUCKET_MARK_DELETED(index, idx);
                 idx = didx;

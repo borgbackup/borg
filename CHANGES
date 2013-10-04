@@ -3,6 +3,12 @@ Attic Changelog
 
 Here you can see the full list of changes between each Attic release.
 
+Version 0.8.1
+-------------
+
+(bugfix release, released on Oct 4, 2013)
+
+- Fix segmentation fault issue.
 
 Version 0.8
 -----------

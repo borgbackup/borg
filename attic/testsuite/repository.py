@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+from attic.hashindex import NSIndex
 from attic.helpers import Location
 from attic.remote import RemoteRepository
 from attic.repository import Repository
@@ -47,6 +48,20 @@ class RepositoryTestCase(AtticTestCase):
         self.repository.put(b'00000000000000000000000000000001', b'bar')
         self.repository.commit()
         self.assert_equal(self.repository.get(b'00000000000000000000000000000001'), b'bar')
+
+    def test_index_rebuild(self):
+        """Verify that repository index rebuild works properly
+        """
+        def extract_and_unlink_index():
+            index_name = [n for n in os.listdir(os.path.join(self.tmppath, 'repository')) if n.startswith('index')][0]
+            idx = NSIndex(os.path.join(self.tmppath, 'repository', index_name))
+            os.unlink(os.path.join(self.tmppath, 'repository', index_name))
+            return list(idx.iteritems())
+        self.test2()
+        self.repository.close()
+        before = extract_and_unlink_index()
+        self.open()
+        self.assert_equal(before, extract_and_unlink_index())
 
     def test_consistency(self):
         """Test cache consistency

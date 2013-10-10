@@ -63,4 +63,16 @@ class HashIndexTestCase(AtticTestCase):
         idx.flush()
         self.assert_equal(initial_size, os.path.getsize(idx_name.name))
 
+    def test_read_only(self):
+        """Make sure read_only indices work even they contain a lot of tombstones
+        """
+        idx_name = tempfile.NamedTemporaryFile()
+        idx = NSIndex.create(idx_name.name)
+        for x in range(100):
+            idx[bytes('%-0.32d' % x, 'ascii')] = x, x
+        for x in range(99):
+            del idx[bytes('%-0.32d' % x, 'ascii')]
+        idx.flush()
+        idx2 = NSIndex(idx_name.name, readonly=True)
+        self.assert_equal(idx2[bytes('%-0.32d' % 99, 'ascii')], (99, 99))
 

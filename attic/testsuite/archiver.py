@@ -77,8 +77,8 @@ class ArchiverTestCase(AtticTestCase):
             self.assert_equal(exit_code, ret)
             return output
         args = list(args)
+        stdout, stderr = sys.stdout, sys.stderr
         try:
-            stdout, stderr = sys.stdout, sys.stderr
             output = StringIO()
             sys.stdout = sys.stderr = output
             ret = self.archiver.run(args)
@@ -99,7 +99,6 @@ class ArchiverTestCase(AtticTestCase):
             os.makedirs(os.path.dirname(filename))
         with open(filename, 'wb') as fd:
             fd.write(b'X' * size)
-
 
     def create_test_files(self):
         """Create a minimal test case including all supported file types

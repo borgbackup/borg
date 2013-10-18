@@ -1,6 +1,3 @@
-from heapq import heappush, heapify, heapreplace, heappop
-
-
 class LRUCache(dict):
 
     def __init__(self, capacity):

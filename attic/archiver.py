@@ -12,7 +12,7 @@ from attic.repository import Repository
 from attic.cache import Cache
 from attic.key import key_creator
 from attic.helpers import location_validator, format_time, \
-    format_file_mode, IncludePattern, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
+    format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_split, Manifest, Location, remove_surrogates
 from attic.remote import RepositoryServer, RemoteRepository, ConnectionClosed
 

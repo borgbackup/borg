@@ -3,6 +3,13 @@ Attic Changelog
 
 Here you can see the full list of changes between each Attic release.
 
+Version 0.9
+-----------
+
+(feature release, released on X)
+
+- Let ssh figure out port/user if not specified so we don't override .ssh/config (#9)
+
 Version 0.8.1
 -------------
 

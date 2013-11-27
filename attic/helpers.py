@@ -285,7 +285,7 @@ class Location:
             self.proto = m.group('proto')
             self.user = m.group('user')
             self.host = m.group('host')
-            self.port = m.group('port') and int(m.group('port')) or 22
+            self.port = m.group('port') and int(m.group('port')) or None
             self.path = m.group('path')
             self.archive = m.group('archive')
             return True
@@ -302,8 +302,6 @@ class Location:
             self.path = m.group('path')
             self.archive = m.group('archive')
             self.proto = self.host and 'ssh' or 'file'
-            if self.proto == 'ssh':
-                self.port = 22
             return True
         return False
 

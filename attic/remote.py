@@ -83,7 +83,14 @@ class RemoteRepository(object):
         if location.host == '__testsuite__':
             args = [sys.executable, '-m', 'attic.archiver', 'serve']
         else:
-            args = ['ssh', '-p', str(location.port), '%s@%s' % (location.user or getpass.getuser(), location.host), 'attic', 'serve']
+            args = ['ssh',]
+            if location.port:
+                args += ['-p', str(location.port)]
+            if location.user:
+                args.append('%s@%s' % (location.user, location.host))
+            else:
+                args.append('%s' % location.host)
+            args += ['attic', 'serve']
         self.p = Popen(args, bufsize=0, stdin=PIPE, stdout=PIPE)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()

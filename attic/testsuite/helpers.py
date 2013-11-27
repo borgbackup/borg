@@ -16,7 +16,7 @@ class LocationTestCase(AtticTestCase):
         )
         self.assert_equal(
             repr(Location('user@host:/some/path::archive')),
-            "Location(proto='ssh', user='user', host='host', port=22, path='/some/path', archive='archive')"
+            "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='archive')"
         )
         self.assert_equal(
             repr(Location('mybackup.attic::archive')),

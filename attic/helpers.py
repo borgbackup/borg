@@ -11,6 +11,29 @@ import time
 from datetime import datetime, timedelta
 from fnmatch import fnmatchcase
 from operator import attrgetter
+import fcntl
+
+
+class UpgradableLock:
+
+    def __init__(self, path, exclusive=False):
+        try:
+            self.fd = open(path, 'r+')
+        except IOError:
+            self.fd = open(path, 'r')
+        if exclusive:
+            fcntl.lockf(self.fd, fcntl.LOCK_EX)
+        else:
+            fcntl.lockf(self.fd, fcntl.LOCK_SH)
+        self.is_exclusive = exclusive
+
+    def upgrade(self):
+        fcntl.lockf(self.fd, fcntl.LOCK_EX)
+        self.is_exclusive = True
+
+    def release(self):
+        fcntl.lockf(self.fd, fcntl.LOCK_UN)
+        self.fd.close()
 
 
 class Manifest:

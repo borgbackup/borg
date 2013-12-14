@@ -1,5 +1,8 @@
 from datetime import datetime
-from attic.helpers import Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe
+import os
+import tempfile
+import unittest
+from attic.helpers import Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, UpgradableLock
 from attic.testsuite import AtticTestCase
 
 
@@ -66,3 +69,20 @@ class MakePathSafeTestCase(AtticTestCase):
         self.assert_equal(make_path_safe('/'), '.')
         self.assert_equal(make_path_safe('/'), '.')
 
+
+class UpgradableLockTestCase(AtticTestCase):
+
+    def test(self):
+        file = tempfile.NamedTemporaryFile()
+        lock = UpgradableLock(file.name)
+        lock.upgrade()
+        lock.upgrade()
+        lock.release()
+
+    @unittest.skipIf(os.getuid() == 0, 'Root can always open files for writing')
+    def test_read_only_lock_file(self):
+        file = tempfile.NamedTemporaryFile()
+        os.chmod(file.name, 0o444)
+        lock = UpgradableLock(file.name)
+        self.assert_raises(OSError, lock.upgrade)
+        lock.release()

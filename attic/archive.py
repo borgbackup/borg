@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from getpass import getuser
 from itertools import zip_longest
 import msgpack
@@ -122,7 +122,7 @@ class Archive(object):
     def ts(self):
         """Timestamp of archive creation in UTC"""
         t, f = self.metadata[b'time'].split('.', 1)
-        return datetime.strptime(t, '%Y-%m-%dT%H:%M:%S') + timedelta(seconds=float('.' + f))
+        return datetime.strptime(t, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc) + timedelta(seconds=float('.' + f))
 
     def __repr__(self):
         return 'Archive(%r)' % self.name

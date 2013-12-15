@@ -8,6 +8,7 @@ Version 0.9
 
 (feature release, released on X)
 
+- Fix incorrect display of time (#13)
 - Improved error handling / reporting. (#12)
 - Use fcntl() instead of flock() when locking repository/cache. (#15)
 - Let ssh figure out port/user if not specified so we don't override .ssh/config (#9)

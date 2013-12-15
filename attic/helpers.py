@@ -8,7 +8,7 @@ import re
 import stat
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from fnmatch import fnmatchcase
 from operator import attrgetter
 import fcntl
@@ -138,7 +138,7 @@ def get_cache_dir():
 
 def to_localtime(ts):
     """Convert datetime object from UTC to local time zone"""
-    return datetime(*time.localtime(ts.timestamp())[:6])
+    return datetime(*time.localtime((ts - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds())[:6])
 
 
 def adjust_patterns(paths, excludes):

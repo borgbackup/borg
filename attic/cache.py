@@ -5,7 +5,7 @@ import os
 from binascii import hexlify
 import shutil
 
-from .helpers import get_cache_dir, decode_dict, st_mtime_ns, unhexlify, UpgradableLock
+from .helpers import Error, get_cache_dir, decode_dict, st_mtime_ns, unhexlify, UpgradableLock
 from .hashindex import ChunkIndex
 
 
@@ -13,9 +13,8 @@ class Cache(object):
     """Client Side cache
     """
 
-    class RepositoryReplay(Exception):
-        """
-        """
+    class RepositoryReplay(Error):
+        """Cache is newer than repository, refusing to continue"""
 
     def __init__(self, repository, key, manifest):
         self.timestamp = None

@@ -14,9 +14,22 @@ from operator import attrgetter
 import fcntl
 
 
+class Error(Exception):
+    """Error base class"""
+
+    exit_code = 1
+
+    def get_message(self):
+        return 'Error: ' + type(self).__doc__.format(*self.args)
+
+
 class UpgradableLock:
 
+    class LockUpgradeFailed(Error):
+        """Failed to acquire write lock on {}"""
+
     def __init__(self, path, exclusive=False):
+        self.path = path
         try:
             self.fd = open(path, 'r+')
         except IOError:
@@ -28,7 +41,10 @@ class UpgradableLock:
         self.is_exclusive = exclusive
 
     def upgrade(self):
-        fcntl.lockf(self.fd, fcntl.LOCK_EX)
+        try:
+            fcntl.lockf(self.fd, fcntl.LOCK_EX)
+        except OSError as e:
+            raise self.LockUpgradeFailed(self.path)
         self.is_exclusive = True
 
     def release(self):

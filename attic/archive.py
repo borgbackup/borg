@@ -10,7 +10,7 @@ import time
 from io import BytesIO
 from attic import xattr
 from attic.chunker import chunkify
-from attic.helpers import uid2user, user2uid, gid2group, group2gid, \
+from attic.helpers import Error, uid2user, user2uid, gid2group, group2gid, \
     Statistics, decode_dict, st_mtime_ns, make_path_safe
 
 ITEMS_BUFFER = 1024 * 1024
@@ -72,11 +72,11 @@ class ItemIter(object):
 
 class Archive(object):
 
-    class DoesNotExist(Exception):
-        pass
+    class DoesNotExist(Error):
+        """Archive {} does not exist"""
 
-    class AlreadyExists(Exception):
-        pass
+    class AlreadyExists(Error):
+        """Archive {} already exists"""
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False):

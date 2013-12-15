@@ -7,7 +7,7 @@ import struct
 from zlib import crc32
 
 from .hashindex import NSIndex
-from .helpers import IntegrityError, read_msgpack, write_msgpack, unhexlify, UpgradableLock
+from .helpers import Error, IntegrityError, read_msgpack, write_msgpack, unhexlify, UpgradableLock
 from .lrucache import LRUCache
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
@@ -30,11 +30,15 @@ class Repository(object):
     DEFAULT_MAX_SEGMENT_SIZE = 5 * 1024 * 1024
     DEFAULT_SEGMENTS_PER_DIR = 10000
 
-    class DoesNotExist(KeyError):
-        """Requested key does not exist"""
+    class DoesNotExist(Error):
+        """Repository {} does not exist"""
 
-    class AlreadyExists(KeyError):
-        """Requested key does not exist"""
+    class AlreadyExists(Error):
+        """Repository {} already exists"""
+
+    class InvalidRepository(Error):
+        """{} is not a valid repository"""
+
 
     def __init__(self, path, create=False):
         self.io = None
@@ -70,11 +74,11 @@ class Repository(object):
         self.path = path
         if not os.path.isdir(path):
             raise self.DoesNotExist(path)
-        self.lock = UpgradableLock(os.path.join(path, 'config'))
         self.config = RawConfigParser()
         self.config.read(os.path.join(self.path, 'config'))
-        if self.config.getint('repository', 'version') != 1:
-            raise Exception('%s Does not look like an Attic repository')
+        if not 'repository' in self.config.sections() or self.config.getint('repository', 'version') != 1:
+            raise self.InvalidRepository(path)
+        self.lock = UpgradableLock(os.path.join(path, 'config'))
         self.max_segment_size = self.config.getint('repository', 'max_segment_size')
         self.segments_per_dir = self.config.getint('repository', 'segments_per_dir')
         self.id = unhexlify(self.config.get('repository', 'id').strip())

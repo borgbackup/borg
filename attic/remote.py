@@ -4,17 +4,16 @@ import os
 import select
 from subprocess import Popen, PIPE
 import sys
-import getpass
 
+from .helpers import Error
 from .repository import Repository
 from .lrucache import LRUCache
 
 BUFSIZE = 10 * 1024 * 1024
 
 
-class ConnectionClosed(Exception):
-    """Connection closed by remote host
-    """
+class ConnectionClosed(Error):
+    """Connection closed by remote host"""
 
 
 class RepositoryServer(object):

@@ -11,7 +11,7 @@ from attic.archive import Archive
 from attic.repository import Repository
 from attic.cache import Cache
 from attic.key import key_creator
-from attic.helpers import location_validator, format_time, \
+from attic.helpers import Error, location_validator, format_time, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_split, Manifest, Location, remove_surrogates
 from attic.remote import RepositoryServer, RemoteRepository, ConnectionClosed
@@ -477,24 +477,9 @@ def main():
     archiver = Archiver()
     try:
         exit_code = archiver.run(sys.argv[1:])
-    except Repository.DoesNotExist:
-        archiver.print_error('Error: Repository not found')
-        exit_code = 1
-    except Repository.AlreadyExists:
-        archiver.print_error('Error: Repository already exists')
-        exit_code = 1
-    except Archive.AlreadyExists as e:
-        archiver.print_error('Error: Archive "%s" already exists', e)
-        exit_code = 1
-    except Archive.DoesNotExist as e:
-        archiver.print_error('Error: Archive "%s" does not exist', e)
-        exit_code = 1
-    except Cache.RepositoryReplay:
-        archiver.print_error('Cache is newer than repository, refusing to continue')
-        exit_code = 1
-    except ConnectionClosed:
-        archiver.print_error('Connection closed by remote host')
-        exit_code = 1
+    except Error as e:
+        archiver.print_error(e.get_message())
+        exit_code = e.exit_code
     except KeyboardInterrupt:
         archiver.print_error('Error: Keyboard interrupt')
         exit_code = 1

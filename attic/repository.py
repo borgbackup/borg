@@ -41,6 +41,7 @@ class Repository(object):
 
 
     def __init__(self, path, create=False):
+        self.path = path
         self.io = None
         self.lock = None
         if create:
@@ -216,7 +217,7 @@ class Repository(object):
             segment, offset = self.index[id]
             return self.io.read(segment, offset, id)
         except KeyError:
-            raise self.DoesNotExist
+            raise self.DoesNotExist(self.path)
 
     def get_many(self, ids, peek=None):
         for id in ids:
@@ -254,7 +255,7 @@ class Repository(object):
             self.compact.add(segment)
             self.segments.setdefault(segment, 0)
         except KeyError:
-            raise self.DoesNotExist
+            raise self.DoesNotExist(self.path)
 
     def add_callback(self, cb, data):
         cb(None, None, data)

@@ -71,6 +71,7 @@ class RemoteRepository(object):
             self.name = name
 
     def __init__(self, location, create=False):
+        self.repository_url = '%s@%s:%s' % (location.user, location.host, location.path)
         self.p = None
         self.cache = LRUCache(256)
         self.to_send = b''
@@ -105,9 +106,9 @@ class RemoteRepository(object):
             self.id = self.call('open', (location.path, create))
         except self.RPCError as e:
             if e.name == b'DoesNotExist':
-                raise Repository.DoesNotExist
+                raise Repository.DoesNotExist(self.repository_url)
             elif e.name == b'AlreadyExists':
-                raise Repository.AlreadyExists
+                raise Repository.AlreadyExists(self.repository_url)
 
     def __del__(self):
         self.close()
@@ -247,7 +248,7 @@ class RemoteRepository(object):
                 return res
         except self.RPCError as e:
             if e.name == b'DoesNotExist':
-                raise Repository.DoesNotExist
+                raise Repository.DoesNotExist(self.repository_url)
             raise
 
     def get_many(self, ids, peek=None):

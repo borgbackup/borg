@@ -1,5 +1,6 @@
 from configparser import RawConfigParser
 from binascii import hexlify
+import errno
 import os
 import re
 import shutil
@@ -314,7 +315,13 @@ class LoggedIO(object):
 
     def is_complete_segment(self, filename):
         with open(filename, 'rb') as fd:
-            fd.seek(-self.header_fmt.size, 2)
+            try:
+                fd.seek(-self.header_fmt.size, os.SEEK_END)
+            except Exception as e:
+                # return False if segment file is empty or too small
+                if e.errno == errno.EINVAL:
+                    return False
+                raise e
             return fd.read(self.header_fmt.size) == self.COMMIT
 
     def segment_filename(self, segment):

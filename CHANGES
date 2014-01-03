@@ -8,6 +8,7 @@ Version 0.9
 
 (feature release, released on X)
 
+- Fix sorting of segment names to ignore NFS left over files. (#17)
 - Fix incorrect display of time (#13)
 - Improved error handling / reporting. (#12)
 - Use fcntl() instead of flock() when locking repository/cache. (#15)

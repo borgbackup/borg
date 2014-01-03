@@ -41,7 +41,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Attic - Deduplicating Archiver'
-copyright = '2010-2013, Jonas Borgström'
+copyright = '2010-2014, Jonas Borgström'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

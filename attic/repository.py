@@ -296,7 +296,7 @@ class LoggedIO(object):
     def _segment_names(self, reverse=False):
         for dirpath, dirs, filenames in os.walk(os.path.join(self.path, 'data')):
             dirs.sort(key=int, reverse=reverse)
-            filenames.sort(key=int, reverse=reverse)
+            filenames = sorted((filename for filename in filenames if filename.isdigit()), key=int, reverse=reverse)
             for filename in filenames:
                 yield int(filename), os.path.join(dirpath, filename)
 

@@ -1,17 +1,29 @@
 """A thin ctypes based wrapper for OpenSSL 1.0
 """
-import sys
+import os
 from ctypes import cdll, c_char_p, c_int, c_uint, c_void_p, POINTER, create_string_buffer
 from ctypes.util import find_library
 import struct
 
-libcrypto = cdll.LoadLibrary(find_library('crypto'))
-# Default libcrypto on OS X is too old, try the brew version
-if not hasattr(libcrypto, 'PKCS5_PBKDF2_HMAC') and sys.platform == 'darwin':
-    libcrypto = cdll.LoadLibrary('/usr/local/opt/openssl/lib/libcrypto.dylib')
-# Default libcrypto on FreeBSD is too old, try the ports version
-if not hasattr(libcrypto, 'PKCS5_PBKDF2_HMAC') and sys.platform.startswith('freebsd'):
-    libcrypto = cdll.LoadLibrary('/usr/local/lib/libcrypto.so')
+
+def _find_libcrypto():
+    _possible_paths = [
+        find_library('crypto'),
+        os.environ.get('ATTIC_LIBCRYPTO_PATH'),
+        '/usr/local/opt/openssl/lib/libcrypto.dylib',  # OS X Brew
+        '/usr/local/lib/libcrypto.so',                 # FreeBSD Ports
+        '/usr/local/ssl/lib/libcrypto.so'
+    ]
+    for path in _possible_paths:
+        try:
+            lib = cdll.LoadLibrary(path)
+            if hasattr(lib, 'PKCS5_PBKDF2_HMAC'):
+                return lib
+        except OSError:
+            pass
+    raise Exception('Failed to find libcrypto version >= 1.0')
+
+libcrypto = _find_libcrypto()
 
 libcrypto.PKCS5_PBKDF2_HMAC.argtypes = (c_char_p, c_int, c_char_p, c_int, c_int, c_void_p, c_int, c_char_p)
 libcrypto.EVP_sha256.restype = c_void_p

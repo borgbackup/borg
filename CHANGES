@@ -13,6 +13,7 @@ Version 0.9
 - Improved error handling / reporting. (#12)
 - Use fcntl() instead of flock() when locking repository/cache. (#15)
 - Let ssh figure out port/user if not specified so we don't override .ssh/config (#9)
+- Improved libcrypto path detection (#23).
 
 Version 0.8.1
 -------------

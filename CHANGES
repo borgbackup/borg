@@ -8,6 +8,7 @@ Version 0.9
 
 (feature release, released on X)
 
+- Remote repository speed and reliability improvements.
 - Fix sorting of segment names to ignore NFS left over files. (#17)
 - Fix incorrect display of time (#13)
 - Improved error handling / reporting. (#12)

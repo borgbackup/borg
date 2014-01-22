@@ -23,54 +23,64 @@ has_mtime_ns = sys.version >= '3.3'
 has_lchmod = hasattr(os, 'lchmod')
 
 
-class ItemIter(object):
+class DownloadPipeline:
 
-    def __init__(self, unpacker, filter):
-        self.unpacker = iter(unpacker)
-        self.filter = filter
-        self.stack = []
-        self.peeks = 0
-        self._peek_iter = None
+    def __init__(self, repository, key):
+        self.repository = repository
+        self.key = key
 
-    def __iter__(self):
-        return self
+    def unpack_many(self, ids, filter=None):
+        unpacker = msgpack.Unpacker(use_list=False)
+        for data in self.fetch_many(ids):
+            unpacker.feed(data)
+            items = [decode_dict(item, (b'path', b'source', b'user', b'group')) for item in unpacker]
+            if filter:
+                items = [item for item in items if filter(item)]
+            for item in items:
+                if b'chunks' in item:
+                    self.repository.preload([c[0] for c in item[b'chunks']])
+            for item in items:
+                yield item
 
-    def __next__(self):
-        if self.stack:
-            item = self.stack.pop(0)
-        else:
-            self._peek_iter = None
-            item = self.get_next()
-        self.peeks = max(0, self.peeks - len(item.get(b'chunks', [])))
-        return item
-
-    def get_next(self):
-        while True:
-            n = next(self.unpacker)
-            decode_dict(n, (b'path', b'source', b'user', b'group'))
-            if not self.filter or self.filter(n):
-                return n
-
-    def peek(self):
-        while True:
-            while not self._peek_iter:
-                if self.peeks > 100:
-                    raise StopIteration
-                _peek = self.get_next()
-                self.stack.append(_peek)
-                if b'chunks' in _peek:
-                    self._peek_iter = iter(_peek[b'chunks'])
-                else:
-                    self._peek_iter = None
-            try:
-                item = next(self._peek_iter)
-                self.peeks += 1
-                return item
-            except StopIteration:
-                self._peek_iter = None
+    def fetch_many(self, ids, is_preloaded=False):
+        for id_, data in zip_longest(ids, self.repository.get_many(ids, is_preloaded=is_preloaded)):
+            yield self.key.decrypt(id_, data)
 
 
-class Archive(object):
+class ChunkBuffer:
+    BUFFER_SIZE = 1 * 1024 * 1024
+
+    def __init__(self, cache, key, stats):
+        self.buffer = BytesIO()
+        self.packer = msgpack.Packer(unicode_errors='surrogateescape')
+        self.cache = cache
+        self.chunks = []
+        self.key = key
+        self.stats = stats
+
+    def add(self, item):
+        self.buffer.write(self.packer.pack(item))
+
+    def flush(self, flush=False):
+        if self.buffer.tell() == 0:
+            return
+        self.buffer.seek(0)
+        chunks = list(bytes(s) for s in chunkify(self.buffer, WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, self.key.chunk_seed))
+        self.buffer.seek(0)
+        self.buffer.truncate(0)
+        # Leave the last parital chunk in the buffer unless flush is True
+        end = None if flush or len(chunks) == 1 else -1
+        for chunk in chunks[:end]:
+            id_, _, _ = self.cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats)
+            self.chunks.append(id_)
+        if end == -1:
+            self.buffer.write(chunks[-1])
+
+    def is_full(self):
+        return self.buffer.tell() > self.BUFFER_SIZE
+
+
+class Archive:
 
     class DoesNotExist(Error):
         """Archive {} does not exist"""
@@ -85,13 +95,13 @@ class Archive(object):
         self.repository = repository
         self.cache = cache
         self.manifest = manifest
-        self.items = BytesIO()
-        self.items_ids = []
         self.hard_links = {}
         self.stats = Statistics()
         self.name = name
         self.checkpoint_interval = checkpoint_interval
         self.numeric_owner = numeric_owner
+        self.items_buffer = ChunkBuffer(self.cache, self.key, self.stats)
+        self.pipeline = DownloadPipeline(self.repository, self.key)
         if create:
             if name in manifest.archives:
                 raise self.AlreadyExists(name)
@@ -128,44 +138,17 @@ class Archive(object):
         return 'Archive(%r)' % self.name
 
     def iter_items(self, filter=None):
-        unpacker = msgpack.Unpacker(use_list=False)
-        i = 0
-        n = 20
-        while True:
-            items = self.metadata[b'items'][i:i + n]
-            i += n
-            if not items:
-                break
-            for id, chunk in [(id, chunk) for id, chunk in zip_longest(items, self.repository.get_many(items))]:
-                unpacker.feed(self.key.decrypt(id, chunk))
-                iter = ItemIter(unpacker, filter)
-                for item in iter:
-                    yield item, iter.peek
+        for item in self.pipeline.unpack_many(self.metadata[b'items'], filter=filter):
+            yield item, None
 
     def add_item(self, item):
-        self.items.write(msgpack.packb(item, unicode_errors='surrogateescape'))
+        self.items_buffer.add(item)
         now = time.time()
         if now - self.last_checkpoint > self.checkpoint_interval:
             self.last_checkpoint = now
             self.write_checkpoint()
-        if self.items.tell() > ITEMS_BUFFER:
-            self.flush_items()
-
-    def flush_items(self, flush=False):
-        if self.items.tell() == 0:
-            return
-        self.items.seek(0)
-        chunks = list(bytes(s) for s in chunkify(self.items, WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, self.key.chunk_seed))
-        self.items.seek(0)
-        self.items.truncate()
-        for chunk in chunks[:-1]:
-            id, _, _ = self.cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats)
-            self.items_ids.append(id)
-        if flush or len(chunks) == 1:
-            id, _, _ = self.cache.add_chunk(self.key.id_hash(chunks[-1]), chunks[-1], self.stats)
-            self.items_ids.append(id)
-        else:
-            self.items.write(chunks[-1])
+        if self.items_buffer.is_full():
+            self.items_buffer.flush()
 
     def write_checkpoint(self):
         self.save(self.checkpoint_name)
@@ -176,11 +159,11 @@ class Archive(object):
         name = name or self.name
         if name in self.manifest.archives:
             raise self.AlreadyExists(name)
-        self.flush_items(flush=True)
+        self.items_buffer.flush(flush=True)
         metadata = {
             'version': 1,
             'name': name,
-            'items': self.items_ids,
+            'items': self.items_buffer.chunks,
             'cmdline': sys.argv,
             'hostname': socket.gethostname(),
             'username': getuser(),
@@ -199,6 +182,9 @@ class Archive(object):
             count, size, csize = self.cache.chunks[id]
             stats.update(size, csize, count == 1)
             self.cache.chunks[id] = count - 1, size, csize
+        def add_file_chunks(chunks):
+            for id, _, _ in chunks:
+                add(id)
         # This function is a bit evil since it abuses the cache to calculate
         # the stats. The cache transaction must be rolled back afterwards
         unpacker = msgpack.Unpacker(use_list=False)
@@ -209,12 +195,9 @@ class Archive(object):
             add(id)
             unpacker.feed(self.key.decrypt(id, chunk))
             for item in unpacker:
-                try:
-                    for id, size, csize in item[b'chunks']:
-                        add(id)
+                if b'chunks' in item:
                     stats.nfiles += 1
-                except KeyError:
-                    pass
+                    add_file_chunks(item[b'chunks'])
         cache.rollback()
         return stats
 
@@ -249,9 +232,8 @@ class Archive(object):
                 os.link(source, path)
             else:
                 with open(path, 'wb') as fd:
-                    ids = [id for id, size, csize in item[b'chunks']]
-                    for id, chunk in zip_longest(ids, self.repository.get_many(ids, peek)):
-                        data = self.key.decrypt(id, chunk)
+                    ids = [c[0] for c in item[b'chunks']]
+                    for data in self.pipeline.fetch_many(ids, is_preloaded=True):
                         fd.write(data)
                     fd.flush()
                     self.restore_attrs(path, item, fd=fd.fileno())
@@ -314,8 +296,8 @@ class Archive(object):
             start(item)
             ids = [id for id, size, csize in item[b'chunks']]
             try:
-                for id, chunk in zip_longest(ids, self.repository.get_many(ids, peek)):
-                    self.key.decrypt(id, chunk)
+                for _ in self.pipeline.fetch_many(ids, is_preloaded=True):
+                    pass
             except Exception:
                 result(item, False)
                 return
@@ -323,15 +305,14 @@ class Archive(object):
 
     def delete(self, cache):
         unpacker = msgpack.Unpacker(use_list=False)
-        for id in self.metadata[b'items']:
-            unpacker.feed(self.key.decrypt(id, self.repository.get(id)))
+        for id_, data in zip_longest(self.metadata[b'items'], self.repository.get_many(self.metadata[b'items'])):
+            unpacker.feed(self.key.decrypt(id_, data))
+            self.cache.chunk_decref(id_)
             for item in unpacker:
-                try:
+                if b'chunks' in item:
                     for chunk_id, size, csize in item[b'chunks']:
                         self.cache.chunk_decref(chunk_id)
-                except KeyError:
-                    pass
-            self.cache.chunk_decref(id)
+
         self.cache.chunk_decref(self.id)
         del self.manifest.archives[self.name]
         self.manifest.write()
@@ -385,19 +366,18 @@ class Archive(object):
         chunks = None
         if ids is not None:
             # Make sure all ids are available
-            for id in ids:
-                if not cache.seen_chunk(id):
+            for id_ in ids:
+                if not cache.seen_chunk(id_):
                     break
             else:
-                chunks = [cache.chunk_incref(id, self.stats) for id in ids]
+                chunks = [cache.chunk_incref(id_, self.stats) for id_ in ids]
         # Only chunkify the file if needed
         if chunks is None:
             with open(path, 'rb') as fd:
                 chunks = []
                 for chunk in chunkify(fd, WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, self.key.chunk_seed):
                     chunks.append(cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats))
-            ids = [id for id, _, _ in chunks]
-            cache.memorize_file(path_hash, st, ids)
+            cache.memorize_file(path_hash, st, [c[0] for c in chunks])
         item = {b'path': safe_path, b'chunks': chunks}
         item.update(self.stat_attrs(st, path))
         self.stats.nfiles += 1

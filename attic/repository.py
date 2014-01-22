@@ -220,9 +220,9 @@ class Repository(object):
         except KeyError:
             raise self.DoesNotExist(self.path)
 
-    def get_many(self, ids, peek=None):
-        for id in ids:
-            yield self.get(id)
+    def get_many(self, ids, is_preloaded=False):
+        for id_ in ids:
+            yield self.get(id_)
 
     def put(self, id, data, wait=True):
         if not self._active_txn:
@@ -260,6 +260,10 @@ class Repository(object):
 
     def add_callback(self, cb, data):
         cb(None, None, data)
+
+    def preload(self, ids):
+        """Preload objects (only applies to remote repositories
+        """
 
 
 class LoggedIO(object):

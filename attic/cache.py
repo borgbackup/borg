@@ -154,16 +154,14 @@ class Cache(object):
             archive = msgpack.unpackb(data)
             decode_dict(archive, (b'name', b'hostname', b'username', b'time'))  # fixme: argv
             print('Analyzing archive:', archive[b'name'])
-            for id, chunk in zip_longest(archive[b'items'], self.repository.get_many(archive[b'items'])):
-                data = self.key.decrypt(id, chunk)
-                add(id, len(data), len(chunk))
+            for id_, chunk in zip_longest(archive[b'items'], self.repository.get_many(archive[b'items'])):
+                data = self.key.decrypt(id_, chunk)
+                add(id_, len(data), len(chunk))
                 unpacker.feed(data)
                 for item in unpacker:
-                    try:
-                        for id, size, csize in item[b'chunks']:
-                            add(id, size, csize)
-                    except KeyError:
-                        pass
+                    if b'chunks' in item:
+                        for id_, size, csize in item[b'chunks']:
+                            add(id_, size, csize)
 
     def add_chunk(self, id, data, stats):
         if not self.txn_active:

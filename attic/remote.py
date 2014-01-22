@@ -7,7 +7,6 @@ import sys
 
 from .helpers import Error
 from .repository import Repository
-from .lrucache import LRUCache
 
 BUFSIZE = 10 * 1024 * 1024
 
@@ -71,19 +70,19 @@ class RemoteRepository(object):
             self.name = name
 
     def __init__(self, location, create=False):
+        self.preload_ids = []
+        self.msgid = 0
+        self.to_send = b''
+        self.cache = {}
+        self.ignore_responses = set()
+        self.responses = {}
+        self.unpacker = msgpack.Unpacker(use_list=False)
         self.repository_url = '%s@%s:%s' % (location.user, location.host, location.path)
         self.p = None
-        self.cache = LRUCache(256)
-        self.to_send = b''
-        self.extra = {}
-        self.pending = {}
-        self.unpacker = msgpack.Unpacker(use_list=False)
-        self.msgid = 0
-        self.received_msgid = 0
         if location.host == '__testsuite__':
             args = [sys.executable, '-m', 'attic.archiver', 'serve']
         else:
-            args = ['ssh',]
+            args = ['ssh']
             if location.port:
                 args += ['-p', str(location.port)]
             if location.user:
@@ -99,11 +98,11 @@ class RemoteRepository(object):
         self.r_fds = [self.stdout_fd]
         self.x_fds = [self.stdin_fd, self.stdout_fd]
 
-        version = self.call('negotiate', (1,))
+        version = self.call('negotiate', 1)
         if version != 1:
             raise Exception('Server insisted on using unsupported protocol version %d' % version)
         try:
-            self.id = self.call('open', (location.path, create))
+            self.id = self.call('open', location.path, create)
         except self.RPCError as e:
             if e.name == b'DoesNotExist':
                 raise Repository.DoesNotExist(self.repository_url)
@@ -113,11 +112,33 @@ class RemoteRepository(object):
     def __del__(self):
         self.close()
 
-    def call(self, cmd, args, wait=True):
-        self.msgid += 1
-        to_send = msgpack.packb((1, self.msgid, cmd, args))
+    def call(self, cmd, *args, **kw):
+        for resp in self.call_many(cmd, [args], **kw):
+            return resp
+
+    def call_many(self, cmd, calls, wait=True, is_preloaded=False):
+        def fetch_from_cache(args):
+            msgid = self.cache[args].pop(0)
+            if not self.cache[args]:
+                del self.cache[args]
+            return msgid
+
+        calls = list(calls)
+        waiting_for = []
         w_fds = [self.stdin_fd]
-        while wait or to_send:
+        while wait or calls:
+            while waiting_for:
+                try:
+                    error, res = self.responses.pop(waiting_for[0])
+                    waiting_for.pop(0)
+                    if error:
+                        raise self.RPCError(error)
+                    else:
+                        yield res
+                        if not waiting_for and not calls:
+                            return
+                except KeyError:
+                    break
             r, w, x = select.select(self.r_fds, w_fds, self.x_fds, 1)
             if x:
                 raise Exception('FD exception occured')
@@ -127,147 +148,60 @@ class RemoteRepository(object):
                     raise ConnectionClosed()
                 self.unpacker.feed(data)
                 for type, msgid, error, res in self.unpacker:
-                    if msgid == self.msgid:
-                        self.received_msgid = msgid
-                        if error:
-                            raise self.RPCError(error)
-                        else:
-                            return res
+                    if msgid in self.ignore_responses:
+                        self.ignore_responses.remove(msgid)
                     else:
-                        args = self.pending.pop(msgid, None)
-                        if args is not None:
-                            self.cache[args] = msgid, res, error
+                        self.responses[msgid] = error, res
             if w:
-                if to_send:
-                    n = os.write(self.stdin_fd, to_send)
-                    assert n > 0
-                    to_send = memoryview(to_send)[n:]
-                if not to_send:
-                    w_fds = []
+                while not self.to_send and (calls or self.preload_ids) and len(waiting_for) < 100:
+                    if calls:
+                        if is_preloaded:
+                            if calls[0] in self.cache:
+                                waiting_for.append(fetch_from_cache(calls.pop(0)))
+                        else:
+                            args = calls.pop(0)
+                            if cmd == 'get' and args in self.cache:
+                                waiting_for.append(fetch_from_cache(args))
+                            else:
+                                self.msgid += 1
+                                waiting_for.append(self.msgid)
+                                self.to_send = msgpack.packb((1, self.msgid, cmd, args))
+                    if not self.to_send and self.preload_ids:
+                        args = (self.preload_ids.pop(0),)
+                        self.msgid += 1
+                        self.cache.setdefault(args, []).append(self.msgid)
+                        self.to_send = msgpack.packb((1, self.msgid, cmd, args))
 
-    def _read(self):
-        data = os.read(self.stdout_fd, BUFSIZE)
-        if not data:
-            raise Exception('Remote host closed connection')
-        self.unpacker.feed(data)
-        to_yield = []
-        for type, msgid, error, res in self.unpacker:
-            self.received_msgid = msgid
-            args = self.pending.pop(msgid, None)
-            if args is not None:
-                self.cache[args] = msgid, res, error
-                for args, resp, error in self.extra.pop(msgid, []):
-                    if not resp and not error:
-                        resp, error = self.cache[args][1:]
-                    to_yield.append((resp, error))
-        for res, error in to_yield:
-            if error:
-                raise self.RPCError(error)
-            else:
-                yield res
-
-    def gen_request(self, cmd, argsv, wait):
-        data = []
-        m = self.received_msgid
-        for args in argsv:
-            # Make sure to invalidate any existing cache entries for non-get requests
-            if not args in self.cache:
-                self.msgid += 1
-                msgid = self.msgid
-                self.pending[msgid] = args
-                self.cache[args] = msgid, None, None
-                data.append(msgpack.packb((1, msgid, cmd, args)))
-            if wait:
-                msgid, resp, error = self.cache[args]
-                m = max(m, msgid)
-                self.extra.setdefault(m, []).append((args, resp, error))
-        return b''.join(data)
-
-    def gen_cache_requests(self, cmd, peek):
-        data = []
-        while True:
-            try:
-                args = (peek()[0],)
-            except StopIteration:
-                break
-            if args in self.cache:
-                continue
-            self.msgid += 1
-            msgid = self.msgid
-            self.pending[msgid] = args
-            self.cache[args] = msgid, None, None
-            data.append(msgpack.packb((1, msgid, cmd, args)))
-        return b''.join(data)
-
-    def call_multi(self, cmd, argsv, wait=True, peek=None):
-        w_fds = [self.stdin_fd]
-        left = len(argsv)
-        data = self.gen_request(cmd, argsv, wait)
-        self.to_send += data
-        for args, resp, error in self.extra.pop(self.received_msgid, []):
-            left -= 1
-            if not resp and not error:
-                resp, error = self.cache[args][1:]
-            if error:
-                raise self.RPCError(error)
-            else:
-                yield resp
-        while left:
-            r, w, x = select.select(self.r_fds, w_fds, self.x_fds, 1)
-            if x:
-                raise Exception('FD exception occured')
-            if r:
-                for res in self._read():
-                    left -= 1
-                    yield res
-            if w:
-                if not self.to_send and peek:
-                    self.to_send = self.gen_cache_requests(cmd, peek)
                 if self.to_send:
-                    n = os.write(self.stdin_fd, self.to_send)
-                    assert n > 0
-#                    self.to_send = memoryview(self.to_send)[n:]
-                    self.to_send = self.to_send[n:]
-                else:
+                    self.to_send = self.to_send[os.write(self.stdin_fd, self.to_send):]
+                if not self.to_send and not (calls or self.preload_ids):
                     w_fds = []
-                    if not wait:
-                        return
+        self.ignore_responses |= set(waiting_for)
 
     def commit(self, *args):
-        self.call('commit', args)
+        return self.call('commit')
 
     def rollback(self, *args):
-        self.cache.clear()
-        self.pending.clear()
-        self.extra.clear()
-        return self.call('rollback', args)
+        return self.call('rollback')
 
-    def get(self, id):
+    def get(self, id_):
+        for resp in self.get_many([id_]):
+            return resp
+
+    def get_many(self, ids, is_preloaded=False):
         try:
-            for res in self.call_multi('get', [(id, )]):
-                return res
+            for resp in self.call_many('get', [(id_,) for id_ in ids], is_preloaded=is_preloaded):
+                yield resp
         except self.RPCError as e:
             if e.name == b'DoesNotExist':
                 raise Repository.DoesNotExist(self.repository_url)
             raise
 
-    def get_many(self, ids, peek=None):
-        return self.call_multi('get', [(id, ) for id in ids], peek=peek)
+    def put(self, id_, data, wait=True):
+        return self.call('put', id_, data, wait=wait)
 
-    def _invalidate(self, id):
-        key = (id, )
-        if key in self.cache:
-            self.pending.pop(self.cache.pop(key)[0], None)
-
-    def put(self, id, data, wait=True):
-        resp = self.call('put', (id, data), wait=wait)
-        self._invalidate(id)
-        return resp
-
-    def delete(self, id, wait=True):
-        resp = self.call('delete', (id, ), wait=wait)
-        self._invalidate(id)
-        return resp
+    def delete(self, id_, wait=True):
+        return self.call('delete', id_, wait=wait)
 
     def close(self):
         if self.p:
@@ -275,3 +209,6 @@ class RemoteRepository(object):
             self.p.stdout.close()
             self.p.wait()
             self.p = None
+
+    def preload(self, ids):
+        self.preload_ids += ids

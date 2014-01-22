@@ -152,6 +152,8 @@ class Cache(object):
             data = self.key.decrypt(id, cdata)
             add(id, len(data), len(cdata))
             archive = msgpack.unpackb(data)
+            if archive[b'version'] != 1:
+                raise Exception('Unknown archive metadata version')
             decode_dict(archive, (b'name', b'hostname', b'username', b'time'))  # fixme: argv
             print('Analyzing archive:', archive[b'name'])
             for id_, chunk in zip_longest(archive[b'items'], self.repository.get_many(archive[b'items'])):

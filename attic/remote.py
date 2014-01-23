@@ -44,7 +44,7 @@ class RepositoryServer(object):
                             f = getattr(self.repository, method)
                         res = f(*args)
                     except Exception as e:
-                        sys.stdout.buffer.write(msgpack.packb((1, msgid, e.__class__.__name__, None)))
+                        sys.stdout.buffer.write(msgpack.packb((1, msgid, e.__class__.__name__, e.args)))
                     else:
                         sys.stdout.buffer.write(msgpack.packb((1, msgid, None, res)))
                     sys.stdout.flush()
@@ -70,6 +70,7 @@ class RemoteRepository(object):
             self.name = name
 
     def __init__(self, location, create=False):
+        self.location = location
         self.preload_ids = []
         self.msgid = 0
         self.to_send = b''
@@ -77,7 +78,6 @@ class RemoteRepository(object):
         self.ignore_responses = set()
         self.responses = {}
         self.unpacker = msgpack.Unpacker(use_list=False)
-        self.repository_url = '%s@%s:%s' % (location.user, location.host, location.path)
         self.p = None
         if location.host == '__testsuite__':
             args = [sys.executable, '-m', 'attic.archiver', 'serve']
@@ -101,13 +101,7 @@ class RemoteRepository(object):
         version = self.call('negotiate', 1)
         if version != 1:
             raise Exception('Server insisted on using unsupported protocol version %d' % version)
-        try:
-            self.id = self.call('open', location.path, create)
-        except self.RPCError as e:
-            if e.name == b'DoesNotExist':
-                raise Repository.DoesNotExist(self.repository_url)
-            elif e.name == b'AlreadyExists':
-                raise Repository.AlreadyExists(self.repository_url)
+        self.id = self.call('open', location.path, create)
 
     def __del__(self):
         self.close()
@@ -132,6 +126,10 @@ class RemoteRepository(object):
                     error, res = self.responses.pop(waiting_for[0])
                     waiting_for.pop(0)
                     if error:
+                        if error == b'DoesNotExist':
+                            raise Repository.DoesNotExist(self.location.orig)
+                        elif error == b'AlreadyExists':
+                            raise Repository.AlreadyExists(self.location.orig)
                         raise self.RPCError(error)
                     else:
                         yield res
@@ -189,13 +187,8 @@ class RemoteRepository(object):
             return resp
 
     def get_many(self, ids, is_preloaded=False):
-        try:
-            for resp in self.call_many('get', [(id_,) for id_ in ids], is_preloaded=is_preloaded):
-                yield resp
-        except self.RPCError as e:
-            if e.name == b'DoesNotExist':
-                raise Repository.DoesNotExist(self.repository_url)
-            raise
+        for resp in self.call_many('get', [(id_,) for id_ in ids], is_preloaded=is_preloaded):
+            yield resp
 
     def put(self, id_, data, wait=True):
         return self.call('put', id_, data, wait=wait)

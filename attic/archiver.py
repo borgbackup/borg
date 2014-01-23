@@ -13,8 +13,8 @@ from attic.cache import Cache
 from attic.key import key_creator
 from attic.helpers import Error, location_validator, format_time, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
-    get_cache_dir, get_keys_dir, format_timedelta, prune_split, Manifest, Location, remove_surrogates
-from attic.remote import RepositoryServer, RemoteRepository, ConnectionClosed
+    get_cache_dir, get_keys_dir, format_timedelta, prune_split, Manifest, remove_surrogates
+from attic.remote import RepositoryServer, RemoteRepository
 
 
 class Archiver:

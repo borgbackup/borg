@@ -6,7 +6,7 @@ Here you can see the full list of changes between each Attic release.
 Version 0.9
 -----------
 
-(feature release, released on X)
+(feature release, released on Jan 23, 2014)
 
 - Remote repository speed and reliability improvements.
 - Fix sorting of segment names to ignore NFS left over files. (#17)

@@ -29,16 +29,17 @@ class DownloadPipeline:
         self.repository = repository
         self.key = key
 
-    def unpack_many(self, ids, filter=None):
+    def unpack_many(self, ids, filter=None, preload=False):
         unpacker = msgpack.Unpacker(use_list=False)
         for data in self.fetch_many(ids):
             unpacker.feed(data)
             items = [decode_dict(item, (b'path', b'source', b'user', b'group')) for item in unpacker]
             if filter:
                 items = [item for item in items if filter(item)]
-            for item in items:
-                if b'chunks' in item:
-                    self.repository.preload([c[0] for c in item[b'chunks']])
+            if preload:
+                for item in items:
+                    if b'chunks' in item:
+                        self.repository.preload([c[0] for c in item[b'chunks']])
             for item in items:
                 yield item
 
@@ -137,9 +138,9 @@ class Archive:
     def __repr__(self):
         return 'Archive(%r)' % self.name
 
-    def iter_items(self, filter=None):
-        for item in self.pipeline.unpack_many(self.metadata[b'items'], filter=filter):
-            yield item, None
+    def iter_items(self, filter=None, preload=False):
+        for item in self.pipeline.unpack_many(self.metadata[b'items'], filter=filter, preload=preload):
+            yield item
 
     def add_item(self, item):
         self.items_buffer.add(item)
@@ -201,7 +202,7 @@ class Archive:
         cache.rollback()
         return stats
 
-    def extract_item(self, item, restore_attrs=True, peek=None):
+    def extract_item(self, item, restore_attrs=True):
         dest = self.cwd
         if item[b'path'].startswith('/') or item[b'path'].startswith('..'):
             raise Exception('Path should be relative and local')
@@ -288,7 +289,7 @@ class Archive:
         elif not symlink:
             os.utime(path, (item[b'mtime'] / 10**9, item[b'mtime'] / 10**9))
 
-    def verify_file(self, item, start, result, peek=None):
+    def verify_file(self, item, start, result):
         if not item[b'chunks']:
             start(item)
             result(item, True)

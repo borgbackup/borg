@@ -24,7 +24,7 @@ class AtticOperations(llfuse.Operations):
         default_dir = {b'mode': 0o40755, b'mtime': int(time.time() * 1e9), b'uid': os.getuid(), b'gid': os.getgid()}
         # Loop through all archive items and assign inode numbers and
         # extract hierarchy information
-        for item, _ in archive.iter_items():
+        for item in archive.iter_items():
             segments = os.fsencode(os.path.normpath(item[b'path'])).split(b'/')
             num_segments = len(segments)
             parent = 1

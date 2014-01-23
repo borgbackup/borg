@@ -166,7 +166,7 @@ class Archiver:
                           numeric_owner=args.numeric_owner)
         patterns = adjust_patterns(args.paths, args.excludes)
         dirs = []
-        for item, peek in archive.iter_items(lambda item: not exclude_path(item[b'path'], patterns)):
+        for item in archive.iter_items(lambda item: not exclude_path(item[b'path'], patterns), preload=True):
             while dirs and not item[b'path'].startswith(dirs[-1][b'path']):
                 archive.extract_item(dirs.pop(-1))
             self.print_verbose(remove_surrogates(item[b'path']))
@@ -175,7 +175,7 @@ class Archiver:
                     dirs.append(item)
                     archive.extract_item(item, restore_attrs=False)
                 else:
-                    archive.extract_item(item, peek=peek)
+                    archive.extract_item(item)
             except IOError as e:
                 self.print_error('%s: %s', remove_surrogates(item[b'path']), e)
 
@@ -228,7 +228,7 @@ class Archiver:
         if args.src.archive:
             tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 0o10: '-', 0o12: 'l', 0o14: 's'}
             archive = Archive(repository, key, manifest, args.src.archive)
-            for item, _ in archive.iter_items():
+            for item in archive.iter_items():
                 type = tmap.get(item[b'mode'] // 4096, '?')
                 mode = format_file_mode(item[b'mode'])
                 size = 0
@@ -271,9 +271,9 @@ class Archiver:
             else:
                 self.print_verbose('ERROR')
                 self.print_error('%s: verification failed' % remove_surrogates(item[b'path']))
-        for item, peek in archive.iter_items(lambda item: not exclude_path(item[b'path'], patterns)):
+        for item in archive.iter_items(lambda item: not exclude_path(item[b'path'], patterns), preload=True):
             if stat.S_ISREG(item[b'mode']) and b'chunks' in item:
-                archive.verify_file(item, start_cb, result_cb, peek=peek)
+                archive.verify_file(item, start_cb, result_cb)
         return self.exit_code
 
     def do_info(self, args):

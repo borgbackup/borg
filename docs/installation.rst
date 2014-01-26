@@ -38,3 +38,6 @@ Installing from git
     $ git clone |git_url|
     $ cd attic
     $ python setup.py install
+
+Please not that when installing from git Cython_ is required to generate some files that
+are normally bundled with the release tarball.

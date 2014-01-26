@@ -24,6 +24,9 @@ You can use pip to install |project_name| quickly and easily::
 
     $ pip install attic
 
+|project_name| is also part of the Debian_, Ubuntu_ and `Arch Linux`_
+distributions of GNU/Linux.
+
 Need more help with installing? See :ref:`installation`.
 
 User's Guide

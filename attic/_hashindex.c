@@ -9,8 +9,12 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
-#if defined(__BYTE_ORDER)&&(__BYTE_ORDER == __BIG_ENDIAN)
-#error This code is not big endian safe yet
+#if defined(__linux__)
+#include <endian.h>
+#elif defined(__APPLE__) && defined(__MACH__)
+#include <machine/endian.h>
+#else
+#include <sys/endian.h>
 #endif
 
 typedef struct {
@@ -37,22 +41,21 @@ typedef struct {
 } HashIndex;
 
 #define MAGIC "ATTICIDX"
-#define EMPTY ((int32_t)-1)
-#define DELETED ((int32_t)-2)
+#define EMPTY htole32(0xffffffff)
+#define DELETED htole32(0xfffffffe)
 #define MAX_BUCKET_SIZE 512
 #define BUCKET_LOWER_LIMIT .25
 #define BUCKET_UPPER_LIMIT .90
 #define MIN_BUCKETS 1024
 #define MAX(x, y) ((x) > (y) ? (x): (y))
-#define BUCKET_ADDR_READ(index, idx) (index->buckets + (idx * index->bucket_size))
-#define BUCKET_ADDR_WRITE(index, idx) (index->buckets + (idx * index->bucket_size))
+#define BUCKET_ADDR(index, idx) (index->buckets + (idx * index->bucket_size))
 
-#define BUCKET_IS_DELETED(index, idx) (*((int32_t *)(BUCKET_ADDR_READ(index, idx) + index->key_size)) == DELETED)
-#define BUCKET_IS_EMPTY(index, idx) (*((int32_t *)(BUCKET_ADDR_READ(index, idx) + index->key_size)) == EMPTY)
+#define BUCKET_IS_DELETED(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) == DELETED)
+#define BUCKET_IS_EMPTY(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) == EMPTY)
 
-#define BUCKET_MATCHES_KEY(index, idx, key) (memcmp(key, BUCKET_ADDR_READ(index, idx), index->key_size) == 0)
+#define BUCKET_MATCHES_KEY(index, idx, key) (memcmp(key, BUCKET_ADDR(index, idx), index->key_size) == 0)
 
-#define BUCKET_MARK_DELETED(index, idx) (*((int32_t *)(BUCKET_ADDR_WRITE(index, idx) + index->key_size)) = DELETED)
+#define BUCKET_MARK_DELETED(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) = DELETED)
 
 #define EPRINTF(msg, ...) EPRINTF_PATH(index->path, msg, ##__VA_ARGS__)
 #define EPRINTF_PATH(path, msg, ...) fprintf(stderr, "hashindex: %s: " msg "\n", path, ##__VA_ARGS__)
@@ -67,12 +70,11 @@ static int hashindex_set(HashIndex *index, const void *key, const void *value);
 static int hashindex_delete(HashIndex *index, const void *key);
 static void *hashindex_next_key(HashIndex *index, const void *key);
 
-
 /* Private API */
 static int
 hashindex_index(HashIndex *index, const void *key)
 {
-    return *((uint32_t *)key) % index->num_buckets;
+    return le32toh(*((uint32_t *)key)) % index->num_buckets;
 }
 
 static int
@@ -93,7 +95,7 @@ hashindex_lookup(HashIndex *index, const void *key)
         }
         else if(BUCKET_MATCHES_KEY(index, idx, key)) {
             if (didx != -1 && !index->readonly) {
-                memcpy(BUCKET_ADDR_WRITE(index, didx), BUCKET_ADDR_READ(index, idx), index->bucket_size);
+                memcpy(BUCKET_ADDR(index, didx), BUCKET_ADDR(index, idx), index->bucket_size);
                 BUCKET_MARK_DELETED(index, idx);
                 idx = didx;
             }
@@ -191,7 +193,7 @@ hashindex_open(const char *path, int readonly)
         EPRINTF_PATH(path, "Unknown file header");
         return NULL;
     }
-    if(length != sizeof(HashHeader) + header->num_buckets * (header->key_size + header->value_size)) {
+    if(length != sizeof(HashHeader) + le32toh(header->num_buckets) * (header->key_size + header->value_size)) {
         EPRINTF_PATH(path, "Incorrect file length");
         return NULL;
     }
@@ -202,8 +204,8 @@ hashindex_open(const char *path, int readonly)
     index->readonly = readonly;
     index->map_addr = addr;
     index->map_length = length;
-    index->num_entries = header->num_entries;
-    index->num_buckets = header->num_buckets;
+    index->num_entries = le32toh(header->num_entries);
+    index->num_buckets = le32toh(header->num_buckets);
     index->key_size = header->key_size;
     index->value_size = header->value_size;
     index->bucket_size = index->key_size + index->value_size;
@@ -228,7 +230,7 @@ hashindex_create(const char *path, int capacity, int key_size, int value_size)
         .magic = MAGIC, .num_entries = 0, .key_size = key_size, .value_size = value_size
     };
     capacity = MAX(MIN_BUCKETS, capacity);
-    header.num_buckets = capacity;
+    header.num_buckets = htole32(capacity);
 
     if(!(fd = fopen(path, "w"))) {
         EPRINTF_PATH(path, "fopen failed");
@@ -238,7 +240,7 @@ hashindex_create(const char *path, int capacity, int key_size, int value_size)
     if(fwrite(&header, 1, sizeof(header), fd) != sizeof(header)) {
         goto error;
     }
-    *((int32_t *)(bucket + key_size)) = EMPTY;
+    *((uint32_t *)(bucket + key_size)) = EMPTY;
     for(i = 0; i < capacity; i++) {
         if(fwrite(bucket, 1, bucket_size, fd) != bucket_size) {
             goto error;
@@ -280,8 +282,8 @@ hashindex_flush(HashIndex *index)
     if(index->readonly) {
         return 1;
     }
-    *((int32_t *)(index->map_addr + 8)) = index->num_entries;
-    *((int32_t *)(index->map_addr + 12)) = index->num_buckets;
+    *((uint32_t *)(index->map_addr + 8)) = htole32(index->num_entries);
+    *((uint32_t *)(index->map_addr + 12)) = htole32(index->num_buckets);
     if(msync(index->map_addr, index->map_length, MS_SYNC) < 0) {
         EPRINTF("msync failed");
         return 0;
@@ -312,7 +314,7 @@ hashindex_get(HashIndex *index, const void *key)
     if(idx < 0) {
         return NULL;
     }
-    return BUCKET_ADDR_READ(index, idx) + index->key_size;
+    return BUCKET_ADDR(index, idx) + index->key_size;
 }
 
 static int
@@ -331,14 +333,14 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
         while(!BUCKET_IS_EMPTY(index, idx) && !BUCKET_IS_DELETED(index, idx)) {
             idx = (idx + 1) % index->num_buckets;
         }
-        ptr = BUCKET_ADDR_WRITE(index, idx);
+        ptr = BUCKET_ADDR(index, idx);
         memcpy(ptr, key, index->key_size);
         memcpy(ptr + index->key_size, value, index->value_size);
         index->num_entries += 1;
     }
     else
     {
-        memcpy(BUCKET_ADDR_WRITE(index, idx) + index->key_size, value, index->value_size);
+        memcpy(BUCKET_ADDR(index, idx) + index->key_size, value, index->value_size);
     }
     return 1;
 }
@@ -376,7 +378,7 @@ hashindex_next_key(HashIndex *index, const void *key)
             return NULL;
         }
     }
-    return BUCKET_ADDR_READ(index, idx);
+    return BUCKET_ADDR(index, idx);
 }
 
 static int

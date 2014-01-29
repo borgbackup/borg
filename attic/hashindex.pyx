@@ -16,8 +16,8 @@ cdef extern from "_hashindex.c":
     void *hashindex_next_key(HashIndex *index, void *key)
     int hashindex_delete(HashIndex *index, void *key)
     int hashindex_set(HashIndex *index, void *key, void *value)
-    int htole32(int v)
-    int le32toh(int v)
+    int _htole32(int v)
+    int _le32toh(int v)
 
 
 _NoDefault = object()
@@ -90,13 +90,13 @@ cdef class NSIndex(IndexBase):
         data = <int *>hashindex_get(self.index, <char *>key)
         if not data:
             raise KeyError
-        return le32toh(data[0]), le32toh(data[1])
+        return _le32toh(data[0]), _le32toh(data[1])
 
     def __setitem__(self, key, value):
         assert len(key) == 32
         cdef int[2] data
-        data[0] = htole32(value[0])
-        data[1] = htole32(value[1])
+        data[0] = _htole32(value[0])
+        data[1] = _htole32(value[1])
         if not hashindex_set(self.index, <char *>key, data):
             raise Exception('hashindex_set failed')
 
@@ -126,7 +126,7 @@ cdef class NSKeyIterator:
         if not self.key:
             raise StopIteration
         cdef int *value = <int *>(self.key + 32)
-        return self.key[:32], (le32toh(value[0]), le32toh(value[1]))
+        return self.key[:32], (_le32toh(value[0]), _le32toh(value[1]))
 
 
 cdef class ChunkIndex(IndexBase):
@@ -138,14 +138,14 @@ cdef class ChunkIndex(IndexBase):
         data = <int *>hashindex_get(self.index, <char *>key)
         if not data:
             raise KeyError
-        return le32toh(data[0]), le32toh(data[1]), le32toh(data[2])
+        return _le32toh(data[0]), _le32toh(data[1]), _le32toh(data[2])
 
     def __setitem__(self, key, value):
         assert len(key) == 32
         cdef int[3] data
-        data[0] = htole32(value[0])
-        data[1] = htole32(value[1])
-        data[2] = htole32(value[2])
+        data[0] = _htole32(value[0])
+        data[1] = _htole32(value[1])
+        data[2] = _htole32(value[2])
         if not hashindex_set(self.index, <char *>key, data):
             raise Exception('hashindex_set failed')
 
@@ -175,4 +175,4 @@ cdef class ChunkKeyIterator:
         if not self.key:
             raise StopIteration
         cdef int *value = <int *>(self.key + 32)
-        return self.key[:32], (le32toh(value[0]), le32toh(value[1]), le32toh(value[2]))
+        return self.key[:32], (_le32toh(value[0]), _le32toh(value[1]), _le32toh(value[2]))

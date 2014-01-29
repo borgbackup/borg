@@ -9,12 +9,14 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
-#if defined(__linux__)
-#include <endian.h>
-#elif defined(__APPLE__) && defined(__MACH__)
-#include <machine/endian.h>
+#if defined(BYTE_ORDER)&&(BYTE_ORDER == BIG_ENDIAN)
+#define _le32toh(x) __builtin_bswap32(x)
+#define _htole32(x) __builtin_bswap32(x)
+#elif defined(BYTE_ORDER)&&(BYTE_ORDER == LITTLE_ENDIAN)
+#define _le32toh(x) (x)
+#define _htole32(x) (x)
 #else
-#include <sys/endian.h>
+#error Unknown byte order
 #endif
 
 typedef struct {
@@ -41,8 +43,8 @@ typedef struct {
 } HashIndex;
 
 #define MAGIC "ATTICIDX"
-#define EMPTY htole32(0xffffffff)
-#define DELETED htole32(0xfffffffe)
+#define EMPTY _htole32(0xffffffff)
+#define DELETED _htole32(0xfffffffe)
 #define MAX_BUCKET_SIZE 512
 #define BUCKET_LOWER_LIMIT .25
 #define BUCKET_UPPER_LIMIT .90
@@ -74,7 +76,7 @@ static void *hashindex_next_key(HashIndex *index, const void *key);
 static int
 hashindex_index(HashIndex *index, const void *key)
 {
-    return le32toh(*((uint32_t *)key)) % index->num_buckets;
+    return _le32toh(*((uint32_t *)key)) % index->num_buckets;
 }
 
 static int
@@ -193,7 +195,7 @@ hashindex_open(const char *path, int readonly)
         EPRINTF_PATH(path, "Unknown file header");
         return NULL;
     }
-    if(length != sizeof(HashHeader) + le32toh(header->num_buckets) * (header->key_size + header->value_size)) {
+    if(length != sizeof(HashHeader) + _le32toh(header->num_buckets) * (header->key_size + header->value_size)) {
         EPRINTF_PATH(path, "Incorrect file length");
         return NULL;
     }
@@ -204,8 +206,8 @@ hashindex_open(const char *path, int readonly)
     index->readonly = readonly;
     index->map_addr = addr;
     index->map_length = length;
-    index->num_entries = le32toh(header->num_entries);
-    index->num_buckets = le32toh(header->num_buckets);
+    index->num_entries = _le32toh(header->num_entries);
+    index->num_buckets = _le32toh(header->num_buckets);
     index->key_size = header->key_size;
     index->value_size = header->value_size;
     index->bucket_size = index->key_size + index->value_size;
@@ -230,7 +232,7 @@ hashindex_create(const char *path, int capacity, int key_size, int value_size)
         .magic = MAGIC, .num_entries = 0, .key_size = key_size, .value_size = value_size
     };
     capacity = MAX(MIN_BUCKETS, capacity);
-    header.num_buckets = htole32(capacity);
+    header.num_buckets = _htole32(capacity);
 
     if(!(fd = fopen(path, "w"))) {
         EPRINTF_PATH(path, "fopen failed");
@@ -282,8 +284,8 @@ hashindex_flush(HashIndex *index)
     if(index->readonly) {
         return 1;
     }
-    *((uint32_t *)(index->map_addr + 8)) = htole32(index->num_entries);
-    *((uint32_t *)(index->map_addr + 12)) = htole32(index->num_buckets);
+    *((uint32_t *)(index->map_addr + 8)) = _htole32(index->num_entries);
+    *((uint32_t *)(index->map_addr + 12)) = _htole32(index->num_buckets);
     if(msync(index->map_addr, index->map_length, MS_SYNC) < 0) {
         EPRINTF("msync failed");
         return 0;

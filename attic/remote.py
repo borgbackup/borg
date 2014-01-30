@@ -111,6 +111,8 @@ class RemoteRepository(object):
             return resp
 
     def call_many(self, cmd, calls, wait=True, is_preloaded=False):
+        if not calls:
+            return
         def fetch_from_cache(args):
             msgid = self.cache[args].pop(0)
             if not self.cache[args]:

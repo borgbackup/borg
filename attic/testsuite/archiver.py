@@ -104,6 +104,7 @@ class ArchiverTestCase(AtticTestCase):
         """Create a minimal test case including all supported file types
         """
         # File
+        self.create_regual_file('empty', size=0)
         self.create_regual_file('file1', size=1024 * 80)
         # Directory
         self.create_regual_file('dir2/file2', size=1024 * 80)
@@ -134,7 +135,7 @@ class ArchiverTestCase(AtticTestCase):
         with changedir('output'):
             self.attic('extract', self.repository_location + '::test')
         self.assert_equal(len(self.attic('list', self.repository_location).splitlines()), 2)
-        self.assert_equal(len(self.attic('list', self.repository_location + '::test').splitlines()), 9)
+        self.assert_equal(len(self.attic('list', self.repository_location + '::test').splitlines()), 10)
         self.assert_dirs_equal('input', 'output/input')
         info_output = self.attic('info', self.repository_location + '::test')
         shutil.rmtree(self.cache_path)

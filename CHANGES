@@ -6,8 +6,9 @@ Here you can see the full list of changes between each Attic release.
 Version 0.10
 ------------
 
-(feature release, released on X)
+(bugfix release, released on Jan 30, 2014)
 
+- Fix deadlock when extracting 0 sized files from remote repositories
 - "--exclude" wildcard patterns are now properly applied to the full path
   not just the file name part (#5).
 - Make source code endianness agnostic (#1)

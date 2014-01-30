@@ -2,7 +2,7 @@ from datetime import datetime
 import os
 import tempfile
 import unittest
-from attic.helpers import Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, UpgradableLock
+from attic.helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, UpgradableLock
 from attic.testsuite import AtticTestCase
 
 
@@ -48,15 +48,26 @@ class FormatTimedeltaTestCase(AtticTestCase):
 
 class PatternTestCase(AtticTestCase):
 
+    files = [
+        '/etc/passwd', '/etc/hosts',
+        '/home/user/.profile', '/home/user/.bashrc',
+        '/home/user2/.profile', '/home/user2/public_html/index.html',
+        '/var/log/messages', '/var/log/dmesg',
+    ]
+
+    def evaluate(self, paths, excludes):
+        patterns = adjust_patterns(paths, [ExcludePattern(p) for p in excludes])
+        return [path for path in self.files if not exclude_path(path, patterns)]
+
     def test(self):
-        self.assert_equal(IncludePattern('/usr').match('/usr'), True)
-        self.assert_equal(IncludePattern('/usr').match('/usr/bin'), True)
-        self.assert_equal(IncludePattern('/usr').match('/usrbin'), False)
-        self.assert_equal(ExcludePattern('*.py').match('foo.py'), True)
-        self.assert_equal(ExcludePattern('*.py').match('foo.pl'), False)
-        self.assert_equal(ExcludePattern('/tmp').match('/tmp'), True)
-        self.assert_equal(ExcludePattern('/tmp').match('/tmp/foo'), True)
-        self.assert_equal(ExcludePattern('/tmp').match('/tmofoo'), False)
+        self.assert_equal(self.evaluate(['/'], ['/home']),
+                          ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg'])
+        self.assert_equal(self.evaluate(['/'], ['*.profile', '/var/log']),
+                          ['/etc/passwd', '/etc/hosts', '/home/user/.bashrc', '/home/user2/public_html/index.html'])
+        self.assert_equal(self.evaluate(['/'], ['/home/*/public_html', '*.profile', '*/log/*']),
+                          ['/etc/passwd', '/etc/hosts', '/home/user/.bashrc'])
+        self.assert_equal(self.evaluate(['/etc', '/var'], ['dmesg']),
+                          ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg'])
 
 
 class MakePathSafeTestCase(AtticTestCase):

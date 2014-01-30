@@ -178,14 +178,12 @@ class ExcludePattern(IncludePattern):
     """
     def __init__(self, pattern):
         self.pattern = self.dirpattern = pattern
-        if not pattern.endswith(os.path.sep):
-            self.dirpattern += os.path.sep
+        if not pattern.endswith('/'):
+            self.dirpattern += '/*'
 
     def match(self, path):
         dir, name = os.path.split(path)
-        return (path == self.pattern
-                or (dir + os.path.sep).startswith(self.dirpattern)
-                or fnmatchcase(name, self.pattern))
+        return fnmatchcase(path, self.pattern) or fnmatchcase(dir + '/', self.dirpattern)
 
     def __repr__(self):
         return '%s(%s)' % (type(self), self.pattern)

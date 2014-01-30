@@ -8,6 +8,8 @@ Version 0.10
 
 (feature release, released on X)
 
+- "--exclude" wildcard patterns are now properly applied to the full path
+  not just the file name part (#5).
 - Make source code endianness agnostic (#1)
 
 Version 0.9

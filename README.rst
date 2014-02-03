@@ -53,4 +53,4 @@ Where are the tests?
 The tests are in the attic/testsuite package. To run the test suite use the
 following command::
 
-  $ python -m attic.testsuite.run
+  $ fakeroot -u python -m attic.testsuite.run

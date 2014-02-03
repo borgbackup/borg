@@ -92,17 +92,17 @@ class Manifest:
 
 
 def prune_split(archives, pattern, n, skip=[]):
-    items = {}
+    last = None
     keep = []
-    for a in archives:
-        key = to_localtime(a.ts).strftime(pattern)
-        items.setdefault(key, [])
-        items[key].append(a)
-    for key, values in sorted(items.items(), reverse=True):
-        if n and values[0] not in skip:
-            values.sort(key=attrgetter('ts'), reverse=True)
-            keep.append(values[0])
-            n -= 1
+    if n == 0:
+        return keep
+    for a in sorted(archives, key=attrgetter('ts'), reverse=True):
+        period = a.ts.strftime(pattern)
+        if period != last:
+            last = period
+            if a not in skip:
+                keep.append(a)
+                if len(keep) == n: break
     return keep
 
 

@@ -1,8 +1,9 @@
-from datetime import datetime
+from time import mktime, strptime
+from datetime import datetime, timezone
 import os
 import tempfile
 import unittest
-from attic.helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, UpgradableLock
+from attic.helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, UpgradableLock, prune_split, to_localtime
 from attic.testsuite import AtticTestCase
 
 
@@ -97,3 +98,41 @@ class UpgradableLockTestCase(AtticTestCase):
         lock = UpgradableLock(file.name)
         self.assert_raises(UpgradableLock.LockUpgradeFailed, lock.upgrade)
         lock.release()
+
+
+class MockArchive(object):
+
+    def __init__(self, ts):
+        self.ts = ts
+
+    def __repr__(self):
+        return repr(self.ts)
+
+
+class PruneSplitTestCase(AtticTestCase):
+
+    def test(self):
+
+        def local_to_UTC(month, day):
+            'Convert noon on the month and day in 2013 to UTC.'
+            seconds = mktime(strptime('2013-%02d-%02d 12:00' % (month, day), '%Y-%m-%d %H:%M'))
+            return datetime.fromtimestamp(seconds, tz=timezone.utc)
+
+        def subset(lst, indices):
+            return {lst[i] for i in indices}
+
+        def dotest(test_archives, n, skip, indices):
+            for ta in test_archives, reversed(test_archives):
+                self.assert_equal(set(prune_split(ta, '%Y-%m', n, skip)),
+                                  subset(test_archives, indices))
+            
+        test_pairs = [(1,1), (2,1), (2,28), (3,1), (3,2), (3,31), (5,1)]
+        test_dates = [local_to_UTC(month, day) for month, day in test_pairs]
+        test_archives = [MockArchive(date) for date in test_dates]
+
+        dotest(test_archives, 3, [], [6, 5, 2])
+        dotest(test_archives, -1, [], [6, 5, 2, 0])
+        dotest(test_archives, 3, [test_archives[6]], [5, 2, 0])
+        dotest(test_archives, 3, [test_archives[5]], [6, 2, 0])
+        dotest(test_archives, 3, [test_archives[4]], [6, 5, 2])
+        dotest(test_archives, 0, [], [])

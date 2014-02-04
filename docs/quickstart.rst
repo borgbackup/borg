@@ -113,13 +113,20 @@ Key file based encryption
 Remote repositories
 -------------------
 
-|project_name| can initialize and access repositories on remote hosts as the
-host is accessible using SSH and |project_name| is installed.
-
-The following syntax is used to address remote repositories::
+|project_name| can initialize and access repositories on remote hosts if the
+host is accessible using SSH.  This is fastest and easiest when |project_name|
+is installed on the remote host, in which case the following syntax is used::
 
   $ attic init user@hostname:repository.attic
 
 or::
 
   $ attic init ssh://user@hostname:port/repository.attic
+
+If it is not possible to install |project_name| on the remote host, 
+it is still possible to use the remote host to store a repository by
+mounting the remote filesystem, for example, using sshfs::
+
+  $ sshfs user@hostname:/path/to/folder /tmp/mymountpoint
+  $ attic init /tmp/mymountpoint/repository.attic
+  $ fusermount -u /tmp/mymountpoint

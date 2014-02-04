@@ -5,7 +5,7 @@ Installation
 ============
 
 |project_name| requires Python_ 3.2 or above to work. Even though Python 3 is
-not the default Python version on most Linux distributions it is usually
+not the default Python version on most Linux distributions, it is usually
 available as an optional install.
 
 Other dependencies:
@@ -15,6 +15,9 @@ Other dependencies:
 
 The OpenSSL version bundled with Mac OS X and FreeBSD is most likey too old.
 Newer versions are available from homebrew_ on OS X and from FreeBSD ports.
+
+The llfuse_ python package is also required if you wish to mount an
+archive as a FUSE filesystem.
 
 Installing from PyPI using pip
 ------------------------------
@@ -39,5 +42,11 @@ Installing from git
     $ cd attic
     $ python setup.py install
 
-Please not that when installing from git Cython_ is required to generate some files that
+Please note that when installing from git, Cython_ is required to generate some files that
 are normally bundled with the release tarball.
+
+Packages
+--------
+
+|project_name| is also part of the Debian_, Ubuntu_ and `Arch Linux`_
+distributions of GNU/Linux.

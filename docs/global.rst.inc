@@ -13,6 +13,7 @@
 .. _OpenSSL: https://www.openssl.org/
 .. _Python: http://www.python.org/
 .. _`msgpack-python`: https://pypi.python.org/pypi/msgpack-python/
+.. _llfuse: https://pypi.python.org/pypi/llfuse/
 .. _homebrew: http://mxcl.github.io/homebrew/
 .. _issue tracker: https://github.com/jborg/attic/issues
 .. _userspace filesystems: https://en.wikipedia.org/wiki/Filesystem_in_Userspace

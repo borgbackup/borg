@@ -1,13 +1,13 @@
 What is Attic?
 --------------
-Attic is a deduplicating backup program. The main goal of attic is to provide
+Attic is a deduplicating backup program. The main goal of Attic is to provide
 an efficient and secure way to backup data. The data deduplication
-technique used makes Attic suitable for daily backups since only actual changes
+technique used makes Attic suitable for daily backups since only changes
 are stored.
 
 Easy to use
 ~~~~~~~~~~~
-Initialze backup repository and create a backup archive::
+Initialize backup repository and create a backup archive::
 
     $ attic init /usbdrive/my-backup.attic
     $ attic create -v /usbdrive/my-backup.attic::documents ~/Documents
@@ -25,8 +25,8 @@ Optional data encryption
     and authenticity is verified using HMAC-SHA256.
 
 Off-site backups
-    attic can store data on any remote host accessible over SSH as long as
-    attic is installed.
+    Attic can store data on any remote host accessible over SSH.  This is
+    most efficient if Attic is also installed on the remote host.
 
 Backups mountable as filesystems
     Backup archives are mountable as userspace filesystems for easy backup
@@ -34,8 +34,9 @@ Backups mountable as filesystems
 
 What do I need?
 ---------------
-Attic requires Python 3.2 or above to work. Besides Python attic also requires 
+Attic requires Python 3.2 or above to work. Besides Python, Attic also requires 
 msgpack-python and sufficiently recent OpenSSL (>= 1.0.0).
+In order to mount archives as filesystems, llfuse is required.
 
 How do I install it?
 --------------------
@@ -45,8 +46,8 @@ How do I install it?
 
 Where are the docs?
 -------------------
-Go to https://pythonhosted.org/Attic/ for a prebuilt version of the docs. You
-can also build them yourself form the docs folder.
+Go to https://pythonhosted.org/Attic/ for a prebuilt version of the documentation.
+You can also build it yourself from the docs folder.
 
 Where are the tests?
 --------------------

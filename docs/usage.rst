@@ -40,21 +40,21 @@ Examples
 
 This command creates a backup archive containing all files found while
 recursively traversing all paths specified. The archive will consume almost
-no disk space for files or parts of files that has already been archived by
+no disk space for files or parts of files that have already been stored in
 other archives.
 
 Examples
 ~~~~~~~~
 ::
 
-    # Backups ~/Documents into an archive named "my-documents"
+    # Backup ~/Documents into an archive named "my-documents"
     $ attic create /data/myrepo.attic::my-documents ~/Documents
 
     # Backup ~/Documents and ~/src but exclude pyc files
     $ attic create /data/myrepo.attic::my-files   \
         ~/Documents                               \
         ~/src                                     \
-        --exclude *.pyc
+        --exclude '*.pyc'
 
     # Backup the root filesystem into an archive named "root-YYYY-MM-DD"
     NAME="root-`date +%Y-%m-%d`"
@@ -82,7 +82,7 @@ Examples
     $ attic extract /data/myrepo::my-files home/USERNAME/src
 
     # Extract the "src" directory but exclude object files
-    $ attic extract /data/myrepo::my-files home/USERNAME/src --exclude *.o
+    $ attic extract /data/myrepo::my-files home/USERNAME/src --exclude '*.o'
 
 
 .. include:: usage/verify.rst.inc
@@ -126,7 +126,7 @@ Examples
 .. include:: usage/prune.rst.inc
 
 The ``prune`` command prunes a repository by deleting archives not matching
-any of the specified retention options specified. This command is normally
+any of the specified retention options. This command is normally
 used by automated backup scripts wanting to keep a certain number of historic
 backups. 
 
@@ -134,11 +134,15 @@ Examples
 ~~~~~~~~
 ::
 
-    # Keep 7 end of day and 4 end of week archives
+    # Keep 7 end of day and 4 additional end of week archives
     $ attic prune /data/myrepo --daily=7 --weekly=4
 
     # Same as above but only apply to archive names starting with "foo"
     $ attic prune /data/myrepo --daily=7 --weekly=4 --prefix=foo
+
+    # Keep 7 end of day, 4 additional end of week archives, and an
+    # end of month archive for every month:
+    $ attic prune /data/myrepo --daily=7 --weekly=4 --monthly=-1
 
 
 .. include:: usage/info.rst.inc

@@ -294,9 +294,6 @@ class Repository(object):
         except KeyError:
             raise self.DoesNotExist(self.path)
 
-    def add_callback(self, cb, data):
-        cb(None, None, data)
-
     def preload(self, ids):
         """Preload objects (only applies to remote repositories
         """

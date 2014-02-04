@@ -3,6 +3,14 @@ Attic Changelog
 
 Here you can see the full list of changes between each Attic release.
 
+Version 0.11
+------------
+
+(feature release, released on X)
+
+- New "check" command for repository consistency checking (#24)
+- Documentation improvements
+
 Version 0.10
 ------------
 

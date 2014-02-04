@@ -205,12 +205,14 @@ class ArchiverTestCase(AtticTestCase):
         self.attic('init', self.repository_location)
         self.create_src_archive('test')
         self.attic('verify', self.repository_location + '::test')
+        self.attic('check', self.repository_location)
         name = sorted(os.listdir(os.path.join(self.tmpdir, 'repository', 'data', '0')), reverse=True)[0]
         fd = open(os.path.join(self.tmpdir, 'repository', 'data', '0', name), 'r+')
         fd.seek(100)
         fd.write('XXXX')
         fd.close()
         self.attic('verify', self.repository_location + '::test', exit_code=1)
+        self.attic('check', self.repository_location, exit_code=1)
 
     def test_readonly_repository(self):
         self.attic('init', self.repository_location)

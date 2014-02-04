@@ -102,7 +102,55 @@ class RepositoryTestCase(AtticTestCase):
         self.repository.commit()
 
 
+class RepositoryCheckTestCase(AtticTestCase):
+
+    def open(self, create=False):
+        return Repository(os.path.join(self.tmppath, 'repository'), create=create)
+
+    def setUp(self):
+        self.tmppath = tempfile.mkdtemp()
+        self.repository = self.open(create=True)
+
+    def tearDown(self):
+        self.repository.close()
+        shutil.rmtree(self.tmppath)
+
+    def add_objects(self, ids):
+        for id_ in ids:
+            self.repository.put(('%032d' % id_).encode('ascii'), b'data')
+        self.repository.commit()
+
+    def open_index(self):
+        head = sorted(int(n[6:]) for n in os.listdir(os.path.join(self.tmppath, 'repository')) if n.startswith('index') and n[6:].isdigit())[0]
+        return NSIndex(os.path.join(self.tmppath, 'repository', 'index.{}'.format(head)))
+
+    def corrupt_object(self, id_):
+        idx = self.open_index()
+        segment, offset = idx[('%032d' % id_).encode('ascii')]
+        with open(os.path.join(self.tmppath, 'repository', 'data', '0', str(segment)), 'r+b') as fd:
+            fd.seek(offset)
+            fd.write(b'BOOM')
+
+    def list_objects(self):
+        return set((int(key) for key, _ in list(self.open_index().iteritems())))
+
+    def test_check(self):
+        self.add_objects([1, 2, 3])
+        self.add_objects([4, 5, 6])
+        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
+        self.assert_equal(True, self.repository.check())
+        self.corrupt_object(5)
+        self.assert_equal(False, self.repository.check())
+        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
+
+
 class RemoteRepositoryTestCase(RepositoryTestCase):
+
+    def open(self, create=False):
+        return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')), create=create)
+
+
+class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
 
     def open(self, create=False):
         return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')), create=create)

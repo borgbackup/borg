@@ -93,6 +93,12 @@ not corrupt. |project_name| will not compare the the archived files with the
 files on disk.
 
 
+.. include:: usage/check.rst.inc
+
+The check command verifies the consistency of a repository. Any inconsistencies
+found are reported to the standard error stream and the command will have a
+non zero exit code.
+
 .. include:: usage/delete.rst.inc
 
 This command deletes an archive from the repository. Any disk space not

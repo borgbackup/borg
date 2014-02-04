@@ -107,11 +107,13 @@ cdef class NSIndex(IndexBase):
 
     def iteritems(self, marker=None, limit=0):
         iter = NSKeyIterator()
+        iter.idx = self
         iter.index = self.index
         return iter
 
 
 cdef class NSKeyIterator:
+    cdef NSIndex idx
     cdef HashIndex *index
     cdef char *key
 
@@ -156,11 +158,13 @@ cdef class ChunkIndex(IndexBase):
 
     def iteritems(self, marker=None, limit=0):
         iter = ChunkKeyIterator()
+        iter.idx = self
         iter.index = self.index
         return iter
 
 
 cdef class ChunkKeyIterator:
+    cdef ChunkIndex idx
     cdef HashIndex *index
     cdef char *key
 

@@ -13,7 +13,7 @@ from attic.cache import Cache
 from attic.key import key_creator
 from attic.helpers import Error, location_validator, format_time, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
-    get_cache_dir, get_keys_dir, format_timedelta, prune_split, Manifest, remove_surrogates
+    get_cache_dir, get_keys_dir, format_timedelta, prune_split, Manifest, remove_surrogates, is_a_terminal
 from attic.remote import RepositoryServer, RemoteRepository
 
 
@@ -57,6 +57,17 @@ class Archiver:
         manifest.key = key
         manifest.write()
         repository.commit()
+        return self.exit_code
+
+    def do_check(self, args):
+        """Check repository consistency
+        """
+        repository = self.open_repository(args.repository)
+        if args.progress is None:
+            args.progress = is_a_terminal(sys.stdout) or args.verbose
+        if not repository.check(progress=args.progress):
+            if args.progress:
+                print('No problems found', file=sys.stderr)
         return self.exit_code
 
     def do_change_passphrase(self, args):
@@ -359,6 +370,24 @@ class Archiver:
         subparser.add_argument('-e', '--encryption', dest='encryption',
                                choices=('none', 'passphrase', 'keyfile'), default='none',
                                help='select encryption method')
+
+        check_epilog = """
+        Progress status will be reported on the standard output stream by default when
+        it is attached to a terminal. Any problems found are printed to the standard error
+        stream and the command will have a non zero exit code.
+        """
+        subparser = subparsers.add_parser('check', parents=[common_parser],
+                                          description=self.do_check.__doc__,
+                                          epilog=check_epilog)
+        subparser.set_defaults(func=self.do_check)
+        subparser.add_argument('repository', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repository to check consistency of')
+        subparser.add_argument('--progress', dest='progress', action='store_true',
+                               default=None,
+                               help='Report progress status to standard output stream')
+        subparser.add_argument('--no-progress', dest='progress', action='store_false',
+                               help='Disable progress reporting')
 
         subparser = subparsers.add_parser('change-passphrase', parents=[common_parser],
                                           description=self.do_change_passphrase.__doc__)

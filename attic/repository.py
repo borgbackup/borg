@@ -213,7 +213,7 @@ class Repository(object):
             if error:
                 error_found = True
             if error or progress:
-                print(msg, file=sys.stderr, flush=True)
+                print(msg, file=sys.stderr)
         seen = set()
         for segment, filename in self.io._segment_names():
             if progress:

@@ -66,8 +66,7 @@ class Archiver:
         if args.progress is None:
             args.progress = is_a_terminal(sys.stdout) or args.verbose
         if not repository.check(progress=args.progress):
-            if args.progress:
-                print('No problems found', file=sys.stderr)
+            self.exit_code = 1
         return self.exit_code
 
     def do_change_passphrase(self, args):
@@ -372,7 +371,7 @@ class Archiver:
                                help='select encryption method')
 
         check_epilog = """
-        Progress status will be reported on the standard output stream by default when
+        Progress status will be reported on the standard error stream by default when
         it is attached to a terminal. Any problems found are printed to the standard error
         stream and the command will have a non zero exit code.
         """

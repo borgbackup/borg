@@ -6,6 +6,7 @@ import re
 import shutil
 import struct
 import sys
+import time
 from zlib import crc32
 
 from .hashindex import NSIndex
@@ -205,33 +206,40 @@ class Repository(object):
         This method verifies all segment checksums and makes sure
         the index is consistent with the data stored in the segments.
         """
+        progress_time = None
         error_found = False
-        def report_error(msg):
+        def report_progress(msg, error=False):
             nonlocal error_found
-            error_found = True
-            print(msg, file=sys.stderr)
+            if error:
+                error_found = True
+            if error or progress:
+                print(msg, file=sys.stderr, flush=True)
         seen = set()
         for segment, filename in self.io._segment_names():
             if progress:
-                print('Checking segment {}/{}'.format(segment, self.io.head))
+                if int(time.time()) != progress_time:
+                    progress_time = int(time.time())
+                    report_progress('Checking segment {}/{}'.format(segment, self.io.head))
             try:
                 objects = list(self.io.iter_objects(segment))
             except (IntegrityError, struct.error):
-                report_error('Error reading segment {}'.format(segment))
+                report_progress('Error reading segment {}'.format(segment), error=True)
                 objects = []
             for tag, key, offset in objects:
                 if tag == TAG_PUT:
                     if key in seen:
-                        report_error('Key found in more than one segment. Segment={}, key={}'.format(segment, hexlify(key)))
+                        report_progress('Key found in more than one segment. Segment={}, key={}'.format(segment, hexlify(key)), error=True)
                     seen.add(key)
                     if self.index.get(key, (0, 0)) != (segment, offset):
-                        report_error('Index vs segment header mismatch. Segment={}, key={}'.format(segment, hexlify(key)))
+                        report_progress('Index vs segment header mismatch. Segment={}, key={}'.format(segment, hexlify(key)), error=True)
                 elif tag == TAG_COMMIT:
                     continue
                 else:
                     raise self.RepositoryCheckFailed(self.path, 'Unexpected tag {} in segment {}'.format(tag, segment))
         if len(self.index) != len(seen):
-            report_error('Index object count mismatch. {} != {}'.format(len(self.index), len(seen)))
+            report_progress('Index object count mismatch. {} != {}'.format(len(self.index), len(seen)), error=True)
+        if not error_found:
+            report_progress('Check complete, no errors found.')
         return not error_found
 
     def rollback(self):

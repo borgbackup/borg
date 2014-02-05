@@ -42,6 +42,9 @@ class Repository(object):
     class InvalidRepository(Error):
         """{} is not a valid repository"""
 
+    class CheckNeeded(Error):
+        '''Inconsistency detected. Please "run attic check {}"'''
+
 
     def __init__(self, path, create=False):
         self.path = path
@@ -90,7 +93,9 @@ class Repository(object):
 
     def close(self):
         if self.lock:
-            self.rollback()
+            if self.io:
+                self.io.close()
+            self.io = None
             self.lock.release()
             self.lock = None
 
@@ -235,7 +240,7 @@ class Repository(object):
                 elif tag == TAG_COMMIT:
                     continue
                 else:
-                    raise self.RepositoryCheckFailed(self.path, 'Unexpected tag {} in segment {}'.format(tag, segment))
+                    report_progress('Unexpected tag {} in segment {}'.format(tag, segment), error=True)
         if len(self.index) != len(seen):
             report_progress('Index object count mismatch. {} != {}'.format(len(self.index), len(seen)), error=True)
         if not error_found:
@@ -350,15 +355,23 @@ class LoggedIO(object):
         """
         self.head = None
         self.segment = 0
-        # FIXME: Only delete segments if we're sure there's at least
-        # one complete segment somewhere
+        to_delete = []
         for segment, filename in self._segment_names(reverse=True):
             if self.is_complete_segment(filename):
                 self.head = segment
                 self.segment = self.head + 1
-                return
+                for filename in to_delete:
+                    os.unlink(filename)
+                break
             else:
-                os.unlink(filename)
+                to_delete.append(filename)
+        else:
+            # Abort if no transaction is found, otherwise all segments
+            # would be deleted
+            if to_delete:
+                raise Repository.CheckNeeded(self.path)
+
+
 
     def is_complete_segment(self, filename):
         with open(filename, 'rb') as fd:

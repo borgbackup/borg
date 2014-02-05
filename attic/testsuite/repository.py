@@ -107,6 +107,11 @@ class RepositoryCheckTestCase(AtticTestCase):
     def open(self, create=False):
         return Repository(os.path.join(self.tmppath, 'repository'), create=create)
 
+    def reopen(self):
+        if self.repository:
+            self.repository.close()
+        self.repository = self.open()
+
     def setUp(self):
         self.tmppath = tempfile.mkdtemp()
         self.repository = self.open(create=True)
@@ -120,9 +125,11 @@ class RepositoryCheckTestCase(AtticTestCase):
             self.repository.put(('%032d' % id_).encode('ascii'), b'data')
         self.repository.commit()
 
+    def get_head(self):
+        return sorted(int(n) for n in os.listdir(os.path.join(self.tmppath, 'repository', 'data', '0')))[-1]
+
     def open_index(self):
-        head = sorted(int(n[6:]) for n in os.listdir(os.path.join(self.tmppath, 'repository')) if n.startswith('index') and n[6:].isdigit())[0]
-        return NSIndex(os.path.join(self.tmppath, 'repository', 'index.{}'.format(head)))
+        return NSIndex(os.path.join(self.tmppath, 'repository', 'index.{}'.format(self.get_head())))
 
     def corrupt_object(self, id_):
         idx = self.open_index()
@@ -140,9 +147,16 @@ class RepositoryCheckTestCase(AtticTestCase):
         self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
         self.assert_equal(True, self.repository.check())
         self.corrupt_object(5)
+        self.reopen()
         self.assert_equal(False, self.repository.check())
         self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
 
+    def test_check_missing_or_corrupt_commit_tag(self):
+        self.add_objects([1, 2, 3])
+        self.assert_equal(set([1, 2, 3]), self.list_objects())
+        with open(os.path.join(self.tmppath, 'repository', 'data', '0', str(self.get_head())), 'ab') as fd:
+            fd.write(b'X')
+        self.assert_raises(Repository.CheckNeeded, self.reopen)
 
 class RemoteRepositoryTestCase(RepositoryTestCase):
 

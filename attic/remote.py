@@ -132,6 +132,8 @@ class RemoteRepository(object):
                             raise Repository.DoesNotExist(self.location.orig)
                         elif error == b'AlreadyExists':
                             raise Repository.AlreadyExists(self.location.orig)
+                        elif error == b'CheckNeeded':
+                            raise Repository.CheckNeeded(self.location.orig)
                         raise self.RPCError(error)
                     else:
                         yield res

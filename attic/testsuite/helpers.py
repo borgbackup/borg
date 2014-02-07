@@ -66,6 +66,7 @@ class PatternTestCase(AtticTestCase):
         self.assert_equal(self.evaluate(['/'], ['/home/']),
                           ['/etc/passwd', '/etc/hosts', '/home', '/var/log/messages', '/var/log/dmesg'])
         self.assert_equal(self.evaluate(['/home/u'], []), [])
+        self.assert_equal(self.evaluate(['/', '/home', '/etc/hosts'], ['/']), [])
         self.assert_equal(self.evaluate(['/home/'], ['/home/user2']), 
                           ['/home', '/home/user/.profile', '/home/user/.bashrc'])
         self.assert_equal(self.evaluate(['/'], ['*.profile', '/var/log']),

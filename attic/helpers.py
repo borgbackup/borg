@@ -158,6 +158,12 @@ def exclude_path(path, patterns):
     return False
 
 
+# For both IncludePattern and ExcludePattern, we require that
+# the pattern either match the whole path or an initial segment
+# of the path up to but not including a path separator.  To
+# unify the two cases, we add a path separator to the end of
+# the path before matching.
+
 class IncludePattern:
     """Literal files or directories listed on the command line
     for some operations (e.g. extract, but create).
@@ -179,19 +185,16 @@ class ExcludePattern(IncludePattern):
     exclude the contents of a directory, but not the directory itself.
     """
     def __init__(self, pattern):
-        self.pattern = pattern
+        if pattern.endswith(os.path.sep):
+            self.pattern = pattern+'*'+os.path.sep
+        else:
+            self.pattern = pattern+os.path.sep+'*'
         # fnmatch and re.match both cache compiled regular expressions.
         # Nevertheless, this is about 10 times faster.
-        if pattern.endswith(os.path.sep):
-            regex = translate(pattern+'*')
-        else:
-            regex1 = translate(pattern)
-            regex2 = translate(pattern+os.path.sep+'*')
-            regex = '(' + regex1 + ')|(' + regex2 + ')'
-        self.regobj = re.compile(regex)
+        self.regex = re.compile(translate(self.pattern))
 
     def match(self, path):
-        return self.regobj.match(path) is not None
+        return self.regex.match(path+os.path.sep) is not None
 
     def __repr__(self):
         return '%s(%s)' % (type(self), self.pattern)

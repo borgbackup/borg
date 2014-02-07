@@ -166,7 +166,7 @@ def exclude_path(path, patterns):
 
 class IncludePattern:
     """Literal files or directories listed on the command line
-    for some operations (e.g. extract, but create).
+    for some operations (e.g. extract, but not create).
     If a directory is specified, all paths that start with that
     path match as well.  A trailing slash makes no difference.
     """

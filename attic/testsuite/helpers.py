@@ -50,7 +50,7 @@ class FormatTimedeltaTestCase(AtticTestCase):
 class PatternTestCase(AtticTestCase):
 
     files = [
-        '/etc/passwd', '/etc/hosts',
+        '/etc/passwd', '/etc/hosts', '/home',
         '/home/user/.profile', '/home/user/.bashrc',
         '/home/user2/.profile', '/home/user2/public_html/index.html',
         '/var/log/messages', '/var/log/dmesg',
@@ -63,11 +63,16 @@ class PatternTestCase(AtticTestCase):
     def test(self):
         self.assert_equal(self.evaluate(['/'], ['/home']),
                           ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg'])
+        self.assert_equal(self.evaluate(['/'], ['/home/']),
+                          ['/etc/passwd', '/etc/hosts', '/home', '/var/log/messages', '/var/log/dmesg'])
+        self.assert_equal(self.evaluate(['/home/u'], []), [])
+        self.assert_equal(self.evaluate(['/home/'], ['/home/user2']), 
+                          ['/home', '/home/user/.profile', '/home/user/.bashrc'])
         self.assert_equal(self.evaluate(['/'], ['*.profile', '/var/log']),
-                          ['/etc/passwd', '/etc/hosts', '/home/user/.bashrc', '/home/user2/public_html/index.html'])
+                          ['/etc/passwd', '/etc/hosts', '/home', '/home/user/.bashrc', '/home/user2/public_html/index.html'])
         self.assert_equal(self.evaluate(['/'], ['/home/*/public_html', '*.profile', '*/log/*']),
-                          ['/etc/passwd', '/etc/hosts', '/home/user/.bashrc'])
-        self.assert_equal(self.evaluate(['/etc', '/var'], ['dmesg']),
+                          ['/etc/passwd', '/etc/hosts', '/home', '/home/user/.bashrc'])
+        self.assert_equal(self.evaluate(['/etc/', '/var'], ['dmesg']),
                           ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg'])
 
 

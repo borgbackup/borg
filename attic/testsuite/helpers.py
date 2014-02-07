@@ -61,6 +61,9 @@ class PatternTestCase(AtticTestCase):
         return [path for path in self.files if not exclude_path(path, patterns)]
 
     def test(self):
+        self.assert_equal(self.evaluate(['/'], []), self.files)
+        self.assert_equal(self.evaluate([], []), self.files)
+        self.assert_equal(self.evaluate(['/'], ['/h']), self.files)
         self.assert_equal(self.evaluate(['/'], ['/home']),
                           ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg'])
         self.assert_equal(self.evaluate(['/'], ['/home/']),

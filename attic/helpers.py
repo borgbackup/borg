@@ -165,11 +165,10 @@ class IncludePattern:
     path match as well.  A trailing slash makes no difference.
     """
     def __init__(self, pattern):
-        self.pattern = pattern.rstrip(os.path.sep)
+        self.pattern = pattern.rstrip(os.path.sep)+os.path.sep
 
     def match(self, path):
-        return (path == self.pattern
-                or path.startswith(self.pattern+os.path.sep))
+        return (path+os.path.sep).startswith(self.pattern)
 
     def __repr__(self):
         return '%s(%s)' % (type(self), self.pattern)

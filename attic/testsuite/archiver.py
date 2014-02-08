@@ -263,6 +263,7 @@ class ArchiverTestCase(AtticTestCase):
 
         def verify_uniqueness():
             repository = Repository(self.repository_path)
+            repository.open_index(repository.io.head)
             for key, _ in repository.index.iteritems():
                 data = repository.get(key)
                 hash = sha256(data).digest()

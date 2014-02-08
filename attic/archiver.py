@@ -376,6 +376,7 @@ class Archiver:
             # FIXME:  If topic is one of the regular commands, show that help.
             # Otherwise, show the default global help.
             print('No help available on %s' % (args.topic,))
+        return self.exit_code
 
     def run(self, args=None):
         keys_dir = get_keys_dir()

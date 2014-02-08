@@ -339,6 +339,44 @@ class Archiver:
             archive.delete(cache)
         return self.exit_code
 
+    helptext = {}
+    helptext['patterns'] = '''
+        Exclude patterns use a variant of shell pattern syntax, with '*' matching any
+        number of characters, '?' matching any single character, '[...]' matching any
+        single character specified, including ranges, and '[!...]' matching any
+        character not specified.  For the purpose of these patterns, the path
+        separator ('\' for Windows and '/' on other systems) is not treated
+        specially.  For a path to match a pattern, it must completely match from
+        start to end, or must match from the start to just before a path separator.
+        Except for the root path, paths will never end in the path separator when
+        matching is attempted.  Thus, if a given pattern ends in a path separator, a
+        '*' is appended before matching is attempted.  Patterns with wildcards should
+        be quoted to protect them from shell expansion.
+        
+        Examples:
+        
+        # Exclude '/home/user/file.o' but not '/home/user/file.odt':
+        $ attic create -e '*.o' repo.attic /
+        
+        # Exclude '/home/user/junk' and '/home/user/subdir/junk' but
+        # not '/home/user/importantjunk' or '/etc/junk':
+        $ attic create -e '/home/*/junk' repo.attic /
+        
+        # Exclude the contents of '/home/user/cache' but not the directory itself:
+        $ attic create -e /home/user/cache/ repo.attic /
+        
+        # The file '/home/user/cache/important' is *not* backed up:
+        $ attic create -e /home/user/cache/ repo.attic / /home/user/cache/important
+        '''
+
+    def do_help(self, args):
+        if args.topic in self.helptext:
+            print(self.helptext[args.topic])
+        else:
+            # FIXME:  If topic is one of the regular commands, show that help.
+            # Otherwise, show the default global help.
+            print('No help available on %s' % (args.topic,))
+
     def run(self, args=None):
         keys_dir = get_keys_dir()
         if not os.path.exists(keys_dir):
@@ -353,7 +391,7 @@ class Archiver:
                             default=False,
                             help='verbose output')
 
-        # We can't use argpase for "serve" since we don't want it to show up in "Available commands"
+        # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
         if args and args[0] == 'serve':
             return self.do_serve()
 
@@ -394,8 +432,11 @@ class Archiver:
         subparser.add_argument('repository', metavar='REPOSITORY',
                                type=location_validator(archive=False))
 
+        create_epilog = '''See "attic help patterns" for more help on exclude patterns.'''
+
         subparser = subparsers.add_parser('create', parents=[common_parser],
-                                          description=self.do_create.__doc__)
+                                          description=self.do_create.__doc__,
+                                          epilog=create_epilog)
         subparser.set_defaults(func=self.do_create)
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
@@ -418,8 +459,11 @@ class Archiver:
         subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
                                help='paths to archive')
 
+        extract_epilog = '''See "attic help patterns" for more help on exclude patterns.'''
+
         subparser = subparsers.add_parser('extract', parents=[common_parser],
-                                          description=self.do_extract.__doc__)
+                                          description=self.do_extract.__doc__,
+                                          epilog=extract_epilog)
         subparser.set_defaults(func=self.do_extract)
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
@@ -459,8 +503,11 @@ class Archiver:
         subparser.add_argument('-o', dest='options', type=str,
                                help='Extra mount options')
 
+        verify_epilog = '''See "attic help patterns" for more help on exclude patterns.'''
+
         subparser = subparsers.add_parser('verify', parents=[common_parser],
-                                          description=self.do_verify.__doc__)
+                                          description=self.do_verify.__doc__,
+                                          epilog=verify_epilog)
         subparser.set_defaults(func=self.do_verify)
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
@@ -510,6 +557,13 @@ class Archiver:
         subparser.add_argument('repository', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to prune')
+
+        subparser = subparsers.add_parser('help', parents=[common_parser],
+                                          description='Extra help')
+        subparser.set_defaults(func=self.do_help)
+        subparser.add_argument('topic', metavar='TOPIC', type=str,
+                               help='additional help on TOPIC')
+
         args = parser.parse_args(args or ['-h'])
         self.verbose = args.verbose
         return args.func(args)

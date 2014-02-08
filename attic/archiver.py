@@ -13,7 +13,8 @@ from attic.cache import Cache
 from attic.key import key_creator
 from attic.helpers import Error, location_validator, format_time, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
-    get_cache_dir, get_keys_dir, format_timedelta, prune_split, Manifest, remove_surrogates, is_a_terminal
+    get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
+    Manifest, remove_surrogates, is_a_terminal
 from attic.remote import RepositoryServer, RemoteRepository
 
 
@@ -311,15 +312,17 @@ class Archiver:
         cache = Cache(repository, key, manifest)
         archives = list(sorted(Archive.list_archives(repository, key, manifest, cache),
                                key=attrgetter('ts'), reverse=True))
-        if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0:
-            self.print_error('At least one of the "hourly", "daily", "weekly", "monthly" or "yearly" '
+        if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0 and args.within is None:
+            self.print_error('At least one of the "within", "hourly", "daily", "weekly", "monthly" or "yearly" '
                              'settings must be specified')
             return 1
         if args.prefix:
             archives = [archive for archive in archives if archive.name.startswith(args.prefix)]
         keep = []
+        if args.within:
+            keep += prune_within(archives, args.within)
         if args.hourly:
-            keep += prune_split(archives, '%Y-%m-%d %H', args.hourly)
+            keep += prune_split(archives, '%Y-%m-%d %H', args.hourly, keep)
         if args.daily:
             keep += prune_split(archives, '%Y-%m-%d', args.daily, keep)
         if args.weekly:
@@ -486,7 +489,12 @@ class Archiver:
         are applied from hourly to yearly, and backups selected by previous rules do
         not count towards those of later rules. Dates and times are interpreted in
         the local timezone, and weeks go from Monday to Sunday. Specifying a
-        negative number of archives to keep means that there is no limit. If a
+        negative number of archives to keep means that there is no limit.
+        The "--within" option takes an argument of the form "<int><char>",
+        where char is "H", "d", "w", "m", "y". For example, "--within 2d" means
+        to keep all archives that were created within the past 48 hours.
+        "1m" is taken to mean "31d". The archives kept with this option do not
+        count towards the totals specified by any other options. If a
         prefix is set with -p, then only archives that start with the prefix are
         considered for deletion and only those archives count towards the totals
         specified by the rules.'''
@@ -495,6 +503,8 @@ class Archiver:
                                           description=self.do_prune.__doc__,
                                           epilog=prune_epilog)
         subparser.set_defaults(func=self.do_prune)
+        subparser.add_argument('--within', dest='within', type=str, metavar='WITHIN',
+                               help='keep all archives within this time interval')
         subparser.add_argument('-H', '--hourly', dest='hourly', type=int, default=0,
                                help='number of hourly archives to keep')
         subparser.add_argument('-d', '--daily', dest='daily', type=int, default=0,

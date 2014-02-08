@@ -8,7 +8,7 @@ import re
 import stat
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from operator import attrgetter
 import fcntl
@@ -89,6 +89,19 @@ class Manifest:
         })
         self.id = self.key.id_hash(data)
         self.repository.put(self.MANIFEST_ID, self.key.encrypt(data))
+
+
+def prune_within(archives, within):
+    multiplier = {'H': 1, 'd': 24, 'w': 24*7, 'm': 24*31, 'y': 24*365}
+    try:
+        hours = int(within[:-1]) * multiplier[within[-1]]
+    except (KeyError, ValueError):
+        # I don't like how this displays the original exception too:
+        raise argparse.ArgumentTypeError('Unable to parse --within option: "%s"' % within)
+    if hours <= 0:
+        raise argparse.ArgumentTypeError('Number specified using --within option must be positive')
+    target = datetime.now(timezone.utc) - timedelta(seconds=hours*60*60)
+    return [a for a in archives if a.ts > target]
 
 
 def prune_split(archives, pattern, n, skip=[]):

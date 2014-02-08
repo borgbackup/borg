@@ -9,7 +9,7 @@ import stat
 import sys
 import time
 from datetime import datetime, timezone
-from fnmatch import fnmatchcase
+from fnmatch import translate
 from operator import attrgetter
 import fcntl
 
@@ -150,7 +150,7 @@ def adjust_patterns(paths, excludes):
 
 def exclude_path(path, patterns):
     """Used by create and extract sub-commands to determine
-    if an item should be processed or not
+    whether or not an item should be processed.
     """
     for pattern in (patterns or []):
         if pattern.match(path):
@@ -158,32 +158,43 @@ def exclude_path(path, patterns):
     return False
 
 
+# For both IncludePattern and ExcludePattern, we require that
+# the pattern either match the whole path or an initial segment
+# of the path up to but not including a path separator.  To
+# unify the two cases, we add a path separator to the end of
+# the path before matching.
+
 class IncludePattern:
-    """--include PATTERN
+    """Literal files or directories listed on the command line
+    for some operations (e.g. extract, but not create).
+    If a directory is specified, all paths that start with that
+    path match as well.  A trailing slash makes no difference.
     """
     def __init__(self, pattern):
-        self.pattern = pattern
+        self.pattern = pattern.rstrip(os.path.sep)+os.path.sep
 
     def match(self, path):
-        dir, name = os.path.split(path)
-        return (path == self.pattern
-                or (dir + os.path.sep).startswith(self.pattern))
+        return (path+os.path.sep).startswith(self.pattern)
 
     def __repr__(self):
         return '%s(%s)' % (type(self), self.pattern)
 
 
 class ExcludePattern(IncludePattern):
-    """
+    """Shell glob patterns to exclude.  A trailing slash means to
+    exclude the contents of a directory, but not the directory itself.
     """
     def __init__(self, pattern):
-        self.pattern = self.dirpattern = pattern
-        if not pattern.endswith('/'):
-            self.dirpattern += '/*'
+        if pattern.endswith(os.path.sep):
+            self.pattern = pattern+'*'+os.path.sep
+        else:
+            self.pattern = pattern+os.path.sep+'*'
+        # fnmatch and re.match both cache compiled regular expressions.
+        # Nevertheless, this is about 10 times faster.
+        self.regex = re.compile(translate(self.pattern))
 
     def match(self, path):
-        dir, name = os.path.split(path)
-        return fnmatchcase(path, self.pattern) or fnmatchcase(dir + '/', self.dirpattern)
+        return self.regex.match(path+os.path.sep) is not None
 
     def __repr__(self):
         return '%s(%s)' % (type(self), self.pattern)

@@ -345,7 +345,7 @@ class Archiver:
         number of characters, '?' matching any single character, '[...]' matching any
         single character specified, including ranges, and '[!...]' matching any
         character not specified.  For the purpose of these patterns, the path
-        separator ('\' for Windows and '/' on other systems) is not treated
+        separator ('\\' for Windows and '/' on other systems) is not treated
         specially.  For a path to match a pattern, it must completely match from
         start to end, or must match from the start to just before a path separator.
         Except for the root path, paths will never end in the path separator when

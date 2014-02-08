@@ -66,7 +66,7 @@ class Archiver:
         repository = self.open_repository(args.repository)
         if args.progress is None:
             args.progress = is_a_terminal(sys.stdout) or args.verbose
-        if not repository.check(progress=args.progress):
+        if not repository.check(progress=args.progress, repair=args.repair):
             self.exit_code = 1
         return self.exit_code
 
@@ -390,6 +390,9 @@ class Archiver:
                                help='Report progress status to standard output stream')
         subparser.add_argument('--no-progress', dest='progress', action='store_false',
                                help='Disable progress reporting')
+        subparser.add_argument('--repair', dest='repair', action='store_true',
+                               default=False,
+                               help='Attempt to repair any inconsistencies found')
 
         subparser = subparsers.add_parser('change-passphrase', parents=[common_parser],
                                           description=self.do_change_passphrase.__doc__)

@@ -205,7 +205,7 @@ class ArchiverTestCase(AtticTestCase):
         self.attic('delete', self.repository_location + '::test.2')
         # Make sure all data except the manifest has been deleted
         repository = Repository(self.repository_path)
-        self.assert_equal(repository._len(), 1)
+        self.assert_equal(len(repository), 1)
 
     def test_corrupted_repository(self):
         self.attic('init', self.repository_location)
@@ -269,8 +269,7 @@ class ArchiverTestCase(AtticTestCase):
 
         def verify_uniqueness():
             repository = Repository(self.repository_path)
-            repository.open_index(repository.io.head)
-            for key, _ in repository.index.iteritems():
+            for key, _ in repository.get_read_only_index(repository.get_transaction_id()).iteritems():
                 data = repository.get(key)
                 hash = sha256(data).digest()
                 if not hash in seen:

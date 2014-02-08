@@ -141,6 +141,19 @@ def to_localtime(ts):
     return datetime(*time.localtime((ts - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds())[:6])
 
 
+def update_excludes(args):
+    """Merge exclude patterns from files with those on command line.
+    Empty lines and lines starting with '#' are ignored, but whitespace
+    is not stripped."""
+    if hasattr(args, 'exclude_files') and args.exclude_files:
+        if not hasattr(args, 'excludes') or args.excludes is None:
+            args.excludes = []
+        for file in args.exclude_files:
+            patterns = [line.rstrip('\r\n') for line in file if not line.startswith('#')]
+            args.excludes += [ExcludePattern(pattern) for pattern in patterns if pattern]
+            file.close()
+
+
 def adjust_patterns(paths, excludes):
     if paths:
         return (excludes or []) + [IncludePattern(path) for path in paths] + [ExcludePattern('*')]

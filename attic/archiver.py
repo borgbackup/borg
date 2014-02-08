@@ -13,7 +13,8 @@ from attic.cache import Cache
 from attic.key import key_creator
 from attic.helpers import Error, location_validator, format_time, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
-    get_cache_dir, get_keys_dir, format_timedelta, prune_split, Manifest, remove_surrogates, is_a_terminal
+    get_cache_dir, get_keys_dir, format_timedelta, prune_split, Manifest, remove_surrogates, \
+    is_a_terminal, update_excludes
 from attic.remote import RepositoryServer, RemoteRepository
 
 
@@ -403,6 +404,9 @@ class Archiver:
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
+        subparser.add_argument('--exclude-from', dest='exclude_files',
+                               type=argparse.FileType('r'), action='append',
+                               metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                type=int, default=300, metavar='SECONDS',
                                help='write checkpoint every SECONDS seconds (Default: 300)')
@@ -424,6 +428,9 @@ class Archiver:
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
+        subparser.add_argument('--exclude-from', dest='exclude_files',
+                               type=argparse.FileType('r'), action='append',
+                               metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,
                                help='only obey numeric user and group identifiers')
@@ -465,6 +472,9 @@ class Archiver:
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
+        subparser.add_argument('--exclude-from', dest='exclude_files',
+                               type=argparse.FileType('r'), action='append',
+                               metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to verity integrity of')
@@ -512,6 +522,7 @@ class Archiver:
                                help='repository to prune')
         args = parser.parse_args(args or ['-h'])
         self.verbose = args.verbose
+        update_excludes(args)
         return args.func(args)
 
 

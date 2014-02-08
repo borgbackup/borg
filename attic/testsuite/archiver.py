@@ -48,12 +48,15 @@ class ArchiverTestCase(AtticTestCase):
         self.output_path = os.path.join(self.tmpdir, 'output')
         self.keys_path = os.path.join(self.tmpdir, 'keys')
         self.cache_path = os.path.join(self.tmpdir, 'cache')
+        self.exclude_file_path = os.path.join(self.tmpdir, 'excludes')
         os.environ['ATTIC_KEYS_DIR'] = self.keys_path
         os.environ['ATTIC_CACHE_DIR'] = self.cache_path
         os.mkdir(self.input_path)
         os.mkdir(self.output_path)
         os.mkdir(self.keys_path)
         os.mkdir(self.cache_path)
+        with open(self.exclude_file_path, 'wb') as fd:
+            fd.write(b'input/file2\n# A commment line, then a blank line\n\n')
         self._old_wd = os.getcwd()
         os.chdir(self.tmpdir)
 
@@ -156,6 +159,9 @@ class ArchiverTestCase(AtticTestCase):
         self.assert_equal(sorted(os.listdir('output/input')), ['file1'])
         with changedir('output'):
             self.attic('extract', '--exclude=input/file2', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file3'])
+        with changedir('output'):
+            self.attic('extract', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file3'])
 
     def test_path_normalization(self):

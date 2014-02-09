@@ -192,8 +192,15 @@ class Repository(object):
         This method verifies all segment checksums and makes sure
         the index is consistent with the data stored in the segments.
         """
+        error_found = False
+        def report_progress(msg, error=False):
+            nonlocal error_found
+            if error:
+                error_found = True
+            if error or progress:
+                print(msg, file=sys.stderr)
+
         assert not self._active_txn
-        assert not self.index
         index_transaction_id = self.get_index_transaction_id()
         segments_transaction_id = self.io.get_segments_transaction_id(index_transaction_id)
         if index_transaction_id is None and segments_transaction_id is None:
@@ -204,15 +211,8 @@ class Repository(object):
             current_index = self.get_read_only_index(transaction_id)
         else:
             current_index = None
+            report_progress('No suitable index found', error=True)
         progress_time = None
-        error_found = False
-
-        def report_progress(msg, error=False):
-            nonlocal error_found
-            if error:
-                error_found = True
-            if error or progress:
-                print(msg, file=sys.stderr)
 
         for segment, filename in self.io.segment_iterator():
             if segment > transaction_id:
@@ -259,7 +259,8 @@ class Repository(object):
             report_progress('Check complete, no errors found.')
         if repair:
             self.write_index()
-        return not error_found
+        self.rollback()
+        return not error_found or repair
 
     def rollback(self):
         """
@@ -362,7 +363,7 @@ class LoggedIO(object):
         """Verify that the transaction id is consistent with the index transaction id
         """
         for segment, filename in self.segment_iterator(reverse=True):
-            if segment < index_transaction_id:
+            if index_transaction_id is not None and segment < index_transaction_id:
                 # The index is newer than any committed transaction found
                 return -1
             if self.is_committed_segment(filename):

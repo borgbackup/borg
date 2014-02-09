@@ -5,7 +5,7 @@ import select
 from subprocess import Popen, PIPE
 import sys
 
-from .helpers import Error
+from .helpers import Error, IntegrityError
 from .repository import Repository
 
 BUFSIZE = 10 * 1024 * 1024
@@ -134,6 +134,8 @@ class RemoteRepository(object):
                             raise Repository.AlreadyExists(self.location.orig)
                         elif error == b'CheckNeeded':
                             raise Repository.CheckNeeded(self.location.orig)
+                        elif error == b'IntegrityError':
+                            raise IntegrityError
                         raise self.RPCError(error)
                     else:
                         yield res

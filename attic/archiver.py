@@ -64,6 +64,15 @@ class Archiver:
         """Check repository consistency
         """
         repository = self.open_repository(args.repository)
+        if args.repair:
+            while True:
+                self.print_error("""Warning: check --repair is an experimental feature that might result
+in data loss. Checking and repairing archive metadata consistency is not yet
+supported so some types of corruptions will be undetected and not repaired.
+
+Type "Yes I am sure" if you understand this and want to continue.\n""")
+                if input('Do you want to continue? ') == 'Yes I am sure':
+                    break
         if args.progress is None:
             args.progress = is_a_terminal(sys.stdout) or args.verbose
         if not repository.check(progress=args.progress, repair=args.repair):

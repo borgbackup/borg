@@ -2,7 +2,7 @@ import os
 import shutil
 import tempfile
 from attic.hashindex import NSIndex
-from attic.helpers import Location
+from attic.helpers import Location, IntegrityError
 from attic.remote import RemoteRepository
 from attic.repository import Repository
 from attic.testsuite import AtticTestCase
@@ -106,10 +106,15 @@ class RepositoryCheckTestCase(AtticTestCase):
         self.repository.close()
         shutil.rmtree(self.tmppath)
 
-    def add_objects(self, ids):
+    def get_objects(self, *ids):
         for id_ in ids:
-            self.repository.put(('%032d' % id_).encode('ascii'), b'data')
-        self.repository.commit()
+            self.repository.get(('%032d' % id_).encode('ascii'))
+
+    def add_objects(self, segments):
+        for ids in segments:
+            for id_ in ids:
+                self.repository.put(('%032d' % id_).encode('ascii'), b'data')
+            self.repository.commit()
 
     def get_head(self):
         return sorted(int(n) for n in os.listdir(os.path.join(self.tmppath, 'repository', 'data', '0')) if n.isdigit())[-1]
@@ -124,36 +129,94 @@ class RepositoryCheckTestCase(AtticTestCase):
             fd.seek(offset)
             fd.write(b'BOOM')
 
+    def delete_segment(self, segment):
+        os.unlink(os.path.join(self.tmppath, 'repository', 'data', '0', str(segment)))
+
+    def delete_index(self):
+        os.unlink(os.path.join(self.tmppath, 'repository', 'index.{}'.format(self.get_head())))
+
+    def rename_index(self, new_name):
+        os.rename(os.path.join(self.tmppath, 'repository', 'index.{}'.format(self.get_head())),
+                  os.path.join(self.tmppath, 'repository', new_name))
+
     def list_objects(self):
         return set((int(key) for key, _ in list(self.open_index().iteritems())))
 
-    def test_check(self):
-        self.add_objects([1, 2, 3])
-        self.add_objects([4, 5, 6])
+    def test_repair_corrupted_segment(self):
+        self.add_objects([[1, 2, 3], [4, 5, 6]])
         self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
         self.assert_equal(True, self.repository.check())
         self.corrupt_object(5)
-        self.reopen()
+        self.assert_raises(IntegrityError, lambda: self.get_objects(5))
+        self.repository.rollback()
+        # Make sure a regular check does not repair anything
         self.assert_equal(False, self.repository.check())
-        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
-
-    def test_check_repair(self):
-        self.add_objects([1, 2, 3])
-        self.add_objects([4, 5, 6])
-        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
+        self.assert_equal(False, self.repository.check())
+        # Make sure a repair actually repairs the repo
+        self.assert_equal(True, self.repository.check(repair=True))
+        self.get_objects(4)
         self.assert_equal(True, self.repository.check())
-        self.corrupt_object(5)
-        self.reopen()
-        self.assert_equal(False, self.repository.check(repair=True))
         self.assert_equal(set([1, 2, 3, 4, 6]), self.list_objects())
 
-
-    def test_check_missing_or_corrupt_commit_tag(self):
-        self.add_objects([1, 2, 3])
+    def test_repair_missing_segment(self):
+        self.add_objects([[1, 2, 3], [4, 5, 6]])
+        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
+        self.assert_equal(True, self.repository.check())
+        self.delete_segment(1)
+        self.repository.rollback()
+        self.assert_equal(True, self.repository.check(repair=True))
         self.assert_equal(set([1, 2, 3]), self.list_objects())
-        with open(os.path.join(self.tmppath, 'repository', 'data', '0', str(self.get_head())), 'ab') as fd:
+
+    def test_repair_missing_commit_segment(self):
+        self.add_objects([[1, 2, 3], [4, 5, 6]])
+        self.delete_segment(1)
+        self.assert_raises(Repository.CheckNeeded, lambda: self.get_objects(4))
+        self.assert_equal(False, self.repository.check())
+        self.assert_raises(Repository.CheckNeeded, lambda: self.get_objects(4))
+        self.assert_equal(True, self.repository.check(repair=True))
+        self.assert_raises(Repository.DoesNotExist, lambda: self.get_objects(4))
+        self.assert_equal(set([1, 2, 3]), self.list_objects())
+
+    def test_repair_corrupted_commit_segment(self):
+        self.add_objects([[1, 2, 3], [4, 5, 6]])
+        with open(os.path.join(self.tmppath, 'repository', 'data', '0', '1'), 'ab') as fd:
             fd.write(b'X')
-        self.assert_raises(Repository.CheckNeeded, lambda: self.repository.get(bytes(32)))
+        self.assert_raises(Repository.CheckNeeded, lambda: self.get_objects(4))
+        self.assert_equal(False, self.repository.check())
+        self.assert_equal(True, self.repository.check(repair=True))
+        self.get_objects(4)
+        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
+
+    def test_repair_missing_index(self):
+        self.add_objects([[1, 2, 3], [4, 5, 6]])
+        self.delete_index()
+        self.assert_raises(Repository.CheckNeeded, lambda: self.get_objects(4))
+        self.assert_equal(False, self.repository.check())
+        self.assert_equal(True, self.repository.check(repair=True))
+        self.assert_equal(True, self.repository.check())
+        self.get_objects(4)
+        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
+
+    def test_repair_index_too_old(self):
+        self.add_objects([[1, 2, 3], [4, 5, 6]])
+        self.rename_index('index.0')
+        self.assert_raises(Repository.CheckNeeded, lambda: self.get_objects(4))
+        self.assert_equal(False, self.repository.check())
+        self.assert_equal(True, self.repository.check(repair=True))
+        self.assert_equal(True, self.repository.check())
+        self.get_objects(4)
+        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
+
+    def test_repair_index_too_new(self):
+        self.add_objects([[1, 2, 3], [4, 5, 6]])
+        self.rename_index('index.100')
+        self.assert_raises(Repository.CheckNeeded, lambda: self.get_objects(4))
+        self.assert_equal(False, self.repository.check())
+        self.assert_equal(True, self.repository.check(repair=True))
+        self.assert_equal(True, self.repository.check())
+        self.get_objects(4)
+        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
+
 
 class RemoteRepositoryTestCase(RepositoryTestCase):
 

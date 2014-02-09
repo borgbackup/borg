@@ -14,7 +14,7 @@ from attic.key import key_creator
 from attic.helpers import Error, location_validator, format_time, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
-    Manifest, remove_surrogates, is_a_terminal, update_excludes
+    Manifest, remove_surrogates, update_excludes
 from attic.remote import RepositoryServer, RemoteRepository
 
 
@@ -74,7 +74,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 if input('Do you want to continue? ') == 'Yes I am sure':
                     break
         if args.progress is None:
-            args.progress = is_a_terminal(sys.stdout) or args.verbose
+            args.progress = sys.stdout.isatty() or args.verbose
         if not repository.check(progress=args.progress, repair=args.repair):
             self.exit_code = 1
         return self.exit_code

@@ -43,7 +43,7 @@ class Repository(object):
         """{} is not a valid repository"""
 
     class CheckNeeded(Error):
-        '''Inconsistency detected. Please "run attic check {}"'''
+        '''Inconsistency detected. Please run "attic check {}"'''
 
 
     def __init__(self, path, create=False):
@@ -199,6 +199,7 @@ class Repository(object):
                 error_found = True
             if error or progress:
                 print(msg, file=sys.stderr)
+                sys.stderr.flush()
 
         assert not self._active_txn
         index_transaction_id = self.get_index_transaction_id()

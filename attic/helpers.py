@@ -468,15 +468,6 @@ def daemonize():
     os.dup2(fd, 2)
 
 
-def is_a_terminal(fd):
-    """Determine if `fd` is associated with a terminal or not
-    """
-    try:
-        os.ttyname(fd.fileno())
-        return True
-    except:
-        return False
-
 if sys.version < '3.3':
     # st_mtime_ns attribute only available in 3.3+
     def st_mtime_ns(st):

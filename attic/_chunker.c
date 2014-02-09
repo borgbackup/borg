@@ -141,7 +141,7 @@ chunker_fill(Chunker *c)
     return 1;
 }
 
-PyObject *
+static PyObject *
 PyBuffer_FromMemory(void *data, Py_ssize_t len)
 {
     Py_buffer buffer;

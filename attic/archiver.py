@@ -579,7 +579,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-d', '--daily', dest='daily', type=int, default=0,
                                help='number of daily archives to keep')
         subparser.add_argument('-w', '--weekly', dest='weekly', type=int, default=0,
-                               help='number of daily archives to keep')
+                               help='number of weekly archives to keep')
         subparser.add_argument('-m', '--monthly', dest='monthly', type=int, default=0,
                                help='number of monthly archives to keep')
         subparser.add_argument('-y', '--yearly', dest='yearly', type=int, default=0,

@@ -105,17 +105,23 @@ cdef class NSIndex(IndexBase):
         data = <int *>hashindex_get(self.index, <char *>key)
         return data != NULL
 
-    def iteritems(self, marker=None, limit=0):
+    def iteritems(self, marker=None):
+        cdef const void *key
         iter = NSKeyIterator()
         iter.idx = self
         iter.index = self.index
+        if marker:
+            key = hashindex_get(self.index, <char *>marker)
+            if marker is None:
+                raise IndexError
+            iter.key = key - 32
         return iter
 
 
 cdef class NSKeyIterator:
     cdef NSIndex idx
     cdef HashIndex *index
-    cdef char *key
+    cdef const void *key
 
     def __cinit__(self):
         self.key = NULL
@@ -124,11 +130,11 @@ cdef class NSKeyIterator:
         return self
 
     def __next__(self):
-        self.key = <char *>hashindex_next_key(self.index, <char *>self.key)
+        self.key = hashindex_next_key(self.index, <char *>self.key)
         if not self.key:
             raise StopIteration
         cdef int *value = <int *>(self.key + 32)
-        return self.key[:32], (_le32toh(value[0]), _le32toh(value[1]))
+        return (<char *>self.key)[:32], (_le32toh(value[0]), _le32toh(value[1]))
 
 
 cdef class ChunkIndex(IndexBase):
@@ -156,17 +162,23 @@ cdef class ChunkIndex(IndexBase):
         data = <int *>hashindex_get(self.index, <char *>key)
         return data != NULL
 
-    def iteritems(self, marker=None, limit=0):
+    def iteritems(self, marker=None):
+        cdef const void *key
         iter = ChunkKeyIterator()
         iter.idx = self
         iter.index = self.index
+        if marker:
+            key = hashindex_get(self.index, <char *>marker)
+            if marker is None:
+                raise IndexError
+            iter.key = key - 32
         return iter
 
 
 cdef class ChunkKeyIterator:
     cdef ChunkIndex idx
     cdef HashIndex *index
-    cdef char *key
+    cdef const void *key
 
     def __cinit__(self):
         self.key = NULL
@@ -175,8 +187,8 @@ cdef class ChunkKeyIterator:
         return self
 
     def __next__(self):
-        self.key = <char *>hashindex_next_key(self.index, <char *>self.key)
+        self.key = hashindex_next_key(self.index, <char *>self.key)
         if not self.key:
             raise StopIteration
         cdef int *value = <int *>(self.key + 32)
-        return self.key[:32], (_le32toh(value[0]), _le32toh(value[1]), _le32toh(value[2]))
+        return (<char *>self.key)[:32], (_le32toh(value[0]), _le32toh(value[1]), _le32toh(value[2]))

@@ -76,3 +76,13 @@ class HashIndexTestCase(AtticTestCase):
         idx2 = NSIndex(idx_name.name, readonly=True)
         self.assert_equal(idx2[bytes('%-0.32d' % 99, 'ascii')], (99, 99))
 
+    def test_iteritems(self):
+        idx_name = tempfile.NamedTemporaryFile()
+        idx = NSIndex.create(idx_name.name)
+        for x in range(100):
+            idx[bytes('%-0.32d' % x, 'ascii')] = x, x
+        all = list(idx.iteritems())
+        self.assert_equal(len(all), 100)
+        second_half = list(idx.iteritems(marker=all[49][0]))
+        self.assert_equal(len(second_half), 50)
+        self.assert_equal(second_half, all[50:])

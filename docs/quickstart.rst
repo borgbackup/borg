@@ -11,7 +11,7 @@ The next section continues by showing how backups can be automated.
 A step by step example
 ----------------------
 
-1. Before any backup can be taken a repository has to be initialized::
+1. Before a backup can be made a repository has to be initialized::
 
     $ attic init /somewhere/my-backup.attic
 
@@ -25,8 +25,8 @@ A step by step example
     $ attic create -v --stats /somwhere/my-backup.attic::second-backup ~/src ~/Documents
 
    This backup will be a lot quicker and a lot smaller since only new never
-   before seen data is stored. The ``--stats`` causes |project_name| to output
-   statistics about the newly created archive such as the amount of unique
+   before seen data is stored. The ``--stats`` option causes |project_name| to
+   output statistics about the newly created archive such as the amount of unique
    data (not shared with other archives).
 
 4. List all archives in the repository::
@@ -49,7 +49,7 @@ A step by step example
 Automating backups
 ------------------
 
-The following example script backups up ``/home`` and
+The following example script backs up ``/home`` and
 ``/var/www`` to a remote server. The script also uses the
 :ref:`attic_prune` subcommand to maintain a certain number
 of old archives::
@@ -65,14 +65,14 @@ of old archives::
         /var/www                                    \
         --exclude /home/*/.cache                    \
         --exclude /home/Ben/Music/Justin\ Bieber    \
-        --exclude *.pyc
+        --exclude '*.pyc'
 
     # Use the `prune` subcommand to maintain 7 daily, 4 weekly
     # and 6 monthly archives.
     attic prune -v $REPOSITORY --daily=7 --weekly=4 --monthly=6
 
 .. Note::
-    This script assumes the repository has already been initalized with
+    This script assumes the repository has already been initialized with
     :ref:`attic_init`.
 
 .. _encrypted_repos:
@@ -80,7 +80,7 @@ of old archives::
 Repository encryption
 ---------------------
 
-Repository encryption is enabled at repository encryption time::
+Repository encryption is enabled at repository creation time::
 
     $ attic init --encryption=passphrase|keyfile PATH
 
@@ -130,3 +130,7 @@ mounting the remote filesystem, for example, using sshfs::
   $ sshfs user@hostname:/path/to/folder /tmp/mymountpoint
   $ attic init /tmp/mymountpoint/repository.attic
   $ fusermount -u /tmp/mymountpoint
+
+However, be aware that sshfs doesn't fully implement POSIX locks, so
+you must be sure to not have two processes trying to access the same
+repository at the same time.

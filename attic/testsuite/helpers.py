@@ -1,9 +1,9 @@
 from time import mktime, strptime
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import os
 import tempfile
 import unittest
-from attic.helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, UpgradableLock, prune_split, to_localtime
+from attic.helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, UpgradableLock, prune_within, prune_split, to_localtime
 from attic.testsuite import AtticTestCase
 
 
@@ -145,3 +145,34 @@ class PruneSplitTestCase(AtticTestCase):
         dotest(test_archives, 3, [test_archives[5]], [6, 2, 0])
         dotest(test_archives, 3, [test_archives[4]], [6, 5, 2])
         dotest(test_archives, 0, [], [])
+
+
+class PruneWithinTestCase(AtticTestCase):
+
+    def test(self):
+
+        def subset(lst, indices):
+            return {lst[i] for i in indices}
+
+        def dotest(test_archives, within, indices):
+            for ta in test_archives, reversed(test_archives):
+                self.assert_equal(set(prune_within(ta, within)),
+                                  subset(test_archives, indices))
+            
+        # 1 minute, 1.5 hours, 2.5 hours, 3.5 hours, 25 hours, 49 hours
+        test_offsets = [60, 90*60, 150*60, 210*60, 25*60*60, 49*60*60]
+        now = datetime.now(timezone.utc)
+        test_dates = [now - timedelta(seconds=s) for s in test_offsets]
+        test_archives = [MockArchive(date) for date in test_dates]
+
+        dotest(test_archives, '1H',  [0])
+        dotest(test_archives, '2H',  [0, 1])
+        dotest(test_archives, '3H',  [0, 1, 2])
+        dotest(test_archives, '24H', [0, 1, 2, 3])
+        dotest(test_archives, '26H', [0, 1, 2, 3, 4])
+        dotest(test_archives, '2d',  [0, 1, 2, 3, 4])
+        dotest(test_archives, '50H', [0, 1, 2, 3, 4, 5])
+        dotest(test_archives, '3d',  [0, 1, 2, 3, 4, 5])
+        dotest(test_archives, '1w',  [0, 1, 2, 3, 4, 5])
+        dotest(test_archives, '1m',  [0, 1, 2, 3, 4, 5])
+        dotest(test_archives, '1y',  [0, 1, 2, 3, 4, 5])

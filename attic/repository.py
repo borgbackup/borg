@@ -206,7 +206,10 @@ class Repository(object):
         segments_transaction_id = self.io.get_segments_transaction_id(index_transaction_id)
         if index_transaction_id is None and segments_transaction_id is None:
             return True
-        transaction_id = max(index_transaction_id or 0, segments_transaction_id or 0)
+        if segments_transaction_id is not None:
+            transaction_id = segments_transaction_id
+        else:
+            transaction_id = index_transaction_id
         self.get_index(None)
         if index_transaction_id == segments_transaction_id:
             current_index = self.get_read_only_index(transaction_id)
@@ -217,6 +220,11 @@ class Repository(object):
 
         for segment, filename in self.io.segment_iterator():
             if segment > transaction_id:
+                if repair:
+                    report_progress('Deleting uncommitted segment {}'.format(segment), error=True)
+                    self.io.delete_segment(segment)
+                else:
+                    report_progress('Uncommitted segment {} found'.format(segment), error=True)
                 continue
             if progress:
                 if int(time.time()) != progress_time:
@@ -254,12 +262,22 @@ class Repository(object):
                     continue
                 else:
                     report_progress('Unexpected tag {} in segment {}'.format(tag, segment), error=True)
+        # We might need to add a commit tag if no committed segment is found
+        if repair and segments_transaction_id is None:
+            report_progress('Adding commit tag to segment {}'.format(transaction_id))
+            self.io.segment = transaction_id + 1
+            self.io.write_commit()
+            self.io.close_segment()
         if current_index and len(current_index) != len(self.index):
             report_progress('Index object count mismatch. {} != {}'.format(len(current_index), len(self.index)), error=True)
         if not error_found:
             report_progress('Check complete, no errors found.')
         if repair:
             self.write_index()
+        else:
+            # Delete temporary index file
+            self.index = None
+            os.unlink(os.path.join(self.path, 'index.tmp'))
         self.rollback()
         return not error_found or repair
 
@@ -364,9 +382,9 @@ class LoggedIO(object):
         """Verify that the transaction id is consistent with the index transaction id
         """
         for segment, filename in self.segment_iterator(reverse=True):
-            if index_transaction_id is not None and segment < index_transaction_id:
-                # The index is newer than any committed transaction found
-                return -1
+#            if index_transaction_id is not None and segment < index_transaction_id:
+#                # The index is newer than any committed transaction found
+#                return -1
             if self.is_committed_segment(filename):
                 return segment
         return None

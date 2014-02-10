@@ -1,8 +1,8 @@
 from configparser import RawConfigParser
 from binascii import hexlify
+from itertools import islice
 import errno
 import os
-import re
 import shutil
 import struct
 import sys
@@ -291,6 +291,11 @@ class Repository(object):
         if not self.index:
             self.index = self.get_read_only_index(self.get_transaction_id())
         return len(self.index)
+
+    def list(self, limit=None, marker=None):
+        if not self.index:
+            self.index = self.get_read_only_index(self.get_transaction_id())
+        return [id_ for id_, _ in islice(self.index.iteritems(marker=marker), limit)]
 
     def get(self, id_):
         if not self.index:

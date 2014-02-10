@@ -194,6 +194,9 @@ class RemoteRepository(object):
     def __len__(self):
         return self.call('__len__')
 
+    def list(self, limit=None, marker=None):
+        return self.call('list', limit, marker)
+
     def get(self, id_):
         for resp in self.get_many([id_]):
             return resp

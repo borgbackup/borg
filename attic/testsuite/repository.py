@@ -87,6 +87,19 @@ class RepositoryTestCase(AtticTestCase):
         self.repository.delete(b'00000000000000000000000000000000')
         self.repository.commit()
 
+    def test_list(self):
+        for x in range(100):
+            self.repository.put(('%-32d' % x).encode('ascii'), b'SOMEDATA')
+        all = self.repository.list()
+        self.assert_equal(len(all), 100)
+        first_half = self.repository.list(limit=50)
+        self.assert_equal(len(first_half), 50)
+        self.assert_equal(first_half, all[:50])
+        second_half = self.repository.list(marker=first_half[-1])
+        self.assert_equal(len(second_half), 50)
+        self.assert_equal(second_half, all[50:])
+        self.assert_equal(len(self.repository.list(limit=50)), 50)
+
 
 class RepositoryCheckTestCase(AtticTestCase):
 

@@ -12,6 +12,7 @@ Version 0.11
 - Documentation improvements
 - Fix exception during "attic create" with repeated files (#39)
 - New "--exclude-from" option for attic create/extract/verify.
+- Improved archive metadata deduplication.
 
 Version 0.10
 ------------

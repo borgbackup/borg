@@ -16,7 +16,7 @@ from attic import xattr
 from attic.chunker import chunkify
 from attic.hashindex import ChunkIndex
 from attic.helpers import Error, uid2user, user2uid, gid2group, group2gid, \
-    Manifest, Statistics, decode_dict, st_mtime_ns, make_path_safe
+    Manifest, Statistics, decode_dict, st_mtime_ns, make_path_safe, StableDict
 
 ITEMS_BUFFER = 1024 * 1024
 CHUNK_MIN = 1024
@@ -63,7 +63,7 @@ class ChunkBuffer:
         self.key = key
 
     def add(self, item):
-        self.buffer.write(self.packer.pack(item))
+        self.buffer.write(self.packer.pack(StableDict(item)))
         if self.is_full():
             self.flush()
 
@@ -348,7 +348,7 @@ class Archive:
             item[b'user'] = item[b'group'] = None
         xattrs = xattr.get_all(path, follow_symlinks=False)
         if xattrs:
-            item[b'xattrs'] = xattrs
+            item[b'xattrs'] = StableDict(xattrs)
         return item
 
     def process_item(self, path, st):
@@ -549,7 +549,7 @@ class ArchiveChecker:
 
             for state, items in groupby(archive[b'items'], missing_chunk_detector):
                 if state != prev_state:
-                    unpacker = msgpack.Unpacker()
+                    unpacker = msgpack.Unpacker(object_hook=StableDict)
                     prev_state = state
                 if state % 2:
                     self.report_progress('Archive metadata damage detected', error=True)

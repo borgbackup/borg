@@ -469,6 +469,12 @@ def daemonize():
     os.dup2(fd, 2)
 
 
+class StableDict(dict):
+    """A dict subclass with stable items() ordering"""
+    def items(self):
+        return sorted(super(StableDict, self).items())
+
+
 if sys.version < '3.3':
     # st_mtime_ns attribute only available in 3.3+
     def st_mtime_ns(st):

@@ -1,10 +1,13 @@
+import hashlib
 from time import mktime, strptime
 from datetime import datetime, timezone, timedelta
 import os
 import tempfile
 import unittest
-from attic.helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, UpgradableLock, prune_within, prune_split, to_localtime
+from attic.helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, UpgradableLock, prune_within, prune_split, to_localtime, \
+    StableDict
 from attic.testsuite import AtticTestCase
+import msgpack
 
 
 class LocationTestCase(AtticTestCase):
@@ -176,3 +179,11 @@ class PruneWithinTestCase(AtticTestCase):
         dotest(test_archives, '1w',  [0, 1, 2, 3, 4, 5])
         dotest(test_archives, '1m',  [0, 1, 2, 3, 4, 5])
         dotest(test_archives, '1y',  [0, 1, 2, 3, 4, 5])
+
+
+class StableDictTestCase(AtticTestCase):
+
+    def test(self):
+        d = StableDict(foo=1, bar=2, boo=3, baz=4)
+        self.assert_equal(list(d.items()), [('bar', 2), ('baz', 4), ('boo', 3), ('foo', 1)])
+        self.assert_equal(hashlib.md5(msgpack.packb(d)).hexdigest(), 'fc78df42cd60691b3ac3dd2a2b39903f')

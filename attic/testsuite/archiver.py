@@ -179,6 +179,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_not_in('..', output)
         self.assert_in(' input/dir1/dir2/file', output)
 
+    def test_repeated_files(self):
+        self.create_regual_file('file1', size=1024 * 80)
+        self.attic('init', self.repository_location)
+        self.attic('create', self.repository_location + '::test', 'input', 'input')
+
     def test_overwrite(self):
         self.create_regual_file('file1', size=1024 * 80)
         self.create_regual_file('dir2/file2', size=1024 * 80)

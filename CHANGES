@@ -10,6 +10,7 @@ Version 0.11
 
 - New "check" command for repository consistency checking (#24)
 - Documentation improvements
+- Fix exception during "attic create" with repeated files (#39)
 
 Version 0.10
 ------------

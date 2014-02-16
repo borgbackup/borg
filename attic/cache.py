@@ -206,7 +206,8 @@ class Cache(object):
         if (entry and entry[3] == st_mtime_ns(st)
             and entry[2] == st.st_size and entry[1] == st.st_ino):
             # reset entry age
-            self.files[path_hash][0] = 0
+            if entry[0] != 0:
+                self.files[path_hash][0] = 0
             return entry[4]
         else:
             return None

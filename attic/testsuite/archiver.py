@@ -9,7 +9,9 @@ import time
 import unittest
 from hashlib import sha256
 from attic import xattr
+from attic.archive import Archive
 from attic.archiver import Archiver
+from attic.helpers import Manifest
 from attic.repository import Repository
 from attic.testsuite import AtticTestCase
 from attic.crypto import bytes_to_long, num_aes_blocks
@@ -20,7 +22,7 @@ try:
 except ImportError:
     has_llfuse = False
 
-src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__), '..', '..')
+src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__), '..')
 
 
 class changedir:
@@ -35,11 +37,12 @@ class changedir:
         os.chdir(self.old)
 
 
-class ArchiverTestCase(AtticTestCase):
+class ArchiverTestCaseBase(AtticTestCase):
 
     prefix = ''
 
     def setUp(self):
+        os.environ['ATTIC_CHECK_I_KWOW_WHAT_I_AM_DOING'] = '1'
         self.archiver = Archiver()
         self.tmpdir = tempfile.mkdtemp()
         self.repository_path = os.path.join(self.tmpdir, 'repository')
@@ -95,6 +98,9 @@ class ArchiverTestCase(AtticTestCase):
 
     def create_src_archive(self, name):
         self.attic('create', self.repository_location + '::' + name, src_dir)
+
+
+class ArchiverTestCase(ArchiverTestCaseBase):
 
     def create_regual_file(self, name, size=0):
         filename = os.path.join(self.input_path, name)
@@ -298,6 +304,67 @@ class ArchiverTestCase(AtticTestCase):
     def test_aes_counter_uniqueness_passphrase(self):
         self.verify_aes_counter_uniqueness('passphrase')
 
+
+class ArchiverCheckTestCase(ArchiverTestCaseBase):
+
+    def setUp(self):
+        super(ArchiverCheckTestCase, self).setUp()
+        self.attic('init', self.repository_location)
+        self.create_src_archive('archive1')
+        self.create_src_archive('archive2')
+
+    def open_archive(self, name):
+        repository = Repository(self.repository_path)
+        manifest, key = Manifest.load(repository)
+        archive = Archive(repository, key, manifest, name)
+        return archive, repository
+
+    def test_missing_file_chunk(self):
+        archive, repository = self.open_archive('archive1')
+        for item in archive.iter_items():
+            if item[b'path'].endswith('testsuite/archiver.py'):
+                repository.delete(item[b'chunks'][-1][0])
+                break
+        repository.commit()
+        self.attic('check', self.repository_location, exit_code=1)
+        self.attic('check', '--repair', self.repository_location, exit_code=0)
+        self.attic('check', self.repository_location, exit_code=0)
+
+    def test_missing_archive_item_chunk(self):
+        archive, repository = self.open_archive('archive1')
+        repository.delete(archive.metadata[b'items'][-1])
+        repository.commit()
+        self.attic('check', self.repository_location, exit_code=1)
+        self.attic('check', '--repair', self.repository_location, exit_code=0)
+        self.attic('check', self.repository_location, exit_code=0)
+
+    def test_missing_archive_metadata(self):
+        archive, repository = self.open_archive('archive1')
+        repository.delete(archive.id)
+        repository.commit()
+        self.attic('check', self.repository_location, exit_code=1)
+        self.attic('check', '--repair', self.repository_location, exit_code=0)
+        self.attic('check', self.repository_location, exit_code=0)
+
+    def test_missing_manifest(self):
+        archive, repository = self.open_archive('archive1')
+        repository.delete(Manifest.MANIFEST_ID)
+        repository.commit()
+        self.attic('check', self.repository_location, exit_code=1)
+        self.attic('check', '--repair', '--progress', self.repository_location, exit_code=0)
+        self.attic('check', '--progress', self.repository_location, exit_code=0)
+
+    def test_extra_chunks(self):
+        self.attic('check', self.repository_location, exit_code=0)
+        repository = Repository(self.repository_location)
+        repository.put(b'01234567890123456789012345678901', b'xxxx')
+        repository.commit()
+        repository.close()
+        self.attic('check', self.repository_location, exit_code=1)
+        self.attic('check', self.repository_location, exit_code=1)
+        self.attic('check', '--repair', self.repository_location, exit_code=0)
+        self.attic('check', self.repository_location, exit_code=0)
+        self.attic('verify', self.repository_location + '::archive1', exit_code=0)
 
 
 class RemoteArchiverTestCase(ArchiverTestCase):

@@ -56,17 +56,18 @@ class Manifest:
 
     MANIFEST_ID = b'\0' * 32
 
-    def __init__(self):
+    def __init__(self, key, repository):
         self.archives = {}
         self.config = {}
+        self.key = key
+        self.repository = repository
 
     @classmethod
     def load(cls, repository):
         from .key import key_factory
-        manifest = cls()
-        manifest.repository = repository
-        cdata = repository.get(manifest.MANIFEST_ID)
-        manifest.key = key = key_factory(repository, cdata)
+        cdata = repository.get(cls.MANIFEST_ID)
+        key = key_factory(repository, cdata)
+        manifest = cls(key, repository)
         data = key.decrypt(None, cdata)
         manifest.id = key.id_hash(data)
         m = msgpack.unpackb(data)

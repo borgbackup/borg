@@ -16,17 +16,17 @@ class Cache(object):
     class RepositoryReplay(Error):
         """Cache is newer than repository, refusing to continue"""
 
-    def __init__(self, repository, key, manifest):
+    def __init__(self, repository, key, manifest, path=None, sync=True):
         self.timestamp = None
         self.txn_active = False
         self.repository = repository
         self.key = key
         self.manifest = manifest
-        self.path = os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
+        self.path = path or os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
         if not os.path.exists(self.path):
             self.create()
         self.open()
-        if self.manifest.id != self.manifest_id:
+        if sync and self.manifest.id != self.manifest_id:
             # If repository is older than the cache something fishy is going on
             if self.timestamp and self.timestamp > manifest.timestamp:
                 raise self.RepositoryReplay()

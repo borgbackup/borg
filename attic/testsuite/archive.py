@@ -1,6 +1,6 @@
 import msgpack
 from attic.testsuite import AtticTestCase
-from attic.archive import ChunkBuffer
+from attic.archive import CacheChunkBuffer
 from attic.key import PlaintextKey
 
 
@@ -20,7 +20,7 @@ class ChunkBufferTestCase(AtticTestCase):
         data = [{b'foo': 1}, {b'bar': 2}]
         cache = MockCache()
         key = PlaintextKey()
-        chunks = ChunkBuffer(cache, key, None)
+        chunks = CacheChunkBuffer(cache, key, None)
         for d in data:
             chunks.add(d)
             chunks.flush()

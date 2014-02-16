@@ -202,6 +202,7 @@ class Repository(object):
                 sys.stderr.flush()
 
         assert not self._active_txn
+        report_progress('Starting repository check...')
         index_transaction_id = self.get_index_transaction_id()
         segments_transaction_id = self.io.get_segments_transaction_id(index_transaction_id)
         if index_transaction_id is None and segments_transaction_id is None:
@@ -271,7 +272,7 @@ class Repository(object):
         if current_index and len(current_index) != len(self.index):
             report_progress('Index object count mismatch. {} != {}'.format(len(current_index), len(self.index)), error=True)
         if not error_found:
-            report_progress('Check complete, no errors found.')
+            report_progress('Repository check complete, no errors found.')
         if repair:
             self.write_index()
         else:

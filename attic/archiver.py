@@ -7,7 +7,7 @@ import stat
 import sys
 
 from attic import __version__
-from attic.archive import Archive
+from attic.archive import Archive, ArchiveChecker
 from attic.repository import Repository
 from attic.cache import Cache
 from attic.key import key_creator
@@ -53,8 +53,7 @@ class Archiver:
         print('Initializing repository at "%s"' % args.repository.orig)
         repository = self.open_repository(args.repository, create=True)
         key = key_creator(repository, args)
-        manifest = Manifest()
-        manifest.repository = repository
+        manifest = Manifest(key, repository)
         manifest.key = key
         manifest.write()
         repository.commit()
@@ -65,10 +64,9 @@ class Archiver:
         """
         repository = self.open_repository(args.repository)
         if args.repair:
-            while True:
-                self.print_error("""Warning: check --repair is an experimental feature that might result
-in data loss. Checking and repairing archive metadata consistency is not yet
-supported so some types of corruptions will be undetected and not repaired.
+            while not os.environ.get('ATTIC_CHECK_I_KWOW_WHAT_I_AM_DOING'):
+                self.print_error("""Warning: 'check --repair' is an experimental feature that might result
+in data loss.
 
 Type "Yes I am sure" if you understand this and want to continue.\n""")
                 if input('Do you want to continue? ') == 'Yes I am sure':
@@ -76,8 +74,11 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         if args.progress is None:
             args.progress = sys.stdout.isatty() or args.verbose
         if not repository.check(progress=args.progress, repair=args.repair):
-            self.exit_code = 1
-        return self.exit_code
+            return 1
+
+        if not ArchiveChecker().check(repository, progress=args.progress, repair=args.repair):
+            return 1
+        return 0
 
     def do_change_passphrase(self, args):
         """Change repository key file passphrase
@@ -85,7 +86,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         repository = self.open_repository(args.repository)
         manifest, key = Manifest.load(repository)
         key.change_passphrase()
-        return self.exit_code
+        return 0
 
     def do_create(self, args):
         """Create new archive

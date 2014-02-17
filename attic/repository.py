@@ -357,7 +357,7 @@ class LoggedIO(object):
     _commit = header_no_crc_fmt.pack(9, TAG_COMMIT)
     COMMIT = crc_fmt.pack(crc32(_commit)) + _commit
 
-    def __init__(self, path, limit, segments_per_dir, capacity=100):
+    def __init__(self, path, limit, segments_per_dir, capacity=90):
         self.path = path
         self.fds = LRUCache(capacity)
         self.segment = 0

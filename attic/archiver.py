@@ -64,7 +64,7 @@ class Archiver:
         """
         repository = self.open_repository(args.repository)
         if args.repair:
-            while not os.environ.get('ATTIC_CHECK_I_KWOW_WHAT_I_AM_DOING'):
+            while not os.environ.get('ATTIC_CHECK_I_KNOW_WHAT_I_AM_DOING'):
                 self.print_error("""Warning: 'check --repair' is an experimental feature that might result
 in data loss.
 

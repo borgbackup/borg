@@ -42,7 +42,7 @@ class ArchiverTestCaseBase(AtticTestCase):
     prefix = ''
 
     def setUp(self):
-        os.environ['ATTIC_CHECK_I_KWOW_WHAT_I_AM_DOING'] = '1'
+        os.environ['ATTIC_CHECK_I_KNOW_WHAT_I_AM_DOING'] = '1'
         self.archiver = Archiver()
         self.tmpdir = tempfile.mkdtemp()
         self.repository_path = os.path.join(self.tmpdir, 'repository')

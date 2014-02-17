@@ -37,8 +37,8 @@ cdef class IndexBase:
                 raise Exception('hashindex_close failed')
 
     @classmethod
-    def create(cls, path):
-        index = hashindex_create(<bytes>os.fsencode(path), 0, cls.key_size, cls.value_size)
+    def create(cls, path, capacity=0):
+        index = hashindex_create(<bytes>os.fsencode(path), capacity, cls.key_size, cls.value_size)
         if not index:
             raise Exception('Failed to create %s' % path)
         hashindex_close(index)

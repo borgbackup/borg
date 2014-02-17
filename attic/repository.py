@@ -217,7 +217,6 @@ class Repository(object):
         else:
             current_index = None
             report_progress('No suitable index found', error=True)
-        progress_time = None
 
         for segment, filename in self.io.segment_iterator():
             if segment > transaction_id:
@@ -227,10 +226,6 @@ class Repository(object):
                 else:
                     report_progress('Uncommitted segment {} found'.format(segment), error=True)
                 continue
-            if progress:
-                if int(time.time()) != progress_time:
-                    progress_time = int(time.time())
-                    report_progress('Checking segment {}/{}'.format(segment, transaction_id))
             try:
                 objects = list(self.io.iter_objects(segment))
             except (IntegrityError, struct.error):
@@ -272,7 +267,7 @@ class Repository(object):
         if current_index and len(current_index) != len(self.index):
             report_progress('Index object count mismatch. {} != {}'.format(len(current_index), len(self.index)), error=True)
         if not error_found:
-            report_progress('Repository check complete, no errors found.')
+            report_progress('Repository check complete, no problems found.')
         if repair:
             self.write_index()
         else:

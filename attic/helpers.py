@@ -63,10 +63,11 @@ class Manifest:
         self.repository = repository
 
     @classmethod
-    def load(cls, repository):
+    def load(cls, repository, key=None):
         from .key import key_factory
         cdata = repository.get(cls.MANIFEST_ID)
-        key = key_factory(repository, cdata)
+        if not key:
+            key = key_factory(repository, cdata)
         manifest = cls(key, repository)
         data = key.decrypt(None, cdata)
         manifest.id = key.id_hash(data)

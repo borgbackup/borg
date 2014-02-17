@@ -419,7 +419,10 @@ class ArchiveChecker:
         shutil.rmtree(self.tmpdir)
 
     def init_chunks(self):
-        self.chunks = ChunkIndex.create(os.path.join(self.tmpdir, 'chunks').encode('utf-8'))
+        # Explicity set the initial hash table capacity to avoid performance issues
+        # due to hash table "resonance"
+        capacity = int(len(self.repository) * 1.2)
+        self.chunks = ChunkIndex.create(os.path.join(self.tmpdir, 'chunks').encode('utf-8'), capacity=capacity)
         marker = None
         while True:
             result = self.repository.list(limit=10000, marker=marker)
@@ -466,11 +469,11 @@ class ArchiveChecker:
         if not Manifest.MANIFEST_ID in self.chunks:
             self.manifest = self.rebuild_manifest()
         else:
-            self.manifest, _ = Manifest.load(repository)
+            self.manifest, _ = Manifest.load(repository, key=self.key)
         self.rebuild_chunks()
         self.verify_chunks()
         if not self.error_found:
-            self.report_progress('Archive consistency check complete, no errors found.')
+            self.report_progress('Archive consistency check complete, no problems found.')
         return self.repair or not self.error_found
 
     def verify_chunks(self):
@@ -563,8 +566,9 @@ class ArchiveChecker:
                     for item in unpacker:
                         yield item
 
-        for name, info in list(self.manifest.archives.items()):
-            self.report_progress('Analyzing archive: ' + name)
+        num_archives = len(self.manifest.archives)
+        for i, (name, info) in enumerate(list(self.manifest.archives.items()), 1):
+            self.report_progress('Analyzing archive {} ({}/{})'.format(name, i, num_archives))
             archive_id = info[b'id']
             if not archive_id in self.chunks:
                 self.report_progress('Archive metadata block is missing', error=True)

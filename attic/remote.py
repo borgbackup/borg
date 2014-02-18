@@ -135,7 +135,7 @@ class RemoteRepository(object):
                         elif error == b'CheckNeeded':
                             raise Repository.CheckNeeded(self.location.orig)
                         elif error == b'IntegrityError':
-                            raise IntegrityError
+                            raise IntegrityError(res)
                         raise self.RPCError(error)
                     else:
                         yield res

@@ -13,6 +13,7 @@ Version 0.11
 - Fix exception during "attic create" with repeated files (#39)
 - New "--exclude-from" option for attic create/extract/verify.
 - Improved archive metadata deduplication.
+- Replace the "verify" command with "extract --dry-run" (#25)
 
 Version 0.10
 ------------

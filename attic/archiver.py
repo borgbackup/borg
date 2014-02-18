@@ -188,20 +188,25 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         patterns = adjust_patterns(args.paths, args.excludes)
         dirs = []
         for item in archive.iter_items(lambda item: not exclude_path(item[b'path'], patterns), preload=True):
-            while dirs and not item[b'path'].startswith(dirs[-1][b'path']):
-                archive.extract_item(dirs.pop(-1))
+            if not args.dry_run:
+                while dirs and not item[b'path'].startswith(dirs[-1][b'path']):
+                    archive.extract_item(dirs.pop(-1))
             self.print_verbose(remove_surrogates(item[b'path']))
             try:
-                if stat.S_ISDIR(item[b'mode']):
-                    dirs.append(item)
-                    archive.extract_item(item, restore_attrs=False)
+                if args.dry_run:
+                    archive.extract_item(item, dry_run=True)
                 else:
-                    archive.extract_item(item)
+                    if stat.S_ISDIR(item[b'mode']):
+                        dirs.append(item)
+                        archive.extract_item(item, restore_attrs=False)
+                    else:
+                        archive.extract_item(item)
             except IOError as e:
                 self.print_error('%s: %s', remove_surrogates(item[b'path']), e)
 
-        while dirs:
-            archive.extract_item(dirs.pop(-1))
+        if not args.dry_run:
+            while dirs:
+                archive.extract_item(dirs.pop(-1))
         return self.exit_code
 
     def do_delete(self, args):
@@ -273,28 +278,6 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         else:
             for archive in sorted(Archive.list_archives(repository, key, manifest), key=attrgetter('ts')):
                 print('%-20s %s' % (archive.metadata[b'name'], to_localtime(archive.ts).strftime('%c')))
-        return self.exit_code
-
-    def do_verify(self, args):
-        """Verify archive consistency
-        """
-        repository = self.open_repository(args.archive)
-        manifest, key = Manifest.load(repository)
-        archive = Archive(repository, key, manifest, args.archive.archive)
-        patterns = adjust_patterns(args.paths, args.excludes)
-
-        def start_cb(item):
-            self.print_verbose('%s ...', remove_surrogates(item[b'path']), newline=False)
-
-        def result_cb(item, success):
-            if success:
-                self.print_verbose('OK')
-            else:
-                self.print_verbose('ERROR')
-                self.print_error('%s: verification failed' % remove_surrogates(item[b'path']))
-        for item in archive.iter_items(lambda item: not exclude_path(item[b'path'], patterns), preload=True):
-            if stat.S_ISREG(item[b'mode']) and b'chunks' in item:
-                archive.verify_file(item, start_cb, result_cb)
         return self.exit_code
 
     def do_info(self, args):
@@ -485,6 +468,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                           description=self.do_extract.__doc__,
                                           epilog=extract_epilog)
         subparser.set_defaults(func=self.do_extract)
+        subparser.add_argument('--dry-run', dest='dry_run',
+                               default=False, action='store_true',
+                               help='do not actually change any files')
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
@@ -525,24 +511,6 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='stay in foreground, do not daemonize')
         subparser.add_argument('-o', dest='options', type=str,
                                help='Extra mount options')
-
-        verify_epilog = '''See "attic help patterns" for more help on exclude patterns.'''
-
-        subparser = subparsers.add_parser('verify', parents=[common_parser],
-                                          description=self.do_verify.__doc__,
-                                          epilog=verify_epilog)
-        subparser.set_defaults(func=self.do_verify)
-        subparser.add_argument('-e', '--exclude', dest='excludes',
-                               type=ExcludePattern, action='append',
-                               metavar="PATTERN", help='exclude paths matching PATTERN')
-        subparser.add_argument('--exclude-from', dest='exclude_files',
-                               type=argparse.FileType('r'), action='append',
-                               metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
-        subparser.add_argument('archive', metavar='ARCHIVE',
-                               type=location_validator(archive=True),
-                               help='archive to verity integrity of')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to verify')
 
         subparser = subparsers.add_parser('info', parents=[common_parser],
                                           description=self.do_info.__doc__)

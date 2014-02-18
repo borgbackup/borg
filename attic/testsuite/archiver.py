@@ -11,7 +11,7 @@ from hashlib import sha256
 from attic import xattr
 from attic.archive import Archive
 from attic.archiver import Archiver
-from attic.helpers import Manifest
+from attic.helpers import Manifest, IntegrityError
 from attic.repository import Repository
 from attic.testsuite import AtticTestCase
 from attic.crypto import bytes_to_long, num_aes_blocks
@@ -209,10 +209,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.attic('init', self.repository_location)
         self.attic('create', self.repository_location + '::test', 'input')
         self.attic('create', self.repository_location + '::test.2', 'input')
-        self.attic('verify', self.repository_location + '::test')
-        self.attic('verify', self.repository_location + '::test.2')
+        self.attic('extract', '--dry-run', self.repository_location + '::test')
+        self.attic('extract', '--dry-run', self.repository_location + '::test.2')
         self.attic('delete', self.repository_location + '::test')
-        self.attic('verify', self.repository_location + '::test.2')
+        self.attic('extract', '--dry-run', self.repository_location + '::test.2')
         self.attic('delete', self.repository_location + '::test.2')
         # Make sure all data except the manifest has been deleted
         repository = Repository(self.repository_path)
@@ -221,14 +221,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_corrupted_repository(self):
         self.attic('init', self.repository_location)
         self.create_src_archive('test')
-        self.attic('verify', self.repository_location + '::test')
+        self.attic('extract', '--dry-run', self.repository_location + '::test')
         self.attic('check', self.repository_location)
         name = sorted(os.listdir(os.path.join(self.tmpdir, 'repository', 'data', '0')), reverse=True)[0]
         fd = open(os.path.join(self.tmpdir, 'repository', 'data', '0', name), 'r+')
         fd.seek(100)
         fd.write('XXXX')
         fd.close()
-        self.attic('verify', self.repository_location + '::test', exit_code=1)
+        self.assert_raises(IntegrityError, lambda: self.attic('extract', '--dry-run', self.repository_location + '::test'))
         self.attic('check', self.repository_location, exit_code=1)
 
     def test_readonly_repository(self):
@@ -236,7 +236,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_src_archive('test')
         os.system('chmod -R ugo-w ' + self.repository_path)
         try:
-            self.attic('verify', self.repository_location + '::test')
+            self.attic('extract', '--dry-run', self.repository_location + '::test')
         finally:
             # Restore permissions so shutil.rmtree is able to delete it
             os.system('chmod -R u+w ' + self.repository_path)
@@ -369,7 +369,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.attic('check', self.repository_location, exit_code=1)
         self.attic('check', '--repair', self.repository_location, exit_code=0)
         self.attic('check', self.repository_location, exit_code=0)
-        self.attic('verify', self.repository_location + '::archive1', exit_code=0)
+        self.attic('extract', '--dry-run', self.repository_location + '::archive1', exit_code=0)
 
 
 class RemoteArchiverTestCase(ArchiverTestCase):

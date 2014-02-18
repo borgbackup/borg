@@ -84,15 +84,6 @@ Examples
     # Extract the "src" directory but exclude object files
     $ attic extract /data/myrepo::my-files home/USERNAME/src --exclude '*.o'
 
-
-.. include:: usage/verify.rst.inc
-
-This command is similar to :ref:`attic_extract` but instead of writing any
-files to disk the command just verifies that all files are extractable and
-not corrupt. |project_name| will not compare the the archived files with the
-files on disk.
-
-
 .. include:: usage/check.rst.inc
 
 The check command verifies the consistency of a repository. Any inconsistencies

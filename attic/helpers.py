@@ -288,9 +288,8 @@ def format_file_size(v):
         return '%d B' % v
 
 
-class IntegrityError(Exception):
-    """
-    """
+class IntegrityError(Error):
+    """Data integrity error"""
 
 
 def memoize(function):

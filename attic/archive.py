@@ -219,7 +219,13 @@ class Archive:
         cache.rollback()
         return stats
 
-    def extract_item(self, item, restore_attrs=True):
+    def extract_item(self, item, restore_attrs=True, dry_run=False):
+        if dry_run:
+            if b'chunks' in item:
+                for _ in self.pipeline.fetch_many([c[0] for c in item[b'chunks']], is_preloaded=True):
+                    pass
+            return
+
         dest = self.cwd
         if item[b'path'].startswith('/') or item[b'path'].startswith('..'):
             raise Exception('Path should be relative and local')
@@ -305,21 +311,6 @@ class Archive:
             os.utime(path, None, ns=(item[b'mtime'], item[b'mtime']), follow_symlinks=False)
         elif not symlink:
             os.utime(path, (item[b'mtime'] / 10**9, item[b'mtime'] / 10**9))
-
-    def verify_file(self, item, start, result):
-        if not item[b'chunks']:
-            start(item)
-            result(item, True)
-        else:
-            start(item)
-            ids = [id for id, size, csize in item[b'chunks']]
-            try:
-                for _ in self.pipeline.fetch_many(ids, is_preloaded=True):
-                    pass
-            except Exception:
-                result(item, False)
-                return
-            result(item, True)
 
     def delete(self, cache):
         unpacker = msgpack.Unpacker(use_list=False)

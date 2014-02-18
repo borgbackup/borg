@@ -178,7 +178,7 @@ class Archive:
         if name in self.manifest.archives:
             raise self.AlreadyExists(name)
         self.items_buffer.flush(flush=True)
-        metadata = {
+        metadata = StableDict({
             'version': 1,
             'name': name,
             'items': self.items_buffer.chunks,
@@ -186,7 +186,7 @@ class Archive:
             'hostname': socket.gethostname(),
             'username': getuser(),
             'time': datetime.utcnow().isoformat(),
-        }
+        })
         data = msgpack.packb(metadata, unicode_errors='surrogateescape')
         self.id = self.key.id_hash(data)
         self.cache.add_chunk(self.id, data, self.stats)
@@ -570,7 +570,7 @@ class ArchiveChecker:
             items_buffer.write_chunk = add_callback
             cdata = self.repository.get(archive_id)
             data = self.key.decrypt(archive_id, cdata)
-            archive = msgpack.unpackb(data)
+            archive = StableDict(msgpack.unpackb(data))
             if archive[b'version'] != 1:
                 raise Exception('Unknown archive metadata version')
             decode_dict(archive, (b'name', b'hostname', b'username', b'time'))  # fixme: argv

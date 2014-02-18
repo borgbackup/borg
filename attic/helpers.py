@@ -83,12 +83,12 @@ class Manifest:
 
     def write(self):
         self.timestamp = datetime.utcnow().isoformat()
-        data = msgpack.packb({
+        data = msgpack.packb(StableDict({
             'version': 1,
             'archives': self.archives,
             'timestamp': self.timestamp,
             'config': self.config,
-        })
+        }))
         self.id = self.key.id_hash(data)
         self.repository.put(self.MANIFEST_ID, self.key.encrypt(data))
 

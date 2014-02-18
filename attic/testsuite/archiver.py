@@ -228,7 +228,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         fd.seek(100)
         fd.write('XXXX')
         fd.close()
-        self.assert_raises(IntegrityError, lambda: self.attic('extract', '--dry-run', self.repository_location + '::test'))
         self.attic('check', self.repository_location, exit_code=1)
 
     def test_readonly_repository(self):

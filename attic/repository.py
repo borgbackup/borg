@@ -87,7 +87,7 @@ class Repository(object):
 
     def get_transaction_id(self):
         index_transaction_id = self.get_index_transaction_id()
-        segments_transaction_id = self.io.get_segments_transaction_id(index_transaction_id or 0)
+        segments_transaction_id = self.io.get_segments_transaction_id()
         if index_transaction_id != segments_transaction_id:
             raise self.CheckNeeded(self.path)
         return index_transaction_id
@@ -204,7 +204,7 @@ class Repository(object):
         assert not self._active_txn
         report_progress('Starting repository check...')
         index_transaction_id = self.get_index_transaction_id()
-        segments_transaction_id = self.io.get_segments_transaction_id(index_transaction_id)
+        segments_transaction_id = self.io.get_segments_transaction_id()
         if index_transaction_id is None and segments_transaction_id is None:
             return True
         if segments_transaction_id is not None:
@@ -379,13 +379,10 @@ class LoggedIO(object):
             for filename in filenames:
                 yield int(filename), os.path.join(dirpath, filename)
 
-    def get_segments_transaction_id(self, index_transaction_id=0):
+    def get_segments_transaction_id(self):
         """Verify that the transaction id is consistent with the index transaction id
         """
         for segment, filename in self.segment_iterator(reverse=True):
-#            if index_transaction_id is not None and segment < index_transaction_id:
-#                # The index is newer than any committed transaction found
-#                return -1
             if self.is_committed_segment(filename):
                 return segment
         return None

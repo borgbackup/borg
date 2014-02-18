@@ -481,9 +481,9 @@ class ArchiveChecker:
         for id_, (count, size, csize) in self.chunks.iteritems():
             if count == 0:
                 unused.add(id_)
-        unexpected = unused - self.possibly_superseded
-        if unexpected:
-            self.report_progress('{} excessive objects found'.format(len(unexpected)), error=True)
+        orphaned = unused - self.possibly_superseded
+        if orphaned:
+            self.report_progress('{} orphaned objects found'.format(len(orphaned)), error=True)
         if self.repair:
             for id_ in unused:
                 self.repository.delete(id_)
@@ -493,6 +493,7 @@ class ArchiveChecker:
     def rebuild_chunks(self):
         # Exclude the manifest from chunks
         del self.chunks[Manifest.MANIFEST_ID]
+
         def record_unused(id_):
             if self.chunks.get(id_, (0,))[0] == 0:
                 self.possibly_superseded.add(id_)

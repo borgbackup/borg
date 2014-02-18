@@ -10,4 +10,4 @@ chunker.c
 *.pyc
 *.pyo
 *.so
-
+docs/usage/*.inc

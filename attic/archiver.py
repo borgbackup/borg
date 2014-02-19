@@ -374,6 +374,24 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             print('No help available on %s' % (args.topic,))
         return self.exit_code
 
+    def preprocess_args(self, args):
+        deprecations = [
+            ('--hourly', '--keep-hourly', 'Warning: "--hourly" has been deprecated. Use "--keep-hourly" instead.'),
+            ('--daily', '--keep-daily', 'Warning: "--daily" has been deprecated. Use "--keep-daily" instead.'),
+            ('--weekly', '--keep-weekly', 'Warning: "--weekly" has been deprecated. Use "--keep-weekly" instead.'),
+            ('--monthly', '--keep-monthly', 'Warning: "--monthly" has been deprecated. Use "--keep-monthly" instead.'),
+            ('--yearly', '--keep-yearly', 'Warning: "--yearly" has been deprecated. Use "--keep-yearly" instead.')
+        ]
+        if args and args[0] == 'verify':
+            print('Warning: "attic verify" has been deprecated. Use "attic extract --dry-run" instead.')
+            args = ['extract', '--dry-run'] + args[1:]
+        for i, arg in enumerate(args[:]):
+            for old_name, new_name, warning in deprecations:
+                if arg.startswith(old_name):
+                    args[i] = arg.replace(old_name, new_name)
+                    print(warning)
+        return args
+
     def run(self, args=None):
         keys_dir = get_keys_dir()
         if not os.path.exists(keys_dir):
@@ -391,6 +409,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
         if args and args[0] == 'serve':
             return self.do_serve()
+        if args:
+            args = self.preprocess_args(args)
 
         parser = argparse.ArgumentParser(description='Attic %s - Deduplicated Backups' % __version__)
         subparsers = parser.add_subparsers(title='Available commands')
@@ -468,7 +488,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                           description=self.do_extract.__doc__,
                                           epilog=extract_epilog)
         subparser.set_defaults(func=self.do_extract)
-        subparser.add_argument('--dry-run', dest='dry_run',
+        subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
                                help='do not actually change any files')
         subparser.add_argument('-e', '--exclude', dest='excludes',
@@ -541,17 +561,17 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                           description=self.do_prune.__doc__,
                                           epilog=prune_epilog)
         subparser.set_defaults(func=self.do_prune)
-        subparser.add_argument('--within', dest='within', type=str, metavar='WITHIN',
+        subparser.add_argument('--keep-within', dest='within', type=str, metavar='WITHIN',
                                help='keep all archives within this time interval')
-        subparser.add_argument('-H', '--hourly', dest='hourly', type=int, default=0,
+        subparser.add_argument('-H', '--keep-hourly', dest='hourly', type=int, default=0,
                                help='number of hourly archives to keep')
-        subparser.add_argument('-d', '--daily', dest='daily', type=int, default=0,
+        subparser.add_argument('-d', '--keep-daily', dest='daily', type=int, default=0,
                                help='number of daily archives to keep')
-        subparser.add_argument('-w', '--weekly', dest='weekly', type=int, default=0,
+        subparser.add_argument('-w', '--keep-weekly', dest='weekly', type=int, default=0,
                                help='number of weekly archives to keep')
-        subparser.add_argument('-m', '--monthly', dest='monthly', type=int, default=0,
+        subparser.add_argument('-m', '--keep-monthly', dest='monthly', type=int, default=0,
                                help='number of monthly archives to keep')
-        subparser.add_argument('-y', '--yearly', dest='yearly', type=int, default=0,
+        subparser.add_argument('-y', '--keep-yearly', dest='yearly', type=int, default=0,
                                help='number of yearly archives to keep')
         subparser.add_argument('-p', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')

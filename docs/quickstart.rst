@@ -69,7 +69,7 @@ of old archives::
 
     # Use the `prune` subcommand to maintain 7 daily, 4 weekly
     # and 6 monthly archives.
-    attic prune -v $REPOSITORY --daily=7 --weekly=4 --monthly=6
+    attic prune -v $REPOSITORY --keep-daily=7 --keep-weekly=4 --keep-monthly=6
 
 .. Note::
     This script assumes the repository has already been initialized with

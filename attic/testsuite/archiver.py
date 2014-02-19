@@ -11,7 +11,7 @@ from hashlib import sha256
 from attic import xattr
 from attic.archive import Archive
 from attic.archiver import Archiver
-from attic.helpers import Manifest, IntegrityError
+from attic.helpers import Manifest
 from attic.repository import Repository
 from attic.testsuite import AtticTestCase
 from attic.crypto import bytes_to_long, num_aes_blocks
@@ -239,6 +239,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         finally:
             # Restore permissions so shutil.rmtree is able to delete it
             os.system('chmod -R u+w ' + self.repository_path)
+
+    def test_cmdline_compatibility(self):
+        self.create_regual_file('file1', size=1024 * 80)
+        self.attic('init', self.repository_location)
+        self.attic('create', self.repository_location + '::test', 'input')
+        output = self.attic('verify', '-v', self.repository_location + '::test')
+        self.assert_in('"attic verify" has been deprecated', output)
+        output = self.attic('prune', self.repository_location, '--hourly=1')
+        self.assert_in('"--hourly" has been deprecated. Use "--keep-hourly" instead', output)
 
     def test_prune_repository(self):
         self.attic('init', self.repository_location)

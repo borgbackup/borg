@@ -13,7 +13,9 @@ Version 0.11
 - Fix exception during "attic create" with repeated files (#39)
 - New "--exclude-from" option for attic create/extract/verify.
 - Improved archive metadata deduplication.
-- Replace the "verify" command with "extract --dry-run" (#25)
+- "attic verify" has been deprecated. Use "attic extract --dry-run" instead.
+- "attic prune --hourly|daily|..." has been deprecated.
+  Use "attic prune --keep-hourly|daily|..." instead.
 
 Version 0.10
 ------------

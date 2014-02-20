@@ -331,8 +331,11 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         for archive in keep:
             self.print_verbose('Keeping archive "%s"' % archive.name)
         for archive in to_delete:
-            self.print_verbose('Pruning archive "%s"', archive.name)
-            archive.delete(cache)
+            if args.dry_run:
+                self.print_verbose('Would prune     "%s"' % archive.name)
+            else:
+                self.print_verbose('Pruning archive "%s"' % archive.name)
+                archive.delete(cache)
         return self.exit_code
 
     helptext = {}
@@ -561,6 +564,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                           description=self.do_prune.__doc__,
                                           epilog=prune_epilog)
         subparser.set_defaults(func=self.do_prune)
+        subparser.add_argument('-n', '--dry-run', dest='dry_run',
+                               default=False, action='store_true',
+                               help='do not change repository')
         subparser.add_argument('--keep-within', dest='within', type=str, metavar='WITHIN',
                                help='keep all archives within this time interval')
         subparser.add_argument('-H', '--keep-hourly', dest='hourly', type=int, default=0,

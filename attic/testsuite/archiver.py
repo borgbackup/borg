@@ -253,10 +253,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.attic('init', self.repository_location)
         self.attic('create', self.repository_location + '::test1', src_dir)
         self.attic('create', self.repository_location + '::test2', src_dir)
-        self.attic('prune', self.repository_location, '--daily=2')
+        output = self.attic('prune', '-v', '--dry-run', self.repository_location, '--keep-daily=2')
+        self.assert_in('Keeping archive "test2"', output)
+        self.assert_in('Would prune     "test1"', output)
         output = self.attic('list', self.repository_location)
-        assert 'test1' not in output
-        assert 'test2' in output
+        self.assert_in('test1', output)
+        self.assert_in('test2', output)
+        self.attic('prune', self.repository_location, '--keep-daily=2')
+        output = self.attic('list', self.repository_location)
+        self.assert_not_in('test1', output)
+        self.assert_in('test2', output)
 
     def test_usage(self):
         self.assert_raises(SystemExit, lambda: self.attic())

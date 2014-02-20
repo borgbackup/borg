@@ -45,7 +45,6 @@ class Repository(object):
     class CheckNeeded(Error):
         '''Inconsistency detected. Please run "attic check {}"'''
 
-
     def __init__(self, path, create=False):
         self.path = path
         self.io = None
@@ -88,6 +87,12 @@ class Repository(object):
     def get_transaction_id(self):
         index_transaction_id = self.get_index_transaction_id()
         segments_transaction_id = self.io.get_segments_transaction_id()
+        # Attempt to automatically rebuild index if we crashed between commit
+        # tag write and index save
+        if (index_transaction_id if index_transaction_id is not None else -1) < (segments_transaction_id if segments_transaction_id is not None else -1):
+            self.replay_segments(index_transaction_id, segments_transaction_id)
+            index_transaction_id = self.get_index_transaction_id()
+
         if index_transaction_id != segments_transaction_id:
             raise self.CheckNeeded(self.path)
         return index_transaction_id
@@ -127,14 +132,16 @@ class Repository(object):
             return {}
         return NSIndex((os.path.join(self.path, 'index.%d') % transaction_id).encode('utf-8'), readonly=True)
 
-    def get_index(self, transaction_id):
+    def get_index(self, transaction_id, do_cleanup=True):
+        self._active_txn = True
         self.lock.upgrade()
         if transaction_id is None:
             self.index = NSIndex.create(os.path.join(self.path, 'index.tmp').encode('utf-8'))
             self.segments = {}
             self.compact = set()
         else:
-            self.io.cleanup(transaction_id)
+            if do_cleanup:
+                self.io.cleanup(transaction_id)
             shutil.copy(os.path.join(self.path, 'index.%d' % transaction_id),
                         os.path.join(self.path, 'index.tmp'))
             self.index = NSIndex(os.path.join(self.path, 'index.tmp').encode('utf-8'))
@@ -161,6 +168,7 @@ class Repository(object):
             if name.endswith(current):
                 continue
             os.unlink(os.path.join(self.path, name))
+        self.index = None
 
     def compact_segments(self):
         """Compact sparse segments by copying data into new segments
@@ -185,6 +193,41 @@ class Repository(object):
             assert self.segments.pop(segment) == 0
             self.io.delete_segment(segment)
         self.compact = set()
+
+    def replay_segments(self, index_transaction_id, segments_transaction_id):
+        self.get_index(index_transaction_id, do_cleanup=False)
+        for segment, filename in self.io.segment_iterator():
+            if index_transaction_id is not None and segment <= index_transaction_id:
+                continue
+            if segment > segments_transaction_id:
+                break
+            self.segments[segment] = 0
+            for tag, key, offset in self.io.iter_objects(segment):
+                if tag == TAG_PUT:
+                    try:
+                        s, _ = self.index[key]
+                        self.compact.add(s)
+                        self.segments[s] -= 1
+                    except KeyError:
+                        pass
+                    self.index[key] = segment, offset
+                    self.segments[segment] += 1
+                elif tag == TAG_DELETE:
+                    try:
+                        s, _ = self.index.pop(key)
+                    except KeyError:
+                        raise self.CheckNeeded(self.path)
+                    self.segments[s] -= 1
+                    self.compact.add(s)
+                    self.compact.add(segment)
+                elif tag == TAG_COMMIT:
+                    continue
+                else:
+                    raise self.CheckNeeded(self.path)
+            if self.segments[segment] == 0:
+                self.compact.add(segment)
+        self.write_index()
+        self.rollback()
 
     def check(self, progress=False, repair=False):
         """Check repository consistency
@@ -220,11 +263,6 @@ class Repository(object):
 
         for segment, filename in self.io.segment_iterator():
             if segment > transaction_id:
-                if repair:
-                    report_progress('Deleting uncommitted segment {}'.format(segment), error=True)
-                    self.io.delete_segment(segment)
-                else:
-                    report_progress('Uncommitted segment {} found'.format(segment), error=True)
                 continue
             try:
                 objects = list(self.io.iter_objects(segment))
@@ -241,7 +279,6 @@ class Repository(object):
                         s, _ = self.index[key]
                         self.compact.add(s)
                         self.segments[s] -= 1
-                        report_progress('Key found in more than one segment. Segment={}, key={}'.format(segment, hexlify(key)), error=True)
                     except KeyError:
                         pass
                     self.index[key] = segment, offset
@@ -264,15 +301,19 @@ class Repository(object):
             self.io.segment = transaction_id + 1
             self.io.write_commit()
             self.io.close_segment()
-        if current_index and len(current_index) != len(self.index):
-            report_progress('Index object count mismatch. {} != {}'.format(len(current_index), len(self.index)), error=True)
+        if current_index and not repair:
+            if len(current_index) != len(self.index) and False:
+                report_progress('Index object count mismatch. {} != {}'.format(len(current_index), len(self.index)), error=True)
+            elif current_index:
+                for key, value in self.index.iteritems():
+                    if current_index.get(key, (-1, -1)) != value:
+                        report_progress('Index mismatch for key {}. {} != {}'.format(key, value, current_index.get(key, (-1, -1))), error=True)
         if not error_found:
             report_progress('Repository check complete, no problems found.')
         if repair:
+            self.compact_segments()
             self.write_index()
         else:
-            # Delete temporary index file
-            self.index = None
             os.unlink(os.path.join(self.path, 'index.tmp'))
         self.rollback()
         return not error_found or repair
@@ -309,7 +350,6 @@ class Repository(object):
     def put(self, id, data, wait=True):
         if not self._active_txn:
             self.get_index(self.get_transaction_id())
-            self._active_txn = True
         try:
             segment, _ = self.index[id]
             self.segments[segment] -= 1
@@ -327,7 +367,6 @@ class Repository(object):
     def delete(self, id, wait=True):
         if not self._active_txn:
             self.get_index(self.get_transaction_id())
-            self._active_txn = True
         try:
             segment, offset = self.index.pop(id)
             self.segments[segment] -= 1

@@ -1,14 +1,15 @@
 import os
 import shutil
 import tempfile
+from attic.testsuite.mock import patch
 from attic.hashindex import NSIndex
-from attic.helpers import Location, IntegrityError
+from attic.helpers import Location, IntegrityError, UpgradableLock
 from attic.remote import RemoteRepository
 from attic.repository import Repository
 from attic.testsuite import AtticTestCase
 
 
-class RepositoryTestCase(AtticTestCase):
+class RepositoryTestCaseBase(AtticTestCase):
 
     def open(self, create=False):
         return Repository(os.path.join(self.tmppath, 'repository'), create=create)
@@ -20,6 +21,14 @@ class RepositoryTestCase(AtticTestCase):
     def tearDown(self):
         self.repository.close()
         shutil.rmtree(self.tmppath)
+
+    def reopen(self):
+        if self.repository:
+            self.repository.close()
+        self.repository = self.open()
+
+
+class RepositoryTestCase(RepositoryTestCaseBase):
 
     def test1(self):
         for x in range(100):
@@ -101,23 +110,72 @@ class RepositoryTestCase(AtticTestCase):
         self.assert_equal(len(self.repository.list(limit=50)), 50)
 
 
-class RepositoryCheckTestCase(AtticTestCase):
+class RepositoryCommitTestCase(RepositoryTestCaseBase):
 
-    def open(self, create=False):
-        return Repository(os.path.join(self.tmppath, 'repository'), create=create)
+    def add_keys(self):
+        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.put(b'00000000000000000000000000000001', b'bar')
+        self.repository.commit()
+        self.repository.put(b'00000000000000000000000000000001', b'bar2')
+        self.repository.put(b'00000000000000000000000000000002', b'boo')
 
-    def reopen(self):
-        if self.repository:
-            self.repository.close()
-        self.repository = self.open()
+    def test_replay_of_missing_index(self):
+        self.add_keys()
+        for name in os.listdir(self.repository.path):
+            if name.startswith('index.'):
+                os.unlink(os.path.join(self.repository.path, name))
+        self.reopen()
+        self.assert_equal(len(self.repository), 2)
+        self.assert_equal(self.repository.check(), True)
 
-    def setUp(self):
-        self.tmppath = tempfile.mkdtemp()
-        self.repository = self.open(create=True)
+    def test_crash_before_compact_segments(self):
+        self.add_keys()
+        self.repository.compact_segments = None
+        try:
+            self.repository.commit()
+        except TypeError:
+            pass
+        self.reopen()
+        self.assert_equal(len(self.repository), 3)
+        self.assert_equal(self.repository.check(), True)
 
-    def tearDown(self):
-        self.repository.close()
-        shutil.rmtree(self.tmppath)
+    def test_replay_of_readonly_repository(self):
+        self.add_keys()
+        for name in os.listdir(self.repository.path):
+            if name.startswith('index.'):
+                os.unlink(os.path.join(self.repository.path, name))
+        with patch.object(UpgradableLock, 'upgrade', side_effect=UpgradableLock.LockUpgradeFailed) as upgrade:
+            self.reopen()
+            self.assert_raises(UpgradableLock.LockUpgradeFailed, lambda: len(self.repository))
+            upgrade.assert_called_once()
+
+
+    def test_crash_before_write_index(self):
+        self.add_keys()
+        self.repository.write_index = None
+        try:
+            self.repository.commit()
+        except TypeError:
+            pass
+        self.reopen()
+        self.assert_equal(len(self.repository), 3)
+        self.assert_equal(self.repository.check(), True)
+
+    def test_crash_before_deleting_compacted_segments(self):
+        self.add_keys()
+        self.repository.io.delete_segment = None
+        try:
+            self.repository.commit()
+        except TypeError:
+            pass
+        self.reopen()
+        self.assert_equal(len(self.repository), 3)
+        self.assert_equal(self.repository.check(), True)
+        self.assert_equal(len(self.repository), 3)
+
+
+
+class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
     def list_indices(self):
         return [name for name in os.listdir(os.path.join(self.tmppath, 'repository')) if name.startswith('index.')]
@@ -161,7 +219,7 @@ class RepositoryCheckTestCase(AtticTestCase):
                   os.path.join(self.tmppath, 'repository', new_name))
 
     def list_objects(self):
-        return set((int(key) for key, _ in list(self.open_index().iteritems())))
+        return set(int(key) for key in self.repository.list())
 
     def test_repair_corrupted_segment(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
@@ -228,22 +286,8 @@ class RepositoryCheckTestCase(AtticTestCase):
     def test_repair_missing_index(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
         self.delete_index()
-        self.assert_raises(Repository.CheckNeeded, lambda: self.get_objects(4))
         self.check(status=False)
         self.check(repair=True, status=True)
-        self.check(status=True)
-        self.get_objects(4)
-        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
-
-    def test_repair_index_too_old(self):
-        self.add_objects([[1, 2, 3], [4, 5, 6]])
-        self.assert_equal(self.list_indices(), ['index.1'])
-        self.rename_index('index.0')
-        self.assert_equal(self.list_indices(), ['index.0'])
-        self.assert_raises(Repository.CheckNeeded, lambda: self.get_objects(4))
-        self.check(status=False)
-        self.check(repair=True, status=True)
-        self.assert_equal(self.list_indices(), ['index.1'])
         self.check(status=True)
         self.get_objects(4)
         self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())

@@ -115,9 +115,11 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
     def add_keys(self):
         self.repository.put(b'00000000000000000000000000000000', b'foo')
         self.repository.put(b'00000000000000000000000000000001', b'bar')
+        self.repository.put(b'00000000000000000000000000000003', b'bar')
         self.repository.commit()
         self.repository.put(b'00000000000000000000000000000001', b'bar2')
         self.repository.put(b'00000000000000000000000000000002', b'boo')
+        self.repository.delete(b'00000000000000000000000000000003')
 
     def test_replay_of_missing_index(self):
         self.add_keys()
@@ -125,7 +127,7 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
             if name.startswith('index.'):
                 os.unlink(os.path.join(self.repository.path, name))
         self.reopen()
-        self.assert_equal(len(self.repository), 2)
+        self.assert_equal(len(self.repository), 3)
         self.assert_equal(self.repository.check(), True)
 
     def test_crash_before_compact_segments(self):
@@ -172,7 +174,6 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         self.assert_equal(len(self.repository), 3)
         self.assert_equal(self.repository.check(), True)
         self.assert_equal(len(self.repository), 3)
-
 
 
 class RepositoryCheckTestCase(RepositoryTestCaseBase):
@@ -249,10 +250,6 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
     def test_repair_missing_commit_segment(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
         self.delete_segment(1)
-        self.assert_raises(Repository.CheckNeeded, lambda: self.get_objects(4))
-        self.check(status=False)
-        self.assert_raises(Repository.CheckNeeded, lambda: self.get_objects(4))
-        self.check(repair=True, status=True)
         self.assert_raises(Repository.DoesNotExist, lambda: self.get_objects(4))
         self.assert_equal(set([1, 2, 3]), self.list_objects())
 
@@ -261,11 +258,9 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         with open(os.path.join(self.tmppath, 'repository', 'data', '0', '1'), 'r+b') as fd:
             fd.seek(-1, os.SEEK_END)
             fd.write(b'X')
-        self.assert_raises(Repository.CheckNeeded, lambda: self.get_objects(4))
-        self.check(status=False)
-        self.check(repair=True, status=True)
-        self.get_objects(3)
         self.assert_raises(Repository.DoesNotExist, lambda: self.get_objects(4))
+        self.check(status=True)
+        self.get_objects(3)
         self.assert_equal(set([1, 2, 3]), self.list_objects())
 
     def test_repair_no_commits(self):
@@ -286,8 +281,6 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
     def test_repair_missing_index(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
         self.delete_index()
-        self.check(status=False)
-        self.check(repair=True, status=True)
         self.check(status=True)
         self.get_objects(4)
         self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
@@ -296,12 +289,8 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
         self.assert_equal(self.list_indices(), ['index.1'])
         self.rename_index('index.100')
-        self.assert_equal(self.list_indices(), ['index.100'])
-        self.assert_raises(Repository.CheckNeeded, lambda: self.get_objects(4))
-        self.check(status=False)
-        self.check(repair=True, status=True)
-        self.assert_equal(self.list_indices(), ['index.1'])
         self.check(status=True)
+        self.assert_equal(self.list_indices(), ['index.1'])
         self.get_objects(4)
         self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
 

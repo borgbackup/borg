@@ -16,6 +16,7 @@ Version 0.11
 - "attic verify" has been deprecated. Use "attic extract --dry-run" instead.
 - "attic prune --hourly|daily|..." has been deprecated.
   Use "attic prune --keep-hourly|daily|..." instead.
+- Ignore xattr errors during "extract" if not supported by the filesystem. (#46)
 
 Version 0.10
 ------------

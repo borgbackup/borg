@@ -1,7 +1,7 @@
-from binascii import hexlify
 from datetime import datetime, timedelta, timezone
 from getpass import getuser
 from itertools import groupby
+import errno
 import shutil
 import tempfile
 from attic.key import key_factory
@@ -283,8 +283,12 @@ class Archive:
     def restore_attrs(self, path, item, symlink=False, fd=None):
         xattrs = item.get(b'xattrs')
         if xattrs:
-            for k, v in xattrs.items():
-                xattr.setxattr(fd or path, k, v)
+                for k, v in xattrs.items():
+                    try:
+                        xattr.setxattr(fd or path, k, v)
+                    except OSError as e:
+                        if e.errno != errno.ENOTSUP:
+                            raise
         uid = gid = None
         if not self.numeric_owner:
             uid = user2uid(item[b'user'])

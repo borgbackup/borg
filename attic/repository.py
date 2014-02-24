@@ -258,6 +258,8 @@ class Repository(object):
             current_index = None
         if transaction_id is None:
             transaction_id = self.get_index_transaction_id()
+        if transaction_id is None:
+            transaction_id = self.io.get_latest_segment()
         segments_transaction_id = self.io.get_segments_transaction_id()
         self.get_index(None)
         for segment, filename in self.io.segment_iterator():
@@ -417,6 +419,12 @@ class LoggedIO(object):
             for filename in filenames:
                 yield int(filename), os.path.join(dirpath, filename)
 
+
+    def get_latest_segment(self):
+        for segment, filename in self.segment_iterator(reverse=True):
+            return segment
+        return None
+
     def get_segments_transaction_id(self):
         """Verify that the transaction id is consistent with the index transaction id
         """
@@ -518,7 +526,7 @@ class LoggedIO(object):
             fd.write(MAGIC)
             while len(data) >= self.header_fmt.size:
                 crc, size, tag = self.header_fmt.unpack(data[:self.header_fmt.size])
-                if size > len(data):
+                if size < self.header_fmt.size or size > len(data):
                     data = data[1:]
                     continue
                 if crc32(data[4:size]) & 0xffffffff != crc:

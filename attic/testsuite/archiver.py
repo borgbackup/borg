@@ -9,12 +9,13 @@ import time
 import unittest
 from hashlib import sha256
 from attic import xattr
-from attic.archive import Archive
+from attic.archive import Archive, ChunkBuffer
 from attic.archiver import Archiver
+from attic.crypto import bytes_to_long, num_aes_blocks
 from attic.helpers import Manifest
 from attic.repository import Repository
 from attic.testsuite import AtticTestCase
-from attic.crypto import bytes_to_long, num_aes_blocks
+from attic.testsuite.mock import patch
 
 try:
     import llfuse
@@ -328,9 +329,10 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 
     def setUp(self):
         super(ArchiverCheckTestCase, self).setUp()
-        self.attic('init', self.repository_location)
-        self.create_src_archive('archive1')
-        self.create_src_archive('archive2')
+        with patch.object(ChunkBuffer, 'BUFFER_SIZE', 10):
+            self.attic('init', self.repository_location)
+            self.create_src_archive('archive1')
+            self.create_src_archive('archive2')
 
     def open_archive(self, name):
         repository = Repository(self.repository_path)
@@ -351,7 +353,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 
     def test_missing_archive_item_chunk(self):
         archive, repository = self.open_archive('archive1')
-        repository.delete(archive.metadata[b'items'][-1])
+        repository.delete(archive.metadata[b'items'][-5])
         repository.commit()
         self.attic('check', self.repository_location, exit_code=1)
         self.attic('check', '--repair', self.repository_location, exit_code=0)

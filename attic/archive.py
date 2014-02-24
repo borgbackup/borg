@@ -402,6 +402,53 @@ class Archive:
             yield Archive(repository, key, manifest, name, cache=cache)
 
 
+class RobustUnpacker():
+    """A restartable/robust version of the streaming msgpack unpacker
+    """
+    def __init__(self, validator):
+        super(RobustUnpacker, self).__init__()
+        self.validator = validator
+        self._buffered_data = []
+        self._resync = False
+        self._skip = 0
+        self._unpacker = msgpack.Unpacker(object_hook=StableDict)
+
+    def resync(self):
+        self._buffered_data = []
+        self._resync = True
+        self._skip = 0
+
+    def feed(self, data):
+        if self._resync:
+            self._buffered_data.append(data)
+        else:
+            self._unpacker.feed(data)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self._resync:
+            while self._resync:
+                data = b''.join(self._buffered_data)[self._skip:]
+                if not data:
+                    raise StopIteration
+                temp_unpacker = msgpack.Unpacker()
+                temp_unpacker.feed(data)
+                for item in temp_unpacker:
+                    if self.validator(item):
+                        self._resync = False
+                        self._unpacker = msgpack.Unpacker(object_hook=StableDict)
+                        self.feed(b''.join(self._buffered_data)[self._skip:])
+                        return self._unpacker.__next__()
+                    else:
+                        self._skip += 1
+                else:
+                    raise StopIteration
+        else:
+            return self._unpacker.__next__()
+
+
 class ArchiveChecker:
 
     def __init__(self):
@@ -527,38 +574,23 @@ class ArchiveChecker:
                 offset += size
             item[b'chunks'] = chunk_list
 
-        def msgpack_resync(data):
-            data = memoryview(data)
-            while data:
-                unpacker = msgpack.Unpacker()
-                unpacker.feed(data)
-                item = next(unpacker)
-                if isinstance(item, dict) and b'path' in item:
-                    return data
-                data = data[1:]
-
         def robust_iterator(archive):
-            prev_state = None
-            state = 0
+            unpacker = RobustUnpacker(lambda item: isinstance(item, dict) and b'path' in item)
+            _state = 0
             def missing_chunk_detector(chunk_id):
-                nonlocal state
-                if state % 2 != int(not chunk_id in self.chunks):
-                    state += 1
-                return state
-
+                nonlocal _state
+                if _state % 2 != int(not chunk_id in self.chunks):
+                    _state += 1
+                return _state
             for state, items in groupby(archive[b'items'], missing_chunk_detector):
-                if state != prev_state:
-                    unpacker = msgpack.Unpacker(object_hook=StableDict)
-                    prev_state = state
+                items = list(items)
                 if state % 2:
                     self.report_progress('Archive metadata damage detected', error=True)
-                    return
-                items = list(items)
-                for i, (chunk_id, cdata) in enumerate(zip(items, self.repository.get_many(items))):
-                    data = self.key.decrypt(chunk_id, cdata)
-                    if state and i == 0:
-                        data = msgpack_resync(data)
-                    unpacker.feed(data)
+                    continue
+                if state > 0:
+                    unpacker.resync()
+                for chunk_id, cdata in zip(items, self.repository.get_many(items)):
+                    unpacker.feed(self.key.decrypt(chunk_id, cdata))
                     for item in unpacker:
                         yield item
 

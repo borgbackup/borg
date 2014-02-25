@@ -2,6 +2,7 @@ import argparse
 from binascii import hexlify
 from datetime import datetime
 from operator import attrgetter
+import io
 import os
 import stat
 import sys
@@ -351,19 +352,19 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         matching is attempted.  Thus, if a given pattern ends in a path separator, a
         '*' is appended before matching is attempted.  Patterns with wildcards should
         be quoted to protect them from shell expansion.
-        
+
         Examples:
-        
+
         # Exclude '/home/user/file.o' but not '/home/user/file.odt':
         $ attic create -e '*.o' repo.attic /
-        
+
         # Exclude '/home/user/junk' and '/home/user/subdir/junk' but
         # not '/home/user/importantjunk' or '/etc/junk':
         $ attic create -e '/home/*/junk' repo.attic /
-        
+
         # Exclude the contents of '/home/user/cache' but not the directory itself:
         $ attic create -e /home/user/cache/ repo.attic /
-        
+
         # The file '/home/user/cache/important' is *not* backed up:
         $ attic create -e /home/user/cache/ repo.attic / /home/user/cache/important
         '''
@@ -598,6 +599,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
 
 def main():
+    # Make sure stdout and stderr have errors='replace') to avoid unicode
+    # issues when print()-ing unicode file names
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=sys.stdout.line_buffering)
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, sys.stderr.encoding, 'replace', line_buffering=sys.stderr.line_buffering)
     archiver = Archiver()
     try:
         exit_code = archiver.run(sys.argv[1:])

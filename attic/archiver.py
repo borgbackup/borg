@@ -15,7 +15,7 @@ from attic.key import key_creator
 from attic.helpers import Error, location_validator, format_time, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
-    Manifest, remove_surrogates, update_excludes
+    Manifest, remove_surrogates, update_excludes, format_archive
 from attic.remote import RepositoryServer, RemoteRepository
 
 
@@ -278,7 +278,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                                   remove_surrogates(item[b'path']), extra))
         else:
             for archive in sorted(Archive.list_archives(repository, key, manifest), key=attrgetter('ts')):
-                print('%-20s %s' % (archive.metadata[b'name'], to_localtime(archive.ts).strftime('%c')))
+                print(format_archive(archive))
         return self.exit_code
 
     def do_info(self, args):
@@ -330,12 +330,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         to_delete = [a for a in archives if a not in keep]
 
         for archive in keep:
-            self.print_verbose('Keeping archive "%s"' % archive.name)
+            self.print_verbose('Keeping archive: %s' % format_archive(archive))
         for archive in to_delete:
             if args.dry_run:
-                self.print_verbose('Would prune     "%s"' % archive.name)
+                self.print_verbose('Would prune:     %s' % format_archive(archive))
             else:
-                self.print_verbose('Pruning archive "%s"' % archive.name)
+                self.print_verbose('Pruning archive: %s' % format_archive(archive))
                 archive.delete(cache)
         return self.exit_code
 
@@ -549,11 +549,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         backups. As an example, "-d 7" means to keep the latest backup on each day
         for 7 days. Days without backups do not count towards the total. The rules
         are applied from hourly to yearly, and backups selected by previous rules do
-        not count towards those of later rules. Dates and times are interpreted in
+        not count towards those of later rules. The time that each backup completes
+        is used for pruning purposes. Dates and times are interpreted in
         the local timezone, and weeks go from Monday to Sunday. Specifying a
         negative number of archives to keep means that there is no limit.
-        The "--within" option takes an argument of the form "<int><char>",
-        where char is "H", "d", "w", "m", "y". For example, "--within 2d" means
+        The "--keep-within" option takes an argument of the form "<int><char>",
+        where char is "H", "d", "w", "m", "y". For example, "--keep-within 2d" means
         to keep all archives that were created within the past 48 hours.
         "1m" is taken to mean "31d". The archives kept with this option do not
         count towards the totals specified by any other options. If a

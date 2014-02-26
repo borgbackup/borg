@@ -288,6 +288,10 @@ def format_file_size(v):
         return '%d B' % v
 
 
+def format_archive(archive):
+    return '%-36s %s' % (archive.name, to_localtime(archive.ts).strftime('%c'))
+
+
 class IntegrityError(Error):
     """Data integrity error"""
 

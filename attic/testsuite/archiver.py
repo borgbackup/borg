@@ -340,6 +340,17 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         archive = Archive(repository, key, manifest, name)
         return archive, repository
 
+    def test_check_usage(self):
+        output = self.attic('check', self.repository_location, exit_code=0)
+        self.assert_in('Starting repository check', output)
+        self.assert_in('Starting archive consistency check', output)
+        output = self.attic('check', '--phase', 'repository', self.repository_location, exit_code=0)
+        self.assert_in('Starting repository check', output)
+        self.assert_not_in('Starting archive consistency check', output)
+        output = self.attic('check', '--phase', 'archive', self.repository_location, exit_code=0)
+        self.assert_not_in('Starting repository check', output)
+        self.assert_in('Starting archive consistency check', output)
+
     def test_missing_file_chunk(self):
         archive, repository = self.open_archive('archive1')
         for item in archive.iter_items():
@@ -372,8 +383,8 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         repository.delete(Manifest.MANIFEST_ID)
         repository.commit()
         self.attic('check', self.repository_location, exit_code=1)
-        self.attic('check', '--repair', '--progress', self.repository_location, exit_code=0)
-        self.attic('check', '--progress', self.repository_location, exit_code=0)
+        self.attic('check', '--repair', self.repository_location, exit_code=0)
+        self.attic('check', self.repository_location, exit_code=0)
 
     def test_extra_chunks(self):
         self.attic('check', self.repository_location, exit_code=0)

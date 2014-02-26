@@ -6,6 +6,7 @@ import io
 import os
 import stat
 import sys
+import textwrap
 
 from attic import __version__
 from attic.archive import Archive, ArchiveChecker
@@ -72,13 +73,10 @@ in data loss.
 Type "Yes I am sure" if you understand this and want to continue.\n""")
                 if input('Do you want to continue? ') == 'Yes I am sure':
                     break
-        if args.progress is None:
-            args.progress = sys.stdout.isatty() or args.verbose
-        if not repository.check(progress=args.progress, repair=args.repair):
-            return 1
-
-        if not ArchiveChecker().check(repository, progress=args.progress, repair=args.repair):
-            return 1
+        if args.phase in ('all', 'repository') and not repository.check(repair=args.repair):
+                return 1
+        if args.phase in ('all', 'archive') and not ArchiveChecker().check(repository, repair=args.repair):
+                return 1
         return 0
 
     def do_change_passphrase(self, args):
@@ -429,26 +427,31 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                choices=('none', 'passphrase', 'keyfile'), default='none',
                                help='select encryption method')
 
-        check_epilog = """
-        Progress status will be reported on the standard error stream by default when
-        it is attached to a terminal. Any problems found are printed to the standard error
-        stream and the command will have a non zero exit code.
-        """
+        check_epilog = textwrap.dedent("""
+        The check command verifies the consistency of a repository and corresponding
+        archives. The check is performed in two phases. In the first phase the
+        checksums of the underlying repository segment files are verified to detect
+        bit rot and other types of damage. In the second phase the consistency and
+        correctness of the archive metadata is verified.
+
+        A specific check phase can be selected using the --phase=repository|archive
+        option. This can be useful since the "archive" phase can be time consuming
+        and requires access to the key file and/or passphrase if encryption is enabled.
+        """)
         subparser = subparsers.add_parser('check', parents=[common_parser],
                                           description=self.do_check.__doc__,
-                                          epilog=check_epilog)
+                                          epilog=check_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_check)
         subparser.add_argument('repository', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to check consistency of')
-        subparser.add_argument('--progress', dest='progress', action='store_true',
-                               default=None,
-                               help='Report progress status to standard output stream')
-        subparser.add_argument('--no-progress', dest='progress', action='store_false',
-                               help='Disable progress reporting')
+        subparser.add_argument('--phase', dest='phase', choices=['repository', 'archive', 'all'],
+                               default='all',
+                               help='which checks to perform (default: all)')
         subparser.add_argument('--repair', dest='repair', action='store_true',
                                default=False,
-                               help='Attempt to repair any inconsistencies found')
+                               help='attempt to repair any inconsistencies found')
 
         subparser = subparsers.add_parser('change-passphrase', parents=[common_parser],
                                           description=self.do_change_passphrase.__doc__)

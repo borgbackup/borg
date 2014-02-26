@@ -182,8 +182,8 @@ class RemoteRepository(object):
                     w_fds = []
         self.ignore_responses |= set(waiting_for)
 
-    def check(self, progress=False, repair=False):
-        return self.call('check', progress, repair)
+    def check(self, repair=False):
+        return self.call('check', repair)
 
     def commit(self, *args):
         return self.call('commit')

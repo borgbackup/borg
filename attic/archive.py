@@ -451,17 +451,15 @@ class ArchiveChecker:
 
     def __init__(self):
         self.error_found = False
-        self.progress = True
         self.possibly_superseded = set()
         self.tmpdir = tempfile.mkdtemp()
 
     def __del__(self):
         shutil.rmtree(self.tmpdir)
 
-    def check(self, repository, progress=True, repair=False):
+    def check(self, repository, repair=False):
         self.report_progress('Starting archive consistency check...')
         self.repair = repair
-        self.progress = progress
         self.repository = repository
         self.init_chunks()
         self.key = self.identify_key(repository)
@@ -494,9 +492,8 @@ class ArchiveChecker:
     def report_progress(self, msg, error=False):
         if error:
             self.error_found = True
-        if error or self.progress:
-            print(msg, file=sys.stderr)
-            sys.stderr.flush()
+        print(msg, file=sys.stderr)
+        sys.stderr.flush()
 
     def identify_key(self, repository):
         cdata = repository.get(next(self.chunks.iteritems())[0])

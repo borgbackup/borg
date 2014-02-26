@@ -233,7 +233,7 @@ class Repository(object):
         self.write_index()
         self.rollback()
 
-    def check(self, progress=False, repair=False):
+    def check(self, repair=False):
         """Check repository consistency
 
         This method verifies all segment checksums and makes sure
@@ -244,9 +244,8 @@ class Repository(object):
             nonlocal error_found
             if error:
                 error_found = True
-            if error or progress:
-                print(msg, file=sys.stderr)
-                sys.stderr.flush()
+            print(msg, file=sys.stderr)
+            sys.stderr.flush()
 
         assert not self._active_txn
         report_progress('Starting repository check...')

@@ -383,7 +383,9 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         repository.delete(Manifest.MANIFEST_ID)
         repository.commit()
         self.attic('check', self.repository_location, exit_code=1)
-        self.attic('check', '--repair', self.repository_location, exit_code=0)
+        output = self.attic('check', '--repair', self.repository_location, exit_code=0)
+        self.assert_in('archive1', output)
+        self.assert_in('archive2', output)
         self.attic('check', self.repository_location, exit_code=0)
 
     def test_extra_chunks(self):

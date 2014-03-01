@@ -509,6 +509,11 @@ class ArchiveChecker:
         for chunk_id, _ in self.chunks.iteritems():
             cdata = self.repository.get(chunk_id)
             data = self.key.decrypt(chunk_id, cdata)
+            # Some basic sanity checks of the payload before feeding it into msgpack
+            if len(data) < 2 or ((data[0] & 0xf0) != 0x80) or ((data[1] & 0xe0) != 0xa0):
+                continue
+            if not b'cmdline' in data or not b'\xa7version\x01' in data:
+                continue
             try:
                 archive = msgpack.unpackb(data)
             except:

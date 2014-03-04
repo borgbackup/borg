@@ -73,7 +73,11 @@ in data loss.
 Type "Yes I am sure" if you understand this and want to continue.\n""")
                 if input('Do you want to continue? ') == 'Yes I am sure':
                     break
-        if args.phase in ('all', 'repository') and not repository.check(repair=args.repair):
+        if args.phase in ('all', 'repository'):
+            print('Starting repository check...')
+            if repository.check(repair=args.repair):
+                print('Repository check complete, no problems found.')
+            else:
                 return 1
         if args.phase in ('all', 'archive') and not ArchiveChecker().check(repository, repair=args.repair):
                 return 1

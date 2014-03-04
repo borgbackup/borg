@@ -240,15 +240,13 @@ class Repository(object):
         the index is consistent with the data stored in the segments.
         """
         error_found = False
-        def report_progress(msg, error=False):
+        def report_error(msg):
             nonlocal error_found
-            if error:
-                error_found = True
+            error_found = True
             print(msg, file=sys.stderr)
             sys.stderr.flush()
 
         assert not self._active_txn
-        report_progress('Starting repository check...')
         try:
             transaction_id = self.get_transaction_id()
             current_index = self.get_read_only_index(transaction_id)
@@ -267,7 +265,7 @@ class Repository(object):
             try:
                 objects = list(self.io.iter_objects(segment))
             except (IntegrityError, struct.error):
-                report_progress('Error reading segment {}'.format(segment), error=True)
+                report_error('Error reading segment {}'.format(segment))
                 objects = []
                 if repair:
                     self.io.recover_segment(segment, filename)
@@ -294,22 +292,20 @@ class Repository(object):
                 elif tag == TAG_COMMIT:
                     continue
                 else:
-                    report_progress('Unexpected tag {} in segment {}'.format(tag, segment), error=True)
+                    report_error('Unexpected tag {} in segment {}'.format(tag, segment))
         # We might need to add a commit tag if no committed segment is found
         if repair and segments_transaction_id is None:
-            report_progress('Adding commit tag to segment {}'.format(transaction_id))
+            report_error('Adding commit tag to segment {}'.format(transaction_id))
             self.io.segment = transaction_id + 1
             self.io.write_commit()
             self.io.close_segment()
         if current_index and not repair:
             if len(current_index) != len(self.index):
-                report_progress('Index object count mismatch. {} != {}'.format(len(current_index), len(self.index)), error=True)
+                report_error('Index object count mismatch. {} != {}'.format(len(current_index), len(self.index)))
             elif current_index:
                 for key, value in self.index.iteritems():
                     if current_index.get(key, (-1, -1)) != value:
-                        report_progress('Index mismatch for key {}. {} != {}'.format(key, value, current_index.get(key, (-1, -1))), error=True)
-        if not error_found:
-            report_progress('Repository check complete, no problems found.')
+                        report_error('Index mismatch for key {}. {} != {}'.format(key, value, current_index.get(key, (-1, -1))))
         if repair:
             self.compact_segments()
             self.write_index()

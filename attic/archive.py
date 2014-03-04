@@ -496,7 +496,7 @@ class ArchiveChecker:
     def report_progress(self, msg, error=False):
         if error:
             self.error_found = True
-        print(msg, file=sys.stderr)
+        print(msg, file=sys.stderr if error else sys.stdout)
         sys.stderr.flush()
 
     def identify_key(self, repository):

@@ -73,13 +73,13 @@ in data loss.
 Type "Yes I am sure" if you understand this and want to continue.\n""")
                 if input('Do you want to continue? ') == 'Yes I am sure':
                     break
-        if args.phase in ('all', 'repository'):
+        if not args.archives_only:
             print('Starting repository check...')
             if repository.check(repair=args.repair):
                 print('Repository check complete, no problems found.')
             else:
                 return 1
-        if args.phase in ('all', 'archive') and not ArchiveChecker().check(repository, repair=args.repair):
+        if not args.repo_only and not ArchiveChecker().check(repository, repair=args.repair):
                 return 1
         return 0
 
@@ -432,15 +432,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='select encryption method')
 
         check_epilog = textwrap.dedent("""
-        The check command verifies the consistency of a repository and corresponding
-        archives. The check is performed in two phases. In the first phase the
-        checksums of the underlying repository segment files are verified to detect
-        bit rot and other types of damage. In the second phase the consistency and
-        correctness of the archive metadata is verified.
+        The check command verifies the consistency of a repository and the corresponding
+        archives. The underlying repository data files are first checked to detect bit rot
+        and other types of damage. After that the consistency and correctness of the archive
+        metadata is verified.
 
-        A specific check phase can be selected using the --phase=repository|archive
-        option. This can be useful since the "archive" phase can be time consuming
-        and requires access to the key file and/or passphrase if encryption is enabled.
+        The archive metadata checks can be time consuming and requires access to the key
+        file and/or passphrase if encryption is enabled. These checks can be skipped using
+        the --repository-only option.
         """)
         subparser = subparsers.add_parser('check', parents=[common_parser],
                                           description=self.do_check.__doc__,
@@ -450,9 +449,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('repository', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to check consistency of')
-        subparser.add_argument('--phase', dest='phase', choices=['repository', 'archive', 'all'],
-                               default='all',
-                               help='which checks to perform (default: all)')
+        subparser.add_argument('--repository-only', dest='repo_only', action='store_true',
+                               default=False,
+                               help='only perform repository checks')
+        subparser.add_argument('--archives-only', dest='archives_only', action='store_true',
+                               default=False,
+                               help='only perform archives checks')
         subparser.add_argument('--repair', dest='repair', action='store_true',
                                default=False,
                                help='attempt to repair any inconsistencies found')

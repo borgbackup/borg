@@ -344,10 +344,10 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         output = self.attic('check', self.repository_location, exit_code=0)
         self.assert_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)
-        output = self.attic('check', '--phase', 'repository', self.repository_location, exit_code=0)
+        output = self.attic('check', '--repository-only', self.repository_location, exit_code=0)
         self.assert_in('Starting repository check', output)
         self.assert_not_in('Starting archive consistency check', output)
-        output = self.attic('check', '--phase', 'archive', self.repository_location, exit_code=0)
+        output = self.attic('check', '--archives-only', self.repository_location, exit_code=0)
         self.assert_not_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)
 

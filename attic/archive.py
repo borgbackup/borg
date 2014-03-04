@@ -431,6 +431,10 @@ class RobustUnpacker():
             while self._resync:
                 if not data:
                     raise StopIteration
+                # Abort early if the data does not look like a serialized item
+                if len(data) < 2 or ((data[0] & 0xf0) != 0x80) or ((data[1] & 0xe0) != 0xa0) or not b'\xa4path' in data:
+                    data = data[1:]
+                    continue
                 self._unpacker = msgpack.Unpacker(object_hook=StableDict)
                 self._unpacker.feed(data)
                 try:

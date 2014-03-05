@@ -244,7 +244,6 @@ class Repository(object):
             nonlocal error_found
             error_found = True
             print(msg, file=sys.stderr)
-            sys.stderr.flush()
 
         assert not self._active_txn
         try:

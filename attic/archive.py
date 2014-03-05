@@ -497,7 +497,6 @@ class ArchiveChecker:
         if error:
             self.error_found = True
         print(msg, file=sys.stderr if error else sys.stdout)
-        sys.stderr.flush()
 
     def identify_key(self, repository):
         cdata = repository.get(next(self.chunks.iteritems())[0])

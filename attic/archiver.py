@@ -611,8 +611,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 def main():
     # Make sure stdout and stderr have errors='replace') to avoid unicode
     # issues when print()-ing unicode file names
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=sys.stdout.line_buffering)
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, sys.stderr.encoding, 'replace', line_buffering=sys.stderr.line_buffering)
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=True)
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, sys.stderr.encoding, 'replace', line_buffering=True)
     archiver = Archiver()
     try:
         exit_code = archiver.run(sys.argv[1:])

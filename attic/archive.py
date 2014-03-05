@@ -163,10 +163,9 @@ class Archive:
 
     def add_item(self, item):
         self.items_buffer.add(item)
-        now = time.time()
-        if now - self.last_checkpoint > self.checkpoint_interval:
-            self.last_checkpoint = now
+        if time.time() - self.last_checkpoint > self.checkpoint_interval:
             self.write_checkpoint()
+            self.last_checkpoint = time.time()
 
     def write_checkpoint(self):
         self.save(self.checkpoint_name)

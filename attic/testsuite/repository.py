@@ -304,7 +304,6 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
     def test_crash_before_compact(self):
         self.repository.put(bytes(32), b'data')
-#        self.repository.commit()
         self.repository.put(bytes(32), b'data2')
         # Simulate a crash before compact
         with patch.object(Repository, 'compact_segments') as compact:

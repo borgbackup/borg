@@ -180,8 +180,8 @@ class Repository(object):
         segments = self.segments
         for segment in sorted(self.compact):
             if self.io.segment_exists(segment):
-                for tag, key, data in self.io.iter_objects(segment, include_data=True):
-                    if tag == TAG_PUT and self.index.get(key, (-1, -1))[0] == segment:
+                for tag, key, offset, data in self.io.iter_objects(segment, include_data=True):
+                    if tag == TAG_PUT and self.index.get(key, (-1, -1)) == (segment, offset):
                         new_segment, offset = self.io.write_put(key, data)
                         self.index[key] = new_segment, offset
                         segments.setdefault(new_segment, 0)
@@ -256,6 +256,8 @@ class Repository(object):
             transaction_id = self.get_index_transaction_id()
         if transaction_id is None:
             transaction_id = self.io.get_latest_segment()
+        if repair:
+            self.io.cleanup(transaction_id)
         segments_transaction_id = self.io.get_segments_transaction_id()
         self.get_index(None)
         for segment, filename in self.io.segment_iterator():
@@ -285,9 +287,9 @@ class Repository(object):
                         s, _ = self.index.pop(key)
                         self.segments[s] -= 1
                         self.compact.add(s)
-                        self.compact.add(segment)
                     except KeyError:
                         pass
+                    self.compact.add(segment)
                 elif tag == TAG_COMMIT:
                     continue
                 else:
@@ -503,7 +505,7 @@ class LoggedIO(object):
             if tag in (TAG_PUT, TAG_DELETE):
                 key = rest[:32]
             if include_data:
-                yield tag, key, rest[32:]
+                yield tag, key, offset, rest[32:]
             else:
                 yield tag, key, offset
             offset += size

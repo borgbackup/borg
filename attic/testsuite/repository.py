@@ -81,6 +81,14 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         self.repository.rollback()
         self.assert_equal(self.repository.get(b'00000000000000000000000000000000'), b'foo')
 
+    def test_overwrite_in_same_transaction(self):
+        """Test cache consistency2
+        """
+        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.put(b'00000000000000000000000000000000', b'foo2')
+        self.repository.commit()
+        self.assert_equal(self.repository.get(b'00000000000000000000000000000000'), b'foo2')
+
     def test_single_kind_transactions(self):
         # put
         self.repository.put(b'00000000000000000000000000000000', b'foo')
@@ -293,6 +301,18 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.assert_equal(self.list_indices(), ['index.1'])
         self.get_objects(4)
         self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
+
+    def test_crash_before_compact(self):
+        self.repository.put(bytes(32), b'data')
+#        self.repository.commit()
+        self.repository.put(bytes(32), b'data2')
+        # Simulate a crash before compact
+        with patch.object(Repository, 'compact_segments') as compact:
+            self.repository.commit()
+            compact.assert_called_once()
+        self.reopen()
+        self.check(repair=True)
+        self.assert_equal(self.repository.get(bytes(32)), b'data2')
 
 
 class RemoteRepositoryTestCase(RepositoryTestCase):

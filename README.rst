@@ -46,7 +46,7 @@ How do I install it?
 
 Where are the docs?
 -------------------
-Go to https://pythonhosted.org/Attic/ for a prebuilt version of the documentation.
+Go to https://attic-backup.org/ for a prebuilt version of the documentation.
 You can also build it yourself from the docs folder.
 
 Where are the tests?

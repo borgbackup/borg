@@ -140,3 +140,7 @@ gh-pages: html
 
 inotify: html
 	while inotifywait -r . --exclude usage.rst --exclude '_build/*' ; do make html ; done
+
+upload: html
+	rsync -va -e ssh _build/html/ sushi.edgewall.com:/srv/attic/www/
+

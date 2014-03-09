@@ -61,7 +61,7 @@ setup(
     version=versioneer.get_version(),
     author='Jonas Borgström',
     author_email='jonas@borgstrom.se',
-    url='https://pythonhosted.org/Attic/',
+    url='https://attic-backup.org/',
     description='Deduplicated backups',
     long_description=long_description,
     license='BSD',

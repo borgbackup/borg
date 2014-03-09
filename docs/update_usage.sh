@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 if [ ! -d usage ]; then
   mkdir usage
 fi

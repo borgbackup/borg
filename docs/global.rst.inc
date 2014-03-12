@@ -21,4 +21,5 @@
 .. _Debian: http://packages.debian.org/attic
 .. _Ubuntu: http://packages.ubuntu.com/attic
 .. _Arch Linux: https://aur.archlinux.org/packages/attic/
+.. _Slackware: http://slackbuilds.org/result/?search=Attic
 .. _Cython: http://cython.org/

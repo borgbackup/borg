@@ -48,5 +48,5 @@ are normally bundled with the release tarball.
 Packages
 --------
 
-|project_name| is also part of the Debian_, Ubuntu_ and `Arch Linux`_
+|project_name| is also part of the Debian_, Ubuntu_, `Arch Linux`_ and Slackware_
 distributions of GNU/Linux.

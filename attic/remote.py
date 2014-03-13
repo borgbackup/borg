@@ -2,9 +2,12 @@ import fcntl
 import msgpack
 import os
 import select
+import shutil
 from subprocess import Popen, PIPE
 import sys
+import tempfile
 
+from .hashindex import NSIndex
 from .helpers import Error, IntegrityError
 from .repository import Repository
 
@@ -220,3 +223,63 @@ class RemoteRepository(object):
 
     def preload(self, ids):
         self.preload_ids += ids
+
+
+class RepositoryCache:
+    """A caching Repository wrapper
+
+    Caches Repository GET operations using a temporary file
+    """
+    def __init__(self, repository):
+        self.tmppath = None
+        self.index = None
+        self.data_fd = None
+        self.repository = repository
+        self.entries = {}
+        self.initialize()
+
+    def __del__(self):
+        self.cleanup()
+
+    def initialize(self):
+        self.tmppath = tempfile.mkdtemp()
+        self.index = NSIndex.create(os.path.join(self.tmppath, 'index'))
+        self.data_fd = open(os.path.join(self.tmppath, 'data'), 'a+b')
+
+    def cleanup(self):
+        del self.index
+        if self.data_fd:
+            self.data_fd.close()
+        if self.tmppath:
+            shutil.rmtree(self.tmppath)
+
+    def load_object(self, offset, size):
+        self.data_fd.seek(offset)
+        data = self.data_fd.read(size)
+        assert len(data) == size
+        return data
+
+    def store_object(self, key, data):
+        self.data_fd.seek(0, os.SEEK_END)
+        self.data_fd.write(data)
+        offset = self.data_fd.tell()
+        self.index[key] = offset - len(data), len(data)
+
+    def get(self, key):
+        return next(self.get_many([key]))
+
+    def get_many(self, keys):
+        unknown_keys = [key for key in keys if not key in self.index]
+        repository_iterator = zip(unknown_keys, self.repository.get_many(unknown_keys))
+        for key in keys:
+            try:
+                yield self.load_object(*self.index[key])
+            except KeyError:
+                for key_, data in repository_iterator:
+                    if key_ == key:
+                        self.store_object(key, data)
+                        yield data
+                        break
+        # Consume any pending requests
+        for _ in repository_iterator:
+            pass

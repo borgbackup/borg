@@ -1,5 +1,5 @@
 from configparser import RawConfigParser
-from itertools import zip_longest
+from attic.remote import RemoteRepository, RepositoryCache
 import msgpack
 import os
 from binascii import hexlify
@@ -146,24 +146,28 @@ class Cache(object):
         print('Initializing cache...')
         self.chunks.clear()
         unpacker = msgpack.Unpacker()
+        if isinstance(self.repository, RemoteRepository):
+            repository = RepositoryCache(self.repository)
+        else:
+            repository = self.repository
         for name, info in self.manifest.archives.items():
-            id = info[b'id']
-            cdata = self.repository.get(id)
-            data = self.key.decrypt(id, cdata)
-            add(id, len(data), len(cdata))
+            archive_id = info[b'id']
+            cdata = repository.get(archive_id)
+            data = self.key.decrypt(archive_id, cdata)
+            add(archive_id, len(data), len(cdata))
             archive = msgpack.unpackb(data)
             if archive[b'version'] != 1:
                 raise Exception('Unknown archive metadata version')
-            decode_dict(archive, (b'name', b'hostname', b'username', b'time'))  # fixme: argv
+            decode_dict(archive, (b'name',))
             print('Analyzing archive:', archive[b'name'])
-            for id_, chunk in zip_longest(archive[b'items'], self.repository.get_many(archive[b'items'])):
-                data = self.key.decrypt(id_, chunk)
-                add(id_, len(data), len(chunk))
+            for key, chunk in zip(archive[b'items'], repository.get_many(archive[b'items'])):
+                data = self.key.decrypt(key, chunk)
+                add(key, len(data), len(chunk))
                 unpacker.feed(data)
                 for item in unpacker:
                     if b'chunks' in item:
-                        for id_, size, csize in item[b'chunks']:
-                            add(id_, size, csize)
+                        for chunk_id, size, csize in item[b'chunks']:
+                            add(chunk_id, size, csize)
 
     def add_chunk(self, id, data, stats):
         if not self.txn_active:

@@ -3,6 +3,14 @@ Attic Changelog
 
 Here you can see the full list of changes between each Attic release.
 
+Version 0.12
+------------
+
+(feature release, released on X)
+
+- Include "all archives" size information in "--stats" output. (#54)
+- Switch to SI units (Power of 1000 instead 1024) when printing file sizes
+
 Version 0.11
 ------------
 

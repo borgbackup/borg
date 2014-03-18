@@ -8,6 +8,7 @@ cdef extern from "_hashindex.c":
 
     HashIndex *hashindex_open(char *path, int readonly)
     HashIndex *hashindex_create(char *path, int capacity, int key_size, int value_size)
+    void hashindex_summarize(HashIndex *index, long long *total_size, long long *total_csize, long long *unique_size, long long *unique_csize)
     int hashindex_get_size(HashIndex *index)
     int hashindex_clear(HashIndex *index)
     int hashindex_close(HashIndex *index)
@@ -173,6 +174,11 @@ cdef class ChunkIndex(IndexBase):
                 raise IndexError
             iter.key = key - 32
         return iter
+
+    def summarize(self):
+        cdef long long total_size, total_csize, unique_size, unique_csize
+        hashindex_summarize(self.index, &total_size, &total_csize, &unique_size, &unique_csize)
+        return total_size, total_csize, unique_size, unique_csize
 
 
 cdef class ChunkKeyIterator:

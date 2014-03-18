@@ -389,3 +389,23 @@ hashindex_get_size(HashIndex *index)
     return index->num_entries;
 }
 
+static void
+hashindex_summarize(HashIndex *index, long long *total_size, long long *total_csize, long long *total_unique_size, long long *total_unique_csize)
+{
+    int64_t size = 0, csize = 0, unique_size = 0, unique_csize = 0;
+    const int32_t *values;
+    void *key = NULL;
+
+    while((key = hashindex_next_key(index, key))) {
+        values = key + 32;
+        unique_size += values[1];
+        unique_csize += values[2];
+        size += values[0] * values[1];
+        csize += values[0] * values[2];
+    }
+    *total_size = size;
+    *total_csize = csize;
+    *total_unique_size = unique_size;
+    *total_unique_csize = unique_csize;
+}
+

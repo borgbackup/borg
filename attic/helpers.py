@@ -132,11 +132,14 @@ class Statistics:
         if unique:
             self.usize += csize
 
-    def print_(self):
+    def print_(self, cache):
+        total_size, total_csize, unique_size, unique_csize = cache.chunks.summarize()
         print('Number of files: %d' % self.nfiles)
-        print('Original size: %d (%s)' % (self.osize, format_file_size(self.osize)))
-        print('Compressed size: %s (%s)' % (self.csize, format_file_size(self.csize)))
-        print('Unique data: %d (%s)' % (self.usize, format_file_size(self.usize)))
+        print()
+        print('                   Original size    Compressed size  Deduplicated size')
+        print('This archive: %18s %18s %18s' % (format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize)))
+        print('All archives: %18s %18s %18s' % (format_file_size(total_size), format_file_size(total_csize), format_file_size(unique_csize)))
+
 
 
 def get_keys_dir():
@@ -278,14 +281,16 @@ def format_file_mode(mod):
 def format_file_size(v):
     """Format file size into a human friendly format
     """
-    if v > 1024 * 1024 * 1024:
-        return '%.2f GB' % (v / 1024. / 1024. / 1024.)
-    elif v > 1024 * 1024:
-        return '%.2f MB' % (v / 1024. / 1024.)
-    elif v > 1024:
-        return '%.2f kB' % (v / 1024.)
+    if v > 10**12:
+        return '%.2f TB' % (v / 10**12)
+    elif v > 10**9:
+        return '%.2f GB' % (v / 10**9)
+    elif v > 10**6:
+        return '%.2f MB' % (v / 10**6)
+    elif v > 10**3:
+        return '%.2f kB' % (v / 10**3)
     else:
-        return '%d B' % v
+        return '%d B ' % v
 
 
 def format_archive(archive):

@@ -130,14 +130,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         if args.stats:
             t = datetime.now()
             diff = t - t0
-            print('-' * 40)
+            print('-' * 70)
             print('Archive name: %s' % args.archive.archive)
             print('Archive fingerprint: %s' % hexlify(archive.id).decode('ascii'))
             print('Start time: %s' % t0.strftime('%c'))
             print('End time: %s' % t.strftime('%c'))
             print('Duration: %s' % format_timedelta(diff))
-            archive.stats.print_()
-            print('-' * 40)
+            archive.stats.print_(cache)
+            print('-' * 70)
         return self.exit_code
 
     def _process(self, archive, cache, excludes, skip_inodes, path, restrict_dev):
@@ -297,7 +297,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         print('Username:', archive.metadata[b'username'])
         print('Time: %s' % to_localtime(archive.ts).strftime('%c'))
         print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
-        stats.print_()
+        stats.print_(cache)
         return self.exit_code
 
     def do_prune(self, args):

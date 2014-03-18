@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import os
 
+API_VERSION = 1
+
 
 cdef extern from "_hashindex.c":
     ctypedef struct HashIndex:

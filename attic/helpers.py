@@ -13,6 +13,10 @@ from fnmatch import translate
 from operator import attrgetter
 import fcntl
 
+import attic.hashindex
+import attic.chunker
+import attic.crypto
+
 
 class Error(Exception):
     """Error base class"""
@@ -21,6 +25,10 @@ class Error(Exception):
 
     def get_message(self):
         return 'Error: ' + type(self).__doc__.format(*self.args)
+
+
+class ExtensionModuleError(Error):
+    """The Attic binary extension modules does not seem to be properly installed"""
 
 
 class UpgradableLock:
@@ -50,6 +58,13 @@ class UpgradableLock:
     def release(self):
         fcntl.lockf(self.fd, fcntl.LOCK_UN)
         self.fd.close()
+
+
+def check_extension_modules():
+    if (attic.hashindex.API_VERSION != 1 or
+        attic.chunker.API_VERSION != 1 or
+        attic.crypto.API_VERSION != 1):
+        raise ExtensionModuleError
 
 
 class Manifest:

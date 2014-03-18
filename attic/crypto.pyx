@@ -3,9 +3,10 @@
 This could be replaced by PyCrypto or something similar when the performance
 of their PBKDF2 implementation is comparable to the OpenSSL version.
 """
-
 from libc.string cimport memcpy
 from libc.stdlib cimport malloc, free
+
+API_VERSION = 1
 
 cdef extern from "openssl/rand.h":
     int  RAND_bytes(unsigned char *buf,int num)

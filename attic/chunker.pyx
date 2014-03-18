@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+API_VERSION = 1
+
 from libc.stdlib cimport free
 
 cdef extern from "_chunker.c":

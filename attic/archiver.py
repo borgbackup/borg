@@ -16,7 +16,7 @@ from attic.key import key_creator
 from attic.helpers import Error, location_validator, format_time, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
-    Manifest, remove_surrogates, update_excludes, format_archive
+    Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules
 from attic.remote import RepositoryServer, RemoteRepository
 
 
@@ -399,6 +399,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         return args
 
     def run(self, args=None):
+        check_extension_modules()
         keys_dir = get_keys_dir()
         if not os.path.exists(keys_dir):
             os.makedirs(keys_dir)

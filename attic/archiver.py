@@ -16,7 +16,7 @@ from attic.key import key_creator
 from attic.helpers import Error, location_validator, format_time, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
-    Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules
+    Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics
 from attic.remote import RepositoryServer, RemoteRepository
 
 
@@ -136,7 +136,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             print('Start time: %s' % t0.strftime('%c'))
             print('End time: %s' % t.strftime('%c'))
             print('Duration: %s' % format_timedelta(diff))
-            archive.stats.print_(cache)
+            print('Number of files: %d' % archive.stats.nfiles)
+            archive.stats.print_('This archive:', cache)
             print('-' * 78)
         return self.exit_code
 
@@ -219,10 +220,13 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
-        archive.delete()
+        stats = Statistics()
+        archive.delete(stats)
         manifest.write()
         repository.commit()
         cache.commit()
+        if args.stats:
+            stats.print_('Deleted data:', cache)
         return self.exit_code
 
     def do_mount(self, args):
@@ -300,7 +304,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         print('Username:', archive.metadata[b'username'])
         print('Time: %s' % to_localtime(archive.ts).strftime('%c'))
         print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
-        stats.print_(cache)
+        print('Number of files: %d' % archive.stats.nfiles)
+        stats.print_('This archive:', cache)
         return self.exit_code
 
     def do_prune(self, args):
@@ -333,7 +338,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
         keep.sort(key=attrgetter('ts'), reverse=True)
         to_delete = [a for a in archives if a not in keep]
-
+        stats = Statistics()
         for archive in keep:
             self.print_verbose('Keeping archive: %s' % format_archive(archive))
         for archive in to_delete:
@@ -341,11 +346,13 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 self.print_verbose('Would prune:     %s' % format_archive(archive))
             else:
                 self.print_verbose('Pruning archive: %s' % format_archive(archive))
-                archive.delete()
+                archive.delete(stats)
         if to_delete and not args.dry_run:
             manifest.write()
             repository.commit()
             cache.commit()
+        if args.stats:
+            stats.print_('Deleted data:', cache)
         return self.exit_code
 
     helptext = {}
@@ -530,6 +537,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser = subparsers.add_parser('delete', parents=[common_parser],
                                           description=self.do_delete.__doc__)
         subparser.set_defaults(func=self.do_delete)
+        subparser.add_argument('-s', '--stats', dest='stats',
+                               action='store_true', default=False,
+                               help='print statistics for the deleted archive')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to delete')
@@ -586,6 +596,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
                                help='do not change repository')
+        subparser.add_argument('-s', '--stats', dest='stats',
+                               action='store_true', default=False,
+                               help='print statistics for the deleted archive')
         subparser.add_argument('--keep-within', dest='within', type=str, metavar='WITHIN',
                                help='keep all archives within this time interval')
         subparser.add_argument('-H', '--keep-hourly', dest='hourly', type=int, default=0,

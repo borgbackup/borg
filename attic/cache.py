@@ -193,15 +193,17 @@ class Cache(object):
         stats.update(size, csize, False)
         return id, size, csize
 
-    def chunk_decref(self, id):
+    def chunk_decref(self, id, stats):
         if not self.txn_active:
             self.begin_txn()
         count, size, csize = self.chunks[id]
         if count == 1:
             del self.chunks[id]
             self.repository.delete(id, wait=False)
+            stats.update(-size, -csize, True)
         else:
             self.chunks[id] = (count - 1, size, csize)
+            stats.update(-size, -csize, False)
 
     def file_known_and_unchanged(self, path_hash, st):
         if self.files is None:

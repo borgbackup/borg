@@ -171,7 +171,7 @@ class Archive:
     def write_checkpoint(self):
         self.save(self.checkpoint_name)
         del self.manifest.archives[self.checkpoint_name]
-        self.cache.chunk_decref(self.id)
+        self.cache.chunk_decref(self.id, self.stats)
 
     def save(self, name=None):
         name = name or self.name
@@ -316,17 +316,17 @@ class Archive:
         elif not symlink:
             os.utime(path, (item[b'mtime'] / 10**9, item[b'mtime'] / 10**9))
 
-    def delete(self):
+    def delete(self, stats):
         unpacker = msgpack.Unpacker(use_list=False)
-        for id_, data in zip(self.metadata[b'items'], self.repository.get_many(self.metadata[b'items'])):
-            unpacker.feed(self.key.decrypt(id_, data))
-            self.cache.chunk_decref(id_)
+        for items_id, data in zip(self.metadata[b'items'], self.repository.get_many(self.metadata[b'items'])):
+            unpacker.feed(self.key.decrypt(items_id, data))
+            self.cache.chunk_decref(items_id, stats)
             for item in unpacker:
                 if b'chunks' in item:
                     for chunk_id, size, csize in item[b'chunks']:
-                        self.cache.chunk_decref(chunk_id)
+                        self.cache.chunk_decref(chunk_id, stats)
 
-        self.cache.chunk_decref(self.id)
+        self.cache.chunk_decref(self.id, stats)
         del self.manifest.archives[self.name]
 
     def stat_attrs(self, st, path):

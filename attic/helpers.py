@@ -151,9 +151,9 @@ class Statistics:
         total_size, total_csize, unique_size, unique_csize = cache.chunks.summarize()
         print('Number of files: %d' % self.nfiles)
         print()
-        print('                   Original size    Compressed size  Deduplicated size')
-        print('This archive: %18s %18s %18s' % (format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize)))
-        print('All archives: %18s %18s %18s' % (format_file_size(total_size), format_file_size(total_csize), format_file_size(unique_csize)))
+        print('                       Original size      Compressed size    Deduplicated size')
+        print('This archive:   %20s %20s %20s' % (format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize)))
+        print('All archives:   %20s %20s %20s' % (format_file_size(total_size), format_file_size(total_csize), format_file_size(unique_csize)))
 
 
 

@@ -130,14 +130,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         if args.stats:
             t = datetime.now()
             diff = t - t0
-            print('-' * 70)
+            print('-' * 78)
             print('Archive name: %s' % args.archive.archive)
             print('Archive fingerprint: %s' % hexlify(archive.id).decode('ascii'))
             print('Start time: %s' % t0.strftime('%c'))
             print('End time: %s' % t.strftime('%c'))
             print('Duration: %s' % format_timedelta(diff))
             archive.stats.print_(cache)
-            print('-' * 70)
+            print('-' * 78)
         return self.exit_code
 
     def _process(self, archive, cache, excludes, skip_inodes, path, restrict_dev):

@@ -219,7 +219,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
-        archive.delete(cache)
+        archive.delete()
+        manifest.write()
+        repository.commit()
+        cache.commit()
         return self.exit_code
 
     def do_mount(self, args):
@@ -338,7 +341,11 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 self.print_verbose('Would prune:     %s' % format_archive(archive))
             else:
                 self.print_verbose('Pruning archive: %s' % format_archive(archive))
-                archive.delete(cache)
+                archive.delete()
+        if to_delete and not args.dry_run:
+            manifest.write()
+            repository.commit()
+            cache.commit()
         return self.exit_code
 
     helptext = {}

@@ -316,7 +316,7 @@ class Archive:
         elif not symlink:
             os.utime(path, (item[b'mtime'] / 10**9, item[b'mtime'] / 10**9))
 
-    def delete(self, cache):
+    def delete(self):
         unpacker = msgpack.Unpacker(use_list=False)
         for id_, data in zip(self.metadata[b'items'], self.repository.get_many(self.metadata[b'items'])):
             unpacker.feed(self.key.decrypt(id_, data))
@@ -328,9 +328,6 @@ class Archive:
 
         self.cache.chunk_decref(self.id)
         del self.manifest.archives[self.name]
-        self.manifest.write()
-        self.repository.commit()
-        cache.commit()
 
     def stat_attrs(self, st, path):
         item = {

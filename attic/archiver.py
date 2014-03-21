@@ -2,6 +2,7 @@ import argparse
 from binascii import hexlify
 from datetime import datetime
 from operator import attrgetter
+import functools
 import io
 import os
 import stat
@@ -385,13 +386,15 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         $ attic create -e /home/user/cache/ repo.attic / /home/user/cache/important
         '''
 
-    def do_help(self, args):
-        if args.topic in self.helptext:
+    def do_help(self, parser, commands, args):
+        if not args.topic:
+            parser.print_help()
+        elif args.topic in self.helptext:
             print(self.helptext[args.topic])
+        elif args.topic in commands:
+            commands[args.topic].print_help()
         else:
-            # FIXME:  If topic is one of the regular commands, show that help.
-            # Otherwise, show the default global help.
-            print('No help available on %s' % (args.topic,))
+            parser.error('No help available on %s' % (args.topic,))
         return self.exit_code
 
     def preprocess_args(self, args):
@@ -619,8 +622,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
         subparser = subparsers.add_parser('help', parents=[common_parser],
                                           description='Extra help')
-        subparser.set_defaults(func=self.do_help)
-        subparser.add_argument('topic', metavar='TOPIC', type=str,
+        subparser.set_defaults(
+            func=functools.partial(self.do_help, parser, subparsers.choices))
+        subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
                                help='additional help on TOPIC')
 
         args = parser.parse_args(args or ['-h'])

@@ -8,6 +8,8 @@ Version 0.12
 
 (feature release, released on X)
 
+- Added option to restrict remote repository access to specific path(s):
+  ``attic serve --restrict-to-path X`` (#51)
 - Include "all archives" size information in "--stats" output. (#54)
 - Switch to SI units (Power of 1000 instead 1024) when printing file sizes
 - Added "--stats" option to 'attic delete' and 'attic prune'

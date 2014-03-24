@@ -47,8 +47,10 @@ class Archiver:
             else:
                 print(msg, end=' ')
 
-    def do_serve(self):
-        return RepositoryServer().serve()
+    def do_serve(self, args):
+        """Start Attic in server mode. This command is usually not used manually.
+        """
+        return RepositoryServer(restrict_to_paths=args.restrict_to_paths).serve()
 
     def do_init(self, args):
         """Initialize an empty repository
@@ -431,13 +433,17 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                             help='verbose output')
 
         # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
-        if args and args[0] == 'serve':
-            return self.do_serve()
         if args:
             args = self.preprocess_args(args)
 
         parser = argparse.ArgumentParser(description='Attic %s - Deduplicated Backups' % __version__)
         subparsers = parser.add_subparsers(title='Available commands')
+
+        subparser = subparsers.add_parser('serve', parents=[common_parser],
+                                          description=self.do_serve.__doc__)
+        subparser.set_defaults(func=self.do_serve)
+        subparser.add_argument('--restrict-to-path', dest='restrict_to_paths', action='append',
+                               metavar='PATH', help='restrict repository access to PATH')
 
         subparser = subparsers.add_parser('init', parents=[common_parser],
                                           description=self.do_init.__doc__)

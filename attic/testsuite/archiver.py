@@ -13,6 +13,7 @@ from attic.archive import Archive, ChunkBuffer
 from attic.archiver import Archiver
 from attic.crypto import bytes_to_long, num_aes_blocks
 from attic.helpers import Manifest
+from attic.remote import RemoteRepository, PathNotAllowed
 from attic.repository import Repository
 from attic.testsuite import AtticTestCase
 from attic.testsuite.mock import patch
@@ -403,3 +404,13 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 
 class RemoteArchiverTestCase(ArchiverTestCase):
     prefix = '__testsuite__:'
+
+    def test_remote_repo_restrict_to_path(self):
+        self.attic('init', self.repository_location)
+        path_prefix = os.path.dirname(self.repository_path)
+        with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo']):
+            self.assert_raises(PathNotAllowed, lambda: self.attic('init', self.repository_location + '_1'))
+        with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', path_prefix]):
+            self.attic('init', self.repository_location + '_2')
+        with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo', '--restrict-to-path', path_prefix]):
+            self.attic('init', self.repository_location + '_3')

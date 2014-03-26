@@ -1,5 +1,5 @@
 from configparser import RawConfigParser
-from attic.remote import RemoteRepository, RepositoryCache
+from attic.remote import cache_if_remote
 import msgpack
 import os
 from binascii import hexlify
@@ -146,10 +146,7 @@ class Cache(object):
         print('Initializing cache...')
         self.chunks.clear()
         unpacker = msgpack.Unpacker()
-        if isinstance(self.repository, RemoteRepository):
-            repository = RepositoryCache(self.repository)
-        else:
-            repository = self.repository
+        repository = cache_if_remote(self.repository)
         for name, info in self.manifest.archives.items():
             archive_id = info[b'id']
             cdata = repository.get(archive_id)

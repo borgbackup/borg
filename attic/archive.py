@@ -5,7 +5,7 @@ import errno
 import shutil
 import tempfile
 from attic.key import key_factory
-from attic.remote import RemoteRepository, RepositoryCache
+from attic.remote import cache_if_remote
 import msgpack
 import os
 import socket
@@ -609,11 +609,7 @@ class ArchiveChecker:
                     for item in unpacker:
                         yield item
 
-        if isinstance(self.repository, RemoteRepository):
-            repository = RepositoryCache(self.repository)
-        else:
-            repository = self.repository
-
+        repository = cache_if_remote(self.repository)
         num_archives = len(self.manifest.archives)
         for i, (name, info) in enumerate(list(self.manifest.archives.items()), 1):
             self.report_progress('Analyzing archive {} ({}/{})'.format(name, i, num_archives))

@@ -1,12 +1,14 @@
 from collections import defaultdict
 import errno
 import llfuse
+import msgpack
 import os
 import stat
 import time
 from attic.archive import Archive
-
 from attic.helpers import daemonize
+from attic.remote import cache_if_remote
+
 # Does this version of llfuse support ns precision?
 have_fuse_mtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
 
@@ -18,7 +20,7 @@ class AtticOperations(llfuse.Operations):
         super(AtticOperations, self).__init__()
         self._inode_count = 0
         self.key = key
-        self.repository = repository
+        self.repository = cache_if_remote(repository)
         self.items = {}
         self.parent = {}
         self.contents = defaultdict(dict)
@@ -33,36 +35,41 @@ class AtticOperations(llfuse.Operations):
     def process_archive(self, archive, prefix=[]):
         """Build fuse inode hierarcy from archive metadata
         """
-        for item in archive.iter_items():
-            segments = prefix + os.fsencode(os.path.normpath(item[b'path'])).split(b'/')
-            num_segments = len(segments)
-            parent = 1
-            for i, segment in enumerate(segments, 1):
-                # Insert a default root inode if needed
-                if self._inode_count == 0 and segment:
-                    archive_inode = self.allocate_inode()
-                    self.items[archive_inode] = self.default_dir
-                    self.parent[archive_inode] = parent
-                # Leaf segment?
-                if i == num_segments:
-                    if b'source' in item and stat.S_ISREG(item[b'mode']):
-                        inode = self._find_inode(item[b'source'], prefix)
-                        self.items[inode][b'nlink'] = self.items[inode].get(b'nlink', 1) + 1
+        unpacker = msgpack.Unpacker()
+        for key, chunk in zip(archive.metadata[b'items'], self.repository.get_many(archive.metadata[b'items'])):
+            data = self.key.decrypt(key, chunk)
+            unpacker.feed(data)
+            for item in unpacker:
+                segments = prefix + os.fsencode(os.path.normpath(item[b'path'])).split(b'/')
+                del item[b'path']
+                num_segments = len(segments)
+                parent = 1
+                for i, segment in enumerate(segments, 1):
+                    # Insert a default root inode if needed
+                    if self._inode_count == 0 and segment:
+                        archive_inode = self.allocate_inode()
+                        self.items[archive_inode] = self.default_dir
+                        self.parent[archive_inode] = parent
+                    # Leaf segment?
+                    if i == num_segments:
+                        if b'source' in item and stat.S_ISREG(item[b'mode']):
+                            inode = self._find_inode(item[b'source'], prefix)
+                            self.items[inode][b'nlink'] = self.items[inode].get(b'nlink', 1) + 1
+                        else:
+                            inode = self.allocate_inode()
+                            self.items[inode] = item
+                        self.parent[inode] = parent
+                        if segment:
+                            self.contents[parent][segment] = inode
+                    elif segment in self.contents[parent]:
+                        parent = self.contents[parent][segment]
                     else:
                         inode = self.allocate_inode()
-                        self.items[inode] = item
-                    self.parent[inode] = parent
-                    if segment:
-                        self.contents[parent][segment] = inode
-                elif segment in self.contents[parent]:
-                    parent = self.contents[parent][segment]
-                else:
-                    inode = self.allocate_inode()
-                    self.items[inode] = self.default_dir
-                    self.parent[inode] = parent
-                    if segment:
-                        self.contents[parent][segment] = inode
-                    parent = inode
+                        self.items[inode] = self.default_dir
+                        self.parent[inode] = parent
+                        if segment:
+                            self.contents[parent][segment] = inode
+                        parent = inode
 
     def allocate_inode(self):
         self._inode_count += 1

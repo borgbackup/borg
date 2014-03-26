@@ -298,3 +298,9 @@ class RepositoryCache:
         # Consume any pending requests
         for _ in repository_iterator:
             pass
+
+
+def cache_if_remote(repository):
+    if isinstance(repository, RemoteRepository):
+        return RepositoryCache(repository)
+    return repository

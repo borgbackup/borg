@@ -4,6 +4,7 @@ import llfuse
 import os
 import stat
 import time
+from attic.archive import Archive
 
 from attic.helpers import daemonize
 # Does this version of llfuse support ns precision?
@@ -13,7 +14,7 @@ have_fuse_mtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
 class AtticOperations(llfuse.Operations):
     """Export Attic archive as a fuse filesystem
     """
-    def __init__(self, key, repository, archive):
+    def __init__(self, key, repository, manifest, archive):
         super(AtticOperations, self).__init__()
         self._inode_count = 0
         self.key = key
@@ -21,22 +22,31 @@ class AtticOperations(llfuse.Operations):
         self.items = {}
         self.parent = {}
         self.contents = defaultdict(dict)
-        default_dir = {b'mode': 0o40755, b'mtime': int(time.time() * 1e9), b'uid': os.getuid(), b'gid': os.getgid()}
-        # Loop through all archive items and assign inode numbers and
-        # extract hierarchy information
+        self.default_dir = {b'mode': 0o40755, b'mtime': int(time.time() * 1e9), b'uid': os.getuid(), b'gid': os.getgid()}
+        if archive:
+            self.process_archive(archive)
+        else:
+            for archive_name in manifest.archives:
+                archive = Archive(repository, key, manifest, archive_name)
+                self.process_archive(archive, [os.fsencode(archive_name)])
+
+    def process_archive(self, archive, prefix=[]):
+        """Build fuse inode hierarcy from archive metadata
+        """
         for item in archive.iter_items():
-            segments = os.fsencode(os.path.normpath(item[b'path'])).split(b'/')
+            segments = prefix + os.fsencode(os.path.normpath(item[b'path'])).split(b'/')
             num_segments = len(segments)
             parent = 1
             for i, segment in enumerate(segments, 1):
                 # Insert a default root inode if needed
                 if self._inode_count == 0 and segment:
-                    self.items[self.allocate_inode()] = default_dir
-                    self.parent[1] = 1
+                    archive_inode = self.allocate_inode()
+                    self.items[archive_inode] = self.default_dir
+                    self.parent[archive_inode] = parent
                 # Leaf segment?
                 if i == num_segments:
                     if b'source' in item and stat.S_ISREG(item[b'mode']):
-                        inode = self._find_inode(item[b'source'])
+                        inode = self._find_inode(item[b'source'], prefix)
                         self.items[inode][b'nlink'] = self.items[inode].get(b'nlink', 1) + 1
                     else:
                         inode = self.allocate_inode()
@@ -48,7 +58,7 @@ class AtticOperations(llfuse.Operations):
                     parent = self.contents[parent][segment]
                 else:
                     inode = self.allocate_inode()
-                    self.items[inode] = default_dir
+                    self.items[inode] = self.default_dir
                     self.parent[inode] = parent
                     if segment:
                         self.contents[parent][segment] = inode
@@ -70,8 +80,8 @@ class AtticOperations(llfuse.Operations):
         stat_.f_favail = 0
         return stat_
 
-    def _find_inode(self, path):
-        segments = os.fsencode(os.path.normpath(path)).split(b'/')
+    def _find_inode(self, path, prefix=[]):
+        segments = prefix + os.fsencode(os.path.normpath(path)).split(b'/')
         inode = 1
         for segment in segments:
             inode = self.contents[inode][segment]

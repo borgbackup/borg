@@ -245,12 +245,13 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             self.print_error('%s: Mountpoint must be a writable directory' % args.mountpoint)
             return self.exit_code
 
-        repository = self.open_repository(args.archive)
+        repository = self.open_repository(args.src)
         manifest, key = Manifest.load(repository)
-        self.print_verbose("Loading archive metadata...", newline=False)
-        archive = Archive(repository, key, manifest, args.archive.archive)
-        self.print_verbose('done')
-        operations = AtticOperations(key, repository, archive)
+        if args.src.archive:
+            archive = Archive(repository, key, manifest, args.src.archive)
+        else:
+            archive = None
+        operations = AtticOperations(key, repository, manifest, archive)
         self.print_verbose("Mounting filesystem")
         try:
             operations.mount(args.mountpoint, args.options, args.foreground)
@@ -562,8 +563,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser = subparsers.add_parser('mount', parents=[common_parser],
                                           description=self.do_mount.__doc__)
         subparser.set_defaults(func=self.do_mount)
-        subparser.add_argument('archive', metavar='ARCHIVE', type=location_validator(archive=True),
-                               help='archive to mount')
+        subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
+                               help='repository/archive to mount')
         subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
                                help='where to mount filesystem')
         subparser.add_argument('-f', '--foreground', dest='foreground',

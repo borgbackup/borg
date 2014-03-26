@@ -271,7 +271,29 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_raises(SystemExit, lambda: self.attic('-h'))
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
-    def test_mount(self):
+    def test_fuse_mount_repository(self):
+        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
+        os.mkdir(mountpoint)
+        self.attic('init', self.repository_location)
+        self.create_test_files()
+        self.attic('create', self.repository_location + '::archive', 'input')
+        self.attic('create', self.repository_location + '::archive2', 'input')
+        try:
+            self.attic('mount', self.repository_location, mountpoint, fork=True)
+            self.wait_for_mount(mountpoint)
+            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive', 'input'))
+            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive2', 'input'))
+        finally:
+            if sys.platform.startswith('linux'):
+                os.system('fusermount -u ' + mountpoint)
+            else:
+                os.system('umount ' + mountpoint)
+            os.rmdir(mountpoint)
+            # Give the daemon some time to exit
+            time.sleep(.2)
+
+    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    def test_fuse_mount_archive(self):
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
         os.mkdir(mountpoint)
         self.attic('init', self.repository_location)

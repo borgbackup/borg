@@ -25,12 +25,18 @@ class AtticOperations(llfuse.Operations):
         self.parent = {}
         self.contents = defaultdict(dict)
         self.default_dir = {b'mode': 0o40755, b'mtime': int(time.time() * 1e9), b'uid': os.getuid(), b'gid': os.getgid()}
+        self.pending_archives = {}
         if archive:
             self.process_archive(archive)
         else:
+            self.parent[1] = self.allocate_inode()
+            self.items[1] = self.default_dir
             for archive_name in manifest.archives:
-                archive = Archive(repository, key, manifest, archive_name)
-                self.process_archive(archive, [os.fsencode(archive_name)])
+                archive_inode = self.allocate_inode()
+                self.items[archive_inode] = self.default_dir
+                self.parent[archive_inode] = 1
+                self.contents[1][os.fsencode(archive_name)] = archive_inode
+                self.pending_archives[archive_inode] = Archive(repository, key, manifest, archive_name)
 
     def process_archive(self, archive, prefix=[]):
         """Build fuse inode hierarcy from archive metadata
@@ -135,7 +141,14 @@ class AtticOperations(llfuse.Operations):
         except KeyError:
             raise llfuse.FUSEError(errno.ENODATA)
 
+    def _load_pending_archive(self, inode):
+        # Check if this is an archive we need to load
+        archive = self.pending_archives.pop(inode, None)
+        if archive:
+            self.process_archive(archive, [os.fsencode(archive.name)])
+
     def lookup(self, parent_inode, name):
+        self._load_pending_archive(parent_inode)
         if name == b'.':
             inode = parent_inode
         elif name == b'..':
@@ -150,6 +163,7 @@ class AtticOperations(llfuse.Operations):
         return inode
 
     def opendir(self, inode):
+        self._load_pending_archive(inode)
         return inode
 
     def read(self, fh, offset, size):

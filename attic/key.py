@@ -274,6 +274,7 @@ class KeyfileKey(AESKeyBase):
         with open(path, 'w') as fd:
             fd.write('%s %s\n' % (self.FILE_ID, hexlify(self.repository_id).decode('ascii')))
             fd.write('\n'.join(textwrap.wrap(b2a_base64(data).decode('ascii'))))
+            fd.write('\n')
         self.path = path
 
     def change_passphrase(self):

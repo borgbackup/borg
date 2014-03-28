@@ -233,7 +233,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         return self.exit_code
 
     def do_mount(self, args):
-        """Mount archive as a FUSE fileystem
+        """Mount archive or an entire repository as a FUSE fileystem
         """
         try:
             from attic.fuse import AtticOperations

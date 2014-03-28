@@ -7,7 +7,8 @@ Version 0.12
 ------------
 
 (feature release, released on X)
-
+- ``attic mount`` now supports mounting an entire repository not only
+  individual archives (#59)
 - Added option to restrict remote repository access to specific path(s):
   ``attic serve --restrict-to-path X`` (#51)
 - Include "all archives" size information in "--stats" output. (#54)

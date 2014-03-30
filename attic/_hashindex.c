@@ -115,15 +115,15 @@ hashindex_resize(HashIndex *index, int capacity)
 {
     char *new_path = malloc(strlen(index->path) + 5);
     int ret = 0;
+    HashIndex *new;
+    void *key = NULL;
     strcpy(new_path, index->path);
     strcat(new_path, ".tmp");
-    HashIndex *new;
 
     if(!(new = hashindex_create(new_path, capacity, index->key_size, index->value_size))) {
         free(new_path);
         return 0;
     }
-    void *key = NULL;
     while((key = hashindex_next_key(index, key))) {
         hashindex_set(new, key, hashindex_get(index, key));
     }

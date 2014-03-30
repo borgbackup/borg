@@ -127,7 +127,7 @@ def prune_split(archives, pattern, n, skip=[]):
     if n == 0:
         return keep
     for a in sorted(archives, key=attrgetter('ts'), reverse=True):
-        period = a.ts.strftime(pattern)
+        period = to_localtime(a.ts).strftime(pattern)
         if period != last:
             last = period
             if a not in skip:

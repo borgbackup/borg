@@ -121,6 +121,9 @@ class Cache(object):
     def rollback(self):
         """Roll back partial and aborted transactions
         """
+        # Remove partial transaction
+        if os.path.exists(os.path.join(self.path, 'txn.tmp')):
+            shutil.rmtree(os.path.join(self.path, 'txn.tmp'))
         # Roll back active transaction
         txn_dir = os.path.join(self.path, 'txn.active')
         if os.path.exists(txn_dir):
@@ -128,9 +131,8 @@ class Cache(object):
             shutil.copy(os.path.join(txn_dir, 'chunks'), self.path)
             shutil.copy(os.path.join(txn_dir, 'files'), self.path)
             os.rename(txn_dir, os.path.join(self.path, 'txn.tmp'))
-        # Remove partial transaction
-        if os.path.exists(os.path.join(self.path, 'txn.tmp')):
-            shutil.rmtree(os.path.join(self.path, 'txn.tmp'))
+            if os.path.exists(os.path.join(self.path, 'txn.tmp')):
+                shutil.rmtree(os.path.join(self.path, 'txn.tmp'))
         self.txn_active = False
 
     def sync(self):

@@ -23,7 +23,7 @@ static uint32_t table_base[] =
     0x813a06b4, 0x68538345, 0x65865ddc, 0x43a71b8e, 0x78619a56, 0x5a34451d, 0x5bdaa3ed, 0x71edc7e9,
     0x17ac9a20, 0x78d10bfa, 0x6c1e7f35, 0xd51839d9, 0x240cbc51, 0x33513cc1, 0xd2b4f795, 0xccaa8186,
     0x0babe682, 0xa33cf164, 0x18c643ea, 0xc1ca105f, 0x9959147a, 0x6d3d94de, 0x0b654fbe, 0xed902ca0,
-    0x7d835cb5, 0x99ba1509, 0x6445c922, 0x495e76c2, 0xf07194bc, 0xa1631d7e, 0x677076a5, 0x89fffe35, 
+    0x7d835cb5, 0x99ba1509, 0x6445c922, 0x495e76c2, 0xf07194bc, 0xa1631d7e, 0x677076a5, 0x89fffe35,
     0x1a49bcf3, 0x8e6c948a, 0x0144c917, 0x8d93aea1, 0x16f87ddf, 0xc8f25d49, 0x1fb11297, 0x27e750cd,
     0x2f422da1, 0xdee89a77, 0x1534c643, 0x457b7b8b, 0xaf172f7a, 0x6b9b09d6, 0x33573f7f, 0xf14e15c4,
     0x526467d5, 0xaf488241, 0x87c3ee0d, 0x33be490c, 0x95aa6e52, 0x43ec242e, 0xd77de99b, 0xd018334f,
@@ -117,6 +117,7 @@ static int
 chunker_fill(Chunker *c)
 {
     size_t n;
+    PyObject *data;
     memmove(c->data, c->data + c->last, c->position + c->remaining - c->last);
     c->position -= c->last;
     c->last = 0;
@@ -124,7 +125,7 @@ chunker_fill(Chunker *c)
     if(c->eof || n == 0) {
         return 1;
     }
-    PyObject *data = PyObject_CallMethod(c->fd, "read", "i", n);
+    data = PyObject_CallMethod(c->fd, "read", "i", n);
     if(!data) {
         return 0;
     }
@@ -159,6 +160,7 @@ chunker_process(Chunker *c)
 {
     uint32_t sum, chunk_mask = c->chunk_mask, min_size = c->min_size, window_size = c->window_size;
     int n = 0;
+    int old_last;
 
     if(c->done) {
         if(c->bytes_read == c->bytes_yielded)
@@ -204,10 +206,9 @@ chunker_process(Chunker *c)
         c->position += c->remaining;
         c->remaining = 0;
     }
-    int old_last = c->last;
+    old_last = c->last;
     c->last = c->position;
     n = c->last - old_last;
     c->bytes_yielded += n;
     return PyBuffer_FromMemory(c->data + old_last, n);
-    
 }

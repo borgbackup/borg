@@ -13,8 +13,8 @@ Easy to use
 Initialize a new backup :ref:`repository <repository_def>` and create your
 first backup :ref:`archive <archive_def>` in two lines::
 
-    $ attic init /usbdrive/my-backup.attic
-    $ attic create -v /usbdrive/my-backup.attic::documents ~/Documents
+    $ attic init /somewhere/my-repository.attic
+    $ attic create -v /somewhere/my-repository.attic::Monday ~/Documents
 
 See the :ref:`quickstart` chapter for a more detailed example.
 

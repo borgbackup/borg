@@ -13,16 +13,16 @@ A step by step example
 
 1. Before a backup can be made a repository has to be initialized::
 
-    $ attic init /somewhere/my-backup.attic
+    $ attic init /somewhere/my-repository.attic
 
 2. Backup the ``~/src`` and ``~/Documents`` directories into an archive called
    *first-backup*::
 
-    $ attic create -v /somwhere/my-backup.attic::first-backup ~/src ~/Documents
+    $ attic create -v /somwhere/my-repository.attic::Monday ~/src ~/Documents
 
 3. The next day create a new archive called *second-backup*::
 
-    $ attic create -v --stats /somwhere/my-backup.attic::second-backup ~/src ~/Documents
+    $ attic create -v --stats /somwhere/my-repository.attic::Tuesday ~/src ~/Documents
 
    This backup will be a lot quicker and a lot smaller since only new never
    before seen data is stored. The ``--stats`` option causes |project_name| to
@@ -31,19 +31,19 @@ A step by step example
 
 4. List all archives in the repository::
 
-    $ attic list /somewhere/my-backup.attic
+    $ attic list /somewhere/my-repository.attic
 
-5. List the contents of the *first-backup* archive::
+5. List the contents of the *Monday* archive::
 
-    $ attic list /somewhere/my-backup.attic::first-backup
+    $ attic list /somewhere/my-repository.attic::Monday
 
-6. Restore the *first-backup* archive::
+6. Restore the *Monday* archive::
 
-    $ attic extract -v /somwhere/my-backup.attic::first-backup
+    $ attic extract -v /somwhere/my-repository.attic::Monday
 
-7. Recover disk space by manually deleting the *first-backup* archive::
+7. Recover disk space by manually deleting the *Monday* archive::
 
-    $ attic delete /somwhere/my-backup.attic::first-backup
+    $ attic delete /somwhere/my-backup.attic::Monday
 
 
 Automating backups
@@ -55,7 +55,7 @@ The following example script backs up ``/home`` and
 of old archives::
 
     #!/bin/sh
-    REPOSITORY=username@remoteserver.com:backup.attic
+    REPOSITORY=username@remoteserver.com:repository.attic
 
     # Backup all of /home and /var/www except a few
     # excluded directories

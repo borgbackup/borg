@@ -32,3 +32,11 @@ How can I specify the encryption passphrase programmatically?
     automated encrypted backups. Another option is to use
     key file based encryption with a blank passphrase. See
     :ref:`encrypted_repos` for more details.
+
+When backing up to remote servers, is data encrypted before leaving the local machine, or do I have to trust that the remote server isn't malicious?
+    Yes, everything is encrypted before leaving the local machine.
+
+If a backup stops mid-way, does the already-backed-up data stay there? I.e. does Attic resume backups?
+    Yes, during a backup a special checkpoint archive named ``<archive-name>.snapshot`` is saved every 5 minutes
+    containing all the data backed-up until that point. This means that at most 5 minutes worth of data needs to be
+    retransmitted if a backup needs to be restarted.

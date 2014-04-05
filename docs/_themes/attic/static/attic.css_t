@@ -107,7 +107,7 @@ tt span.pre {
   font-size: 110%;
 }
 dt {
-  font-style: italic;
+  font-family: "Oswald";
   font-size: 95%;
 }
 

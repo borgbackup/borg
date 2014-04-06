@@ -18,11 +18,11 @@ A step by step example
 2. Backup the ``~/src`` and ``~/Documents`` directories into an archive called
    *Monday*::
 
-    $ attic create -v /somwhere/my-repository.attic::Monday ~/src ~/Documents
+    $ attic create /somwhere/my-repository.attic::Monday ~/src ~/Documents
 
 3. The next day create a new archive called *Tuesday*::
 
-    $ attic create -v --stats /somwhere/my-repository.attic::Tuesday ~/src ~/Documents
+    $ attic create --stats /somwhere/my-repository.attic::Tuesday ~/src ~/Documents
 
    This backup will be a lot quicker and a lot smaller since only new never
    before seen data is stored. The ``--stats`` option causes |project_name| to
@@ -31,8 +31,8 @@ A step by step example
 
     Archive name: Tuesday
     Archive fingerprint: 387a5e3f9b0e792e91ce87134b0f4bfe17677d9248cb5337f3fbf3a8e157942a
-    Start time: Sun Apr  6 12:00:10 2014
-    End time:   Sun Apr  6 12:00:10 2014
+    Start time: Tue Mar 25 12:00:10 2014
+    End time:   Tue Mar 25 12:00:10 2014
     Duration: 0.08 seconds
     Number of files: 358
                            Original size      Compressed size    Deduplicated size
@@ -43,19 +43,27 @@ A step by step example
 4. List all archives in the repository::
 
     $ attic list /somewhere/my-repository.attic
+    Monday                               Mon Mar 24 11:59:35 2014
+    Tuesday                              Tue Mar 25 12:00:10 2014
 
 5. List the contents of the *Monday* archive::
 
     $ attic list /somewhere/my-repository.attic::Monday
+    drwxr-xr-x user  group         0 Jan 06 15:22 home/user/Documents
+    -rw-r--r-- user  group      7961 Nov 17  2012 home/user/Documents/Important.doc
+    ...
 
 6. Restore the *Monday* archive::
 
-    $ attic extract -v /somwhere/my-repository.attic::Monday
+    $ attic extract /somwhere/my-repository.attic::Monday
 
 7. Recover disk space by manually deleting the *Monday* archive::
 
     $ attic delete /somwhere/my-backup.attic::Monday
 
+.. Note::
+    Attic is quiet by default. Add the ``-v`` or ``--verbose`` option to
+    get progress reporting during command execution.
 
 Automating backups
 ------------------
@@ -81,10 +89,6 @@ of old archives::
     # Use the `prune` subcommand to maintain 7 daily, 4 weekly
     # and 6 monthly archives.
     attic prune -v $REPOSITORY --keep-daily=7 --keep-weekly=4 --keep-monthly=6
-
-.. Note::
-    This script assumes the repository has already been initialized with
-    :ref:`attic_init`.
 
 .. _encrypted_repos:
 

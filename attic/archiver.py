@@ -254,8 +254,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         return self.exit_code
 
     def do_list(self, args):
-        """List archive or repository contents
-        """
+        """List archive or repository contents"""
         repository = self.open_repository(args.src)
         manifest, key = Manifest.load(repository)
         if args.src.archive:

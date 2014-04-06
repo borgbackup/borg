@@ -14,7 +14,17 @@ Initialize a new backup :ref:`repository <repository_def>` and create your
 first backup :ref:`archive <archive_def>` in two lines::
 
     $ attic init /somewhere/my-repository.attic
-    $ attic create -v /somewhere/my-repository.attic::Monday ~/Documents
+    $ attic create /somewhere/my-repository.attic::Monday ~/Documents
+    $ attic create --stats /somewhere/my-repository.attic::Tuesday ~/Documents
+    Archive name: Tuesday
+    Archive fingerprint: 387a5e3f9b0e792e91ce87134b0f4bfe17677d9248cb5337f3fbf3a8e157942a
+    Start time: Tue Mar 25 12:00:10 2014
+    End time:   Tue Mar 25 12:00:10 2014
+    Duration: 0.08 seconds
+    Number of files: 358
+                           Original size      Compressed size    Deduplicated size
+    This archive:               57.16 MB             46.78 MB            151.67 kB
+    All archives:              114.02 MB             93.46 MB             44.81 MB
 
 See the :ref:`quickstart` chapter for a more detailed example.
 

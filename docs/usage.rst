@@ -21,13 +21,13 @@ Examples
 ~~~~~~~~
 ::
 
-    # Local backup repository
+    # Local repository
     $ attic init /data/mybackuprepo.attic
 
-    # Remote backup repository
+    # Remote repository
     $ attic init user@hostname:mybackuprepo.attic
 
-    # Encrypted remote backup repository
+    # Encrypted remote repository
     $ attic init --encryption=passphrase user@hostname:mybackuprepo.attic
 
 

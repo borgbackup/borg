@@ -16,18 +16,29 @@ A step by step example
     $ attic init /somewhere/my-repository.attic
 
 2. Backup the ``~/src`` and ``~/Documents`` directories into an archive called
-   *first-backup*::
+   *Monday*::
 
     $ attic create -v /somwhere/my-repository.attic::Monday ~/src ~/Documents
 
-3. The next day create a new archive called *second-backup*::
+3. The next day create a new archive called *Tuesday*::
 
     $ attic create -v --stats /somwhere/my-repository.attic::Tuesday ~/src ~/Documents
 
    This backup will be a lot quicker and a lot smaller since only new never
    before seen data is stored. The ``--stats`` option causes |project_name| to
    output statistics about the newly created archive such as the amount of unique
-   data (not shared with other archives).
+   data (not shared with other archives)::
+
+    Archive name: Tuesday
+    Archive fingerprint: 387a5e3f9b0e792e91ce87134b0f4bfe17677d9248cb5337f3fbf3a8e157942a
+    Start time: Sun Apr  6 12:00:10 2014
+    End time:   Sun Apr  6 12:00:10 2014
+    Duration: 0.08 seconds
+    Number of files: 358
+                           Original size      Compressed size    Deduplicated size
+    This archive:               57.16 MB             46.78 MB            151.67 kB
+    All archives:              114.02 MB             93.46 MB             44.81 MB
+
 
 4. List all archives in the repository::
 
@@ -87,12 +98,17 @@ Repository encryption is enabled at repository creation time::
 When repository encryption is enabled all data is encrypted using 256-bit AES_
 encryption and the integrity and authenticity is verified using `HMAC-SHA256`_.
 
+All data is encrypted before being written to the repository. This means that
+an attacker that manages to compromise the host containing an encrypted
+archive will not be able to access any of the data.
+
 |project_name| supports two different methods to derive the AES and HMAC keys.
 
 Passphrase based encryption
     This method uses a user supplied passphrase to derive the keys using the
-    PBKDF2_ key derivation function. This method is convenient to use and
-    secure as long as a *strong* passphrase is used.
+    PBKDF2_ key derivation function. This method is convenient to use since
+    there is no key file to keep track of and secure as long as a *strong*
+    passphrase is used.
 
     .. Note::
         For automated backups the passphrase can be specified using the
@@ -101,7 +117,8 @@ Passphrase based encryption
 Key file based encryption
     This method generates random keys at repository initialization time that
     are stored in a password protected file in the ``~/.attic/keys/`` directory.
-    This method is secure and suitable for automated backups.
+    The key file is a printable text file. This method is secure and suitable
+    for automated backups.
 
     .. Note::
         The repository data is totally inaccessible without the key file

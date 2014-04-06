@@ -53,8 +53,7 @@ class Archiver:
         return RepositoryServer(restrict_to_paths=args.restrict_to_paths).serve()
 
     def do_init(self, args):
-        """Initialize an empty repository
-        """
+        """Initialize an empty repository"""
         print('Initializing repository at "%s"' % args.repository.orig)
         repository = self.open_repository(args.repository, create=True)
         key = key_creator(repository, args)
@@ -65,8 +64,7 @@ class Archiver:
         return self.exit_code
 
     def do_check(self, args):
-        """Check repository consistency
-        """
+        """Check repository consistency"""
         repository = self.open_repository(args.repository)
         if args.repair:
             while not os.environ.get('ATTIC_CHECK_I_KNOW_WHAT_I_AM_DOING'):
@@ -87,16 +85,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         return 0
 
     def do_change_passphrase(self, args):
-        """Change repository key file passphrase
-        """
+        """Change repository key file passphrase"""
         repository = self.open_repository(args.repository)
         manifest, key = Manifest.load(repository)
         key.change_passphrase()
         return 0
 
     def do_create(self, args):
-        """Create new archive
-        """
+        """Create new archive"""
         t0 = datetime.now()
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
@@ -186,8 +182,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             self.print_error('Unknown file type: %s', path)
 
     def do_extract(self, args):
-        """Extract archive contents
-        """
+        """Extract archive contents"""
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
         archive = Archive(repository, key, manifest, args.archive.archive,
@@ -217,8 +212,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         return self.exit_code
 
     def do_delete(self, args):
-        """Delete archive
-        """
+        """Delete an existing archive"""
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest)
@@ -233,8 +227,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         return self.exit_code
 
     def do_mount(self, args):
-        """Mount archive or an entire repository as a FUSE fileystem
-        """
+        """Mount archive or an entire repository as a FUSE fileystem"""
         try:
             from attic.fuse import AtticOperations
         except ImportError:
@@ -295,8 +288,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         return self.exit_code
 
     def do_info(self, args):
-        """Show archive details such as disk space used
-        """
+        """Show archive details such as disk space used"""
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest)
@@ -313,8 +305,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         return self.exit_code
 
     def do_prune(self, args):
-        """Prune repository archives according to specified rules
-        """
+        """Prune repository archives according to specified rules"""
         repository = self.open_repository(args.repository)
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest)
@@ -395,7 +386,13 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         elif args.topic in self.helptext:
             print(self.helptext[args.topic])
         elif args.topic in commands:
-            commands[args.topic].print_help()
+            if args.epilog_only:
+                print(commands[args.topic].epilog)
+            elif args.usage_only:
+                commands[args.topic].epilog = None
+                commands[args.topic].print_help()
+            else:
+                commands[args.topic].print_help()
         else:
             parser.error('No help available on %s' % (args.topic,))
         return self.exit_code
@@ -445,9 +442,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.set_defaults(func=self.do_serve)
         subparser.add_argument('--restrict-to-path', dest='restrict_to_paths', action='append',
                                metavar='PATH', help='restrict repository access to PATH')
-
+        init_epilog = textwrap.dedent("""
+        This command initializes an empty repository. A repository is a filesystem
+        directory containing the deduplicated data from zero or more archives.
+        Encryption can be enabled at repository init time.
+        """)
         subparser = subparsers.add_parser('init', parents=[common_parser],
-                                          description=self.do_init.__doc__)
+                                          description=self.do_init.__doc__, epilog=init_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_init)
         subparser.add_argument('repository', metavar='REPOSITORY',
                                type=location_validator(archive=False),
@@ -484,17 +486,30 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                default=False,
                                help='attempt to repair any inconsistencies found')
 
+        change_passphrase_epilog = textwrap.dedent("""
+        The key files used for repository encryption are optionally passphrase
+        protected. This command can be used to change this passphrase.
+        """)
         subparser = subparsers.add_parser('change-passphrase', parents=[common_parser],
-                                          description=self.do_change_passphrase.__doc__)
+                                          description=self.do_change_passphrase.__doc__,
+                                          epilog=change_passphrase_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_change_passphrase)
         subparser.add_argument('repository', metavar='REPOSITORY',
                                type=location_validator(archive=False))
 
-        create_epilog = '''See "attic help patterns" for more help on exclude patterns.'''
+        create_epilog = textwrap.dedent("""
+        This command creates a backup archive containing all files found while recursively
+        traversing all paths specified. The archive will consume almost no disk space for
+        files or parts of files that have already been stored in other archives.
+
+        See "attic help patterns" for more help on exclude patterns.
+        """)
 
         subparser = subparsers.add_parser('create', parents=[common_parser],
                                           description=self.do_create.__doc__,
-                                          epilog=create_epilog)
+                                          epilog=create_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_create)
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
@@ -520,11 +535,18 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
                                help='paths to archive')
 
-        extract_epilog = '''See "attic help patterns" for more help on exclude patterns.'''
+        extract_epilog = textwrap.dedent("""
+        This command extracts the contents of an archive. By default the entire
+        archive is extracted but a subset of files and directories can be selected
+        by passing a list of ``PATHs`` as arguments. The file selection can further
+        be restricted by using the ``--exclude`` option.
 
+        See "attic help patterns" for more help on exclude patterns.
+        """)
         subparser = subparsers.add_parser('extract', parents=[common_parser],
                                           description=self.do_extract.__doc__,
-                                          epilog=extract_epilog)
+                                          epilog=extract_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_extract)
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
@@ -544,8 +566,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to extract')
 
+        delete_epilog = textwrap.dedent("""
+        This command deletes an archive from the repository. Any disk space not
+        shared with any other existing archive is also reclaimed.
+        """)
         subparser = subparsers.add_parser('delete', parents=[common_parser],
-                                          description=self.do_delete.__doc__)
+                                          description=self.do_delete.__doc__,
+                                          epilog=delete_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_delete)
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
@@ -554,14 +582,26 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                type=location_validator(archive=True),
                                help='archive to delete')
 
+        list_epilog = textwrap.dedent("""
+        This command lists the contents of a repository or an archive.
+        """)
         subparser = subparsers.add_parser('list', parents=[common_parser],
-                                          description=self.do_list.__doc__)
+                                          description=self.do_list.__doc__,
+                                          epilog=list_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_list)
         subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
                                help='repository/archive to list contents of')
-
+        mount_epilog = textwrap.dedent("""
+        This command mounts an archive as a FUSE filesystem. This can be useful for
+        browsing an archive or restoring individual files. Unless the ``--foreground``
+        option is given the command will run in the background until the filesystem
+        is ``umounted``.
+        """)
         subparser = subparsers.add_parser('mount', parents=[common_parser],
-                                          description=self.do_mount.__doc__)
+                                          description=self.do_mount.__doc__,
+                                          epilog=mount_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_mount)
         subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
                                help='repository/archive to mount')
@@ -573,35 +613,45 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-o', dest='options', type=str,
                                help='Extra mount options')
 
+        info_epilog = textwrap.dedent("""
+        This command displays some detailed information about the specified archive.
+        """)
         subparser = subparsers.add_parser('info', parents=[common_parser],
-                                          description=self.do_info.__doc__)
+                                          description=self.do_info.__doc__,
+                                          epilog=info_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_info)
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to display information about')
 
-        prune_epilog = '''The prune command prunes a repository by deleting archives
-        not matching any of the specified retention options. This command is normally
-        used by automated backup scripts wanting to keep a certain number of historic
-        backups. As an example, "-d 7" means to keep the latest backup on each day
-        for 7 days. Days without backups do not count towards the total. The rules
-        are applied from hourly to yearly, and backups selected by previous rules do
-        not count towards those of later rules. The time that each backup completes
-        is used for pruning purposes. Dates and times are interpreted in
+        prune_epilog = textwrap.dedent("""
+        The prune command prunes a repository by deleting archives not matching
+        any of the specified retention options. This command is normally used by
+        automated backup scripts wanting to keep a certain number of historic backups.
+
+        As an example, "-d 7" means to keep the latest backup on each day for 7 days.
+        Days without backups do not count towards the total.
+        The rules are applied from hourly to yearly, and backups selected by previous
+        rules do not count towards those of later rules. The time that each backup
+        completes is used for pruning purposes. Dates and times are interpreted in
         the local timezone, and weeks go from Monday to Sunday. Specifying a
         negative number of archives to keep means that there is no limit.
+
         The "--keep-within" option takes an argument of the form "<int><char>",
         where char is "H", "d", "w", "m", "y". For example, "--keep-within 2d" means
         to keep all archives that were created within the past 48 hours.
         "1m" is taken to mean "31d". The archives kept with this option do not
-        count towards the totals specified by any other options. If a
-        prefix is set with -p, then only archives that start with the prefix are
-        considered for deletion and only those archives count towards the totals
-        specified by the rules.'''
+        count towards the totals specified by any other options.
 
+        If a prefix is set with -p, then only archives that start with the prefix are
+        considered for deletion and only those archives count towards the totals
+        specified by the rules.
+        """)
         subparser = subparsers.add_parser('prune', parents=[common_parser],
                                           description=self.do_prune.__doc__,
-                                          epilog=prune_epilog)
+                                          epilog=prune_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_prune)
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
@@ -629,8 +679,11 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
         subparser = subparsers.add_parser('help', parents=[common_parser],
                                           description='Extra help')
-        subparser.set_defaults(
-            func=functools.partial(self.do_help, parser, subparsers.choices))
+        subparser.add_argument('--epilog-only', dest='epilog_only',
+                               action='store_true', default=False)
+        subparser.add_argument('--usage-only', dest='usage_only',
+                               action='store_true', default=False)
+        subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
         subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
                                help='additional help on TOPIC')
 

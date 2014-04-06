@@ -17,11 +17,6 @@ messages as it is processing.
 
 .. include:: usage/init.rst.inc
 
-This command initializes an empty :ref:`repository <repository_def>`.
-A repository is a filesystem directory
-containing the deduplicated data from zero or more archives.
-Encryption is enabled at repository initialization time.
-
 Examples
 ~~~~~~~~
 ::
@@ -37,11 +32,6 @@ Examples
 
 
 .. include:: usage/create.rst.inc
-
-This command creates a backup archive containing all files found while
-recursively traversing all paths specified. The archive will consume almost
-no disk space for files or parts of files that have already been stored in
-other archives.
 
 Examples
 ~~~~~~~~
@@ -63,11 +53,6 @@ Examples
 
 .. include:: usage/extract.rst.inc
 
-This command extracts the contents of an archive. By default the entire
-archive is extracted but a subset of files and directories can be selected
-by passing a list of ``PATHs`` as arguments. The file selection can further
-be restricted by using the ``--exclude`` option.
-
 Examples
 ~~~~~~~~
 ::
@@ -88,13 +73,7 @@ Examples
 
 .. include:: usage/delete.rst.inc
 
-This command deletes an archive from the repository. Any disk space not
-shared with any other existing archive is also reclaimed.
-
-
 .. include:: usage/list.rst.inc
-
-This command lists the contents of a repository or an archive.
 
 Examples
 ~~~~~~~~
@@ -118,11 +97,6 @@ Examples
 
 .. include:: usage/prune.rst.inc
 
-The ``prune`` command prunes a repository by deleting archives not matching
-any of the specified retention options. This command is normally
-used by automated backup scripts wanting to keep a certain number of historic
-backups. 
-
 Examples
 ~~~~~~~~
 ::
@@ -144,8 +118,6 @@ Examples
 
 .. include:: usage/info.rst.inc
 
-This command displays some detailed information about the specified archive.
-
 Examples
 ~~~~~~~~
 ::
@@ -165,11 +137,6 @@ Examples
 
 .. include:: usage/mount.rst.inc
 
-This command mounts an archive as a FUSE filesystem. This can be useful for
-browsing an archive or restoring individual files. Unless the ``--foreground``
-option is given the command will run in the background until the filesystem
-is ``umounted``.
-
 Examples
 ~~~~~~~~
 ::
@@ -182,15 +149,12 @@ Examples
 
 .. include:: usage/change-passphrase.rst.inc
 
-The key files used for repository encryption are optionally passphrase
-protected. This command can be used to change this passphrase.
-
 Examples
 ~~~~~~~~
 ::
 
     # Create a key file protected repository
-    $ attic init --key-file /tmp/encrypted-repo
+    $ attic init --encryption=keyfile /tmp/encrypted-repo
     Initializing repository at "/tmp/encrypted-repo"
     Enter passphrase (empty for no passphrase):
     Enter same passphrase again: 

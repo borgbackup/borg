@@ -6,16 +6,19 @@ Here you can see the full list of changes between each Attic release.
 Version 0.12
 ------------
 
-(feature release, released on X)
-- ``attic prune`` now uses the local time zone (instead of UTC) when
-  determining which archives to keep.
+(feature release, released on April 7, 2014)
+
+- Python 3.4 support (#62)
+- Various documentation improvements a new style
 - ``attic mount`` now supports mounting an entire repository not only
   individual archives (#59)
 - Added option to restrict remote repository access to specific path(s):
   ``attic serve --restrict-to-path X`` (#51)
 - Include "all archives" size information in "--stats" output. (#54)
+- Added ``--stats`` option to ``attic delete`` and ``attic prune``
+- Fixed bug where ``attic prune`` used UTC instead of the local time zone
+  when determining which archives to keep.
 - Switch to SI units (Power of 1000 instead 1024) when printing file sizes
-- Added "--stats" option to 'attic delete' and 'attic prune'
 
 Version 0.11
 ------------

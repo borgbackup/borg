@@ -27,6 +27,7 @@ CHUNK_MASK = 0xffff
 utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
 has_mtime_ns = sys.version >= '3.3'
 has_lchmod = hasattr(os, 'lchmod')
+has_lchflags = hasattr(os, 'lchflags')
 
 
 class DownloadPipeline:
@@ -315,6 +316,12 @@ class Archive:
             os.utime(path, None, ns=(item[b'mtime'], item[b'mtime']), follow_symlinks=False)
         elif not symlink:
             os.utime(path, (item[b'mtime'] / 10**9, item[b'mtime'] / 10**9))
+        # Only available on OS X and FreeBSD
+        if has_lchflags and b'bsdflags' in item:
+            try:
+                os.lchflags(path, item[b'bsdflags'])
+            except OSError:
+                pass
 
     def delete(self, stats):
         unpacker = msgpack.Unpacker(use_list=False)
@@ -341,6 +348,8 @@ class Archive:
         xattrs = xattr.get_all(path, follow_symlinks=False)
         if xattrs:
             item[b'xattrs'] = StableDict(xattrs)
+        if has_lchflags and st.st_flags:
+            item[b'bsdflags'] = st.st_flags
         return item
 
     def process_item(self, path, st):

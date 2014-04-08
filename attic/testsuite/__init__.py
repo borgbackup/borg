@@ -15,6 +15,8 @@ try:
 except ImportError:
     have_fuse_mtime_ns = False
 
+has_lchflags = hasattr(os, 'lchflags')
+
 
 # The mtime get/set precison varies on different OS and Python versions
 if 'HAVE_FUTIMENS' in getattr(posix, '_have_functions', []):
@@ -56,6 +58,8 @@ class AtticTestCase(unittest.TestCase):
             # Assume path2 is on FUSE if st_dev is different
             fuse = s1.st_dev != s2.st_dev
             attrs = ['st_mode', 'st_uid', 'st_gid', 'st_rdev']
+            if has_lchflags:
+                attrs.append('st_flags')
             if not fuse or not os.path.isdir(path1):
                 # dir nlink is always 1 on our fuse fileystem
                 attrs.append('st_nlink')

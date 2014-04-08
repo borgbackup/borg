@@ -24,6 +24,8 @@ try:
 except ImportError:
     has_llfuse = False
 
+has_lchflags = hasattr(os, 'lchflags')
+
 src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__), '..')
 
 
@@ -138,6 +140,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             xattr.setxattr(os.path.join(self.input_path, 'link1'), 'user.foo_symlink', b'bar_symlink', follow_symlinks=False)
         # FIFO node
         os.mkfifo(os.path.join(self.input_path, 'fifo1'))
+        if has_lchflags:
+            os.lchflags(os.path.join(self.input_path, 'file1'), stat.UF_NODUMP)
 
     def test_basic_functionality(self):
         self.create_test_files()

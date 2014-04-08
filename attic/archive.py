@@ -285,7 +285,7 @@ class Archive:
         if xattrs:
                 for k, v in xattrs.items():
                     try:
-                        xattr.setxattr(fd or path, k, v)
+                        xattr.setxattr(fd or path, k, v, follow_symlinks=False)
                     except OSError as e:
                         if e.errno != errno.ENOTSUP:
                             raise

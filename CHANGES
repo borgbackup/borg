@@ -8,6 +8,7 @@ Version 0.13
 
 (feature release, released on X)
 
+- Added support for backup and restore of BSDFlags (OSX, FreeBSD) (#56)
 - Fix bug where xattrs on symlinks were not correctly restored
 
 

@@ -14,6 +14,7 @@ import sys
 import time
 from io import BytesIO
 from attic import xattr
+from attic.platform import acl_get, acl_set
 from attic.chunker import chunkify
 from attic.hashindex import ChunkIndex
 from attic.helpers import Error, uid2user, user2uid, gid2group, group2gid, \
@@ -294,8 +295,8 @@ class Archive:
         if not self.numeric_owner:
             uid = user2uid(item[b'user'])
             gid = group2gid(item[b'group'])
-        uid = uid or item[b'uid']
-        gid = gid or item[b'gid']
+        uid = item[b'uid'] if uid is None else uid
+        gid = item[b'gid'] if gid is None else gid
         # This code is a bit of a mess due to os specific differences
         try:
             if fd:
@@ -316,6 +317,7 @@ class Archive:
             os.utime(path, None, ns=(item[b'mtime'], item[b'mtime']), follow_symlinks=False)
         elif not symlink:
             os.utime(path, (item[b'mtime'] / 10**9, item[b'mtime'] / 10**9))
+        acl_set(path, item, self.numeric_owner)
         # Only available on OS X and FreeBSD
         if has_lchflags and b'bsdflags' in item:
             try:
@@ -350,6 +352,7 @@ class Archive:
             item[b'xattrs'] = StableDict(xattrs)
         if has_lchflags and st.st_flags:
             item[b'bsdflags'] = st.st_flags
+        item[b'acl'] = acl_get(path, item, self.numeric_owner)
         return item
 
     def process_item(self, path, st):

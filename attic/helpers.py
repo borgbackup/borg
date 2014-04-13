@@ -61,9 +61,11 @@ class UpgradableLock:
 
 
 def check_extension_modules():
+    import attic.platform
     if (attic.hashindex.API_VERSION != 1 or
         attic.chunker.API_VERSION != 1 or
-        attic.crypto.API_VERSION != 1):
+        attic.crypto.API_VERSION != 1 or
+        attic.platform.API_VERSION != 1):
         raise ExtensionModuleError
 
 
@@ -328,35 +330,64 @@ def memoize(function):
 
 
 @memoize
-def uid2user(uid):
+def uid2user(uid, default=None):
     try:
         return pwd.getpwuid(uid).pw_name
     except KeyError:
-        return None
+        return default
 
 
 @memoize
-def user2uid(user):
+def user2uid(user, default=None):
     try:
         return user and pwd.getpwnam(user).pw_uid
     except KeyError:
-        return None
+        return default
 
 
 @memoize
-def gid2group(gid):
+def gid2group(gid, default=None):
     try:
         return grp.getgrgid(gid).gr_name
     except KeyError:
-        return None
+        return default
 
 
 @memoize
-def group2gid(group):
+def group2gid(group, default=None):
     try:
         return group and grp.getgrnam(group).gr_gid
     except KeyError:
-        return None
+        return default
+
+
+def acl_use_local_uid_gid(acl):
+    """Replace the user/group field with the local uid/gid if possible
+    """
+    entries = []
+    for entry in acl.decode('ascii').split('\n'):
+        if entry:
+            fields = entry.split(':')
+            if fields[0] == 'user' and fields[1]:
+                fields[1] = user2uid(fields[1], fields[3])
+            elif fields[0] == 'group' and fields[1]:
+                fields[1] = group2gid(fields[1], fields[3])
+            entries.append(':'.join(entry.split(':')[:3]))
+    return ('\n'.join(entries)).encode('ascii')
+
+
+def acl_use_stored_uid_gid(acl):
+    """Replace the user/group field with the stored uid/gid
+    """
+    entries = []
+    for entry in acl.decode('ascii').split('\n'):
+        if entry:
+            fields = entry.split(':')
+            if len(fields) == 4:
+                entries.append(':'.join([fields[0], fields[3], fields[2]]))
+            else:
+                entries.append(entry)
+    return ('\n'.join(entries)).encode('ascii')
 
 
 class Location:

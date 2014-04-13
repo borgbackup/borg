@@ -9,7 +9,7 @@ versioneer.versionfile_build = 'attic/_version.py'
 versioneer.tag_prefix = ''
 versioneer.parentdir_prefix = 'Attic-' # dirname like 'myproject-1.2.0'
 
-platform = os.uname().sysname
+platform = os.uname()[0]
 
 min_python = (3, 2)
 if sys.version_info < min_python:

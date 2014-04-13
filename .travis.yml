@@ -4,6 +4,7 @@ python:
   - "3.3"
 # command to install dependencies
 install:
+  - "apt-get install -y libacl1-dev"
   - "pip install --use-mirrors Cython"
   - "pip install -e ."
 # command to run tests

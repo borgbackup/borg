@@ -1,6 +1,6 @@
 import os
 
-platform = os.uname().sysname
+platform = os.uname()[0]
 
 if platform == 'Linux':
     from attic.platform_linux import acl_get, acl_set, API_VERSION

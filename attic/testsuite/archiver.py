@@ -119,6 +119,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # File
         self.create_regual_file('empty', size=0)
         self.create_regual_file('file1', size=1024 * 80)
+        self.create_regual_file('flagfile', size=1024)
         # Directory
         self.create_regual_file('dir2/file2', size=1024 * 80)
         # File owner
@@ -141,7 +142,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # FIFO node
         os.mkfifo(os.path.join(self.input_path, 'fifo1'))
         if has_lchflags:
-            os.lchflags(os.path.join(self.input_path, 'file1'), stat.UF_NODUMP)
+            os.lchflags(os.path.join(self.input_path, 'flagfile'), stat.UF_NODUMP)
 
     def test_basic_functionality(self):
         self.create_test_files()
@@ -151,7 +152,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir('output'):
             self.attic('extract', self.repository_location + '::test')
         self.assert_equal(len(self.attic('list', self.repository_location).splitlines()), 2)
-        self.assert_equal(len(self.attic('list', self.repository_location + '::test').splitlines()), 10)
+        self.assert_equal(len(self.attic('list', self.repository_location + '::test').splitlines()), 11)
         self.assert_dirs_equal('input', 'output/input')
         info_output = self.attic('info', self.repository_location + '::test')
         shutil.rmtree(self.cache_path)

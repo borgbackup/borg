@@ -1,4 +1,5 @@
 import os
+import re
 from attic.helpers import acl_use_local_uid_gid, acl_use_stored_uid_gid, user2uid, group2gid
 
 API_VERSION = 1
@@ -22,11 +23,13 @@ cdef extern from "acl/libacl.h":
     int acl_extended_file_nofollow(const char *path)
 
 
+_comment_re = re.compile(' *#.*', re.M)
+
 def acl_append_numeric_ids(acl):
     """Extend the "POSIX 1003.1e draft standard 17" format with an additional uid/gid field
     """
     entries = []
-    for entry in acl.decode('ascii').split('\n'):
+    for entry in _comment_re.sub('', acl.decode('ascii')).split('\n'):
         if entry:
             type, name, permission = entry.split(':')
             if name and type == 'user':
@@ -42,7 +45,7 @@ def acl_numeric_ids(acl):
     """Replace the "POSIX 1003.1e draft standard 17" user/group field with uid/gid
     """
     entries = []
-    for entry in acl.decode('ascii').split('\n'):
+    for entry in _comment_re.sub('', acl.decode('ascii')).split('\n'):
         if entry:
             type, name, permission = entry.split(':')
             if name and type == 'user':

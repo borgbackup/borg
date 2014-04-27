@@ -1,6 +1,6 @@
 import os
 import re
-from attic.helpers import acl_use_local_uid_gid, acl_use_stored_uid_gid, user2uid, group2gid
+from attic.helpers import posix_acl_use_stored_uid_gid, user2uid, group2gid
 
 API_VERSION = 1
 
@@ -25,7 +25,23 @@ cdef extern from "acl/libacl.h":
 
 _comment_re = re.compile(' *#.*', re.M)
 
-def acl_append_numeric_ids(acl):
+
+cdef acl_use_local_uid_gid(acl):
+    """Replace the user/group field with the local uid/gid if possible
+    """
+    entries = []
+    for entry in acl.decode('ascii').split('\n'):
+        if entry:
+            fields = entry.split(':')
+            if fields[0] == 'user' and fields[1]:
+                fields[1] = user2uid(fields[1], fields[3])
+            elif fields[0] == 'group' and fields[1]:
+                fields[1] = group2gid(fields[1], fields[3])
+            entries.append(':'.join(entry.split(':')[:3]))
+    return ('\n'.join(entries)).encode('ascii')
+
+
+cdef acl_append_numeric_ids(acl):
     """Extend the "POSIX 1003.1e draft standard 17" format with an additional uid/gid field
     """
     entries = []
@@ -41,7 +57,7 @@ def acl_append_numeric_ids(acl):
     return ('\n'.join(entries)).encode('ascii')
 
 
-def acl_numeric_ids(acl):
+cdef acl_numeric_ids(acl):
     """Replace the "POSIX 1003.1e draft standard 17" user/group field with uid/gid
     """
     entries = []
@@ -100,7 +116,7 @@ def acl_set(path, item, numeric_owner=False):
     cdef acl_t access_acl = NULL
     cdef acl_t default_acl = NULL
     if numeric_owner:
-        converter = acl_use_stored_uid_gid
+        converter = posix_acl_use_stored_uid_gid
     else:
         converter = acl_use_local_uid_gid
     access_text = item.get(b'acl_access')

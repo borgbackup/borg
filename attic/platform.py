@@ -4,6 +4,8 @@ platform = os.uname()[0]
 
 if platform == 'Linux':
     from attic.platform_linux import acl_get, acl_set, API_VERSION
+elif platform == 'FreeBSD':
+    from attic.platform_freebsd import acl_get, acl_set, API_VERSION
 else:
     API_VERSION = 1
 

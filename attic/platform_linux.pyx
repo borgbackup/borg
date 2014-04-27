@@ -26,7 +26,7 @@ cdef extern from "acl/libacl.h":
 _comment_re = re.compile(' *#.*', re.M)
 
 
-cdef acl_use_local_uid_gid(acl):
+def acl_use_local_uid_gid(acl):
     """Replace the user/group field with the local uid/gid if possible
     """
     entries = []

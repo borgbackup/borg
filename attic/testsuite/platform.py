@@ -1,5 +1,6 @@
 import os
 import shutil
+import sys
 import tempfile
 import unittest
 from attic.platform import acl_get, acl_set
@@ -33,6 +34,7 @@ def fakeroot_detected():
     return 'FAKEROOTKEY' in os.environ
 
 
+@unittest.skipUnless(sys.platform.startswith('linux'), 'linux only test')
 @unittest.skipIf(fakeroot_detected(), 'not compatible with fakeroot')
 class PlatformLinuxTestCase(AtticTestCase):
 

@@ -65,9 +65,11 @@ cdef acl_numeric_ids(acl):
         if entry:
             type, name, permission = entry.split(':')
             if name and type == 'user':
-                entries.append(':'.join([type, str(user2uid(name, name)), permission]))
+                uid = str(user2uid(name, name))
+                entries.append(':'.join([type, uid, permission, uid]))
             elif name and type == 'group':
-                entries.append(':'.join([type, str(group2gid(name, name)), permission]))
+                gid = str(group2gid(name, name))
+                entries.append(':'.join([type, gid, permission, gid]))
             else:
                 entries.append(entry)
     return ('\n'.join(entries)).encode('ascii')
@@ -94,12 +96,12 @@ def acl_get(path, item, numeric_owner=False):
         if access_acl:
             access_text = acl_to_text(access_acl, NULL)
             if access_text:
-                item[b'acl_access'] = acl_append_numeric_ids(access_text)
+                item[b'acl_access'] = converter(access_text)
         default_acl = acl_get_file(<bytes>os.fsencode(path), ACL_TYPE_DEFAULT)
         if default_acl:
             default_text = acl_to_text(default_acl, NULL)
             if default_text:
-                item[b'acl_default'] = acl_append_numeric_ids(default_text)
+                item[b'acl_default'] = converter(default_text)
     finally:
         acl_free(default_text)
         acl_free(default_acl)

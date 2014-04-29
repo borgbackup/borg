@@ -66,7 +66,7 @@ if sys.platform.startswith('linux'):
         n2 = _check(func(path, namebuf, n), path)
         if n2 != n:
             raise Exception('listxattr failed')
-        return [os.fsdecode(name) for name in namebuf.raw.split(b'\0')[:-1]]
+        return [os.fsdecode(name) for name in namebuf.raw.split(b'\0')[:-1] if not n.startswith(b'system.posix_acl_')]
 
     def getxattr(path, name, *, follow_symlinks=True):
         name = os.fsencode(name)

@@ -106,12 +106,14 @@ class ArchiverTestCaseBase(AtticTestCase):
 
 class ArchiverTestCase(ArchiverTestCaseBase):
 
-    def create_regular_file(self, name, size=0):
+    def create_regular_file(self, name, size=0, contents=None):
         filename = os.path.join(self.input_path, name)
         if not os.path.exists(os.path.dirname(filename)):
             os.makedirs(os.path.dirname(filename))
         with open(filename, 'wb') as fd:
-            fd.write(b'X' * size)
+            if contents is None:
+                contents = b'X' * size
+            fd.write(contents)
 
     def create_test_files(self):
         """Create a minimal test case including all supported file types
@@ -177,6 +179,17 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir('output'):
             self.attic('extract', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file3'])
+
+    def test_exclude_caches(self):
+        self.attic('init', self.repository_location)
+        self.create_regular_file('file1', size=1024 * 80)
+        self.create_regular_file('cache1/CACHEDIR.TAG', contents = b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
+        self.create_regular_file('cache2/CACHEDIR.TAG', contents = b'invalid signature')
+        self.attic('create', '--exclude-caches', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.attic('extract', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['cache2', 'file1'])
+        self.assert_equal(sorted(os.listdir('output/input/cache2')), ['CACHEDIR.TAG'])
 
     def test_path_normalization(self):
         self.attic('init', self.repository_location)

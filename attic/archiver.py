@@ -17,7 +17,8 @@ from attic.key import key_creator
 from attic.helpers import Error, location_validator, format_time, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
-    Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics
+    Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
+    is_cachedir
 from attic.remote import RepositoryServer, RemoteRepository
 
 
@@ -124,7 +125,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     continue
             else:
                 restrict_dev = None
-            self._process(archive, cache, args.excludes, skip_inodes, path, restrict_dev)
+            self._process(archive, cache, args.excludes, args.exclude_caches, skip_inodes, path, restrict_dev)
         archive.save()
         if args.stats:
             t = datetime.now()
@@ -140,7 +141,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             print('-' * 78)
         return self.exit_code
 
-    def _process(self, archive, cache, excludes, skip_inodes, path, restrict_dev):
+    def _process(self, archive, cache, excludes, exclude_caches, skip_inodes, path, restrict_dev):
         if exclude_path(path, excludes):
             return
         try:
@@ -163,6 +164,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             except IOError as e:
                 self.print_error('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
+            if exclude_caches and is_cachedir(path):
+                return
             archive.process_item(path, st)
             try:
                 entries = os.listdir(path)
@@ -170,7 +173,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 self.print_error('%s: %s', path, e)
             else:
                 for filename in sorted(entries):
-                    self._process(archive, cache, excludes, skip_inodes,
+                    self._process(archive, cache, excludes, exclude_caches, skip_inodes,
                                   os.path.join(path, filename), restrict_dev)
         elif stat.S_ISLNK(st.st_mode):
             archive.process_symlink(path, st)
@@ -519,6 +522,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('--exclude-from', dest='exclude_files',
                                type=argparse.FileType('r'), action='append',
                                metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
+        subparser.add_argument('--exclude-caches', dest='exclude_caches',
+                               action='store_true', default=False,
+                               help='exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)')
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                type=int, default=300, metavar='SECONDS',
                                help='write checkpoint every SECONDS seconds (Default: 300)')

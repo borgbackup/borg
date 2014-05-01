@@ -11,6 +11,8 @@ Version 0.13
 - Experimental Linux and FreeBSD ACL support (#66)
 - Added support for backup and restore of BSDFlags (OSX, FreeBSD) (#56)
 - Fix bug where xattrs on symlinks were not correctly restored
+- Added cachedir support. CACHEDIR.TAG compatible cache directories
+  can now be excluded using ``--exclude-caches`` (#74)
 
 Version 0.12
 ------------

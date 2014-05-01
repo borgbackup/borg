@@ -427,6 +427,13 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
             os.chmod(cache_dir, stat.S_IRWXU)
+            with open(os.path.join(cache_dir, 'CACHEDIR.TAG'), 'w') as fd:
+                fd.write(textwrap.dedent("""
+                    Signature: 8a477f597d28d172789f06886806bc55
+                    # This file is a cache directory tag created by Attic.
+                    # For information about cache directory tags, see:
+                    #       http://www.brynosaurus.com/cachedir/
+                    """).lstrip())
         common_parser = argparse.ArgumentParser(add_help=False)
         common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
                             default=False,

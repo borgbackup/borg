@@ -245,6 +245,7 @@ class ExcludePattern(IncludePattern):
     def __repr__(self):
         return '%s(%s)' % (type(self), self.pattern)
 
+
 def is_cachedir(path):
     """Determines whether the specified path is a cache directory (and
     therefore should potentially be excluded from the backup) according to
@@ -252,7 +253,6 @@ def is_cachedir(path):
     (http://www.brynosaurus.com/cachedir/spec.html).
     """
 
-    tag_filename = 'CACHEDIR.TAG'
     tag_contents = b'Signature: 8a477f597d28d172789f06886806bc55'
     tag_path = os.path.join(path, 'CACHEDIR.TAG')
     try:
@@ -261,9 +261,10 @@ def is_cachedir(path):
                 tag_data = tag_file.read(len(tag_contents))
                 if tag_data == tag_contents:
                     return True
-    except OSError as e:
-        raise
+    except OSError:
+        pass
     return False
+
 
 def walk_path(path, skip_inodes=None):
     st = os.lstat(path)

@@ -22,9 +22,8 @@ Which file attributes are preserved?
     * Group ID of owner
     * Unix Permission
     * Extended attributes (xattrs)
-
-    .. Note::
-        POSIX Access Control Lists (ACL_) are not yet preserved.
+    * Access Control Lists (ACL_) on Linux, OS X and FreeBSD
+    * BSD flags on OS X and FreeBSD
 
 How can I specify the encryption passphrase programmatically?
     The encryption passphrase can be specified programmatically using the

@@ -12,6 +12,8 @@ from .hashindex import ChunkIndex
 class Cache(object):
     """Client Side cache
     """
+    # Do not cache file metadata for files smaller than this
+    FILE_MIN_SIZE = 4096
 
     class RepositoryReplay(Error):
         """Cache is newer than repository, refusing to continue"""
@@ -81,9 +83,10 @@ class Cache(object):
                 if not data:
                     break
                 u.feed(data)
-                for hash, item in u:
+                for path_hash, item in u:
+                    if item[2] > self.FILE_MIN_SIZE:
                         item[0] += 1
-                        self.files[hash] = item
+                        self.files[path_hash] = item
 
     def begin_txn(self):
         # Initialize transaction snapshot
@@ -218,7 +221,8 @@ class Cache(object):
             return None
 
     def memorize_file(self, path_hash, st, ids):
-        # Entry: Age, inode, size, mtime, chunk ids
-        mtime_ns = st_mtime_ns(st)
-        self.files[path_hash] = 0, st.st_ino, st.st_size, mtime_ns, ids
-        self._newest_mtime = max(self._newest_mtime, mtime_ns)
+        if st.st_size > self.FILE_MIN_SIZE:
+            # Entry: Age, inode, size, mtime, chunk ids
+            mtime_ns = st_mtime_ns(st)
+            self.files[path_hash] = 0, st.st_ino, st.st_size, mtime_ns, ids
+            self._newest_mtime = max(self._newest_mtime, mtime_ns)

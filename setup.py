@@ -25,6 +25,7 @@ crypto_source = 'attic/crypto.pyx'
 chunker_source = 'attic/chunker.pyx'
 hashindex_source = 'attic/hashindex.pyx'
 platform_linux_source = 'attic/platform_linux.pyx'
+platform_darwin_source = 'attic/platform_darwin.pyx'
 platform_freebsd_source = 'attic/platform_freebsd.pyx'
 
 try:
@@ -39,7 +40,7 @@ try:
             versioneer.cmd_sdist.__init__(self, *args, **kwargs)
 
         def make_distribution(self):
-            self.filelist.extend(['attic/crypto.c', 'attic/chunker.c', 'attic/_chunker.c', 'attic/hashindex.c', 'attic/_hashindex.c', 'attic/platform_linux.c', 'attic/platform_freebsd.c'])
+            self.filelist.extend(['attic/crypto.c', 'attic/chunker.c', 'attic/_chunker.c', 'attic/hashindex.c', 'attic/_hashindex.c', 'attic/platform_linux.c', 'attic/platform_freebsd.c', 'attic/platform_darwin.c'])
             super(Sdist, self).make_distribution()
 
 except ImportError:
@@ -52,6 +53,7 @@ except ImportError:
     hashindex_source = hashindex_source.replace('.pyx', '.c')
     platform_linux_source = platform_linux_source.replace('.pyx', '.c')
     platform_freebsd_source = platform_freebsd_source.replace('.pyx', '.c')
+    platform_darwin_source = platform_darwin_source.replace('.pyx', '.c')
     from distutils.command.build_ext import build_ext
     if not all(os.path.exists(path) for path in [crypto_source, chunker_source, hashindex_source, platform_linux_source, platform_freebsd_source]):
         raise ImportError('The GIT version of Attic needs Cython. Install Cython or use a released version')
@@ -91,6 +93,8 @@ if platform == 'Linux':
     ext_modules.append(Extension('attic.platform_linux', [platform_linux_source], libraries=['acl']))
 elif platform == 'FreeBSD':
     ext_modules.append(Extension('attic.platform_freebsd', [platform_freebsd_source]))
+elif platform == 'Darwin':
+    ext_modules.append(Extension('attic.platform_darwin', [platform_darwin_source]))
 
 setup(
     name='Attic',

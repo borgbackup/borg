@@ -71,3 +71,30 @@ class PlatformLinuxTestCase(AtticTestCase):
         self.assert_equal(self.get_acl(self.tmpdir)[b'acl_access'], ACCESS_ACL)
         self.assert_equal(self.get_acl(self.tmpdir)[b'acl_default'], DEFAULT_ACL)
 
+
+@unittest.skipUnless(sys.platform.startswith('darwin'), 'OS X only test')
+@unittest.skipIf(fakeroot_detected(), 'not compatible with fakeroot')
+class PlatformDarwinTestCase(AtticTestCase):
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def get_acl(self, path, numeric_owner=False):
+        item = {}
+        acl_get(path, item, numeric_owner=numeric_owner)
+        return item
+
+    def set_acl(self, path, acl, numeric_owner=False):
+        item = {b'acl_extended': acl}
+        acl_set(path, item, numeric_owner=numeric_owner)
+
+    def test_access_acl(self):
+        file = tempfile.NamedTemporaryFile()
+        self.assert_equal(self.get_acl(file.name), {})
+        self.set_acl(file.name, b'!#acl 1\ngroup:ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000014:staff:9999:allow:read\nuser:FFFFEEEE-DDDD-CCCC-BBBB-AAAA00000000:root:0:allow:read\n', numeric_owner=False)
+        self.assert_in(b'group:ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000014:staff:20:allow:read', self.get_acl(file.name)[b'acl_extended'])
+        self.assert_in(b'user:FFFFEEEE-DDDD-CCCC-BBBB-AAAA00000000:root:0:allow:read', self.get_acl(file.name)[b'acl_extended'])
+

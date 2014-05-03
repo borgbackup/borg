@@ -1,4 +1,6 @@
 import os
+from attic.helpers import user2uid, group2gid
+
 API_VERSION = 1
 
 cdef extern from "sys/acl.h":
@@ -14,6 +16,38 @@ cdef extern from "sys/acl.h":
     int ACL_TYPE_EXTENDED
 
 
+def _remove_numeric_id_if_possible(acl):
+    """Replace the user/group field with the local uid/gid if possible
+    """
+    entries = []
+    for entry in acl.decode('ascii').split('\n'):
+        if entry:
+            fields = entry.split(':')
+            if fields[0] == 'user':
+                if user2uid(fields[2]) is not None:
+                    fields[1] = fields[3] = ''
+            elif fields[0] == 'group':
+                if group2gid(fields[2]) is not None:
+                    fields[1] = fields[3] = ''
+            entries.append(':'.join(fields))
+    return ('\n'.join(entries)).encode('ascii')
+
+
+def _remove_non_numeric_identifier(acl):
+    """Remove user and group names from the acl
+    """
+    entries = []
+    for entry in acl.split(b'\n'):
+        if entry:
+            fields = entry.split(b':')
+            if fields[0] in (b'user', b'group'):
+                fields[2] = b''
+                entries.append(b':'.join(fields))
+            else:
+                entries.append(entry)
+    return b'\n'.join(entries)
+
+
 def acl_get(path, item, numeric_owner=False):
     cdef acl_t acl = NULL
     cdef char *text = NULL
@@ -24,7 +58,10 @@ def acl_get(path, item, numeric_owner=False):
         text = acl_to_text(acl, NULL)
         if text == NULL:
             return
-        item[b'acl_extended'] = text
+        if numeric_owner:
+            item[b'acl_extended'] = _remove_non_numeric_identifier(text)
+        else:
+            item[b'acl_extended'] = text
     finally:
         acl_free(text)
         acl_free(acl)
@@ -34,7 +71,10 @@ def acl_set(path, item, numeric_owner=False):
     cdef acl_t acl = NULL
     try:
         try:
-            acl = acl_from_text(item[b'acl_extended'])
+            if numeric_owner:
+                acl = acl_from_text(item[b'acl_extended'])
+            else:
+                acl = acl_from_text(<bytes>_remove_numeric_id_if_possible(item[b'acl_extended']))
         except KeyError:
             return
         if acl == NULL:

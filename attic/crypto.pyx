@@ -23,8 +23,8 @@ cdef extern from "openssl/evp.h":
         pass
     const EVP_MD *EVP_sha256()
     const EVP_CIPHER *EVP_aes_256_ctr()
-    EVP_CIPHER_CTX *EVP_CIPHER_CTX_new()
-    void EVP_CIPHER_CTX_free(EVP_CIPHER_CTX *a)
+    void EVP_CIPHER_CTX_init(EVP_CIPHER_CTX *a)
+    void EVP_CIPHER_CTX_cleanup(EVP_CIPHER_CTX *a)
 
     int EVP_EncryptInit_ex(EVP_CIPHER_CTX *ctx,const EVP_CIPHER *cipher, ENGINE *impl,
                            const unsigned char *key, const unsigned char *iv)
@@ -84,19 +84,16 @@ def get_random_bytes(n):
 cdef class AES:
     """A thin wrapper around the OpenSSL EVP cipher API
     """
-    cdef EVP_CIPHER_CTX *ctx
+    cdef EVP_CIPHER_CTX ctx
 
     def __cinit__(self, key, iv=None):
-        self.ctx = EVP_CIPHER_CTX_new()
-        if not self.ctx:
-            raise MemoryError
-        if not EVP_EncryptInit_ex(self.ctx, EVP_aes_256_ctr(), NULL, NULL, NULL):
+        EVP_CIPHER_CTX_init(&self.ctx)
+        if not EVP_EncryptInit_ex(&self.ctx, EVP_aes_256_ctr(), NULL, NULL, NULL):
             raise Exception('EVP_EncryptInit_ex failed')
         self.reset(key, iv)
 
     def __dealloc__(self):
-        if self.ctx:
-            EVP_CIPHER_CTX_free(self.ctx)
+        EVP_CIPHER_CTX_cleanup(&self.ctx)
 
     def reset(self, key=None, iv=None):
         cdef const unsigned char *key2 = NULL
@@ -105,7 +102,7 @@ cdef class AES:
             key2 = key
         if iv:
             iv2 = iv
-        if not EVP_EncryptInit_ex(self.ctx, NULL, NULL, key2, iv2):
+        if not EVP_EncryptInit_ex(&self.ctx, NULL, NULL, key2, iv2):
             raise Exception('EVP_EncryptInit_ex failed')
 
     @property
@@ -119,7 +116,7 @@ cdef class AES:
         if not out:
             raise MemoryError
         try:
-            if not EVP_EncryptUpdate(self.ctx, out, &outl, data, inl):
+            if not EVP_EncryptUpdate(&self.ctx, out, &outl, data, inl):
                 raise Exception('EVP_EncryptUpdate failed')
             return out[:inl]
         finally:

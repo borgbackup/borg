@@ -38,7 +38,7 @@ static uint32_t table_base[] =
     0xc5ae37bb, 0xa76ce12a, 0x8150d8f3, 0x2ec29218, 0xa35f0984, 0x48c0647e, 0x0b5ff98c, 0x71893f7b
 };
 
-#define BARREL_SHIFT(v, shift) ( ((v) << ((shift) & 0x1f)) | ((v) >> (32 - ((shift) & 0x1f))) )
+#define BARREL_SHIFT(v, shift) ( ((v) << shift) | ((v) >> (32 - shift)) )
 
 
 static uint32_t *
@@ -56,11 +56,12 @@ buzhash_init_table(uint32_t seed)
 static uint32_t
 buzhash(const unsigned char *data, size_t len, const uint32_t *h)
 {
-    size_t i;
-    uint32_t sum = 0;
+    uint32_t i;
+    uint32_t sum = 0, imod;
     for(i = len - 1; i > 0; i--)
     {
-        sum ^= BARREL_SHIFT(h[*data], i);
+        imod = i & 0x1f;
+        sum ^= BARREL_SHIFT(h[*data], imod);
         data++;
     }
     return sum ^ h[*data];
@@ -69,7 +70,8 @@ buzhash(const unsigned char *data, size_t len, const uint32_t *h)
 static uint32_t
 buzhash_update(uint32_t sum, unsigned char remove, unsigned char add, size_t len, const uint32_t *h)
 {
-    return BARREL_SHIFT(sum, 1) ^ BARREL_SHIFT(h[remove], len) ^ h[add];
+    uint32_t lenmod = len & 0x1f;
+    return BARREL_SHIFT(sum, 1) ^ BARREL_SHIFT(h[remove], lenmod) ^ h[add];
 }
 
 typedef struct {

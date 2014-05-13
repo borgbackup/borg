@@ -3,29 +3,34 @@
 This could be replaced by PyCrypto or something similar when the performance
 of their PBKDF2 implementation is comparable to the OpenSSL version.
 """
-from libc.string cimport memcpy
 from libc.stdlib cimport malloc, free
 
-API_VERSION = 1
+API_VERSION = 2
 
 cdef extern from "openssl/rand.h":
     int  RAND_bytes(unsigned char *buf,int num)
 
-cdef extern from "openssl/aes.h":
-    ctypedef struct AES_KEY:
-        pass
-
-    int AES_set_encrypt_key(const unsigned char *userKey, const int bits, AES_KEY *key)
-    void AES_ctr128_encrypt(const unsigned char *in_, unsigned char *out,
-                            size_t length, const AES_KEY *key,
-                            unsigned char *ivec,
-                            unsigned char *ecount_buf,
-                            unsigned int *num)
 
 cdef extern from "openssl/evp.h":
     ctypedef struct EVP_MD:
         pass
+    ctypedef struct EVP_CIPHER:
+        pass
+    ctypedef struct EVP_CIPHER_CTX:
+        unsigned char *iv
+        pass
+    ctypedef struct ENGINE:
+        pass
     const EVP_MD *EVP_sha256()
+    const EVP_CIPHER *EVP_aes_256_ctr()
+    EVP_CIPHER_CTX *EVP_CIPHER_CTX_new()
+    void EVP_CIPHER_CTX_free(EVP_CIPHER_CTX *a)
+
+    int EVP_EncryptInit_ex(EVP_CIPHER_CTX *ctx,const EVP_CIPHER *cipher, ENGINE *impl,
+                           const unsigned char *key, const unsigned char *iv)
+    int EVP_EncryptUpdate(EVP_CIPHER_CTX *ctx, unsigned char *out,
+                          int *outl, const unsigned char *in_, int inl)
+
     int PKCS5_PBKDF2_HMAC(const char *password, int passwordlen,
                           const unsigned char *salt, int saltlen, int iter,
                           const EVP_MD *digest,
@@ -77,35 +82,46 @@ def get_random_bytes(n):
 
 
 cdef class AES:
-    """A thin wrapper around the OpenSSL AES CTR_MODE cipher
+    """A thin wrapper around the OpenSSL EVP cipher API
     """
-    cdef AES_KEY key
-    cdef unsigned char _iv[16]
-    cdef unsigned char buf[16]
-    cdef unsigned int num
+    cdef EVP_CIPHER_CTX *ctx
 
     def __cinit__(self, key, iv=None):
+        self.ctx = EVP_CIPHER_CTX_new()
+        if not self.ctx:
+            raise MemoryError
+        if not EVP_EncryptInit_ex(self.ctx, EVP_aes_256_ctr(), NULL, NULL, NULL):
+            raise Exception('EVP_EncryptInit_ex failed')
         self.reset(key, iv)
 
+    def __dealloc__(self):
+        if self.ctx:
+            EVP_CIPHER_CTX_free(self.ctx)
+
     def reset(self, key=None, iv=None):
+        cdef const unsigned char *key2 = NULL
+        cdef const unsigned char *iv2 = NULL
         if key:
-            AES_set_encrypt_key(key, len(key) * 8, &self.key)
+            key2 = key
         if iv:
-            memcpy(self._iv, <unsigned char *>iv, 16)
-        self.num = 0
+            iv2 = iv
+        if not EVP_EncryptInit_ex(self.ctx, NULL, NULL, key2, iv2):
+            raise Exception('EVP_EncryptInit_ex failed')
 
     @property
     def iv(self):
-        return self._iv[:16]
+        return self.ctx.iv[:16]
 
     def encrypt(self, data):
-        cdef int n = len(data)
-        cdef unsigned char *out = <unsigned char *>malloc(n)
+        cdef int inl = len(data)
+        cdef int outl
+        cdef unsigned char *out = <unsigned char *>malloc(inl)
         if not out:
             raise MemoryError
         try:
-            AES_ctr128_encrypt(data, out, len(data), &self.key, self._iv, self.buf, &self.num)
-            return out[:n]
+            if not EVP_EncryptUpdate(self.ctx, out, &outl, data, inl):
+                raise Exception('EVP_EncryptUpdate failed')
+            return out[:inl]
         finally:
             free(out)
     decrypt = encrypt

@@ -18,7 +18,7 @@ from attic.platform import acl_get, acl_set
 from attic.chunker import chunkify
 from attic.hashindex import ChunkIndex
 from attic.helpers import Error, uid2user, user2uid, gid2group, group2gid, \
-    Manifest, Statistics, decode_dict, st_mtime_ns, make_path_safe, StableDict
+    Manifest, Statistics, decode_dict, st_mtime_ns, make_path_safe, StableDict, int_to_bigint, bigint_to_int
 
 ITEMS_BUFFER = 1024 * 1024
 CHUNK_MIN = 1024
@@ -311,12 +311,13 @@ class Archive:
             os.chmod(path, item[b'mode'])
         elif has_lchmod:  # Not available on Linux
             os.lchmod(path, item[b'mode'])
+        mtime = bigint_to_int(item[b'mtime'])
         if fd and utime_supports_fd:  # Python >= 3.3
-            os.utime(fd, None, ns=(item[b'mtime'], item[b'mtime']))
+            os.utime(fd, None, ns=(mtime, mtime))
         elif utime_supports_fd:  # Python >= 3.3
-            os.utime(path, None, ns=(item[b'mtime'], item[b'mtime']), follow_symlinks=False)
+            os.utime(path, None, ns=(mtime, mtime), follow_symlinks=False)
         elif not symlink:
-            os.utime(path, (item[b'mtime'] / 10**9, item[b'mtime'] / 10**9))
+            os.utime(path, (mtime / 1e9, mtime / 1e9))
         acl_set(path, item, self.numeric_owner)
         # Only available on OS X and FreeBSD
         if has_lchflags and b'bsdflags' in item:
@@ -343,7 +344,7 @@ class Archive:
             b'mode': st.st_mode,
             b'uid': st.st_uid, b'user': uid2user(st.st_uid),
             b'gid': st.st_gid, b'group': gid2group(st.st_gid),
-            b'mtime': st_mtime_ns(st),
+            b'mtime': int_to_bigint(st_mtime_ns(st))
         }
         if self.numeric_owner:
             item[b'user'] = item[b'group'] = None

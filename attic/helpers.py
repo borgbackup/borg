@@ -280,7 +280,7 @@ def walk_path(path, skip_inodes=None):
 def format_time(t):
     """Format datetime suitable for fixed length list output
     """
-    if (datetime.now() - t).days < 365:
+    if abs((datetime.now() - t).days) < 365:
         return t.strftime('%b %d %H:%M')
     else:
         return t.strftime('%b %d  %Y')
@@ -548,3 +548,21 @@ else:
         return st.st_mtime_ns
 
     unhexlify = binascii.unhexlify
+
+
+def bigint_to_int(mtime):
+    """Convert bytearray to int
+    """
+    if isinstance(mtime, bytes):
+        return int.from_bytes(mtime, 'little', signed=True)
+    return mtime
+
+
+def int_to_bigint(value):
+    """Convert integers larger than 64 bits to bytearray
+
+    Smaller integers are left alone
+    """
+    if value.bit_length() > 63:
+        return value.to_bytes((value.bit_length() + 9) // 8, 'little', signed=True)
+    return value

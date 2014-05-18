@@ -15,6 +15,7 @@ Version 0.13
 - Fix bug where xattrs on symlinks were not correctly restored
 - Added cachedir support. CACHEDIR.TAG compatible cache directories
   can now be excluded using ``--exclude-caches`` (#74)
+- Fix crash on extreme mtime timestamps (year 2400+) (#81)
 
 Version 0.12
 ------------

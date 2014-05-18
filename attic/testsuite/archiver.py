@@ -120,6 +120,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         """
         # File
         self.create_regular_file('empty', size=0)
+        # 2600-01-01 > 2**64 ns
+        os.utime('input/empty', (19880895600, 19880895600))
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('flagfile', size=1024)
         # Directory

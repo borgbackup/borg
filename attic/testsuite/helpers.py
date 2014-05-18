@@ -5,9 +5,21 @@ import os
 import tempfile
 import unittest
 from attic.helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, UpgradableLock, prune_within, prune_split, to_localtime, \
-    StableDict
+    StableDict, int_to_bigint, bigint_to_int
 from attic.testsuite import AtticTestCase
 import msgpack
+
+
+class BigIntTestCase(AtticTestCase):
+
+    def test_bigint(self):
+        self.assert_equal(int_to_bigint(0), 0)
+        self.assert_equal(int_to_bigint(2**63-1), 2**63-1)
+        self.assert_equal(int_to_bigint(-2**63+1), -2**63+1)
+        self.assert_equal(int_to_bigint(2**63), b'\x00\x00\x00\x00\x00\x00\x00\x80\x00')
+        self.assert_equal(int_to_bigint(-2**63), b'\x00\x00\x00\x00\x00\x00\x00\x80\xff')
+        self.assert_equal(bigint_to_int(int_to_bigint(-2**70)), -2**70)
+        self.assert_equal(bigint_to_int(int_to_bigint(2**70)), 2**70)
 
 
 class LocationTestCase(AtticTestCase):

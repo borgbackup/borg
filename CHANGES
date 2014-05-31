@@ -16,6 +16,7 @@ Version 0.13
 - Added cachedir support. CACHEDIR.TAG compatible cache directories
   can now be excluded using ``--exclude-caches`` (#74)
 - Fix crash on extreme mtime timestamps (year 2400+) (#81)
+- Fix Python 3.2 specific lockf issue (EDEADLK)
 
 Version 0.12
 ------------

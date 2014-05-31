@@ -120,7 +120,7 @@ class UpgradableLockTestCase(AtticTestCase):
         file = tempfile.NamedTemporaryFile()
         os.chmod(file.name, 0o444)
         lock = UpgradableLock(file.name)
-        self.assert_raises(UpgradableLock.LockUpgradeFailed, lock.upgrade)
+        self.assert_raises(UpgradableLock.WriteLockFailed, lock.upgrade)
         lock.release()
 
 

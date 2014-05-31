@@ -44,7 +44,7 @@ class Repository(object):
     class CheckNeeded(Error):
         '''Inconsistency detected. Please run "attic check {}"'''
 
-    def __init__(self, path, create=False):
+    def __init__(self, path, create=False, exclusive=False):
         self.path = path
         self.io = None
         self.lock = None
@@ -52,7 +52,7 @@ class Repository(object):
         self._active_txn = False
         if create:
             self.create(path)
-        self.open(path)
+        self.open(path, exclusive)
 
     def __del__(self):
         self.close()
@@ -98,7 +98,7 @@ class Repository(object):
             self.replay_segments(replay_from, segments_transaction_id)
         return self.get_index_transaction_id()
 
-    def open(self, path):
+    def open(self, path, exclusive):
         self.path = path
         if not os.path.isdir(path):
             raise self.DoesNotExist(path)
@@ -106,7 +106,7 @@ class Repository(object):
         self.config.read(os.path.join(self.path, 'config'))
         if not 'repository' in self.config.sections() or self.config.getint('repository', 'version') != 1:
             raise self.InvalidRepository(path)
-        self.lock = UpgradableLock(os.path.join(path, 'config'))
+        self.lock = UpgradableLock(os.path.join(path, 'config'), exclusive)
         self.max_segment_size = self.config.getint('repository', 'max_segment_size')
         self.segments_per_dir = self.config.getint('repository', 'segments_per_dir')
         self.id = unhexlify(self.config.get('repository', 'id').strip())

@@ -27,11 +27,11 @@ class Archiver:
     def __init__(self):
         self.exit_code = 0
 
-    def open_repository(self, location, create=False):
+    def open_repository(self, location, create=False, exclusive=False):
         if location.proto == 'ssh':
             repository = RemoteRepository(location, create=create)
         else:
-            repository = Repository(location.path, create=create)
+            repository = Repository(location.path, create=create, exclusive=exclusive)
         repository._location = location
         return repository
 
@@ -56,7 +56,7 @@ class Archiver:
     def do_init(self, args):
         """Initialize an empty repository"""
         print('Initializing repository at "%s"' % args.repository.orig)
-        repository = self.open_repository(args.repository, create=True)
+        repository = self.open_repository(args.repository, create=True, exclusive=True)
         key = key_creator(repository, args)
         manifest = Manifest(key, repository)
         manifest.key = key
@@ -66,7 +66,7 @@ class Archiver:
 
     def do_check(self, args):
         """Check repository consistency"""
-        repository = self.open_repository(args.repository)
+        repository = self.open_repository(args.repository, exclusive=args.repair)
         if args.repair:
             while not os.environ.get('ATTIC_CHECK_I_KNOW_WHAT_I_AM_DOING'):
                 self.print_error("""Warning: 'check --repair' is an experimental feature that might result
@@ -95,7 +95,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
     def do_create(self, args):
         """Create new archive"""
         t0 = datetime.now()
-        repository = self.open_repository(args.archive)
+        repository = self.open_repository(args.archive, exclusive=True)
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
@@ -216,7 +216,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
     def do_delete(self, args):
         """Delete an existing archive"""
-        repository = self.open_repository(args.archive)
+        repository = self.open_repository(args.archive, exclusive=True)
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
@@ -308,7 +308,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
     def do_prune(self, args):
         """Prune repository archives according to specified rules"""
-        repository = self.open_repository(args.repository)
+        repository = self.open_repository(args.repository, exclusive=True)
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest)
         archives = list(sorted(Archive.list_archives(repository, key, manifest, cache),

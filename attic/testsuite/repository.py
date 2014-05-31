@@ -154,9 +154,9 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         for name in os.listdir(self.repository.path):
             if name.startswith('index.'):
                 os.unlink(os.path.join(self.repository.path, name))
-        with patch.object(UpgradableLock, 'upgrade', side_effect=UpgradableLock.LockUpgradeFailed) as upgrade:
+        with patch.object(UpgradableLock, 'upgrade', side_effect=UpgradableLock.WriteLockFailed) as upgrade:
             self.reopen()
-            self.assert_raises(UpgradableLock.LockUpgradeFailed, lambda: len(self.repository))
+            self.assert_raises(UpgradableLock.WriteLockFailed, lambda: len(self.repository))
             upgrade.assert_called_once()
 
 

@@ -52,7 +52,7 @@ class UpgradableLock:
         try:
             fcntl.lockf(self.fd, fcntl.LOCK_EX)
         # Python 3.2 raises IOError, Python3.3+ raises OSError
-        except (OSError):
+        except (IOError, OSError):
             raise self.LockUpgradeFailed(self.path)
         self.is_exclusive = True
 

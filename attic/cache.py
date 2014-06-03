@@ -5,7 +5,8 @@ import os
 from binascii import hexlify
 import shutil
 
-from .helpers import Error, get_cache_dir, decode_dict, st_mtime_ns, unhexlify, UpgradableLock
+from .helpers import Error, get_cache_dir, decode_dict, st_mtime_ns, unhexlify, UpgradableLock, int_to_bigint, \
+    bigint_to_int
 from .hashindex import ChunkIndex
 
 
@@ -210,7 +211,7 @@ class Cache(object):
         if not entry:
             return None
         entry = msgpack.unpackb(entry)
-        if entry[1] == st.st_ino and entry[2] == st.st_size and entry[3] == st_mtime_ns(st):
+        if entry[2] == st.st_size and bigint_to_int(entry[3]) == st_mtime_ns(st) and entry[1] == st.st_ino:
             # reset entry age
             entry[0] = 0
             self.files[path_hash] = msgpack.packb(entry)
@@ -221,5 +222,5 @@ class Cache(object):
     def memorize_file(self, path_hash, st, ids):
         # Entry: Age, inode, size, mtime, chunk ids
         mtime_ns = st_mtime_ns(st)
-        self.files[path_hash] = msgpack.packb((0, st.st_ino, st.st_size, mtime_ns, ids))
+        self.files[path_hash] = msgpack.packb((0, st.st_ino, st.st_size, int_to_bigint(mtime_ns), ids))
         self._newest_mtime = max(self._newest_mtime, mtime_ns)

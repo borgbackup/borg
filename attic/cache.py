@@ -103,11 +103,12 @@ class Cache(object):
             return
         if self.files is not None:
             with open(os.path.join(self.path, 'files'), 'wb') as fd:
-                for item in self.files.items():
+                for path_hash, item in self.files.items():
                     # Discard cached files with the newest mtime to avoid
                     # issues with filesystem snapshots and mtime precision
-                    if item[1][0] < 10 and item[1][3] < self._newest_mtime:
-                        msgpack.pack(item, fd)
+                    item = msgpack.unpackb(item)
+                    if item[0] < 10 and bigint_to_int(item[3]) < self._newest_mtime:
+                        msgpack.pack((path_hash, item), fd)
         self.config.set('cache', 'manifest', hexlify(self.manifest.id).decode('ascii'))
         self.config.set('cache', 'timestamp', self.manifest.timestamp)
         with open(os.path.join(self.path, 'config'), 'w') as fd:

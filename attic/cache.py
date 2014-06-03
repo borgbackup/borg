@@ -86,7 +86,7 @@ class Cache(object):
                 for path_hash, item in u:
                     if item[2] > self.FILE_MIN_SIZE:
                         item[0] += 1
-                        self.files[path_hash] = item
+                        self.files[path_hash] = msgpack.packb(item)
 
     def begin_txn(self):
         # Initialize transaction snapshot
@@ -211,11 +211,13 @@ class Cache(object):
         if self.files is None:
             self._read_files()
         entry = self.files.get(path_hash)
-        if (entry and entry[3] == st_mtime_ns(st)
-            and entry[2] == st.st_size and entry[1] == st.st_ino):
+        if not entry:
+            return None
+        entry = msgpack.unpackb(entry)
+        if entry[1] == st.st_ino and entry[2] == st.st_size and entry[3] == st_mtime_ns(st):
             # reset entry age
-            if entry[0] != 0:
-                self.files[path_hash][0] = 0
+            entry[0] = 0
+            self.files[path_hash] = msgpack.packb(entry)
             return entry[4]
         else:
             return None
@@ -224,5 +226,5 @@ class Cache(object):
         if st.st_size > self.FILE_MIN_SIZE:
             # Entry: Age, inode, size, mtime, chunk ids
             mtime_ns = st_mtime_ns(st)
-            self.files[path_hash] = 0, st.st_ino, st.st_size, mtime_ns, ids
+            self.files[path_hash] = msgpack.packb((0, st.st_ino, st.st_size, mtime_ns, ids))
             self._newest_mtime = max(self._newest_mtime, mtime_ns)

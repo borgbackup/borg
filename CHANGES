@@ -8,6 +8,7 @@ Version 0.13
 
 (feature release, released on X)
 
+- Reduce file cache memory usage (#90)
 - Faster AES encryption (utilizing AES-NI when available)
 - Reduced memory usage when backing up many small files (#69)
 - Experimental Linux, OS X and FreeBSD ACL support (#66)

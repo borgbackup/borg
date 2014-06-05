@@ -25,3 +25,5 @@ class ChunkerTestCase(AtticTestCase):
         self.assert_equal(buzhash(b'abcdefghijklmnop', 0), 3795437769)
         self.assert_equal(buzhash(b'abcdefghijklmnop', 1), 3795400502)
         self.assert_equal(buzhash(b'abcdefghijklmnop', 1), buzhash_update(buzhash(b'Xabcdefghijklmno', 1), ord('X'), ord('p'), 16, 1))
+        # Test with more than 31 bytes to make sure our barrel_shift macro works correctly
+        self.assert_equal(buzhash(b'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz', 0), 566521248)

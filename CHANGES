@@ -8,6 +8,7 @@ Version 0.13
 
 (feature release, released on X)
 
+- Fix sporadic "Resource temporarily unavailable" when using remote repositories
 - Reduce file cache memory usage (#90)
 - Faster AES encryption (utilizing AES-NI when available)
 - Experimental Linux, OS X and FreeBSD ACL support (#66)

@@ -1,3 +1,4 @@
+import errno
 import fcntl
 import msgpack
 import os
@@ -195,7 +196,13 @@ class RemoteRepository(object):
                         self.to_send = msgpack.packb((1, self.msgid, cmd, args))
 
                 if self.to_send:
-                    self.to_send = self.to_send[os.write(self.stdin_fd, self.to_send):]
+                    try:
+                        self.to_send = self.to_send[os.write(self.stdin_fd, self.to_send):]
+                    except OSError as e:
+                        # io.write might raise EAGAIN even though select indicates
+                        # that the fd should be writable
+                        if e.errno != errno.EAGAIN:
+                            raise
                 if not self.to_send and not (calls or self.preload_ids):
                     w_fds = []
         self.ignore_responses |= set(waiting_for)

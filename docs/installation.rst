@@ -29,7 +29,7 @@ Installing from source tarballs
 -------------------------------
 .. parsed-literal::
 
-    $ curl -O |package_url|
+    $ curl -O :targz_url:`Attic`
     $ tar -xvzf |package_filename|
     $ cd |package_dirname|
     $ python setup.py install
@@ -50,3 +50,9 @@ Packages
 
 |project_name| is also part of the Debian_, Ubuntu_, `Arch Linux`_ and Slackware_
 distributions of GNU/Linux.
+
+Standalone binaries
+-------------------
+
+Prebuilt standalone binaries that work on
+most Linux systems can be found :artifacts:`here <>`.

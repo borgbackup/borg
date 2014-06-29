@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+    # -*- coding: utf-8 -*-
 #
 # Attic documentation build configuration file, created by
 # sphinx-quickstart on Sat Sep 10 18:18:25 2011.
@@ -216,3 +216,11 @@ latex_documents = [
 #    ('man', 'attic', 'Attic',
 #     ['Jonas Borgström'], 1)
 #]
+
+extensions = ['sphinx.ext.extlinks']
+
+extlinks = {
+    'issue': ('https://github.com/jborg/attic/issues/%s', '#'),
+    'targz_url': ('https://pypi.python.org/packages/source/A/Attic/%%s-%s.tar.gz' % version, None),
+    'artifacts': ('https://attic-backup.org/downloads/releases/%s/%%s' % version, '')
+        }

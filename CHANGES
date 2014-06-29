@@ -6,7 +6,7 @@ Here you can see the full list of changes between each Attic release.
 Version 0.13
 ------------
 
-(feature release, released on X)
+(feature release, released on Jun 29, 2014)
 
 - Fix sporadic "Resource temporarily unavailable" when using remote repositories
 - Reduce file cache memory usage (#90)

@@ -26,6 +26,7 @@ WINDOW_SIZE = 0xfff
 CHUNK_MASK = 0xffff
 
 utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
+utime_supports_follow_symlinks = os.utime in getattr(os, 'supports_follow_symlinks', {})
 has_mtime_ns = sys.version >= '3.3'
 has_lchmod = hasattr(os, 'lchmod')
 has_lchflags = hasattr(os, 'lchflags')
@@ -314,7 +315,7 @@ class Archive:
         mtime = bigint_to_int(item[b'mtime'])
         if fd and utime_supports_fd:  # Python >= 3.3
             os.utime(fd, None, ns=(mtime, mtime))
-        elif utime_supports_fd:  # Python >= 3.3
+        elif utime_supports_follow_symlinks:  # Python >= 3.3
             os.utime(path, None, ns=(mtime, mtime), follow_symlinks=False)
         elif not symlink:
             os.utime(path, (mtime / 1e9, mtime / 1e9))

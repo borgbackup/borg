@@ -339,7 +339,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         def verify_uniqueness():
             repository = Repository(self.repository_path)
-            for key, _ in repository.get_read_only_index(repository.get_transaction_id()).iteritems():
+            for key, _ in repository.open_index(repository.get_transaction_id()).iteritems():
                 data = repository.get(key)
                 hash = sha256(data).digest()
                 if not hash in seen:

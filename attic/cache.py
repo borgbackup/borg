@@ -49,7 +49,7 @@ class Cache(object):
         config.set('cache', 'manifest', '')
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             config.write(fd)
-        ChunkIndex.create(os.path.join(self.path, 'chunks').encode('utf-8'))
+        ChunkIndex().write(os.path.join(self.path, 'chunks').encode('utf-8'))
         with open(os.path.join(self.path, 'files'), 'w') as fd:
             pass  # empty file
 
@@ -65,7 +65,7 @@ class Cache(object):
         self.id = self.config.get('cache', 'repository')
         self.manifest_id = unhexlify(self.config.get('cache', 'manifest'))
         self.timestamp = self.config.get('cache', 'timestamp', fallback=None)
-        self.chunks = ChunkIndex(os.path.join(self.path, 'chunks').encode('utf-8'))
+        self.chunks = ChunkIndex.read(os.path.join(self.path, 'chunks').encode('utf-8'))
         self.files = None
 
     def close(self):
@@ -113,7 +113,7 @@ class Cache(object):
         self.config.set('cache', 'timestamp', self.manifest.timestamp)
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             self.config.write(fd)
-        self.chunks.flush()
+        self.chunks.write(os.path.join(self.path, 'chunks').encode('utf-8'))
         os.rename(os.path.join(self.path, 'txn.active'),
                   os.path.join(self.path, 'txn.tmp'))
         shutil.rmtree(os.path.join(self.path, 'txn.tmp'))

@@ -73,7 +73,7 @@ class UpgradableLock:
 
 def check_extension_modules():
     import attic.platform
-    if (attic.hashindex.API_VERSION != 1 or
+    if (attic.hashindex.API_VERSION != 2 or
         attic.chunker.API_VERSION != 1 or
         attic.crypto.API_VERSION != 2 or
         attic.platform.API_VERSION != 1):

@@ -7,7 +7,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <sys/mman.h>
 
 #if defined(BYTE_ORDER)&&(BYTE_ORDER == BIG_ENDIAN)
 #define _le32toh(x) __builtin_bswap32(x)
@@ -28,9 +27,7 @@ typedef struct {
 } __attribute__((__packed__)) HashHeader;
 
 typedef struct {
-    char *path;
-    void *map_addr;
-    off_t map_length;
+    void *data;
     void *buckets;
     int num_entries;
     int num_buckets;
@@ -39,7 +36,7 @@ typedef struct {
     int bucket_size;
     int lower_limit;
     int upper_limit;
-    int readonly;
+    int data_len;
 } HashIndex;
 
 #define MAGIC "ATTICIDX"
@@ -58,15 +55,14 @@ typedef struct {
 #define BUCKET_MATCHES_KEY(index, idx, key) (memcmp(key, BUCKET_ADDR(index, idx), index->key_size) == 0)
 
 #define BUCKET_MARK_DELETED(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) = DELETED)
+#define BUCKET_MARK_EMPTY(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) = EMPTY)
 
-#define EPRINTF(msg, ...) EPRINTF_PATH(index->path, msg, ##__VA_ARGS__)
+#define EPRINTF(msg, ...) fprintf(stderr, "hashindex: " msg "\n", ##__VA_ARGS__)
 #define EPRINTF_PATH(path, msg, ...) fprintf(stderr, "hashindex: %s: " msg "\n", path, ##__VA_ARGS__)
 
-static HashIndex *hashindex_open(const char *path, int readonly);
-static int hashindex_close(HashIndex *index);
-static int hashindex_clear(HashIndex *index);
-static int hashindex_flush(HashIndex *index);
-static HashIndex *hashindex_create(const char *path, int capacity, int key_size, int value_size);
+static HashIndex *hashindex_read(const char *path);
+static int hashindex_write(HashIndex *index, const char *path);
+static HashIndex *hashindex_init(int capacity, int key_size, int value_size);
 static const void *hashindex_get(HashIndex *index, const void *key);
 static int hashindex_set(HashIndex *index, const void *key, const void *value);
 static int hashindex_delete(HashIndex *index, const void *key);
@@ -96,7 +92,7 @@ hashindex_lookup(HashIndex *index, const void *key)
             }
         }
         else if(BUCKET_MATCHES_KEY(index, idx, key)) {
-            if (didx != -1 && !index->readonly) {
+            if (didx != -1) {
                 memcpy(BUCKET_ADDR(index, didx), BUCKET_ADDR(index, idx), index->bucket_size);
                 BUCKET_MARK_DELETED(index, idx);
                 idx = didx;
@@ -113,200 +109,159 @@ hashindex_lookup(HashIndex *index, const void *key)
 static int
 hashindex_resize(HashIndex *index, int capacity)
 {
-    char *new_path = malloc(strlen(index->path) + 5);
-    int ret = 0;
     HashIndex *new;
     void *key = NULL;
-    strcpy(new_path, index->path);
-    strcat(new_path, ".tmp");
 
-    if(!(new = hashindex_create(new_path, capacity, index->key_size, index->value_size))) {
-        free(new_path);
+    if(!(new = hashindex_init(capacity, index->key_size, index->value_size))) {
         return 0;
     }
     while((key = hashindex_next_key(index, key))) {
         hashindex_set(new, key, hashindex_get(index, key));
     }
-    munmap(index->map_addr, index->map_length);
-    index->map_addr = new->map_addr;
-    index->map_length = new->map_length;
+    free(index->data);
+    index->data = new->data;
+    index->data_len = new->data_len;
     index->num_buckets = new->num_buckets;
     index->lower_limit = new->lower_limit;
     index->upper_limit = new->upper_limit;
     index->buckets = new->buckets;
-    if(unlink(index->path) < 0) {
-        EPRINTF("unlink failed");
-        goto out;
-    }
-    if(rename(new_path, index->path) < 0) {
-        EPRINTF_PATH(new_path, "rename failed");
-        goto out;
-    }
-    ret = 1;
-out:
-    free(new_path);
-    free(new->path);
     free(new);
-    return ret;
+    return 1;
 }
 
 /* Public API */
 static HashIndex *
-hashindex_open(const char *path, int readonly)
+hashindex_read(const char *path)
 {
-    void *addr;
-    int fd, oflags, prot;
+    FILE *fd;
     off_t length;
-    HashHeader *header;
-    HashIndex *index;
+    HashHeader header;
+    HashIndex *index = NULL;
 
-    if(readonly) {
-        oflags = O_RDONLY;
-        prot = PROT_READ;
-    }
-    else {
-        oflags = O_RDWR;
-        prot = PROT_READ | PROT_WRITE;
-    }
-
-    if((fd = open(path, oflags)) < 0) {
-        EPRINTF_PATH(path, "open failed");
-        fprintf(stderr, "Failed to open %s\n", path);
+    if((fd = fopen(path, "r")) == NULL) {
+        EPRINTF_PATH(path, "fopen failed");
         return NULL;
     }
-    if((length = lseek(fd, 0, SEEK_END)) < 0) {
-        EPRINTF_PATH(path, "lseek failed");
-        if(close(fd) < 0) {
-            EPRINTF_PATH(path, "close failed");
-        }
-        return NULL;
+    if(fread(&header, 1, sizeof(HashHeader), fd) != sizeof(HashHeader)) {
+        EPRINTF_PATH(path, "fread failed");
+        goto fail;
     }
-    addr = mmap(0, length, prot, MAP_SHARED, fd, 0);
-    if(close(fd) < 0) {
-        EPRINTF_PATH(path, "close failed");
-        return NULL;
+    if(fseek(fd, 0, SEEK_END) < 0) {
+        EPRINTF_PATH(path, "fseek failed");
+        goto fail;
     }
-    if(addr == MAP_FAILED) {
-        EPRINTF_PATH(path, "mmap failed");
-        return NULL;
+    if((length = ftell(fd)) < 0) {
+        EPRINTF_PATH(path, "ftell failed");
+        goto fail;
     }
-    header = (HashHeader *)addr;
-    if(memcmp(header->magic, MAGIC, 8)) {
+    if(fseek(fd, 0, SEEK_SET) < 0) {
+        EPRINTF_PATH(path, "fseek failed");
+        goto fail;
+    }
+    if(memcmp(header.magic, MAGIC, 8)) {
         EPRINTF_PATH(path, "Unknown file header");
-        return NULL;
+        goto fail;
     }
-    if(length != sizeof(HashHeader) + _le32toh(header->num_buckets) * (header->key_size + header->value_size)) {
+    if(length != sizeof(HashHeader) + _le32toh(header.num_buckets) * (header.key_size + header.value_size)) {
         EPRINTF_PATH(path, "Incorrect file length");
-        return NULL;
+        goto fail;
     }
     if(!(index = malloc(sizeof(HashIndex)))) {
         EPRINTF_PATH(path, "malloc failed");
-        return NULL;
+        goto fail;
     }
-    index->readonly = readonly;
-    index->map_addr = addr;
-    index->map_length = length;
-    index->num_entries = _le32toh(header->num_entries);
-    index->num_buckets = _le32toh(header->num_buckets);
-    index->key_size = header->key_size;
-    index->value_size = header->value_size;
+    if(!(index->data = malloc(length))) {
+        EPRINTF_PATH(path, "malloc failed");
+        free(index);
+        index = NULL;
+        goto fail;
+    }
+    if(fread(index->data, 1, length, fd) != length) {
+        EPRINTF_PATH(path, "fread failed");
+        free(index->data);
+        free(index);
+        index = NULL;
+        goto fail;
+    }
+    index->data_len = length;
+    index->num_entries = _le32toh(header.num_entries);
+    index->num_buckets = _le32toh(header.num_buckets);
+    index->key_size = header.key_size;
+    index->value_size = header.value_size;
     index->bucket_size = index->key_size + index->value_size;
-    index->buckets = (addr + sizeof(HashHeader));
+    index->buckets = index->data + sizeof(HashHeader);
     index->lower_limit = index->num_buckets > MIN_BUCKETS ? ((int)(index->num_buckets * BUCKET_LOWER_LIMIT)) : 0;
     index->upper_limit = (int)(index->num_buckets * BUCKET_UPPER_LIMIT);
-    if(!(index->path = strdup(path))) {
-        EPRINTF_PATH(path, "strdup failed");
-        free(index);
-        return NULL;
+fail:
+    if(fclose(fd) < 0) {
+        EPRINTF_PATH(path, "fclose failed");
     }
     return index;
 }
 
 static HashIndex *
-hashindex_create(const char *path, int capacity, int key_size, int value_size)
+hashindex_init(int capacity, int key_size, int value_size)
 {
-    FILE *fd;
-    char bucket[MAX_BUCKET_SIZE] = {};
-    int i, bucket_size;
+    HashIndex *index;
     HashHeader header = {
         .magic = MAGIC, .num_entries = 0, .key_size = key_size, .value_size = value_size
     };
-    capacity = MAX(MIN_BUCKETS, capacity);
-    header.num_buckets = _htole32(capacity);
-
-    if(!(fd = fopen(path, "w"))) {
-        EPRINTF_PATH(path, "fopen failed");
-        return NULL;
-    }
-    bucket_size = key_size + value_size;
-    if(fwrite(&header, 1, sizeof(header), fd) != sizeof(header)) {
-        goto error;
-    }
-    *((uint32_t *)(bucket + key_size)) = EMPTY;
-    for(i = 0; i < capacity; i++) {
-        if(fwrite(bucket, 1, bucket_size, fd) != bucket_size) {
-            goto error;
-        }
-    }
-    if(fclose(fd) < 0) {
-        EPRINTF_PATH(path, "fclose failed");
-        if(unlink(path) < 0) {
-            EPRINTF_PATH(path, "unlink failed");
-    }
-        return NULL;
-    }
-    return hashindex_open(path, 0);
-error:
-    if(unlink(path) < 0) {
-        EPRINTF_PATH(path, "unlink failed");
-    }
-    EPRINTF_PATH(path, "fwrite failed");
-    if(fclose(fd) < 0) {
-        EPRINTF_PATH(path, "fclose failed");
-    }
-    return NULL;
-}
-
-static int
-hashindex_clear(HashIndex *index)
-{
     int i;
-    for(i = 0; i < index->num_buckets; i++) {
-        BUCKET_MARK_DELETED(index, i);
+    capacity = MAX(MIN_BUCKETS, capacity);
+
+    if(!(index = malloc(sizeof(HashIndex)))) {
+        EPRINTF("malloc failed");
+        return NULL;
+    }
+    index->data_len = sizeof(HashHeader) + capacity * (key_size + value_size);
+    if(!(index->data = calloc(index->data_len, 1))) {
+        EPRINTF("malloc failed");
+        free(index);
+        return NULL;
     }
     index->num_entries = 0;
-    return hashindex_resize(index, MIN_BUCKETS);
+    index->key_size = key_size;
+    index->value_size = value_size;
+    index->num_buckets = capacity;
+    index->bucket_size = index->key_size + index->value_size;
+    index->lower_limit = index->num_buckets > MIN_BUCKETS ? ((int)(index->num_buckets * BUCKET_LOWER_LIMIT)) : 0;
+    index->upper_limit = (int)(index->num_buckets * BUCKET_UPPER_LIMIT);
+    index->buckets = index->data + sizeof(HashHeader);
+    memcpy(index->data, &header, sizeof(HashHeader));
+    for(i = 0; i < capacity; i++) {
+        BUCKET_MARK_EMPTY(index, i);
+    }
+    return index;
+}
+
+static void
+hashindex_free(HashIndex *index)
+{
+    free(index->data);
+    free(index);
 }
 
 static int
-hashindex_flush(HashIndex *index)
+hashindex_write(HashIndex *index, const char *path)
 {
-    if(index->readonly) {
-        return 1;
-    }
-    *((uint32_t *)(index->map_addr + 8)) = _htole32(index->num_entries);
-    *((uint32_t *)(index->map_addr + 12)) = _htole32(index->num_buckets);
-    if(msync(index->map_addr, index->map_length, MS_SYNC) < 0) {
-        EPRINTF("msync failed");
+    FILE *fd;
+    int ret = 1;
+
+    if((fd = fopen(path, "w")) == NULL) {
+        EPRINTF_PATH(path, "open failed");
+        fprintf(stderr, "Failed to open %s for writing\n", path);
         return 0;
     }
-    return 1;
-}
-
-static int
-hashindex_close(HashIndex *index)
-{
-    int rv = 1;
-    if(hashindex_flush(index) < 0) {
-        rv = 0;
+    *((uint32_t *)(index->data + 8)) = _htole32(index->num_entries);
+    *((uint32_t *)(index->data + 12)) = _htole32(index->num_buckets);
+    if(fwrite(index->data, 1, index->data_len, fd) != index->data_len) {
+        EPRINTF_PATH(path, "fwrite failed");
+        ret = 0;
     }
-    if(munmap(index->map_addr, index->map_length) < 0) {
-        EPRINTF("munmap failed");
-        rv = 0;
+    if(fclose(fd) < 0) {
+        EPRINTF_PATH(path, "fclose failed");
     }
-    free(index->path);
-    free(index);
-    return rv;
+    return ret;
 }
 
 static const void *

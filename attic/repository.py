@@ -128,24 +128,22 @@ class Repository(object):
         self.write_index()
         self.rollback()
 
-    def get_read_only_index(self, transaction_id):
+    def open_index(self, transaction_id):
         if transaction_id is None:
-            return {}
-        return NSIndex((os.path.join(self.path, 'index.%d') % transaction_id).encode('utf-8'), readonly=True)
+            return NSIndex()
+        return NSIndex.read((os.path.join(self.path, 'index.%d') % transaction_id).encode('utf-8'))
 
-    def get_index(self, transaction_id, do_cleanup=True):
+    def prepare_txn(self, transaction_id, do_cleanup=True):
         self._active_txn = True
         self.lock.upgrade()
+        if not self.index:
+            self.index = self.open_index(transaction_id)
         if transaction_id is None:
-            self.index = NSIndex.create(os.path.join(self.path, 'index.tmp').encode('utf-8'))
             self.segments = {}
             self.compact = set()
         else:
             if do_cleanup:
                 self.io.cleanup(transaction_id)
-            shutil.copy(os.path.join(self.path, 'index.%d' % transaction_id),
-                        os.path.join(self.path, 'index.tmp'))
-            self.index = NSIndex(os.path.join(self.path, 'index.tmp').encode('utf-8'))
             hints = read_msgpack(os.path.join(self.path, 'hints.%d' % transaction_id))
             if hints[b'version'] != 1:
                 raise ValueError('Unknown hints file version: %d' % hints['version'])
@@ -158,7 +156,7 @@ class Repository(object):
                  b'compact': list(self.compact)}
         transaction_id = self.io.get_segments_transaction_id()
         write_msgpack(os.path.join(self.path, 'hints.%d' % transaction_id), hints)
-        self.index.flush()
+        self.index.write(os.path.join(self.path, 'index.tmp'))
         os.rename(os.path.join(self.path, 'index.tmp'),
                   os.path.join(self.path, 'index.%d' % transaction_id))
         # Remove old indices
@@ -199,7 +197,7 @@ class Repository(object):
         self.compact = set()
 
     def replay_segments(self, index_transaction_id, segments_transaction_id):
-        self.get_index(index_transaction_id, do_cleanup=False)
+        self.prepare_txn(index_transaction_id, do_cleanup=False)
         for segment, filename in self.io.segment_iterator():
             if index_transaction_id is not None and segment <= index_transaction_id:
                 continue
@@ -248,7 +246,7 @@ class Repository(object):
         assert not self._active_txn
         try:
             transaction_id = self.get_transaction_id()
-            current_index = self.get_read_only_index(transaction_id)
+            current_index = self.open_index(transaction_id)
         except Exception:
             transaction_id = self.io.get_segments_transaction_id()
             current_index = None
@@ -259,7 +257,7 @@ class Repository(object):
         if repair:
             self.io.cleanup(transaction_id)
         segments_transaction_id = self.io.get_segments_transaction_id()
-        self.get_index(None)
+        self.prepare_txn(None)
         for segment, filename in self.io.segment_iterator():
             if segment > transaction_id:
                 continue
@@ -310,8 +308,6 @@ class Repository(object):
         if repair:
             self.compact_segments()
             self.write_index()
-        else:
-            os.unlink(os.path.join(self.path, 'index.tmp'))
         self.rollback()
         return not error_found or repair
 
@@ -323,17 +319,17 @@ class Repository(object):
 
     def __len__(self):
         if not self.index:
-            self.index = self.get_read_only_index(self.get_transaction_id())
+            self.index = self.open_index(self.get_transaction_id())
         return len(self.index)
 
     def list(self, limit=None, marker=None):
         if not self.index:
-            self.index = self.get_read_only_index(self.get_transaction_id())
+            self.index = self.open_index(self.get_transaction_id())
         return [id_ for id_, _ in islice(self.index.iteritems(marker=marker), limit)]
 
     def get(self, id_):
         if not self.index:
-            self.index = self.get_read_only_index(self.get_transaction_id())
+            self.index = self.open_index(self.get_transaction_id())
         try:
             segment, offset = self.index[id_]
             return self.io.read(segment, offset, id_)
@@ -346,7 +342,7 @@ class Repository(object):
 
     def put(self, id, data, wait=True):
         if not self._active_txn:
-            self.get_index(self.get_transaction_id())
+            self.prepare_txn(self.get_transaction_id())
         try:
             segment, _ = self.index[id]
             self.segments[segment] -= 1
@@ -363,7 +359,7 @@ class Repository(object):
 
     def delete(self, id, wait=True):
         if not self._active_txn:
-            self.get_index(self.get_transaction_id())
+            self.prepare_txn(self.get_transaction_id())
         try:
             segment, offset = self.index.pop(id)
         except KeyError:

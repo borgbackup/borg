@@ -265,7 +265,7 @@ class RepositoryCache:
 
     def initialize(self):
         self.tmppath = tempfile.mkdtemp()
-        self.index = NSIndex.create(os.path.join(self.tmppath, 'index'))
+        self.index = NSIndex()
         self.data_fd = open(os.path.join(self.tmppath, 'data'), 'a+b')
 
     def cleanup(self):

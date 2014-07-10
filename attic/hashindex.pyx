@@ -1,20 +1,19 @@
 # -*- coding: utf-8 -*-
 import os
 
-API_VERSION = 1
+API_VERSION = 2
 
 
 cdef extern from "_hashindex.c":
     ctypedef struct HashIndex:
         pass
 
-    HashIndex *hashindex_open(char *path, int readonly)
-    HashIndex *hashindex_create(char *path, int capacity, int key_size, int value_size)
+    HashIndex *hashindex_read(char *path)
+    HashIndex *hashindex_init(int capacity, int key_size, int value_size)
+    void hashindex_free(HashIndex *index)
     void hashindex_summarize(HashIndex *index, long long *total_size, long long *total_csize, long long *unique_size, long long *unique_csize)
     int hashindex_get_size(HashIndex *index)
-    int hashindex_clear(HashIndex *index)
-    int hashindex_close(HashIndex *index)
-    int hashindex_flush(HashIndex *index)
+    int hashindex_write(HashIndex *index, char *path)
     void *hashindex_get(HashIndex *index, void *key)
     void *hashindex_next_key(HashIndex *index, void *key)
     int hashindex_delete(HashIndex *index, void *key)
@@ -29,31 +28,33 @@ cdef class IndexBase:
     cdef HashIndex *index
     key_size = 32
 
-    def __cinit__(self, path, readonly=False):
-        self.index = hashindex_open(<bytes>os.fsencode(path), readonly)
-        if not self.index:
-            raise Exception('Failed to open %s' % path)
+    def __cinit__(self, capacity=0, path=None):
+        if path:
+            self.index = hashindex_read(<bytes>os.fsencode(path))
+            if not self.index:
+                raise Exception('hashindex_read failed')
+        else:
+            self.index = hashindex_init(capacity, self.key_size, self.value_size)
+            if not self.index:
+                raise Exception('hashindex_init failed')
 
     def __dealloc__(self):
         if self.index:
-            if not hashindex_close(self.index):
-                raise Exception('hashindex_close failed')
+            hashindex_free(self.index)
 
     @classmethod
-    def create(cls, path, capacity=0):
-        index = hashindex_create(<bytes>os.fsencode(path), capacity, cls.key_size, cls.value_size)
-        if not index:
-            raise Exception('Failed to create %s' % path)
-        hashindex_close(index)
-        return cls(path)
+    def read(cls, path):
+        return cls(path=path)
+
+    def write(self, path):
+        if not hashindex_write(self.index, <bytes>os.fsencode(path)):
+            raise Exception('hashindex_write failed')
 
     def clear(self):
-        if not hashindex_clear(self.index):
-            raise Exception('hashindex_clear failed')
-
-    def flush(self):
-        if not hashindex_flush(self.index):
-            raise Exception('hashindex_flush failed')
+        hashindex_free(self.index)
+        self.index = hashindex_init(0, self.key_size, self.value_size)
+        if not self.index:
+            raise Exception('hashindex_init failed')
 
     def setdefault(self, key, value):
         if not key in self:

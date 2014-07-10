@@ -61,7 +61,7 @@ class ChunkBuffer:
     BUFFER_SIZE = 1 * 1024 * 1024
 
     def __init__(self, key):
-        self.buffer = BytesIO()
+        self.buffer = BytesIO().write
         self.packer = msgpack.Packer(unicode_errors='surrogateescape')
         self.chunks = []
         self.key = key
@@ -504,7 +504,7 @@ class ArchiveChecker:
         # Explicity set the initial hash table capacity to avoid performance issues
         # due to hash table "resonance"
         capacity = int(len(self.repository) * 1.2)
-        self.chunks = ChunkIndex.create(os.path.join(self.tmpdir, 'chunks').encode('utf-8'), capacity=capacity)
+        self.chunks = ChunkIndex(capacity)
         marker = None
         while True:
             result = self.repository.list(limit=10000, marker=marker)

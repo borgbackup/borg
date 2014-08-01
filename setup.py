@@ -68,7 +68,7 @@ def detect_openssl(prefixes):
                     return prefix
 
 
-possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl', '/usr/local/attic']
+possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl', '/usr/local/attic', '/opt/local']
 if os.environ.get('ATTIC_OPENSSL_PREFIX'):
     possible_openssl_prefixes.insert(0, os.environ.get('ATTIC_OPENSSL_PREFIX'))
 ssl_prefix = detect_openssl(possible_openssl_prefixes)

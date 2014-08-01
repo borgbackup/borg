@@ -8,6 +8,7 @@ Version 0.14
 
 (feature release, released on X)
 
+- Add MacPorts' path to the default openssl search path (#101)
 - HashIndex improvements, eliminates unnecessary IO on low memory systems.
 
 Version 0.13

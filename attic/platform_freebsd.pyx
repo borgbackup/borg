@@ -1,7 +1,7 @@
 import os
 from attic.helpers import posix_acl_use_stored_uid_gid
 
-API_VERSION = 1
+API_VERSION = 2
 
 cdef extern from "errno.h":
     int errno
@@ -42,7 +42,7 @@ cdef _get_acl(p, type, item, attribute, int flags):
         acl_free(acl)
 
 
-def acl_get(path, item, numeric_owner=False):
+def acl_get(path, item, st, numeric_owner=False):
     """Saves ACL Entries
 
     If `numeric_owner` is True the user/group field is not preserved only uid/gid

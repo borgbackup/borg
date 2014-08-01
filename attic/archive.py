@@ -354,7 +354,7 @@ class Archive:
             item[b'xattrs'] = StableDict(xattrs)
         if has_lchflags and st.st_flags:
             item[b'bsdflags'] = st.st_flags
-        item[b'acl'] = acl_get(path, item, self.numeric_owner)
+        acl_get(path, item, st, self.numeric_owner)
         return item
 
     def process_item(self, path, st):

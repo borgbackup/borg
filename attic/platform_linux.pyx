@@ -1,8 +1,9 @@
 import os
 import re
+from stat import S_ISLNK
 from attic.helpers import posix_acl_use_stored_uid_gid, user2uid, group2gid
 
-API_VERSION = 1
+API_VERSION = 2
 
 cdef extern from "sys/types.h":
     int ACL_TYPE_ACCESS
@@ -20,7 +21,7 @@ cdef extern from "sys/acl.h":
     char *acl_to_text(acl_t acl, ssize_t *len)
 
 cdef extern from "acl/libacl.h":
-    int acl_extended_file_nofollow(const char *path)
+    int acl_extended_file(const char *path)
 
 
 _comment_re = re.compile(' *#.*', re.M)
@@ -75,7 +76,7 @@ cdef acl_numeric_ids(acl):
     return ('\n'.join(entries)).encode('ascii')
 
 
-def acl_get(path, item, numeric_owner=False):
+def acl_get(path, item, st, numeric_owner=False):
     """Saves ACL Entries
 
     If `numeric_owner` is True the user/group field is not preserved only uid/gid
@@ -85,7 +86,7 @@ def acl_get(path, item, numeric_owner=False):
     cdef char *default_text = NULL
     cdef char *access_text = NULL
 
-    if acl_extended_file_nofollow(<bytes>os.fsencode(path)) <= 0:
+    if S_ISLNK(st.st_mode) or acl_extended_file(<bytes>os.fsencode(path)) <= 0:
         return
     if numeric_owner:
         converter = acl_numeric_ids

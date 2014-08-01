@@ -46,7 +46,7 @@ class PlatformLinuxTestCase(AtticTestCase):
 
     def get_acl(self, path, numeric_owner=False):
         item = {}
-        acl_get(path, item, numeric_owner=numeric_owner)
+        acl_get(path, item, os.stat(path), numeric_owner=numeric_owner)
         return item
 
     def set_acl(self, path, access=None, default=None, numeric_owner=False):
@@ -84,7 +84,7 @@ class PlatformDarwinTestCase(AtticTestCase):
 
     def get_acl(self, path, numeric_owner=False):
         item = {}
-        acl_get(path, item, numeric_owner=numeric_owner)
+        acl_get(path, item, os.stat(path), numeric_owner=numeric_owner)
         return item
 
     def set_acl(self, path, acl, numeric_owner=False):

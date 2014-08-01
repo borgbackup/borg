@@ -1,7 +1,7 @@
 import os
 from attic.helpers import user2uid, group2gid
 
-API_VERSION = 1
+API_VERSION = 2
 
 cdef extern from "sys/acl.h":
     ctypedef struct _acl_t:
@@ -48,7 +48,7 @@ def _remove_non_numeric_identifier(acl):
     return b'\n'.join(entries)
 
 
-def acl_get(path, item, numeric_owner=False):
+def acl_get(path, item, st, numeric_owner=False):
     cdef acl_t acl = NULL
     cdef char *text = NULL
     try:

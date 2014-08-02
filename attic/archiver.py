@@ -191,14 +191,21 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         archive = Archive(repository, key, manifest, args.archive.archive,
                           numeric_owner=args.numeric_owner)
         patterns = adjust_patterns(args.paths, args.excludes)
+        dry_run = args.dry_run
+        strip_components = args.strip_components
         dirs = []
         for item in archive.iter_items(lambda item: not exclude_path(item[b'path'], patterns), preload=True):
+            orig_path = item[b'path']
+            if strip_components:
+                item[b'path'] = os.sep.join(orig_path.split(os.sep)[strip_components:])
+                if not item[b'path']:
+                    continue
             if not args.dry_run:
                 while dirs and not item[b'path'].startswith(dirs[-1][b'path']):
                     archive.extract_item(dirs.pop(-1))
-            self.print_verbose(remove_surrogates(item[b'path']))
+            self.print_verbose(remove_surrogates(orig_path))
             try:
-                if args.dry_run:
+                if dry_run:
                     archive.extract_item(item, dry_run=True)
                 else:
                     if stat.S_ISDIR(item[b'mode']):
@@ -207,7 +214,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     else:
                         archive.extract_item(item)
             except IOError as e:
-                self.print_error('%s: %s', remove_surrogates(item[b'path']), e)
+                self.print_error('%s: %s', remove_surrogates(orig_path), e)
 
         if not args.dry_run:
             while dirs:
@@ -572,6 +579,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,
                                help='only obey numeric user and group identifiers')
+        subparser.add_argument('--strip-components', dest='strip_components',
+                               type=int, default=0, metavar='NUMBER',
+                               help='Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to extract')

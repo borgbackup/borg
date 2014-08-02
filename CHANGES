@@ -7,6 +7,8 @@ Version 0.14
 ------------
 
 (feature release, released on X)
+- Added support for stripping leading path segments (#95)
+  "attic extract --strip-segments X"
 - Add workaround for old Linux systems without acl_extended_file_no_follow (#96)
 - Add MacPorts' path to the default openssl search path (#101)
 - HashIndex improvements, eliminates unnecessary IO on low memory systems.

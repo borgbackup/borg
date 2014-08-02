@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import filecmp
 import os
 import posix
@@ -40,6 +41,12 @@ class AtticTestCase(unittest.TestCase):
     assert_not_equal = unittest.TestCase.assertNotEqual
     assert_raises = unittest.TestCase.assertRaises
     assert_true = unittest.TestCase.assertTrue
+
+    @contextmanager
+    def assert_creates_file(self, path):
+        self.assert_true(not os.path.exists(path), '{} should not exist'.format(path))
+        yield
+        self.assert_true(os.path.exists(path), '{} should exist'.format(path))
 
     def assert_dirs_equal(self, dir1, dir2):
         diff = filecmp.dircmp(dir1, dir2)

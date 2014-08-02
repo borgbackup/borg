@@ -165,6 +165,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # end the same way as info_output
         assert info_output2.endswith(info_output)
 
+    def test_strip_components(self):
+        self.attic('init', self.repository_location)
+        self.create_regular_file('dir/file')
+        self.attic('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.attic('extract', self.repository_location + '::test', '--strip-components', '3')
+            self.assert_true(not os.path.exists('file'))
+            with self.assert_creates_file('file'):
+                self.attic('extract', self.repository_location + '::test', '--strip-components', '2')
+            with self.assert_creates_file('dir/file'):
+                self.attic('extract', self.repository_location + '::test', '--strip-components', '1')
+            with self.assert_creates_file('input/dir/file'):
+                self.attic('extract', self.repository_location + '::test', '--strip-components', '0')
+
     def test_extract_include_exclude(self):
         self.attic('init', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)

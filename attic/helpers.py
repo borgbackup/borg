@@ -74,7 +74,7 @@ class UpgradableLock:
 def check_extension_modules():
     import attic.platform
     if (attic.hashindex.API_VERSION != 2 or
-        attic.chunker.API_VERSION != 1 or
+        attic.chunker.API_VERSION != 2 or
         attic.crypto.API_VERSION != 2 or
         attic.platform.API_VERSION != 2):
         raise ExtensionModuleError
@@ -577,3 +577,4 @@ def int_to_bigint(value):
     if value.bit_length() > 63:
         return value.to_bytes((value.bit_length() + 9) // 8, 'little', signed=True)
     return value
+

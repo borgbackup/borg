@@ -15,7 +15,7 @@ import time
 from io import BytesIO
 from attic import xattr
 from attic.platform import acl_get, acl_set
-from attic.chunker import chunkify
+from attic.chunker import Chunker
 from attic.hashindex import ChunkIndex
 from attic.helpers import Error, uid2user, user2uid, gid2group, group2gid, \
     Manifest, Statistics, decode_dict, st_mtime_ns, make_path_safe, StableDict, int_to_bigint, bigint_to_int
@@ -65,6 +65,7 @@ class ChunkBuffer:
         self.packer = msgpack.Packer(unicode_errors='surrogateescape')
         self.chunks = []
         self.key = key
+        self.chunker = Chunker(WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, self.key.chunk_seed)
 
     def add(self, item):
         self.buffer.write(self.packer.pack(StableDict(item)))
@@ -78,7 +79,7 @@ class ChunkBuffer:
         if self.buffer.tell() == 0:
             return
         self.buffer.seek(0)
-        chunks = list(bytes(s) for s in chunkify(self.buffer, WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, self.key.chunk_seed))
+        chunks = list(bytes(s) for s in self.chunker.chunkify(self.buffer))
         self.buffer.seek(0)
         self.buffer.truncate(0)
         # Leave the last parital chunk in the buffer unless flush is True
@@ -126,6 +127,7 @@ class Archive:
         self.numeric_owner = numeric_owner
         self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
         self.pipeline = DownloadPipeline(self.repository, self.key)
+        self.chunker = Chunker(WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, self.key.chunk_seed)
         if create:
             if name in manifest.archives:
                 raise self.AlreadyExists(name)
@@ -399,7 +401,7 @@ class Archive:
         if chunks is None:
             with open(path, 'rb') as fd:
                 chunks = []
-                for chunk in chunkify(fd, WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, self.key.chunk_seed):
+                for chunk in self.chunker.chunkify(fd):
                     chunks.append(cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats))
             cache.memorize_file(path_hash, st, [c[0] for c in chunks])
         item = {b'path': safe_path, b'chunks': chunks}

@@ -85,15 +85,22 @@ typedef struct {
 } Chunker;
 
 static Chunker *
-chunker_init(PyObject *fd, int window_size, int chunk_mask, int min_size, uint32_t seed)
+chunker_init(int window_size, int chunk_mask, int min_size, uint32_t seed)
 {
-    Chunker *c = malloc(sizeof(Chunker));
+    Chunker *c = calloc(sizeof(Chunker), 1);
     c->window_size = window_size;
     c->chunk_mask = chunk_mask;
     c->min_size = min_size;
     c->table = buzhash_init_table(seed);
     c->buf_size = 10 * 1024 * 1024;
     c->data = malloc(c->buf_size);
+    return c;
+}
+
+static void
+chunker_set_fd(Chunker *c, PyObject *fd)
+{
+    Py_XDECREF(c->fd);
     c->fd = fd;
     Py_INCREF(fd);
     c->done = 0;
@@ -103,13 +110,12 @@ chunker_init(PyObject *fd, int window_size, int chunk_mask, int min_size, uint32
     c->position = 0;
     c->last = 0;
     c->eof = 0;
-    return c;
 }
 
 static void
 chunker_free(Chunker *c)
 {
-    Py_DECREF(c->fd);
+    Py_XDECREF(c->fd);
     free(c->table);
     free(c->data);
     free(c);

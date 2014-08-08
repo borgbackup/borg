@@ -49,6 +49,7 @@ class LocationTestCase(AtticTestCase):
             repr(Location('some/relative/path::archive')),
             "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='archive')"
         )
+        self.assert_raises(ValueError, lambda: Location('ssh://localhost:22/path:archive'))
 
 
 class FormatTimedeltaTestCase(AtticTestCase):

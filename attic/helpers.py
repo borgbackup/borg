@@ -277,17 +277,6 @@ def is_cachedir(path):
     return False
 
 
-def walk_path(path, skip_inodes=None):
-    st = os.lstat(path)
-    if skip_inodes and (st.st_ino, st.st_dev) in skip_inodes:
-        return
-    yield path, st
-    if stat.S_ISDIR(st.st_mode):
-        for f in os.listdir(path):
-            for x in walk_path(os.path.join(path, f), skip_inodes):
-                yield x
-
-
 def format_time(t):
     """Format datetime suitable for fixed length list output
     """

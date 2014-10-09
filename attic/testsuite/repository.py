@@ -36,11 +36,11 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         key50 = ('%-32d' % 50).encode('ascii')
         self.assert_equal(self.repository.get(key50), b'SOMEDATA')
         self.repository.delete(key50)
-        self.assert_raises(Repository.DoesNotExist, lambda: self.repository.get(key50))
+        self.assert_raises(Repository.ObjectNotFound, lambda: self.repository.get(key50))
         self.repository.commit()
         self.repository.close()
         repository2 = self.open()
-        self.assert_raises(Repository.DoesNotExist, lambda: repository2.get(key50))
+        self.assert_raises(Repository.ObjectNotFound, lambda: repository2.get(key50))
         for x in range(100):
             if x == 50:
                 continue
@@ -68,7 +68,7 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         self.repository.put(b'00000000000000000000000000000000', b'bar')
         self.assert_equal(self.repository.get(b'00000000000000000000000000000000'), b'bar')
         self.repository.delete(b'00000000000000000000000000000000')
-        self.assert_raises(Repository.DoesNotExist, lambda: self.repository.get(b'00000000000000000000000000000000'))
+        self.assert_raises(Repository.ObjectNotFound, lambda: self.repository.get(b'00000000000000000000000000000000'))
 
     def test_consistency2(self):
         """Test cache consistency2
@@ -258,7 +258,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
     def test_repair_missing_commit_segment(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
         self.delete_segment(1)
-        self.assert_raises(Repository.DoesNotExist, lambda: self.get_objects(4))
+        self.assert_raises(Repository.ObjectNotFound, lambda: self.get_objects(4))
         self.assert_equal(set([1, 2, 3]), self.list_objects())
 
     def test_repair_corrupted_commit_segment(self):
@@ -266,7 +266,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         with open(os.path.join(self.tmppath, 'repository', 'data', '0', '1'), 'r+b') as fd:
             fd.seek(-1, os.SEEK_END)
             fd.write(b'X')
-        self.assert_raises(Repository.DoesNotExist, lambda: self.get_objects(4))
+        self.assert_raises(Repository.ObjectNotFound, lambda: self.get_objects(4))
         self.check(status=True)
         self.get_objects(3)
         self.assert_equal(set([1, 2, 3]), self.list_objects())

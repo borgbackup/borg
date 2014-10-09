@@ -44,6 +44,9 @@ class Repository(object):
     class CheckNeeded(Error):
         '''Inconsistency detected. Please run "attic check {}"'''
 
+    class ObjectNotFound(Error):
+        """Object with key {} not found in repository {}"""
+
     def __init__(self, path, create=False, exclusive=False):
         self.path = path
         self.io = None
@@ -334,7 +337,7 @@ class Repository(object):
             segment, offset = self.index[id_]
             return self.io.read(segment, offset, id_)
         except KeyError:
-            raise self.DoesNotExist(self.path)
+            raise self.ObjectNotFound(id_, self.path)
 
     def get_many(self, ids, is_preloaded=False):
         for id_ in ids:
@@ -363,7 +366,7 @@ class Repository(object):
         try:
             segment, offset = self.index.pop(id)
         except KeyError:
-            raise self.DoesNotExist(self.path)
+            raise self.ObjectNotFound(id, self.path)
         self.segments[segment] -= 1
         self.compact.add(segment)
         segment = self.io.write_delete(id)

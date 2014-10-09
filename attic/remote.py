@@ -155,6 +155,8 @@ class RemoteRepository(object):
                             raise IntegrityError(res)
                         elif error == b'PathNotAllowed':
                             raise PathNotAllowed(*res)
+                        if error == b'ObjectNotFound':
+                            raise Repository.ObjectNotFound(res[0], self.location.orig)
                         raise self.RPCError(error)
                     else:
                         yield res

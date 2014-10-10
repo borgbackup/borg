@@ -408,12 +408,14 @@ class LoggedIO(object):
         self.fds = None  # Just to make sure we're disabled
 
     def segment_iterator(self, reverse=False):
-        for dirpath, dirs, filenames in os.walk(os.path.join(self.path, 'data')):
-            dirs.sort(key=int, reverse=reverse)
-            filenames = sorted((filename for filename in filenames if filename.isdigit()), key=int, reverse=reverse)
-            for filename in filenames:
-                yield int(filename), os.path.join(dirpath, filename)
-
+        data_path = os.path.join(self.path, 'data')
+        dirs = sorted((dir for dir in os.listdir(data_path) if dir.isdigit()), key=int, reverse=reverse)
+        for dir in dirs:
+            filenames = os.listdir(os.path.join(data_path, dir))
+            sorted_filenames = sorted((filename for filename in filenames
+                                       if filename.isdigit()), key=int, reverse=reverse)
+            for filename in sorted_filenames:
+                yield int(filename), os.path.join(data_path, dir, filename)
 
     def get_latest_segment(self):
         for segment, filename in self.segment_iterator(reverse=True):

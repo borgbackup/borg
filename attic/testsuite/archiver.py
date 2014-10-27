@@ -159,6 +159,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_equal(len(self.attic('list', self.repository_location + '::test').splitlines()), 11)
         self.assert_dirs_equal('input', 'output/input')
         info_output = self.attic('info', self.repository_location + '::test')
+        self.assert_in('Number of files: 4', info_output)
         shutil.rmtree(self.cache_path)
         info_output2 = self.attic('info', self.repository_location + '::test')
         # info_output2 starts with some "initializing cache" text but should

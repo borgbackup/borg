@@ -309,7 +309,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         print('Username:', archive.metadata[b'username'])
         print('Time: %s' % to_localtime(archive.ts).strftime('%c'))
         print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
-        print('Number of files: %d' % archive.stats.nfiles)
+        print('Number of files: %d' % stats.nfiles)
         stats.print_('This archive:', cache)
         return self.exit_code
 

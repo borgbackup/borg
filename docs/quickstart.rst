@@ -18,11 +18,11 @@ A step by step example
 2. Backup the ``~/src`` and ``~/Documents`` directories into an archive called
    *Monday*::
 
-    $ attic create /somwhere/my-repository.attic::Monday ~/src ~/Documents
+    $ attic create /somewhere/my-repository.attic::Monday ~/src ~/Documents
 
 3. The next day create a new archive called *Tuesday*::
 
-    $ attic create --stats /somwhere/my-repository.attic::Tuesday ~/src ~/Documents
+    $ attic create --stats /somewhere/my-repository.attic::Tuesday ~/src ~/Documents
 
    This backup will be a lot quicker and a lot smaller since only new never
    before seen data is stored. The ``--stats`` option causes |project_name| to

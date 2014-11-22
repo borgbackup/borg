@@ -33,10 +33,10 @@ typedef struct {
     int num_buckets;
     int key_size;
     int value_size;
-    int bucket_size;
+    off_t bucket_size;
     int lower_limit;
     int upper_limit;
-    int data_len;
+    off_t data_len;
 } HashIndex;
 
 #define MAGIC "ATTICIDX"
@@ -213,7 +213,7 @@ hashindex_init(int capacity, int key_size, int value_size)
         EPRINTF("malloc failed");
         return NULL;
     }
-    index->data_len = sizeof(HashHeader) + capacity * (key_size + value_size);
+    index->data_len = sizeof(HashHeader) + (off_t)capacity * (key_size + value_size);
     if(!(index->data = calloc(index->data_len, 1))) {
         EPRINTF("malloc failed");
         free(index);

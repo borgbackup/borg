@@ -59,7 +59,7 @@ class AtticOperations(llfuse.Operations):
                 self.pending_archives[archive_inode] = Archive(repository, key, manifest, archive_name)
 
     def process_archive(self, archive, prefix=[]):
-        """Build fuse inode hierarcy from archive metadata
+        """Build fuse inode hierarchy from archive metadata
         """
         unpacker = msgpack.Unpacker()
         for key, chunk in zip(archive.metadata[b'items'], self.repository.get_many(archive.metadata[b'items'])):

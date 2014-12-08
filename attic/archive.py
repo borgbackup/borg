@@ -82,7 +82,7 @@ class ChunkBuffer:
         chunks = list(bytes(s) for s in self.chunker.chunkify(self.buffer))
         self.buffer.seek(0)
         self.buffer.truncate(0)
-        # Leave the last parital chunk in the buffer unless flush is True
+        # Leave the last partial chunk in the buffer unless flush is True
         end = None if flush or len(chunks) == 1 else -1
         for chunk in chunks[:end]:
             self.chunks.append(self.write_chunk(chunk))
@@ -399,7 +399,7 @@ class Archive:
                 chunks = [cache.chunk_incref(id_, self.stats) for id_ in ids]
         # Only chunkify the file if needed
         if chunks is None:
-            with open(path, 'rb') as fd:
+            with Archive._open_rb(path, st) as fd:
                 chunks = []
                 for chunk in self.chunker.chunkify(fd):
                     chunks.append(cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats))
@@ -413,6 +413,45 @@ class Archive:
     def list_archives(repository, key, manifest, cache=None):
         for name, info in manifest.archives.items():
             yield Archive(repository, key, manifest, name, cache=cache)
+
+    @staticmethod
+    def _open_rb(path, st):
+        flags_noatime = None
+        euid = None
+
+        def open_simple(p, s):
+            return open(p, 'rb')
+
+        def open_noatime_if_owner(p, s):
+            if s.st_uid == euid:
+                return os.fdopen(os.open(p, flags_noatime), 'rb')
+            else:
+                return open(p, 'rb')
+
+        def open_noatime(p, s):
+            try:
+                fd = os.open(p, flags_noatime)
+            except PermissionError:
+                # Was this EPERM due to the O_NOATIME flag?
+                fo = open(p, 'rb')
+                # Yes, it was -- otherwise the above line would have thrown
+                # another exception.
+                euid = os.geteuid()
+                # So in future, let's check whether the file is owned by us
+                # before attempting to use O_NOATIME.
+                Archive._open_rb = open_noatime_if_owner
+                return fo
+            return os.fdopen(fd, 'rb')
+
+        o_noatime = getattr(os, 'O_NOATIME', None)
+        if o_noatime is not None:
+            flags_noatime = os.O_RDONLY | getattr(os, 'O_BINARY', 0) | o_noatime
+            # Always use O_NOATIME version.
+            Archive._open_rb = open_noatime
+        else:
+            # Always use non-O_NOATIME version.
+            Archive._open_rb = open_simple
+        return Archive._open_rb(path, st)
 
 
 class RobustUnpacker():

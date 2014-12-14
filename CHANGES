@@ -14,6 +14,7 @@ Version 0.14
 - HashIndex improvements, eliminates unnecessary IO on low memory systems.
 - Fix "Number of files" output for attic info. (#124)
 - limit create file permissions so files aren't read while restoring
+- Fix issue with empty xattr values (#106)
 
 Version 0.13
 ------------

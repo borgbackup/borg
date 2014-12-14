@@ -228,7 +228,7 @@ class IncludePattern:
     path match as well.  A trailing slash makes no difference.
     """
     def __init__(self, pattern):
-        self.pattern = pattern.rstrip(os.path.sep)+os.path.sep
+        self.pattern = os.path.normpath(pattern).rstrip(os.path.sep)+os.path.sep
 
     def match(self, path):
         return (path+os.path.sep).startswith(self.pattern)
@@ -243,9 +243,9 @@ class ExcludePattern(IncludePattern):
     """
     def __init__(self, pattern):
         if pattern.endswith(os.path.sep):
-            self.pattern = pattern+'*'+os.path.sep
+            self.pattern = os.path.normpath(pattern).rstrip(os.path.sep)+os.path.sep+'*'+os.path.sep
         else:
-            self.pattern = pattern+os.path.sep+'*'
+            self.pattern = os.path.normpath(pattern)+os.path.sep+'*'
         # fnmatch and re.match both cache compiled regular expressions.
         # Nevertheless, this is about 10 times faster.
         self.regex = re.compile(translate(self.pattern))

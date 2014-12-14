@@ -89,7 +89,7 @@ if sys.platform.startswith('linux'):
 
     def setxattr(path, name, value, *, follow_symlinks=True):
         name = os.fsencode(name)
-        value = os.fsencode(value)
+        value = value and os.fsencode(value)
         if isinstance(path, str):
             path = os.fsencode(path)
         if isinstance(path, int):
@@ -98,7 +98,7 @@ if sys.platform.startswith('linux'):
             func = libc.setxattr
         else:
             func = libc.lsetxattr
-        _check(func(path, name, value, len(value), 0), path)
+        _check(func(path, name, value, len(value) if value else 0, 0), path)
 
 elif sys.platform == 'darwin':
     libc.listxattr.argtypes = (c_char_p, c_char_p, c_size_t, c_int)
@@ -155,7 +155,7 @@ elif sys.platform == 'darwin':
 
     def setxattr(path, name, value, *, follow_symlinks=True):
         name = os.fsencode(name)
-        value = os.fsencode(value)
+        value = value and os.fsencode(value)
         func = libc.setxattr
         flags = 0
         if isinstance(path, str):
@@ -164,7 +164,7 @@ elif sys.platform == 'darwin':
             func = libc.fsetxattr
         elif not follow_symlinks:
             flags = XATTR_NOFOLLOW
-        _check(func(path, name, value, len(value), 0, flags), path)
+        _check(func(path, name, value, len(value) if value else 0, 0, flags), path)
 
 elif sys.platform.startswith('freebsd'):
     EXTATTR_NAMESPACE_USER = 0x0001
@@ -236,7 +236,7 @@ elif sys.platform.startswith('freebsd'):
 
     def setxattr(path, name, value, *, follow_symlinks=True):
         name = os.fsencode(name)
-        value = os.fsencode(value)
+        value = value and os.fsencode(value)
         if isinstance(path, str):
             path = os.fsencode(path)
         if isinstance(path, int):
@@ -245,7 +245,7 @@ elif sys.platform.startswith('freebsd'):
             func = libc.extattr_set_file
         else:
             func = libc.extattr_set_link
-        _check(func(path, EXTATTR_NAMESPACE_USER, name, value, len(value)), path)
+        _check(func(path, EXTATTR_NAMESPACE_USER, name, value, len(value) if value else 0), path)
 
 else:
     raise Exception('Unsupported platform: %s' % sys.platform)

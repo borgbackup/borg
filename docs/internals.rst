@@ -127,11 +127,28 @@ on the repository.
 Encryption
 ----------
 
-AES_ is used with CTR mode of operation (so no need of padding). A 64
+AES_ is used with CTR mode of operation (so no need for padding). A 64
 bits initialization vector is used, a SHA256_ based HMAC_ is computed
 on the encrypted chunk with a random 64 bits nonce and both are stored
-in the chunk. The header of each chunk is actually : TYPE(1) +
-HMAC(32) + NONCE(8). Encryption and HMAC use two different keys.
+in the chunk. The header of each chunk is : ``TYPE(1)` +
+``HMAC(32)`` + ``NONCE(8)`` + ``CIPHERTEXT``. Encryption and HMAC use
+two different keys.
+
+In AES CTR mode you can think of the IV as the start value for the
+counter. The counter itself is incremented by one after each 16 byte
+block. The IV/counter is not required to be random but it must NEVER be
+reused. So to accomplish this Attic initializes the encryption counter
+to be higher than any previously used counter value before encrypting
+new data.
+
+To reduce payload size only 8 bytes of the 16 bytes nonce is saved in
+the payload, the first 8 bytes are always zeros. This does not affect
+security but limits the maximum repository capacity to only 295
+exabytes (2**64 * 16 bytes).
+
+Encryption keys are either a passphrase, passed through the
+``ATTIC_PASSPHRASE`` environment or prompted on the commandline, or
+stored in automatically generated key files.
 
 Key files
 ---------

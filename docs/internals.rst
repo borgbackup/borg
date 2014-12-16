@@ -24,21 +24,22 @@ repository_id
   the ``id`` field in the ``config`` ``INI`` file of the repository.
 
 enc_key
-  the AES encryption key
+  the key used to encrypt data with AES (256 bits)
   
 enc_hmac_key
-  the HMAC key (32 bytes)
+  the key used to HMAC the resulting AES-encrypted data (256 bits)
 
 id_key
-  another HMAC key? unclear.
+  the key used to HMAC the above chunks, the resulting hash is
+  stored out of band (256 bits)
 
 chunk_seed
-  unknown
+  the seed for the buzhash chunking table (signed 32 bit integer)
 
 Those fields are encoded using msgpack_. The utf-8-encoded phassphrase
 is encrypted with a PBKDF2_ and SHA256_ using 100000 iterations and a
-random 32 bytes salt to give us a derived key. The derived key is 32
-bytes long.  A HMAC_ SHA256_ checksum of the above fields is generated
+random 256 bits salt to give us a derived key. The derived key is 256
+bits long.  A HMAC_ SHA256_ checksum of the above fields is generated
 with the derived key, then the derived key is also used to encrypt the
 above pack of fields. Then the result is stored in a another msgpack_
 formatted as follows:
@@ -47,20 +48,20 @@ version
   currently always an integer, 1
 
 salt
-  random 32 bytes salt used to encrypt the passphrase
+  random 256 bits salt used to encrypt the passphrase
 
 iterations
-  number of iterations used to encrypt the passphrase
+  number of iterations used to encrypt the passphrase (currently 100000)
 
 algorithm
   the hashing algorithm used to encrypt the passphrase and do the HMAC
-  checksum
+  checksum (currently the string ``sha256``)
 
 hash
-  the HMAC checksum of the encrypted passphrase key
+  the HMAC checksum of the encrypted derived key
 
 data
-  the passphrase key, encrypted with AES over a PBKDF2_ SHA256 hash
+  the derived key, encrypted with AES over a PBKDF2_ SHA256 hash
   described above
 
 The resulting msgpack_ is then encoded using base64 and written to the

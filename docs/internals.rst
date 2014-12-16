@@ -24,7 +24,7 @@ File chunk cache
 
 The chunk lookup index (chunk hash -> reference count, size, ciphered
 size ; in file cache/chunk) and the repository index (chunk hash ->
-segment, offset ; in file repo/index.%d) are stored in a sort of hash
+segment, offset ; in file ``repo/index.%d``) are stored in a sort of hash
 table, directly mapped in memory from the file content, with only one
 slot per bucket, but that spreads the collisions to the following
 buckets. As a consequence the hash is just a start position for a linear
@@ -44,16 +44,19 @@ of ~250 bytes even if only one chunck hash. The inode number is stored
 to make sure we distinguish between different files, as a single path
 may not be unique accross different archives in different setups.
 
+The ``index.%d`` files are random access but those files can be
+recreated if damaged or lost using "attic check --repair".
+
 Repository structure
 --------------------
 
 |project_name| is a "filesystem based transactional key value store".
 
 Objects referenced by a key (256bits id/hash) are stored in line in
-files (segments) of size approx 5MB in repo/data. They contain :
+files (segments) of size approx 5MB in ``repo/data``. They contain :
 header size, crc, size, tag, key, data. Tag is either ``PUT``,
 ``DELETE``, or ``COMMIT``.  Segments are built locally, and then
-uploaded.
+uploaded. Those files are strictly append-only and modified only once.
 
 A segment file is basically a transaction log where each repository
 operation is appended to the file. So if an object is written to the
@@ -100,6 +103,26 @@ the last 16 bits of the checksum are null, producing chunks of 64kB on
 average. All these parameters are fixed. The buzhash table is altered
 by XORing it with a seed randomly generated once for the archive, and
 stored encrypted in the keyfile.
+
+Repository config file
+----------------------
+
+Each repository has a ``config`` file which which is a ``INI``
+formatted file which looks like this:
+
+  [repository]
+  version = 1
+  segments_per_dir = 10000
+  max_segment_size = 5242880
+  id = 57d6c1d52ce76a836b532b0e42e677dec6af9fca3673db511279358828a21ed6
+
+This is where the ``repository.id`` is stored. It is a unique
+identifier for repositories. It will not change if you move the
+repository around so you can make a local transfer then decide to move
+the repository in another (even remote) location at a later time.
+
+|project_name| will do a POSIX read lock on that file when operating
+on the repository.
 
 Encryption
 ----------

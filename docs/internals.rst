@@ -9,6 +9,30 @@ mechanisms of |project_name|. It is partly based on `mailing list
 discussion about internals`_ and also on static code analysis. It may
 not be exactly up to date with the current source code.
 
+|project_name| stores its data in a `Repository`. Each repository can
+hold multiple `Archives`, which represent individual backups that
+contain a full archive of the files specified when the backup was
+performed. Deduplication is performed across multiple backups, both on
+data and metadata, using `Segments` chunked with the Buzhash_
+algorithm. Each repository has the following file structure:
+
+README
+  simple text file describing the repository
+
+config
+  description of the repository, includes the unique identifier. also
+  acts as a lock file
+
+data/
+  directory where the actual data (`segments`) is stored
+
+hints.%d
+  undocumented
+
+index.%d
+  cache of the file indexes. those files can be regenerated with
+  ``check --repair``
+
 Indexes and memory usage
 ------------------------
 
@@ -45,7 +69,7 @@ to make sure we distinguish between different files, as a single path
 may not be unique accross different archives in different setups.
 
 The ``index.%d`` files are random access but those files can be
-recreated if damaged or lost using "attic check --repair".
+recreated if damaged or lost using ``check --repair``.
 
 Repository structure
 --------------------

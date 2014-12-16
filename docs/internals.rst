@@ -33,8 +33,8 @@ index.%d
   cache of the file indexes. those files can be regenerated with
   ``check --repair``
 
-Repository config file
-----------------------
+Config file
+-----------
 
 Each repository has a ``config`` file which which is a ``INI``
 formatted file which looks like this::
@@ -53,8 +53,8 @@ the repository in another (even remote) location at a later time.
 |project_name| will do a POSIX read lock on that file when operating
 on the repository.
 
-Repository structure
---------------------
+Segments and archives
+---------------------
 
 |project_name| is a "filesystem based transactional key value
 store". It makes extensive use of msgpack_ to store data and, unless

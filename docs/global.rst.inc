@@ -12,6 +12,7 @@
 .. _github: https://github.com/jborg/attic
 .. _OpenSSL: https://www.openssl.org/
 .. _Python: http://www.python.org/
+.. _Buzhash: https://en.wikipedia.org/wiki/Buzhash
 .. _PBKDF2: https://en.wikipedia.org/wiki/PBKDF2
 .. _SHA256: https://en.wikipedia.org/wiki/SHA-256
 .. _HMAC: https://en.wikipedia.org/wiki/HMAC
@@ -28,3 +29,4 @@
 .. _Arch Linux: https://aur.archlinux.org/packages/attic/
 .. _Slackware: http://slackbuilds.org/result/?search=Attic
 .. _Cython: http://cython.org/
+.. _mailing list discussion about internals: http://librelist.com/browser/attic/2014/5/6/questions-and-suggestions-about-inner-working-of-attic>

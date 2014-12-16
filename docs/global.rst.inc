@@ -12,6 +12,10 @@
 .. _github: https://github.com/jborg/attic
 .. _OpenSSL: https://www.openssl.org/
 .. _Python: http://www.python.org/
+.. _PBKDF2: https://en.wikipedia.org/wiki/PBKDF2
+.. _SHA256: https://en.wikipedia.org/wiki/SHA-256
+.. _HMAC: https://en.wikipedia.org/wiki/HMAC
+.. _msgpack: http://msgpack.org/
 .. _`msgpack-python`: https://pypi.python.org/pypi/msgpack-python/
 .. _llfuse: https://pypi.python.org/pypi/llfuse/
 .. _homebrew: http://mxcl.github.io/homebrew/

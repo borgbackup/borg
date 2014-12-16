@@ -9,6 +9,7 @@
 .. _HMAC-SHA256: http://en.wikipedia.org/wiki/HMAC
 .. _PBKDF2: https://en.wikipedia.org/wiki/PBKDF2
 .. _ACL: https://en.wikipedia.org/wiki/Access_control_list
+.. _libacl: http://savannah.nongnu.org/projects/acl/
 .. _github: https://github.com/jborg/attic
 .. _OpenSSL: https://www.openssl.org/
 .. _Python: http://www.python.org/

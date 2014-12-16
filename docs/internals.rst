@@ -37,13 +37,13 @@ Repository config file
 ----------------------
 
 Each repository has a ``config`` file which which is a ``INI``
-formatted file which looks like this:
+formatted file which looks like this::
 
-  [repository]
-  version = 1
-  segments_per_dir = 10000
-  max_segment_size = 5242880
-  id = 57d6c1d52ce76a836b532b0e42e677dec6af9fca3673db511279358828a21ed6
+    [repository]
+    version = 1
+    segments_per_dir = 10000
+    max_segment_size = 5242880
+    id = 57d6c1d52ce76a836b532b0e42e677dec6af9fca3673db511279358828a21ed6
 
 This is where the ``repository.id`` is stored. It is a unique
 identifier for repositories. It will not change if you move the
@@ -309,6 +309,6 @@ data
   described above
 
 The resulting msgpack_ is then encoded using base64 and written to the
-key file, wrapped using the textwrap_ module with a header. The header
-is a single line with the string ``ATTIC_KEY``, a space and a
-hexadecimal representation of the repository id.
+key file, wrapped using the builtin ``textwrap`` module with a
+header. The header is a single line with the string ``ATTIC_KEY``, a
+space and a hexadecimal representation of the repository id.

@@ -6,7 +6,7 @@ Here you can see the full list of changes between each Attic release.
 Version 0.14
 ------------
 
-(feature release, released on X)
+(feature release, released on Dec 17, 2014)
 - Added support for stripping leading path segments (#95)
   "attic extract --strip-segments X"
 - Add workaround for old Linux systems without acl_extended_file_no_follow (#96)

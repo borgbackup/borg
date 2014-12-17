@@ -309,6 +309,6 @@ data
   described above
 
 The resulting msgpack_ is then encoded using base64 and written to the
-key file, wrapped using the builtin ``textwrap`` module with a
+key file, wrapped using the standard ``textwrap`` module with a
 header. The header is a single line with the string ``ATTIC_KEY``, a
 space and a hexadecimal representation of the repository id.

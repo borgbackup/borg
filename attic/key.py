@@ -8,10 +8,14 @@ from hashlib import sha256
 import zlib
 
 from attic.crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
-from attic.helpers import IntegrityError, get_keys_dir
+from attic.helpers import IntegrityError, get_keys_dir, Error
 
 PREFIX = b'\0' * 8
 
+
+class UnsupportedPayloadError(Error):
+    """Unsupported payload type {}. A newer version is required to access this repository.
+    """
 
 class HMAC(hmac.HMAC):
     """Workaround a bug in Python < 3.4 Where HMAC does not accept memoryviews
@@ -37,7 +41,7 @@ def key_factory(repository, manifest_data):
     elif manifest_data[0] == PlaintextKey.TYPE:
         return PlaintextKey.detect(repository, manifest_data)
     else:
-        raise Exception('Unkown Key type %d' % ord(manifest_data[0]))
+        raise UnsupportedPayloadError(manifest_data[0])
 
 
 class KeyBase(object):

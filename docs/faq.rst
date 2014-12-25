@@ -36,6 +36,6 @@ When backing up to remote servers, is data encrypted before leaving the local ma
     Yes, everything is encrypted before leaving the local machine.
 
 If a backup stops mid-way, does the already-backed-up data stay there? I.e. does Attic resume backups?
-    Yes, during a backup a special checkpoint archive named ``<archive-name>.snapshot`` is saved every 5 minutes
+    Yes, during a backup a special checkpoint archive named ``<archive-name>.checkpoint`` is saved every 5 minutes
     containing all the data backed-up until that point. This means that at most 5 minutes worth of data needs to be
     retransmitted if a backup needs to be restarted.

@@ -31,6 +31,12 @@ has_mtime_ns = sys.version >= '3.3'
 has_lchmod = hasattr(os, 'lchmod')
 has_lchflags = hasattr(os, 'lchflags')
 
+# Python <= 3.2 raises OSError instead of PermissionError (See #164)
+try:
+    PermissionError = PermissionError
+except NameError:
+    PermissionError = OSError
+
 
 class DownloadPipeline:
 

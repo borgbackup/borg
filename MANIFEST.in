@@ -1,4 +1,5 @@
 include README.rst LICENSE CHANGES MANIFEST.in versioneer.py
+recursive-include attic *.pyx
 recursive-include docs *
 recursive-exclude docs *.pyc
 recursive-exclude docs *.pyo

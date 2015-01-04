@@ -8,6 +8,7 @@ Version 0.15
 
 (feature release, released on X)
 - Fix Python 3.2 compatibility issue with noatime open() (#164)
+- Include missing pyx files in dist files (#168)
 
 Version 0.14
 ------------

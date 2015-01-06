@@ -162,7 +162,7 @@ hashindex_read(const char *path)
         EPRINTF_PATH(path, "Unknown file header");
         goto fail;
     }
-    if(length != sizeof(HashHeader) + _le32toh(header.num_buckets) * (header.key_size + header.value_size)) {
+    if(length != sizeof(HashHeader) + (off_t)_le32toh(header.num_buckets) * (header.key_size + header.value_size)) {
         EPRINTF_PATH(path, "Incorrect file length");
         goto fail;
     }

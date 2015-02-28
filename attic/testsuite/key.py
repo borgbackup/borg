@@ -13,6 +13,7 @@ class KeyTestCase(AtticTestCase):
 
     class MockArgs(object):
         repository = Location(tempfile.mkstemp()[1])
+        compression = 'zlib'
 
     keyfile2_key_file = """
         ATTIC KEY 0000000000000000000000000000000000000000000000000000000000000000

@@ -35,24 +35,30 @@ class HMAC(hmac.HMAC):
 def key_creator(repository, args):
     if args.encryption == 'keyfile':
         return KeyfileKey.create(repository, args)
-    elif args.encryption == 'passphrase':
+    if args.encryption == 'passphrase':
         return PassphraseKey.create(repository, args)
-    else:
+    if args.encryption == 'none':
         return PlaintextKey.create(repository, args)
+    raise NotImplemented(args.encryption)
 
 
 def key_factory(repository, manifest_data):
-    if manifest_data[0] == KeyfileKey.TYPE:
+    # key type is determined by 4 lower bits of the type byte
+    key_type = manifest_data[0] & 0x0f
+    if key_type == KeyfileKey.TYPE:
         return KeyfileKey.detect(repository, manifest_data)
-    elif manifest_data[0] == PassphraseKey.TYPE:
+    if key_type == PassphraseKey.TYPE:
         return PassphraseKey.detect(repository, manifest_data)
-    elif manifest_data[0] == PlaintextKey.TYPE:
+    if key_type == PlaintextKey.TYPE:
         return PlaintextKey.detect(repository, manifest_data)
-    else:
-        raise UnsupportedPayloadError(manifest_data[0])
+    raise UnsupportedPayloadError(manifest_data[0])
 
 
 class CompressorBase(object):
+    @classmethod
+    def create(cls, args):
+        return cls()
+
     def compress(self, data):
         pass
 
@@ -61,6 +67,8 @@ class CompressorBase(object):
 
 
 class ZlibCompressor(CompressorBase):
+    TYPE = 0x00  # must be 0x00 for backwards compatibility
+
     def compress(self, data):
         return zlib.compress(data)
 
@@ -69,6 +77,8 @@ class ZlibCompressor(CompressorBase):
 
 
 class LzmaCompressor(CompressorBase):
+    TYPE = 0x10
+
     def __init__(self):
         if lzma is None:
             raise NotImplemented("lzma compression needs Python >= 3.3 or backports.lzma from PyPi")
@@ -80,11 +90,31 @@ class LzmaCompressor(CompressorBase):
         return lzma.decompress(data)
 
 
+def compressor_creator(args):
+    if args is None:  # used by unit tests
+        return ZlibCompressor.create(args)
+    if args.compression == 'lzma':
+        return LzmaCompressor.create(args)
+    if args.compression == 'zlib':
+        return ZlibCompressor.create(args)
+    raise NotImplemented(args.compression)
+
+
+def compressor_factory(manifest_data):
+    # compression is determined by 4 upper bits of the type byte
+    compression_type = manifest_data[0] & 0xf0
+    if compression_type == ZlibCompressor.TYPE:
+        return ZlibCompressor()
+    if compression_type == LzmaCompressor.TYPE:
+        return LzmaCompressor()
+    raise UnsupportedPayloadError(manifest_data[0])
+
+
 class KeyBase(object):
 
-    def __init__(self):
-        self.TYPE_STR = bytes([self.TYPE])
-        self.compressor = ZlibCompressor()
+    def __init__(self, compressor):
+        self.compressor = compressor
+        self.TYPE_STR = bytes([self.TYPE | self.compressor.TYPE])
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
@@ -105,11 +135,13 @@ class PlaintextKey(KeyBase):
     @classmethod
     def create(cls, repository, args):
         print('Encryption NOT enabled.\nUse the "--encryption=passphrase|keyfile" to enable encryption.')
-        return cls()
+        compressor = compressor_creator(args)
+        return cls(compressor)
 
     @classmethod
     def detect(cls, repository, manifest_data):
-        return cls()
+        compressor = compressor_factory(manifest_data)
+        return cls(compressor)
 
     def id_hash(self, data):
         return sha256(data).digest()
@@ -118,8 +150,9 @@ class PlaintextKey(KeyBase):
         return b''.join([self.TYPE_STR, self.compressor.compress(data)])
 
     def decrypt(self, id, data):
-        if data[0] != self.TYPE:
-            raise IntegrityError('Invalid encryption envelope')
+        type_str = bytes([data[0]])
+        if type_str != self.TYPE_STR:
+            raise IntegrityError('Invalid encryption envelope %r' % type_str)
         data = self.compressor.decompress(memoryview(data)[1:])
         if id and sha256(data).digest() != id:
             raise IntegrityError('Chunk id verification failed')
@@ -191,7 +224,8 @@ class PassphraseKey(AESKeyBase):
 
     @classmethod
     def create(cls, repository, args):
-        key = cls()
+        compressor = compressor_creator(args)
+        key = cls(compressor)
         passphrase = os.environ.get('ATTIC_PASSPHRASE')
         if passphrase is not None:
             passphrase2 = passphrase
@@ -213,7 +247,8 @@ class PassphraseKey(AESKeyBase):
     @classmethod
     def detect(cls, repository, manifest_data):
         prompt = 'Enter passphrase for %s: ' % repository._location.orig
-        key = cls()
+        compressor = compressor_factory(manifest_data)
+        key = cls(compressor)
         passphrase = os.environ.get('ATTIC_PASSPHRASE')
         if passphrase is None:
             passphrase = getpass(prompt)
@@ -238,7 +273,8 @@ class KeyfileKey(AESKeyBase):
 
     @classmethod
     def detect(cls, repository, manifest_data):
-        key = cls()
+        compressor = compressor_factory(manifest_data)
+        key = cls(compressor)
         path = cls.find_key_file(repository)
         prompt = 'Enter passphrase for key file %s: ' % path
         passphrase = os.environ.get('ATTIC_PASSPHRASE', '')
@@ -346,7 +382,8 @@ class KeyfileKey(AESKeyBase):
             passphrase2 = getpass('Enter same passphrase again: ')
             if passphrase != passphrase2:
                 print('Passphrases do not match')
-        key = cls()
+        compressor = compressor_creator(args)
+        key = cls(compressor)
         key.repository_id = repository.id
         key.init_from_random_data(get_random_bytes(100))
         key.init_ciphers()

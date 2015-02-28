@@ -1,7 +1,7 @@
 import msgpack
 from attic.testsuite import AtticTestCase
 from attic.archive import CacheChunkBuffer, RobustUnpacker
-from attic.key import PlaintextKey
+from attic.key import PlaintextKey, ZlibCompressor
 
 
 class MockCache:
@@ -19,7 +19,7 @@ class ChunkBufferTestCase(AtticTestCase):
     def test(self):
         data = [{b'foo': 1}, {b'bar': 2}]
         cache = MockCache()
-        key = PlaintextKey()
+        key = PlaintextKey(ZlibCompressor())
         chunks = CacheChunkBuffer(cache, key, None)
         for d in data:
             chunks.add(d)

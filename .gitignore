@@ -11,3 +11,4 @@ chunker.c
 *.pyo
 *.so
 docs/usage/*.inc
+.idea/

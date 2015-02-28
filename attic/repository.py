@@ -79,9 +79,9 @@ class Repository(object):
             config.write(fd)
 
     def get_index_transaction_id(self):
-        indicies = sorted((int(name[6:]) for name in os.listdir(self.path) if name.startswith('index.') and name[6:].isdigit()))
-        if indicies:
-            return indicies[-1]
+        indices = sorted((int(name[6:]) for name in os.listdir(self.path) if name.startswith('index.') and name[6:].isdigit()))
+        if indices:
+            return indices[-1]
         else:
             return None
 

@@ -19,7 +19,7 @@ except ImportError:
 has_lchflags = hasattr(os, 'lchflags')
 
 
-# The mtime get/set precison varies on different OS and Python versions
+# The mtime get/set precision varies on different OS and Python versions
 if 'HAVE_FUTIMENS' in getattr(posix, '_have_functions', []):
     st_mtime_ns_round = 0
 elif 'HAVE_UTIMES' in sysconfig.get_config_vars():
@@ -68,7 +68,7 @@ class AtticTestCase(unittest.TestCase):
             if has_lchflags:
                 attrs.append('st_flags')
             if not fuse or not os.path.isdir(path1):
-                # dir nlink is always 1 on our fuse fileystem
+                # dir nlink is always 1 on our fuse filesystem
                 attrs.append('st_nlink')
             d1 = [filename] + [getattr(s1, a) for a in attrs]
             d2 = [filename] + [getattr(s2, a) for a in attrs]
@@ -109,7 +109,7 @@ def get_tests(suite):
 
 
 class TestLoader(unittest.TestLoader):
-    """A customzied test loader that properly detects and filters our test cases
+    """A customized test loader that properly detects and filters our test cases
     """
 
     def loadTestsFromName(self, pattern, module=None):

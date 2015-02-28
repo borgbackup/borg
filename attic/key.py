@@ -32,25 +32,27 @@ class HMAC(hmac.HMAC):
         self.inner.update(msg)
 
 
-def key_creator(repository, args):
-    if args.encryption == 'keyfile':
-        return KeyfileKey.create(repository, args)
-    if args.encryption == 'passphrase':
-        return PassphraseKey.create(repository, args)
-    if args.encryption == 'none':
-        return PlaintextKey.create(repository, args)
-    raise NotImplemented(args.encryption)
+def compressor_creator(args):
+    if args is None:  # used by unit tests
+        return ZlibCompressor.create(args)
+    if args.compression == 'zlib':
+        return ZlibCompressor.create(args)
+    if args.compression == 'lzma':
+        return LzmaCompressor.create(args)
+    if args.compression == 'none':
+        return NullCompressor.create(args)
+    raise NotImplemented(args.compression)
 
 
-def key_factory(repository, manifest_data):
-    # key type is determined by 4 lower bits of the type byte
-    key_type = manifest_data[0] & 0x0f
-    if key_type == KeyfileKey.TYPE:
-        return KeyfileKey.detect(repository, manifest_data)
-    if key_type == PassphraseKey.TYPE:
-        return PassphraseKey.detect(repository, manifest_data)
-    if key_type == PlaintextKey.TYPE:
-        return PlaintextKey.detect(repository, manifest_data)
+def compressor_factory(manifest_data):
+    # compression is determined by 4 upper bits of the type byte
+    compression_type = manifest_data[0] & 0xf0
+    if compression_type == ZlibCompressor.TYPE:
+        return ZlibCompressor()
+    if compression_type == LzmaCompressor.TYPE:
+        return LzmaCompressor()
+    if compression_type == NullCompressor.TYPE:
+        return NullCompressor()
     raise UnsupportedPayloadError(manifest_data[0])
 
 
@@ -100,27 +102,25 @@ class NullCompressor(CompressorBase):
         return data
 
 
-def compressor_creator(args):
-    if args is None:  # used by unit tests
-        return ZlibCompressor.create(args)
-    if args.compression == 'lzma':
-        return LzmaCompressor.create(args)
-    if args.compression == 'zlib':
-        return ZlibCompressor.create(args)
-    if args.compression == 'none':
-        return NullCompressor.create(args)
-    raise NotImplemented(args.compression)
+def key_creator(repository, args):
+    if args.encryption == 'keyfile':
+        return KeyfileKey.create(repository, args)
+    if args.encryption == 'passphrase':
+        return PassphraseKey.create(repository, args)
+    if args.encryption == 'none':
+        return PlaintextKey.create(repository, args)
+    raise NotImplemented(args.encryption)
 
 
-def compressor_factory(manifest_data):
-    # compression is determined by 4 upper bits of the type byte
-    compression_type = manifest_data[0] & 0xf0
-    if compression_type == ZlibCompressor.TYPE:
-        return ZlibCompressor()
-    if compression_type == LzmaCompressor.TYPE:
-        return LzmaCompressor()
-    if compression_type == NullCompressor.TYPE:
-        return NullCompressor()
+def key_factory(repository, manifest_data):
+    # key type is determined by 4 lower bits of the type byte
+    key_type = manifest_data[0] & 0x0f
+    if key_type == KeyfileKey.TYPE:
+        return KeyfileKey.detect(repository, manifest_data)
+    if key_type == PassphraseKey.TYPE:
+        return PassphraseKey.detect(repository, manifest_data)
+    if key_type == PlaintextKey.TYPE:
+        return PlaintextKey.detect(repository, manifest_data)
     raise UnsupportedPayloadError(manifest_data[0])
 
 

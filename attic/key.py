@@ -130,6 +130,11 @@ class KeyBase(object):
         self.compressor = compressor
         self.TYPE_STR = bytes([self.TYPE | self.compressor.TYPE])
 
+    def type_check(self, type_byte):
+        type_str = bytes([type_byte])
+        if type_str != self.TYPE_STR:
+            raise IntegrityError('Invalid encryption envelope %r' % type_str)
+
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
         """
@@ -164,9 +169,7 @@ class PlaintextKey(KeyBase):
         return b''.join([self.TYPE_STR, self.compressor.compress(data)])
 
     def decrypt(self, id, data):
-        type_str = bytes([data[0]])
-        if type_str != self.TYPE_STR:
-            raise IntegrityError('Invalid encryption envelope %r' % type_str)
+        self.type_check(data[0])
         data = self.compressor.decompress(memoryview(data)[1:])
         if id and sha256(data).digest() != id:
             raise IntegrityError('Chunk id verification failed')
@@ -201,8 +204,7 @@ class AESKeyBase(KeyBase):
         return b''.join((self.TYPE_STR, hmac, data))
 
     def decrypt(self, id, data):
-        if data[0] != self.TYPE:
-            raise IntegrityError('Invalid encryption envelope')
+        self.type_check(data[0])
         hmac = memoryview(data)[1:33]
         if memoryview(HMAC(self.enc_hmac_key, memoryview(data)[33:], sha256).digest()) != hmac:
             raise IntegrityError('Encryption envelope checksum mismatch')
@@ -213,8 +215,7 @@ class AESKeyBase(KeyBase):
         return data
 
     def extract_nonce(self, payload):
-        if payload[0] != self.TYPE:
-            raise IntegrityError('Invalid encryption envelope')
+        self.type_check(payload[0])
         nonce = bytes_to_long(payload[33:41])
         return nonce
 

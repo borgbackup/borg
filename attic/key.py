@@ -44,10 +44,27 @@ def key_factory(repository, manifest_data):
         raise UnsupportedPayloadError(manifest_data[0])
 
 
+class CompressionBase(object):
+    def compress(self, data):
+        pass
+
+    def decompress(self, data):
+        pass
+
+
+class ZlibCompression(CompressionBase):
+    def compress(self, data):
+        return zlib.compress(data)
+
+    def decompress(self, data):
+        return zlib.decompress(data)
+
+
 class KeyBase(object):
 
     def __init__(self):
         self.TYPE_STR = bytes([self.TYPE])
+        self.compressor = ZlibCompression()
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
@@ -78,12 +95,12 @@ class PlaintextKey(KeyBase):
         return sha256(data).digest()
 
     def encrypt(self, data):
-        return b''.join([self.TYPE_STR, zlib.compress(data)])
+        return b''.join([self.TYPE_STR, self.compressor.compress(data)])
 
     def decrypt(self, id, data):
         if data[0] != self.TYPE:
             raise IntegrityError('Invalid encryption envelope')
-        data = zlib.decompress(memoryview(data)[1:])
+        data = self.compressor.decompress(memoryview(data)[1:])
         if id and sha256(data).digest() != id:
             raise IntegrityError('Chunk id verification failed')
         return data
@@ -110,7 +127,7 @@ class AESKeyBase(KeyBase):
         return HMAC(self.id_key, data, sha256).digest()
 
     def encrypt(self, data):
-        data = zlib.compress(data)
+        data = self.compressor.compress(data)
         self.enc_cipher.reset()
         data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(data)))
         hmac = HMAC(self.enc_hmac_key, data, sha256).digest()
@@ -123,7 +140,7 @@ class AESKeyBase(KeyBase):
         if memoryview(HMAC(self.enc_hmac_key, memoryview(data)[33:], sha256).digest()) != hmac:
             raise IntegrityError('Encryption envelope checksum mismatch')
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
-        data = zlib.decompress(self.dec_cipher.decrypt(data[41:]))  # should use memoryview
+        data = self.compressor.decompress(self.dec_cipher.decrypt(data[41:]))  # should use memoryview
         if id and HMAC(self.id_key, data, sha256).digest() != id:
             raise IntegrityError('Chunk id verification failed')
         return data

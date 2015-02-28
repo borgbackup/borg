@@ -139,7 +139,7 @@ class PruneSplitTestCase(AtticTestCase):
     def test(self):
 
         def local_to_UTC(month, day):
-            'Convert noon on the month and day in 2013 to UTC.'
+            """Convert noon on the month and day in 2013 to UTC."""
             seconds = mktime(strptime('2013-%02d-%02d 12:00' % (month, day), '%Y-%m-%d %H:%M'))
             return datetime.fromtimestamp(seconds, tz=timezone.utc)
 

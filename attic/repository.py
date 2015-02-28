@@ -41,7 +41,7 @@ class Repository(object):
         """{} is not a valid repository"""
 
     class CheckNeeded(Error):
-        '''Inconsistency detected. Please run "attic check {}"'''
+        """Inconsistency detected. Please run "attic check {}"."""
 
     class ObjectNotFound(Error):
         """Object with key {} not found in repository {}"""

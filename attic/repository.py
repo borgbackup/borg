@@ -577,6 +577,7 @@ class LoggedIO(object):
         if self._write_fd:
             self.segment += 1
             self.offset = 0
-            os.fsync(self._write_fd)
+            self._write_fd.flush()
+            os.fsync(self._write_fd.fileno())
             self._write_fd.close()
             self._write_fd = None

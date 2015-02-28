@@ -90,6 +90,16 @@ class LzmaCompressor(CompressorBase):
         return lzma.decompress(data)
 
 
+class NullCompressor(CompressorBase):
+    TYPE = 0x20
+
+    def compress(self, data):
+        return data
+
+    def decompress(self, data):
+        return data
+
+
 def compressor_creator(args):
     if args is None:  # used by unit tests
         return ZlibCompressor.create(args)
@@ -97,6 +107,8 @@ def compressor_creator(args):
         return LzmaCompressor.create(args)
     if args.compression == 'zlib':
         return ZlibCompressor.create(args)
+    if args.compression == 'none':
+        return NullCompressor.create(args)
     raise NotImplemented(args.compression)
 
 
@@ -107,6 +119,8 @@ def compressor_factory(manifest_data):
         return ZlibCompressor()
     if compression_type == LzmaCompressor.TYPE:
         return LzmaCompressor()
+    if compression_type == NullCompressor.TYPE:
+        return NullCompressor()
     raise UnsupportedPayloadError(manifest_data[0])
 
 

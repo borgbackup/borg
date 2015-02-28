@@ -476,7 +476,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                choices=('none', 'passphrase', 'keyfile'), default='none',
                                help='select encryption method')
         subparser.add_argument('-c', '--compression', dest='compression',
-                               choices=('zlib', 'lzma'), default='zlib',
+                               choices=('none', 'zlib', 'lzma'), default='zlib',
                                help='select compression method')
 
         check_epilog = textwrap.dedent("""

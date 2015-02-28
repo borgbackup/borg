@@ -7,6 +7,14 @@ import hmac
 from hashlib import sha256
 import zlib
 
+try:
+    import lzma  # python >= 3.3
+except ImportError:
+    try:
+        from backports import lzma  # backports.lzma from pypi
+    except ImportError:
+        lzma = None
+
 from attic.crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
 from attic.helpers import IntegrityError, get_keys_dir, Error
 
@@ -44,7 +52,7 @@ def key_factory(repository, manifest_data):
         raise UnsupportedPayloadError(manifest_data[0])
 
 
-class CompressionBase(object):
+class CompressorBase(object):
     def compress(self, data):
         pass
 
@@ -52,7 +60,7 @@ class CompressionBase(object):
         pass
 
 
-class ZlibCompression(CompressionBase):
+class ZlibCompressor(CompressorBase):
     def compress(self, data):
         return zlib.compress(data)
 
@@ -60,11 +68,23 @@ class ZlibCompression(CompressionBase):
         return zlib.decompress(data)
 
 
+class LzmaCompressor(CompressorBase):
+    def __init__(self):
+        if lzma is None:
+            raise NotImplemented("lzma compression needs Python >= 3.3 or backports.lzma from PyPi")
+
+    def compress(self, data):
+        return lzma.compress(data)
+
+    def decompress(self, data):
+        return lzma.decompress(data)
+
+
 class KeyBase(object):
 
     def __init__(self):
         self.TYPE_STR = bytes([self.TYPE])
-        self.compressor = ZlibCompression()
+        self.compressor = ZlibCompressor()
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key

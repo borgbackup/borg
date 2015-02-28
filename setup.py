@@ -96,6 +96,10 @@ elif platform == 'FreeBSD':
 elif platform == 'Darwin':
     ext_modules.append(Extension('attic.platform_darwin', [platform_darwin_source]))
 
+install_requires = ['msgpack-python']
+if sys.version_info < (3, 3):
+    install_requires.append('backports.lzma')
+
 setup(
     name='Attic',
     version=versioneer.get_version(),
@@ -122,5 +126,5 @@ setup(
     scripts=['scripts/attic'],
     cmdclass=cmdclass,
     ext_modules=ext_modules,
-    install_requires=['msgpack-python']
+    install_requires=install_requires,
 )

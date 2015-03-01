@@ -230,11 +230,14 @@ class Archive:
         cache.rollback()
         return stats
 
-    def extract_item(self, item, restore_attrs=True, dry_run=False):
-        if dry_run:
+    def extract_item(self, item, restore_attrs=True, dry_run=False, stdout=False):
+        if dry_run or stdout:
             if b'chunks' in item:
-                for _ in self.pipeline.fetch_many([c[0] for c in item[b'chunks']], is_preloaded=True):
-                    pass
+                for data in self.pipeline.fetch_many([c[0] for c in item[b'chunks']], is_preloaded=True):
+                    if stdout:
+                        sys.stdout.buffer.write(data)
+                if stdout:
+                    sys.stdout.buffer.flush()
             return
 
         dest = self.cwd

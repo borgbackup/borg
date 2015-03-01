@@ -116,6 +116,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             except IOError:
                 pass
         for path in args.paths:
+            if path == '-':  # stdin
+                path = 'stdin'
+                self.print_verbose(path)
+                try:
+                    archive.process_stdin(path, cache)
+                except IOError as e:
+                    self.print_error('%s: %s', path, e)
+                continue
             path = os.path.normpath(path)
             if args.dontcross:
                 try:

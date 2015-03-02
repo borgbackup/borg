@@ -5,7 +5,7 @@ import tempfile
 from binascii import hexlify
 from attic.crypto import bytes_to_long, num_aes_blocks
 from attic.testsuite import AtticTestCase
-from attic.key import PlaintextKey, PassphraseKey, KeyfileKey
+from attic.key import PlaintextKey, PassphraseKey, KeyfileKey, COMPR_DEFAULT
 from attic.helpers import Location, unhexlify
 
 
@@ -13,7 +13,8 @@ class KeyTestCase(AtticTestCase):
 
     class MockArgs(object):
         repository = Location(tempfile.mkstemp()[1])
-        compression = 'zlib'
+        compression = COMPR_DEFAULT
+        mac = None
 
     keyfile2_key_file = """
         ATTIC KEY 0000000000000000000000000000000000000000000000000000000000000000
@@ -46,7 +47,7 @@ class KeyTestCase(AtticTestCase):
         id = bytes(32)
 
     def test_plaintext(self):
-        key = PlaintextKey.create(None, None)
+        key = PlaintextKey.create(None, self.MockArgs())
         data = b'foo'
         self.assert_equal(hexlify(key.id_hash(data)), b'2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae')
         self.assert_equal(data, key.decrypt(key.id_hash(data), key.encrypt(data)))
@@ -79,7 +80,7 @@ class KeyTestCase(AtticTestCase):
 
     def test_passphrase(self):
         os.environ['ATTIC_PASSPHRASE'] = 'test'
-        key = PassphraseKey.create(self.MockRepository(), None)
+        key = PassphraseKey.create(self.MockRepository(), self.MockArgs())
         self.assert_equal(bytes_to_long(key.enc_cipher.iv, 8), 0)
         self.assert_equal(hexlify(key.id_key), b'793b0717f9d8fb01c751a487e9b827897ceea62409870600013fbc6b4d8d7ca6')
         self.assert_equal(hexlify(key.enc_hmac_key), b'b885a05d329a086627412a6142aaeb9f6c54ab7950f996dd65587251f6bc0901')

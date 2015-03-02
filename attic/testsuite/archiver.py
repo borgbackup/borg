@@ -359,8 +359,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 hash = sha256(data).digest()
                 if not hash in seen:
                     seen.add(hash)
-                    num_blocks = num_aes_blocks(len(data) - 41)
-                    nonce = bytes_to_long(data[33:41])
+                    num_blocks = num_aes_blocks(len(data) - 4 - 40)
+                    nonce = bytes_to_long(data[4+32:4+40])
                     for counter in range(nonce, nonce + num_blocks):
                         self.assert_not_in(counter, used)
                         used.add(counter)

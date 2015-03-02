@@ -4,7 +4,7 @@ import os
 import msgpack
 import textwrap
 import hmac
-from hashlib import sha256
+from hashlib import sha256, sha512
 import zlib
 
 try:
@@ -25,6 +25,21 @@ class UnsupportedPayloadError(Error):
     """Unsupported payload type {}. A newer version is required to access this repository.
     """
 
+class sha512_256(object):  # note: can't subclass sha512
+    """sha512, but digest truncated to 256bit - faster than sha256 on 64bit platforms"""
+    def __init__(self, data=b''):
+        self.h = sha512(data)
+
+    def update(self, data):
+        self.h.update(data)
+
+    def digest(self):
+        return self.h.digest()[:32]
+
+    def hexdigest(self):
+        return self.h.hexdigest()[:64]
+
+
 class HMAC(hmac.HMAC):
     """Workaround a bug in Python < 3.4 Where HMAC does not accept memoryviews
     """
@@ -32,108 +47,97 @@ class HMAC(hmac.HMAC):
         self.inner.update(msg)
 
 
-def compressor_creator(args):
-    if args is None:  # used by unit tests
-        return ZlibCompressor.create(args)
-    if args.compression == 'zlib':
-        return ZlibCompressor.create(args)
-    if args.compression == 'lzma':
-        return LzmaCompressor.create(args)
-    if args.compression == 'none':
-        return NullCompressor.create(args)
-    raise NotImplemented(args.compression)
+class SHA256(object):  # note: can't subclass sha256
+    TYPE = 0x00
+
+    def __init__(self, key, data=b''):
+        # signature is like for a MAC, we ignore the key as this is a simple hash
+        if key is not None:
+            raise Exception("use a HMAC if you have a key")
+        self.h = sha256(data)
+
+    def update(self, data):
+        self.h.update(data)
+
+    def digest(self):
+        return self.h.digest()
+
+    def hexdigest(self):
+        return self.h.hexdigest()
 
 
-def compressor_factory(manifest_data):
-    # compression is determined by 4 upper bits of the type byte
-    compression_type = manifest_data[0] & 0xf0
-    if compression_type == ZlibCompressor.TYPE:
-        return ZlibCompressor()
-    if compression_type == LzmaCompressor.TYPE:
-        return LzmaCompressor()
-    if compression_type == NullCompressor.TYPE:
-        return NullCompressor()
-    raise UnsupportedPayloadError(manifest_data[0])
+class SHA512_256(sha512_256):
+    """sha512, but digest truncated to 256bit - faster than sha256 on 64bit platforms"""
+    TYPE = 0x01
+
+    def __init__(self, key, data):
+        # signature is like for a MAC, we ignore the key as this is a simple hash
+        if key is not None:
+            raise Exception("use a HMAC if you have a key")
+        super().__init__(data)
 
 
-class CompressorBase(object):
-    @classmethod
-    def create(cls, args):
-        return cls()
+HASH_DEFAULT = SHA256.TYPE
+
+
+class HMAC_SHA256(HMAC):
+    TYPE = 0x02
+
+    def __init__(self, key, data):
+        if key is None:
+            raise Exception("do not use HMAC if you don't have a key")
+        super().__init__(key, data, sha256)
+
+
+class HMAC_SHA512_256(HMAC):
+    TYPE = 0x03
+
+    def __init__(self, key, data):
+        if key is None:
+            raise Exception("do not use HMAC if you don't have a key")
+        super().__init__(key, data, sha512_256)
+
+
+MAC_DEFAULT = HMAC_SHA256.TYPE
+
+
+class ZlibCompressor(object):  # uses 0..9 in the mapping
+    TYPE = 0
+    LEVELS = range(10)
 
     def compress(self, data):
-        pass
-
-    def decompress(self, data):
-        pass
-
-
-class ZlibCompressor(CompressorBase):
-    TYPE = 0x00  # must be 0x00 for backwards compatibility
-
-    def compress(self, data):
-        return zlib.compress(data)
+        level = self.TYPE - ZlibCompressor.TYPE
+        return zlib.compress(data, level)
 
     def decompress(self, data):
         return zlib.decompress(data)
 
 
-class LzmaCompressor(CompressorBase):
-    TYPE = 0x10
+class LzmaCompressor(object):  # uses 10..19 in the mapping
+    TYPE = 10
+    PRESETS = range(10)
 
     def __init__(self):
         if lzma is None:
             raise NotImplemented("lzma compression needs Python >= 3.3 or backports.lzma from PyPi")
 
     def compress(self, data):
-        return lzma.compress(data)
+        preset = self.TYPE - LzmaCompressor.TYPE
+        return lzma.compress(data, preset=preset)
 
     def decompress(self, data):
         return lzma.decompress(data)
 
 
-class NullCompressor(CompressorBase):
-    TYPE = 0x20
-
-    def compress(self, data):
-        return data
-
-    def decompress(self, data):
-        return data
-
-
-def key_creator(repository, args):
-    if args.encryption == 'keyfile':
-        return KeyfileKey.create(repository, args)
-    if args.encryption == 'passphrase':
-        return PassphraseKey.create(repository, args)
-    if args.encryption == 'none':
-        return PlaintextKey.create(repository, args)
-    raise NotImplemented(args.encryption)
-
-
-def key_factory(repository, manifest_data):
-    # key type is determined by 4 lower bits of the type byte
-    key_type = manifest_data[0] & 0x0f
-    if key_type == KeyfileKey.TYPE:
-        return KeyfileKey.detect(repository, manifest_data)
-    if key_type == PassphraseKey.TYPE:
-        return PassphraseKey.detect(repository, manifest_data)
-    if key_type == PlaintextKey.TYPE:
-        return PlaintextKey.detect(repository, manifest_data)
-    raise UnsupportedPayloadError(manifest_data[0])
+COMPR_DEFAULT = ZlibCompressor.TYPE + 6  # zlib level 6
 
 
 class KeyBase(object):
+    TYPE = 0x00  # override in derived classes
 
-    def __init__(self, compressor):
-        self.compressor = compressor
-        self.TYPE_STR = bytes([self.TYPE | self.compressor.TYPE])
-
-    def type_check(self, type_byte):
-        type_str = bytes([type_byte])
-        if type_str != self.TYPE_STR:
-            raise IntegrityError('Invalid encryption envelope %r' % type_str)
+    def __init__(self, compressor, maccer):
+        self.compressor = compressor()
+        self.maccer = maccer
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
@@ -155,23 +159,27 @@ class PlaintextKey(KeyBase):
     def create(cls, repository, args):
         print('Encryption NOT enabled.\nUse the "--encryption=passphrase|keyfile" to enable encryption.')
         compressor = compressor_creator(args)
-        return cls(compressor)
+        maccer = maccer_creator(args, cls)
+        return cls(compressor, maccer)
 
     @classmethod
     def detect(cls, repository, manifest_data):
-        compressor = compressor_factory(manifest_data)
-        return cls(compressor)
+        offset, compressor, crypter, maccer = parser(manifest_data)
+        return cls(compressor, maccer)
 
     def id_hash(self, data):
-        return sha256(data).digest()
+        return self.maccer(None, data).digest()
 
     def encrypt(self, data):
-        return b''.join([self.TYPE_STR, self.compressor.compress(data)])
+        header = make_header(compr_type=self.compressor.TYPE, crypt_type=self.TYPE, mac_type=self.maccer.TYPE)
+        return b''.join([header, self.compressor.compress(data)])
 
     def decrypt(self, id, data):
-        self.type_check(data[0])
-        data = self.compressor.decompress(memoryview(data)[1:])
-        if id and sha256(data).digest() != id:
+        offset, compressor, crypter, maccer = parser(data)
+        assert isinstance(self, crypter)
+        assert self.maccer is maccer
+        data = self.compressor.decompress(memoryview(data)[offset:])
+        if id and self.id_hash(data) != id:
             raise IntegrityError('Chunk id verification failed')
         return data
 
@@ -181,42 +189,45 @@ class AESKeyBase(KeyBase):
 
     Chunks are encrypted using 256bit AES in Counter Mode (CTR)
 
-    Payload layout: TYPE(1) + HMAC(32) + NONCE(8) + CIPHERTEXT
+    Payload layout: HEADER(4) + HMAC(32) + NONCE(8) + CIPHERTEXT
 
     To reduce payload size only 8 bytes of the 16 bytes nonce is saved
     in the payload, the first 8 bytes are always zeros. This does not
     affect security but limits the maximum repository capacity to
     only 295 exabytes!
     """
-
-    PAYLOAD_OVERHEAD = 1 + 32 + 8  # TYPE + HMAC + NONCE
+    PAYLOAD_OVERHEAD = 4 + 32 + 8  # HEADER + HMAC + NONCE
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
         """
-        return HMAC(self.id_key, data, sha256).digest()
+        return self.maccer(self.id_key, data).digest()
 
     def encrypt(self, data):
         data = self.compressor.compress(data)
         self.enc_cipher.reset()
         data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(data)))
-        hmac = HMAC(self.enc_hmac_key, data, sha256).digest()
-        return b''.join((self.TYPE_STR, hmac, data))
+        hmac = self.maccer(self.enc_hmac_key, data).digest()
+        header = make_header(compr_type=self.compressor.TYPE, crypt_type=self.TYPE, mac_type=self.maccer.TYPE)
+        return b''.join((header, hmac, data))
 
     def decrypt(self, id, data):
-        self.type_check(data[0])
-        hmac = memoryview(data)[1:33]
-        if memoryview(HMAC(self.enc_hmac_key, memoryview(data)[33:], sha256).digest()) != hmac:
+        offset, compressor, crypter, maccer = parser(data)
+        assert isinstance(self, crypter)
+        assert self.maccer is maccer
+        hmac = memoryview(data)[offset:offset+32]
+        if memoryview(self.maccer(self.enc_hmac_key, memoryview(data)[offset+32:]).digest()) != hmac:
             raise IntegrityError('Encryption envelope checksum mismatch')
-        self.dec_cipher.reset(iv=PREFIX + data[33:41])
-        data = self.compressor.decompress(self.dec_cipher.decrypt(data[41:]))  # should use memoryview
-        if id and HMAC(self.id_key, data, sha256).digest() != id:
+        self.dec_cipher.reset(iv=PREFIX + data[offset+32:offset+40])
+        data = self.compressor.decompress(self.dec_cipher.decrypt(data[offset+40:]))  # should use memoryview
+        if id and self.id_hash(data) != id:
             raise IntegrityError('Chunk id verification failed')
         return data
 
     def extract_nonce(self, payload):
-        self.type_check(payload[0])
-        nonce = bytes_to_long(payload[33:41])
+        offset, compressor, crypter, maccer = parser(payload)
+        assert isinstance(self, crypter)
+        nonce = bytes_to_long(payload[offset+32:offset+40])
         return nonce
 
     def init_from_random_data(self, data):
@@ -240,7 +251,8 @@ class PassphraseKey(AESKeyBase):
     @classmethod
     def create(cls, repository, args):
         compressor = compressor_creator(args)
-        key = cls(compressor)
+        maccer = maccer_creator(args, cls)
+        key = cls(compressor, maccer)
         passphrase = os.environ.get('ATTIC_PASSPHRASE')
         if passphrase is not None:
             passphrase2 = passphrase
@@ -262,8 +274,8 @@ class PassphraseKey(AESKeyBase):
     @classmethod
     def detect(cls, repository, manifest_data):
         prompt = 'Enter passphrase for %s: ' % repository._location.orig
-        compressor = compressor_factory(manifest_data)
-        key = cls(compressor)
+        offset, compressor, crypter, maccer = parser(manifest_data)
+        key = cls(compressor, maccer)
         passphrase = os.environ.get('ATTIC_PASSPHRASE')
         if passphrase is None:
             passphrase = getpass(prompt)
@@ -271,7 +283,7 @@ class PassphraseKey(AESKeyBase):
             key.init(repository, passphrase)
             try:
                 key.decrypt(None, manifest_data)
-                num_blocks = num_aes_blocks(len(manifest_data) - 41)
+                num_blocks = num_aes_blocks(len(manifest_data) - offset - 40)
                 key.init_ciphers(PREFIX + long_to_bytes(key.extract_nonce(manifest_data) + num_blocks))
                 return key
             except IntegrityError:
@@ -288,14 +300,14 @@ class KeyfileKey(AESKeyBase):
 
     @classmethod
     def detect(cls, repository, manifest_data):
-        compressor = compressor_factory(manifest_data)
-        key = cls(compressor)
+        offset, compressor, crypter, maccer = parser(manifest_data)
+        key = cls(compressor, maccer)
         path = cls.find_key_file(repository)
         prompt = 'Enter passphrase for key file %s: ' % path
         passphrase = os.environ.get('ATTIC_PASSPHRASE', '')
         while not key.load(path, passphrase):
             passphrase = getpass(prompt)
-        num_blocks = num_aes_blocks(len(manifest_data) - 41)
+        num_blocks = num_aes_blocks(len(manifest_data) - offset - 40)
         key.init_ciphers(PREFIX + long_to_bytes(key.extract_nonce(manifest_data) + num_blocks))
         return key
 
@@ -398,7 +410,8 @@ class KeyfileKey(AESKeyBase):
             if passphrase != passphrase2:
                 print('Passphrases do not match')
         compressor = compressor_creator(args)
-        key = cls(compressor)
+        maccer = maccer_creator(args, cls)
+        key = cls(compressor, maccer)
         key.repository_id = repository.id
         key.init_from_random_data(get_random_bytes(100))
         key.init_ciphers()
@@ -406,3 +419,115 @@ class KeyfileKey(AESKeyBase):
         print('Key file "%s" created.' % key.path)
         print('Keep this file safe. Your data will be inaccessible without it.')
         return key
+
+
+# note: key 0 nicely maps to a zlib compressor with level 0 which means "no compression"
+compressor_mapping = {}
+for level in ZlibCompressor.LEVELS:
+    compressor_mapping[ZlibCompressor.TYPE + level] = \
+        type('ZlibCompressorLevel%d' % level, (ZlibCompressor, ), dict(TYPE=ZlibCompressor.TYPE + level))
+for preset in LzmaCompressor.PRESETS:
+    compressor_mapping[LzmaCompressor.TYPE + preset] = \
+        type('LzmaCompressorPreset%d' % preset, (LzmaCompressor, ), dict(TYPE=LzmaCompressor.TYPE + preset))
+
+
+crypter_mapping = {
+    KeyfileKey.TYPE: KeyfileKey,
+    PassphraseKey.TYPE: PassphraseKey,
+    PlaintextKey.TYPE: PlaintextKey,
+}
+
+
+maccer_mapping = {
+    # simple hashes, not MACs (but MAC-like signature):
+    SHA256.TYPE: SHA256,
+    SHA512_256.TYPE: SHA512_256,
+    # MACs:
+    HMAC_SHA256.TYPE: HMAC_SHA256,
+    HMAC_SHA512_256.TYPE: HMAC_SHA512_256,
+}
+
+
+def p(offset, compr_type, crypt_type, mac_type):
+    try:
+        compressor = compressor_mapping[compr_type]
+        crypter = crypter_mapping[crypt_type]
+        maccer = maccer_mapping[mac_type]
+    except KeyError:
+        raise UnsupportedPayloadError("compr_type %x crypt_type %x mac_type %x" % (compr_type, crypt_type, mac_type))
+    return offset, compressor, crypter, maccer
+
+
+def parser00(data):  # legacy, hardcoded
+    return p(offset=1, compr_type=6, crypt_type=KeyfileKey.TYPE, mac_type=HMAC_SHA256.TYPE)
+
+
+def parser01(data):  # legacy, hardcoded
+    return p(offset=1, compr_type=6, crypt_type=PassphraseKey.TYPE, mac_type=HMAC_SHA256.TYPE)
+
+
+def parser02(data):  # legacy, hardcoded
+    return p(offset=1, compr_type=6, crypt_type=PlaintextKey.TYPE, mac_type=SHA256.TYPE)
+
+
+def parser03(data):  # new & flexible
+    offset = 4
+    compr_type, crypt_type, mac_type = data[1:offset]
+    return p(offset=offset, compr_type=compr_type, crypt_type=crypt_type, mac_type=mac_type)
+
+
+def parser(data):
+    parser_mapping = {
+        0x00: parser00,
+        0x01: parser01,
+        0x02: parser02,
+        0x03: parser03,
+    }
+    header_type = data[0]
+    parser_func = parser_mapping[header_type]
+    return parser_func(data)
+
+
+def key_factory(repository, manifest_data):
+    offset, compressor, crypter, maccer = parser(manifest_data)
+    return crypter.detect(repository, manifest_data)
+
+
+def make_header(compr_type, crypt_type, mac_type):
+    # always create new-style 0x03 headers
+    return bytes([0x03, compr_type, crypt_type, mac_type])
+
+
+def compressor_creator(args):
+    # args == None is used by unit tests
+    compression = COMPR_DEFAULT if args is None else args.compression
+    compressor = compressor_mapping.get(compression)
+    if compressor is None:
+        raise NotImplementedError("no compression %d" % args.compression)
+    return compressor
+
+
+def key_creator(repository, args):
+    if args.encryption == 'keyfile':
+        return KeyfileKey.create(repository, args)
+    if args.encryption == 'passphrase':
+        return PassphraseKey.create(repository, args)
+    if args.encryption == 'none':
+        return PlaintextKey.create(repository, args)
+    raise NotImplemented("no encryption %s" % args.encryption)
+
+
+def maccer_creator(args, key_cls):
+    # args == None is used by unit tests
+    mac = None if args is None else args.mac
+    if mac is None:
+        if key_cls is PlaintextKey:
+            mac = HASH_DEFAULT
+        elif key_cls in (KeyfileKey, PassphraseKey):
+            mac = MAC_DEFAULT
+        else:
+            raise NotImplementedError("unknown key class")
+    maccer = maccer_mapping.get(mac)
+    if maccer is None:
+        raise NotImplementedError("no mac %d" % args.mac)
+    return maccer

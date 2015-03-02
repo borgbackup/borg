@@ -13,7 +13,7 @@ from attic import __version__
 from attic.archive import Archive, ArchiveChecker
 from attic.repository import Repository
 from attic.cache import Cache
-from attic.key import key_creator
+from attic.key import key_creator, COMPR_DEFAULT
 from attic.helpers import Error, location_validator, format_time, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
@@ -476,8 +476,11 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                choices=('none', 'passphrase', 'keyfile'), default='none',
                                help='select encryption method')
         subparser.add_argument('-c', '--compression', dest='compression',
-                               choices=('none', 'zlib', 'lzma'), default='zlib',
-                               help='select compression method')
+                               type=int, default=COMPR_DEFAULT, metavar='METHOD',
+                               help='select compression method (0..19)')
+        subparser.add_argument('-m', '--mac', dest='mac',
+                               type=int, default=None, metavar='METHOD',
+                               help='select hash/mac method (0..3)')
 
         check_epilog = textwrap.dedent("""
         The check command verifies the consistency of a repository and the corresponding

@@ -27,19 +27,28 @@ class UnsupportedPayloadError(Error):
 
 class sha512_256(object):  # note: can't subclass sha512
     """sha512, but digest truncated to 256bit - faster than sha256 on 64bit platforms"""
-    digest_size = 32
+    digestsize = digest_size = 32
+    block_size = 64
 
-    def __init__(self, data=b''):
-        self.h = sha512(data)
+    def __init__(self, data=None):
+        self.name = 'sha512-256'
+        self._h = sha512()
+        if data:
+            self.update(data)
+
+    def update(self, data):
+        self._h.update(data)
 
     def digest(self):
-        return self.h.digest()[:self.digest_size]
+        return self._h.digest()[:self.digest_size]
 
     def hexdigest(self):
-        return self.h.hexdigest()[:self.digest_size * 2]
+        return self._h.hexdigest()[:self.digest_size * 2]
 
-    def __getattr__(self, item):
-        return getattr(self.h, item)
+    def copy(self):
+        new = sha512_256.__new__(sha512_256)
+        new._h = self._h.copy()
+        return new
 
 
 class HMAC(hmac.HMAC):
@@ -218,7 +227,8 @@ class AESKeyBase(KeyBase):
         assert isinstance(self, crypter)
         assert self.maccer is maccer
         hmac = memoryview(data)[offset:offset+32]
-        if memoryview(self.maccer(self.enc_hmac_key, memoryview(data)[offset+32:]).digest()) != hmac:
+        computed_hmac = memoryview(self.maccer(self.enc_hmac_key, memoryview(data)[offset+32:]).digest())
+        if computed_hmac != hmac:
             raise IntegrityError('Encryption envelope checksum mismatch')
         self.dec_cipher.reset(iv=PREFIX + data[offset+32:offset+40])
         data = self.compressor.decompress(self.dec_cipher.decrypt(data[offset+40:]))  # should use memoryview

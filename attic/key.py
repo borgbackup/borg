@@ -27,17 +27,19 @@ class UnsupportedPayloadError(Error):
 
 class sha512_256(object):  # note: can't subclass sha512
     """sha512, but digest truncated to 256bit - faster than sha256 on 64bit platforms"""
+    digest_size = 32
+
     def __init__(self, data=b''):
         self.h = sha512(data)
 
-    def update(self, data):
-        self.h.update(data)
-
     def digest(self):
-        return self.h.digest()[:32]
+        return self.h.digest()[:self.digest_size]
 
     def hexdigest(self):
-        return self.h.hexdigest()[:64]
+        return self.h.hexdigest()[:self.digest_size * 2]
+
+    def __getattr__(self, item):
+        return getattr(self.h, item)
 
 
 class HMAC(hmac.HMAC):

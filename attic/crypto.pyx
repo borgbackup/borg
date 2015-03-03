@@ -8,7 +8,7 @@ from libc.stdlib cimport malloc, free
 API_VERSION = 2
 
 cdef extern from "openssl/rand.h":
-    int  RAND_bytes(unsigned char *buf,int num)
+    int  RAND_bytes(unsigned char *buf, int num)
 
 
 cdef extern from "openssl/evp.h":
@@ -26,18 +26,16 @@ cdef extern from "openssl/evp.h":
     void EVP_CIPHER_CTX_init(EVP_CIPHER_CTX *a)
     void EVP_CIPHER_CTX_cleanup(EVP_CIPHER_CTX *a)
 
-    int EVP_EncryptInit_ex(EVP_CIPHER_CTX *ctx,const EVP_CIPHER *cipher, ENGINE *impl,
+    int EVP_EncryptInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher, ENGINE *impl,
                            const unsigned char *key, const unsigned char *iv)
-    int EVP_DecryptInit_ex(EVP_CIPHER_CTX *ctx,const EVP_CIPHER *cipher, ENGINE *impl,
+    int EVP_DecryptInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher, ENGINE *impl,
                            const unsigned char *key, const unsigned char *iv)
-    int EVP_EncryptUpdate(EVP_CIPHER_CTX *ctx, unsigned char *out,
-                          int *outl, const unsigned char *in_, int inl)
-    int EVP_DecryptUpdate(EVP_CIPHER_CTX *ctx, unsigned char *out,
-                          int *outl, const unsigned char *in_, int inl)
-    int EVP_EncryptFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out,
-                            int *outl)
-    int EVP_DecryptFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out,
-                            int *outl)
+    int EVP_EncryptUpdate(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl,
+                          const unsigned char *in_, int inl)
+    int EVP_DecryptUpdate(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl,
+                          const unsigned char *in_, int inl)
+    int EVP_EncryptFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
+    int EVP_DecryptFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
 
     int PKCS5_PBKDF2_HMAC(const char *password, int passwordlen,
                           const unsigned char *salt, int saltlen, int iter,
@@ -55,7 +53,8 @@ long_to_bytes = lambda x: _long.pack(x)
 
 
 def num_aes_blocks(length):
-    """Return the number of AES blocks required to encrypt/decrypt *length* bytes of data
+    """Return the number of AES blocks required to encrypt/decrypt *length* bytes of data.
+       Note: this is only correct for modes without padding, like AES-CTR.
     """
     return (length + 15) // 16
 
@@ -160,7 +159,10 @@ cdef class AES:
             if not EVP_DecryptUpdate(&self.ctx, out, &outl, data, inl):
                 raise Exception('EVP_DecryptUpdate failed')
             ptl = outl
-            if EVP_DecryptFinal_ex(&self.ctx, out+outl, &outl) <= 0:
+            if EVP_DecryptFinal_ex(&self.ctx, out+ptl, &outl) <= 0:
+                # this error check is very important for modes with padding or
+                # authentication. for them, a failure here means corrupted data.
+                # CTR mode does not use padding nor authentication.
                 raise Exception('EVP_DecryptFinal failed')
             ptl += outl
             return out[:ptl]

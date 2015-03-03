@@ -152,7 +152,10 @@ cdef class AES:
         cdef int inl = len(data)
         cdef int ptl = 0
         cdef int outl = 0
-        cdef unsigned char *out = <unsigned char *>malloc(inl)
+        # note: modes that use padding, need up to one extra AES block (16b).
+        # This is what the openssl docs say. I am not sure this is correct,
+        # but OTOH it will not cause any harm if our buffer is a little bigger.
+        cdef unsigned char *out = <unsigned char *>malloc(inl+16)
         if not out:
             raise MemoryError
         try:

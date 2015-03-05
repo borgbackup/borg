@@ -151,7 +151,7 @@ Chunks
 ------
 
 |project_name| uses a rolling checksum with Buzhash_ algorithm, with
-window size of 4095 bytes, with a minimum of 1024, and triggers when
+window size of 4095 bytes (`0xFFF`), with a minimum of 1024, and triggers when
 the last 16 bits of the checksum are null, producing chunks of 64kB on
 average. All these parameters are fixed. The buzhash table is altered
 by XORing it with a seed randomly generated once for the archive, and

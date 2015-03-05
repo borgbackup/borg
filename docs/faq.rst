@@ -21,7 +21,9 @@ Can I backup from multiple servers into a single repository?
     the cache. This rebuild can be quite time consuming.
 
     So, yes it's possible. But it will be most efficient if a single
-    repository is only modified from one place.
+    repository is only modified from one place. Also keep in mind that
+    Attic will keep an exclusive lock on the repository while creating
+    or deleting archives, which may make *simultaneous* backups fail.
 
 Which file attributes are preserved?
     The following attributes are preserved:

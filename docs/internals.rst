@@ -213,7 +213,7 @@ Indexes memory usage
 --------------------
 
 Here is the estimated memory usage of |project_name| when using those
-indexes:
+indexes.
 
 Repository index
   40 bytes x N ~ 200MB (If a remote repository is
@@ -224,6 +224,9 @@ Chunk lookup index
 
 File chunk cache
   probably 80-100 bytes x N ~ 400MB
+
+In the above we assume 350GB of data that we divide on an average 64KB
+chunk size, so N is around 5.3 million.
 
 Encryption
 ----------

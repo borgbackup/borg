@@ -113,7 +113,7 @@ object that contain metadata:
 * time
 
 Each item represents a file or directory or
-symlink is stored as a ``item`` dictionnary that contains:
+symlink is stored as an ``item`` dictionary that contains:
 
 * path
 * list of chunks
@@ -135,7 +135,7 @@ it and it is reset every time an inode's metadata is changed.
 All items are serialized using msgpack and the resulting byte stream
 is fed into the same chunker used for regular file data and turned
 into deduplicated chunks. The reference to these chunks is then added
-to the archvive metadata. This allows the archive to store many files,
+to the archive metadata. This allows the archive to store many files,
 beyond the ``MAX_OBJECT_SIZE`` barrier of 20MB.
 
 A chunk is an object as well, of course, and its id is the hash of its
@@ -199,7 +199,7 @@ the ``file path hash`` and contains:
 * chunks hashes
 
 The inode number is stored to make sure we distinguish between
-different files, as a single path may not be unique accross different
+different files, as a single path may not be unique across different
 archives in different setups.
 
 The file chunk cache is stored as a python associative array storing
@@ -207,7 +207,7 @@ python objects, which generate a lot of overhead. This takes around
 240 bytes per file without the chunk list, to be compared to at most
 64 bytes of real data (depending on data alignment), and around 80
 bytes per chunk hash (vs 32), with a minimum of ~250 bytes even if
-only one chunck hash.
+only one chunk hash.
 
 Indexes memory usage
 --------------------
@@ -238,12 +238,12 @@ two different keys.
 In AES CTR mode you can think of the IV as the start value for the
 counter. The counter itself is incremented by one after each 16 byte
 block. The IV/counter is not required to be random but it must NEVER be
-reused. So to accomplish this Attic initializes the encryption counter
+reused. So to accomplish this |project_name| initializes the encryption counter
 to be higher than any previously used counter value before encrypting
 new data.
 
 To reduce payload size only 8 bytes of the 16 bytes nonce is saved in
-the payload, the first 8 bytes are always zeros. This does not affect
+the payload, the first 8 bytes are always zeroes. This does not affect
 security but limits the maximum repository capacity to only 295
 exabytes (2**64 * 16 bytes).
 
@@ -280,7 +280,7 @@ id_key
 chunk_seed
   the seed for the buzhash chunking table (signed 32 bit integer)
 
-Those fields are encoded using msgpack_. The utf-8-encoded phassphrase
+Those fields are processed using msgpack_. The utf-8 encoded phassphrase
 is encrypted with PBKDF2_ and SHA256_ using 100000 iterations and a
 random 256 bits salt to give us a derived key. The derived key is 256
 bits long.  A `HMAC-SHA256`_ checksum of the above fields is generated
@@ -292,20 +292,20 @@ version
   currently always an integer, 1
 
 salt
-  random 256 bits salt used to encrypt the passphrase
+  random 256 bits salt used to process the passphrase
 
 iterations
-  number of iterations used to encrypt the passphrase (currently 100000)
+  number of iterations used to process the passphrase (currently 100000)
 
 algorithm
-  the hashing algorithm used to encrypt the passphrase and do the HMAC
+  the hashing algorithm used to process the passphrase and do the HMAC
   checksum (currently the string ``sha256``)
 
 hash
-  the HMAC checksum of the encrypted derived key
+  the HMAC of the encrypted derived key
 
 data
-  the derived key, encrypted with AES over a PBKDF2_ SHA256 hash
+  the derived key, encrypted with AES over a PBKDF2_ SHA256 key
   described above
 
 The resulting msgpack_ is then encoded using base64 and written to the

@@ -138,8 +138,8 @@ into deduplicated chunks. The reference to these chunks is then added
 to the archive metadata. This allows the archive to store many files,
 beyond the ``MAX_OBJECT_SIZE`` barrier of 20MB.
 
-A chunk is an object as well, of course, and its id is the hash of its
-(unencrypted and uncompressed) content.
+A chunk is an object as well, of course. The chunk id is either 
+HMAC-SHA256_, when encryption is used, or a SHA256_ hash otherwise.
 
 Hints are stored in a file (``repo/hints``) and contain:
 

@@ -4,7 +4,7 @@ import tempfile
 from attic.testsuite.mock import patch
 from attic.hashindex import NSIndex
 from attic.helpers import Location, IntegrityError, UpgradableLock
-from attic.remote import RemoteRepository
+from attic.remote import RemoteRepository, InvalidRPCMethod
 from attic.repository import Repository
 from attic.testsuite import AtticTestCase
 
@@ -318,6 +318,9 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
 
     def open(self, create=False):
         return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')), create=create)
+
+    def test_invalid_rpc(self):
+        self.assert_raises(InvalidRPCMethod, lambda: self.repository.call('__init__', None))
 
 
 class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):

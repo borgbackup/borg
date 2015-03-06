@@ -135,6 +135,7 @@ hashindex_read(const char *path)
 {
     FILE *fd;
     off_t length;
+    off_t bytes_read;
     HashHeader header;
     HashIndex *index = NULL;
 
@@ -142,8 +143,9 @@ hashindex_read(const char *path)
         EPRINTF_PATH(path, "fopen failed");
         return NULL;
     }
-    if(fread(&header, 1, sizeof(HashHeader), fd) != sizeof(HashHeader)) {
-        EPRINTF_PATH(path, "fread failed");
+    bytes_read = fread(&header, 1, sizeof(HashHeader), fd);
+    if(bytes_read != sizeof(HashHeader)) {
+        EPRINTF_PATH(path, "fread header failed (expected %ld, got %ld)", sizeof(HashHeader), bytes_read);
         goto fail;
     }
     if(fseek(fd, 0, SEEK_END) < 0) {
@@ -176,8 +178,9 @@ hashindex_read(const char *path)
         index = NULL;
         goto fail;
     }
-    if(fread(index->data, 1, length, fd) != length) {
-        EPRINTF_PATH(path, "fread failed");
+    bytes_read = fread(index->data, 1, length, fd);
+    if(bytes_read != length) {
+        EPRINTF_PATH(path, "fread hashindex failed (expected %ld, got %ld)", length, bytes_read);
         free(index->data);
         free(index);
         index = NULL;

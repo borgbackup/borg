@@ -17,6 +17,7 @@ Which file attributes are preserved?
 
     * Name
     * Contents
+    * Hardlinks and symlinks
     * Time of last modification (nanosecond precision with Python >= 3.3)
     * User ID of owner
     * Group ID of owner

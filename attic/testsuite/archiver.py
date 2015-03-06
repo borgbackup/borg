@@ -217,6 +217,25 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_not_in('..', output)
         self.assert_in(' input/dir1/dir2/file', output)
 
+    def test_exclude_normalization(self):
+        self.attic('init', self.repository_location)
+        self.create_regular_file('file1', size=1024 * 80)
+        self.create_regular_file('file2', size=1024 * 80)
+        with changedir('input'):
+            self.attic('create', '--exclude=file1', self.repository_location + '::test1', '.')
+        with changedir('output'):
+            self.attic('extract', self.repository_location + '::test1')
+        self.assert_equal(sorted(os.listdir('output')), ['file2'])
+        with changedir('input'):
+            self.attic('create', '--exclude=./file1', self.repository_location + '::test2', '.')
+        with changedir('output'):
+            self.attic('extract', self.repository_location + '::test2')
+        self.assert_equal(sorted(os.listdir('output')), ['file2'])
+        self.attic('create', '--exclude=input/./file1', self.repository_location + '::test3', 'input')
+        with changedir('output'):
+            self.attic('extract', self.repository_location + '::test3')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file2'])
+
     def test_repeated_files(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.attic('init', self.repository_location)

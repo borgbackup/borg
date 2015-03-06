@@ -173,8 +173,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 self.print_error('%s: %s', path, e)
             else:
                 for filename in sorted(entries):
+                    entry_path = os.path.normpath(os.path.join(path, filename))
                     self._process(archive, cache, excludes, exclude_caches, skip_inodes,
-                                  os.path.join(path, filename), restrict_dev)
+                                  entry_path, restrict_dev)
         elif stat.S_ISLNK(st.st_mode):
             archive.process_symlink(path, st)
         elif stat.S_ISFIFO(st.st_mode):

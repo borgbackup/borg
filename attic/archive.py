@@ -230,11 +230,14 @@ class Archive:
         cache.rollback()
         return stats
 
-    def extract_item(self, item, restore_attrs=True, dry_run=False):
-        if dry_run:
+    def extract_item(self, item, restore_attrs=True, dry_run=False, stdout=False):
+        if dry_run or stdout:
             if b'chunks' in item:
-                for _ in self.pipeline.fetch_many([c[0] for c in item[b'chunks']], is_preloaded=True):
-                    pass
+                for data in self.pipeline.fetch_many([c[0] for c in item[b'chunks']], is_preloaded=True):
+                    if stdout:
+                        sys.stdout.buffer.write(data)
+                if stdout:
+                    sys.stdout.buffer.flush()
             return
 
         dest = self.cwd
@@ -379,6 +382,23 @@ class Archive:
         source = os.readlink(path)
         item = {b'path': make_path_safe(path), b'source': source}
         item.update(self.stat_attrs(st, path))
+        self.add_item(item)
+
+    def process_stdin(self, path, cache):
+        uid, gid = 0, 0
+        fd = sys.stdin.buffer  # binary
+        chunks = []
+        for chunk in self.chunker.chunkify(fd):
+            chunks.append(cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats))
+        self.stats.nfiles += 1
+        item = {
+            b'path': path,
+            b'chunks': chunks,
+            b'mode': 0o100660,  # regular file, ug=rw
+            b'uid': uid, b'user': uid2user(uid),
+            b'gid': gid, b'group': gid2group(gid),
+            b'mtime': int_to_bigint(int(time.time()) * 1000000000)
+        }
         self.add_item(item)
 
     def process_file(self, path, st, cache):

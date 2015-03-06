@@ -116,6 +116,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             except IOError:
                 pass
         for path in args.paths:
+            if path == '-':  # stdin
+                path = 'stdin'
+                self.print_verbose(path)
+                try:
+                    archive.process_stdin(path, cache)
+                except IOError as e:
+                    self.print_error('%s: %s', path, e)
+                continue
             path = os.path.normpath(path)
             if args.dontcross:
                 try:
@@ -195,6 +203,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                           numeric_owner=args.numeric_owner)
         patterns = adjust_patterns(args.paths, args.excludes)
         dry_run = args.dry_run
+        stdout = args.stdout
         strip_components = args.strip_components
         dirs = []
         for item in archive.iter_items(lambda item: not exclude_path(item[b'path'], patterns), preload=True):
@@ -205,7 +214,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     continue
             if not args.dry_run:
                 while dirs and not item[b'path'].startswith(dirs[-1][b'path']):
-                    archive.extract_item(dirs.pop(-1))
+                    archive.extract_item(dirs.pop(-1), stdout=stdout)
             self.print_verbose(remove_surrogates(orig_path))
             try:
                 if dry_run:
@@ -215,7 +224,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                         dirs.append(item)
                         archive.extract_item(item, restore_attrs=False)
                     else:
-                        archive.extract_item(item)
+                        archive.extract_item(item, stdout=stdout)
             except IOError as e:
                 self.print_error('%s: %s', remove_surrogates(orig_path), e)
 
@@ -585,6 +594,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('--strip-components', dest='strip_components',
                                type=int, default=0, metavar='NUMBER',
                                help='Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.')
+        subparser.add_argument('--stdout', dest='stdout',
+                               action='store_true', default=False,
+                               help='write all extracted data to stdout')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to extract')

@@ -12,6 +12,19 @@ Can I backup VM disk images?
     Yes, the :ref:`deduplication <deduplication_def>` technique used by |project_name|
     makes sure only the modified parts of the file are stored.
 
+Can I backup from multiple servers into a single repository?
+    Yes, but in order for the deduplication used by Attic to work, it
+    needs to keep a local cache containing checksums of all file
+    chunks already stored in the repository. This cache is stored in
+    ``~/.cache/attic/``.  If Attic detects that a repository has been
+    modified since the local cache was updated it will need to rebuild
+    the cache. This rebuild can be quite time consuming.
+
+    So, yes it's possible. But it will be most efficient if a single
+    repository is only modified from one place. Also keep in mind that
+    Attic will keep an exclusive lock on the repository while creating
+    or deleting archives, which may make *simultaneous* backups fail.
+
 Which file attributes are preserved?
     The following attributes are preserved:
 

@@ -43,6 +43,7 @@ class AtticOperations(llfuse.Operations):
         self.contents = defaultdict(dict)
         self.default_dir = {b'mode': 0o40755, b'mtime': int(time.time() * 1e9), b'uid': os.getuid(), b'gid': os.getgid()}
         self.pending_archives = {}
+        self.accounted_chunks = {}
         self.cache = ItemCache()
         if archive:
             self.process_archive(archive)
@@ -130,8 +131,13 @@ class AtticOperations(llfuse.Operations):
     def getattr(self, inode):
         item = self.get_item(inode)
         size = 0
+        dsize = 0
         try:
-            size = sum(size for _, size, _ in item[b'chunks'])
+            for key, chunksize, _ in item[b'chunks']:
+                size += chunksize
+                if self.accounted_chunks.get(key, inode) == inode:
+                    self.accounted_chunks[key] = inode
+                    dsize += chunksize
         except KeyError:
             pass
         entry = llfuse.EntryAttributes()
@@ -146,7 +152,7 @@ class AtticOperations(llfuse.Operations):
         entry.st_rdev = item.get(b'rdev', 0)
         entry.st_size = size
         entry.st_blksize = 512
-        entry.st_blocks = 1
+        entry.st_blocks = dsize / 512
         if have_fuse_mtime_ns:
             entry.st_atime_ns = item[b'mtime']
             entry.st_mtime_ns = item[b'mtime']

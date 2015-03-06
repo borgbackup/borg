@@ -30,11 +30,15 @@ class CryptoTestCase(AtticTestCase):
     def test_aes(self):
         key = b'X' * 32
         data = b'foo' * 10
-        aes = AES(key)
+        # encrypt
+        aes = AES(is_encrypt=True, key=key)
         self.assert_equal(bytes_to_long(aes.iv, 8), 0)
         cdata = aes.encrypt(data)
         self.assert_equal(hexlify(cdata), b'c6efb702de12498f34a2c2bbc8149e759996d08bf6dc5c610aefc0c3a466')
         self.assert_equal(bytes_to_long(aes.iv, 8), 2)
-        self.assert_not_equal(data, aes.decrypt(cdata))
-        aes.reset(iv=b'\0' * 16)
-        self.assert_equal(data, aes.decrypt(cdata))
+        # decrypt
+        aes = AES(is_encrypt=False, key=key)
+        self.assert_equal(bytes_to_long(aes.iv, 8), 0)
+        pdata = aes.decrypt(cdata)
+        self.assert_equal(data, pdata)
+        self.assert_equal(bytes_to_long(aes.iv, 8), 2)

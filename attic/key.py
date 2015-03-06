@@ -144,8 +144,8 @@ class AESKeyBase(KeyBase):
             self.chunk_seed = self.chunk_seed - 0xffffffff - 1
 
     def init_ciphers(self, enc_iv=b''):
-        self.enc_cipher = AES(self.enc_key, enc_iv)
-        self.dec_cipher = AES(self.enc_key)
+        self.enc_cipher = AES(is_encrypt=True, key=self.enc_key, iv=enc_iv)
+        self.dec_cipher = AES(is_encrypt=False, key=self.enc_key)
 
 
 class PassphraseKey(AESKeyBase):
@@ -244,7 +244,7 @@ class KeyfileKey(AESKeyBase):
         assert d[b'version'] == 1
         assert d[b'algorithm'] == b'sha256'
         key = pbkdf2_sha256(passphrase.encode('utf-8'), d[b'salt'], d[b'iterations'], 32)
-        data = AES(key).decrypt(d[b'data'])
+        data = AES(is_encrypt=False, key=key).decrypt(d[b'data'])
         if HMAC(key, data, sha256).digest() != d[b'hash']:
             return None
         return data
@@ -254,7 +254,7 @@ class KeyfileKey(AESKeyBase):
         iterations = 100000
         key = pbkdf2_sha256(passphrase.encode('utf-8'), salt, iterations, 32)
         hash = HMAC(key, data, sha256).digest()
-        cdata = AES(key).encrypt(data)
+        cdata = AES(is_encrypt=True, key=key).encrypt(data)
         d = {
             'version': 1,
             'salt': salt,

@@ -5,7 +5,6 @@ import msgpack
 import os
 import pwd
 import re
-import stat
 import sys
 import time
 from datetime import datetime, timezone, timedelta
@@ -481,7 +480,7 @@ def write_msgpack(filename, d):
     with open(filename + '.tmp', 'wb') as fd:
         msgpack.pack(d, fd)
         fd.flush()
-        os.fsync(fd)
+        os.fsync(fd.fileno())
     os.rename(filename + '.tmp', filename)
 
 

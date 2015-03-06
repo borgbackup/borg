@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta
 import os
 import tempfile
 import unittest
-from attic.helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, UpgradableLock, prune_within, prune_split, to_localtime, \
+from attic.helpers import adjust_patterns, exclude_path, Location, format_timedelta, ExcludePattern, make_path_safe, UpgradableLock, prune_within, prune_split, \
     StableDict, int_to_bigint, bigint_to_int
 from attic.testsuite import AtticTestCase
 import msgpack
@@ -139,7 +139,7 @@ class PruneSplitTestCase(AtticTestCase):
     def test(self):
 
         def local_to_UTC(month, day):
-            'Convert noon on the month and day in 2013 to UTC.'
+            """Convert noon on the month and day in 2013 to UTC."""
             seconds = mktime(strptime('2013-%02d-%02d 12:00' % (month, day), '%Y-%m-%d %H:%M'))
             return datetime.fromtimestamp(seconds, tz=timezone.utc)
 

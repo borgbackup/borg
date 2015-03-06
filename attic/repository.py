@@ -3,7 +3,6 @@ from binascii import hexlify
 from itertools import islice
 import errno
 import os
-import shutil
 import struct
 import sys
 from zlib import crc32
@@ -42,7 +41,7 @@ class Repository(object):
         """{} is not a valid repository"""
 
     class CheckNeeded(Error):
-        '''Inconsistency detected. Please run "attic check {}"'''
+        """Inconsistency detected. Please run "attic check {}"."""
 
     class ObjectNotFound(Error):
         """Object with key {} not found in repository {}"""
@@ -80,9 +79,9 @@ class Repository(object):
             config.write(fd)
 
     def get_index_transaction_id(self):
-        indicies = sorted((int(name[6:]) for name in os.listdir(self.path) if name.startswith('index.') and name[6:].isdigit()))
-        if indicies:
-            return indicies[-1]
+        indices = sorted((int(name[6:]) for name in os.listdir(self.path) if name.startswith('index.') and name[6:].isdigit()))
+        if indices:
+            return indices[-1]
         else:
             return None
 
@@ -577,6 +576,7 @@ class LoggedIO(object):
         if self._write_fd:
             self.segment += 1
             self.offset = 0
-            os.fsync(self._write_fd)
+            self._write_fd.flush()
+            os.fsync(self._write_fd.fileno())
             self._write_fd.close()
             self._write_fd = None

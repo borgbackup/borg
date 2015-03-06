@@ -15,3 +15,4 @@ platform_linux.c
 *.pyo
 *.so
 docs/usage/*.inc
+.idea/

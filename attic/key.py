@@ -50,7 +50,7 @@ class KeyBase(object):
         self.TYPE_STR = bytes([self.TYPE])
 
     def id_hash(self, data):
-        """Return HMAC hash using the "id" HMAC key
+        """Return a HASH (no id_key) or a MAC (using the "id_key" key)
         """
 
     def encrypt(self, data):
@@ -92,9 +92,9 @@ class PlaintextKey(KeyBase):
 class AESKeyBase(KeyBase):
     """Common base class shared by KeyfileKey and PassphraseKey
 
-    Chunks are encrypted using 256bit AES in Counter Mode (CTR)
+    Chunks are encrypted using 256bit AES in Galois Counter Mode (GCM)
 
-    Payload layout: TYPE(1) + HMAC(32) + NONCE(8) + CIPHERTEXT
+    Payload layout: TYPE(1) + TAG(32) + NONCE(8) + CIPHERTEXT
 
     To reduce payload size only 8 bytes of the 16 bytes nonce is saved
     in the payload, the first 8 bytes are always zeros. This does not
@@ -105,45 +105,68 @@ class AESKeyBase(KeyBase):
     PAYLOAD_OVERHEAD = 1 + 32 + 8  # TYPE + HMAC + NONCE
 
     def id_hash(self, data):
-        """Return HMAC hash using the "id" HMAC key
         """
-        return HMAC(self.id_key, data, sha256).digest()
+        Return GMAC using the "id_key" GMAC key
+
+        XXX do we need a cryptographic hash function here or is a keyed hash
+        function like GMAC / GHASH good enough? See NIST SP 800-38D.
+
+        IMPORTANT: in 1 repo, there should be only 1 kind of id_hash, otherwise
+        data hashed/maced with one id_hash might result in same ID as already
+        exists in the repo for other data created with another id_hash method.
+        somehow unlikely considering 128 or 256bits, but still.
+        """
+        mac_cipher = AES(is_encrypt=True, key=self.id_key, iv=b'\0'*16)  # XXX do we need an IV here?
+        # GMAC = aes-gcm with all data as AAD, no data as to-be-encrypted data
+        mac_cipher.add(bytes(data))
+        tag, _ = mac_cipher.compute_tag_and_encrypt(b'')
+        return tag
 
     def encrypt(self, data):
         data = zlib.compress(data)
-        self.enc_cipher.reset()
-        data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(data)))
-        hmac = HMAC(self.enc_hmac_key, data, sha256).digest()
-        return b''.join((self.TYPE_STR, hmac, data))
+        self.enc_cipher.reset(iv=self.enc_iv)
+        iv_last8 = self.enc_iv[8:]
+        self.enc_cipher.add(iv_last8)
+        tag, data = self.enc_cipher.compute_tag_and_encrypt(data)
+        # increase the IV (counter) value so same value is never used twice
+        current_iv = bytes_to_long(iv_last8)
+        self.enc_iv = PREFIX + long_to_bytes(current_iv + num_aes_blocks(len(data)))
+        return b''.join((self.TYPE_STR, tag, iv_last8, data))
 
     def decrypt(self, id, data):
         if data[0] != self.TYPE:
             raise IntegrityError('Invalid encryption envelope')
-        hmac = memoryview(data)[1:33]
-        if memoryview(HMAC(self.enc_hmac_key, memoryview(data)[33:], sha256).digest()) != hmac:
+        iv_last8 = data[1+32:1+40]
+        iv = PREFIX + iv_last8
+        self.dec_cipher.reset(iv=iv)
+        self.dec_cipher.add(iv_last8)
+        tag, data = data[1:1+32], data[1+40:]
+        try:
+            data = self.dec_cipher.check_tag_and_decrypt(tag, data)
+        except Exception:
             raise IntegrityError('Encryption envelope checksum mismatch')
-        self.dec_cipher.reset(iv=PREFIX + data[33:41])
-        data = zlib.decompress(self.dec_cipher.decrypt(data[41:]))  # should use memoryview
-        if id and HMAC(self.id_key, data, sha256).digest() != id:
+        data = zlib.decompress(data)
+        if id and self.id_hash(data) != id:
             raise IntegrityError('Chunk id verification failed')
         return data
 
     def extract_nonce(self, payload):
         if payload[0] != self.TYPE:
-            raise IntegrityError('Invalid encryption envelope')
+             raise IntegrityError('Invalid encryption envelope')
         nonce = bytes_to_long(payload[33:41])
         return nonce
 
     def init_from_random_data(self, data):
         self.enc_key = data[0:32]
-        self.enc_hmac_key = data[32:64]
+        self.enc_hmac_key = data[32:64]  # XXX enc_hmac_key not used for AES-GCM
         self.id_key = data[64:96]
         self.chunk_seed = bytes_to_int(data[96:100])
         # Convert to signed int32
         if self.chunk_seed & 0x80000000:
             self.chunk_seed = self.chunk_seed - 0xffffffff - 1
 
-    def init_ciphers(self, enc_iv=b''):
+    def init_ciphers(self, enc_iv=PREFIX * 2):  # default IV = 16B zero
+        self.enc_iv = enc_iv
         self.enc_cipher = AES(is_encrypt=True, key=self.enc_key, iv=enc_iv)
         self.dec_cipher = AES(is_encrypt=False, key=self.enc_key)
 
@@ -242,25 +265,25 @@ class KeyfileKey(AESKeyBase):
     def decrypt_key_file(self, data, passphrase):
         d = msgpack.unpackb(data)
         assert d[b'version'] == 1
-        assert d[b'algorithm'] == b'sha256'
+        assert d[b'algorithm'] == b'gmac'
         key = pbkdf2_sha256(passphrase.encode('utf-8'), d[b'salt'], d[b'iterations'], 32)
-        data = AES(is_encrypt=False, key=key).decrypt(d[b'data'])
-        if HMAC(key, data, sha256).digest() != d[b'hash']:
+        try:
+            data = AES(is_encrypt=False, key=key, iv=b'\0'*16).check_tag_and_decrypt(d[b'hash'], d[b'data'])
+            return data
+        except Exception:
             return None
-        return data
 
     def encrypt_key_file(self, data, passphrase):
         salt = get_random_bytes(32)
         iterations = 100000
         key = pbkdf2_sha256(passphrase.encode('utf-8'), salt, iterations, 32)
-        hash = HMAC(key, data, sha256).digest()
-        cdata = AES(is_encrypt=True, key=key).encrypt(data)
+        tag, cdata = AES(is_encrypt=True, key=key, iv=b'\0'*16).compute_tag_and_encrypt(data)
         d = {
             'version': 1,
             'salt': salt,
             'iterations': iterations,
-            'algorithm': 'sha256',
-            'hash': hash,
+            'algorithm': 'gmac',
+            'hash': tag,
             'data': cdata,
         }
         return msgpack.packb(d)

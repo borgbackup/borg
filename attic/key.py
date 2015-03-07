@@ -460,32 +460,46 @@ maccer_mapping = {
 }
 
 
-def p(offset, compr_type, crypt_type, mac_type):
+from collections import namedtuple
+Meta = namedtuple('Meta', 'compr_type, crypt_type, mac_type')
+
+
+def get_implementations(meta):
     try:
-        compressor = compressor_mapping[compr_type]
-        crypter = crypter_mapping[crypt_type]
-        maccer = maccer_mapping[mac_type]
+        compressor = compressor_mapping[meta.compr_type]
+        crypter = crypter_mapping[meta.crypt_type]
+        maccer = maccer_mapping[meta.mac_type]
     except KeyError:
-        raise UnsupportedPayloadError("compr_type %x crypt_type %x mac_type %x" % (compr_type, crypt_type, mac_type))
-    return offset, compressor, crypter, maccer
+        raise UnsupportedPayloadError("compr_type %x crypt_type %x mac_type %x" % (
+            meta.compr_type, meta.crypt_type, meta.mac_type))
+    return compressor, crypter, maccer
 
 
 def parser00(data):  # legacy, hardcoded
-    return p(offset=1, compr_type=6, crypt_type=KeyfileKey.TYPE, mac_type=HMAC_SHA256.TYPE)
-
+    offset = 1
+    meta = Meta(compr_type=6, crypt_type=KeyfileKey.TYPE, mac_type=HMAC_SHA256.TYPE)
+    compressor, crypter, maccer = get_implementations(meta)
+    return offset, compressor, crypter, maccer
 
 def parser01(data):  # legacy, hardcoded
-    return p(offset=1, compr_type=6, crypt_type=PassphraseKey.TYPE, mac_type=HMAC_SHA256.TYPE)
-
+    offset = 1
+    meta = Meta(compr_type=6, crypt_type=PassphraseKey.TYPE, mac_type=HMAC_SHA256.TYPE)
+    compressor, crypter, maccer = get_implementations(meta)
+    return offset, compressor, crypter, maccer
 
 def parser02(data):  # legacy, hardcoded
-    return p(offset=1, compr_type=6, crypt_type=PlaintextKey.TYPE, mac_type=SHA256.TYPE)
+    offset = 1
+    meta = Meta(compr_type=6, crypt_type=PlaintextKey.TYPE, mac_type=SHA256.TYPE)
+    compressor, crypter, maccer = get_implementations(meta)
+    return offset, compressor, crypter, maccer
 
 
 def parser03(data):  # new & flexible
     offset = 4
     compr_type, crypt_type, mac_type = data[1:offset]
-    return p(offset=offset, compr_type=compr_type, crypt_type=crypt_type, mac_type=mac_type)
+    meta = Meta(compr_type=compr_type, crypt_type=crypt_type, mac_type=mac_type)
+    compressor, crypter, maccer = get_implementations(meta)
+    return offset, compressor, crypter, maccer
 
 
 def parser(data):

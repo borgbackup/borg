@@ -479,37 +479,30 @@ def get_implementations(meta):
     return compressor, crypter, maccer
 
 
-def parser00(all_data):  # legacy, hardcoded
+def legacy_parser(all_data, crypt_type):  # all rather hardcoded
     offset = 1
-    hmac = all_data[offset:offset+32]
-    stored_iv = all_data[offset+32:offset+40]
-    iv = PREFIX + stored_iv
-    data = all_data[offset+40:]
-    meta = Meta(compr_type=6, crypt_type=KeyfileKey.TYPE, mac_type=HMAC_SHA256.TYPE,
+    if crypt_type == PlaintextKey.TYPE:
+        hmac = None
+        iv = stored_iv = None
+        data = all_data[offset:]
+    else:
+        hmac = all_data[offset:offset+32]
+        stored_iv = all_data[offset+32:offset+40]
+        iv = PREFIX + stored_iv
+        data = all_data[offset+40:]
+    meta = Meta(compr_type=6, crypt_type=crypt_type, mac_type=HMAC_SHA256.TYPE,
                 hmac=hmac, iv=iv, stored_iv=stored_iv)
     compressor, crypter, maccer = get_implementations(meta)
     return meta, data, compressor, crypter, maccer
 
-def parser01(all_data):  # legacy, hardcoded
-    offset = 1
-    hmac = all_data[offset:offset+32]
-    stored_iv = all_data[offset+32:offset+40]
-    iv = PREFIX + stored_iv
-    data = all_data[offset+40:]
-    meta = Meta(compr_type=6, crypt_type=PassphraseKey.TYPE, mac_type=HMAC_SHA256.TYPE,
-                hmac=hmac, iv=iv, stored_iv=stored_iv)
-    compressor, crypter, maccer = get_implementations(meta)
-    return meta, data, compressor, crypter, maccer
+def parser00(all_data):
+    return legacy_parser(all_data, KeyfileKey.TYPE)
 
-def parser02(all_data):  # legacy, hardcoded
-    offset = 1
-    hmac = None
-    iv = stored_iv = None
-    data = all_data[offset:]
-    meta = Meta(compr_type=6, crypt_type=PlaintextKey.TYPE, mac_type=SHA256.TYPE,
-                hmac=hmac, iv=iv, stored_iv=stored_iv)
-    compressor, crypter, maccer = get_implementations(meta)
-    return meta, data, compressor, crypter, maccer
+def parser01(all_data):
+    return legacy_parser(all_data, PassphraseKey.TYPE)
+
+def parser02(all_data):
+    return legacy_parser(all_data, PlaintextKey.TYPE)
 
 
 def parser03(all_data):  # new & flexible

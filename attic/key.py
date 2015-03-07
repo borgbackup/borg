@@ -206,13 +206,6 @@ class AESKeyBase(KeyBase):
     """Common base class shared by KeyfileKey and PassphraseKey
 
     Chunks are encrypted using 256bit AES in Counter Mode (CTR)
-
-    Payload layout: HEADER(4) + HMAC(32) + NONCE(8) + CIPHERTEXT
-
-    To reduce payload size only 8 bytes of the 16 bytes nonce is saved
-    in the payload, the first 8 bytes are always zeros. This does not
-    affect security but limits the maximum repository capacity to
-    only 295 exabytes!
     """
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
@@ -478,6 +471,17 @@ def get_implementations(meta):
 
 
 def legacy_parser(all_data, crypt_type):  # all rather hardcoded
+    """
+    Payload layout:
+    no encryption:   TYPE(1) + data
+    with encryption: TYPE(1) + HMAC(32) + NONCE(8) + data
+    data is compressed with zlib level 6 and (in the 2nd case) encrypted.
+
+    To reduce payload size only 8 bytes of the 16 bytes nonce is saved
+    in the payload, the first 8 bytes are always zeros. This does not
+    affect security but limits the maximum repository capacity to
+    only 295 exabytes!
+    """
     offset = 1
     if crypt_type == PlaintextKey.TYPE:
         hmac = None
@@ -503,6 +507,13 @@ def parser02(all_data):
 
 
 def parser03(all_data):  # new & flexible
+    """
+    Payload layout:
+    always: TYPE(1) + MSGPACK((meta, data))
+
+    meta is a Meta namedtuple and contains all required information about data.
+    data is maybe compressed (see meta) and maybe encrypted (see meta).
+    """
     meta_tuple, data = msgpack.unpackb(all_data[1:])
     meta = Meta(*meta_tuple)
     compressor, crypter, maccer = get_implementations(meta)

@@ -463,7 +463,20 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         init_epilog = textwrap.dedent("""
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
-        Encryption can be enabled at repository init time.
+        Encryption can be enabled, compression and mac method can be chosen at
+        repository init time.
+
+        --compression METHODs (default: zlib level 6):
+
+        - 00..09  zlib levels 0..9 (0 means no compression, 9 max. compression)
+        - 10..19  lzma levels 0..9 (0 means no compression, 9 max. compression)
+
+        --mac METHODs (default: sha256 or hmac-sha256):
+
+        - 0       sha256 (just simple hash, no MAC, faster on 32bit CPU)
+        - 1       sha512-256 (just simple hash, no MAC, faster on 64bit CPU)
+        - 2       hmac-sha256 (HMAC, faster on 32bit CPU)
+        - 3       hmac-sha512-256 (HMAC, faster on 64bit CPU)
         """)
         subparser = subparsers.add_parser('init', parents=[common_parser],
                                           description=self.do_init.__doc__, epilog=init_epilog,

@@ -64,7 +64,8 @@ class KeyTestCase(AtticTestCase):
         self.assert_equal(key.extract_nonce(manifest2), 1)
         iv = key.extract_nonce(manifest)
         key2 = KeyfileKey.detect(self.MockRepository(), manifest)
-        self.assert_equal(bytes_to_long(key2.enc_cipher.iv, 8), iv + num_aes_blocks(len(manifest) - KeyfileKey.PAYLOAD_OVERHEAD))
+        # we just assume that the payload fits into 1 AES block (which is given for b'XXX').
+        self.assert_equal(bytes_to_long(key2.enc_cipher.iv, 8), iv + 1)
         # Key data sanity check
         self.assert_equal(len(set([key2.id_key, key2.enc_key, key2.enc_hmac_key])), 3)
         self.assert_equal(key2.chunk_seed == 0, False)
@@ -94,7 +95,8 @@ class KeyTestCase(AtticTestCase):
         self.assert_equal(key.extract_nonce(manifest2), 1)
         iv = key.extract_nonce(manifest)
         key2 = PassphraseKey.detect(self.MockRepository(), manifest)
-        self.assert_equal(bytes_to_long(key2.enc_cipher.iv, 8), iv + num_aes_blocks(len(manifest) - PassphraseKey.PAYLOAD_OVERHEAD))
+        # we just assume that the payload fits into 1 AES block (which is given for b'XXX').
+        self.assert_equal(bytes_to_long(key2.enc_cipher.iv, 8), iv + 1)
         self.assert_equal(key.id_key, key2.id_key)
         self.assert_equal(key.enc_hmac_key, key2.enc_hmac_key)
         self.assert_equal(key.enc_key, key2.enc_key)

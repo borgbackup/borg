@@ -213,8 +213,6 @@ class AESKeyBase(KeyBase):
     affect security but limits the maximum repository capacity to
     only 295 exabytes!
     """
-    PAYLOAD_OVERHEAD = 4 + 32 + 8  # HEADER + HMAC + NONCE, TODO: get rid of this
-
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
         """

@@ -19,7 +19,11 @@ except ImportError:
 from attic.crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
 from attic.helpers import IntegrityError, get_keys_dir, Error
 
+# we do not store the full IV on disk, as the upper 8 bytes are expected to be
+# zero anyway as the full IV is a 128bit counter. PREFIX are the upper 8 bytes,
+# stored_iv are the lower 8 Bytes.
 PREFIX = b'\0' * 8
+Meta = namedtuple('Meta', 'compr_type, crypt_type, mac_type, hmac, stored_iv')
 
 
 class UnsupportedPayloadError(Error):
@@ -144,9 +148,6 @@ class LzmaCompressor(object):  # uses 10..19 in the mapping
 COMPR_DEFAULT = ZlibCompressor.TYPE + 6  # zlib level 6
 
 
-Meta = namedtuple('Meta', 'compr_type, crypt_type, mac_type, hmac, iv, stored_iv')
-
-
 class KeyBase(object):
     TYPE = 0x00  # override in derived classes
 
@@ -187,7 +188,7 @@ class PlaintextKey(KeyBase):
 
     def encrypt(self, data):
         meta = Meta(compr_type=self.compressor.TYPE, crypt_type=self.TYPE, mac_type=self.maccer.TYPE,
-                    hmac=None, iv=None, stored_iv=None)
+                    hmac=None, stored_iv=None)
         data = self.compressor.compress(data)
         return generate(meta, data)
 
@@ -222,11 +223,10 @@ class AESKeyBase(KeyBase):
         data = self.compressor.compress(data)
         self.enc_cipher.reset()
         stored_iv = self.enc_cipher.iv[8:]
-        iv = PREFIX + stored_iv
         data = self.enc_cipher.encrypt(data)
         hmac = self.maccer(self.enc_hmac_key, stored_iv + data).digest()
         meta = Meta(compr_type=self.compressor.TYPE, crypt_type=self.TYPE, mac_type=self.maccer.TYPE,
-                    hmac=hmac, iv=iv, stored_iv=stored_iv)
+                    hmac=hmac, stored_iv=stored_iv)
         return generate(meta, data)
 
     def decrypt(self, id, data):
@@ -236,7 +236,7 @@ class AESKeyBase(KeyBase):
         computed_hmac = self.maccer(self.enc_hmac_key, meta.stored_iv + data).digest()
         if computed_hmac != meta.hmac:
             raise IntegrityError('Encryption envelope checksum mismatch')
-        self.dec_cipher.reset(iv=meta.iv)
+        self.dec_cipher.reset(iv=PREFIX + meta.stored_iv)
         data = self.compressor.decompress(self.dec_cipher.decrypt(data))
         if id and self.id_hash(data) != id:
             raise IntegrityError('Chunk id verification failed')
@@ -486,10 +486,9 @@ def legacy_parser(all_data, crypt_type):  # all rather hardcoded
     else:
         hmac = all_data[offset:offset+32]
         stored_iv = all_data[offset+32:offset+40]
-        iv = PREFIX + stored_iv
         data = all_data[offset+40:]
     meta = Meta(compr_type=6, crypt_type=crypt_type, mac_type=HMAC_SHA256.TYPE,
-                hmac=hmac, iv=iv, stored_iv=stored_iv)
+                hmac=hmac, stored_iv=stored_iv)
     compressor, crypter, maccer = get_implementations(meta)
     return meta, data, compressor, crypter, maccer
 

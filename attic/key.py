@@ -64,7 +64,7 @@ class HMAC(hmac.HMAC):
 
 
 class SHA256(object):  # note: can't subclass sha256
-    TYPE = 0x00
+    TYPE = 0
 
     def __init__(self, key, data=b''):
         # signature is like for a MAC, we ignore the key as this is a simple hash
@@ -84,7 +84,7 @@ class SHA256(object):  # note: can't subclass sha256
 
 class SHA512_256(sha512_256):
     """sha512, but digest truncated to 256bit - faster than sha256 on 64bit platforms"""
-    TYPE = 0x01
+    TYPE = 1
 
     def __init__(self, key, data):
         # signature is like for a MAC, we ignore the key as this is a simple hash
@@ -97,7 +97,7 @@ HASH_DEFAULT = SHA256.TYPE
 
 
 class HMAC_SHA256(HMAC):
-    TYPE = 0x02
+    TYPE = 10
 
     def __init__(self, key, data):
         if key is None:
@@ -106,7 +106,7 @@ class HMAC_SHA256(HMAC):
 
 
 class HMAC_SHA512_256(HMAC):
-    TYPE = 0x03
+    TYPE = 11
 
     def __init__(self, key, data):
         if key is None:

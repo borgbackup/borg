@@ -13,7 +13,7 @@ from attic import __version__
 from attic.archive import Archive, ArchiveChecker
 from attic.repository import Repository
 from attic.cache import Cache
-from attic.key import key_creator, COMPR_DEFAULT
+from attic.key import key_creator, COMPR_DEFAULT, HASH_DEFAULT, MAC_DEFAULT
 from attic.helpers import Error, location_validator, format_time, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
@@ -466,18 +466,18 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         Encryption can be enabled, compression and mac method can be chosen at
         repository init time.
 
-        --compression METHODs (default: zlib level 6):
+        --compression METHODs (default: %02d):
 
         - 00..09  zlib levels 0..9 (0 means no compression, 9 max. compression)
         - 10..19  lzma levels 0..9 (0 means no compression, 9 max. compression)
 
-        --mac METHODs (default: sha256 or hmac-sha256):
+        --mac METHODs (default: %02d or %02d):
 
-        - 0       sha256 (just simple hash, no MAC, faster on 32bit CPU)
-        - 1       sha512-256 (just simple hash, no MAC, faster on 64bit CPU)
-        - 2       hmac-sha256 (HMAC, faster on 32bit CPU)
-        - 3       hmac-sha512-256 (HMAC, faster on 64bit CPU)
-        """)
+        - 00      sha256 (just simple hash, no MAC, faster on 32bit CPU)
+        - 01      sha512-256 (just simple hash, no MAC, faster on 64bit CPU)
+        - 10      hmac-sha256 (HMAC, faster on 32bit CPU)
+        - 11      hmac-sha512-256 (HMAC, faster on 64bit CPU)
+        """ % (COMPR_DEFAULT, HASH_DEFAULT, MAC_DEFAULT))
         subparser = subparsers.add_parser('init', parents=[common_parser],
                                           description=self.do_init.__doc__, epilog=init_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)

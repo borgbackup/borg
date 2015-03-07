@@ -451,7 +451,7 @@ crypter_mapping = {
 
 
 maccer_mapping = {
-    # simple hashes, not MACs (but MAC-like signature):
+    # simple hashes, not MACs (but MAC-like class __init__ method signature):
     SHA256.TYPE: SHA256,
     SHA512_256.TYPE: SHA512_256,
     # MACs:

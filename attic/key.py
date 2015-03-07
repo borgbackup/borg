@@ -504,19 +504,8 @@ def parser02(all_data):
 
 
 def parser03(all_data):  # new & flexible
-    offset = 4
-    compr_type, crypt_type, mac_type = all_data[1:offset]
-    if crypt_type == PlaintextKey.TYPE:
-        hmac = None
-        iv = stored_iv = None
-        data = all_data[offset:]
-    else:
-        hmac = all_data[offset:offset+32]
-        stored_iv = all_data[offset+32:offset+40]
-        iv = PREFIX + stored_iv
-        data = all_data[offset+40:]
-    meta = Meta(compr_type=compr_type, crypt_type=crypt_type, mac_type=mac_type,
-                hmac=hmac, iv=iv, stored_iv=stored_iv)
+    meta_tuple, data = msgpack.unpackb(all_data[1:])
+    meta = Meta(*meta_tuple)
     compressor, crypter, maccer = get_implementations(meta)
     return meta, data, compressor, crypter, maccer
 
@@ -540,14 +529,8 @@ def key_factory(repository, manifest_data):
 
 def generate(meta, data):
     # always create new-style 0x03 format
-    start = bytes([0x03, meta.compr_type, meta.crypt_type, meta.mac_type])
-    if meta.crypt_type == PlaintextKey.TYPE:
-        result = start + data
-    else:
-        assert len(meta.hmac) == 32
-        assert len(meta.stored_iv) == 8
-        result = start + meta.hmac + meta.stored_iv + data
-    return result
+    return b'\x03' + msgpack.packb((meta, data))
+
 
 def compressor_creator(args):
     # args == None is used by unit tests

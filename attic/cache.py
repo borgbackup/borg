@@ -16,13 +16,14 @@ class Cache(object):
     class RepositoryReplay(Error):
         """Cache is newer than repository, refusing to continue"""
 
-    def __init__(self, repository, key, manifest, path=None, sync=True):
+    def __init__(self, repository, key, manifest, path=None, sync=True, do_files=False):
         self.timestamp = None
         self.txn_active = False
         self.repository = repository
         self.key = key
         self.manifest = manifest
         self.path = path or os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
+        self.do_files = do_files
         if not os.path.exists(self.path):
             self.create()
         self.open()
@@ -83,6 +84,7 @@ class Cache(object):
                 u.feed(data)
                 for path_hash, item in u:
                     item[0] += 1
+                    # in the end, this takes about 240 Bytes per file
                     self.files[path_hash] = msgpack.packb(item)
 
     def begin_txn(self):
@@ -206,6 +208,8 @@ class Cache(object):
             stats.update(-size, -csize, False)
 
     def file_known_and_unchanged(self, path_hash, st):
+        if not self.do_files:
+            return None
         if self.files is None:
             self._read_files()
         entry = self.files.get(path_hash)
@@ -221,6 +225,8 @@ class Cache(object):
             return None
 
     def memorize_file(self, path_hash, st, ids):
+        if not self.do_files:
+            return
         # Entry: Age, inode, size, mtime, chunk ids
         mtime_ns = st_mtime_ns(st)
         self.files[path_hash] = msgpack.packb((0, st.st_ino, st.st_size, int_to_bigint(mtime_ns), ids))

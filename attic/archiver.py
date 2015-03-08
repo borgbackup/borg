@@ -157,16 +157,17 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         # Ignore unix sockets
         if stat.S_ISSOCK(st.st_mode):
             return
-        self.print_verbose(remove_surrogates(path))
+        status = None
         if stat.S_ISREG(st.st_mode):
             try:
-                archive.process_file(path, st, cache)
+                status = archive.process_file(path, st, cache)
             except IOError as e:
                 self.print_error('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
             if exclude_caches and is_cachedir(path):
                 return
             archive.process_item(path, st)
+            status = 'd'  # directory
             try:
                 entries = os.listdir(path)
             except OSError as e:
@@ -176,13 +177,28 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     self._process(archive, cache, excludes, exclude_caches, skip_inodes,
                                   os.path.join(path, filename), restrict_dev)
         elif stat.S_ISLNK(st.st_mode):
-            archive.process_symlink(path, st)
+            status = archive.process_symlink(path, st)
         elif stat.S_ISFIFO(st.st_mode):
             archive.process_item(path, st)
+            status = 'f'  # fifo
         elif stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
-            archive.process_dev(path, st)
+            status = archive.process_dev(path, st)
         else:
             self.print_error('Unknown file type: %s', path)
+            return
+        # Status output
+        # A lowercase character means a file type other than a regular file,
+        # attic usually just stores them. E.g. (d)irectory.
+        # Hardlinks to already seen content are indicated by (h).
+        # A uppercase character means a regular file that was (A)dded,
+        # (M)odified or was (U)nchanged.
+        # Note: A/M/U is relative to the "files" cache, not to the repo.
+        # This would be an issue if the files cache is not used.
+        if status is None:
+            status = '?'  # need to add a status code somewhere
+        # output ALL the stuff - it can be easily filtered using grep.
+        # even stuff considered unchanged might be interesting.
+        self.print_verbose("%1s %s", status, remove_surrogates(path))
 
     def do_extract(self, args):
         """Extract archive contents"""

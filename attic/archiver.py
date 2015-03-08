@@ -291,7 +291,11 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                         size = sum(size for _, size, _ in item[b'chunks'])
                     except KeyError:
                         pass
-                mtime = format_time(datetime.fromtimestamp(bigint_to_int(item[b'mtime']) / 1e9))
+                try:
+                    mtime = datetime.fromtimestamp(bigint_to_int(item[b'mtime']) / 1e9)
+                except ValueError:
+                    # likely a broken mtime and datetime did not want to go beyond year 9999
+                    mtime = datetime(9999, 12, 31, 23, 59, 59)
                 if b'source' in item:
                     if type == 'l':
                         extra = ' -> %s' % item[b'source']
@@ -301,7 +305,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 else:
                     extra = ''
                 print('%s%s %-6s %-6s %8d %s %s%s' % (type, mode, item[b'user'] or item[b'uid'],
-                                                  item[b'group'] or item[b'gid'], size, mtime,
+                                                  item[b'group'] or item[b'gid'], size, format_time(mtime),
                                                   remove_surrogates(item[b'path']), extra))
         else:
             for archive in sorted(Archive.list_archives(repository, key, manifest), key=attrgetter('ts')):

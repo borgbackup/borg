@@ -190,6 +190,12 @@ class PassphraseKey(AESKeyBase):
             except IntegrityError:
                 passphrase = getpass(prompt)
 
+    def change_passphrase(self):
+        class ImmutablePassphraseError(Error):
+            """The passphrase for this encryption key type can't be changed."""
+
+        raise ImmutablePassphraseError
+
     def init(self, repository, passphrase):
         self.init_from_random_data(pbkdf2_sha256(passphrase.encode('utf-8'), repository.id, self.iterations, 100))
         self.init_ciphers()

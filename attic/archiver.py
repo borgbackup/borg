@@ -97,7 +97,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         t0 = datetime.now()
         repository = self.open_repository(args.archive, exclusive=True)
         manifest, key = Manifest.load(repository)
-        cache = Cache(repository, key, manifest)
+        cache = Cache(repository, key, manifest, do_files=args.cache_files)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
                           create=True, checkpoint_interval=args.checkpoint_interval,
                           numeric_owner=args.numeric_owner)
@@ -227,7 +227,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         """Delete an existing archive"""
         repository = self.open_repository(args.archive, exclusive=True)
         manifest, key = Manifest.load(repository)
-        cache = Cache(repository, key, manifest)
+        cache = Cache(repository, key, manifest, do_files=args.cache_files)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
         stats = Statistics()
         archive.delete(stats)
@@ -302,7 +302,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         """Show archive details such as disk space used"""
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
-        cache = Cache(repository, key, manifest)
+        cache = Cache(repository, key, manifest, do_files=args.cache_files)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
         stats = archive.calc_stats(cache)
         print('Name:', archive.name)
@@ -319,7 +319,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         """Prune repository archives according to specified rules"""
         repository = self.open_repository(args.repository, exclusive=True)
         manifest, key = Manifest.load(repository)
-        cache = Cache(repository, key, manifest)
+        cache = Cache(repository, key, manifest, do_files=args.cache_files)
         archives = list(sorted(Archive.list_archives(repository, key, manifest, cache),
                                key=attrgetter('ts'), reverse=True))
         if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0 and args.within is None:
@@ -447,6 +447,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
                             default=False,
                             help='verbose output')
+        common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
+                            default=True,
+                            help='do not use the "files" cache')
 
         # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
         if args:

@@ -44,7 +44,10 @@ class RepositoryServer(object):
                 if not data:
                     return
                 unpacker.feed(data)
-                for type, msgid, method, args in unpacker:
+                for unpacked in unpacker:
+                    if not (isinstance(unpacked, tuple) and len(unpacked) == 4):
+                        raise Exception("Unexpected RPC data format.")
+                    type, msgid, method, args = unpacked
                     method = method.decode('ascii')
                     try:
                         try:
@@ -172,7 +175,10 @@ class RemoteRepository(object):
                 if not data:
                     raise ConnectionClosed()
                 self.unpacker.feed(data)
-                for type, msgid, error, res in self.unpacker:
+                for unpacked in self.unpacker:
+                    if not (isinstance(unpacked, tuple) and len(unpacked) == 4):
+                        raise Exception("Unexpected RPC data format.")
+                    type, msgid, error, res = unpacked
                     if msgid in self.ignore_responses:
                         self.ignore_responses.remove(msgid)
                     else:

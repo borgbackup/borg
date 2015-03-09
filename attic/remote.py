@@ -157,7 +157,7 @@ class RemoteRepository(object):
                             raise PathNotAllowed(*res)
                         if error == b'ObjectNotFound':
                             raise Repository.ObjectNotFound(res[0], self.location.orig)
-                        raise self.RPCError(error)
+                        raise self.RPCError("%s%r" % (error.decode('ascii'), res))
                     else:
                         yield res
                         if not waiting_for and not calls:

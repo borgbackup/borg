@@ -122,5 +122,14 @@ setup(
     scripts=['scripts/attic'],
     cmdclass=cmdclass,
     ext_modules=ext_modules,
-    install_requires=['msgpack-python']
+    # msgpack pure python data corruption in some versions.
+    # The compiled C-version of python-msgpack was not affected.
+    # So, IF you had a compiler installed AND you did not force the pure-python version,
+    # you likely were not affected by the issue.
+    # python-msgpack <=0.4.2 is OK, 0.4.5 is latest release, but bug was fixed in repo.
+    # Details see:
+    # https://github.com/jborg/attic/issues/171
+    # https://github.com/jborg/attic/issues/185
+    # https://github.com/msgpack/msgpack-python/issues/124
+    install_requires=['msgpack-python<=0.4.2,>0.4.5']
 )

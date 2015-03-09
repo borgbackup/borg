@@ -224,18 +224,28 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         return self.exit_code
 
     def do_delete(self, args):
-        """Delete an existing archive"""
-        repository = self.open_repository(args.archive, exclusive=True)
+        """Delete an existing repository or archive"""
+        repository = self.open_repository(args.target, exclusive=True)
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest)
-        archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
-        stats = Statistics()
-        archive.delete(stats)
-        manifest.write()
-        repository.commit()
-        cache.commit()
-        if args.stats:
-            stats.print_('Deleted data:', cache)
+        if args.target.archive:
+            archive = Archive(repository, key, manifest, args.target.archive, cache=cache)
+            stats = Statistics()
+            archive.delete(stats)
+            manifest.write()
+            repository.commit()
+            cache.commit()
+            if args.stats:
+                stats.print_('Deleted data:', cache)
+        else:
+            print("You requested to completely DELETE the repository *including* all archives it contains:")
+            for archive in sorted(Archive.list_archives(repository, key, manifest), key=attrgetter('ts')):
+                print(format_archive(archive))
+            print("""Type "YES" if you understand this and want to continue.\n""")
+            if input('Do you want to continue? ') == 'YES':
+                repository.destroy()
+                cache.destroy()
+                print("Repository and corresponding cache were deleted.")
         return self.exit_code
 
     def do_mount(self, args):
@@ -591,8 +601,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='paths to extract')
 
         delete_epilog = textwrap.dedent("""
-        This command deletes an archive from the repository. Any disk space not
-        shared with any other existing archive is also reclaimed.
+        This command deletes an archive from the repository or the complete repository.
+        Disk space is reclaimed accordingly. If you delete the complete repository, the
+        local cache for it (if any) is also deleted.
         """)
         subparser = subparsers.add_parser('delete', parents=[common_parser],
                                           description=self.do_delete.__doc__,
@@ -602,9 +613,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the deleted archive')
-        subparser.add_argument('archive', metavar='ARCHIVE',
-                               type=location_validator(archive=True),
-                               help='archive to delete')
+        subparser.add_argument('target', metavar='TARGET',
+                               type=location_validator(),
+                               help='archive or repository to delete')
 
         list_epilog = textwrap.dedent("""
         This command lists the contents of a repository or an archive.

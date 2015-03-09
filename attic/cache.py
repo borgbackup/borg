@@ -38,7 +38,7 @@ class Cache(object):
         self.close()
 
     def create(self):
-        """Create a new empty cache at `path`
+        """Create a new empty cache at `self.path`
         """
         os.makedirs(self.path)
         with open(os.path.join(self.path, 'README'), 'w') as fd:
@@ -53,6 +53,13 @@ class Cache(object):
         ChunkIndex().write(os.path.join(self.path, 'chunks').encode('utf-8'))
         with open(os.path.join(self.path, 'files'), 'w') as fd:
             pass  # empty file
+
+    def destroy(self):
+        """destroy the cache at `self.path`
+        """
+        self.close()
+        os.remove(os.path.join(self.path, 'config'))  # kill config first
+        shutil.rmtree(self.path)
 
     def open(self):
         if not os.path.isdir(self.path):

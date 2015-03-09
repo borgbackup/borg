@@ -18,6 +18,7 @@ class Cache(object):
 
     def __init__(self, repository, key, manifest, path=None, sync=True):
         self.timestamp = None
+        self.lock = None
         self.txn_active = False
         self.repository = repository
         self.key = key
@@ -69,7 +70,9 @@ class Cache(object):
         self.files = None
 
     def close(self):
-        self.lock.release()
+        if self.lock:
+            self.lock.release()
+            self.lock = None
 
     def _read_files(self):
         self.files = {}

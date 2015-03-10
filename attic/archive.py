@@ -672,7 +672,9 @@ class ArchiveChecker:
 
         repository = cache_if_remote(self.repository)
         num_archives = len(self.manifest.archives)
-        for i, (name, info) in enumerate(list(self.manifest.archives.items()), 1):
+        archive_items = sorted(self.manifest.archives.items(), reverse=True,
+                               key=lambda name_info: name_info[1][b'time'])
+        for i, (name, info) in enumerate(archive_items, 1):
             self.report_progress('Analyzing archive {} ({}/{})'.format(name, i, num_archives))
             archive_id = info[b'id']
             if not archive_id in self.chunks:

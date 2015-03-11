@@ -529,7 +529,7 @@ class ArchiveChecker:
     def __del__(self):
         shutil.rmtree(self.tmpdir)
 
-    def check(self, repository, repair=False):
+    def check(self, repository, repair=False, last=None):
         self.report_progress('Starting archive consistency check...')
         self.repair = repair
         self.repository = repository
@@ -539,8 +539,11 @@ class ArchiveChecker:
             self.manifest = self.rebuild_manifest()
         else:
             self.manifest, _ = Manifest.load(repository, key=self.key)
-        self.rebuild_refcounts()
-        self.verify_chunks()
+        self.rebuild_refcounts(last=last)
+        if last is None:
+            self.verify_chunks()
+        else:
+            self.report_progress('Orphaned objects check skipped (needs all archives checked)')
         if not self.error_found:
             self.report_progress('Archive consistency check complete, no problems found.')
         return self.repair or not self.error_found
@@ -595,7 +598,7 @@ class ArchiveChecker:
         self.report_progress('Manifest rebuild complete', error=True)
         return manifest
 
-    def rebuild_refcounts(self):
+    def rebuild_refcounts(self, last=None):
         """Rebuild object reference counts by walking the metadata
 
         Missing and/or incorrect data is repaired when detected
@@ -674,8 +677,9 @@ class ArchiveChecker:
         num_archives = len(self.manifest.archives)
         archive_items = sorted(self.manifest.archives.items(), reverse=True,
                                key=lambda name_info: name_info[1][b'time'])
-        for i, (name, info) in enumerate(archive_items, 1):
-            self.report_progress('Analyzing archive {} ({}/{})'.format(name, i, num_archives))
+        end = None if last is None else min(num_archives, last)
+        for i, (name, info) in enumerate(archive_items[:end]):
+            self.report_progress('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
             archive_id = info[b'id']
             if not archive_id in self.chunks:
                 self.report_progress('Archive metadata block is missing', error=True)

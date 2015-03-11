@@ -81,7 +81,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 print('Repository check complete, no problems found.')
             else:
                 return 1
-        if not args.repo_only and not ArchiveChecker().check(repository, repair=args.repair):
+        if not args.repo_only and not ArchiveChecker().check(repository, repair=args.repair, last=args.last):
                 return 1
         return 0
 
@@ -503,6 +503,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('--repair', dest='repair', action='store_true',
                                default=False,
                                help='attempt to repair any inconsistencies found')
+        subparser.add_argument('--last', dest='last',
+                               type=int, default=None, metavar='N',
+                               help='only check last N archives (Default: all)')
 
         change_passphrase_epilog = textwrap.dedent("""
         The key files used for repository encryption are optionally passphrase

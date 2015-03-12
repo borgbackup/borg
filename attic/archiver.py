@@ -13,7 +13,7 @@ from attic import __version__
 from attic.archive import Archive, ArchiveChecker
 from attic.repository import Repository
 from attic.cache import Cache
-from attic.key import key_creator
+from attic.key import key_creator, COMPR_DEFAULT, HASH_DEFAULT, MAC_DEFAULT
 from attic.helpers import Error, location_validator, format_time, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
@@ -480,8 +480,21 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         init_epilog = textwrap.dedent("""
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
-        Encryption can be enabled at repository init time.
-        """)
+        Encryption can be enabled, compression and mac method can be chosen at
+        repository init time.
+
+        --compression METHODs (default: %02d):
+
+        - 00..09  zlib levels 0..9 (0 means no compression, 9 max. compression)
+        - 10..19  lzma levels 0..9 (0 means no compression, 9 max. compression)
+
+        --mac METHODs (default: %02d or %02d):
+
+        - 00      sha256 (just simple hash, no MAC, faster on 32bit CPU)
+        - 01      sha512-256 (just simple hash, no MAC, faster on 64bit CPU)
+        - 10      hmac-sha256 (HMAC, faster on 32bit CPU)
+        - 11      hmac-sha512-256 (HMAC, faster on 64bit CPU)
+        """ % (COMPR_DEFAULT, HASH_DEFAULT, MAC_DEFAULT))
         subparser = subparsers.add_parser('init', parents=[common_parser],
                                           description=self.do_init.__doc__, epilog=init_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -492,6 +505,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-e', '--encryption', dest='encryption',
                                choices=('none', 'passphrase', 'keyfile'), default='none',
                                help='select encryption method')
+        subparser.add_argument('-c', '--compression', dest='compression',
+                               type=int, default=COMPR_DEFAULT, metavar='METHOD',
+                               help='select compression method (0..19)')
+        subparser.add_argument('-m', '--mac', dest='mac',
+                               type=int, default=None, metavar='METHOD',
+                               help='select hash/mac method (0..3)')
 
         check_epilog = textwrap.dedent("""
         The check command verifies the consistency of a repository and the corresponding

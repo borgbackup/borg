@@ -115,6 +115,8 @@ class HMAC_SHA512_256(HMAC):
 
 
 class GMAC:
+    TYPE = 20
+
     def __init__(self, key, data):
         if key is None:
             raise Exception("do not use GMAC if you don't have a key")
@@ -129,7 +131,7 @@ class GMAC:
         return tag
 
 
-MAC_DEFAULT = HMAC_SHA256.TYPE
+MAC_DEFAULT = GMAC.TYPE
 
 
 class ZlibCompressor(object):  # uses 0..9 in the mapping
@@ -238,8 +240,7 @@ class AESKeyBase(KeyBase):
     only 295 exabytes!
     """
     def id_hash(self, data):
-        return GMAC(self.id_key, data).digest()
-        #return self.maccer(self.id_key, data).digest()
+        return self.maccer(self.id_key, data).digest()
 
     def encrypt(self, data):
         data = self.compressor.compress(data)
@@ -500,6 +501,7 @@ maccer_mapping = {
     # MACs:
     HMAC_SHA256.TYPE: HMAC_SHA256,
     HMAC_SHA512_256.TYPE: HMAC_SHA512_256,
+    GMAC.TYPE: GMAC,
 }
 
 

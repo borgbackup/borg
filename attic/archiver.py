@@ -494,6 +494,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         - 01      sha512-256 (just simple hash, no MAC, faster on 64bit CPU)
         - 10      hmac-sha256 (HMAC, faster on 32bit CPU)
         - 11      hmac-sha512-256 (HMAC, faster on 64bit CPU)
+        - 20      gmac (MAC, fastest on CPUs with AES-GCM HW support)
         """ % (COMPR_DEFAULT, HASH_DEFAULT, MAC_DEFAULT))
         subparser = subparsers.add_parser('init', parents=[common_parser],
                                           description=self.do_init.__doc__, epilog=init_epilog,

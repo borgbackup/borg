@@ -114,6 +114,21 @@ class HMAC_SHA512_256(HMAC):
         super().__init__(key, data, sha512_256)
 
 
+class GMAC:
+    def __init__(self, key, data):
+        if key is None:
+            raise Exception("do not use GMAC if you don't have a key")
+        self.key = key
+        self.data = data
+
+    def digest(self):
+        mac_cipher = AES(is_encrypt=True, key=self.key, iv=b'\0'*16)  # XXX do we need an IV here?
+        # GMAC = aes-gcm with all data as AAD, no data as to-be-encrypted data
+        mac_cipher.add(bytes(self.data))
+        tag, _ = mac_cipher.compute_tag_and_encrypt(b'')
+        return tag
+
+
 MAC_DEFAULT = HMAC_SHA256.TYPE
 
 
@@ -156,7 +171,15 @@ class KeyBase(object):
         self.maccer = maccer
 
     def id_hash(self, data):
-        """Return HMAC hash using the "id" HMAC key
+        """Return a HASH (no id_key) or a MAC (using the "id_key" key)
+
+        XXX do we need a cryptographic hash function here or is a keyed hash
+        function like GMAC / GHASH good enough? See NIST SP 800-38D.
+
+        IMPORTANT: in 1 repo, there should be only 1 kind of id_hash, otherwise
+        data hashed/maced with one id_hash might result in same ID as already
+        exists in the repo for other data created with another id_hash method.
+        somehow unlikely considering 128 or 256bits, but still.
         """
 
     def encrypt(self, data):
@@ -205,32 +228,46 @@ class PlaintextKey(KeyBase):
 class AESKeyBase(KeyBase):
     """Common base class shared by KeyfileKey and PassphraseKey
 
-    Chunks are encrypted using 256bit AES in Counter Mode (CTR)
+    Chunks are encrypted using 256bit AES in Galois Counter Mode (GCM)
+
+    Payload layout: TYPE(1) + TAG(32) + NONCE(8) + CIPHERTEXT
+
+    To reduce payload size only 8 bytes of the 16 bytes nonce is saved
+    in the payload, the first 8 bytes are always zeros. This does not
+    affect security but limits the maximum repository capacity to
+    only 295 exabytes!
     """
     def id_hash(self, data):
-        """Return HMAC hash using the "id" HMAC key
-        """
-        return self.maccer(self.id_key, data).digest()
+        return GMAC(self.id_key, data).digest()
+        #return self.maccer(self.id_key, data).digest()
 
     def encrypt(self, data):
         data = self.compressor.compress(data)
-        self.enc_cipher.reset()
-        stored_iv = self.enc_cipher.iv[8:]
-        data = self.enc_cipher.encrypt(data)
-        hmac = self.maccer(self.enc_hmac_key, stored_iv + data).digest()
+        self.enc_cipher.reset(iv=self.enc_iv)
+        iv_last8 = self.enc_iv[8:]
+        self.enc_cipher.add(iv_last8)
+        tag, data = self.enc_cipher.compute_tag_and_encrypt(data)
+        # increase the IV (counter) value so same value is never used twice
+        current_iv = bytes_to_long(iv_last8)
+        self.enc_iv = PREFIX + long_to_bytes(current_iv + num_aes_blocks(len(data)))
         meta = Meta(compr_type=self.compressor.TYPE, crypt_type=self.TYPE, mac_type=self.maccer.TYPE,
-                    hmac=hmac, stored_iv=stored_iv)
+                    hmac=tag, stored_iv=iv_last8)
         return generate(meta, data)
 
     def decrypt(self, id, data):
         meta, data, compressor, crypter, maccer = parser(data)
         assert isinstance(self, crypter)
         assert self.maccer is maccer
-        computed_hmac = self.maccer(self.enc_hmac_key, meta.stored_iv + data).digest()
-        if computed_hmac != meta.hmac:
+        iv_last8 = meta.stored_iv
+        iv = PREFIX + iv_last8
+        self.dec_cipher.reset(iv=iv)
+        self.dec_cipher.add(iv_last8)
+        tag = meta.hmac  # TODO rename Meta element name to be generic
+        try:
+            data = self.dec_cipher.check_tag_and_decrypt(tag, data)
+        except Exception:
             raise IntegrityError('Encryption envelope checksum mismatch')
-        self.dec_cipher.reset(iv=PREFIX + meta.stored_iv)
-        data = self.compressor.decompress(self.dec_cipher.decrypt(data))
+        data = self.compressor.decompress(data)
         if id and self.id_hash(data) != id:
             raise IntegrityError('Chunk id verification failed')
         return data
@@ -243,14 +280,15 @@ class AESKeyBase(KeyBase):
 
     def init_from_random_data(self, data):
         self.enc_key = data[0:32]
-        self.enc_hmac_key = data[32:64]
+        self.enc_hmac_key = data[32:64]  # XXX enc_hmac_key not used for AES-GCM
         self.id_key = data[64:96]
         self.chunk_seed = bytes_to_int(data[96:100])
         # Convert to signed int32
         if self.chunk_seed & 0x80000000:
             self.chunk_seed = self.chunk_seed - 0xffffffff - 1
 
-    def init_ciphers(self, enc_iv=b''):
+    def init_ciphers(self, enc_iv=PREFIX * 2):  # default IV = 16B zero
+        self.enc_iv = enc_iv
         self.enc_cipher = AES(is_encrypt=True, key=self.enc_key, iv=enc_iv)
         self.dec_cipher = AES(is_encrypt=False, key=self.enc_key)
 
@@ -359,25 +397,25 @@ class KeyfileKey(AESKeyBase):
     def decrypt_key_file(self, data, passphrase):
         d = msgpack.unpackb(data)
         assert d[b'version'] == 1
-        assert d[b'algorithm'] == b'sha256'
+        assert d[b'algorithm'] == b'gmac'
         key = pbkdf2_sha256(passphrase.encode('utf-8'), d[b'salt'], d[b'iterations'], 32)
-        data = AES(is_encrypt=False, key=key).decrypt(d[b'data'])
-        if HMAC(key, data, sha256).digest() != d[b'hash']:
+        try:
+            data = AES(is_encrypt=False, key=key, iv=b'\0'*16).check_tag_and_decrypt(d[b'hash'], d[b'data'])
+            return data
+        except Exception:
             return None
-        return data
 
     def encrypt_key_file(self, data, passphrase):
         salt = get_random_bytes(32)
         iterations = 100000
         key = pbkdf2_sha256(passphrase.encode('utf-8'), salt, iterations, 32)
-        hash = HMAC(key, data, sha256).digest()
-        cdata = AES(is_encrypt=True, key=key).encrypt(data)
+        tag, cdata = AES(is_encrypt=True, key=key, iv=b'\0'*16).compute_tag_and_encrypt(data)
         d = {
             'version': 1,
             'salt': salt,
             'iterations': iterations,
-            'algorithm': 'sha256',
-            'hash': hash,
+            'algorithm': 'gmac',
+            'hash': tag,
             'data': cdata,
         }
         return msgpack.packb(d)

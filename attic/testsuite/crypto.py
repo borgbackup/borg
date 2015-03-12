@@ -27,18 +27,20 @@ class CryptoTestCase(AtticTestCase):
         self.assert_equal(len(bytes2), 10)
         self.assert_not_equal(bytes, bytes2)
 
-    def test_aes(self):
+    def test_aes_gcm(self):
         key = b'X' * 32
+        iv = b'A' * 16
         data = b'foo' * 10
         # encrypt
-        aes = AES(is_encrypt=True, key=key)
-        self.assert_equal(bytes_to_long(aes.iv, 8), 0)
-        cdata = aes.encrypt(data)
-        self.assert_equal(hexlify(cdata), b'c6efb702de12498f34a2c2bbc8149e759996d08bf6dc5c610aefc0c3a466')
-        self.assert_equal(bytes_to_long(aes.iv, 8), 2)
-        # decrypt
-        aes = AES(is_encrypt=False, key=key)
-        self.assert_equal(bytes_to_long(aes.iv, 8), 0)
-        pdata = aes.decrypt(cdata)
+        aes = AES(is_encrypt=True, key=key, iv=iv)
+        tag, cdata = aes.compute_tag_and_encrypt(data)
+        self.assert_equal(hexlify(tag), b'c98aa10eb6b7031bcc2160878d9438fb00000000000000000000000000000000')
+        self.assert_equal(hexlify(cdata), b'841bcce405df769d22ee9f7f012edf5dc7fb2594d924c7400ffd050f2741')
+        # decrypt (correct tag/cdata)
+        aes = AES(is_encrypt=False, key=key, iv=iv)
+        pdata = aes.check_tag_and_decrypt(tag, cdata)
         self.assert_equal(data, pdata)
-        self.assert_equal(bytes_to_long(aes.iv, 8), 2)
+        # decrypt (incorrect tag/cdata)
+        aes = AES(is_encrypt=False, key=key, iv=iv)
+        cdata = b'x' + cdata[1:]  # corrupt cdata
+        self.assertRaises(Exception, aes.check_tag_and_decrypt, tag, cdata)

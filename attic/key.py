@@ -514,6 +514,11 @@ def parser03(all_data):  # new & flexible
     meta is a Meta namedtuple and contains all required information about data.
     data is maybe compressed (see meta) and maybe encrypted (see meta).
     """
+    # TODO use Unpacker(..., max_*_len=NOTMORETHANNEEDED) to avoid any memory
+    # allocation issues on untrusted and potentially tampered input data.
+    # Problem: we currently must use older msgpack because pure python impl.
+    # is broken in 0.4.2 < version <= 0.4.5, but this api is only offered by
+    # more recent ones, not by 0.4.2. So, fix here when 0.4.6 is out. :-(
     meta_tuple, data = msgpack.unpackb(all_data[1:])
     meta = Meta(*meta_tuple)
     compressor, crypter, maccer = get_implementations(meta)

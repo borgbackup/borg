@@ -23,7 +23,7 @@ from attic.helpers import IntegrityError, get_keys_dir, Error
 # zero anyway as the full IV is a 128bit counter. PREFIX are the upper 8 bytes,
 # stored_iv are the lower 8 Bytes.
 PREFIX = b'\0' * 8
-Meta = namedtuple('Meta', 'compr_type, crypt_type, mac_type, cipher_type, hmac, stored_iv')
+Meta = namedtuple('Meta', 'compr_type, key_type, mac_type, cipher_type, hmac, stored_iv')
 
 
 class UnsupportedPayloadError(Error):
@@ -63,6 +63,9 @@ class HMAC(hmac.HMAC):
         self.inner.update(msg)
 
 
+# HASH / MAC stuff below all has a mac-like interface, so it can be used in the same way.
+# special case: hashes do not use keys (and thus, do not sign/authenticate)
+
 class SHA256(object):  # note: can't subclass sha256
     TYPE = 0
 
@@ -91,9 +94,6 @@ class SHA512_256(sha512_256):
         if key is not None:
             raise Exception("use a HMAC if you have a key")
         super().__init__(data)
-
-
-HASH_DEFAULT = SHA256.TYPE
 
 
 class HMAC_SHA256(HMAC):
@@ -131,8 +131,12 @@ class GMAC:
         return tag
 
 
+HASH_DEFAULT = SHA256.TYPE
 MAC_DEFAULT = GMAC.TYPE
 
+
+# compressor classes, all same interface
+# special case: zlib level 0 is "no compression"
 
 class ZlibCompressor(object):  # uses 0..9 in the mapping
     TYPE = 0
@@ -164,6 +168,9 @@ class LzmaCompressor(object):  # uses 10..19 in the mapping
 
 COMPR_DEFAULT = ZlibCompressor.TYPE + 6  # zlib level 6
 
+
+# ciphers - AEAD (authenticated encryption with assoc. data) style interface
+# special case: PLAIN dummy does not encrypt / authenticate
 
 class PLAIN:
     TYPE = 0
@@ -217,6 +224,9 @@ PLAIN_DEFAULT = PLAIN.TYPE
 CIPHER_DEFAULT = AES_GCM.TYPE
 
 
+# misc. types of keys
+# special case: no keys (thus: no encryption, no signing/authentication)
+
 class KeyBase(object):
     TYPE = 0x00  # override in derived classes
 
@@ -243,14 +253,14 @@ class KeyBase(object):
     def encrypt(self, data):
         data = self.compressor.compress(data)
         tag, iv_last8, data = self.cipher.compute_tag_and_encrypt(data)
-        meta = Meta(compr_type=self.compressor.TYPE, crypt_type=self.TYPE,
+        meta = Meta(compr_type=self.compressor.TYPE, key_type=self.TYPE,
                     mac_type=self.maccer_cls.TYPE, cipher_type=self.cipher.TYPE,
                     hmac=tag, stored_iv=iv_last8)
         return generate(meta, data)
 
     def decrypt(self, id, data):
-        meta, data, compressor, crypter, maccer, cipher = parser(data)
-        assert isinstance(self, crypter)
+        meta, data, compressor, keyer, maccer, cipher = parser(data)
+        assert isinstance(self, keyer)
         assert self.maccer_cls is maccer
         assert self.cipher_cls is cipher
         data = self.cipher.check_tag_and_decrypt(meta.hmac, meta.stored_iv, data)
@@ -275,7 +285,7 @@ class PlaintextKey(KeyBase):
 
     @classmethod
     def detect(cls, repository, manifest_data):
-        meta, data, compressor, crypter, maccer, cipher = parser(manifest_data)
+        meta, data, compressor, keyer, maccer, cipher = parser(manifest_data)
         return cls(compressor, maccer, cipher)
 
 
@@ -292,8 +302,8 @@ class AESKeyBase(KeyBase):
     only 295 exabytes!
     """
     def extract_nonce(self, payload):
-        meta, data, compressor, crypter, maccer, cipher = parser(payload)
-        assert isinstance(self, crypter)
+        meta, data, compressor, keyer, maccer, cipher = parser(payload)
+        assert isinstance(self, keyer)
         nonce = bytes_to_long(meta.stored_iv)
         return nonce
 
@@ -346,7 +356,7 @@ class PassphraseKey(AESKeyBase):
     @classmethod
     def detect(cls, repository, manifest_data):
         prompt = 'Enter passphrase for %s: ' % repository._location.orig
-        meta, data, compressor, crypter, maccer, cipher = parser(manifest_data)
+        meta, data, compressor, keyer, maccer, cipher = parser(manifest_data)
         key = cls(compressor, maccer, cipher)
         passphrase = os.environ.get('ATTIC_PASSPHRASE')
         if passphrase is None:
@@ -378,7 +388,7 @@ class KeyfileKey(AESKeyBase):
 
     @classmethod
     def detect(cls, repository, manifest_data):
-        meta, data, compressor, crypter, maccer, cipher = parser(manifest_data)
+        meta, data, compressor, keyer, maccer, cipher = parser(manifest_data)
         key = cls(compressor, maccer, cipher)
         path = cls.find_key_file(repository)
         prompt = 'Enter passphrase for key file %s: ' % path
@@ -510,7 +520,7 @@ for preset in LzmaCompressor.PRESETS:
         type('LzmaCompressorPreset%d' % preset, (LzmaCompressor, ), dict(TYPE=LzmaCompressor.TYPE + preset))
 
 
-crypter_mapping = {
+keyer_mapping = {
     KeyfileKey.TYPE: KeyfileKey,
     PassphraseKey.TYPE: PassphraseKey,
     PlaintextKey.TYPE: PlaintextKey,
@@ -540,16 +550,16 @@ cipher_mapping = {
 def get_implementations(meta):
     try:
         compressor = compressor_mapping[meta.compr_type]
-        crypter = crypter_mapping[meta.crypt_type]
+        keyer = keyer_mapping[meta.key_type]
         maccer = maccer_mapping[meta.mac_type]
         cipher = cipher_mapping[meta.cipher_type]
     except KeyError:
-        raise UnsupportedPayloadError("compr_type %x crypt_type %x mac_type %x" % (
-            meta.compr_type, meta.crypt_type, meta.mac_type, meta.cipher_type))
-    return compressor, crypter, maccer, cipher
+        raise UnsupportedPayloadError("compr_type %x key_type %x mac_type %x" % (
+            meta.compr_type, meta.key_type, meta.mac_type, meta.cipher_type))
+    return compressor, keyer, maccer, cipher
 
 
-def legacy_parser(all_data, crypt_type):  # all rather hardcoded
+def legacy_parser(all_data, key_type):  # all rather hardcoded
     """
     Payload layout:
     no encryption:   TYPE(1) + data
@@ -562,7 +572,7 @@ def legacy_parser(all_data, crypt_type):  # all rather hardcoded
     only 295 exabytes!
     """
     offset = 1
-    if crypt_type == PlaintextKey.TYPE:
+    if key_type == PlaintextKey.TYPE:
         hmac = None
         iv = stored_iv = None
         data = all_data[offset:]
@@ -570,11 +580,11 @@ def legacy_parser(all_data, crypt_type):  # all rather hardcoded
         hmac = all_data[offset:offset+32]
         stored_iv = all_data[offset+32:offset+40]
         data = all_data[offset+40:]
-    meta = Meta(compr_type=6, crypt_type=crypt_type,
+    meta = Meta(compr_type=6, key_type=key_type,
                 mac_type=HMAC_SHA256.TYPE, cipher_type=AES_CTR_HMAC.TYPE,
                 hmac=hmac, stored_iv=stored_iv)
-    compressor, crypter, maccer, cipher = get_implementations(meta)
-    return meta, data, compressor, crypter, maccer, cipher
+    compressor, keyer, maccer, cipher = get_implementations(meta)
+    return meta, data, compressor, keyer, maccer, cipher
 
 def parser00(all_data):
     return legacy_parser(all_data, KeyfileKey.TYPE)
@@ -601,8 +611,8 @@ def parser03(all_data):  # new & flexible
     # more recent ones, not by 0.4.2. So, fix here when 0.4.6 is out. :-(
     meta_tuple, data = msgpack.unpackb(all_data[1:])
     meta = Meta(*meta_tuple)
-    compressor, crypter, maccer, cipher = get_implementations(meta)
-    return meta, data, compressor, crypter, maccer, cipher
+    compressor, keyer, maccer, cipher = get_implementations(meta)
+    return meta, data, compressor, keyer, maccer, cipher
 
 
 def parser(data):
@@ -618,8 +628,8 @@ def parser(data):
 
 
 def key_factory(repository, manifest_data):
-    meta, data, compressor, crypter, maccer, cipher = parser(manifest_data)
-    return crypter.detect(repository, manifest_data)
+    meta, data, compressor, keyer, maccer, cipher = parser(manifest_data)
+    return keyer.detect(repository, manifest_data)
 
 
 def generate(meta, data):

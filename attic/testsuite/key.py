@@ -15,22 +15,23 @@ class KeyTestCase(AtticTestCase):
         repository = Location(tempfile.mkstemp()[1])
         compression = COMPR_DEFAULT
         mac = None
+        cipher = None
 
     keyfile2_key_file = """
 ATTIC KEY 0000000000000000000000000000000000000000000000000000000000000000
-hqlhbGdvcml0aG2kZ21hY6d2ZXJzaW9uAaRkYXRh2gDQByfRqTSTSlAic/cXPGs0IsqVb+
-Zi/U16d6T+dUBtRHFjaFCJqtY+CPWiv2BD35cZop4TImLdGYcGvOAVOzdGKL7n8dTVnI0G
-jnapbvt8NBYRhXV9G3hFMTLjncJoHLQwHSXkVoG/UjBWHf9pcyhfSdWAyePkWrfk0K+O97
-/MGvYdUDeMju89c7SZKOD4PVZ+gG9ILpmI0SvCciptAX2ZrNqeJ3AkqoVzThT7VsNwbpHF
-j7MgZ5hWAqLA+PkEZ39jnchWWm2dxJMkjUmeAGjoiappdGVyYXRpb25zzgABhqCkc2FsdN
-oAIHxtfNeGPOnhza/lXT492RZEVFmm2hewR0MwDhI6DQAopGhhc2jaACAtXRPR5mDd71wp
-xNWoIlr9AAAAAAAAAAAAAAAAAAAAAA==""".strip()
+hqppdGVyYXRpb25zzgABhqCpYWxnb3JpdGhtpGdtYWOkaGFzaNoAII1CqUnJzgKISX3lwR
++wWqMAAAAAAAAAAAAAAAAAAAAApGRhdGHaANBGe/oYLxHbAq72vjwEpgNMV73dTMkZkYh4
+0WtFC65DwZmqvwbwBBaq1g+fiym+khRtrn9hZvF6rpjk0RrAURSxCXIt/XUNQzQlcQjYbb
+kTT0aFk3DkKbwA/pgx10s/nWBmz9xv4yT5uoewOdPV009nJnrLdIz1zJTPvy2ylejHF3Na
+Sy/B/tWA9PIeRZzrDe/lVY6YBs8lKz1jtT/3vCJFCa+LOSSJHV+tExnpgO0NBTxDmTckRe
+vk3IRPVUml5VXHoUYEUEj6QpBA2F4NKdSzpHNhbHTaACDh3gxO3vgi+K/KMmBebec6RhBy
+QQWJNlInT3+yKnQpdqd2ZXJzaW9uAQ==""".strip()
 
     keyfile2_cdata = unhexlify(re.sub('\W', '', """
-        039295060014da0020c772252fb7a88e06be0e1e371168fb5b00000000000000000000000000000000
-        a80000000000000000af86399e604aa35fed0fae7bc02b39ae
+        03929606001402da002046c635e7ce41b65c5c075fa6afb97f5100000000000000000000000000000000
+        a80000000000000000affb14944408753093ba2860edb49220
         """))
-    keyfile2_id = unhexlify('b1927b00c683abe7b40ec4cc3d8c8f2f00000000000000000000000000000000')
+    keyfile2_id = unhexlify('94899966ce3eaad825f37500c8c87ef100000000000000000000000000000000')
 
     def setUp(self):
         self.tmppath = tempfile.mkdtemp()

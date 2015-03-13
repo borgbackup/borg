@@ -23,7 +23,7 @@ from attic.helpers import IntegrityError, get_keys_dir, Error
 # zero anyway as the full IV is a 128bit counter. PREFIX are the upper 8 bytes,
 # stored_iv are the lower 8 Bytes.
 PREFIX = b'\0' * 8
-Meta = namedtuple('Meta', 'compr_type, crypt_type, mac_type, hmac, stored_iv')
+Meta = namedtuple('Meta', 'compr_type, crypt_type, mac_type, cipher_type, hmac, stored_iv')
 
 
 class UnsupportedPayloadError(Error):
@@ -124,7 +124,7 @@ class GMAC:
         self.data = data
 
     def digest(self):
-        mac_cipher = AES(is_encrypt=True, key=self.key, iv=b'\0'*16)  # XXX do we need an IV here?
+        mac_cipher = AES(is_encrypt=True, key=self.key, iv=b'\0' * 16)
         # GMAC = aes-gcm with all data as AAD, no data as to-be-encrypted data
         mac_cipher.add(bytes(self.data))
         tag, _ = mac_cipher.compute_tag_and_encrypt(b'')
@@ -165,12 +165,67 @@ class LzmaCompressor(object):  # uses 10..19 in the mapping
 COMPR_DEFAULT = ZlibCompressor.TYPE + 6  # zlib level 6
 
 
+class PLAIN:
+    TYPE = 0
+
+    def __init__(self, **kw):
+        pass
+
+    def compute_tag_and_encrypt(self, data):
+        return b'', b'', data
+
+    def check_tag_and_decrypt(self, tag, iv_last8, data):
+        return data
+
+
+class AES_CTR_HMAC:
+    TYPE = 1
+    # TODO
+
+
+class AES_GCM:
+    TYPE = 2
+
+    def __init__(self, enc_key=b'\0' * 32, enc_iv=b'\0' * 16, **kw):
+        # note: hmac_key is not used for aes-gcm, it does aes+gmac in 1 pass
+        self.enc_iv = enc_iv
+        self.enc_cipher = AES(is_encrypt=True, key=enc_key, iv=enc_iv)
+        self.dec_cipher = AES(is_encrypt=False, key=enc_key)
+
+    def compute_tag_and_encrypt(self, data):
+        self.enc_cipher.reset(iv=self.enc_iv)
+        iv_last8 = self.enc_iv[8:]
+        self.enc_cipher.add(iv_last8)
+        tag, data = self.enc_cipher.compute_tag_and_encrypt(data)
+        # increase the IV (counter) value so same value is never used twice
+        current_iv = bytes_to_long(iv_last8)
+        self.enc_iv = PREFIX + long_to_bytes(current_iv + num_aes_blocks(len(data)))
+        return tag, iv_last8, data
+
+    def check_tag_and_decrypt(self, tag, iv_last8, data):
+        iv = PREFIX + iv_last8
+        self.dec_cipher.reset(iv=iv)
+        self.dec_cipher.add(iv_last8)
+        try:
+            data = self.dec_cipher.check_tag_and_decrypt(tag, data)
+        except Exception:
+            raise IntegrityError('Encryption envelope checksum mismatch')
+        return data
+
+
+PLAIN_DEFAULT = PLAIN.TYPE
+CIPHER_DEFAULT = AES_GCM.TYPE
+
+
 class KeyBase(object):
     TYPE = 0x00  # override in derived classes
 
-    def __init__(self, compressor, maccer):
-        self.compressor = compressor()
-        self.maccer = maccer
+    def __init__(self, compressor_cls, maccer_cls, cipher_cls):
+        self.compressor = compressor_cls()
+        self.maccer_cls = maccer_cls  # hasher/maccer used by id_hash
+        self.cipher_cls = cipher_cls  # plaintext dummy or AEAD cipher
+        self.cipher = cipher_cls()
+        self.id_key = None
 
     def id_hash(self, data):
         """Return a HASH (no id_key) or a MAC (using the "id_key" key)
@@ -183,12 +238,26 @@ class KeyBase(object):
         exists in the repo for other data created with another id_hash method.
         somehow unlikely considering 128 or 256bits, but still.
         """
+        return self.maccer_cls(self.id_key, data).digest()
 
     def encrypt(self, data):
-        pass
+        data = self.compressor.compress(data)
+        tag, iv_last8, data = self.cipher.compute_tag_and_encrypt(data)
+        meta = Meta(compr_type=self.compressor.TYPE, crypt_type=self.TYPE,
+                    mac_type=self.maccer_cls.TYPE, cipher_type=self.cipher.TYPE,
+                    hmac=tag, stored_iv=iv_last8)
+        return generate(meta, data)
 
     def decrypt(self, id, data):
-        pass
+        meta, data, compressor, crypter, maccer, cipher = parser(data)
+        assert isinstance(self, crypter)
+        assert self.maccer_cls is maccer
+        assert self.cipher_cls is cipher
+        data = self.cipher.check_tag_and_decrypt(meta.hmac, meta.stored_iv, data)
+        data = self.compressor.decompress(data)
+        if id and self.id_hash(data) != id:
+            raise IntegrityError('Chunk id verification failed')
+        return data
 
 
 class PlaintextKey(KeyBase):
@@ -201,30 +270,13 @@ class PlaintextKey(KeyBase):
         print('Encryption NOT enabled.\nUse the "--encryption=passphrase|keyfile" to enable encryption.')
         compressor = compressor_creator(args)
         maccer = maccer_creator(args, cls)
-        return cls(compressor, maccer)
+        cipher = cipher_creator(args, cls)
+        return cls(compressor, maccer, cipher)
 
     @classmethod
     def detect(cls, repository, manifest_data):
-        meta, data, compressor, crypter, maccer = parser(manifest_data)
-        return cls(compressor, maccer)
-
-    def id_hash(self, data):
-        return self.maccer(None, data).digest()
-
-    def encrypt(self, data):
-        meta = Meta(compr_type=self.compressor.TYPE, crypt_type=self.TYPE, mac_type=self.maccer.TYPE,
-                    hmac=None, stored_iv=None)
-        data = self.compressor.compress(data)
-        return generate(meta, data)
-
-    def decrypt(self, id, data):
-        meta, data, compressor, crypter, maccer = parser(data)
-        assert isinstance(self, crypter)
-        assert self.maccer is maccer
-        data = self.compressor.decompress(data)
-        if id and self.id_hash(data) != id:
-            raise IntegrityError('Chunk id verification failed')
-        return data
+        meta, data, compressor, crypter, maccer, cipher = parser(manifest_data)
+        return cls(compressor, maccer, cipher)
 
 
 class AESKeyBase(KeyBase):
@@ -239,59 +291,28 @@ class AESKeyBase(KeyBase):
     affect security but limits the maximum repository capacity to
     only 295 exabytes!
     """
-    def id_hash(self, data):
-        return self.maccer(self.id_key, data).digest()
-
-    def encrypt(self, data):
-        data = self.compressor.compress(data)
-        self.enc_cipher.reset(iv=self.enc_iv)
-        iv_last8 = self.enc_iv[8:]
-        self.enc_cipher.add(iv_last8)
-        tag, data = self.enc_cipher.compute_tag_and_encrypt(data)
-        # increase the IV (counter) value so same value is never used twice
-        current_iv = bytes_to_long(iv_last8)
-        self.enc_iv = PREFIX + long_to_bytes(current_iv + num_aes_blocks(len(data)))
-        meta = Meta(compr_type=self.compressor.TYPE, crypt_type=self.TYPE, mac_type=self.maccer.TYPE,
-                    hmac=tag, stored_iv=iv_last8)
-        return generate(meta, data)
-
-    def decrypt(self, id, data):
-        meta, data, compressor, crypter, maccer = parser(data)
-        assert isinstance(self, crypter)
-        assert self.maccer is maccer
-        iv_last8 = meta.stored_iv
-        iv = PREFIX + iv_last8
-        self.dec_cipher.reset(iv=iv)
-        self.dec_cipher.add(iv_last8)
-        tag = meta.hmac  # TODO rename Meta element name to be generic
-        try:
-            data = self.dec_cipher.check_tag_and_decrypt(tag, data)
-        except Exception:
-            raise IntegrityError('Encryption envelope checksum mismatch')
-        data = self.compressor.decompress(data)
-        if id and self.id_hash(data) != id:
-            raise IntegrityError('Chunk id verification failed')
-        return data
-
     def extract_nonce(self, payload):
-        meta, data, compressor, crypter, maccer = parser(payload)
+        meta, data, compressor, crypter, maccer, cipher = parser(payload)
         assert isinstance(self, crypter)
         nonce = bytes_to_long(meta.stored_iv)
         return nonce
 
     def init_from_random_data(self, data):
         self.enc_key = data[0:32]
-        self.enc_hmac_key = data[32:64]  # XXX enc_hmac_key not used for AES-GCM
+        self.enc_hmac_key = data[32:64]
         self.id_key = data[64:96]
         self.chunk_seed = bytes_to_int(data[96:100])
         # Convert to signed int32
         if self.chunk_seed & 0x80000000:
             self.chunk_seed = self.chunk_seed - 0xffffffff - 1
 
-    def init_ciphers(self, enc_iv=PREFIX * 2):  # default IV = 16B zero
-        self.enc_iv = enc_iv
-        self.enc_cipher = AES(is_encrypt=True, key=self.enc_key, iv=enc_iv)
-        self.dec_cipher = AES(is_encrypt=False, key=self.enc_key)
+    def init_ciphers(self, enc_iv=b'\0' * 16):
+        self.cipher = self.cipher_cls(enc_key=self.enc_key, enc_iv=enc_iv,
+                                      enc_hmac_key=self.enc_hmac_key)
+
+    @property
+    def enc_iv(self):
+        return self.cipher.enc_iv
 
 
 class PassphraseKey(AESKeyBase):
@@ -302,7 +323,8 @@ class PassphraseKey(AESKeyBase):
     def create(cls, repository, args):
         compressor = compressor_creator(args)
         maccer = maccer_creator(args, cls)
-        key = cls(compressor, maccer)
+        cipher = cipher_creator(args, cls)
+        key = cls(compressor, maccer, cipher)
         passphrase = os.environ.get('ATTIC_PASSPHRASE')
         if passphrase is not None:
             passphrase2 = passphrase
@@ -324,8 +346,8 @@ class PassphraseKey(AESKeyBase):
     @classmethod
     def detect(cls, repository, manifest_data):
         prompt = 'Enter passphrase for %s: ' % repository._location.orig
-        meta, data, compressor, crypter, maccer = parser(manifest_data)
-        key = cls(compressor, maccer)
+        meta, data, compressor, crypter, maccer, cipher = parser(manifest_data)
+        key = cls(compressor, maccer, cipher)
         passphrase = os.environ.get('ATTIC_PASSPHRASE')
         if passphrase is None:
             passphrase = getpass(prompt)
@@ -356,8 +378,8 @@ class KeyfileKey(AESKeyBase):
 
     @classmethod
     def detect(cls, repository, manifest_data):
-        meta, data, compressor, crypter, maccer = parser(manifest_data)
-        key = cls(compressor, maccer)
+        meta, data, compressor, crypter, maccer, cipher = parser(manifest_data)
+        key = cls(compressor, maccer, cipher)
         path = cls.find_key_file(repository)
         prompt = 'Enter passphrase for key file %s: ' % path
         passphrase = os.environ.get('ATTIC_PASSPHRASE', '')
@@ -467,7 +489,8 @@ class KeyfileKey(AESKeyBase):
                 print('Passphrases do not match')
         compressor = compressor_creator(args)
         maccer = maccer_creator(args, cls)
-        key = cls(compressor, maccer)
+        cipher = cipher_creator(args, cls)
+        key = cls(compressor, maccer, cipher)
         key.repository_id = repository.id
         key.init_from_random_data(get_random_bytes(100))
         key.init_ciphers()
@@ -505,15 +528,25 @@ maccer_mapping = {
 }
 
 
+cipher_mapping = {
+    # no cipher (but cipher-like class __init__ method signature):
+    PLAIN.TYPE: PLAIN,
+    # AEAD cipher implementations
+    AES_CTR_HMAC.TYPE: AES_CTR_HMAC,
+    AES_GCM.TYPE: AES_GCM,
+}
+
+
 def get_implementations(meta):
     try:
         compressor = compressor_mapping[meta.compr_type]
         crypter = crypter_mapping[meta.crypt_type]
         maccer = maccer_mapping[meta.mac_type]
+        cipher = cipher_mapping[meta.cipher_type]
     except KeyError:
         raise UnsupportedPayloadError("compr_type %x crypt_type %x mac_type %x" % (
-            meta.compr_type, meta.crypt_type, meta.mac_type))
-    return compressor, crypter, maccer
+            meta.compr_type, meta.crypt_type, meta.mac_type, meta.cipher_type))
+    return compressor, crypter, maccer, cipher
 
 
 def legacy_parser(all_data, crypt_type):  # all rather hardcoded
@@ -537,10 +570,11 @@ def legacy_parser(all_data, crypt_type):  # all rather hardcoded
         hmac = all_data[offset:offset+32]
         stored_iv = all_data[offset+32:offset+40]
         data = all_data[offset+40:]
-    meta = Meta(compr_type=6, crypt_type=crypt_type, mac_type=HMAC_SHA256.TYPE,
+    meta = Meta(compr_type=6, crypt_type=crypt_type,
+                mac_type=HMAC_SHA256.TYPE, cipher_type=AES_CTR_HMAC.TYPE,
                 hmac=hmac, stored_iv=stored_iv)
-    compressor, crypter, maccer = get_implementations(meta)
-    return meta, data, compressor, crypter, maccer
+    compressor, crypter, maccer, cipher = get_implementations(meta)
+    return meta, data, compressor, crypter, maccer, cipher
 
 def parser00(all_data):
     return legacy_parser(all_data, KeyfileKey.TYPE)
@@ -567,8 +601,8 @@ def parser03(all_data):  # new & flexible
     # more recent ones, not by 0.4.2. So, fix here when 0.4.6 is out. :-(
     meta_tuple, data = msgpack.unpackb(all_data[1:])
     meta = Meta(*meta_tuple)
-    compressor, crypter, maccer = get_implementations(meta)
-    return meta, data, compressor, crypter, maccer
+    compressor, crypter, maccer, cipher = get_implementations(meta)
+    return meta, data, compressor, crypter, maccer, cipher
 
 
 def parser(data):
@@ -584,7 +618,7 @@ def parser(data):
 
 
 def key_factory(repository, manifest_data):
-    meta, data, compressor, crypter, maccer = parser(manifest_data)
+    meta, data, compressor, crypter, maccer, cipher = parser(manifest_data)
     return crypter.detect(repository, manifest_data)
 
 
@@ -626,3 +660,19 @@ def maccer_creator(args, key_cls):
     if maccer is None:
         raise NotImplementedError("no mac %d" % args.mac)
     return maccer
+
+
+def cipher_creator(args, key_cls):
+    # args == None is used by unit tests
+    cipher = None if args is None else args.cipher
+    if cipher is None:
+        if key_cls is PlaintextKey:
+            cipher = PLAIN_DEFAULT
+        elif key_cls in (KeyfileKey, PassphraseKey):
+            cipher = CIPHER_DEFAULT
+        else:
+            raise NotImplementedError("unknown key class")
+    cipher = cipher_mapping.get(cipher)
+    if cipher is None:
+        raise NotImplementedError("no cipher %d" % args.cipher)
+    return cipher

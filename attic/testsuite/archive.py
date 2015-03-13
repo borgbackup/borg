@@ -20,6 +20,7 @@ class ChunkBufferTestCase(AtticTestCase):
         repository = None
         compression = COMPR_DEFAULT
         mac = None
+        cipher = None
 
     def test(self):
         data = [{b'foo': 1}, {b'bar': 2}]

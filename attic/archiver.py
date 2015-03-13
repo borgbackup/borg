@@ -13,7 +13,7 @@ from attic import __version__
 from attic.archive import Archive, ArchiveChecker
 from attic.repository import Repository
 from attic.cache import Cache
-from attic.key import key_creator, COMPR_DEFAULT, HASH_DEFAULT, MAC_DEFAULT
+from attic.key import key_creator, COMPR_DEFAULT, HASH_DEFAULT, MAC_DEFAULT, PLAIN_DEFAULT, CIPHER_DEFAULT
 from attic.helpers import Error, location_validator, format_time, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
@@ -59,7 +59,6 @@ class Archiver:
         repository = self.open_repository(args.repository, create=True, exclusive=True)
         key = key_creator(repository, args)
         manifest = Manifest(key, repository)
-        manifest.key = key
         manifest.write()
         repository.commit()
         return self.exit_code
@@ -488,6 +487,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         - 00..09  zlib levels 0..9 (0 means no compression, 9 max. compression)
         - 10..19  lzma levels 0..9 (0 means no compression, 9 max. compression)
 
+        --cipher METHODs (default: %02d or %02d)
+
+        - 00      No encryption
+        - 01      AEAD: AES-CTR + HMAC-SHA256
+        - 02      AEAD: AES-GCM
+
         --mac METHODs (default: %02d or %02d):
 
         - 00      sha256 (just simple hash, no MAC, faster on 32bit CPU)
@@ -495,7 +500,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         - 10      hmac-sha256 (HMAC, faster on 32bit CPU)
         - 11      hmac-sha512-256 (HMAC, faster on 64bit CPU)
         - 20      gmac (MAC, fastest on CPUs with AES-GCM HW support)
-        """ % (COMPR_DEFAULT, HASH_DEFAULT, MAC_DEFAULT))
+        """ % (COMPR_DEFAULT, PLAIN_DEFAULT, CIPHER_DEFAULT, HASH_DEFAULT, MAC_DEFAULT))
         subparser = subparsers.add_parser('init', parents=[common_parser],
                                           description=self.do_init.__doc__, epilog=init_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -506,6 +511,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-e', '--encryption', dest='encryption',
                                choices=('none', 'passphrase', 'keyfile'), default='none',
                                help='select encryption method')
+        subparser.add_argument('-C', '--cipher', dest='cipher',
+                               type=int, default=None, metavar='METHOD',
+                               help='select cipher (0..2)')
         subparser.add_argument('-c', '--compression', dest='compression',
                                type=int, default=COMPR_DEFAULT, metavar='METHOD',
                                help='select compression method (0..19)')

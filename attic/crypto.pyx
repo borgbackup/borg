@@ -7,6 +7,9 @@ from libc.stdlib cimport malloc, free
 
 API_VERSION = 2
 
+AES_CTR_MODE = 1
+AES_GCM_MODE = 2
+
 TAG_SIZE = 16  # bytes; 128 bits is the maximum allowed value. see "hack" below.
 IV_SIZE = 16  # bytes; 128 bits
 
@@ -25,6 +28,7 @@ cdef extern from "openssl/evp.h":
     ctypedef struct ENGINE:
         pass
     const EVP_MD *EVP_sha256()
+    const EVP_CIPHER *EVP_aes_256_ctr()
     const EVP_CIPHER *EVP_aes_256_gcm()
     void EVP_CIPHER_CTX_init(EVP_CIPHER_CTX *a)
     void EVP_CIPHER_CTX_cleanup(EVP_CIPHER_CTX *a)
@@ -99,12 +103,19 @@ cdef class AES:
     """
     cdef EVP_CIPHER_CTX ctx
     cdef int is_encrypt
+    cdef int mode
 
-    def __cinit__(self, is_encrypt, key, iv=None):
+    def __cinit__(self, mode, is_encrypt, key, iv=None):
         EVP_CIPHER_CTX_init(&self.ctx)
+        self.mode = mode
         self.is_encrypt = is_encrypt
         # Set cipher type and mode
-        cipher_mode = EVP_aes_256_gcm()
+        if mode == AES_CTR_MODE:
+            cipher_mode = EVP_aes_256_ctr()
+        elif mode == AES_GCM_MODE:
+            cipher_mode = EVP_aes_256_gcm()
+        else:
+            raise Exception('unknown mode')
         if self.is_encrypt:
             if not EVP_EncryptInit_ex(&self.ctx, cipher_mode, NULL, NULL, NULL):
                 raise Exception('EVP_EncryptInit_ex failed')
@@ -123,9 +134,10 @@ cdef class AES:
             key2 = key
         if iv:
             iv2 = iv
-        # Set IV length (bytes)
-        if not EVP_CIPHER_CTX_ctrl(&self.ctx, EVP_CTRL_GCM_SET_IVLEN, IV_SIZE, NULL):
-            raise Exception('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
+        if self.mode == AES_GCM_MODE:
+            # Set IV length (bytes)
+            if not EVP_CIPHER_CTX_ctrl(&self.ctx, EVP_CTRL_GCM_SET_IVLEN, IV_SIZE, NULL):
+                raise Exception('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
         # Initialise key and IV
         if self.is_encrypt:
             if not EVP_EncryptInit_ex(&self.ctx, NULL, NULL, key2, iv2):
@@ -137,6 +149,8 @@ cdef class AES:
     def add(self, aad):
         cdef int aadl = len(aad)
         cdef int outl
+        if self.mode != AES_GCM_MODE:
+            raise Exception('additional data only supported for AES GCM mode')
         # Zero or more calls to specify any AAD
         if self.is_encrypt:
             if not EVP_EncryptUpdate(&self.ctx, NULL, &outl, aad, aadl):
@@ -161,9 +175,10 @@ cdef class AES:
             if not EVP_EncryptFinal_ex(&self.ctx, out+ctl, &outl):
                 raise Exception('EVP_EncryptFinal failed')
             ctl += outl
-            # Get tag
-            if not EVP_CIPHER_CTX_ctrl(&self.ctx, EVP_CTRL_GCM_GET_TAG, TAG_SIZE, tag):
-                raise Exception('EVP_CIPHER_CTX_ctrl GET TAG failed')
+            if self.mode == AES_GCM_MODE:
+                # Get tag (only GCM mode. for CTR, the returned tag is undefined)
+                if not EVP_CIPHER_CTX_ctrl(&self.ctx, EVP_CTRL_GCM_GET_TAG, TAG_SIZE, tag):
+                    raise Exception('EVP_CIPHER_CTX_ctrl GET TAG failed')
             # hack: caller wants 32B tags (256b), so we give back that amount
             return (tag[:TAG_SIZE] + b'\x00'*16), out[:ctl]
         finally:
@@ -184,11 +199,12 @@ cdef class AES:
             if not EVP_DecryptUpdate(&self.ctx, out, &outl, data, inl):
                 raise Exception('EVP_DecryptUpdate failed')
             ptl = outl
-            # Set expected tag value.
-            if not EVP_CIPHER_CTX_ctrl(&self.ctx, EVP_CTRL_GCM_SET_TAG, TAG_SIZE, tag):
-                raise Exception('EVP_CIPHER_CTX_ctrl SET TAG failed')
+            if self.mode == AES_GCM_MODE:
+                # Set expected tag value.
+                if not EVP_CIPHER_CTX_ctrl(&self.ctx, EVP_CTRL_GCM_SET_TAG, TAG_SIZE, tag):
+                    raise Exception('EVP_CIPHER_CTX_ctrl SET TAG failed')
             if EVP_DecryptFinal_ex(&self.ctx, out+ptl, &outl) <= 0:
-                # a failure here means corrupted / tampered tag or data
+                # for GCM mode, a failure here means corrupted / tampered tag or data
                 raise Exception('EVP_DecryptFinal failed')
             ptl += outl
             return out[:ptl]

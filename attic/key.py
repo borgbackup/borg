@@ -16,7 +16,8 @@ except ImportError:
     except ImportError:
         lzma = None
 
-from attic.crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
+from attic.crypto import pbkdf2_sha256, get_random_bytes, AES, AES_CTR_MODE, AES_GCM_MODE, \
+    bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
 from attic.helpers import IntegrityError, get_keys_dir, Error
 
 # we do not store the full IV on disk, as the upper 8 bytes are expected to be
@@ -124,7 +125,7 @@ class GMAC:
         self.data = data
 
     def digest(self):
-        mac_cipher = AES(is_encrypt=True, key=self.key, iv=b'\0' * 16)
+        mac_cipher = AES(mode=AES_GCM_MODE, is_encrypt=True, key=self.key, iv=b'\0' * 16)
         # GMAC = aes-gcm with all data as AAD, no data as to-be-encrypted data
         mac_cipher.add(bytes(self.data))
         tag, _ = mac_cipher.compute_tag_and_encrypt(b'')
@@ -187,7 +188,30 @@ class PLAIN:
 
 class AES_CTR_HMAC:
     TYPE = 1
-    # TODO
+
+    def __init__(self, enc_key=b'\0' * 32, enc_iv=b'\0' * 16, enc_hmac_key=b'\0' * 32, **kw):
+        self.hmac_key = enc_hmac_key
+        self.enc_iv = enc_iv
+        self.enc_cipher = AES(mode=AES_CTR_MODE, is_encrypt=True, key=enc_key, iv=enc_iv)
+        self.dec_cipher = AES(mode=AES_CTR_MODE, is_encrypt=False, key=enc_key)
+
+    def compute_tag_and_encrypt(self, data):
+        self.enc_cipher.reset(iv=self.enc_iv)
+        iv_last8 = self.enc_iv[8:]
+        _, data = self.enc_cipher.compute_tag_and_encrypt(data)
+        # increase the IV (counter) value so same value is never used twice
+        current_iv = bytes_to_long(iv_last8)
+        self.enc_iv = PREFIX + long_to_bytes(current_iv + num_aes_blocks(len(data)))
+        tag = HMAC(self.hmac_key, iv_last8 + data, sha256).digest()  # XXX mac / hash flexibility
+        return tag, iv_last8, data
+
+    def check_tag_and_decrypt(self, tag, iv_last8, data):
+        iv = PREFIX + iv_last8
+        if HMAC(self.hmac_key, iv_last8 + data, sha256).digest() != tag:
+            raise IntegrityError('Encryption envelope checksum mismatch')
+        self.dec_cipher.reset(iv=iv)
+        data = self.dec_cipher.check_tag_and_decrypt(None, data)
+        return data
 
 
 class AES_GCM:
@@ -196,8 +220,8 @@ class AES_GCM:
     def __init__(self, enc_key=b'\0' * 32, enc_iv=b'\0' * 16, **kw):
         # note: hmac_key is not used for aes-gcm, it does aes+gmac in 1 pass
         self.enc_iv = enc_iv
-        self.enc_cipher = AES(is_encrypt=True, key=enc_key, iv=enc_iv)
-        self.dec_cipher = AES(is_encrypt=False, key=enc_key)
+        self.enc_cipher = AES(mode=AES_GCM_MODE, is_encrypt=True, key=enc_key, iv=enc_iv)
+        self.dec_cipher = AES(mode=AES_GCM_MODE, is_encrypt=False, key=enc_key)
 
     def compute_tag_and_encrypt(self, data):
         self.enc_cipher.reset(iv=self.enc_iv)
@@ -292,9 +316,10 @@ class PlaintextKey(KeyBase):
 class AESKeyBase(KeyBase):
     """Common base class shared by KeyfileKey and PassphraseKey
 
-    Chunks are encrypted using 256bit AES in Galois Counter Mode (GCM)
+    Chunks are encrypted using 256bit AES in CTR or GCM mode.
+    Chunks are authenticated by a GCM GMAC or a HMAC.
 
-    Payload layout: TYPE(1) + TAG(32) + NONCE(8) + CIPHERTEXT
+    Payload layout: TYPE(1) + MAC(32) + NONCE(8) + CIPHERTEXT
 
     To reduce payload size only 8 bytes of the 16 bytes nonce is saved
     in the payload, the first 8 bytes are always zeros. This does not
@@ -433,7 +458,8 @@ class KeyfileKey(AESKeyBase):
         assert d[b'algorithm'] == b'gmac'
         key = pbkdf2_sha256(passphrase.encode('utf-8'), d[b'salt'], d[b'iterations'], 32)
         try:
-            data = AES(is_encrypt=False, key=key, iv=b'\0'*16).check_tag_and_decrypt(d[b'hash'], d[b'data'])
+            cipher = AES(mode=AES_GCM_MODE, is_encrypt=False, key=key, iv=b'\0'*16)
+            data = cipher.check_tag_and_decrypt(d[b'hash'], d[b'data'])
             return data
         except Exception:
             return None
@@ -442,7 +468,8 @@ class KeyfileKey(AESKeyBase):
         salt = get_random_bytes(32)
         iterations = 100000
         key = pbkdf2_sha256(passphrase.encode('utf-8'), salt, iterations, 32)
-        tag, cdata = AES(is_encrypt=True, key=key, iv=b'\0'*16).compute_tag_and_encrypt(data)
+        cipher = AES(mode=AES_GCM_MODE, is_encrypt=True, key=key, iv=b'\0'*16)
+        tag, cdata = cipher.compute_tag_and_encrypt(data)
         d = {
             'version': 1,
             'salt': salt,

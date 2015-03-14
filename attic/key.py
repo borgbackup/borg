@@ -97,6 +97,24 @@ class SHA512_256(sha512_256):
         super().__init__(data)
 
 
+class GHASH:
+    TYPE = 2
+
+    def __init__(self, key, data):
+        # signature is like for a MAC, we ignore the key as this is a simple hash
+        if key is not None:
+            raise Exception("use a MAC if you have a key")
+        self.key = b'\0' * 32
+        self.data = data
+
+    def digest(self):
+        mac_cipher = AES(mode=AES_GCM_MODE, is_encrypt=True, key=self.key, iv=b'\0' * 16)
+        # GMAC = aes-gcm with all data as AAD, no data as to-be-encrypted data
+        mac_cipher.add(bytes(self.data))
+        tag, _ = mac_cipher.compute_tag_and_encrypt(b'')
+        return tag
+
+
 class HMAC_SHA256(HMAC):
     TYPE = 10
 
@@ -115,24 +133,18 @@ class HMAC_SHA512_256(HMAC):
         super().__init__(key, data, sha512_256)
 
 
-class GMAC:
+class GMAC(GHASH):
     TYPE = 20
 
     def __init__(self, key, data):
+        super().__init__(None, data)
         if key is None:
             raise Exception("do not use GMAC if you don't have a key")
         self.key = key
-        self.data = data
-
-    def digest(self):
-        mac_cipher = AES(mode=AES_GCM_MODE, is_encrypt=True, key=self.key, iv=b'\0' * 16)
-        # GMAC = aes-gcm with all data as AAD, no data as to-be-encrypted data
-        mac_cipher.add(bytes(self.data))
-        tag, _ = mac_cipher.compute_tag_and_encrypt(b'')
-        return tag
 
 
-HASH_DEFAULT = SHA256.TYPE
+# defaults are optimized for speed on modern CPUs with AES hw support
+HASH_DEFAULT = GHASH.TYPE
 MAC_DEFAULT = GMAC.TYPE
 
 
@@ -167,7 +179,8 @@ class LzmaCompressor(object):  # uses 10..19 in the mapping
         return lzma.decompress(data)
 
 
-COMPR_DEFAULT = ZlibCompressor.TYPE + 6  # zlib level 6
+# default is optimized for speed (and a little compression)
+COMPR_DEFAULT = ZlibCompressor.TYPE + 1 # zlib level 1
 
 
 # ciphers - AEAD (authenticated encryption with assoc. data) style interface
@@ -244,6 +257,7 @@ class AES_GCM:
         return data
 
 
+# cipher default is optimized for speed on modern CPUs with AES hw support
 PLAIN_DEFAULT = PLAIN.TYPE
 CIPHER_DEFAULT = AES_GCM.TYPE
 
@@ -558,6 +572,7 @@ maccer_mapping = {
     # simple hashes, not MACs (but MAC-like class __init__ method signature):
     SHA256.TYPE: SHA256,
     SHA512_256.TYPE: SHA512_256,
+    GHASH.TYPE: GHASH,
     # MACs:
     HMAC_SHA256.TYPE: HMAC_SHA256,
     HMAC_SHA512_256.TYPE: HMAC_SHA512_256,

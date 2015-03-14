@@ -59,7 +59,7 @@ QQWJNlInT3+yKnQpdqd2ZXJzaW9uAQ==""".strip()
     def test_plaintext(self):
         key = PlaintextKey.create(None, self.MockArgs())
         data = b'foo'
-        self.assert_equal(hexlify(key.id_hash(data)), b'2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae')
+        self.assert_equal(hexlify(key.id_hash(data)), b'4c9137bc0dd3ddb31de4e138a49d7eb300000000000000000000000000000000')
         self.assert_equal(data, key.decrypt(key.id_hash(data), key.encrypt(data)))
 
     def test_keyfile(self):

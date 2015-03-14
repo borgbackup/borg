@@ -484,8 +484,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
         --compression METHODs (default: %02d):
 
-        - 00..09  zlib levels 0..9 (0 means no compression, 9 max. compression)
-        - 10..19  lzma levels 0..9 (0 means no compression, 9 max. compression)
+        - 00      no compression
+        - 01..09  zlib levels 1..9 (1 means low compression, 9 max. compression)
+        - 10..19  lzma levels 0..9 (0 means low compression, 9 max. compression)
 
         --cipher METHODs (default: %02d or %02d)
 

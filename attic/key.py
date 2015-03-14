@@ -151,7 +151,17 @@ MAC_DEFAULT = GMAC.TYPE
 # compressor classes, all same interface
 # special case: zlib level 0 is "no compression"
 
-class ZlibCompressor(object):  # uses 0..9 in the mapping
+class NullCompressor(object):  # uses 0 in the mapping
+    TYPE = 0
+
+    def compress(self, data):
+        return bytes(data)
+
+    def decompress(self, data):
+        return bytes(data)
+
+
+class ZlibCompressor(object):  # uses 1..9 in the mapping
     TYPE = 0
     LEVELS = range(10)
 
@@ -179,8 +189,8 @@ class LzmaCompressor(object):  # uses 10..19 in the mapping
         return lzma.decompress(data)
 
 
-# default is optimized for speed (and a little compression)
-COMPR_DEFAULT = ZlibCompressor.TYPE + 1 # zlib level 1
+# default is optimized for speed
+COMPR_DEFAULT = NullCompressor.TYPE # no compression
 
 
 # ciphers - AEAD (authenticated encryption with assoc. data) style interface
@@ -559,6 +569,8 @@ for level in ZlibCompressor.LEVELS:
 for preset in LzmaCompressor.PRESETS:
     compressor_mapping[LzmaCompressor.TYPE + preset] = \
         type('LzmaCompressorPreset%d' % preset, (LzmaCompressor, ), dict(TYPE=LzmaCompressor.TYPE + preset))
+# overwrite 0 with NullCompressor
+compressor_mapping[NullCompressor.TYPE] = NullCompressor
 
 
 keyer_mapping = {

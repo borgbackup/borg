@@ -8,10 +8,10 @@ from ctypes import CDLL, create_string_buffer, c_ssize_t, c_size_t, c_char_p, c_
 from ctypes.util import find_library
 
 
-def is_enabled():
+def is_enabled(path=None):
     """Determine if xattr is enabled on the filesystem
     """
-    with tempfile.NamedTemporaryFile() as fd:
+    with tempfile.NamedTemporaryFile(dir=path) as fd:
         try:
             setxattr(fd.fileno(), 'user.name', b'value')
         except OSError:

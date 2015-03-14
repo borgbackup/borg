@@ -30,17 +30,19 @@ class RepositoryServer(object):
         self.restrict_to_paths = restrict_to_paths
 
     def serve(self):
+        stdin_fd = sys.stdin.fileno()
+        stdout_fd = sys.stdout.fileno()
         # Make stdin non-blocking
-        fl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
-        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, fl | os.O_NONBLOCK)
+        fl = fcntl.fcntl(stdin_fd, fcntl.F_GETFL)
+        fcntl.fcntl(stdin_fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
         # Make stdout blocking
-        fl = fcntl.fcntl(sys.stdout.fileno(), fcntl.F_GETFL)
-        fcntl.fcntl(sys.stdout.fileno(), fcntl.F_SETFL, fl & ~os.O_NONBLOCK)
+        fl = fcntl.fcntl(stdout_fd, fcntl.F_GETFL)
+        fcntl.fcntl(stdout_fd, fcntl.F_SETFL, fl & ~os.O_NONBLOCK)
         unpacker = msgpack.Unpacker(use_list=False)
         while True:
-            r, w, es = select.select([sys.stdin], [], [], 10)
+            r, w, es = select.select([stdin_fd], [], [], 10)
             if r:
-                data = os.read(sys.stdin.fileno(), BUFSIZE)
+                data = os.read(stdin_fd, BUFSIZE)
                 if not data:
                     return
                 unpacker.feed(data)
@@ -53,10 +55,9 @@ class RepositoryServer(object):
                             f = getattr(self.repository, method)
                         res = f(*args)
                     except Exception as e:
-                        sys.stdout.buffer.write(msgpack.packb((1, msgid, e.__class__.__name__, e.args)))
+                        os.write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, e.args)))
                     else:
-                        sys.stdout.buffer.write(msgpack.packb((1, msgid, None, res)))
-                    sys.stdout.flush()
+                        os.write(stdout_fd, msgpack.packb((1, msgid, None, res)))
             if es:
                 return
 

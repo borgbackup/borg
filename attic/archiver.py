@@ -479,7 +479,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         init_epilog = textwrap.dedent("""
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
-        Encryption can be enabled, compression and mac method can be chosen at
+        Encryption can be enabled, compression, cipher and mac method can be chosen at
         repository init time.
 
         --compression METHODs (default: %02d):
@@ -496,11 +496,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
         --mac METHODs (default: %02d or %02d):
 
-        - 00      sha256 (just simple hash, no MAC, faster on 32bit CPU)
-        - 01      sha512-256 (just simple hash, no MAC, faster on 64bit CPU)
-        - 10      hmac-sha256 (HMAC, faster on 32bit CPU)
-        - 11      hmac-sha512-256 (HMAC, faster on 64bit CPU)
-        - 20      gmac (MAC, fastest on CPUs with AES-GCM HW support)
+        - 00      sha256 (simple hash, no MAC, faster on 32bit CPU)
+        - 01      sha512-256 (simple hash, no MAC, faster on 64bit CPU)
+        - 02      ghash (simple hash, no MAC, fastest on CPUs with AES-GCM support)
+        - 10      hmac-sha256 (MAC, faster on 32bit CPU)
+        - 11      hmac-sha512-256 (MAC, faster on 64bit CPU)
+        - 20      gmac (MAC, fastest on CPUs with AES-GCM support)
         """ % (COMPR_DEFAULT, PLAIN_DEFAULT, CIPHER_DEFAULT, HASH_DEFAULT, MAC_DEFAULT))
         subparser = subparsers.add_parser('init', parents=[common_parser],
                                           description=self.do_init.__doc__, epilog=init_epilog,
@@ -511,7 +512,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption',
                                choices=('none', 'passphrase', 'keyfile'), default='none',
-                               help='select encryption method')
+                               help='select encryption key method')
         subparser.add_argument('-C', '--cipher', dest='cipher',
                                type=int, default=None, metavar='METHOD',
                                help='select cipher (0..2)')

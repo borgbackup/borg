@@ -658,12 +658,19 @@ def parser03(all_data):  # new & flexible
     meta is a Meta namedtuple and contains all required information about data.
     data is maybe compressed (see meta) and maybe encrypted (see meta).
     """
-    # TODO use Unpacker(..., max_*_len=NOTMORETHANNEEDED) to avoid any memory
-    # allocation issues on untrusted and potentially tampered input data.
-    # Problem: we currently must use older msgpack because pure python impl.
-    # is broken in 0.4.2 < version <= 0.4.5, but this api is only offered by
-    # more recent ones, not by 0.4.2. So, fix here when 0.4.6 is out. :-(
-    meta_tuple, data = msgpack.unpackb(all_data[1:])
+    max_len = 2000000  # XXX formula?
+    unpacker = msgpack.Unpacker(
+        use_list=False,
+        # avoid memory allocation issues causes by tampered input data.
+        max_buffer_size=max_len,  # does not work in 0.4.6 unpackb C implementation
+        max_array_len=10,  # meta_tuple
+        max_bin_len=max_len,  # data
+        max_str_len=0,  # not used yet
+        max_map_len=0,  # not used yet
+        max_ext_len=0,  # not used yet
+        )
+    unpacker.feed(all_data[1:])
+    meta_tuple, data = unpacker.unpack()
     meta = Meta(*meta_tuple)
     compressor, keyer, maccer, cipher = get_implementations(meta)
     return meta, data, compressor, keyer, maccer, cipher
@@ -688,7 +695,7 @@ def key_factory(repository, manifest_data):
 
 def generate(meta, data):
     # always create new-style 0x03 format
-    return b'\x03' + msgpack.packb((meta, data))
+    return b'\x03' + msgpack.packb((meta, data), use_bin_type=True)
 
 
 def compressor_creator(args):

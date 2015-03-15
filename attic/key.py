@@ -608,7 +608,7 @@ def get_implementations(meta):
         maccer = maccer_mapping[meta.mac_type]
         cipher = cipher_mapping[meta.cipher_type]
     except KeyError:
-        raise UnsupportedPayloadError("compr_type %x key_type %x mac_type %x" % (
+        raise UnsupportedPayloadError("compr_type %x key_type %x mac_type %x cipher_type %x" % (
             meta.compr_type, meta.key_type, meta.mac_type, meta.cipher_type))
     return compressor, keyer, maccer, cipher
 

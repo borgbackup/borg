@@ -18,7 +18,7 @@ TAG_DELETE = 1
 TAG_COMMIT = 2
 
 
-class Repository(object):
+class Repository:
     """Filesystem based transactional key value store
 
     On disk layout:
@@ -32,19 +32,19 @@ class Repository(object):
     DEFAULT_SEGMENTS_PER_DIR = 10000
 
     class DoesNotExist(Error):
-        """Repository {} does not exist"""
+        """Repository {} does not exist."""
 
     class AlreadyExists(Error):
-        """Repository {} already exists"""
+        """Repository {} already exists."""
 
     class InvalidRepository(Error):
-        """{} is not a valid repository"""
+        """{} is not a valid repository."""
 
     class CheckNeeded(Error):
         """Inconsistency detected. Please run "attic check {}"."""
 
     class ObjectNotFound(Error):
-        """Object with key {} not found in repository {}"""
+        """Object with key {} not found in repository {}."""
 
     def __init__(self, path, create=False, exclusive=False):
         self.path = path
@@ -106,7 +106,7 @@ class Repository(object):
             raise self.DoesNotExist(path)
         self.config = RawConfigParser()
         self.config.read(os.path.join(self.path, 'config'))
-        if not 'repository' in self.config.sections() or self.config.getint('repository', 'version') != 1:
+        if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:
             raise self.InvalidRepository(path)
         self.lock = UpgradableLock(os.path.join(path, 'config'), exclusive)
         self.max_segment_size = self.config.getint('repository', 'max_segment_size')
@@ -240,6 +240,7 @@ class Repository(object):
         the index is consistent with the data stored in the segments.
         """
         error_found = False
+
         def report_error(msg):
             nonlocal error_found
             error_found = True
@@ -377,7 +378,7 @@ class Repository(object):
         """
 
 
-class LoggedIO(object):
+class LoggedIO:
 
     header_fmt = struct.Struct('<IIB')
     assert header_fmt.size == 9

@@ -10,7 +10,7 @@ from .helpers import Error, get_cache_dir, decode_dict, st_mtime_ns, unhexlify, 
 from .hashindex import ChunkIndex
 
 
-class Cache(object):
+class Cache:
     """Client Side cache
     """
     class RepositoryReplay(Error):

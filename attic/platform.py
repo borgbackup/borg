@@ -13,5 +13,6 @@ else:
 
     def acl_get(path, item, numeric_owner=False):
         pass
+
     def acl_set(path, item, numeric_owner=False):
         pass

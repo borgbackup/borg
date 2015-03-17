@@ -304,9 +304,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                         extra = ' link to %s' % item[b'source']
                 else:
                     extra = ''
-                print('%s%s %-6s %-6s %8d %s %s%s' % (type, mode, item[b'user'] or item[b'uid'],
-                                                  item[b'group'] or item[b'gid'], size, format_time(mtime),
-                                                  remove_surrogates(item[b'path']), extra))
+                print('%s%s %-6s %-6s %8d %s %s%s' % (
+                    type, mode, item[b'user'] or item[b'uid'],
+                    item[b'group'] or item[b'gid'], size, format_time(mtime),
+                    remove_surrogates(item[b'path']), extra))
         else:
             for archive in sorted(Archive.list_archives(repository, key, manifest), key=attrgetter('ts')):
                 print(format_archive(archive))
@@ -459,11 +460,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     """).lstrip())
         common_parser = argparse.ArgumentParser(add_help=False)
         common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
-                            default=False,
-                            help='verbose output')
-        common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
-                            default=True,
-                            help='do not use the "files" cache')
+                                   default=False,
+                                   help='verbose output')
+        common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false')
 
         # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
         if args:

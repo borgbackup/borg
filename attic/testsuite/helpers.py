@@ -125,7 +125,7 @@ class UpgradableLockTestCase(AtticTestCase):
         lock.release()
 
 
-class MockArchive(object):
+class MockArchive:
 
     def __init__(self, ts):
         self.ts = ts
@@ -151,7 +151,7 @@ class PruneSplitTestCase(AtticTestCase):
                 self.assert_equal(set(prune_split(ta, '%Y-%m', n, skip)),
                                   subset(test_archives, indices))
             
-        test_pairs = [(1,1), (2,1), (2,28), (3,1), (3,2), (3,31), (5,1)]
+        test_pairs = [(1, 1), (2, 1), (2, 28), (3, 1), (3, 2), (3, 31), (5, 1)]
         test_dates = [local_to_UTC(month, day) for month, day in test_pairs]
         test_archives = [MockArchive(date) for date in test_dates]
 

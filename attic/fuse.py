@@ -228,7 +228,5 @@ class AtticOperations(llfuse.Operations):
             daemonize()
         try:
             llfuse.main(single=True)
-        except:
+        finally:
             llfuse.close()
-            raise
-        llfuse.close()

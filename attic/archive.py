@@ -587,7 +587,7 @@ class ArchiveChecker:
                 continue
             try:
                 archive = msgpack.unpackb(data)
-            except:
+            except Exception:
                 continue
             if isinstance(archive, dict) and b'items' in archive and b'cmdline' in archive:
                 self.report_progress('Found archive ' + archive[b'name'].decode('utf-8'), error=True)

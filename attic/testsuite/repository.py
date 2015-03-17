@@ -159,7 +159,6 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
             self.assert_raises(UpgradableLock.WriteLockFailed, lambda: len(self.repository))
             upgrade.assert_called_once()
 
-
     def test_crash_before_write_index(self):
         self.add_keys()
         self.repository.write_index = None

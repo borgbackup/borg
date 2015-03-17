@@ -17,6 +17,7 @@ git_full = "$Format:%H$"
 import subprocess
 import sys
 
+
 def run_command(args, cwd=None, verbose=False):
     try:
         # remember shell=False, so use git.cmd on windows, not just git
@@ -41,6 +42,7 @@ import sys
 import re
 import os.path
 
+
 def get_expanded_variables(versionfile_source):
     # the code embedded in _version.py can just fetch the value of these
     # variables. When used from setup.py, we don't want to import
@@ -48,7 +50,7 @@ def get_expanded_variables(versionfile_source):
     # used from _version.py.
     variables = {}
     try:
-        for line in open(versionfile_source,"r").readlines():
+        for line in open(versionfile_source, "r").readlines():
             if line.strip().startswith("git_refnames ="):
                 mo = re.search(r'=\s*"(.*)"', line)
                 if mo:
@@ -61,12 +63,13 @@ def get_expanded_variables(versionfile_source):
         pass
     return variables
 
+
 def versions_from_expanded_variables(variables, tag_prefix, verbose=False):
     refnames = variables["refnames"].strip()
     if refnames.startswith("$Format"):
         if verbose:
             print("variables are unexpanded, not using")
-        return {} # unexpanded, so not in an unpacked git-archive tarball
+        return {}  # unexpanded, so not in an unpacked git-archive tarball
     refs = set([r.strip() for r in refnames.strip("()").split(",")])
     for ref in list(refs):
         if not re.search(r'\d', ref):
@@ -87,13 +90,14 @@ def versions_from_expanded_variables(variables, tag_prefix, verbose=False):
             r = ref[len(tag_prefix):]
             if verbose:
                 print("picking %s" % r)
-            return { "version": r,
-                     "full": variables["full"].strip() }
+            return {"version": r,
+                    "full": variables["full"].strip()}
     # no suitable tags, so we use the full revision id
     if verbose:
         print("no suitable tags, using full revision id")
-    return { "version": variables["full"].strip(),
-             "full": variables["full"].strip() }
+    return {"version": variables["full"].strip(),
+            "full": variables["full"].strip()}
+
 
 def versions_from_vcs(tag_prefix, versionfile_source, verbose=False):
     # this runs 'git' from the root of the source tree. That either means
@@ -110,7 +114,7 @@ def versions_from_vcs(tag_prefix, versionfile_source, verbose=False):
         here = os.path.abspath(__file__)
     except NameError:
         # some py2exe/bbfreeze/non-CPython implementations don't do __file__
-        return {} # not always correct
+        return {}  # not always correct
 
     # versionfile_source is the relative path from the top of the source tree
     # (where the .git directory might live) to this file. Invert this to find
@@ -157,7 +161,7 @@ def versions_from_parentdir(parentdir_prefix, versionfile_source, verbose=False)
             here = os.path.abspath(__file__)
         except NameError:
             # py2exe/bbfreeze/non-CPython don't have __file__
-            return {} # without __file__, we have no hope
+            return {}  # without __file__, we have no hope
         # versionfile_source is the relative path from the top of the source
         # tree to _version.py. Invert this to find the root from __file__.
         root = here
@@ -183,8 +187,9 @@ tag_prefix = ""
 parentdir_prefix = "Attic-"
 versionfile_source = "attic/_version.py"
 
+
 def get_versions(default={"version": "unknown", "full": ""}, verbose=False):
-    variables = { "refnames": git_refnames, "full": git_full }
+    variables = {"refnames": git_refnames, "full": git_full}
     ver = versions_from_expanded_variables(variables, tag_prefix, verbose)
     if not ver:
         ver = versions_from_vcs(tag_prefix, versionfile_source, verbose)

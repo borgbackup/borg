@@ -107,7 +107,7 @@ class Repository:
             raise self.DoesNotExist(path)
         self.config = RawConfigParser()
         self.config.read(os.path.join(self.path, 'config'))
-        if not 'repository' in self.config.sections() or self.config.getint('repository', 'version') != 1:
+        if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:
             raise self.InvalidRepository(path)
         self.lock = UpgradableLock(os.path.join(path, 'config'), exclusive)
         self.max_segment_size = self.config.getint('repository', 'max_segment_size')
@@ -241,6 +241,7 @@ class Repository:
         the index is consistent with the data stored in the segments.
         """
         error_found = False
+
         def report_error(msg):
             nonlocal error_found
             error_found = True

@@ -102,7 +102,7 @@ class Manifest:
         m = msgpack.unpackb(data)
         if not m.get(b'version') == 1:
             raise ValueError('Invalid manifest version')
-        manifest.archives = dict((k.decode('utf-8'), v) for k,v in m[b'archives'].items())
+        manifest.archives = dict((k.decode('utf-8'), v) for k, v in m[b'archives'].items())
         manifest.timestamp = m.get(b'timestamp')
         if manifest.timestamp:
             manifest.timestamp = manifest.timestamp.decode('ascii')
@@ -145,7 +145,8 @@ def prune_split(archives, pattern, n, skip=[]):
             last = period
             if a not in skip:
                 keep.append(a)
-                if len(keep) == n: break
+                if len(keep) == n:
+                    break
     return keep
 
 

@@ -200,8 +200,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_exclude_caches(self):
         self.attic('init', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)
-        self.create_regular_file('cache1/CACHEDIR.TAG', contents = b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
-        self.create_regular_file('cache2/CACHEDIR.TAG', contents = b'invalid signature')
+        self.create_regular_file('cache1/CACHEDIR.TAG', contents=b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
+        self.create_regular_file('cache2/CACHEDIR.TAG', contents=b'invalid signature')
         self.attic('create', '--exclude-caches', self.repository_location + '::test', 'input')
         with changedir('output'):
             self.attic('extract', self.repository_location + '::test')
@@ -356,7 +356,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             for key, _ in repository.open_index(repository.get_transaction_id()).iteritems():
                 data = repository.get(key)
                 hash = sha256(data).digest()
-                if not hash in seen:
+                if hash not in seen:
                     seen.add(hash)
                     num_blocks = num_aes_blocks(len(data) - 41)
                     nonce = bytes_to_long(data[33:41])

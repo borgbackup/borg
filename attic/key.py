@@ -17,6 +17,7 @@ class UnsupportedPayloadError(Error):
     """Unsupported payload type {}. A newer version is required to access this repository.
     """
 
+
 class HMAC(hmac.HMAC):
     """Workaround a bug in Python < 3.4 Where HMAC does not accept memoryviews
     """

@@ -130,6 +130,7 @@ class RemoteRepository:
     def call_many(self, cmd, calls, wait=True, is_preloaded=False):
         if not calls:
             return
+
         def fetch_from_cache(args):
             msgid = self.cache[args].pop(0)
             if not self.cache[args]:
@@ -293,7 +294,7 @@ class RepositoryCache:
         return next(self.get_many([key]))
 
     def get_many(self, keys):
-        unknown_keys = [key for key in keys if not key in self.index]
+        unknown_keys = [key for key in keys if key not in self.index]
         repository_iterator = zip(unknown_keys, self.repository.get_many(unknown_keys))
         for key in keys:
             try:

@@ -7,7 +7,7 @@ import versioneer
 versioneer.versionfile_source = 'attic/_version.py'
 versioneer.versionfile_build = 'attic/_version.py'
 versioneer.tag_prefix = ''
-versioneer.parentdir_prefix = 'Attic-' # dirname like 'myproject-1.2.0'
+versioneer.parentdir_prefix = 'Attic-'  # dirname like 'myproject-1.2.0'
 
 platform = os.uname()[0]
 

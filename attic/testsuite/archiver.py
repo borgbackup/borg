@@ -206,8 +206,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_exclude_caches(self):
         self.attic('init', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)
-        self.create_regular_file('cache1/CACHEDIR.TAG', contents = b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
-        self.create_regular_file('cache2/CACHEDIR.TAG', contents = b'invalid signature')
+        self.create_regular_file('cache1/CACHEDIR.TAG', contents=b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
+        self.create_regular_file('cache2/CACHEDIR.TAG', contents=b'invalid signature')
         self.attic('create', '--exclude-caches', self.repository_location + '::test', 'input')
         with changedir('output'):
             self.attic('extract', self.repository_location + '::test')
@@ -287,10 +287,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.attic('extract', '--dry-run', self.repository_location + '::test')
         self.attic('check', self.repository_location)
         name = sorted(os.listdir(os.path.join(self.tmpdir, 'repository', 'data', '0')), reverse=True)[0]
-        fd = open(os.path.join(self.tmpdir, 'repository', 'data', '0', name), 'r+')
-        fd.seek(100)
-        fd.write('XXXX')
-        fd.close()
+        with open(os.path.join(self.tmpdir, 'repository', 'data', '0', name), 'r+') as fd:
+            fd.seek(100)
+            fd.write('XXXX')
         self.attic('check', self.repository_location, exit_code=1)
 
     def test_readonly_repository(self):
@@ -382,7 +381,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             for key, _ in repository.open_index(repository.get_transaction_id()).iteritems():
                 data = repository.get(key)
                 hash = sha256(data).digest()
-                if not hash in seen:
+                if hash not in seen:
                     seen.add(hash)
                     meta, data, _, _, _, _ = parser(data)
                     num_blocks = num_aes_blocks(len(data))

@@ -141,7 +141,7 @@ class Archive:
             i = 0
             while True:
                 self.checkpoint_name = '%s.checkpoint%s' % (name, i and ('.%d' % i) or '')
-                if not self.checkpoint_name in manifest.archives:
+                if self.checkpoint_name not in manifest.archives:
                     break
                 i += 1
         else:
@@ -211,6 +211,7 @@ class Archive:
             count, size, csize = self.cache.chunks[id]
             stats.update(size, csize, count == 1)
             self.cache.chunks[id] = count - 1, size, csize
+
         def add_file_chunks(chunks):
             for id, _, _ in chunks:
                 add(id)
@@ -555,7 +556,7 @@ class ArchiveChecker:
         self.repository = repository
         self.init_chunks()
         self.key = self.identify_key(repository)
-        if not Manifest.MANIFEST_ID in self.chunks:
+        if Manifest.MANIFEST_ID not in self.chunks:
             self.manifest = self.rebuild_manifest()
         else:
             self.manifest, _ = Manifest.load(repository, key=self.key)
@@ -606,11 +607,11 @@ class ArchiveChecker:
             # Some basic sanity checks of the payload before feeding it into msgpack
             if len(data) < 2 or ((data[0] & 0xf0) != 0x80) or ((data[1] & 0xe0) != 0xa0):
                 continue
-            if not b'cmdline' in data or not b'\xa7version\x01' in data:
+            if b'cmdline' not in data or b'\xa7version\x01' not in data:
                 continue
             try:
                 archive = msgpack.unpackb(data)
-            except:
+            except Exception:
                 continue
             if isinstance(archive, dict) and b'items' in archive and b'cmdline' in archive:
                 self.report_progress('Found archive ' + archive[b'name'].decode('utf-8'), error=True)
@@ -655,7 +656,7 @@ class ArchiveChecker:
             offset = 0
             chunk_list = []
             for chunk_id, size, csize in item[b'chunks']:
-                if not chunk_id in self.chunks:
+                if chunk_id not in self.chunks:
                     # If a file chunk is missing, create an all empty replacement chunk
                     self.report_progress('{}: Missing file chunk detected (Byte {}-{})'.format(item[b'path'].decode('utf-8', 'surrogateescape'), offset, offset + size), error=True)
                     data = bytes(size)
@@ -676,11 +677,13 @@ class ArchiveChecker:
             """
             unpacker = RobustUnpacker(lambda item: isinstance(item, dict) and b'path' in item)
             _state = 0
+
             def missing_chunk_detector(chunk_id):
                 nonlocal _state
-                if _state % 2 != int(not chunk_id in self.chunks):
+                if _state % 2 != int(chunk_id not in self.chunks):
                     _state += 1
                 return _state
+
             for state, items in groupby(archive[b'items'], missing_chunk_detector):
                 items = list(items)
                 if state % 2:
@@ -701,7 +704,7 @@ class ArchiveChecker:
         for i, (name, info) in enumerate(archive_items[:end]):
             self.report_progress('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
             archive_id = info[b'id']
-            if not archive_id in self.chunks:
+            if archive_id not in self.chunks:
                 self.report_progress('Archive metadata block is missing', error=True)
                 del self.manifest.archives[name]
                 continue

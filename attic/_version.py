@@ -15,7 +15,6 @@ git_full = "$Format:%H$"
 
 
 import subprocess
-import sys
 
 
 def run_command(args, cwd=None, verbose=False):

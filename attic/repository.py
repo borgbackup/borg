@@ -3,7 +3,6 @@ from binascii import hexlify
 from itertools import islice
 import errno
 import os
-import shutil
 import struct
 import sys
 from zlib import crc32

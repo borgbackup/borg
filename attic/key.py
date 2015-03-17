@@ -44,7 +44,7 @@ def key_factory(repository, manifest_data):
         raise UnsupportedPayloadError(manifest_data[0])
 
 
-class KeyBase(object):
+class KeyBase:
 
     def __init__(self):
         self.TYPE_STR = bytes([self.TYPE])

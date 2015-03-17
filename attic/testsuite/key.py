@@ -11,7 +11,7 @@ from attic.helpers import Location, unhexlify
 
 class KeyTestCase(AtticTestCase):
 
-    class MockArgs(object):
+    class MockArgs:
         repository = Location(tempfile.mkstemp()[1])
 
     keyfile2_key_file = """
@@ -37,8 +37,8 @@ class KeyTestCase(AtticTestCase):
     def tearDown(self):
         shutil.rmtree(self.tmppath)
 
-    class MockRepository(object):
-        class _Location(object):
+    class MockRepository:
+        class _Location:
             orig = '/some/place'
 
         _location = _Location()

@@ -23,7 +23,7 @@ class PathNotAllowed(Error):
     """Repository path not allowed"""
 
 
-class RepositoryServer(object):
+class RepositoryServer:
 
     def __init__(self, restrict_to_paths):
         self.repository = None
@@ -78,7 +78,7 @@ class RepositoryServer(object):
         return self.repository.id
 
 
-class RemoteRepository(object):
+class RemoteRepository:
     extra_test_args = []
 
     class RPCError(Exception):

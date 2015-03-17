@@ -19,7 +19,7 @@ TAG_DELETE = 1
 TAG_COMMIT = 2
 
 
-class Repository(object):
+class Repository:
     """Filesystem based transactional key value store
 
     On disk layout:
@@ -378,7 +378,7 @@ class Repository(object):
         """
 
 
-class LoggedIO(object):
+class LoggedIO:
 
     header_fmt = struct.Struct('<IIB')
     assert header_fmt.size == 9

@@ -125,7 +125,7 @@ class UpgradableLockTestCase(AtticTestCase):
         lock.release()
 
 
-class MockArchive(object):
+class MockArchive:
 
     def __init__(self, ts):
         self.ts = ts

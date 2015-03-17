@@ -262,10 +262,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.attic('extract', '--dry-run', self.repository_location + '::test')
         self.attic('check', self.repository_location)
         name = sorted(os.listdir(os.path.join(self.tmpdir, 'repository', 'data', '0')), reverse=True)[0]
-        fd = open(os.path.join(self.tmpdir, 'repository', 'data', '0', name), 'r+')
-        fd.seek(100)
-        fd.write('XXXX')
-        fd.close()
+        with open(os.path.join(self.tmpdir, 'repository', 'data', '0', name), 'r+') as fd:
+            fd.seek(100)
+            fd.write('XXXX')
         self.attic('check', self.repository_location, exit_code=1)
 
     def test_readonly_repository(self):

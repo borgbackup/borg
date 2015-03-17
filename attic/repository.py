@@ -33,19 +33,19 @@ class Repository:
     DEFAULT_SEGMENTS_PER_DIR = 10000
 
     class DoesNotExist(Error):
-        """Repository {} does not exist"""
+        """Repository {} does not exist."""
 
     class AlreadyExists(Error):
-        """Repository {} already exists"""
+        """Repository {} already exists."""
 
     class InvalidRepository(Error):
-        """{} is not a valid repository"""
+        """{} is not a valid repository."""
 
     class CheckNeeded(Error):
-        '''Inconsistency detected. Please run "attic check {}"'''
+        """Inconsistency detected. Please run "attic check {}"."""
 
     class ObjectNotFound(Error):
-        """Object with key {} not found in repository {}"""
+        """Object with key {} not found in repository {}."""
 
     def __init__(self, path, create=False, exclusive=False):
         self.path = path

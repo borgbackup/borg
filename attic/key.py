@@ -658,7 +658,7 @@ def parser03(all_data):  # new & flexible
     meta is a Meta namedtuple and contains all required information about data.
     data is maybe compressed (see meta) and maybe encrypted (see meta).
     """
-    max_len = 2000000  # XXX formula?
+    max_len = 10000000  # XXX formula?
     unpacker = msgpack.Unpacker(
         use_list=False,
         # avoid memory allocation issues causes by tampered input data.

@@ -131,10 +131,10 @@ class Archive:
         self.name = name
         self.checkpoint_interval = checkpoint_interval
         self.numeric_owner = numeric_owner
-        self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
         self.pipeline = DownloadPipeline(self.repository, self.key)
-        self.chunker = Chunker(WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, self.key.chunk_seed)
         if create:
+            self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
+            self.chunker = Chunker(WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, self.key.chunk_seed)
             if name in manifest.archives:
                 raise self.AlreadyExists(name)
             self.last_checkpoint = time.time()

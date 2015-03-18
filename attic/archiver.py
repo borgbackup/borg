@@ -252,8 +252,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         """Mount archive or an entire repository as a FUSE fileystem"""
         try:
             from attic.fuse import AtticOperations
-        except ImportError:
-            self.print_error('the "llfuse" module is required to use this feature')
+        except ImportError as e:
+            self.print_error('loading fuse support failed [ImportError: %s]' % str(e))
             return self.exit_code
 
         if not os.path.isdir(args.mountpoint) or not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):

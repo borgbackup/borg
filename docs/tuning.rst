@@ -28,6 +28,14 @@ Maybe you don't want to backup:
 
 You can exclude these, so they don't waste time and space.
 
+Avoid scrolling
+---------------
+If you do benchmarks, avoid creating a lot of log output, especially if it
+means scrolling text in a window on a graphical user interface.
+
+Rather use much less log output or at least redirect the output to a log file,
+that is also much faster than scrolling.
+
 Speed (in general)
 ------------------
 Keep an eye on CPU and I/O bounds. Try to find the sweet spot in the middle

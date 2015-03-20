@@ -450,7 +450,8 @@ class Archive:
             return open(p, 'rb')
 
         def open_noatime_if_owner(p, s):
-            if s.st_uid == euid:
+            if euid == 0 or s.st_uid == euid:
+                # we are root or owner of file
                 return os.fdopen(os.open(p, flags_noatime), 'rb')
             else:
                 return open(p, 'rb')
@@ -463,6 +464,7 @@ class Archive:
                 fo = open(p, 'rb')
                 # Yes, it was -- otherwise the above line would have thrown
                 # another exception.
+                nonlocal euid
                 euid = os.geteuid()
                 # So in future, let's check whether the file is owned by us
                 # before attempting to use O_NOATIME.

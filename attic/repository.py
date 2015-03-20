@@ -446,7 +446,7 @@ class LoggedIO(object):
         with open(filename, 'rb') as fd:
             try:
                 fd.seek(-self.header_fmt.size, os.SEEK_END)
-            except Exception as e:
+            except OSError as e:
                 # return False if segment file is empty or too small
                 if e.errno == errno.EINVAL:
                     return False

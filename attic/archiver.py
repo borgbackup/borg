@@ -750,6 +750,9 @@ def main():
     except Error as e:
         archiver.print_error(e.get_message())
         exit_code = e.exit_code
+    except RemoteRepository.RPCError as e:
+        print(e)
+        exit_code = 1
     except KeyboardInterrupt:
         archiver.print_error('Error: Keyboard interrupt')
         exit_code = 1

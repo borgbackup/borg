@@ -7,6 +7,9 @@ import shutil
 from subprocess import Popen, PIPE
 import sys
 import tempfile
+import traceback
+
+from attic import __version__
 
 from .hashindex import NSIndex
 from .helpers import Error, IntegrityError
@@ -52,8 +55,9 @@ class RepositoryServer(object):
                         except AttributeError:
                             f = getattr(self.repository, method)
                         res = f(*args)
-                    except Exception as e:
-                        sys.stdout.buffer.write(msgpack.packb((1, msgid, e.__class__.__name__, e.args)))
+                    except BaseException as e:
+                        exc = "Remote Traceback by Attic %s%s%s" % (__version__, os.linesep, traceback.format_exc())
+                        sys.stdout.buffer.write(msgpack.packb((1, msgid, e.__class__.__name__, exc)))
                     else:
                         sys.stdout.buffer.write(msgpack.packb((1, msgid, None, res)))
                     sys.stdout.flush()
@@ -157,7 +161,7 @@ class RemoteRepository(object):
                             raise PathNotAllowed(*res)
                         if error == b'ObjectNotFound':
                             raise Repository.ObjectNotFound(res[0], self.location.orig)
-                        raise self.RPCError(error)
+                        raise self.RPCError(res.decode('utf-8'))
                     else:
                         yield res
                         if not waiting_for and not calls:

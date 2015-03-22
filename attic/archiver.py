@@ -166,8 +166,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         elif stat.S_ISDIR(st.st_mode):
             if exclude_caches and is_cachedir(path):
                 return
-            archive.process_item(path, st)
-            status = 'd'  # directory
+            status = archive.process_dir(path, st)
             try:
                 entries = os.listdir(path)
             except OSError as e:
@@ -179,8 +178,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         elif stat.S_ISLNK(st.st_mode):
             status = archive.process_symlink(path, st)
         elif stat.S_ISFIFO(st.st_mode):
-            archive.process_item(path, st)
-            status = 'f'  # fifo
+            status = archive.process_fifo(path, st)
         elif stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
             status = archive.process_dev(path, st)
         else:

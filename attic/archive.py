@@ -365,28 +365,33 @@ class Archive:
         acl_get(path, item, st, self.numeric_owner)
         return item
 
-    def process_item(self, path, st):
+    def process_dir(self, path, st):
         item = {b'path': make_path_safe(path)}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
+        return 'd'  # directory
+
+    def process_fifo(self, path, st):
+        item = {b'path': make_path_safe(path)}
+        item.update(self.stat_attrs(st, path))
+        self.add_item(item)
+        return 'f'  # fifo
 
     def process_dev(self, path, st):
         item = {b'path': make_path_safe(path), b'rdev': st.st_rdev}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
         if stat.S_ISCHR(st.st_mode):
-            status = 'c'  # char device
+            return 'c'  # char device
         elif stat.S_ISBLK(st.st_mode):
-            status = 'b'  # block device
-        return status
+            return 'b'  # block device
 
     def process_symlink(self, path, st):
         source = os.readlink(path)
         item = {b'path': make_path_safe(path), b'source': source}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
-        status = 's'  # symlink
-        return status
+        return 's'  # symlink
 
     def process_file(self, path, st, cache):
         status = None

@@ -1,0 +1,23 @@
+Stuff in merge-all and not in merge minus minor changes:
+
+added tuning docs
+
+attic init --compression NN --cipher NN --mac NN ...
+(see attic init --help)
+
+new hashes:      sha512_256
+                 ghash (default)
+new MACs:        hmac-sha512-256
+                 gmac (default)
+new ciphers:     aes256-ctr + hmac-sha512-256
+                 aes256-gcm (default)
+new compression: no compression (default)
+                 zlib level 1..9 (previously, level 6 was hardcoded)
+                 lzma preset 0..9
+
+source: more flexible type 0x03 header format, allowing to give hash algo,
+compression algo and level, encryption algo, key type.
+
+source: less hardcoding, numeric offsets / lengths
+source: flexible hashing, compression, encryption, key dispatching
+

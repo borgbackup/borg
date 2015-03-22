@@ -369,21 +369,33 @@ class Archive:
         acl_get(path, item, st, self.numeric_owner)
         return item
 
-    def process_item(self, path, st):
+    def process_dir(self, path, st):
         item = {b'path': make_path_safe(path)}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
+        return 'd'  # directory
+
+    def process_fifo(self, path, st):
+        item = {b'path': make_path_safe(path)}
+        item.update(self.stat_attrs(st, path))
+        self.add_item(item)
+        return 'f'  # fifo
 
     def process_dev(self, path, st):
         item = {b'path': make_path_safe(path), b'rdev': st.st_rdev}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
+        if stat.S_ISCHR(st.st_mode):
+            return 'c'  # char device
+        elif stat.S_ISBLK(st.st_mode):
+            return 'b'  # block device
 
     def process_symlink(self, path, st):
         source = os.readlink(path)
         item = {b'path': make_path_safe(path), b'source': source}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
+        return 's'  # symlink
 
     def process_stdin(self, path, cache):
         uid, gid = 0, 0
@@ -403,6 +415,7 @@ class Archive:
         self.add_item(item)
 
     def process_file(self, path, st, cache):
+        status = None
         safe_path = make_path_safe(path)
         # Is it a hard link?
         if st.st_nlink > 1:
@@ -411,7 +424,8 @@ class Archive:
                 item = self.stat_attrs(st, path)
                 item.update({b'path': safe_path, b'source': source})
                 self.add_item(item)
-                return
+                status = 'h'  # regular file, hardlink (to already seen inodes)
+                return status
             else:
                 self.hard_links[st.st_ino, st.st_dev] = safe_path
         path_hash = self.key.id_hash(os.path.join(self.cwd, path).encode('utf-8', 'surrogateescape'))
@@ -424,6 +438,9 @@ class Archive:
                     break
             else:
                 chunks = [cache.chunk_incref(id_, self.stats) for id_ in ids]
+                status = 'U'  # regular file, unchanged
+        else:
+            status = 'A'  # regular file, added
         # Only chunkify the file if needed
         if chunks is None:
             with Archive._open_rb(path, st) as fd:
@@ -431,10 +448,12 @@ class Archive:
                 for chunk in self.chunker.chunkify(fd):
                     chunks.append(cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats))
             cache.memorize_file(path_hash, st, [c[0] for c in chunks])
+            status = status or 'M'  # regular file, modified (if not 'A' already)
         item = {b'path': safe_path, b'chunks': chunks}
         item.update(self.stat_attrs(st, path))
         self.stats.nfiles += 1
         self.add_item(item)
+        return status
 
     @staticmethod
     def list_archives(repository, key, manifest, cache=None):

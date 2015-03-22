@@ -24,7 +24,7 @@ from attic.helpers import IntegrityError, get_keys_dir, Error
 # zero anyway as the full IV is a 128bit counter. PREFIX are the upper 8 bytes,
 # stored_iv are the lower 8 Bytes.
 PREFIX = b'\0' * 8
-Meta = namedtuple('Meta', 'compr_type, key_type, mac_type, cipher_type, hmac, stored_iv')
+Meta = namedtuple('Meta', 'compr_type, key_type, mac_type, cipher_type, stored_iv')
 
 
 class UnsupportedPayloadError(Error):
@@ -300,19 +300,19 @@ class KeyBase(object):
 
     def encrypt(self, data):
         data = self.compressor.compress(data)
-        tag, iv_last8, data = self.cipher.compute_tag_and_encrypt(data)
+        mac, iv_last8, data = self.cipher.compute_tag_and_encrypt(data)
         meta = Meta(compr_type=self.compressor.TYPE, key_type=self.TYPE,
                     mac_type=self.maccer_cls.TYPE, cipher_type=self.cipher.TYPE,
-                    hmac=tag, stored_iv=iv_last8)
-        return generate(meta, data)
+                    stored_iv=iv_last8)
+        return generate(mac, meta, data)
 
     def decrypt(self, id, data):
-        meta, data = parser(data)
+        mac, meta, data = parser(data)
         compressor, keyer, maccer, cipher = get_implementations(meta)
         assert isinstance(self, keyer)
         assert self.maccer_cls is maccer
         assert self.cipher_cls is cipher
-        data = self.cipher.check_tag_and_decrypt(meta.hmac, meta.stored_iv, data)
+        data = self.cipher.check_tag_and_decrypt(mac, meta.stored_iv, data)
         data = self.compressor.decompress(data)
         if id and self.id_hash(data) != id:
             raise IntegrityError('Chunk id verification failed')
@@ -334,7 +334,7 @@ class PlaintextKey(KeyBase):
 
     @classmethod
     def detect(cls, repository, manifest_data):
-        meta, data = parser(manifest_data)
+        mac, meta, data = parser(manifest_data)
         compressor, keyer, maccer, cipher = get_implementations(meta)
         return cls(compressor, maccer, cipher)
 
@@ -353,7 +353,7 @@ class AESKeyBase(KeyBase):
     only 295 exabytes!
     """
     def extract_nonce(self, payload):
-        meta, data = parser(payload)
+        mac, meta, data = parser(payload)
         nonce = bytes_to_long(meta.stored_iv)
         return nonce
 
@@ -406,7 +406,7 @@ class PassphraseKey(AESKeyBase):
     @classmethod
     def detect(cls, repository, manifest_data):
         prompt = 'Enter passphrase for %s: ' % repository._location.orig
-        meta, data = parser(manifest_data)
+        mac, meta, data = parser(manifest_data)
         compressor, keyer, maccer, cipher = get_implementations(meta)
         key = cls(compressor, maccer, cipher)
         passphrase = os.environ.get('ATTIC_PASSPHRASE')
@@ -439,7 +439,7 @@ class KeyfileKey(AESKeyBase):
 
     @classmethod
     def detect(cls, repository, manifest_data):
-        meta, data = parser(manifest_data)
+        mac, meta, data = parser(manifest_data)
         compressor, keyer, maccer, cipher = get_implementations(meta)
         key = cls(compressor, maccer, cipher)
         path = cls.find_key_file(repository)
@@ -630,17 +630,17 @@ def legacy_parser(all_data, key_type):  # all rather hardcoded
     """
     offset = 1
     if key_type == PlaintextKey.TYPE:
-        hmac = None
-        iv = stored_iv = None
+        mac = None
+        stored_iv = None
         data = all_data[offset:]
     else:
-        hmac = all_data[offset:offset+32]
+        mac = all_data[offset:offset+32]
         stored_iv = all_data[offset+32:offset+40]
         data = all_data[offset+40:]
     meta = Meta(compr_type=6, key_type=key_type,
                 mac_type=HMAC_SHA256.TYPE, cipher_type=AES_CTR_HMAC.TYPE,
-                hmac=hmac, stored_iv=stored_iv)
-    return meta, data
+                stored_iv=stored_iv)
+    return mac, meta, data
 
 def parser00(all_data):
     return legacy_parser(all_data, KeyfileKey.TYPE)
@@ -655,7 +655,7 @@ def parser02(all_data):
 def parser03(all_data):  # new & flexible
     """
     Payload layout:
-    always: TYPE(1) + MSGPACK((meta, data))
+    always: TYPE(1) + MSGPACK((tag, meta, data))
 
     meta is a Meta namedtuple and contains all required information about data.
     data is maybe compressed (see meta) and maybe encrypted (see meta).
@@ -672,9 +672,9 @@ def parser03(all_data):  # new & flexible
         max_ext_len=0,  # not used yet
         )
     unpacker.feed(all_data[1:])
-    meta_tuple, data = unpacker.unpack()
+    mac, meta_tuple, data = unpacker.unpack()
     meta = Meta(*meta_tuple)
-    return meta, data
+    return mac, meta, data
 
 
 def parser(data):
@@ -690,14 +690,14 @@ def parser(data):
 
 
 def key_factory(repository, manifest_data):
-    meta, data = parser(manifest_data)
+    mac, meta, data = parser(manifest_data)
     compressor, keyer, maccer, cipher = get_implementations(meta)
     return keyer.detect(repository, manifest_data)
 
 
-def generate(meta, data):
+def generate(mac, meta, data):
     # always create new-style 0x03 format
-    return b'\x03' + msgpack.packb((meta, data), use_bin_type=True)
+    return b'\x03' + msgpack.packb((mac, meta, data), use_bin_type=True)
 
 
 def compressor_creator(args):

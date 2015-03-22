@@ -385,7 +385,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                     seen.add(hash)
                     mac, meta, data = parser(data)
                     num_blocks = num_aes_blocks(len(data))
-                    nonce = bytes_to_long(meta.stored_iv)
+                    nonce = bytes_to_long(meta.iv, 8)
                     for counter in range(nonce, nonce + num_blocks):
                         self.assert_not_in(counter, used)
                         used.add(counter)

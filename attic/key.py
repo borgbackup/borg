@@ -24,7 +24,7 @@ from attic.helpers import IntegrityError, get_keys_dir, Error
 # zero anyway as the full IV is a 128bit counter. PREFIX are the upper 8 bytes,
 # stored_iv are the lower 8 Bytes.
 PREFIX = b'\0' * 8
-Meta = namedtuple('Meta', 'compr_type, key_type, mac_type, cipher_type, stored_iv')
+Meta = namedtuple('Meta', 'compr_type, key_type, mac_type, cipher_type, iv, legacy')
 
 
 class UnsupportedPayloadError(Error):
@@ -198,15 +198,44 @@ COMPR_DEFAULT = NullCompressor.TYPE # no compression
 
 class PLAIN:
     TYPE = 0
+    enc_iv = None  # dummy
 
     def __init__(self, **kw):
         pass
 
-    def compute_mac_and_encrypt(self, data):
-        return b'', b'', data
+    def compute_mac_and_encrypt(self, meta, data):
+        return None, data
 
-    def check_mac_and_decrypt(self, mac, iv_last8, data):
+    def check_mac_and_decrypt(self, mac, meta, data):
         return data
+
+
+def increment_iv(iv, amount):
+    """
+    increment the given IV considering that <amount> bytes of data was
+    encrypted based on it. In CTR / GCM mode, the IV is just a counter and
+    must never repeat.
+
+    :param iv: current IV, 16 bytes (128 bit)
+    :param amount: amount of data (in bytes) that was encrypted
+    :return: new IV, 16 bytes (128 bit)
+    """
+    # TODO: code assumes that the last 8 bytes are enough, the upper 8 always zero
+    iv_last8 = iv[8:]
+    current_iv = bytes_to_long(iv_last8)
+    new_iv = current_iv + num_aes_blocks(amount)
+    iv_last8 = long_to_bytes(new_iv)
+    iv = PREFIX + iv_last8
+    return iv
+
+
+def get_aad(meta):
+    """get additional authenticated data for AEAD ciphers"""
+    if meta.legacy:
+        # legacy format computed the mac over (iv_last8 +  data)
+        return meta.iv[8:]
+    else:
+        return msgpack.packb(meta)
 
 
 class AES_CTR_HMAC:
@@ -218,21 +247,19 @@ class AES_CTR_HMAC:
         self.enc_cipher = AES(mode=AES_CTR_MODE, is_encrypt=True, key=enc_key, iv=enc_iv)
         self.dec_cipher = AES(mode=AES_CTR_MODE, is_encrypt=False, key=enc_key)
 
-    def compute_mac_and_encrypt(self, data):
-        self.enc_cipher.reset(iv=self.enc_iv)
-        iv_last8 = self.enc_iv[8:]
+    def compute_mac_and_encrypt(self, meta, data):
+        self.enc_cipher.reset(iv=meta.iv)
         _, data = self.enc_cipher.compute_mac_and_encrypt(data)
-        # increase the IV (counter) value so same value is never used twice
-        current_iv = bytes_to_long(iv_last8)
-        self.enc_iv = PREFIX + long_to_bytes(current_iv + num_aes_blocks(len(data)))
-        mac = HMAC(self.hmac_key, iv_last8 + data, sha256).digest()  # XXX mac / hash flexibility
-        return mac, iv_last8, data
+        self.enc_iv = increment_iv(meta.iv, len(data))
+        aad = get_aad(meta)
+        mac = HMAC(self.hmac_key, aad + data, sha256).digest()  # XXX mac / hash flexibility
+        return mac, data
 
-    def check_mac_and_decrypt(self, mac, iv_last8, data):
-        iv = PREFIX + iv_last8
-        if HMAC(self.hmac_key, iv_last8 + data, sha256).digest() != mac:
+    def check_mac_and_decrypt(self, mac, meta, data):
+        aad = get_aad(meta)
+        if HMAC(self.hmac_key, aad + data, sha256).digest() != mac:
             raise IntegrityError('Encryption envelope checksum mismatch')
-        self.dec_cipher.reset(iv=iv)
+        self.dec_cipher.reset(iv=meta.iv)
         data = self.dec_cipher.check_mac_and_decrypt(None, data)
         return data
 
@@ -246,20 +273,18 @@ class AES_GCM:
         self.enc_cipher = AES(mode=AES_GCM_MODE, is_encrypt=True, key=enc_key, iv=enc_iv)
         self.dec_cipher = AES(mode=AES_GCM_MODE, is_encrypt=False, key=enc_key)
 
-    def compute_mac_and_encrypt(self, data):
-        self.enc_cipher.reset(iv=self.enc_iv)
-        iv_last8 = self.enc_iv[8:]
-        self.enc_cipher.add(iv_last8)
+    def compute_mac_and_encrypt(self, meta, data):
+        self.enc_cipher.reset(iv=meta.iv)
+        aad = get_aad(meta)
+        self.enc_cipher.add(aad)
         mac, data = self.enc_cipher.compute_mac_and_encrypt(data)
-        # increase the IV (counter) value so same value is never used twice
-        current_iv = bytes_to_long(iv_last8)
-        self.enc_iv = PREFIX + long_to_bytes(current_iv + num_aes_blocks(len(data)))
-        return mac, iv_last8, data
+        self.enc_iv = increment_iv(meta.iv, len(data))
+        return mac, data
 
-    def check_mac_and_decrypt(self, mac, iv_last8, data):
-        iv = PREFIX + iv_last8
-        self.dec_cipher.reset(iv=iv)
-        self.dec_cipher.add(iv_last8)
+    def check_mac_and_decrypt(self, mac, meta, data):
+        self.dec_cipher.reset(iv=meta.iv)
+        aad = get_aad(meta)
+        self.dec_cipher.add(aad)
         try:
             data = self.dec_cipher.check_mac_and_decrypt(mac, data)
         except Exception:
@@ -300,10 +325,10 @@ class KeyBase(object):
 
     def encrypt(self, data):
         data = self.compressor.compress(data)
-        mac, iv_last8, data = self.cipher.compute_mac_and_encrypt(data)
         meta = Meta(compr_type=self.compressor.TYPE, key_type=self.TYPE,
                     mac_type=self.maccer_cls.TYPE, cipher_type=self.cipher.TYPE,
-                    stored_iv=iv_last8)
+                    iv=self.cipher.enc_iv, legacy=False)
+        mac, data = self.cipher.compute_mac_and_encrypt(meta, data)
         return generate(mac, meta, data)
 
     def decrypt(self, id, data):
@@ -312,7 +337,7 @@ class KeyBase(object):
         assert isinstance(self, keyer)
         assert self.maccer_cls is maccer
         assert self.cipher_cls is cipher
-        data = self.cipher.check_mac_and_decrypt(mac, meta.stored_iv, data)
+        data = self.cipher.check_mac_and_decrypt(mac, meta, data)
         data = self.compressor.decompress(data)
         if id and self.id_hash(data) != id:
             raise IntegrityError('Chunk id verification failed')
@@ -352,10 +377,9 @@ class AESKeyBase(KeyBase):
     affect security but limits the maximum repository capacity to
     only 295 exabytes!
     """
-    def extract_nonce(self, payload):
-        mac, meta, data = parser(payload)
-        nonce = bytes_to_long(meta.stored_iv)
-        return nonce
+    def extract_iv(self, payload):
+        _, meta, _ = parser(payload)
+        return meta.iv
 
     def init_from_random_data(self, data):
         self.enc_key = data[0:32]
@@ -416,8 +440,7 @@ class PassphraseKey(AESKeyBase):
             key.init(repository, passphrase)
             try:
                 key.decrypt(None, manifest_data)
-                num_blocks = num_aes_blocks(len(data))
-                key.init_ciphers(PREFIX + long_to_bytes(key.extract_nonce(manifest_data) + num_blocks))
+                key.init_ciphers(increment_iv(key.extract_iv(manifest_data), len(data)))
                 return key
             except IntegrityError:
                 passphrase = getpass(prompt)
@@ -447,8 +470,7 @@ class KeyfileKey(AESKeyBase):
         passphrase = os.environ.get('ATTIC_PASSPHRASE', '')
         while not key.load(path, passphrase):
             passphrase = getpass(prompt)
-        num_blocks = num_aes_blocks(len(data))
-        key.init_ciphers(PREFIX + long_to_bytes(key.extract_nonce(manifest_data) + num_blocks))
+        key.init_ciphers(increment_iv(key.extract_iv(manifest_data), len(data)))
         return key
 
     @classmethod
@@ -631,15 +653,15 @@ def legacy_parser(all_data, key_type):  # all rather hardcoded
     offset = 1
     if key_type == PlaintextKey.TYPE:
         mac = None
-        stored_iv = None
+        iv = None
         data = all_data[offset:]
     else:
         mac = all_data[offset:offset+32]
-        stored_iv = all_data[offset+32:offset+40]
+        iv = PREFIX + all_data[offset+32:offset+40]
         data = all_data[offset+40:]
     meta = Meta(compr_type=6, key_type=key_type,
                 mac_type=HMAC_SHA256.TYPE, cipher_type=AES_CTR_HMAC.TYPE,
-                stored_iv=stored_iv)
+                iv=iv, legacy=True)
     return mac, meta, data
 
 def parser00(all_data):

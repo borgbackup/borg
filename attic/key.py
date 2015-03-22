@@ -652,16 +652,19 @@ def legacy_parser(all_data, key_type):  # all rather hardcoded
     """
     offset = 1
     if key_type == PlaintextKey.TYPE:
+        mac_type = SHA256.TYPE
         mac = None
+        cipher_type = PLAIN.TYPE
         iv = None
         data = all_data[offset:]
     else:
+        mac_type = HMAC_SHA256.TYPE
         mac = all_data[offset:offset+32]
+        cipher_type = AES_CTR_HMAC.TYPE
         iv = PREFIX + all_data[offset+32:offset+40]
         data = all_data[offset+40:]
-    meta = Meta(compr_type=6, key_type=key_type,
-                mac_type=HMAC_SHA256.TYPE, cipher_type=AES_CTR_HMAC.TYPE,
-                iv=iv, legacy=True)
+    meta = Meta(compr_type=6, key_type=key_type, mac_type=mac_type,
+                cipher_type=cipher_type, iv=iv, legacy=True)
     return mac, meta, data
 
 def parser00(all_data):

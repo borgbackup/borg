@@ -48,7 +48,7 @@ class CryptoTestCase(AtticTestCase):
         # encrypt
         aes = AES(mode=AES_GCM_MODE, is_encrypt=True, key=key, iv=iv)
         mac, cdata = aes.compute_mac_and_encrypt(data)
-        self.assert_equal(hexlify(mac), b'c98aa10eb6b7031bcc2160878d9438fb00000000000000000000000000000000')
+        self.assert_equal(hexlify(mac), b'c98aa10eb6b7031bcc2160878d9438fb')
         self.assert_equal(hexlify(cdata), b'841bcce405df769d22ee9f7f012edf5dc7fb2594d924c7400ffd050f2741')
         # decrypt (correct mac/cdata)
         aes = AES(mode=AES_GCM_MODE, is_encrypt=False, key=key, iv=iv)

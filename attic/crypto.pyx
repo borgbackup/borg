@@ -179,8 +179,7 @@ cdef class AES:
                 # Get tag (mac) - only GCM mode. for CTR, the returned mac is undefined
                 if not EVP_CIPHER_CTX_ctrl(&self.ctx, EVP_CTRL_GCM_GET_TAG, MAC_SIZE, mac):
                     raise Exception('EVP_CIPHER_CTX_ctrl GET TAG failed')
-            # hack: caller wants 32B tags (256b), so we give back that amount
-            return (mac[:MAC_SIZE] + b'\x00'*16), out[:ctl]
+            return (mac[:MAC_SIZE]), out[:ctl]
         finally:
             free(mac)
             free(out)

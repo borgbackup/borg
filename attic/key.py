@@ -112,7 +112,7 @@ class GHASH:
         # GMAC = aes-gcm with all data as AAD, no data as to-be-encrypted data
         mac_cipher.add(bytes(self.data))
         hash, _ = mac_cipher.compute_mac_and_encrypt(b'')
-        return hash
+        return hash + b'\0'*16  # XXX hashindex code wants 32 bytes (256 bit)
 
 
 class HMAC_SHA256(HMAC):

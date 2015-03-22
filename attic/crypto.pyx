@@ -10,7 +10,7 @@ API_VERSION = 2
 AES_CTR_MODE = 1
 AES_GCM_MODE = 2
 
-TAG_SIZE = 16  # bytes; 128 bits is the maximum allowed value. see "hack" below.
+MAC_SIZE = 16  # bytes; 128 bits is the maximum allowed value. see "hack" below.
 IV_SIZE = 16  # bytes; 128 bits
 
 cdef extern from "openssl/rand.h":
@@ -159,13 +159,13 @@ cdef class AES:
             if not EVP_DecryptUpdate(&self.ctx, NULL, &outl, aad, aadl):
                 raise Exception('EVP_DecryptUpdate failed')
 
-    def compute_tag_and_encrypt(self, data):
+    def compute_mac_and_encrypt(self, data):
         cdef int inl = len(data)
         cdef int ctl = 0
         cdef int outl = 0
         # note: modes that use padding, need up to one extra AES block (16B)
         cdef unsigned char *out = <unsigned char *>malloc(inl+16)
-        cdef unsigned char *tag = <unsigned char *>malloc(TAG_SIZE)
+        cdef unsigned char *mac = <unsigned char *>malloc(MAC_SIZE)
         if not out:
             raise MemoryError
         try:
@@ -176,16 +176,16 @@ cdef class AES:
                 raise Exception('EVP_EncryptFinal failed')
             ctl += outl
             if self.mode == AES_GCM_MODE:
-                # Get tag (only GCM mode. for CTR, the returned tag is undefined)
-                if not EVP_CIPHER_CTX_ctrl(&self.ctx, EVP_CTRL_GCM_GET_TAG, TAG_SIZE, tag):
+                # Get tag (mac) - only GCM mode. for CTR, the returned mac is undefined
+                if not EVP_CIPHER_CTX_ctrl(&self.ctx, EVP_CTRL_GCM_GET_TAG, MAC_SIZE, mac):
                     raise Exception('EVP_CIPHER_CTX_ctrl GET TAG failed')
             # hack: caller wants 32B tags (256b), so we give back that amount
-            return (tag[:TAG_SIZE] + b'\x00'*16), out[:ctl]
+            return (mac[:MAC_SIZE] + b'\x00'*16), out[:ctl]
         finally:
-            free(tag)
+            free(mac)
             free(out)
 
-    def check_tag_and_decrypt(self, tag, data):
+    def check_mac_and_decrypt(self, mac, data):
         cdef int inl = len(data)
         cdef int ptl = 0
         cdef int outl = 0
@@ -200,11 +200,11 @@ cdef class AES:
                 raise Exception('EVP_DecryptUpdate failed')
             ptl = outl
             if self.mode == AES_GCM_MODE:
-                # Set expected tag value.
-                if not EVP_CIPHER_CTX_ctrl(&self.ctx, EVP_CTRL_GCM_SET_TAG, TAG_SIZE, tag):
+                # Set expected tag (mac) value.
+                if not EVP_CIPHER_CTX_ctrl(&self.ctx, EVP_CTRL_GCM_SET_TAG, MAC_SIZE, mac):
                     raise Exception('EVP_CIPHER_CTX_ctrl SET TAG failed')
             if EVP_DecryptFinal_ex(&self.ctx, out+ptl, &outl) <= 0:
-                # for GCM mode, a failure here means corrupted / tampered tag or data
+                # for GCM mode, a failure here means corrupted / tampered tag (mac) or data
                 raise Exception('EVP_DecryptFinal failed')
             ptl += outl
             return out[:ptl]

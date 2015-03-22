@@ -111,8 +111,8 @@ class GHASH:
         mac_cipher = AES(mode=AES_GCM_MODE, is_encrypt=True, key=self.key, iv=b'\0' * 16)
         # GMAC = aes-gcm with all data as AAD, no data as to-be-encrypted data
         mac_cipher.add(bytes(self.data))
-        tag, _ = mac_cipher.compute_tag_and_encrypt(b'')
-        return tag
+        hash, _ = mac_cipher.compute_mac_and_encrypt(b'')
+        return hash
 
 
 class HMAC_SHA256(HMAC):
@@ -202,10 +202,10 @@ class PLAIN:
     def __init__(self, **kw):
         pass
 
-    def compute_tag_and_encrypt(self, data):
+    def compute_mac_and_encrypt(self, data):
         return b'', b'', data
 
-    def check_tag_and_decrypt(self, tag, iv_last8, data):
+    def check_mac_and_decrypt(self, mac, iv_last8, data):
         return data
 
 
@@ -218,22 +218,22 @@ class AES_CTR_HMAC:
         self.enc_cipher = AES(mode=AES_CTR_MODE, is_encrypt=True, key=enc_key, iv=enc_iv)
         self.dec_cipher = AES(mode=AES_CTR_MODE, is_encrypt=False, key=enc_key)
 
-    def compute_tag_and_encrypt(self, data):
+    def compute_mac_and_encrypt(self, data):
         self.enc_cipher.reset(iv=self.enc_iv)
         iv_last8 = self.enc_iv[8:]
-        _, data = self.enc_cipher.compute_tag_and_encrypt(data)
+        _, data = self.enc_cipher.compute_mac_and_encrypt(data)
         # increase the IV (counter) value so same value is never used twice
         current_iv = bytes_to_long(iv_last8)
         self.enc_iv = PREFIX + long_to_bytes(current_iv + num_aes_blocks(len(data)))
-        tag = HMAC(self.hmac_key, iv_last8 + data, sha256).digest()  # XXX mac / hash flexibility
-        return tag, iv_last8, data
+        mac = HMAC(self.hmac_key, iv_last8 + data, sha256).digest()  # XXX mac / hash flexibility
+        return mac, iv_last8, data
 
-    def check_tag_and_decrypt(self, tag, iv_last8, data):
+    def check_mac_and_decrypt(self, mac, iv_last8, data):
         iv = PREFIX + iv_last8
-        if HMAC(self.hmac_key, iv_last8 + data, sha256).digest() != tag:
+        if HMAC(self.hmac_key, iv_last8 + data, sha256).digest() != mac:
             raise IntegrityError('Encryption envelope checksum mismatch')
         self.dec_cipher.reset(iv=iv)
-        data = self.dec_cipher.check_tag_and_decrypt(None, data)
+        data = self.dec_cipher.check_mac_and_decrypt(None, data)
         return data
 
 
@@ -246,22 +246,22 @@ class AES_GCM:
         self.enc_cipher = AES(mode=AES_GCM_MODE, is_encrypt=True, key=enc_key, iv=enc_iv)
         self.dec_cipher = AES(mode=AES_GCM_MODE, is_encrypt=False, key=enc_key)
 
-    def compute_tag_and_encrypt(self, data):
+    def compute_mac_and_encrypt(self, data):
         self.enc_cipher.reset(iv=self.enc_iv)
         iv_last8 = self.enc_iv[8:]
         self.enc_cipher.add(iv_last8)
-        tag, data = self.enc_cipher.compute_tag_and_encrypt(data)
+        mac, data = self.enc_cipher.compute_mac_and_encrypt(data)
         # increase the IV (counter) value so same value is never used twice
         current_iv = bytes_to_long(iv_last8)
         self.enc_iv = PREFIX + long_to_bytes(current_iv + num_aes_blocks(len(data)))
-        return tag, iv_last8, data
+        return mac, iv_last8, data
 
-    def check_tag_and_decrypt(self, tag, iv_last8, data):
+    def check_mac_and_decrypt(self, mac, iv_last8, data):
         iv = PREFIX + iv_last8
         self.dec_cipher.reset(iv=iv)
         self.dec_cipher.add(iv_last8)
         try:
-            data = self.dec_cipher.check_tag_and_decrypt(tag, data)
+            data = self.dec_cipher.check_mac_and_decrypt(mac, data)
         except Exception:
             raise IntegrityError('Encryption envelope checksum mismatch')
         return data
@@ -300,7 +300,7 @@ class KeyBase(object):
 
     def encrypt(self, data):
         data = self.compressor.compress(data)
-        mac, iv_last8, data = self.cipher.compute_tag_and_encrypt(data)
+        mac, iv_last8, data = self.cipher.compute_mac_and_encrypt(data)
         meta = Meta(compr_type=self.compressor.TYPE, key_type=self.TYPE,
                     mac_type=self.maccer_cls.TYPE, cipher_type=self.cipher.TYPE,
                     stored_iv=iv_last8)
@@ -312,7 +312,7 @@ class KeyBase(object):
         assert isinstance(self, keyer)
         assert self.maccer_cls is maccer
         assert self.cipher_cls is cipher
-        data = self.cipher.check_tag_and_decrypt(mac, meta.stored_iv, data)
+        data = self.cipher.check_mac_and_decrypt(mac, meta.stored_iv, data)
         data = self.compressor.decompress(data)
         if id and self.id_hash(data) != id:
             raise IntegrityError('Chunk id verification failed')
@@ -486,7 +486,7 @@ class KeyfileKey(AESKeyBase):
         key = pbkdf2_sha256(passphrase.encode('utf-8'), d[b'salt'], d[b'iterations'], 32)
         try:
             cipher = AES(mode=AES_GCM_MODE, is_encrypt=False, key=key, iv=b'\0'*16)
-            data = cipher.check_tag_and_decrypt(d[b'hash'], d[b'data'])
+            data = cipher.check_mac_and_decrypt(d[b'hash'], d[b'data'])
             return data
         except Exception:
             return None
@@ -496,13 +496,13 @@ class KeyfileKey(AESKeyBase):
         iterations = 100000
         key = pbkdf2_sha256(passphrase.encode('utf-8'), salt, iterations, 32)
         cipher = AES(mode=AES_GCM_MODE, is_encrypt=True, key=key, iv=b'\0'*16)
-        tag, cdata = cipher.compute_tag_and_encrypt(data)
+        mac, cdata = cipher.compute_mac_and_encrypt(data)
         d = {
             'version': 1,
             'salt': salt,
             'iterations': iterations,
             'algorithm': 'gmac',
-            'hash': tag,
+            'hash': mac,
             'data': cdata,
         }
         return msgpack.packb(d)
@@ -655,7 +655,7 @@ def parser02(all_data):
 def parser03(all_data):  # new & flexible
     """
     Payload layout:
-    always: TYPE(1) + MSGPACK((tag, meta, data))
+    always: TYPE(1) + MSGPACK((mac, meta, data))
 
     meta is a Meta namedtuple and contains all required information about data.
     data is maybe compressed (see meta) and maybe encrypted (see meta).

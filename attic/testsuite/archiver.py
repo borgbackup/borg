@@ -383,7 +383,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 hash = sha256(data).digest()
                 if hash not in seen:
                     seen.add(hash)
-                    meta, data, _, _, _, _ = parser(data)
+                    meta, data = parser(data)
                     num_blocks = num_aes_blocks(len(data))
                     nonce = bytes_to_long(meta.stored_iv)
                     for counter in range(nonce, nonce + num_blocks):

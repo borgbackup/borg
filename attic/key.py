@@ -307,7 +307,8 @@ class KeyBase(object):
         return generate(meta, data)
 
     def decrypt(self, id, data):
-        meta, data, compressor, keyer, maccer, cipher = parser(data)
+        meta, data = parser(data)
+        compressor, keyer, maccer, cipher = get_implementations(meta)
         assert isinstance(self, keyer)
         assert self.maccer_cls is maccer
         assert self.cipher_cls is cipher
@@ -333,7 +334,8 @@ class PlaintextKey(KeyBase):
 
     @classmethod
     def detect(cls, repository, manifest_data):
-        meta, data, compressor, keyer, maccer, cipher = parser(manifest_data)
+        meta, data = parser(manifest_data)
+        compressor, keyer, maccer, cipher = get_implementations(meta)
         return cls(compressor, maccer, cipher)
 
 
@@ -351,8 +353,7 @@ class AESKeyBase(KeyBase):
     only 295 exabytes!
     """
     def extract_nonce(self, payload):
-        meta, data, compressor, keyer, maccer, cipher = parser(payload)
-        assert isinstance(self, keyer)
+        meta, data = parser(payload)
         nonce = bytes_to_long(meta.stored_iv)
         return nonce
 
@@ -405,7 +406,8 @@ class PassphraseKey(AESKeyBase):
     @classmethod
     def detect(cls, repository, manifest_data):
         prompt = 'Enter passphrase for %s: ' % repository._location.orig
-        meta, data, compressor, keyer, maccer, cipher = parser(manifest_data)
+        meta, data = parser(manifest_data)
+        compressor, keyer, maccer, cipher = get_implementations(meta)
         key = cls(compressor, maccer, cipher)
         passphrase = os.environ.get('ATTIC_PASSPHRASE')
         if passphrase is None:
@@ -437,7 +439,8 @@ class KeyfileKey(AESKeyBase):
 
     @classmethod
     def detect(cls, repository, manifest_data):
-        meta, data, compressor, keyer, maccer, cipher = parser(manifest_data)
+        meta, data = parser(manifest_data)
+        compressor, keyer, maccer, cipher = get_implementations(meta)
         key = cls(compressor, maccer, cipher)
         path = cls.find_key_file(repository)
         prompt = 'Enter passphrase for key file %s: ' % path
@@ -637,8 +640,7 @@ def legacy_parser(all_data, key_type):  # all rather hardcoded
     meta = Meta(compr_type=6, key_type=key_type,
                 mac_type=HMAC_SHA256.TYPE, cipher_type=AES_CTR_HMAC.TYPE,
                 hmac=hmac, stored_iv=stored_iv)
-    compressor, keyer, maccer, cipher = get_implementations(meta)
-    return meta, data, compressor, keyer, maccer, cipher
+    return meta, data
 
 def parser00(all_data):
     return legacy_parser(all_data, KeyfileKey.TYPE)
@@ -672,8 +674,7 @@ def parser03(all_data):  # new & flexible
     unpacker.feed(all_data[1:])
     meta_tuple, data = unpacker.unpack()
     meta = Meta(*meta_tuple)
-    compressor, keyer, maccer, cipher = get_implementations(meta)
-    return meta, data, compressor, keyer, maccer, cipher
+    return meta, data
 
 
 def parser(data):
@@ -689,7 +690,8 @@ def parser(data):
 
 
 def key_factory(repository, manifest_data):
-    meta, data, compressor, keyer, maccer, cipher = parser(manifest_data)
+    meta, data = parser(manifest_data)
+    compressor, keyer, maccer, cipher = get_implementations(meta)
     return keyer.detect(repository, manifest_data)
 
 

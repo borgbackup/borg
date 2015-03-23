@@ -11,7 +11,7 @@ from hashlib import sha256
 from attic import xattr
 from attic.archive import Archive, ChunkBuffer
 from attic.archiver import Archiver
-from attic.crypto import bytes_to_long, num_aes_blocks
+from attic.crypto import bytes16_to_int, num_aes_blocks
 from attic.helpers import Manifest
 from attic.key import parser
 from attic.remote import RemoteRepository, PathNotAllowed
@@ -385,7 +385,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                     seen.add(hash)
                     mac, meta, data = parser(data)
                     num_blocks = num_aes_blocks(len(data))
-                    nonce = bytes_to_long(meta.iv, 8)
+                    nonce = bytes16_to_int(meta.iv)
                     for counter in range(nonce, nonce + num_blocks):
                         self.assert_not_in(counter, used)
                         used.add(counter)

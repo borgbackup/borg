@@ -1,7 +1,7 @@
 from binascii import hexlify
 from attic.testsuite import AtticTestCase
 from attic.crypto import pbkdf2_sha256, get_random_bytes, AES, AES_GCM_MODE, AES_CTR_MODE, \
-    bytes_to_long, bytes_to_int, long_to_bytes
+    bytes_to_int, bytes16_to_int, int_to_bytes16, increment_iv
 
 
 class CryptoTestCase(AtticTestCase):
@@ -9,9 +9,27 @@ class CryptoTestCase(AtticTestCase):
     def test_bytes_to_int(self):
         self.assert_equal(bytes_to_int(b'\0\0\0\1'), 1)
 
-    def test_bytes_to_long(self):
-        self.assert_equal(bytes_to_long(b'\0\0\0\0\0\0\0\1'), 1)
-        self.assert_equal(long_to_bytes(1), b'\0\0\0\0\0\0\0\1')
+    def test_bytes16_to_int(self):
+        i, b = 1, b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1'
+        self.assert_equal(bytes16_to_int(b), i)
+        self.assert_equal(int_to_bytes16(i), b)
+        i, b = (1 << 64) + 2, b'\0\0\0\0\0\0\0\1\0\0\0\0\0\0\0\2'
+        self.assert_equal(bytes16_to_int(b), i)
+        self.assert_equal(int_to_bytes16(i), b)
+
+    def test_increment_iv(self):
+        tests = [
+            # iv, amount, iv_expected
+            (0, 0, 0),
+            (0, 15, 1),
+            (0, 16, 1),
+            (0, 17, 2),
+            (0xffffffffffffffff, 32, 0x10000000000000001),
+        ]
+        for iv, amount, iv_expected in tests:
+            iv = int_to_bytes16(iv)
+            iv_expected = int_to_bytes16(iv_expected)
+            self.assert_equal(increment_iv(iv, amount), iv_expected)
 
     def test_pbkdf2_sha256(self):
         self.assert_equal(hexlify(pbkdf2_sha256(b'password', b'salt', 1, 32)),

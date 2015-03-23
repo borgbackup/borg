@@ -17,7 +17,7 @@ except ImportError:
         lzma = None
 
 from attic.crypto import pbkdf2_sha256, get_random_bytes, AES, AES_CTR_MODE, AES_GCM_MODE, \
-    bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
+    bytes_to_int, increment_iv
 from attic.helpers import IntegrityError, get_keys_dir, Error
 
 # we do not store the full IV on disk, as the upper 8 bytes are expected to be
@@ -214,25 +214,6 @@ class PLAIN:
 
     def check_mac_and_decrypt(self, mac, meta, data):
         return data
-
-
-def increment_iv(iv, amount):
-    """
-    increment the given IV considering that <amount> bytes of data was
-    encrypted based on it. In CTR / GCM mode, the IV is just a counter and
-    must never repeat.
-
-    :param iv: current IV, 16 bytes (128 bit)
-    :param amount: amount of data (in bytes) that was encrypted
-    :return: new IV, 16 bytes (128 bit)
-    """
-    # TODO: code assumes that the last 8 bytes are enough, the upper 8 always zero
-    iv_last8 = iv[8:]
-    current_iv = bytes_to_long(iv_last8)
-    new_iv = current_iv + num_aes_blocks(amount)
-    iv_last8 = long_to_bytes(new_iv)
-    iv = PREFIX + iv_last8
-    return iv
 
 
 def get_aad(meta):

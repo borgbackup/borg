@@ -3,7 +3,6 @@ import re
 import shutil
 import tempfile
 from binascii import hexlify
-from attic.crypto import bytes_to_long
 from attic.testsuite import AtticTestCase
 from attic.key import PlaintextKey, PassphraseKey, KeyfileKey, COMPR_DEFAULT, increment_iv
 from attic.helpers import Location, unhexlify

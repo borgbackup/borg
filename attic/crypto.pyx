@@ -55,11 +55,21 @@ cdef extern from "openssl/evp.h":
 import struct
 
 _int = struct.Struct('>I')
-_long = struct.Struct('>Q')
+_2long = struct.Struct('>QQ')
 
 bytes_to_int = lambda x, offset=0: _int.unpack_from(x, offset)[0]
-bytes_to_long = lambda x, offset=0: _long.unpack_from(x, offset)[0]
-long_to_bytes = lambda x: _long.pack(x)
+
+
+def bytes16_to_int(b, offset=0):
+    h, l = _2long.unpack_from(b, offset)
+    return (h << 64) + l
+
+
+def int_to_bytes16(i):
+    max_uint64 = 0xffffffffffffffff
+    l = i & max_uint64
+    h = (i >> 64) & max_uint64
+    return _2long.pack(h, l)
 
 
 def num_aes_blocks(length):
@@ -67,6 +77,22 @@ def num_aes_blocks(length):
        Note: this is only correct for modes without padding, like AES-CTR.
     """
     return (length + 15) // 16
+
+
+def increment_iv(iv, amount):
+    """
+    increment the given IV considering that <amount> bytes of data was
+    encrypted based on it. In CTR / GCM mode, the IV is just a counter and
+    must never repeat.
+
+    :param iv: current IV, 16 bytes (128 bit)
+    :param amount: amount of data (in bytes) that was encrypted
+    :return: new IV, 16 bytes (128 bit)
+    """
+    iv = bytes16_to_int(iv)
+    iv += num_aes_blocks(amount)
+    iv = int_to_bytes16(iv)
+    return iv
 
 
 def pbkdf2_sha256(password, salt, iterations, size):

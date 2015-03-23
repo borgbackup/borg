@@ -734,13 +734,13 @@ def compressor_creator(args):
     return compressor
 
 
-def key_creator(repository, args):
+def key_creator(args):
     if args.encryption == 'keyfile':
-        return KeyfileKey.create(repository, args)
+        return KeyfileKey
     if args.encryption == 'passphrase':
-        return PassphraseKey.create(repository, args)
+        return PassphraseKey
     if args.encryption == 'none':
-        return PlaintextKey.create(repository, args)
+        return PlaintextKey
     raise NotImplemented("no encryption %s" % args.encryption)
 
 

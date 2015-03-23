@@ -57,7 +57,8 @@ class Archiver:
         """Initialize an empty repository"""
         print('Initializing repository at "%s"' % args.repository.orig)
         repository = self.open_repository(args.repository, create=True, exclusive=True)
-        key = key_creator(repository, args)
+        key_cls = key_creator(args)
+        key = key_cls.create(repository, args)
         manifest = Manifest(key, repository)
         manifest.write()
         repository.commit()

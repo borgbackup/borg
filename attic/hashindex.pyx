@@ -28,7 +28,8 @@ cdef class IndexBase:
     cdef HashIndex *index
     cdef int key_size
 
-    def __cinit__(self, capacity=0, path=None, key_size=32):
+    def __cinit__(self, capacity=0, path=None, key_size=None):
+        assert key_size is not None
         self.key_size = key_size
         if path:
             self.index = hashindex_read(<bytes>os.fsencode(path))
@@ -44,8 +45,8 @@ cdef class IndexBase:
             hashindex_free(self.index)
 
     @classmethod
-    def read(cls, path):
-        return cls(path=path)
+    def read(cls, path, key_size=None):
+        return cls(path=path, key_size=key_size)
 
     def write(self, path):
         if not hashindex_write(self.index, <bytes>os.fsencode(path)):

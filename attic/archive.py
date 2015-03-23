@@ -577,7 +577,7 @@ class ArchiveChecker:
         self.repository = repository
         self.init_chunks()
         self.key = self.identify_key(repository)
-        if Manifest.MANIFEST_ID not in self.chunks:
+        if Manifest.manifest_id(repository) not in self.chunks:
             self.manifest = self.rebuild_manifest()
         else:
             self.manifest, _ = Manifest.load(repository, key=self.key)
@@ -596,7 +596,7 @@ class ArchiveChecker:
         # Explicity set the initial hash table capacity to avoid performance issues
         # due to hash table "resonance"
         capacity = int(len(self.repository) * 1.2)
-        self.chunks = ChunkIndex(capacity)
+        self.chunks = ChunkIndex(capacity, key_size=self.repository.key_size)
         marker = None
         while True:
             result = self.repository.list(limit=10000, marker=marker)
@@ -648,7 +648,7 @@ class ArchiveChecker:
         Missing and/or incorrect data is repaired when detected
         """
         # Exclude the manifest from chunks
-        del self.chunks[Manifest.MANIFEST_ID]
+        del self.chunks[Manifest.manifest_id(self.repository)]
 
         def mark_as_possibly_superseded(id_):
             if self.chunks.get(id_, (0,))[0] == 0:

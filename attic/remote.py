@@ -89,7 +89,7 @@ class RepositoryServer:
     def negotiate(self, versions):
         return 1
 
-    def open(self, path, create=False):
+    def open(self, path, create=False, key_size=None):
         path = os.fsdecode(path)
         if path.startswith('/~'):
             path = path[1:]
@@ -100,8 +100,8 @@ class RepositoryServer:
                     break
             else:
                 raise PathNotAllowed(path)
-        self.repository = Repository(path, create)
-        return self.repository.id
+        self.repository = Repository(path, create, key_size=key_size)
+        return self.repository.id, self.repository.key_size
 
 
 class RemoteRepository:
@@ -112,7 +112,7 @@ class RemoteRepository:
         def __init__(self, name):
             self.name = name
 
-    def __init__(self, location, create=False):
+    def __init__(self, location, create=False, key_size=None):
         self.location = location
         self.preload_ids = []
         self.msgid = 0
@@ -144,7 +144,7 @@ class RemoteRepository:
         version = self.call('negotiate', 1)
         if version != 1:
             raise Exception('Server insisted on using unsupported protocol version %d' % version)
-        self.id = self.call('open', location.path, create)
+        self.id, self.key_size = self.call('open', location.path, create, key_size)
 
     def __del__(self):
         self.close()
@@ -299,7 +299,7 @@ class RepositoryCache:
 
     def initialize(self):
         self.tmppath = tempfile.mkdtemp()
-        self.index = NSIndex()
+        self.index = NSIndex(key_size=self.repository.key_size)
         self.data_fd = open(os.path.join(self.tmppath, 'data'), 'a+b')
 
     def cleanup(self):

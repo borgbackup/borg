@@ -13,7 +13,7 @@ from attic import __version__
 from attic.archive import Archive, ArchiveChecker
 from attic.repository import Repository
 from attic.cache import Cache
-from attic.key import key_creator, COMPR_DEFAULT, HASH_DEFAULT, MAC_DEFAULT, PLAIN_DEFAULT, CIPHER_DEFAULT
+from attic.key import key_creator, maccer_creator, COMPR_DEFAULT, HASH_DEFAULT, MAC_DEFAULT, PLAIN_DEFAULT, CIPHER_DEFAULT
 from attic.helpers import Error, location_validator, format_time, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
@@ -27,11 +27,11 @@ class Archiver:
     def __init__(self):
         self.exit_code = 0
 
-    def open_repository(self, location, create=False, exclusive=False):
+    def open_repository(self, location, create=False, exclusive=False, key_size=None):
         if location.proto == 'ssh':
-            repository = RemoteRepository(location, create=create)
+            repository = RemoteRepository(location, create=create, key_size=key_size)
         else:
-            repository = Repository(location.path, create=create, exclusive=exclusive)
+            repository = Repository(location.path, create=create, exclusive=exclusive, key_size=key_size)
         repository._location = location
         return repository
 
@@ -56,8 +56,10 @@ class Archiver:
     def do_init(self, args):
         """Initialize an empty repository"""
         print('Initializing repository at "%s"' % args.repository.orig)
-        repository = self.open_repository(args.repository, create=True, exclusive=True)
         key_cls = key_creator(args)
+        maccer_cls = maccer_creator(args, key_cls)
+        repository = self.open_repository(args.repository, create=True, exclusive=True,
+                                          key_size=maccer_cls.digest_size)
         key = key_cls.create(repository, args)
         manifest = Manifest(key, repository)
         manifest.write()

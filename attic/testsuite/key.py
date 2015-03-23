@@ -19,20 +19,20 @@ class KeyTestCase(AtticTestCase):
 
     keyfile2_key_file = """
 ATTIC KEY 0000000000000000000000000000000000000000000000000000000000000000
-hqlhbGdvcml0aG2kZ21hY6RoYXNo2gAgY7jwSMnBwpqD3Fk/aAdSAgAAAAAAAAAAAAAAAA
-AAAACqaXRlcmF0aW9uc84AAYagp3ZlcnNpb24BpHNhbHTaACASqCq8G6a/K/W+bOrNDW65
-Sfl9ZHrTEtq6l+AMUmATxKRkYXRh2gDQuDVCijDzeZDD/JLPrOtsQL/vrZEWvCt5RuXFOt
-tTZfbCJDmv2nt4KvYToVsp82pffZDcsLaOOBCTGurpkdefsdiLMgGiLlbrsXlES+fbKZfq
-Tx2x2DjU4L1bFxuoypDIdk2lB3S98ZpFZ6yd1XtDBVTQ34FZTlDXIZ5HyuxAJBrGKYj/Un
-Fk24N5xSoPfeQhE3r7hqEsGwEEX0s6sg0LHMGyc4xSBb13iZxWRlSdnvBC7teIeevhT/DU
-scOrlrX0NO2eqe5jQF+zj1Q6OtBvRA==
+hqRzYWx02gAgA1l4jfyv22y6U/mxxDT8HodSWAcX0g3nOESrQcNnBsundmVyc2lvbgGqaX
+RlcmF0aW9uc84AAYagqWFsZ29yaXRobaRnbWFjpGhhc2iw7eaB54JssAOnM1S4S9CeTaRk
+YXRh2gDQzmuyg3iYjMeTLObY+ybI+QfngB+5mmHeEAfBa42fuEZgqM3rYyMj2XfgvamF+O
+0asvhEyy9om190FaOxQ4RiiTMNqSP0FKLmd1i5ZyDMfRyp7JbscRFs9Ryk28yXWkv0MgQy
+EAYlaycY+6lWdRSgEPxidyPl9t9dr2AI/UuiQytwqmcmXgWD6Px6wgpOS/4AcRmEvDqIIl
+Rc2xsu+RevGAxk5rnrIIRPr7WB5R2cinzEn9ylDgBDt9LZbq706ELgtwVTnjWB8FBTPwVI
+vLTTXQ==
 """.strip()
 
     keyfile2_cdata = unhexlify(re.sub('\W', '', """
-        0393c420fd6e9ac6f8c49c4789d1c924c14c309200000000000000000000000000000000
-        9600001402c41000000000000000000000000000000000c2c4071352fe2286e3ed
+        0393c4102e5ce8f5e9477c9e4ce2de453121aa139600001402c41000000000000000000000000000000000
+        c2c407b0147a64a379d1
         """))
-    keyfile2_id = unhexlify('d4954bcf8d7b1762356e91b2611c727800000000000000000000000000000000')
+    keyfile2_id = unhexlify('dd9451069663931c8abd85452d016733')
 
     def setUp(self):
         self.tmppath = tempfile.mkdtemp()
@@ -60,7 +60,7 @@ scOrlrX0NO2eqe5jQF+zj1Q6OtBvRA==
     def test_plaintext(self):
         key = PlaintextKey.create(None, self.MockArgs())
         data = b'foo'
-        self.assert_equal(hexlify(key.id_hash(data)), b'4c9137bc0dd3ddb31de4e138a49d7eb300000000000000000000000000000000')
+        self.assert_equal(hexlify(key.id_hash(data)), b'4c9137bc0dd3ddb31de4e138a49d7eb3')
         self.assert_equal(data, key.decrypt(key.id_hash(data), key.encrypt(data)))
 
     def test_keyfile(self):
@@ -115,5 +115,5 @@ scOrlrX0NO2eqe5jQF+zj1Q6OtBvRA==
         self.assert_equal(key.enc_key, key2.enc_key)
         self.assert_equal(key.chunk_seed, key2.chunk_seed)
         data = b'foo'
-        self.assert_equal(hexlify(key.id_hash(data)), b'a409d69859b8a07625f066e42cde050100000000000000000000000000000000')
+        self.assert_equal(hexlify(key.id_hash(data)), b'a409d69859b8a07625f066e42cde0501')
         self.assert_equal(data, key2.decrypt(key2.id_hash(data), key.encrypt(data)))

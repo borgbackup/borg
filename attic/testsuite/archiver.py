@@ -464,7 +464,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 
     def test_missing_manifest(self):
         archive, repository = self.open_archive('archive1')
-        repository.delete(Manifest.MANIFEST_ID)
+        repository.delete(Manifest.manifest_id(repository))
         repository.commit()
         self.attic('check', self.repository_location, exit_code=1)
         output = self.attic('check', '--repair', self.repository_location, exit_code=0)
@@ -475,7 +475,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
     def test_extra_chunks(self):
         self.attic('check', self.repository_location, exit_code=0)
         repository = Repository(self.repository_location)
-        repository.put(b'01234567890123456789012345678901', b'xxxx')
+        repository.put(b'0123456789012345', b'xxxx')
         repository.commit()
         repository.close()
         self.attic('check', self.repository_location, exit_code=1)

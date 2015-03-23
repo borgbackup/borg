@@ -51,7 +51,7 @@ class Cache:
         config.set('cache', 'manifest', '')
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             config.write(fd)
-        ChunkIndex().write(os.path.join(self.path, 'chunks').encode('utf-8'))
+        ChunkIndex(key_size=self.repository.key_size).write(os.path.join(self.path, 'chunks').encode('utf-8'))
         with open(os.path.join(self.path, 'files'), 'w') as fd:
             pass  # empty file
 
@@ -67,7 +67,8 @@ class Cache:
         self.id = self.config.get('cache', 'repository')
         self.manifest_id = unhexlify(self.config.get('cache', 'manifest'))
         self.timestamp = self.config.get('cache', 'timestamp', fallback=None)
-        self.chunks = ChunkIndex.read(os.path.join(self.path, 'chunks').encode('utf-8'))
+        self.chunks = ChunkIndex.read(os.path.join(self.path, 'chunks').encode('utf-8'),
+                                      key_size=self.repository.key_size)
         self.files = None
 
     def close(self):

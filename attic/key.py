@@ -69,6 +69,7 @@ class HMAC(hmac.HMAC):
 
 class SHA256(object):  # note: can't subclass sha256
     TYPE = 0
+    digest_size = 32
 
     def __init__(self, key, data=b''):
         # signature is like for a MAC, we ignore the key as this is a simple hash
@@ -89,6 +90,7 @@ class SHA256(object):  # note: can't subclass sha256
 class SHA512_256(sha512_256):
     """sha512, but digest truncated to 256bit - faster than sha256 on 64bit platforms"""
     TYPE = 1
+    digest_size = 32
 
     def __init__(self, key, data):
         # signature is like for a MAC, we ignore the key as this is a simple hash
@@ -99,6 +101,7 @@ class SHA512_256(sha512_256):
 
 class GHASH:
     TYPE = 2
+    digest_size = 16
 
     def __init__(self, key, data):
         # signature is like for a MAC, we ignore the key as this is a simple hash
@@ -112,11 +115,12 @@ class GHASH:
         # GMAC = aes-gcm with all data as AAD, no data as to-be-encrypted data
         mac_cipher.add(bytes(self.data))
         hash, _ = mac_cipher.compute_mac_and_encrypt(b'')
-        return hash + b'\0'*16  # XXX hashindex code wants 32 bytes (256 bit)
+        return hash
 
 
 class HMAC_SHA256(HMAC):
     TYPE = 10
+    digest_size = 32
 
     def __init__(self, key, data):
         if key is None:
@@ -126,6 +130,7 @@ class HMAC_SHA256(HMAC):
 
 class HMAC_SHA512_256(HMAC):
     TYPE = 11
+    digest_size = 32
 
     def __init__(self, key, data):
         if key is None:
@@ -135,6 +140,7 @@ class HMAC_SHA512_256(HMAC):
 
 class GMAC(GHASH):
     TYPE = 20
+    digest_size = 16
 
     def __init__(self, key, data):
         super().__init__(None, data)

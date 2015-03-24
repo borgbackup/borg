@@ -150,12 +150,16 @@ class Archive:
             info = self.manifest.archives[name]
             self.load(info[b'id'])
 
+    def _load_meta(self, id):
+        data = self.key.decrypt(id, self.repository.get(id))
+        metadata = msgpack.unpackb(data)
+        if metadata[b'version'] != 1:
+            raise Exception('Unknown archive metadata version')
+        return metadata
+
     def load(self, id):
         self.id = id
-        data = self.key.decrypt(self.id, self.repository.get(self.id))
-        self.metadata = msgpack.unpackb(data)
-        if self.metadata[b'version'] != 1:
-            raise Exception('Unknown archive metadata version')
+        self.metadata = self._load_meta(self.id)
         decode_dict(self.metadata, (b'name', b'hostname', b'username', b'time'))
         self.metadata[b'cmdline'] = [arg.decode('utf-8', 'surrogateescape') for arg in self.metadata[b'cmdline']]
         self.name = self.metadata[b'name']
@@ -334,6 +338,18 @@ class Archive:
                 os.lchflags(path, item[b'bsdflags'])
             except OSError:
                 pass
+
+    def rename(self, name):
+        if name in self.manifest.archives:
+            raise self.AlreadyExists(name)
+        metadata = StableDict(self._load_meta(self.id))
+        metadata[b'name'] = name
+        data = msgpack.packb(metadata, unicode_errors='surrogateescape')
+        new_id = self.key.id_hash(data)
+        self.cache.add_chunk(new_id, data, self.stats)
+        self.manifest.archives[name] = {'id': new_id, 'time': metadata[b'time']}
+        self.cache.chunk_decref(self.id, self.stats)
+        del self.manifest.archives[self.name]
 
     def delete(self, stats):
         unpacker = msgpack.Unpacker(use_list=False)

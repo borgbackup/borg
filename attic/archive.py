@@ -422,25 +422,31 @@ class Archive:
 
     @staticmethod
     def _open_rb(path, st):
-        flags_noatime = None
+        flags_normal = os.O_RDONLY | getattr(os, 'O_BINARY', 0)
+        flags_noatime = flags_normal | getattr(os, 'NO_ATIME', 0)
         euid = None
 
         def open_simple(p, s):
-            return open(p, 'rb')
+            fd = os.open(p, flags_normal)
+            return os.fdopen(fd, 'rb')
+
+        def open_noatime(p, s):
+            fd = os.open(p, flags_noatime)
+            return os.fdopen(fd, 'rb')
 
         def open_noatime_if_owner(p, s):
             if euid == 0 or s.st_uid == euid:
                 # we are root or owner of file
-                return os.fdopen(os.open(p, flags_noatime), 'rb')
+                return open_noatime(p, s)
             else:
-                return open(p, 'rb')
+                return open_simple(p, s)
 
-        def open_noatime(p, s):
+        def open_noatime_with_fallback(p, s):
             try:
                 fd = os.open(p, flags_noatime)
             except PermissionError:
                 # Was this EPERM due to the O_NOATIME flag?
-                fo = open(p, 'rb')
+                fd = os.open(p, flags_normal)
                 # Yes, it was -- otherwise the above line would have thrown
                 # another exception.
                 nonlocal euid
@@ -448,14 +454,11 @@ class Archive:
                 # So in future, let's check whether the file is owned by us
                 # before attempting to use O_NOATIME.
                 Archive._open_rb = open_noatime_if_owner
-                return fo
             return os.fdopen(fd, 'rb')
 
-        o_noatime = getattr(os, 'O_NOATIME', None)
-        if o_noatime is not None:
-            flags_noatime = os.O_RDONLY | getattr(os, 'O_BINARY', 0) | o_noatime
+        if flags_noatime != flags_normal:
             # Always use O_NOATIME version.
-            Archive._open_rb = open_noatime
+            Archive._open_rb = open_noatime_with_fallback
         else:
             # Always use non-O_NOATIME version.
             Archive._open_rb = open_simple

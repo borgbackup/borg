@@ -251,6 +251,18 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 archive.extract_item(dirs.pop(-1))
         return self.exit_code
 
+    def do_rename(self, args):
+        """Rename an existing archive"""
+        repository = self.open_repository(args.archive, exclusive=True)
+        manifest, key = Manifest.load(repository)
+        cache = Cache(repository, key, manifest)
+        archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
+        archive.rename(args.name)
+        manifest.write()
+        repository.commit()
+        cache.commit()
+        return self.exit_code
+
     def do_delete(self, args):
         """Delete an existing archive"""
         repository = self.open_repository(args.archive, exclusive=True)
@@ -663,6 +675,20 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='archive to extract')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to extract')
+
+        rename_epilog = textwrap.dedent("""
+        This command renames an archive in the repository.
+        """)
+        subparser = subparsers.add_parser('rename', parents=[common_parser],
+                                          description=self.do_rename.__doc__,
+                                          epilog=rename_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.set_defaults(func=self.do_rename)
+        subparser.add_argument('archive', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='archive to rename')
+        subparser.add_argument('name', metavar='NEWNAME', type=str,
+                               help='the new archive name to use')
 
         delete_epilog = textwrap.dedent("""
         This command deletes an archive from the repository. Any disk space not

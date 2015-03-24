@@ -266,6 +266,26 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir('output'):
             self.attic('extract', self.repository_location + '::test', exit_code=1)
 
+    def test_rename(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.create_regular_file('dir2/file2', size=1024 * 80)
+        self.attic('init', self.repository_location)
+        self.attic('create', self.repository_location + '::test', 'input')
+        self.attic('create', self.repository_location + '::test.2', 'input')
+        self.attic('extract', '--dry-run', self.repository_location + '::test')
+        self.attic('extract', '--dry-run', self.repository_location + '::test.2')
+        self.attic('rename', self.repository_location + '::test', 'test.3')
+        self.attic('extract', '--dry-run', self.repository_location + '::test.2')
+        self.attic('rename', self.repository_location + '::test.2', 'test.4')
+        self.attic('extract', '--dry-run', self.repository_location + '::test.3')
+        self.attic('extract', '--dry-run', self.repository_location + '::test.4')
+        # Make sure both archives have been renamed
+        repository = Repository(self.repository_path)
+        manifest, key = Manifest.load(repository)
+        self.assert_equal(len(manifest.archives), 2)
+        self.assert_in('test.3', manifest.archives)
+        self.assert_in('test.4', manifest.archives)
+
     def test_delete(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('dir2/file2', size=1024 * 80)

@@ -169,6 +169,18 @@ class Statistics:
         print('%-15s %20s %20s %20s' % (label, format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize)))
         print('All archives:   %20s %20s %20s' % (format_file_size(total_size), format_file_size(total_csize), format_file_size(unique_csize)))
 
+    def show_progress(self, item=None, final=False):
+        if not final:
+            path = remove_surrogates(item[b'path']) if item else ''
+            if len(path) > 43:
+                path = '%s...%s' % (path[:20], path[-20:])
+            msg = '%9s O %9s C %9s D %-43s' % (
+                format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize), path)
+        else:
+            msg = ' ' * 79
+        print(msg, end='\r')
+        sys.stdout.flush()
+
 
 def get_keys_dir():
     """Determine where to repository keys and cache"""

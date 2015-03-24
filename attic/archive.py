@@ -120,7 +120,7 @@ class Archive:
         """Archive {} already exists"""
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
-                 checkpoint_interval=300, numeric_owner=False):
+                 checkpoint_interval=300, numeric_owner=False, progress=False):
         self.cwd = os.getcwd()
         self.key = key
         self.repository = repository
@@ -128,6 +128,8 @@ class Archive:
         self.manifest = manifest
         self.hard_links = {}
         self.stats = Statistics()
+        self.show_progress = progress
+        self.last_progress = time.time()
         self.name = name
         self.checkpoint_interval = checkpoint_interval
         self.numeric_owner = numeric_owner
@@ -174,6 +176,9 @@ class Archive:
             yield item
 
     def add_item(self, item):
+        if self.show_progress and time.time() - self.last_progress > 0.2:
+            self.stats.show_progress(item=item)
+            self.last_progress = time.time()
         self.items_buffer.add(item)
         if time.time() - self.last_checkpoint > self.checkpoint_interval:
             self.write_checkpoint()

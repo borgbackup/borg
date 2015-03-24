@@ -102,7 +102,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         cache = Cache(repository, key, manifest, do_files=args.cache_files)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
                           create=True, checkpoint_interval=args.checkpoint_interval,
-                          numeric_owner=args.numeric_owner)
+                          numeric_owner=args.numeric_owner, progress=args.progress)
         # Add Attic cache dir to inode_skip list
         skip_inodes = set()
         try:
@@ -137,6 +137,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 restrict_dev = None
             self._process(archive, cache, args.excludes, args.exclude_caches, skip_inodes, path, restrict_dev)
         archive.save()
+        if args.progress:
+            archive.stats.show_progress(final=True)
         if args.stats:
             t = datetime.now()
             diff = t - t0
@@ -598,6 +600,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the created archive')
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help='print progress while creating the archive')
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')

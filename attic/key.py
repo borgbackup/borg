@@ -210,7 +210,7 @@ class BLOSCCompressor(object):
             raise NotImplemented("%s compression needs blosc from PyPi" % self.CNAME)
         if self.CNAME not in blosc.compressor_list():
             raise NotImplemented("%s compression is not supported by blosc" % self.CNAME)
-        blosc.set_blocksize(8192)  # maybe 8 threads processing a 64KB chunks -> 8KB block
+        blosc.set_blocksize(16384)  # 16kiB is the minimum, so 64kiB are enough for 4 threads
 
     def _get_level(self):
         raise NotImplemented

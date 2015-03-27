@@ -1,3 +1,5 @@
+|build|
+
 What is Attic?
 --------------
 Attic is a deduplicating backup program. The main goal of Attic is to provide
@@ -55,3 +57,7 @@ The tests are in the attic/testsuite package. To run the test suite use the
 following command::
 
   $ fakeroot -u python -m attic.testsuite.run
+
+.. |build| image:: https://travis-ci.org/attic/merge.svg
+        :alt: Build Status
+        :target: https://travis-ci.org/attic/merge

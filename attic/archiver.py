@@ -517,6 +517,11 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         - 00      no compression
         - 01..09  zlib levels 1..9 (1 means low compression, 9 max. compression)
         - 10..19  lzma levels 0..9 (0 means low compression, 9 max. compression)
+        - 20..29  lz4 (blosc) levels 0..9 (0 = no, 9 = max. compression)
+        - 30..39  lz4hc (blosc) levels 0..9 (0 = no, 9 = max. compression)
+        - 40..49  blosclz (blosc) levels 0..9 (0 = no, 9 = max. compression)
+        - 50..59  snappy (blosc) levels 0..9 (0 = no, 9 = max. compression)
+        - 60..69  zlib (blosc) levels 0..9 (0 = no, 9 = max. compression)
 
         --cipher METHODs (default: %02d or %02d)
 

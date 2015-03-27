@@ -98,9 +98,15 @@ elif platform == 'Darwin':
 
 # msgpack pure python data corruption was fixed in 0.4.6.
 # Also, we might use some rather recent API features.
-install_requires=['msgpack-python>=0.4.6']
+install_requires=['msgpack-python>=0.4.6', 'blosc>1.2.4']
 if sys.version_info < (3, 3):
     install_requires.append('backports.lzma')
+
+dependency_links=[
+    # blosc 1.2.5 is not released yet, but needed for set_blocksize so we can
+    # get parallel compression even if only feeding it 64KB chunks of data...
+    "https://github.com/Blosc/python-blosc/archive/master.zip#egg=blosc-1.2.5"
+]
 
 setup(
     name='Attic',
@@ -129,4 +135,5 @@ setup(
     cmdclass=cmdclass,
     ext_modules=ext_modules,
     install_requires=install_requires,
+    dependency_links=dependency_links,
 )

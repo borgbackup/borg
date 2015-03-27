@@ -16,6 +16,11 @@ except ImportError:
     except ImportError:
         lzma = None
 
+try:
+    import blosc
+except ImportError:
+    blosc = None
+
 from attic.crypto import pbkdf2_sha256, get_random_bytes, AES, AES_CTR_MODE, AES_GCM_MODE, \
     bytes_to_int, increment_iv
 from attic.helpers import IntegrityError, get_keys_dir, Error
@@ -193,6 +198,68 @@ class LzmaCompressor(object):  # uses 10..19 in the mapping
 
     def decompress(self, data):
         return lzma.decompress(data)
+
+
+class BLOSCCompressor(object):
+    TYPE = 0  # override in subclass
+    LEVELS = range(10)
+    CNAME = ''  # override in subclass
+
+    def __init__(self):
+        if blosc is None:
+            raise NotImplemented("%s compression needs blosc from PyPi" % self.CNAME)
+        if self.CNAME not in blosc.compressor_list():
+            raise NotImplemented("%s compression is not supported by blosc" % self.CNAME)
+        blosc.set_blocksize(8192)  # maybe 8 threads processing a 64KB chunks -> 8KB block
+
+    def _get_level(self):
+        raise NotImplemented
+
+    def compress(self, data):
+        return blosc.compress(bytes(data), 1, cname=self.CNAME, clevel=self._get_level())
+
+    def decompress(self, data):
+        return blosc.decompress(data)
+
+
+class LZ4Compressor(BLOSCCompressor):
+    TYPE = 20
+    CNAME = 'lz4'
+
+    def _get_level(self):
+        return self.TYPE - LZ4Compressor.TYPE
+
+
+class LZ4HCCompressor(BLOSCCompressor):
+    TYPE = 30
+    CNAME = 'lz4hc'
+
+    def _get_level(self):
+        return self.TYPE - LZ4HCCompressor.TYPE
+
+
+class BLOSCLZCompressor(BLOSCCompressor):
+    TYPE = 40
+    CNAME = 'blosclz'
+
+    def _get_level(self):
+        return self.TYPE - BLOSCLZCompressor.TYPE
+
+
+class SnappyCompressor(BLOSCCompressor):
+    TYPE = 50
+    CNAME = 'snappy'
+
+    def _get_level(self):
+        return self.TYPE - SnappyCompressor.TYPE
+
+
+class BLOSCZlibCompressor(BLOSCCompressor):
+    TYPE = 60
+    CNAME = 'zlib'
+
+    def _get_level(self):
+        return self.TYPE - BLOSCZlibCompressor.TYPE
 
 
 # default is optimized for speed
@@ -581,6 +648,21 @@ for level in ZlibCompressor.LEVELS:
 for preset in LzmaCompressor.PRESETS:
     compressor_mapping[LzmaCompressor.TYPE + preset] = \
         type('LzmaCompressorPreset%d' % preset, (LzmaCompressor, ), dict(TYPE=LzmaCompressor.TYPE + preset))
+for level in LZ4Compressor.LEVELS:
+    compressor_mapping[LZ4Compressor.TYPE + level] = \
+        type('LZ4CompressorLevel%d' % level, (LZ4Compressor, ), dict(TYPE=LZ4Compressor.TYPE + level))
+for level in LZ4HCCompressor.LEVELS:
+    compressor_mapping[LZ4HCCompressor.TYPE + level] = \
+        type('LZ4HCCompressorLevel%d' % level, (LZ4HCCompressor, ), dict(TYPE=LZ4HCCompressor.TYPE + level))
+for level in BLOSCLZCompressor.LEVELS:
+    compressor_mapping[BLOSCLZCompressor.TYPE + level] = \
+        type('BLOSCLZCompressorLevel%d' % level, (BLOSCLZCompressor, ), dict(TYPE=BLOSCLZCompressor.TYPE + level))
+for level in SnappyCompressor.LEVELS:
+    compressor_mapping[SnappyCompressor.TYPE + level] = \
+        type('SnappyCompressorLevel%d' % level, (SnappyCompressor, ), dict(TYPE=SnappyCompressor.TYPE + level))
+for level in BLOSCZlibCompressor.LEVELS:
+    compressor_mapping[BLOSCZlibCompressor.TYPE + level] = \
+        type('BLOSCZlibCompressorLevel%d' % level, (BLOSCZlibCompressor, ), dict(TYPE=BLOSCZlibCompressor.TYPE + level))
 # overwrite 0 with NullCompressor
 compressor_mapping[NullCompressor.TYPE] = NullCompressor
 

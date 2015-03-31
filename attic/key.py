@@ -25,10 +25,6 @@ from attic.crypto import pbkdf2_sha256, get_random_bytes, AES, AES_CTR_MODE, AES
     bytes_to_int, increment_iv
 from attic.helpers import IntegrityError, get_keys_dir, Error
 
-# we do not store the full IV on disk, as the upper 8 bytes are expected to be
-# zero anyway as the full IV is a 128bit counter. PREFIX are the upper 8 bytes,
-# stored_iv are the lower 8 Bytes.
-PREFIX = b'\0' * 8
 Meta = namedtuple('Meta', 'compr_type, key_type, mac_type, cipher_type, iv, legacy')
 
 
@@ -188,7 +184,6 @@ MAC_DEFAULT = GMAC.TYPE
 
 
 # compressor classes, all same interface
-# special case: zlib level 0 is "no compression"
 
 class NullCompressor(object):  # uses 0 in the mapping
     TYPE = 0
@@ -762,7 +757,9 @@ def legacy_parser(all_data, key_type):  # all rather hardcoded
         mac_type = HMAC_SHA256.TYPE
         mac = all_data[offset:offset+32]
         cipher_type = AES_CTR_HMAC.TYPE
-        iv = PREFIX + all_data[offset+32:offset+40]
+        # legacy attic did not store the full IV on disk, as the upper 8 bytes
+        # are expected to be zero anyway as the full IV is a 128bit counter.
+        iv = b'\0' * 8 + all_data[offset+32:offset+40]
         data = all_data[offset+40:]
     meta = Meta(compr_type=6, key_type=key_type, mac_type=mac_type,
                 cipher_type=cipher_type, iv=iv, legacy=True)

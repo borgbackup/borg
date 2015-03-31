@@ -24,7 +24,7 @@ Space efficient storage
 
 Optional data encryption
     All data can be protected using 256-bit AES encryption and data integrity
-    and authenticity is verified using HMAC-SHA256.
+    and authenticity is verified using a MAC (message authentication code).
 
 Off-site backups
     Attic can store data on any remote host accessible over SSH.  This is
@@ -36,9 +36,10 @@ Backups mountable as filesystems
 
 What do I need?
 ---------------
-Attic requires Python 3.2 or above to work. Besides Python, Attic also requires 
-msgpack-python and sufficiently recent OpenSSL (>= 1.0.0).
+Attic requires Python 3.2 or above to work.
+Attic also requires a sufficiently recent OpenSSL (>= 1.0.0).
 In order to mount archives as filesystems, llfuse is required.
+For other python requirements, please see setup.py install_requires.
 
 How do I install it?
 --------------------
@@ -56,7 +57,7 @@ Where are the tests?
 The tests are in the attic/testsuite package. To run the test suite use the
 following command::
 
-  $ fakeroot -u python -m attic.testsuite.run
+  $ fakeroot -u tox  # you need to have tox installed
 
 .. |build| image:: https://travis-ci.org/attic/merge.svg
         :alt: Build Status

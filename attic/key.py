@@ -5,7 +5,7 @@ import msgpack
 import textwrap
 from collections import namedtuple
 import hmac
-from hashlib import sha256, sha512
+from hashlib import sha1, sha256, sha512
 import zlib
 
 try:
@@ -123,6 +123,46 @@ class GHASH:
         return hash
 
 
+class SHA1(object):  # note: can't subclass sha1
+    TYPE = 3
+    digest_size = 20
+
+    def __init__(self, key, data=b''):
+        # signature is like for a MAC, we ignore the key as this is a simple hash
+        if key is not None:
+            raise Exception("use a HMAC if you have a key")
+        self.h = sha1(data)
+
+    def update(self, data):
+        self.h.update(data)
+
+    def digest(self):
+        return self.h.digest()
+
+    def hexdigest(self):
+        return self.h.hexdigest()
+
+
+class SHA512(object):  # note: can't subclass sha512
+    TYPE = 4
+    digest_size = 64
+
+    def __init__(self, key, data=b''):
+        # signature is like for a MAC, we ignore the key as this is a simple hash
+        if key is not None:
+            raise Exception("use a HMAC if you have a key")
+        self.h = sha512(data)
+
+    def update(self, data):
+        self.h.update(data)
+
+    def digest(self):
+        return self.h.digest()
+
+    def hexdigest(self):
+        return self.h.hexdigest()
+
+
 class HMAC_SHA256(HMAC):
     TYPE = 10
     digest_size = 32
@@ -141,6 +181,26 @@ class HMAC_SHA512_256(HMAC):
         if key is None:
             raise Exception("do not use HMAC if you don't have a key")
         super().__init__(key, data, sha512_256)
+
+
+class HMAC_SHA1(HMAC):
+    TYPE = 13
+    digest_size = 20
+
+    def __init__(self, key, data):
+        if key is None:
+            raise Exception("do not use HMAC if you don't have a key")
+        super().__init__(key, data, sha1)
+
+
+class HMAC_SHA512(HMAC):
+    TYPE = 14
+    digest_size = 64
+
+    def __init__(self, key, data):
+        if key is None:
+            raise Exception("do not use HMAC if you don't have a key")
+        super().__init__(key, data, sha512)
 
 
 class GMAC(GHASH):

@@ -736,12 +736,16 @@ keyer_mapping = {
 
 maccer_mapping = {
     # simple hashes, not MACs (but MAC-like class __init__ method signature):
+    SHA1.TYPE: SHA1,
     SHA256.TYPE: SHA256,
     SHA512_256.TYPE: SHA512_256,
+    SHA512.TYPE: SHA512,
     GHASH.TYPE: GHASH,
     # MACs:
+    HMAC_SHA1.TYPE: HMAC_SHA1,
     HMAC_SHA256.TYPE: HMAC_SHA256,
     HMAC_SHA512_256.TYPE: HMAC_SHA512_256,
+    HMAC_SHA512.TYPE: HMAC_SHA512,
     GMAC.TYPE: GMAC,
 }
 

@@ -62,25 +62,19 @@ class sha512_256(object):  # note: can't subclass sha512
         return new
 
 
-class HMAC(hmac.HMAC):
-    """Workaround a bug in Python < 3.4 Where HMAC does not accept memoryviews
-    """
-    def update(self, msg):
-        self.inner.update(msg)
-
-
 # HASH / MAC stuff below all has a mac-like interface, so it can be used in the same way.
 # special case: hashes do not use keys (and thus, do not sign/authenticate)
 
-class SHA256(object):  # note: can't subclass sha256
-    TYPE = 0
-    digest_size = 32
+class HASH:  # note: we can't subclass sha1/sha256/sha512
+    TYPE = 0  # override in subclass
+    digest_size = 0  # override in subclass
+    hash_func = None  # override in subclass
 
     def __init__(self, key, data=b''):
         # signature is like for a MAC, we ignore the key as this is a simple hash
         if key is not None:
             raise Exception("use a HMAC if you have a key")
-        self.h = sha256(data)
+        self.h = self.hash_func(data)
 
     def update(self, data):
         self.h.update(data)
@@ -92,126 +86,100 @@ class SHA256(object):  # note: can't subclass sha256
         return self.h.hexdigest()
 
 
-class SHA512_256(sha512_256):
-    """sha512, but digest truncated to 256bit - faster than sha256 on 64bit platforms"""
+class SHA256(HASH):
+    TYPE = 0
+    digest_size = 32
+    hash_func = sha256
+
+
+class SHA512_256(HASH):
     TYPE = 1
     digest_size = 32
-
-    def __init__(self, key, data):
-        # signature is like for a MAC, we ignore the key as this is a simple hash
-        if key is not None:
-            raise Exception("use a HMAC if you have a key")
-        super().__init__(data)
+    hash_func = sha512_256
 
 
 class GHASH:
     TYPE = 2
     digest_size = 16
 
-    def __init__(self, key, data):
+    def __init__(self, key, data=b''):
         # signature is like for a MAC, we ignore the key as this is a simple hash
         if key is not None:
             raise Exception("use a MAC if you have a key")
-        self.key = b'\0' * 32
-        self.data = data
+        self.mac_cipher = AES(mode=AES_GCM_MODE, is_encrypt=True, key=b'\0' * 32, iv=b'\0' * 16)
+        if data:
+            self.update(data)
+
+    def update(self, data):
+        # GMAC = aes-gcm with all data as AAD, no data as to-be-encrypted data
+        self.mac_cipher.add(bytes(data))
 
     def digest(self):
-        mac_cipher = AES(mode=AES_GCM_MODE, is_encrypt=True, key=self.key, iv=b'\0' * 16)
-        # GMAC = aes-gcm with all data as AAD, no data as to-be-encrypted data
-        mac_cipher.add(bytes(self.data))
-        hash, _ = mac_cipher.compute_mac_and_encrypt(b'')
+        hash, _ = self.mac_cipher.compute_mac_and_encrypt(b'')
         return hash
 
 
-class SHA1(object):  # note: can't subclass sha1
+class SHA1(HASH):
     TYPE = 3
     digest_size = 20
-
-    def __init__(self, key, data=b''):
-        # signature is like for a MAC, we ignore the key as this is a simple hash
-        if key is not None:
-            raise Exception("use a HMAC if you have a key")
-        self.h = sha1(data)
-
-    def update(self, data):
-        self.h.update(data)
-
-    def digest(self):
-        return self.h.digest()
-
-    def hexdigest(self):
-        return self.h.hexdigest()
+    hash_func = sha1
 
 
-class SHA512(object):  # note: can't subclass sha512
+class SHA512(HASH):
     TYPE = 4
     digest_size = 64
+    hash_func = sha512
 
-    def __init__(self, key, data=b''):
-        # signature is like for a MAC, we ignore the key as this is a simple hash
-        if key is not None:
-            raise Exception("use a HMAC if you have a key")
-        self.h = sha512(data)
 
-    def update(self, data):
-        self.h.update(data)
+class HMAC(hmac.HMAC):
+    TYPE = 0  # override in subclass
+    digest_size = 0  # override in subclass
+    hash_func = None  # override in subclass
 
-    def digest(self):
-        return self.h.digest()
+    def __init__(self, key, data):
+        if key is None:
+            raise Exception("do not use HMAC if you don't have a key")
+        super().__init__(key, data, self.hash_func)
 
-    def hexdigest(self):
-        return self.h.hexdigest()
+    def update(self, msg):
+        # Workaround a bug in Python < 3.4 Where HMAC does not accept memoryviews
+        self.inner.update(msg)
 
 
 class HMAC_SHA256(HMAC):
     TYPE = 10
     digest_size = 32
-
-    def __init__(self, key, data):
-        if key is None:
-            raise Exception("do not use HMAC if you don't have a key")
-        super().__init__(key, data, sha256)
+    hash_func = sha256
 
 
 class HMAC_SHA512_256(HMAC):
     TYPE = 11
     digest_size = 32
-
-    def __init__(self, key, data):
-        if key is None:
-            raise Exception("do not use HMAC if you don't have a key")
-        super().__init__(key, data, sha512_256)
+    hash_func = sha512_256
 
 
 class HMAC_SHA1(HMAC):
     TYPE = 13
     digest_size = 20
-
-    def __init__(self, key, data):
-        if key is None:
-            raise Exception("do not use HMAC if you don't have a key")
-        super().__init__(key, data, sha1)
+    hash_func = sha1
 
 
 class HMAC_SHA512(HMAC):
     TYPE = 14
     digest_size = 64
-
-    def __init__(self, key, data):
-        if key is None:
-            raise Exception("do not use HMAC if you don't have a key")
-        super().__init__(key, data, sha512)
+    hash_func = sha512
 
 
 class GMAC(GHASH):
     TYPE = 20
     digest_size = 16
 
-    def __init__(self, key, data):
-        super().__init__(None, data)
+    def __init__(self, key, data=b''):
         if key is None:
             raise Exception("do not use GMAC if you don't have a key")
-        self.key = key
+        self.mac_cipher = AES(mode=AES_GCM_MODE, is_encrypt=True, key=key, iv=b'\0' * 16)
+        if data:
+            self.update(data)
 
 
 # defaults are optimized for speed on modern CPUs with AES hw support

@@ -7,6 +7,6 @@ python:
 install:
   - "sudo apt-get install -y libacl1-dev"
   - "pip install --use-mirrors Cython"
-  - "pip install -e ."
+  - "pip install --process-dependency-links -e ."
 # command to run tests
 script: fakeroot -u python -m attic.testsuite.run -vb

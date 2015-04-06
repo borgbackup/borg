@@ -62,6 +62,7 @@ class Archiver:
         manifest.key = key
         manifest.write()
         repository.commit()
+        Cache(repository, key, manifest, warn_if_unencrypted=False)
         return self.exit_code
 
     def do_check(self, args):

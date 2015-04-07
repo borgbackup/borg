@@ -7,6 +7,7 @@ Version 0.15
 ------------
 
 (feature release, released on X)
+- Require approval before accessing previously unknown unencrypted repositories (#271)
 - Fix issue with hash index files larger than 2GB.
 - Fix Python 3.2 compatibility issue with noatime open() (#164)
 - Include missing pyx files in dist files (#168)

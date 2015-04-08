@@ -78,8 +78,9 @@ typedef struct {
     int window_size, chunk_mask, min_size;
     size_t buf_size;
     uint32_t *table;
-    uint8_t *data;
+    uint8_t *data, *read_buf;
     PyObject *fd;
+    int fh;
     int done, eof;
     size_t remaining, bytes_read, bytes_yielded, position, last;
 } Chunker;
@@ -94,15 +95,17 @@ chunker_init(int window_size, int chunk_mask, int min_size, uint32_t seed)
     c->table = buzhash_init_table(seed);
     c->buf_size = 10 * 1024 * 1024;
     c->data = malloc(c->buf_size);
+    c->read_buf = malloc(c->buf_size);
     return c;
 }
 
 static void
-chunker_set_fd(Chunker *c, PyObject *fd)
+chunker_set_fd(Chunker *c, PyObject *fd, int fh)
 {
     Py_XDECREF(c->fd);
     c->fd = fd;
     Py_INCREF(fd);
+    c->fh = fh;
     c->done = 0;
     c->remaining = 0;
     c->bytes_read = 0;
@@ -118,6 +121,7 @@ chunker_free(Chunker *c)
     Py_XDECREF(c->fd);
     free(c->table);
     free(c->data);
+    free(c->read_buf);
     free(c);
 }
 
@@ -133,20 +137,40 @@ chunker_fill(Chunker *c)
     if(c->eof || n == 0) {
         return 1;
     }
-    data = PyObject_CallMethod(c->fd, "read", "i", n);
-    if(!data) {
-        return 0;
-    }
-    n = PyBytes_Size(data);
-    if(n) {
-        memcpy(c->data + c->position + c->remaining, PyBytes_AsString(data), n);
-        c->remaining += n;
-        c->bytes_read += n;
+    if(c->fh >= 0) {
+        // if we have a os-level file descriptor, use os-level API
+        n = read(c->fh, c->read_buf, n);
+        if(n > 0) {
+            memcpy(c->data + c->position + c->remaining, c->read_buf, n);
+            c->remaining += n;
+            c->bytes_read += n;
+        }
+        else
+        if(n == 0) {
+            c->eof = 1;
+        }
+        else {
+            // some error happened
+            return 0;
+        }
     }
     else {
-        c->eof = 1;
+        // no os-level file descriptor, use Python file object API
+        data = PyObject_CallMethod(c->fd, "read", "i", n);
+        if(!data) {
+            return 0;
+        }
+        n = PyBytes_Size(data);
+        if(n) {
+            memcpy(c->data + c->position + c->remaining, PyBytes_AsString(data), n);
+            c->remaining += n;
+            c->bytes_read += n;
+        }
+        else {
+            c->eof = 1;
+        }
+        Py_DECREF(data);
     }
-    Py_DECREF(data);
     return 1;
 }
 

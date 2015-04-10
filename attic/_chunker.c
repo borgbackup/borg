@@ -1,4 +1,5 @@
 #include <Python.h>
+#include <fcntl.h>
 
 /* Cyclic polynomial / buzhash: https://en.wikipedia.org/wiki/Rolling_hash */
 
@@ -153,6 +154,14 @@ chunker_fill(Chunker *c)
             // some error happened
             return 0;
         }
+        #if ( _XOPEN_SOURCE >= 600 || _POSIX_C_SOURCE >= 200112L )
+        // We tell the OS that we do not need the data of this file any more
+        // that it maybe has in the cache. This avoids that we spoil the
+        // complete cache with data that we only read once and (due to cache
+        // size limit) kick out data from the cache that might be still useful
+        // for the OS or other processes.
+        posix_fadvise(c->fh, (off_t) 0, (off_t) 0, POSIX_FADV_DONTNEED);
+        #endif
     }
     else {
         // no os-level file descriptor, use Python file object API

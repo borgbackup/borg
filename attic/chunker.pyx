@@ -9,7 +9,7 @@ cdef extern from "_chunker.c":
     ctypedef struct _Chunker "Chunker":
         pass
     _Chunker *chunker_init(int window_size, int chunk_mask, int min_size, uint32_t seed)
-    void chunker_set_fd(_Chunker *chunker, object fd)
+    void chunker_set_fd(_Chunker *chunker, object f, int fd)
     void chunker_free(_Chunker *chunker)
     object chunker_process(_Chunker *chunker)
     uint32_t *buzhash_init_table(uint32_t seed)
@@ -23,8 +23,15 @@ cdef class Chunker:
     def __cinit__(self, window_size, chunk_mask, min_size, seed):
         self.chunker = chunker_init(window_size, chunk_mask, min_size, seed & 0xffffffff)
 
-    def chunkify(self, fd):
-        chunker_set_fd(self.chunker, fd)
+    def chunkify(self, fd, fh=-1):
+        """
+        Cut a file into chunks.
+
+        :param fd: Python file object
+        :param fh: OS-level file handle (if available),
+                   defaults to -1 which means not to use OS-level fd.
+        """
+        chunker_set_fd(self.chunker, fd, fh)
         return self
 
     def __dealloc__(self):

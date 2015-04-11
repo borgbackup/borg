@@ -555,6 +555,10 @@ class LoggedIO:
         header = self.header_no_crc_fmt.pack(size, TAG_PUT)
         crc = self.crc_fmt.pack(crc32(data, crc32(id, crc32(header))) & 0xffffffff)
         fd.write(b''.join((crc, header, id, data)))
+        if hasattr(os, 'posix_fadvise'):  # python >= 3.3, only on UNIX
+            # tell the OS that it does not need to cache what we just wrote,
+            # avoids spoiling the cache for the OS and other processes.
+            os.posix_fadvise(fd.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
         self.offset += size
         return self.segment, offset
 

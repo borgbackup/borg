@@ -464,9 +464,10 @@ class Archive:
             status = 'A'  # regular file, added
         # Only chunkify the file if needed
         if chunks is None:
-            with Archive._open_rb(path, st) as fd:
+            fh = Archive._open_rb(path, st)
+            with os.fdopen(fh, 'rb') as fd:
                 chunks = []
-                for chunk in self.chunker.chunkify(fd):
+                for chunk in self.chunker.chunkify(fd, fh):
                     chunks.append(cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats))
             cache.memorize_file(path_hash, st, [c[0] for c in chunks])
             status = status or 'M'  # regular file, modified (if not 'A' already)
@@ -488,12 +489,10 @@ class Archive:
         euid = None
 
         def open_simple(p, s):
-            fd = os.open(p, flags_normal)
-            return os.fdopen(fd, 'rb')
+            return os.open(p, flags_normal)
 
         def open_noatime(p, s):
-            fd = os.open(p, flags_noatime)
-            return os.fdopen(fd, 'rb')
+            return os.open(p, flags_noatime)
 
         def open_noatime_if_owner(p, s):
             if euid == 0 or s.st_uid == euid:
@@ -515,7 +514,7 @@ class Archive:
                 # So in future, let's check whether the file is owned by us
                 # before attempting to use O_NOATIME.
                 Archive._open_rb = open_noatime_if_owner
-            return os.fdopen(fd, 'rb')
+            return fd
 
         if flags_noatime != flags_normal:
             # Always use O_NOATIME version.

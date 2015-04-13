@@ -51,6 +51,14 @@ class LocationTestCase(AtticTestCase):
         )
         self.assert_raises(ValueError, lambda: Location('ssh://localhost:22/path:archive'))
 
+    def test_canonical_path(self):
+        locations = ['some/path::archive', 'file://some/path::archive', 'host:some/path::archive',
+                     'host:~user/some/path::archive', 'ssh://host/some/path::archive',
+                     'ssh://user@host:1234/some/path::archive']
+        for location in locations:
+            self.assert_equal(Location(location).canonical_path(),
+                              Location(Location(location).canonical_path()).canonical_path())
+
 
 class FormatTimedeltaTestCase(AtticTestCase):
 

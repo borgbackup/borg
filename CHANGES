@@ -7,6 +7,7 @@ Version 0.15
 ------------
 
 (feature release, released on X)
+- Reduce repository listing memory usage (#163).
 - Fix BrokenPipeError for remote repositories (#233)
 - Fix incorrect behavior with two character directory names (#265, #268)
 - Require approval before accessing relocated/moved repository (#271)

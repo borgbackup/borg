@@ -7,6 +7,7 @@ Version 0.15
 ------------
 
 (feature release, released on X)
+- Fix incorrect behavior with two character directory names (#265, #268)
 - Require approval before accessing relocated/moved repository (#271)
 - Require approval before accessing previously unknown unencrypted repositories (#271)
 - Fix issue with hash index files larger than 2GB.

@@ -109,11 +109,12 @@ class MakePathSafeTestCase(AtticTestCase):
     def test(self):
         self.assert_equal(make_path_safe('/foo/bar'), 'foo/bar')
         self.assert_equal(make_path_safe('/foo/bar'), 'foo/bar')
+        self.assert_equal(make_path_safe('/f/bar'), 'f/bar')
+        self.assert_equal(make_path_safe('fo/bar'), 'fo/bar')
         self.assert_equal(make_path_safe('../foo/bar'), 'foo/bar')
         self.assert_equal(make_path_safe('../../foo/bar'), 'foo/bar')
         self.assert_equal(make_path_safe('/'), '.')
         self.assert_equal(make_path_safe('/'), '.')
-
 
 class UpgradableLockTestCase(AtticTestCase):
 

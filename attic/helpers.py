@@ -513,7 +513,7 @@ def remove_surrogates(s, errors='replace'):
     return s.encode('utf-8', errors).decode('utf-8')
 
 
-_safe_re = re.compile('^((..)?/+)+')
+_safe_re = re.compile(r'^((\.\.)?/+)+')
 
 
 def make_path_safe(path):

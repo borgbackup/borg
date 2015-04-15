@@ -25,6 +25,10 @@ from attic.crypto import pbkdf2_sha256, get_random_bytes, AES, AES_CTR_MODE, AES
     bytes_to_int, increment_iv
 from attic.helpers import IntegrityError, get_keys_dir, Error
 
+# TODO fix cyclic import:
+#from attic.archive import CHUNK_MAX
+CHUNK_MAX = 10 * 1024 * 1024
+
 Meta = namedtuple('Meta', 'compr_type, key_type, mac_type, cipher_type, iv, legacy')
 
 
@@ -783,13 +787,12 @@ def parser03(all_data):  # new & flexible
     meta is a Meta namedtuple and contains all required information about data.
     data is maybe compressed (see meta) and maybe encrypted (see meta).
     """
-    max_len = 10000000  # XXX formula?
     unpacker = msgpack.Unpacker(
         use_list=False,
         # avoid memory allocation issues causes by tampered input data.
-        max_buffer_size=max_len,  # does not work in 0.4.6 unpackb C implementation
+        max_buffer_size=CHUNK_MAX + 1000,  # does not work in 0.4.6 unpackb C implementation
         max_array_len=10,  # meta_tuple
-        max_bin_len=max_len,  # data
+        max_bin_len=CHUNK_MAX,  # data
         max_str_len=0,  # not used yet
         max_map_len=0,  # not used yet
         max_ext_len=0,  # not used yet

@@ -22,6 +22,8 @@ class Cache:
     class CacheInitAbortedError(Error):
         """Cache initialization aborted"""
 
+    class RepositoryAccessAborted(Error):
+        """Repository access aborted"""
 
     class EncryptionMethodMismatch(Error):
         """Repository encryption method changed since last acccess, refusing to continue
@@ -37,15 +39,20 @@ class Cache:
         self.manifest = manifest
         self.path = path or os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
         self.do_files = do_files
+        # Warn user before sending data to a never seen before unencrypted repository
         if not os.path.exists(self.path):
             if warn_if_unencrypted and isinstance(key, PlaintextKey):
-                if 'ATTIC_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK' not in os.environ:
-                    print("""Warning: Attempting to access a previously unknown unencrypted repository\n""", file=sys.stderr)
-                    answer = input('Do you want to continue? [yN] ')
-                    if not (answer and answer in 'Yy'):
-                        raise self.CacheInitAbortedError()
+                if not self._confirm('Warning: Attempting to access a previously unknown unencrypted repository',
+                                     'ATTIC_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'):
+                    raise self.CacheInitAbortedError()
             self.create()
         self.open()
+        # Warn user before sending data to a relocated repository
+        if self.previous_location and self.previous_location != repository._location.canonical_path():
+            msg = 'Warning: The repository at location {} was previously located at {}'.format(repository._location.canonical_path(), self.previous_location)
+            if not self._confirm(msg, 'ATTIC_RELOCATED_REPO_ACCESS_IS_OK'):
+                raise self.RepositoryAccessAborted()
+
         if sync and self.manifest.id != self.manifest_id:
             # If repository is older than the cache something fishy is going on
             if self.timestamp and self.timestamp > manifest.timestamp:
@@ -58,6 +65,16 @@ class Cache:
 
     def __del__(self):
         self.close()
+
+    def _confirm(self, message, env_var_override=None):
+        print(message, file=sys.stderr)
+        if env_var_override and os.environ.get(env_var_override):
+            print("Yes (From {})".format(env_var_override))
+            return True
+        if sys.stdin.isatty():
+            return False
+        answer = input('Do you want to continue? [yN] ')
+        return answer and answer in 'Yy'
 
     def create(self):
         """Create a new empty cache at `path`
@@ -89,6 +106,7 @@ class Cache:
         self.manifest_id = unhexlify(self.config.get('cache', 'manifest'))
         self.timestamp = self.config.get('cache', 'timestamp', fallback=None)
         self.key_type = self.config.get('cache', 'key_type', fallback=None)
+        self.previous_location = self.config.get('cache', 'previous_location', fallback=None)
         self.chunks = ChunkIndex.read(os.path.join(self.path, 'chunks').encode('utf-8'))
         self.files = None
 
@@ -139,6 +157,7 @@ class Cache:
         self.config.set('cache', 'manifest', hexlify(self.manifest.id).decode('ascii'))
         self.config.set('cache', 'timestamp', self.manifest.timestamp)
         self.config.set('cache', 'key_type', str(self.key.TYPE))
+        self.config.set('cache', 'previous_location', self.repository._location.canonical_path())
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             self.config.write(fd)
         self.chunks.write(os.path.join(self.path, 'chunks').encode('utf-8'))

@@ -218,6 +218,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_equal(repository_id, self._extract_repository_id(self.repository_path))
         self.assert_raises(Cache.EncryptionMethodMismatch, lambda :self.attic('create', self.repository_location + '::test.2', 'input'))
 
+    def test_repository_swap_detection2(self):
+        self.create_test_files()
+        self.attic('init', '--encryption=none', self.repository_location + '_unencrypted')
+        os.environ['ATTIC_PASSPHRASE'] = 'passphrase'
+        self.attic('init', '--encryption=passphrase', self.repository_location + '_encrypted')
+        self.attic('create', self.repository_location + '_encrypted::test', 'input')
+        shutil.rmtree(self.repository_path + '_encrypted')
+        os.rename(self.repository_path + '_unencrypted', self.repository_path + '_encrypted')
+        self.assert_raises(Cache.RepositoryAccessAborted, lambda :self.attic('create', self.repository_location + '_encrypted::test.2', 'input'))
+
     def test_strip_components(self):
         self.attic('init', self.repository_location)
         self.create_regular_file('dir/file')

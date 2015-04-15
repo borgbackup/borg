@@ -469,6 +469,21 @@ class Location:
     def __repr__(self):
         return "Location(%s)" % self
 
+    def canonical_path(self):
+        if self.proto == 'file':
+            return self.path
+        else:
+            if self.path and self.path.startswith('~'):
+                path = '/' + self.path
+            elif self.path and not self.path.startswith('/'):
+                path = '/~/' + self.path
+            else:
+                path = self.path
+            return 'ssh://{}{}{}{}'.format('{}@'.format(self.user) if self.user else '',
+                                                        self.host,
+                                                        ':{}'.format(self.port) if self.port else '',
+                                                        path)
+
 
 def location_validator(archive=None):
     def validator(text):
@@ -510,7 +525,7 @@ def remove_surrogates(s, errors='replace'):
     return s.encode('utf-8', errors).decode('utf-8')
 
 
-_safe_re = re.compile('^((\.\.)?/+)+')
+_safe_re = re.compile(r'^((\.\.)?/+)+')
 
 
 def make_path_safe(path):

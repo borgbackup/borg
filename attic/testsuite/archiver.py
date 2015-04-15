@@ -11,7 +11,7 @@ import time
 import unittest
 from hashlib import sha256
 from attic import xattr
-from attic.archive import Archive, ChunkBuffer
+from attic.archive import Archive, ChunkBuffer, CHUNK_MAX
 from attic.archiver import Archiver
 from attic.cache import Cache
 from attic.crypto import bytes16_to_int, num_aes_blocks
@@ -206,6 +206,38 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with open(os.path.join(path, 'config'), 'w') as fd:
             config.write(fd)
         return Repository(self.repository_path).id
+
+    def test_sparse_file(self):
+        filename = os.path.join(self.input_path, 'sparse')
+        content = b'foobar'
+        hole_size = 5 * CHUNK_MAX  # 5 full chunker buffers
+        with open(filename, 'wb') as fd:
+            # create a file that has a hole at the beginning and end
+            fd.seek(hole_size, 1)
+            fd.write(content)
+            fd.seek(hole_size, 1)
+            pos = fd.tell()
+            fd.truncate(pos)
+        total_len = hole_size + len(content) + hole_size
+        st = os.stat(filename)
+        self.assert_equal(st.st_size, total_len)
+        if hasattr(st, 'st_blocks'):
+            self.assert_true(st.st_blocks * 512 < total_len / 10)  # is input sparse?
+        self.attic('init', self.repository_location)
+        self.attic('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.attic('extract', self.repository_location + '::test')
+        self.assert_dirs_equal('input', 'output/input')
+        filename = os.path.join(self.output_path, 'input', 'sparse')
+        with open(filename, 'rb') as fd:
+            # check if file contents are as expected
+            self.assert_equal(fd.read(hole_size), b'\0' * hole_size)
+            self.assert_equal(fd.read(len(content)), content)
+            self.assert_equal(fd.read(hole_size), b'\0' * hole_size)
+        st = os.stat(filename)
+        self.assert_equal(st.st_size, total_len)
+        if hasattr(st, 'st_blocks'):
+            self.assert_true(st.st_blocks * 512 < total_len / 10)  # is output sparse?
 
     def test_repository_swap_detection(self):
         self.create_test_files()

@@ -6,7 +6,8 @@ Here you can see the full list of changes between each Attic release.
 Version 0.15
 ------------
 
-(feature release, released on X)
+(bugfix release, released on Apr 15, 2015)
+- xattr: Be less strict about unknown/unsupported platforms (#239)
 - Reduce repository listing memory usage (#163).
 - Fix BrokenPipeError for remote repositories (#233)
 - Fix incorrect behavior with two character directory names (#265, #268)

@@ -9,9 +9,9 @@ elif platform == 'FreeBSD':
 elif platform == 'Darwin':
     from attic.platform_darwin import acl_get, acl_set, API_VERSION
 else:
-    API_VERSION = 1
+    API_VERSION = 2
 
-    def acl_get(path, item, numeric_owner=False):
+    def acl_get(path, item, st, numeric_owner=False):
         pass
     def acl_set(path, item, numeric_owner=False):
         pass

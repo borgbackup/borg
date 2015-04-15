@@ -248,4 +248,11 @@ elif sys.platform.startswith('freebsd'):
         _check(func(path, EXTATTR_NAMESPACE_USER, name, value, len(value) if value else 0), path)
 
 else:
-    raise Exception('Unsupported platform: %s' % sys.platform)
+    def listxattr(path, *, follow_symlinks=True):
+        return []
+
+    def getxattr(path, name, *, follow_symlinks=True):
+        pass
+
+    def setxattr(path, name, value, *, follow_symlinks=True):
+        pass

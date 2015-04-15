@@ -1,7 +1,10 @@
 import msgpack
 from attic.testsuite import AtticTestCase
-from attic.archive import CacheChunkBuffer, RobustUnpacker
+from attic.testsuite.mock import Mock
+from attic.archive import Archive, CacheChunkBuffer, RobustUnpacker
 from attic.key import PlaintextKey, COMPR_DEFAULT
+from attic.helpers import Manifest
+from datetime import datetime, timezone
 
 
 class MockCache:
@@ -12,6 +15,33 @@ class MockCache:
     def add_chunk(self, id, data, stats=None):
         self.objects[id] = data
         return id, len(data), len(data)
+
+
+class ArchiveTimestampTestCase(AtticTestCase):
+
+    class MockArgs(object):
+        repository = None
+        compression = COMPR_DEFAULT
+        mac = None
+        cipher = None
+
+    def _test_timestamp_parsing(self, isoformat, expected):
+        repository = Mock()
+        key = PlaintextKey.create(None, self.MockArgs())
+        manifest = Manifest(repository, key)
+        a = Archive(repository, key, manifest, 'test', create=True)
+        a.metadata = {b'time': isoformat}
+        self.assert_equal(a.ts, expected)
+
+    def test_with_microseconds(self):
+        self._test_timestamp_parsing(
+            '1970-01-01T00:00:01.000001',
+            datetime(1970, 1, 1, 0, 0, 1, 1, timezone.utc))
+
+    def test_without_microseconds(self):
+        self._test_timestamp_parsing(
+            '1970-01-01T00:00:01',
+            datetime(1970, 1, 1, 0, 0, 1, 0, timezone.utc))
 
 
 class ChunkBufferTestCase(AtticTestCase):

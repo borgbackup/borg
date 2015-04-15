@@ -85,14 +85,14 @@ typedef struct {
 } Chunker;
 
 static Chunker *
-chunker_init(int window_size, int chunk_mask, int min_size, uint32_t seed)
+chunker_init(int window_size, int chunk_mask, int min_size, int max_size, uint32_t seed)
 {
     Chunker *c = calloc(sizeof(Chunker), 1);
     c->window_size = window_size;
     c->chunk_mask = chunk_mask;
     c->min_size = min_size;
     c->table = buzhash_init_table(seed);
-    c->buf_size = 10 * 1024 * 1024;
+    c->buf_size = max_size;
     c->data = malloc(c->buf_size);
     return c;
 }

@@ -8,7 +8,7 @@ cdef extern from "_chunker.c":
     ctypedef int uint32_t
     ctypedef struct _Chunker "Chunker":
         pass
-    _Chunker *chunker_init(int window_size, int chunk_mask, int min_size, uint32_t seed)
+    _Chunker *chunker_init(int window_size, int chunk_mask, int min_size, int max_size, uint32_t seed)
     void chunker_set_fd(_Chunker *chunker, object fd)
     void chunker_free(_Chunker *chunker)
     object chunker_process(_Chunker *chunker)
@@ -20,8 +20,8 @@ cdef extern from "_chunker.c":
 cdef class Chunker:
     cdef _Chunker *chunker
 
-    def __cinit__(self, window_size, chunk_mask, min_size, seed):
-        self.chunker = chunker_init(window_size, chunk_mask, min_size, seed & 0xffffffff)
+    def __cinit__(self, window_size, chunk_mask, min_size, max_size, seed):
+        self.chunker = chunker_init(window_size, chunk_mask, min_size, max_size, seed & 0xffffffff)
 
     def chunkify(self, fd):
         chunker_set_fd(self.chunker, fd)

@@ -22,8 +22,11 @@ from attic.helpers import Error, uid2user, user2uid, gid2group, group2gid, \
 
 ITEMS_BUFFER = 1024 * 1024
 CHUNK_MIN = 1024
+CHUNK_MAX = 10 * 1024 * 1024
 WINDOW_SIZE = 0xfff
 CHUNK_MASK = 0xffff
+
+ZEROS = b'\0' * CHUNK_MAX
 
 utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
 utime_supports_follow_symlinks = os.utime in getattr(os, 'supports_follow_symlinks', {})
@@ -71,7 +74,7 @@ class ChunkBuffer:
         self.packer = msgpack.Packer(unicode_errors='surrogateescape')
         self.chunks = []
         self.key = key
-        self.chunker = Chunker(WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, self.key.chunk_seed)
+        self.chunker = Chunker(WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, CHUNK_MAX,self.key.chunk_seed)
 
     def add(self, item):
         self.buffer.write(self.packer.pack(StableDict(item)))
@@ -134,7 +137,7 @@ class Archive:
         self.pipeline = DownloadPipeline(self.repository, self.key)
         if create:
             self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
-            self.chunker = Chunker(WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, self.key.chunk_seed)
+            self.chunker = Chunker(WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, CHUNK_MAX, self.key.chunk_seed)
             if name in manifest.archives:
                 raise self.AlreadyExists(name)
             self.last_checkpoint = time.time()
@@ -269,7 +272,13 @@ class Archive:
                 with open(path, 'wb') as fd:
                     ids = [c[0] for c in item[b'chunks']]
                     for data in self.pipeline.fetch_many(ids, is_preloaded=True):
-                        fd.write(data)
+                        if ZEROS.startswith(data):
+                            # all-zero chunk: create a hole in a sparse file
+                            fd.seek(len(data), 1)
+                        else:
+                            fd.write(data)
+                    pos = fd.tell()
+                    fd.truncate(pos)
                     fd.flush()
                     self.restore_attrs(path, item, fd=fd.fileno())
         elif stat.S_ISFIFO(mode):

@@ -78,6 +78,13 @@ class Repository:
         with open(os.path.join(path, 'config'), 'w') as fd:
             config.write(fd)
 
+    def destroy(self):
+        """Destroy the repository at `self.path`
+        """
+        self.close()
+        os.remove(os.path.join(self.path, 'config'))  # kill config first
+        shutil.rmtree(self.path)
+
     def get_index_transaction_id(self):
         indices = sorted((int(name[6:]) for name in os.listdir(self.path) if name.startswith('index.') and name[6:].isdigit()))
         if indices:

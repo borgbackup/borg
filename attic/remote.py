@@ -250,6 +250,9 @@ class RemoteRepository:
     def rollback(self, *args):
         return self.call('rollback')
 
+    def destroy(self):
+        return self.call('destroy')
+
     def __len__(self):
         return self.call('__len__')
 

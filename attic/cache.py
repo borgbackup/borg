@@ -73,7 +73,10 @@ class Cache:
             return True
         if sys.stdin.isatty():
             return False
-        answer = input('Do you want to continue? [yN] ')
+        try:
+            answer = input('Do you want to continue? [yN] ')
+        except EOFError:
+            return False
         return answer and answer in 'Yy'
 
     def create(self):

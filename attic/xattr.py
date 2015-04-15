@@ -248,14 +248,11 @@ elif sys.platform.startswith('freebsd'):
         _check(func(path, EXTATTR_NAMESPACE_USER, name, value, len(value) if value else 0), path)
 
 else:
-    # this is a dummy xattr interface for platforms for which we do not have
-    # a real implementation (or which do not support xattr at all).
-
     def listxattr(path, *, follow_symlinks=True):
         return []
 
     def getxattr(path, name, *, follow_symlinks=True):
-        return
+        pass
 
     def setxattr(path, name, value, *, follow_symlinks=True):
-        return
+        pass

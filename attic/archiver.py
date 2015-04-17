@@ -223,6 +223,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         patterns = adjust_patterns(args.paths, args.excludes)
         dry_run = args.dry_run
         stdout = args.stdout
+        sparse = args.sparse
         strip_components = args.strip_components
         dirs = []
         for item in archive.iter_items(lambda item: not exclude_path(item[b'path'], patterns), preload=True):
@@ -243,7 +244,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                         dirs.append(item)
                         archive.extract_item(item, restore_attrs=False)
                     else:
-                        archive.extract_item(item, stdout=stdout)
+                        archive.extract_item(item, stdout=stdout, sparse=sparse)
             except IOError as e:
                 self.print_error('%s: %s', remove_surrogates(orig_path), e)
 
@@ -690,6 +691,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('--stdout', dest='stdout',
                                action='store_true', default=False,
                                help='write all extracted data to stdout')
+        subparser.add_argument('--sparse', dest='sparse',
+                               action='store_true', default=False,
+                               help='create holes in output sparse file from all-zero chunks')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to extract')

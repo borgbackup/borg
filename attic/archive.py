@@ -246,7 +246,7 @@ class Archive:
         cache.rollback()
         return stats
 
-    def extract_item(self, item, restore_attrs=True, dry_run=False, stdout=False):
+    def extract_item(self, item, restore_attrs=True, dry_run=False, stdout=False, sparse=False):
         if dry_run or stdout:
             if b'chunks' in item:
                 for data in self.pipeline.fetch_many([c[0] for c in item[b'chunks']], is_preloaded=True):
@@ -288,7 +288,7 @@ class Archive:
                 with open(path, 'wb') as fd:
                     ids = [c[0] for c in item[b'chunks']]
                     for data in self.pipeline.fetch_many(ids, is_preloaded=True):
-                        if ZEROS.startswith(data):
+                        if sparse and ZEROS.startswith(data):
                             # all-zero chunk: create a hole in a sparse file
                             fd.seek(len(data), 1)
                         else:

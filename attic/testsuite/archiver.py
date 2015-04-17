@@ -216,7 +216,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.attic('init', self.repository_location)
         self.attic('create', self.repository_location + '::test', 'input')
         with changedir('output'):
-            self.attic('extract', self.repository_location + '::test')
+            self.attic('extract', '--sparse', self.repository_location + '::test')
         self.assert_dirs_equal('input', 'output/input')
         filename = os.path.join(self.output_path, 'input', 'sparse')
         with open(filename, 'rb') as fd:

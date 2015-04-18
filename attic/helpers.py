@@ -269,6 +269,26 @@ class ExcludePattern(IncludePattern):
         return '%s(%s)' % (type(self), self.pattern)
 
 
+def timestamp(s):
+    """Convert a --timestamp=s argument to a datetime object"""
+    try:
+        # is it pointing to a file / directory?
+        ts = os.stat(s).st_mtime
+        return datetime.utcfromtimestamp(ts)
+    except OSError:
+        # didn't work, try parsing as timestamp. UTC, no TZ, no microsecs support.
+        for format in ('%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%dT%H:%M:%S+00:00',
+                       '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S',
+                       '%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M',
+                       '%Y-%m-%d', '%Y-%j',
+                       ):
+            try:
+                return datetime.strptime(s, format)
+            except ValueError:
+                continue
+        raise ValueError
+
+
 def is_cachedir(path):
     """Determines whether the specified path is a cache directory (and
     therefore should potentially be excluded from the backup) according to

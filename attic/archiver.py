@@ -15,7 +15,7 @@ from attic.repository import Repository
 from attic.cache import Cache
 from attic.key import key_creator
 from attic.helpers import Error, location_validator, format_time, \
-    format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, \
+    format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     is_cachedir, bigint_to_int
@@ -127,7 +127,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             else:
                 restrict_dev = None
             self._process(archive, cache, args.excludes, args.exclude_caches, skip_inodes, path, restrict_dev)
-        archive.save()
+        archive.save(timestamp=args.timestamp)
         if args.stats:
             t = datetime.now()
             diff = t - t0
@@ -551,6 +551,11 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,
                                help='only store numeric user and group identifiers')
+        subparser.add_argument('--timestamp', dest='timestamp',
+                               type=timestamp, default=None,
+                               metavar='yyyy-mm-ddThh:mm:ss',
+                               help='manually specify the archive creation date/time (UTC). '
+                                    'alternatively, give a reference file/directory.')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to create')

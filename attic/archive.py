@@ -184,11 +184,13 @@ class Archive:
         del self.manifest.archives[self.checkpoint_name]
         self.cache.chunk_decref(self.id, self.stats)
 
-    def save(self, name=None):
+    def save(self, name=None, timestamp=None):
         name = name or self.name
         if name in self.manifest.archives:
             raise self.AlreadyExists(name)
         self.items_buffer.flush(flush=True)
+        if timestamp is None:
+            timestamp = datetime.utcnow()
         metadata = StableDict({
             'version': 1,
             'name': name,
@@ -196,7 +198,7 @@ class Archive:
             'cmdline': sys.argv,
             'hostname': socket.gethostname(),
             'username': getuser(),
-            'time': datetime.utcnow().isoformat(),
+            'time': timestamp.isoformat(),
         })
         data = msgpack.packb(metadata, unicode_errors='surrogateescape')
         self.id = self.key.id_hash(data)

@@ -185,6 +185,14 @@ def to_localtime(ts):
     return datetime(*time.localtime((ts - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds())[:6])
 
 
+def parse_timestamp(timestamp):
+    """Parse a ISO 8601 timestamp string"""
+    if '.' in timestamp:  # microseconds might not be pressent
+        return datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%f').replace(tzinfo=timezone.utc)
+    else:
+        return datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
+
+
 def update_excludes(args):
     """Merge exclude patterns from files with those on command line.
     Empty lines and lines starting with '#' are ignored, but whitespace

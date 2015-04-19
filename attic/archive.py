@@ -163,8 +163,7 @@ class Archive:
     @property
     def ts(self):
         """Timestamp of archive creation in UTC"""
-        t, f = self.metadata[b'time'].split('.', 1)
-        return datetime.strptime(t, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc) + timedelta(seconds=float('.' + f))
+        return parse_timestamp(self.metadata[b'time'])
 
     def __repr__(self):
         return 'Archive(%r)' % self.name

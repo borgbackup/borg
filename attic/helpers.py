@@ -5,7 +5,6 @@ import msgpack
 import os
 import pwd
 import re
-import stat
 import sys
 import time
 from datetime import datetime, timezone, timedelta

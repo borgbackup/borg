@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from getpass import getuser
 from itertools import groupby
 import errno

@@ -1,16 +1,29 @@
-Stuff in "merge" that is not in "master" minus minor changes:
+Important note about "merge" branch
+===================================
 
-dummy acl and xattr implementation for unsupported platforms
+Goal of the "merge" branch is to be conservative and only merge:
+- bug fixes
+- new features that do not impact compatibility
+- docs updates
+- etc.
+
+BUT: THERE IS NO GUARANTEE THAT IT IS ALWAYS COMPATIBLE WITH ORIGINAL ATTIC
+nor THAT YOU CAN SWITCH BACK AND FORTH BETWEEN ORIGINAL CODE AND THIS CODE
+WITHIN THE SAME REPOSITORY WITHOUT ENCOUNTERING ISSUES.
+
+Please also see the LICENSE for more informations.
+
+
+Stuff in "merge" that is not in "master" minus minor changes
+============================================================
+
 give specific path to xattr.is_enabled(), disable symlink setattr call that always fails
-less memory usage: do not create items_buffer and chunker unless we are creating new archive
 fix misleading hint the fuse ImportError handler gave, fixes #237
 source: misc. cleanups, pep8, style
-serve: use os.write(stdout_fd, ...), fixes #233
 implement attic check --last N
 check: sort archives in reverse time order
 avoid defect python-msgpack releases, fixes #171, fixes #185
 check unpacked data from RPC for tuple type and correct length, fixes #127
-Cache: do not try to release the lock twice
 less memory usage: add global option --no-cache-files
 fix traceback when trying to do unsupported passphrase change, fixes #189
 datetime does not like the year 10.000, fixes issue #139
@@ -19,7 +32,22 @@ cleanup crypto.pyx, make it easier to adapt to other modes
 attic extract: if --stdout is given, write all extracted binary data to stdout
 attic create: if "-" is given as path, read binary from stdin
 do os.fsync like recommended in the python docs
-Extra debug information for 'fread failed'
+extra debug information for 'fread failed'
 FUSE: reflect deduplication in allocated blocks
-Only allow whitelisted RPC calls in server mode
-Normalize source/exclude paths before matching
+only allow whitelisted RPC calls in server mode
+normalize source/exclude paths before matching
+fix "attic info" all archives stats, fixes #183
+implement attic create --timestamp, utc string or reference file/dir
+simple sparse file support (attic extract --sparse)
+fix parsing with missing microseconds, fixes #282
+use posix_fadvise to not spoil the OS cache, fixes #252
+source: Let chunker optionally work with os-level file descriptor.
+source: Linux: remove duplicate os.fsencode calls
+fix test setup for 32bit platforms, partial fix for #196
+source: refactor _open_rb code a bit, so it is more consistent / regular
+implement attic rename repo::oldname newname
+implement attic create --progress
+source: refactor indicator (status) and item processing
+implement attic delete <repository> (also deletes local cache)
+better attic create -v output
+

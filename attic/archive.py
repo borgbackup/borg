@@ -14,6 +14,7 @@ import sys
 import time
 from io import BytesIO
 from attic import xattr
+from attic.cache import Cache
 from attic.platform import acl_get, acl_set
 from attic.chunker import Chunker
 from attic.hashindex import ChunkIndex
@@ -223,20 +224,22 @@ class Archive:
         self.repository.commit()
         self.cache.commit()
 
-    def calc_stats(self, cache):
+    def calc_stats(self):
         def add(id):
-            count, size, csize = self.cache.chunks[id]
+            count, size, csize = cache.chunks[id]
             stats.update(size, csize, count == 1)
-            self.cache.chunks[id] = count - 1, size, csize
+            cache.chunks[id] = count - 1, size, csize  # dirties cache.chunks!
 
         def add_file_chunks(chunks):
             for id, _, _ in chunks:
                 add(id)
+
         # This function is a bit evil since it abuses the cache to calculate
-        # the stats. The cache transaction must be rolled back afterwards
-        unpacker = msgpack.Unpacker(use_list=False)
+        # the stats. The cache transaction must be rolled back afterwards.
+        cache = Cache(self.repository, self.key, self.manifest)
         cache.begin_txn()
         stats = Statistics()
+        unpacker = msgpack.Unpacker(use_list=False)
         add(self.id)
         for id, chunk in zip(self.metadata[b'items'], self.repository.get_many(self.metadata[b'items'])):
             add(id)

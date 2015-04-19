@@ -209,7 +209,7 @@ class Archive:
         def add(id):
             count, size, csize = cache.chunks[id]
             stats.update(size, csize, count == 1)
-            self.cache.chunks[id] = count - 1, size, csize
+            cache.chunks[id] = count - 1, size, csize
         def add_file_chunks(chunks):
             for id, _, _ in chunks:
                 add(id)

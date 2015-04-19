@@ -86,19 +86,20 @@ def acl_get(path, item, st, numeric_owner=False):
     cdef char *default_text = NULL
     cdef char *access_text = NULL
 
-    if S_ISLNK(st.st_mode) or acl_extended_file(<bytes>os.fsencode(path)) <= 0:
+    p = <bytes>os.fsencode(path)
+    if S_ISLNK(st.st_mode) or acl_extended_file(p) <= 0:
         return
     if numeric_owner:
         converter = acl_numeric_ids
     else:
         converter = acl_append_numeric_ids
     try:
-        access_acl = acl_get_file(<bytes>os.fsencode(path), ACL_TYPE_ACCESS)
+        access_acl = acl_get_file(p, ACL_TYPE_ACCESS)
         if access_acl:
             access_text = acl_to_text(access_acl, NULL)
             if access_text:
                 item[b'acl_access'] = converter(access_text)
-        default_acl = acl_get_file(<bytes>os.fsencode(path), ACL_TYPE_DEFAULT)
+        default_acl = acl_get_file(p, ACL_TYPE_DEFAULT)
         if default_acl:
             default_text = acl_to_text(default_acl, NULL)
             if default_text:
@@ -118,6 +119,8 @@ def acl_set(path, item, numeric_owner=False):
     """
     cdef acl_t access_acl = NULL
     cdef acl_t default_acl = NULL
+
+    p = <bytes>os.fsencode(path)
     if numeric_owner:
         converter = posix_acl_use_stored_uid_gid
     else:
@@ -128,13 +131,13 @@ def acl_set(path, item, numeric_owner=False):
         try:
             access_acl = acl_from_text(<bytes>converter(access_text))
             if access_acl:
-                acl_set_file(<bytes>os.fsencode(path), ACL_TYPE_ACCESS, access_acl)
+                acl_set_file(p, ACL_TYPE_ACCESS, access_acl)
         finally:
             acl_free(access_acl)
     if default_text:
         try:
             default_acl = acl_from_text(<bytes>converter(default_text))
             if default_acl:
-                acl_set_file(<bytes>os.fsencode(path), ACL_TYPE_DEFAULT, default_acl)
+                acl_set_file(p, ACL_TYPE_DEFAULT, default_acl)
         finally:
             acl_free(default_acl)

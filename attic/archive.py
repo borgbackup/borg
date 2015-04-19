@@ -207,7 +207,7 @@ class Archive:
 
     def calc_stats(self, cache):
         def add(id):
-            count, size, csize = self.cache.chunks[id]
+            count, size, csize = cache.chunks[id]
             stats.update(size, csize, count == 1)
             self.cache.chunks[id] = count - 1, size, csize
         def add_file_chunks(chunks):

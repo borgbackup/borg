@@ -1,23 +1,53 @@
-Stuff in merge-all and not in merge minus minor changes:
+Important note about "merge-all" branch
+=======================================
+
+Goal of the rather experimental "merge-all" branch is to merge all the stuff:
+- changesets from "merge" branch
+- features that DO IMPACT compatibility with original attic
+- etc.
+
+THERE IS NO GUARANTEE THAT IT IS COMPATIBLE WITH ORIGINAL ATTIC OR PREVIOUS
+"merge-all" CODE nor THAT YOU CAN SWITCH BACK AND FORTH BETWEEN ORIGINAL CODE
+OR PREVIOUS "merge-all" CODE AND THIS CODE WITHIN THE SAME REPOSITORY WITHOUT
+ENCOUNTERING SEVERE ISSUES.
+
+Please also see the LICENSE for more informations.
+
+
+Stuff in "merge-all" that is not in "merge" minus minor changes
+===============================================================
 
 added tuning docs
 
 attic init --compression NN --cipher NN --mac NN ...
 (see attic init --help)
 
-new hashes:      sha512_256
+new hashes:      sha512-256
+                 sha512
+                 sha1
                  ghash (default)
 new MACs:        hmac-sha512-256
+                 hmac-sha512
+                 hmac-sha1
                  gmac (default)
 new ciphers:     aes256-ctr + hmac-sha512-256
                  aes256-gcm (default)
 new compression: no compression (default)
                  zlib level 1..9 (previously, level 6 was hardcoded)
                  lzma preset 0..9
+                 lz4 (and other) multi-threaded algos from blosc library
 
 source: more flexible type 0x03 header format, allowing to give hash algo,
 compression algo and level, encryption algo, key type.
 
+IV is stored in full length, length of stored IV/MAC/hash is flexible.
+Indexing key size (key = id_hash()) is flexible and configurable per repo.
+
 source: less hardcoding, numeric offsets / lengths
 source: flexible hashing, compression, encryption, key dispatching
+
+
+Important changes and fixes within "merge-all" branch
+=====================================================
+Apr 15 2015: fix BufferFull msgpack exception
 

@@ -9,8 +9,6 @@ versioneer.versionfile_build = 'attic/_version.py'
 versioneer.tag_prefix = ''
 versioneer.parentdir_prefix = 'Attic-' # dirname like 'myproject-1.2.0'
 
-platform = os.uname()[0]
-
 min_python = (3, 2)
 if sys.version_info < min_python:
     print("Attic requires Python %d.%d or later" % min_python)
@@ -89,11 +87,11 @@ ext_modules = [
     Extension('attic.chunker', [chunker_source]),
     Extension('attic.hashindex', [hashindex_source])
 ]
-if platform == 'Linux':
+if sys.platform.startswith('linux'):
     ext_modules.append(Extension('attic.platform_linux', [platform_linux_source], libraries=['acl']))
-elif platform == 'FreeBSD':
+elif sys.platform.startswith('freebsd'):
     ext_modules.append(Extension('attic.platform_freebsd', [platform_freebsd_source]))
-elif platform == 'Darwin':
+elif sys.platform == 'darwin':
     ext_modules.append(Extension('attic.platform_darwin', [platform_darwin_source]))
 
 setup(

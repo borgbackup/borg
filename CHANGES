@@ -7,6 +7,7 @@ Version 0.16
 ------------
 
 (bugfix release, released on X)
+- More user friendly error message when repository key file is not found (#236)
 - Fix parsing of iso 8601 timestamps with zero microseconds (#282)
 
 Version 0.15

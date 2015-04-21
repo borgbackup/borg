@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from getpass import getuser
 from itertools import groupby
 import errno
@@ -14,11 +14,10 @@ import sys
 import time
 from io import BytesIO
 from attic import xattr
-from attic.cache import Cache
 from attic.platform import acl_get, acl_set
 from attic.chunker import Chunker
 from attic.hashindex import ChunkIndex
-from attic.helpers import Error, uid2user, user2uid, gid2group, group2gid, \
+from attic.helpers import parse_timestamp, Error, uid2user, user2uid, gid2group, group2gid, \
     Manifest, Statistics, decode_dict, st_mtime_ns, make_path_safe, StableDict, int_to_bigint, bigint_to_int
 
 ITEMS_BUFFER = 1024 * 1024
@@ -173,11 +172,7 @@ class Archive:
     @property
     def ts(self):
         """Timestamp of archive creation in UTC"""
-        t = self.metadata[b'time'].split('.', 1)
-        dt = datetime.strptime(t[0], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
-        if len(t) > 1:
-            dt += timedelta(seconds=float('.' + t[1]))
-        return dt
+        return parse_timestamp(self.metadata[b'time'])
 
     def __repr__(self):
         return 'Archive(%r)' % self.name
@@ -224,22 +219,19 @@ class Archive:
         self.repository.commit()
         self.cache.commit()
 
-    def calc_stats(self):
+    def calc_stats(self, cache):
         def add(id):
             count, size, csize = cache.chunks[id]
             stats.update(size, csize, count == 1)
-            cache.chunks[id] = count - 1, size, csize  # dirties cache.chunks!
-
+            cache.chunks[id] = count - 1, size, csize
         def add_file_chunks(chunks):
             for id, _, _ in chunks:
                 add(id)
-
         # This function is a bit evil since it abuses the cache to calculate
-        # the stats. The cache transaction must be rolled back afterwards.
-        cache = Cache(self.repository, self.key, self.manifest)
+        # the stats. The cache transaction must be rolled back afterwards
+        unpacker = msgpack.Unpacker(use_list=False)
         cache.begin_txn()
         stats = Statistics()
-        unpacker = msgpack.Unpacker(use_list=False)
         add(self.id)
         for id, chunk in zip(self.metadata[b'items'], self.repository.get_many(self.metadata[b'items'])):
             add(id)

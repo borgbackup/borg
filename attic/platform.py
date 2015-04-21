@@ -1,12 +1,10 @@
-import os
+import sys
 
-platform = os.uname()[0]
-
-if platform == 'Linux':
+if sys.platform.startswith('linux'):
     from attic.platform_linux import acl_get, acl_set, API_VERSION
-elif platform == 'FreeBSD':
+elif sys.platform.startswith('freebsd'):
     from attic.platform_freebsd import acl_get, acl_set, API_VERSION
-elif platform == 'Darwin':
+elif sys.platform == 'darwin':
     from attic.platform_darwin import acl_get, acl_set, API_VERSION
 else:
     API_VERSION = 2

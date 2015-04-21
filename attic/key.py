@@ -36,6 +36,11 @@ class UnsupportedPayloadError(Error):
     """Unsupported payload type {}. A newer version is required to access this repository.
     """
 
+class KeyfileNotFoundError(Error):
+    """No key file for repository {} found in {}.
+    """
+
+
 class sha512_256(object):  # note: can't subclass sha512
     """sha512, but digest truncated to 256bit - faster than sha256 on 64bit platforms"""
     digestsize = digest_size = 32
@@ -564,7 +569,7 @@ class KeyfileKey(AESKeyBase):
                 line = fd.readline().strip()
                 if line and line.startswith(cls.FILE_ID) and line[10:] == id:
                     return filename
-        raise Exception('Key file for repository with ID %s not found' % id)
+        raise KeyfileNotFoundError(repository._location.canonical_path(), get_keys_dir())
 
     def load(self, filename, passphrase):
         with open(filename, 'r') as fd:

@@ -3,6 +3,14 @@ Attic Changelog
 
 Here you can see the full list of changes between each Attic release.
 
+Version 0.16
+------------
+
+(bugfix release, released on X)
+- Fix "All archives" output for attic info. (#183)
+- More user friendly error message when repository key file is not found (#236)
+- Fix parsing of iso 8601 timestamps with zero microseconds (#282)
+
 Version 0.15
 ------------
 

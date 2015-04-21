@@ -103,11 +103,7 @@ class Cache:
         os.remove(os.path.join(self.path, 'config'))  # kill config first
         shutil.rmtree(self.path)
 
-    def open(self):
-        if not os.path.isdir(self.path):
-            raise Exception('%s Does not look like an Attic cache' % self.path)
-        self.lock = UpgradableLock(os.path.join(self.path, 'config'), exclusive=True)
-        self.rollback()
+    def _do_open(self):
         self.config = RawConfigParser()
         self.config.read(os.path.join(self.path, 'config'))
         if self.config.getint('cache', 'version') != 1:
@@ -120,6 +116,12 @@ class Cache:
         self.chunks = ChunkIndex.read(os.path.join(self.path, 'chunks').encode('utf-8'),
                                       key_size=self.repository.key_size)
         self.files = None
+
+    def open(self):
+        if not os.path.isdir(self.path):
+            raise Exception('%s Does not look like an Attic cache' % self.path)
+        self.lock = UpgradableLock(os.path.join(self.path, 'config'), exclusive=True)
+        self.rollback()
 
     def close(self):
         if self.lock:
@@ -193,6 +195,7 @@ class Cache:
             if os.path.exists(os.path.join(self.path, 'txn.tmp')):
                 shutil.rmtree(os.path.join(self.path, 'txn.tmp'))
         self.txn_active = False
+        self._do_open()
 
     def sync(self):
         """Initializes cache by fetching and reading all archive indicies

@@ -17,6 +17,10 @@ class UnsupportedPayloadError(Error):
     """Unsupported payload type {}. A newer version is required to access this repository.
     """
 
+class KeyfileNotFoundError(Error):
+    """No key file for repository {} found in {}.
+    """
+
 
 class HMAC(hmac.HMAC):
     """Workaround a bug in Python < 3.4 Where HMAC does not accept memoryviews
@@ -228,7 +232,7 @@ class KeyfileKey(AESKeyBase):
                 line = fd.readline().strip()
                 if line and line.startswith(cls.FILE_ID) and line[10:] == id:
                     return filename
-        raise Exception('Key file for repository with ID %s not found' % id)
+        raise KeyfileNotFoundError(repository._location.canonical_path(), get_keys_dir())
 
     def load(self, filename, passphrase):
         with open(filename, 'r') as fd:

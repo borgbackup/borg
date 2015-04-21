@@ -119,6 +119,10 @@ class Archive:
     class AlreadyExists(Error):
         """Archive {} already exists"""
 
+    class IncompatibleFilesystemEncodingError(Error):
+        """Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable."""
+
+
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False):
         self.cwd = os.getcwd()
@@ -247,6 +251,8 @@ class Archive:
                 os.rmdir(path)
             else:
                 os.unlink(path)
+        except UnicodeEncodeError:
+            raise self.IncompatibleFilesystemEncodingError(path, sys.getfilesystemencoding())
         except OSError:
             pass
         mode = item[b'mode']

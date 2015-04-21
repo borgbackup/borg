@@ -188,6 +188,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
     def do_extract(self, args):
         """Extract archive contents"""
         # be restrictive when restoring files, restore permissions later
+        if sys.getfilesystemencoding() == 'ascii':
+            print('Warning: File system encoding is "ascii", extracting non-ascii filenames will not be supported.')
         os.umask(0o077)
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)

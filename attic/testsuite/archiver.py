@@ -208,11 +208,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         return Repository(self.repository_path).id
 
     def test_sparse_file(self):
+        # no sparse file support on Mac OS X
+        sparse_support = sys.platform != 'darwin'
         filename = os.path.join(self.input_path, 'sparse')
         content = b'foobar'
         hole_size = 5 * CHUNK_MAX  # 5 full chunker buffers
         with open(filename, 'wb') as fd:
-            # create a file that has a hole at the beginning and end
+            # create a file that has a hole at the beginning and end (if the
+            # OS and filesystem supports sparse files)
             fd.seek(hole_size, 1)
             fd.write(content)
             fd.seek(hole_size, 1)
@@ -221,7 +224,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         total_len = hole_size + len(content) + hole_size
         st = os.stat(filename)
         self.assert_equal(st.st_size, total_len)
-        if hasattr(st, 'st_blocks'):
+        if sparse_support and hasattr(st, 'st_blocks'):
             self.assert_true(st.st_blocks * 512 < total_len / 10)  # is input sparse?
         self.attic('init', self.repository_location)
         self.attic('create', self.repository_location + '::test', 'input')
@@ -236,7 +239,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.assert_equal(fd.read(hole_size), b'\0' * hole_size)
         st = os.stat(filename)
         self.assert_equal(st.st_size, total_len)
-        if hasattr(st, 'st_blocks'):
+        if sparse_support and hasattr(st, 'st_blocks'):
             self.assert_true(st.st_blocks * 512 < total_len / 10)  # is output sparse?
 
     def test_repository_swap_detection(self):

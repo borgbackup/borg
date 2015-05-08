@@ -7,6 +7,7 @@ Version 0.16
 ------------
 
 (bugfix release, released on X)
+- Fix typo preventing the security confirmation prompt from working (#303)
 - Improve handling of systems with improperly configured file system encoding (#289)
 - Fix "All archives" output for attic info. (#183)
 - More user friendly error message when repository key file is not found (#236)

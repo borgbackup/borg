@@ -106,18 +106,19 @@ class ArchiverTestCaseBase(AtticTestCase):
             self.assert_equal(exit_code, ret)
             return output
         args = list(args)
-        stdout, stderr = sys.stdout, sys.stderr
+        stdin, stdout, stderr = sys.stdin, sys.stdout, sys.stderr
         try:
+            sys.stdin = StringIO()
             output = StringIO()
             sys.stdout = sys.stderr = output
             ret = self.archiver.run(args)
-            sys.stdout, sys.stderr = stdout, stderr
+            sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
             if ret != exit_code:
                 print(output.getvalue())
             self.assert_equal(exit_code, ret)
             return output.getvalue()
         finally:
-            sys.stdout, sys.stderr = stdout, stderr
+            sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
 
     def create_src_archive(self, name):
         self.attic('create', self.repository_location + '::' + name, src_dir)

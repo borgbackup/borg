@@ -293,7 +293,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
     def do_mount(self, args):
         """Mount archive or an entire repository as a FUSE fileystem"""
         try:
-            from attic.fuse import AtticOperations
+            from attic.fuse import FuseOperations
         except ImportError as e:
             self.print_error('loading fuse support failed [ImportError: %s]' % str(e))
             return self.exit_code
@@ -308,7 +308,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             archive = Archive(repository, key, manifest, args.src.archive)
         else:
             archive = None
-        operations = AtticOperations(key, repository, manifest, archive)
+        operations = FuseOperations(key, repository, manifest, archive)
         self.print_verbose("Mounting filesystem")
         try:
             operations.mount(args.mountpoint, args.options, args.foreground)

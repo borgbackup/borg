@@ -34,7 +34,7 @@ class FuseOperations(llfuse.Operations):
     """Export archive as a fuse filesystem
     """
     def __init__(self, key, repository, manifest, archive):
-        super(AtticOperations, self).__init__()
+        super(FuseOperations, self).__init__()
         self._inode_count = 0
         self.key = key
         self.repository = cache_if_remote(repository)

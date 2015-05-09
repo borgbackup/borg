@@ -4,7 +4,7 @@ import sys
 import tempfile
 import unittest
 from attic.platform import acl_get, acl_set
-from attic.testsuite import AtticTestCase
+from attic.testsuite import BaseTestCase
 
 
 ACCESS_ACL = """
@@ -36,7 +36,7 @@ def fakeroot_detected():
 
 @unittest.skipUnless(sys.platform.startswith('linux'), 'linux only test')
 @unittest.skipIf(fakeroot_detected(), 'not compatible with fakeroot')
-class PlatformLinuxTestCase(AtticTestCase):
+class PlatformLinuxTestCase(BaseTestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
@@ -74,7 +74,7 @@ class PlatformLinuxTestCase(AtticTestCase):
 
 @unittest.skipUnless(sys.platform.startswith('darwin'), 'OS X only test')
 @unittest.skipIf(fakeroot_detected(), 'not compatible with fakeroot')
-class PlatformDarwinTestCase(AtticTestCase):
+class PlatformDarwinTestCase(BaseTestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()

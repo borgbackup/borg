@@ -1,5 +1,5 @@
 import msgpack
-from attic.testsuite import AtticTestCase
+from attic.testsuite import BaseTestCase
 from attic.testsuite.mock import Mock
 from attic.archive import Archive, CacheChunkBuffer, RobustUnpacker
 from attic.key import PlaintextKey
@@ -17,7 +17,7 @@ class MockCache:
         return id, len(data), len(data)
 
 
-class ArchiveTimestampTestCase(AtticTestCase):
+class ArchiveTimestampTestCase(BaseTestCase):
 
     def _test_timestamp_parsing(self, isoformat, expected):
         repository = Mock()
@@ -38,7 +38,7 @@ class ArchiveTimestampTestCase(AtticTestCase):
             datetime(1970, 1, 1, 0, 0, 1, 0, timezone.utc))
 
 
-class ChunkBufferTestCase(AtticTestCase):
+class ChunkBufferTestCase(BaseTestCase):
 
     def test(self):
         data = [{b'foo': 1}, {b'bar': 2}]
@@ -56,7 +56,7 @@ class ChunkBufferTestCase(AtticTestCase):
         self.assert_equal(data, list(unpacker))
 
 
-class RobustUnpackerTestCase(AtticTestCase):
+class RobustUnpackerTestCase(BaseTestCase):
 
     def make_chunks(self, items):
         return b''.join(msgpack.packb({'path': item}) for item in items)

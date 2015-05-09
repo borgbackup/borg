@@ -6,11 +6,11 @@ import tempfile
 import unittest
 from attic.helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, UpgradableLock, prune_within, prune_split, to_localtime, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp
-from attic.testsuite import AtticTestCase
+from attic.testsuite import BaseTestCase
 import msgpack
 
 
-class BigIntTestCase(AtticTestCase):
+class BigIntTestCase(BaseTestCase):
 
     def test_bigint(self):
         self.assert_equal(int_to_bigint(0), 0)
@@ -22,7 +22,7 @@ class BigIntTestCase(AtticTestCase):
         self.assert_equal(bigint_to_int(int_to_bigint(2**70)), 2**70)
 
 
-class LocationTestCase(AtticTestCase):
+class LocationTestCase(BaseTestCase):
 
     def test(self):
         self.assert_equal(
@@ -60,7 +60,7 @@ class LocationTestCase(AtticTestCase):
                               Location(Location(location).canonical_path()).canonical_path())
 
 
-class FormatTimedeltaTestCase(AtticTestCase):
+class FormatTimedeltaTestCase(BaseTestCase):
 
     def test(self):
         t0 = datetime(2001, 1, 1, 10, 20, 3, 0)
@@ -71,7 +71,7 @@ class FormatTimedeltaTestCase(AtticTestCase):
         )
 
 
-class PatternTestCase(AtticTestCase):
+class PatternTestCase(BaseTestCase):
 
     files = [
         '/etc/passwd', '/etc/hosts', '/home',
@@ -104,7 +104,7 @@ class PatternTestCase(AtticTestCase):
                           ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg'])
 
 
-class MakePathSafeTestCase(AtticTestCase):
+class MakePathSafeTestCase(BaseTestCase):
 
     def test(self):
         self.assert_equal(make_path_safe('/foo/bar'), 'foo/bar')
@@ -116,7 +116,7 @@ class MakePathSafeTestCase(AtticTestCase):
         self.assert_equal(make_path_safe('/'), '.')
         self.assert_equal(make_path_safe('/'), '.')
 
-class UpgradableLockTestCase(AtticTestCase):
+class UpgradableLockTestCase(BaseTestCase):
 
     def test(self):
         file = tempfile.NamedTemporaryFile()
@@ -143,7 +143,7 @@ class MockArchive:
         return repr(self.ts)
 
 
-class PruneSplitTestCase(AtticTestCase):
+class PruneSplitTestCase(BaseTestCase):
 
     def test(self):
 
@@ -172,7 +172,7 @@ class PruneSplitTestCase(AtticTestCase):
         dotest(test_archives, 0, [], [])
 
 
-class PruneWithinTestCase(AtticTestCase):
+class PruneWithinTestCase(BaseTestCase):
 
     def test(self):
 
@@ -203,7 +203,7 @@ class PruneWithinTestCase(AtticTestCase):
         dotest(test_archives, '1y',  [0, 1, 2, 3, 4, 5])
 
 
-class StableDictTestCase(AtticTestCase):
+class StableDictTestCase(BaseTestCase):
 
     def test(self):
         d = StableDict(foo=1, bar=2, boo=3, baz=4)
@@ -211,7 +211,7 @@ class StableDictTestCase(AtticTestCase):
         self.assert_equal(hashlib.md5(msgpack.packb(d)).hexdigest(), 'fc78df42cd60691b3ac3dd2a2b39903f')
 
 
-class TestParseTimestamp(AtticTestCase):
+class TestParseTimestamp(BaseTestCase):
 
     def test(self):
         self.assert_equal(parse_timestamp('2015-04-19T20:25:00.226410'), datetime(2015, 4, 19, 20, 25, 0, 226410, timezone.utc))

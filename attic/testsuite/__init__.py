@@ -32,7 +32,7 @@ has_mtime_ns = sys.version >= '3.3'
 utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
 
 
-class AtticTestCase(unittest.TestCase):
+class BaseTestCase(unittest.TestCase):
     """
     """
     assert_in = unittest.TestCase.assertIn

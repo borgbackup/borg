@@ -18,7 +18,7 @@ from attic.crypto import bytes_to_long, num_aes_blocks
 from attic.helpers import Manifest
 from attic.remote import RemoteRepository, PathNotAllowed
 from attic.repository import Repository
-from attic.testsuite import AtticTestCase
+from attic.testsuite import BaseTestCase
 from attic.testsuite.mock import patch
 
 try:
@@ -60,7 +60,7 @@ class environment_variable:
                 os.environ[k] = v
 
 
-class ArchiverTestCaseBase(AtticTestCase):
+class ArchiverTestCaseBase(BaseTestCase):
 
     prefix = ''
 

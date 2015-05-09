@@ -6,10 +6,11 @@ from attic.hashindex import NSIndex
 from attic.helpers import Location, IntegrityError, UpgradableLock
 from attic.remote import RemoteRepository, InvalidRPCMethod
 from attic.repository import Repository
-from attic.testsuite import AtticTestCase
+from attic.testsuite import BaseTestCase
 
 
-class RepositoryTestCaseBase(AtticTestCase):
+class RepositoryTestCaseBase(BaseTestCase):
+    key_size = 32
 
     def open(self, create=False):
         return Repository(os.path.join(self.tmppath, 'repository'), create=create)

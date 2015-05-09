@@ -1,10 +1,10 @@
 from attic.chunker import Chunker, buzhash, buzhash_update
-from attic.testsuite import AtticTestCase
+from attic.testsuite import BaseTestCase
 from attic.archive import CHUNK_MAX
 from io import BytesIO
 
 
-class ChunkerTestCase(AtticTestCase):
+class ChunkerTestCase(BaseTestCase):
 
     def test_chunkify(self):
         data = b'0' * int(1.5 * CHUNK_MAX) + b'Y'

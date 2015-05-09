@@ -1,8 +1,8 @@
 from attic.lrucache import LRUCache
-from attic.testsuite import AtticTestCase
+from attic.testsuite import BaseTestCase
 
 
-class LRUCacheTestCase(AtticTestCase):
+class LRUCacheTestCase(BaseTestCase):
 
     def test(self):
         c = LRUCache(2)

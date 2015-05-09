@@ -2,10 +2,10 @@ import hashlib
 import os
 import tempfile
 from attic.hashindex import NSIndex, ChunkIndex
-from attic.testsuite import AtticTestCase
+from attic.testsuite import BaseTestCase
 
 
-class HashIndexTestCase(AtticTestCase):
+class HashIndexTestCase(BaseTestCase):
 
     def _generic_test(self, cls, make_value, sha):
         idx = cls()

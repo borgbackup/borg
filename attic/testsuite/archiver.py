@@ -90,7 +90,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         shutil.rmtree(self.tmpdir)
         os.chdir(self._old_wd)
 
-    def attic(self, *args, **kw):
+    def cmd(self, *args, **kw):
         exit_code = kw.get('exit_code', 0)
         fork = kw.get('fork', False)
         if fork:
@@ -121,7 +121,7 @@ class ArchiverTestCaseBase(BaseTestCase):
             sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
 
     def create_src_archive(self, name):
-        self.attic('create', self.repository_location + '::' + name, src_dir)
+        self.cmd('create', self.repository_location + '::' + name, src_dir)
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -179,19 +179,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_basic_functionality(self):
         self.create_test_files()
-        self.attic('init', self.repository_location)
-        self.attic('create', self.repository_location + '::test', 'input')
-        self.attic('create', self.repository_location + '::test.2', 'input')
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', self.repository_location + '::test.2', 'input')
         with changedir('output'):
-            self.attic('extract', self.repository_location + '::test')
-        self.assert_equal(len(self.attic('list', self.repository_location).splitlines()), 2)
-        self.assert_equal(len(self.attic('list', self.repository_location + '::test').splitlines()), 11)
+            self.cmd('extract', self.repository_location + '::test')
+        self.assert_equal(len(self.cmd('list', self.repository_location).splitlines()), 2)
+        self.assert_equal(len(self.cmd('list', self.repository_location + '::test').splitlines()), 11)
         self.assert_dirs_equal('input', 'output/input')
-        info_output = self.attic('info', self.repository_location + '::test')
+        info_output = self.cmd('info', self.repository_location + '::test')
         self.assert_in('Number of files: 4', info_output)
         shutil.rmtree(self.cache_path)
         with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='1'):
-            info_output2 = self.attic('info', self.repository_location + '::test')
+            info_output2 = self.cmd('info', self.repository_location + '::test')
         # info_output2 starts with some "initializing cache" text but should
         # end the same way as info_output
         assert info_output2.endswith(info_output)
@@ -226,10 +226,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_equal(st.st_size, total_len)
         if sparse_support and hasattr(st, 'st_blocks'):
             self.assert_true(st.st_blocks * 512 < total_len / 10)  # is input sparse?
-        self.attic('init', self.repository_location)
-        self.attic('create', self.repository_location + '::test', 'input')
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
         with changedir('output'):
-            self.attic('extract', '--sparse', self.repository_location + '::test')
+            self.cmd('extract', '--sparse', self.repository_location + '::test')
         self.assert_dirs_equal('input', 'output/input')
         filename = os.path.join(self.output_path, 'input', 'sparse')
         with open(filename, 'rb') as fd:
@@ -245,132 +245,132 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_repository_swap_detection(self):
         self.create_test_files()
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
-        self.attic('init', '--encryption=passphrase', self.repository_location)
+        self.cmd('init', '--encryption=passphrase', self.repository_location)
         repository_id = self._extract_repository_id(self.repository_path)
-        self.attic('create', self.repository_location + '::test', 'input')
+        self.cmd('create', self.repository_location + '::test', 'input')
         shutil.rmtree(self.repository_path)
-        self.attic('init', '--encryption=none', self.repository_location)
+        self.cmd('init', '--encryption=none', self.repository_location)
         self._set_repository_id(self.repository_path, repository_id)
         self.assert_equal(repository_id, self._extract_repository_id(self.repository_path))
-        self.assert_raises(Cache.EncryptionMethodMismatch, lambda :self.attic('create', self.repository_location + '::test.2', 'input'))
+        self.assert_raises(Cache.EncryptionMethodMismatch, lambda :self.cmd('create', self.repository_location + '::test.2', 'input'))
 
     def test_repository_swap_detection2(self):
         self.create_test_files()
-        self.attic('init', '--encryption=none', self.repository_location + '_unencrypted')
+        self.cmd('init', '--encryption=none', self.repository_location + '_unencrypted')
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
-        self.attic('init', '--encryption=passphrase', self.repository_location + '_encrypted')
-        self.attic('create', self.repository_location + '_encrypted::test', 'input')
+        self.cmd('init', '--encryption=passphrase', self.repository_location + '_encrypted')
+        self.cmd('create', self.repository_location + '_encrypted::test', 'input')
         shutil.rmtree(self.repository_path + '_encrypted')
         os.rename(self.repository_path + '_unencrypted', self.repository_path + '_encrypted')
-        self.assert_raises(Cache.RepositoryAccessAborted, lambda :self.attic('create', self.repository_location + '_encrypted::test.2', 'input'))
+        self.assert_raises(Cache.RepositoryAccessAborted, lambda :self.cmd('create', self.repository_location + '_encrypted::test.2', 'input'))
 
     def test_strip_components(self):
-        self.attic('init', self.repository_location)
+        self.cmd('init', self.repository_location)
         self.create_regular_file('dir/file')
-        self.attic('create', self.repository_location + '::test', 'input')
+        self.cmd('create', self.repository_location + '::test', 'input')
         with changedir('output'):
-            self.attic('extract', self.repository_location + '::test', '--strip-components', '3')
+            self.cmd('extract', self.repository_location + '::test', '--strip-components', '3')
             self.assert_true(not os.path.exists('file'))
             with self.assert_creates_file('file'):
-                self.attic('extract', self.repository_location + '::test', '--strip-components', '2')
+                self.cmd('extract', self.repository_location + '::test', '--strip-components', '2')
             with self.assert_creates_file('dir/file'):
-                self.attic('extract', self.repository_location + '::test', '--strip-components', '1')
+                self.cmd('extract', self.repository_location + '::test', '--strip-components', '1')
             with self.assert_creates_file('input/dir/file'):
-                self.attic('extract', self.repository_location + '::test', '--strip-components', '0')
+                self.cmd('extract', self.repository_location + '::test', '--strip-components', '0')
 
     def test_extract_include_exclude(self):
-        self.attic('init', self.repository_location)
+        self.cmd('init', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
         self.create_regular_file('file3', size=1024 * 80)
         self.create_regular_file('file4', size=1024 * 80)
-        self.attic('create', '--exclude=input/file4', self.repository_location + '::test', 'input')
+        self.cmd('create', '--exclude=input/file4', self.repository_location + '::test', 'input')
         with changedir('output'):
-            self.attic('extract', self.repository_location + '::test', 'input/file1', )
+            self.cmd('extract', self.repository_location + '::test', 'input/file1', )
         self.assert_equal(sorted(os.listdir('output/input')), ['file1'])
         with changedir('output'):
-            self.attic('extract', '--exclude=input/file2', self.repository_location + '::test')
+            self.cmd('extract', '--exclude=input/file2', self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file3'])
         with changedir('output'):
-            self.attic('extract', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test')
+            self.cmd('extract', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file3'])
 
     def test_exclude_caches(self):
-        self.attic('init', self.repository_location)
+        self.cmd('init', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('cache1/CACHEDIR.TAG', contents=b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
         self.create_regular_file('cache2/CACHEDIR.TAG', contents=b'invalid signature')
-        self.attic('create', '--exclude-caches', self.repository_location + '::test', 'input')
+        self.cmd('create', '--exclude-caches', self.repository_location + '::test', 'input')
         with changedir('output'):
-            self.attic('extract', self.repository_location + '::test')
+            self.cmd('extract', self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['cache2', 'file1'])
         self.assert_equal(sorted(os.listdir('output/input/cache2')), ['CACHEDIR.TAG'])
 
     def test_path_normalization(self):
-        self.attic('init', self.repository_location)
+        self.cmd('init', self.repository_location)
         self.create_regular_file('dir1/dir2/file', size=1024 * 80)
         with changedir('input/dir1/dir2'):
-            self.attic('create', self.repository_location + '::test', '../../../input/dir1/../dir1/dir2/..')
-        output = self.attic('list', self.repository_location + '::test')
+            self.cmd('create', self.repository_location + '::test', '../../../input/dir1/../dir1/dir2/..')
+        output = self.cmd('list', self.repository_location + '::test')
         self.assert_not_in('..', output)
         self.assert_in(' input/dir1/dir2/file', output)
 
     def test_exclude_normalization(self):
-        self.attic('init', self.repository_location)
+        self.cmd('init', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
         with changedir('input'):
-            self.attic('create', '--exclude=file1', self.repository_location + '::test1', '.')
+            self.cmd('create', '--exclude=file1', self.repository_location + '::test1', '.')
         with changedir('output'):
-            self.attic('extract', self.repository_location + '::test1')
+            self.cmd('extract', self.repository_location + '::test1')
         self.assert_equal(sorted(os.listdir('output')), ['file2'])
         with changedir('input'):
-            self.attic('create', '--exclude=./file1', self.repository_location + '::test2', '.')
+            self.cmd('create', '--exclude=./file1', self.repository_location + '::test2', '.')
         with changedir('output'):
-            self.attic('extract', self.repository_location + '::test2')
+            self.cmd('extract', self.repository_location + '::test2')
         self.assert_equal(sorted(os.listdir('output')), ['file2'])
-        self.attic('create', '--exclude=input/./file1', self.repository_location + '::test3', 'input')
+        self.cmd('create', '--exclude=input/./file1', self.repository_location + '::test3', 'input')
         with changedir('output'):
-            self.attic('extract', self.repository_location + '::test3')
+            self.cmd('extract', self.repository_location + '::test3')
         self.assert_equal(sorted(os.listdir('output/input')), ['file2'])
 
     def test_repeated_files(self):
         self.create_regular_file('file1', size=1024 * 80)
-        self.attic('init', self.repository_location)
-        self.attic('create', self.repository_location + '::test', 'input', 'input')
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input', 'input')
 
     def test_overwrite(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('dir2/file2', size=1024 * 80)
-        self.attic('init', self.repository_location)
-        self.attic('create', self.repository_location + '::test', 'input')
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
         # Overwriting regular files and directories should be supported
         os.mkdir('output/input')
         os.mkdir('output/input/file1')
         os.mkdir('output/input/dir2')
         with changedir('output'):
-            self.attic('extract', self.repository_location + '::test')
+            self.cmd('extract', self.repository_location + '::test')
         self.assert_dirs_equal('input', 'output/input')
         # But non-empty dirs should fail
         os.unlink('output/input/file1')
         os.mkdir('output/input/file1')
         os.mkdir('output/input/file1/dir')
         with changedir('output'):
-            self.attic('extract', self.repository_location + '::test', exit_code=1)
+            self.cmd('extract', self.repository_location + '::test', exit_code=1)
 
     def test_rename(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('dir2/file2', size=1024 * 80)
-        self.attic('init', self.repository_location)
-        self.attic('create', self.repository_location + '::test', 'input')
-        self.attic('create', self.repository_location + '::test.2', 'input')
-        self.attic('extract', '--dry-run', self.repository_location + '::test')
-        self.attic('extract', '--dry-run', self.repository_location + '::test.2')
-        self.attic('rename', self.repository_location + '::test', 'test.3')
-        self.attic('extract', '--dry-run', self.repository_location + '::test.2')
-        self.attic('rename', self.repository_location + '::test.2', 'test.4')
-        self.attic('extract', '--dry-run', self.repository_location + '::test.3')
-        self.attic('extract', '--dry-run', self.repository_location + '::test.4')
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', self.repository_location + '::test.2', 'input')
+        self.cmd('extract', '--dry-run', self.repository_location + '::test')
+        self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
+        self.cmd('rename', self.repository_location + '::test', 'test.3')
+        self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
+        self.cmd('rename', self.repository_location + '::test.2', 'test.4')
+        self.cmd('extract', '--dry-run', self.repository_location + '::test.3')
+        self.cmd('extract', '--dry-run', self.repository_location + '::test.4')
         # Make sure both archives have been renamed
         repository = Repository(self.repository_path)
         manifest, key = Manifest.load(repository)
@@ -381,77 +381,77 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_delete(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('dir2/file2', size=1024 * 80)
-        self.attic('init', self.repository_location)
-        self.attic('create', self.repository_location + '::test', 'input')
-        self.attic('create', self.repository_location + '::test.2', 'input')
-        self.attic('extract', '--dry-run', self.repository_location + '::test')
-        self.attic('extract', '--dry-run', self.repository_location + '::test.2')
-        self.attic('delete', self.repository_location + '::test')
-        self.attic('extract', '--dry-run', self.repository_location + '::test.2')
-        self.attic('delete', self.repository_location + '::test.2')
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', self.repository_location + '::test.2', 'input')
+        self.cmd('extract', '--dry-run', self.repository_location + '::test')
+        self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
+        self.cmd('delete', self.repository_location + '::test')
+        self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
+        self.cmd('delete', self.repository_location + '::test.2')
         # Make sure all data except the manifest has been deleted
         repository = Repository(self.repository_path)
         self.assert_equal(len(repository), 1)
 
     def test_corrupted_repository(self):
-        self.attic('init', self.repository_location)
+        self.cmd('init', self.repository_location)
         self.create_src_archive('test')
-        self.attic('extract', '--dry-run', self.repository_location + '::test')
-        self.attic('check', self.repository_location)
+        self.cmd('extract', '--dry-run', self.repository_location + '::test')
+        self.cmd('check', self.repository_location)
         name = sorted(os.listdir(os.path.join(self.tmpdir, 'repository', 'data', '0')), reverse=True)[0]
         with open(os.path.join(self.tmpdir, 'repository', 'data', '0', name), 'r+') as fd:
             fd.seek(100)
             fd.write('XXXX')
-        self.attic('check', self.repository_location, exit_code=1)
+        self.cmd('check', self.repository_location, exit_code=1)
 
     def test_readonly_repository(self):
-        self.attic('init', self.repository_location)
+        self.cmd('init', self.repository_location)
         self.create_src_archive('test')
         os.system('chmod -R ugo-w ' + self.repository_path)
         try:
-            self.attic('extract', '--dry-run', self.repository_location + '::test')
+            self.cmd('extract', '--dry-run', self.repository_location + '::test')
         finally:
             # Restore permissions so shutil.rmtree is able to delete it
             os.system('chmod -R u+w ' + self.repository_path)
 
     def test_cmdline_compatibility(self):
         self.create_regular_file('file1', size=1024 * 80)
-        self.attic('init', self.repository_location)
-        self.attic('create', self.repository_location + '::test', 'input')
-        output = self.attic('verify', '-v', self.repository_location + '::test')
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        output = self.cmd('verify', '-v', self.repository_location + '::test')
         self.assert_in('"borg verify" has been deprecated', output)
-        output = self.attic('prune', self.repository_location, '--hourly=1')
+        output = self.cmd('prune', self.repository_location, '--hourly=1')
         self.assert_in('"--hourly" has been deprecated. Use "--keep-hourly" instead', output)
 
     def test_prune_repository(self):
-        self.attic('init', self.repository_location)
-        self.attic('create', self.repository_location + '::test1', src_dir)
-        self.attic('create', self.repository_location + '::test2', src_dir)
-        output = self.attic('prune', '-v', '--dry-run', self.repository_location, '--keep-daily=2')
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test1', src_dir)
+        self.cmd('create', self.repository_location + '::test2', src_dir)
+        output = self.cmd('prune', '-v', '--dry-run', self.repository_location, '--keep-daily=2')
         self.assert_in('Keeping archive: test2', output)
         self.assert_in('Would prune:     test1', output)
-        output = self.attic('list', self.repository_location)
+        output = self.cmd('list', self.repository_location)
         self.assert_in('test1', output)
         self.assert_in('test2', output)
-        self.attic('prune', self.repository_location, '--keep-daily=2')
-        output = self.attic('list', self.repository_location)
+        self.cmd('prune', self.repository_location, '--keep-daily=2')
+        output = self.cmd('list', self.repository_location)
         self.assert_not_in('test1', output)
         self.assert_in('test2', output)
 
     def test_usage(self):
-        self.assert_raises(SystemExit, lambda: self.attic())
-        self.assert_raises(SystemExit, lambda: self.attic('-h'))
+        self.assert_raises(SystemExit, lambda: self.cmd())
+        self.assert_raises(SystemExit, lambda: self.cmd('-h'))
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
     def test_fuse_mount_repository(self):
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
         os.mkdir(mountpoint)
-        self.attic('init', self.repository_location)
+        self.cmd('init', self.repository_location)
         self.create_test_files()
-        self.attic('create', self.repository_location + '::archive', 'input')
-        self.attic('create', self.repository_location + '::archive2', 'input')
+        self.cmd('create', self.repository_location + '::archive', 'input')
+        self.cmd('create', self.repository_location + '::archive2', 'input')
         try:
-            self.attic('mount', self.repository_location, mountpoint, fork=True)
+            self.cmd('mount', self.repository_location, mountpoint, fork=True)
             self.wait_for_mount(mountpoint)
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive', 'input'))
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive2', 'input'))
@@ -468,11 +468,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_fuse_mount_archive(self):
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
         os.mkdir(mountpoint)
-        self.attic('init', self.repository_location)
+        self.cmd('init', self.repository_location)
         self.create_test_files()
-        self.attic('create', self.repository_location + '::archive', 'input')
+        self.cmd('create', self.repository_location + '::archive', 'input')
         try:
-            self.attic('mount', self.repository_location + '::archive', mountpoint, fork=True)
+            self.cmd('mount', self.repository_location + '::archive', mountpoint, fork=True)
             self.wait_for_mount(mountpoint)
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'))
         finally:
@@ -503,13 +503,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         self.create_test_files()
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
-        self.attic('init', '--encryption=' + method, self.repository_location)
+        self.cmd('init', '--encryption=' + method, self.repository_location)
         verify_uniqueness()
-        self.attic('create', self.repository_location + '::test', 'input')
+        self.cmd('create', self.repository_location + '::test', 'input')
         verify_uniqueness()
-        self.attic('create', self.repository_location + '::test.2', 'input')
+        self.cmd('create', self.repository_location + '::test.2', 'input')
         verify_uniqueness()
-        self.attic('delete', self.repository_location + '::test.2')
+        self.cmd('delete', self.repository_location + '::test.2')
         verify_uniqueness()
         self.assert_equal(used, set(range(len(used))))
 
@@ -525,7 +525,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
     def setUp(self):
         super(ArchiverCheckTestCase, self).setUp()
         with patch.object(ChunkBuffer, 'BUFFER_SIZE', 10):
-            self.attic('init', self.repository_location)
+            self.cmd('init', self.repository_location)
             self.create_src_archive('archive1')
             self.create_src_archive('archive2')
 
@@ -536,13 +536,13 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         return archive, repository
 
     def test_check_usage(self):
-        output = self.attic('check', self.repository_location, exit_code=0)
+        output = self.cmd('check', self.repository_location, exit_code=0)
         self.assert_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)
-        output = self.attic('check', '--repository-only', self.repository_location, exit_code=0)
+        output = self.cmd('check', '--repository-only', self.repository_location, exit_code=0)
         self.assert_in('Starting repository check', output)
         self.assert_not_in('Starting archive consistency check', output)
-        output = self.attic('check', '--archives-only', self.repository_location, exit_code=0)
+        output = self.cmd('check', '--archives-only', self.repository_location, exit_code=0)
         self.assert_not_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)
 
@@ -553,58 +553,58 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                 repository.delete(item[b'chunks'][-1][0])
                 break
         repository.commit()
-        self.attic('check', self.repository_location, exit_code=1)
-        self.attic('check', '--repair', self.repository_location, exit_code=0)
-        self.attic('check', self.repository_location, exit_code=0)
+        self.cmd('check', self.repository_location, exit_code=1)
+        self.cmd('check', '--repair', self.repository_location, exit_code=0)
+        self.cmd('check', self.repository_location, exit_code=0)
 
     def test_missing_archive_item_chunk(self):
         archive, repository = self.open_archive('archive1')
         repository.delete(archive.metadata[b'items'][-5])
         repository.commit()
-        self.attic('check', self.repository_location, exit_code=1)
-        self.attic('check', '--repair', self.repository_location, exit_code=0)
-        self.attic('check', self.repository_location, exit_code=0)
+        self.cmd('check', self.repository_location, exit_code=1)
+        self.cmd('check', '--repair', self.repository_location, exit_code=0)
+        self.cmd('check', self.repository_location, exit_code=0)
 
     def test_missing_archive_metadata(self):
         archive, repository = self.open_archive('archive1')
         repository.delete(archive.id)
         repository.commit()
-        self.attic('check', self.repository_location, exit_code=1)
-        self.attic('check', '--repair', self.repository_location, exit_code=0)
-        self.attic('check', self.repository_location, exit_code=0)
+        self.cmd('check', self.repository_location, exit_code=1)
+        self.cmd('check', '--repair', self.repository_location, exit_code=0)
+        self.cmd('check', self.repository_location, exit_code=0)
 
     def test_missing_manifest(self):
         archive, repository = self.open_archive('archive1')
         repository.delete(Manifest.MANIFEST_ID)
         repository.commit()
-        self.attic('check', self.repository_location, exit_code=1)
-        output = self.attic('check', '--repair', self.repository_location, exit_code=0)
+        self.cmd('check', self.repository_location, exit_code=1)
+        output = self.cmd('check', '--repair', self.repository_location, exit_code=0)
         self.assert_in('archive1', output)
         self.assert_in('archive2', output)
-        self.attic('check', self.repository_location, exit_code=0)
+        self.cmd('check', self.repository_location, exit_code=0)
 
     def test_extra_chunks(self):
-        self.attic('check', self.repository_location, exit_code=0)
+        self.cmd('check', self.repository_location, exit_code=0)
         repository = Repository(self.repository_location)
         repository.put(b'01234567890123456789012345678901', b'xxxx')
         repository.commit()
         repository.close()
-        self.attic('check', self.repository_location, exit_code=1)
-        self.attic('check', self.repository_location, exit_code=1)
-        self.attic('check', '--repair', self.repository_location, exit_code=0)
-        self.attic('check', self.repository_location, exit_code=0)
-        self.attic('extract', '--dry-run', self.repository_location + '::archive1', exit_code=0)
+        self.cmd('check', self.repository_location, exit_code=1)
+        self.cmd('check', self.repository_location, exit_code=1)
+        self.cmd('check', '--repair', self.repository_location, exit_code=0)
+        self.cmd('check', self.repository_location, exit_code=0)
+        self.cmd('extract', '--dry-run', self.repository_location + '::archive1', exit_code=0)
 
 
 class RemoteArchiverTestCase(ArchiverTestCase):
     prefix = '__testsuite__:'
 
     def test_remote_repo_restrict_to_path(self):
-        self.attic('init', self.repository_location)
+        self.cmd('init', self.repository_location)
         path_prefix = os.path.dirname(self.repository_path)
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo']):
-            self.assert_raises(PathNotAllowed, lambda: self.attic('init', self.repository_location + '_1'))
+            self.assert_raises(PathNotAllowed, lambda: self.cmd('init', self.repository_location + '_1'))
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', path_prefix]):
-            self.attic('init', self.repository_location + '_2')
+            self.cmd('init', self.repository_location + '_2')
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo', '--restrict-to-path', path_prefix]):
-            self.attic('init', self.repository_location + '_3')
+            self.cmd('init', self.repository_location + '_3')

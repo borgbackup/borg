@@ -435,17 +435,17 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         Examples:
 
         # Exclude '/home/user/file.o' but not '/home/user/file.odt':
-        $ borg create -e '*.o' repo.borg /
+        $ borg create -e '*.o' backup /
 
         # Exclude '/home/user/junk' and '/home/user/subdir/junk' but
         # not '/home/user/importantjunk' or '/etc/junk':
-        $ borg create -e '/home/*/junk' repo.borg /
+        $ borg create -e '/home/*/junk' backup /
 
         # Exclude the contents of '/home/user/cache' but not the directory itself:
-        $ borg create -e /home/user/cache/ repo.borg /
+        $ borg create -e /home/user/cache/ backup /
 
         # The file '/home/user/cache/important' is *not* backed up:
-        $ borg create -e /home/user/cache/ repo.borg / /home/user/cache/important
+        $ borg create -e /home/user/cache/ backup / /home/user/cache/important
         '''
 
     def do_help(self, parser, commands, args):

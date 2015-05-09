@@ -13,8 +13,8 @@ Easy to use
 ~~~~~~~~~~~
 Initialize backup repository and create a backup archive::
 
-    $ borg init /usbdrive/my-backup.borg
-    $ borg create -v /usbdrive/my-backup.borg::documents ~/Documents
+    $ borg init /mnt/backup
+    $ borg create -v /mnt/backup::documents ~/Documents
 
 Main features
 ~~~~~~~~~~~~~

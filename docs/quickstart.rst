@@ -13,16 +13,16 @@ A step by step example
 
 1. Before a backup can be made a repository has to be initialized::
 
-    $ borg init /somewhere/my-repository.borg
+    $ borg init /mnt/backup
 
 2. Backup the ``~/src`` and ``~/Documents`` directories into an archive called
    *Monday*::
 
-    $ borg create /somewhere/my-repository.borg::Monday ~/src ~/Documents
+    $ borg create /mnt/backup::Monday ~/src ~/Documents
 
 3. The next day create a new archive called *Tuesday*::
 
-    $ borg create --stats /somewhere/my-repository.borg::Tuesday ~/src ~/Documents
+    $ borg create --stats /mnt/backup::Tuesday ~/src ~/Documents
 
    This backup will be a lot quicker and a lot smaller since only new never
    before seen data is stored. The ``--stats`` option causes |project_name| to
@@ -42,24 +42,24 @@ A step by step example
 
 4. List all archives in the repository::
 
-    $ borg list /somewhere/my-repository.borg
+    $ borg list /mnt/backup
     Monday                               Mon Mar 24 11:59:35 2014
     Tuesday                              Tue Mar 25 12:00:10 2014
 
 5. List the contents of the *Monday* archive::
 
-    $ borg list /somewhere/my-repository.borg::Monday
+    $ borg list /mnt/backup::Monday
     drwxr-xr-x user  group         0 Jan 06 15:22 home/user/Documents
     -rw-r--r-- user  group      7961 Nov 17  2012 home/user/Documents/Important.doc
     ...
 
 6. Restore the *Monday* archive::
 
-    $ borg extract /somwhere/my-repository.borg::Monday
+    $ borg extract /mnt/backup::Monday
 
 7. Recover disk space by manually deleting the *Monday* archive::
 
-    $ borg delete /somwhere/my-backup.borg::Monday
+    $ borg delete /mnt/backup::Monday
 
 .. Note::
     Borg is quiet by default. Add the ``-v`` or ``--verbose`` option to
@@ -74,7 +74,7 @@ The following example script backs up ``/home`` and
 of old archives::
 
     #!/bin/sh
-    REPOSITORY=username@remoteserver.com:repository.borg
+    REPOSITORY=username@remoteserver.com:backup
 
     # Backup all of /home and /var/www except a few
     # excluded directories
@@ -138,19 +138,19 @@ Remote repositories
 host is accessible using SSH.  This is fastest and easiest when |project_name|
 is installed on the remote host, in which case the following syntax is used::
 
-  $ borg init user@hostname:repository.borg
+  $ borg init user@hostname:backup
 
 or::
 
-  $ borg init ssh://user@hostname:port/repository.borg
+  $ borg init ssh://user@hostname:port/backup
 
 If it is not possible to install |project_name| on the remote host, 
 it is still possible to use the remote host to store a repository by
 mounting the remote filesystem, for example, using sshfs::
 
-  $ sshfs user@hostname:/path/to/folder /tmp/mymountpoint
-  $ borg init /tmp/mymountpoint/repository.borg
-  $ fusermount -u /tmp/mymountpoint
+  $ sshfs user@hostname:/path/to/folder /mnt
+  $ borg init /mnt/backup
+  $ fusermount -u /mnt
 
 However, be aware that sshfs doesn't fully implement POSIX locks, so
 you must be sure to not have two processes trying to access the same

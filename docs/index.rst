@@ -13,9 +13,9 @@ Easy to use
 Initialize a new backup :ref:`repository <repository_def>` and create your
 first backup :ref:`archive <archive_def>` in two lines::
 
-    $ borg init /somewhere/my-repository.borg
-    $ borg create /somewhere/my-repository.borg::Monday ~/Documents
-    $ borg create --stats /somewhere/my-repository.borg::Tuesday ~/Documents
+    $ borg init /mnt/backup
+    $ borg create /mnt/backup::Monday ~/Documents
+    $ borg create --stats /mnt/backup::Tuesday ~/Documents
     Archive name: Tuesday
     Archive fingerprint: 387a5e3f9b0e792e91ce87134b0f4bfe17677d9248cb5337f3fbf3a8e157942a
     Start time: Tue Mar 25 12:00:10 2014

@@ -44,10 +44,12 @@ class HashIndexTestCase(AtticTestCase):
         self.assert_equal(len(cls.read(idx_name.name)), 0)
 
     def test_nsindex(self):
-        self._generic_test(NSIndex, lambda x: (x, x), '369a18ae6a52524eb2884a3c0fdc2824947edd017a2688c5d4d7b3510c245ab9')
+        self._generic_test(NSIndex, lambda x: (x, x),
+                           '861d6d60069ea45e39d36bed2bdc1d0c07981e0641955f897ac6848be429abac')
 
     def test_chunkindex(self):
-        self._generic_test(ChunkIndex, lambda x: (x, x, x), 'ed22e8a883400453c0ee79a06c54df72c994a54eeefdc6c0989efdc5ee6d07b7')
+        self._generic_test(ChunkIndex, lambda x: (x, x, x),
+                           '69464bd0ebbc5866b9f95d838bc48617d21bfe3dcf294682a5c21a2ef6b9dc0b')
 
     def test_resize(self):
         n = 2000  # Must be >= MIN_BUCKETS

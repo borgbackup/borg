@@ -207,7 +207,7 @@ class PassphraseKey(AESKeyBase):
 
 
 class KeyfileKey(AESKeyBase):
-    FILE_ID = 'ATTIC KEY'
+    FILE_ID = 'BORG_KEY'
     TYPE = 0x00
 
     @classmethod
@@ -230,7 +230,8 @@ class KeyfileKey(AESKeyBase):
             filename = os.path.join(keys_dir, name)
             with open(filename, 'r') as fd:
                 line = fd.readline().strip()
-                if line and line.startswith(cls.FILE_ID) and line[10:] == id:
+                if (line and line.startswith(cls.FILE_ID) and
+                    line[len(cls.FILE_ID)+1:] == id):
                     return filename
         raise KeyfileNotFoundError(repository._location.canonical_path(), get_keys_dir())
 

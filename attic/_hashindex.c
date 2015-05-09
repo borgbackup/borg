@@ -39,7 +39,7 @@ typedef struct {
     off_t data_len;
 } HashIndex;
 
-#define MAGIC "ATTICIDX"
+#define MAGIC "BORG_IDX"
 #define EMPTY _htole32(0xffffffff)
 #define DELETED _htole32(0xfffffffe)
 #define MAX_BUCKET_SIZE 512

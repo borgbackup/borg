@@ -13,7 +13,7 @@ from .helpers import Error, IntegrityError, read_msgpack, write_msgpack, unhexli
 from .lrucache import LRUCache
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
-MAGIC = b'ATTICSEG'
+MAGIC = b'BORG_SEG'
 TAG_PUT = 0
 TAG_DELETE = 1
 TAG_COMMIT = 2

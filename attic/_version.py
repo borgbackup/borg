@@ -183,7 +183,7 @@ def versions_from_parentdir(parentdir_prefix, versionfile_source, verbose=False)
     return {"version": dirname[len(parentdir_prefix):], "full": ""}
 
 tag_prefix = ""
-parentdir_prefix = "Attic-"
+parentdir_prefix = "borgbackup-"
 versionfile_source = "attic/_version.py"
 
 

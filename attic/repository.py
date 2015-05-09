@@ -42,7 +42,7 @@ class Repository:
         """{} is not a valid repository."""
 
     class CheckNeeded(Error):
-        """Inconsistency detected. Please run "attic check {}"."""
+        """Inconsistency detected. Please run "borg check {}"."""
 
     class ObjectNotFound(Error):
         """Object with key {} not found in repository {}."""
@@ -68,7 +68,7 @@ class Repository:
         if not os.path.exists(path):
             os.mkdir(path)
         with open(os.path.join(path, 'README'), 'w') as fd:
-            fd.write('This is an Attic repository\n')
+            fd.write('This is a Borg repository\n')
         os.mkdir(os.path.join(path, 'data'))
         config = RawConfigParser()
         config.add_section('repository')

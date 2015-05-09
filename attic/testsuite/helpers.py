@@ -38,8 +38,8 @@ class LocationTestCase(AtticTestCase):
             "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='archive')"
         )
         self.assert_equal(
-            repr(Location('mybackup.attic::archive')),
-            "Location(proto='file', user=None, host=None, port=None, path='mybackup.attic', archive='archive')"
+            repr(Location('mybackup.borg::archive')),
+            "Location(proto='file', user=None, host=None, port=None, path='mybackup.borg', archive='archive')"
         )
         self.assert_equal(
             repr(Location('/some/absolute/path::archive')),

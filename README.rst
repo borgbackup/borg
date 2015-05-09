@@ -1,16 +1,20 @@
-What is Attic?
---------------
-Attic is a deduplicating backup program. The main goal of Attic is to provide
+|build|
+
+What is Borg?
+-------------
+Borg is a deduplicating backup program. The main goal of Borg is to provide
 an efficient and secure way to backup data. The data deduplication
-technique used makes Attic suitable for daily backups since only changes
+technique used makes Borg suitable for daily backups since only changes
 are stored.
+
+Borg is a fork of Attic and maintained by "The Borg Collective" (see AUTHORS file).
 
 Easy to use
 ~~~~~~~~~~~
 Initialize backup repository and create a backup archive::
 
-    $ attic init /usbdrive/my-backup.attic
-    $ attic create -v /usbdrive/my-backup.attic::documents ~/Documents
+    $ borg init /usbdrive/my-backup.borg
+    $ borg create -v /usbdrive/my-backup.borg::documents ~/Documents
 
 Main features
 ~~~~~~~~~~~~~
@@ -25,8 +29,8 @@ Optional data encryption
     and authenticity is verified using HMAC-SHA256.
 
 Off-site backups
-    Attic can store data on any remote host accessible over SSH.  This is
-    most efficient if Attic is also installed on the remote host.
+    Borg can store data on any remote host accessible over SSH.  This is
+    most efficient if Borg is also installed on the remote host.
 
 Backups mountable as filesystems
     Backup archives are mountable as userspace filesystems for easy backup
@@ -34,24 +38,28 @@ Backups mountable as filesystems
 
 What do I need?
 ---------------
-Attic requires Python 3.2 or above to work. Besides Python, Attic also requires 
-msgpack-python and sufficiently recent OpenSSL (>= 1.0.0).
+Borg requires Python 3.2 or above to work.
+Borg also requires a sufficiently recent OpenSSL (>= 1.0.0).
 In order to mount archives as filesystems, llfuse is required.
 
 How do I install it?
 --------------------
 ::
 
-  $ pip install Attic
+  $ pip3 install borgbackup
 
 Where are the docs?
 -------------------
-Go to https://attic-backup.org/ for a prebuilt version of the documentation.
+Go to https://borgbackup.github.io/ for a prebuilt version of the documentation.
 You can also build it yourself from the docs folder.
 
 Where are the tests?
 --------------------
-The tests are in the attic/testsuite package. To run the test suite use the
+The tests are in the borg/testsuite package. To run the test suite use the
 following command::
 
-  $ fakeroot -u python -m attic.testsuite.run
+  $ fakeroot -u tox  # you need to have tox installed
+
+.. |build| image:: https://travis-ci.org/borgbackup/borg.svg
+        :alt: Build Status
+        :target: https://travis-ci.org/borgbackup/borg

@@ -79,7 +79,7 @@ class RepositoryServer:
                             f = getattr(self.repository, method)
                         res = f(*args)
                     except BaseException as e:
-                        exc = "Remote Traceback by Attic %s%s%s" % (__version__, os.linesep, traceback.format_exc())
+                        exc = "Remote Traceback by Borg %s%s%s" % (__version__, os.linesep, traceback.format_exc())
                         os.write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc)))
                     else:
                         os.write(stdout_fd, msgpack.packb((1, msgid, None, res)))
@@ -132,7 +132,7 @@ class RemoteRepository:
                 args.append('%s@%s' % (location.user, location.host))
             else:
                 args.append('%s' % location.host)
-            args += ['attic', 'serve']
+            args += ['borg', 'serve']
         self.p = Popen(args, bufsize=0, stdin=PIPE, stdout=PIPE)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()

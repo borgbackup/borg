@@ -26,7 +26,7 @@ Off-site backups
     long as |project_name| is installed.
 
 Backups mountable as filesystems
-    Backup archives are :ref:`mountable <attic_mount>` as
+    Backup archives are :ref:`mountable <borg_mount>` as
     `userspace filesystems`_ for easy backup verification and restores.
 
 
@@ -53,8 +53,8 @@ Repository
     A repository is a filesystem directory storing data from zero or more
     archives. The data in a repository is both deduplicated and 
     optionally encrypted making it both efficient and safe. Repositories are
-    created using :ref:`attic_init` and the contents can be listed using
-    :ref:`attic_list`.
+    created using :ref:`borg_init` and the contents can be listed using
+    :ref:`borg_list`.
 
 Key file
     When a repository is initialized a key file containing a password

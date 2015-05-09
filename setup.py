@@ -7,11 +7,11 @@ import versioneer
 versioneer.versionfile_source = 'attic/_version.py'
 versioneer.versionfile_build = 'attic/_version.py'
 versioneer.tag_prefix = ''
-versioneer.parentdir_prefix = 'Attic-'  # dirname like 'myproject-1.2.0'
+versioneer.parentdir_prefix = 'borgbackup-'  # dirname like 'myproject-1.2.0'
 
 min_python = (3, 2)
 if sys.version_info < min_python:
-    print("Attic requires Python %d.%d or later" % min_python)
+    print("Borg requires Python %d.%d or later" % min_python)
     sys.exit(1)
 
 try:
@@ -54,7 +54,7 @@ except ImportError:
     platform_darwin_source = platform_darwin_source.replace('.pyx', '.c')
     from distutils.command.build_ext import build_ext
     if not all(os.path.exists(path) for path in [crypto_source, chunker_source, hashindex_source, platform_linux_source, platform_freebsd_source]):
-        raise ImportError('The GIT version of Attic needs Cython. Install Cython or use a released version')
+        raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version')
 
 
 def detect_openssl(prefixes):
@@ -67,8 +67,8 @@ def detect_openssl(prefixes):
 
 
 possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl', '/usr/local/attic', '/opt/local']
-if os.environ.get('ATTIC_OPENSSL_PREFIX'):
-    possible_openssl_prefixes.insert(0, os.environ.get('ATTIC_OPENSSL_PREFIX'))
+if os.environ.get('BORG_OPENSSL_PREFIX'):
+    possible_openssl_prefixes.insert(0, os.environ.get('BORG_OPENSSL_PREFIX'))
 ssl_prefix = detect_openssl(possible_openssl_prefixes)
 if not ssl_prefix:
     raise Exception('Unable to find OpenSSL >= 1.0 headers. (Looked here: {})'.format(', '.join(possible_openssl_prefixes)))
@@ -95,12 +95,12 @@ elif sys.platform == 'darwin':
     ext_modules.append(Extension('attic.platform_darwin', [platform_darwin_source]))
 
 setup(
-    name='Attic',
+    name='borgbackup',
     version=versioneer.get_version(),
-    author='Jonas Borgstrom',
-    author_email='jonas@borgstrom.se',
-    url='https://attic-backup.org/',
-    description='Deduplicated backups',
+    author='The Borg Collective (see AUTHORS file)',
+    author_email='borgbackup@librelist.com',
+    url='https://borgbackup.github.io/',
+    description='Deduplicated, encrypted, authenticated and compressed backups',
     long_description=long_description,
     license='BSD',
     platforms=['Linux', 'MacOS X'],
@@ -117,7 +117,7 @@ setup(
         'Topic :: System :: Archiving :: Backup',
     ],
     packages=['attic', 'attic.testsuite'],
-    scripts=['scripts/attic'],
+    scripts=['scripts/borg'],
     cmdclass=cmdclass,
     ext_modules=ext_modules,
     # msgpack pure python data corruption was fixed in 0.4.6.

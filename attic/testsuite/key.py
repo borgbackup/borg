@@ -32,7 +32,7 @@ class KeyTestCase(AtticTestCase):
 
     def setUp(self):
         self.tmppath = tempfile.mkdtemp()
-        os.environ['ATTIC_KEYS_DIR'] = self.tmppath
+        os.environ['BORG_KEYS_DIR'] = self.tmppath
 
     def tearDown(self):
         shutil.rmtree(self.tmppath)
@@ -51,7 +51,7 @@ class KeyTestCase(AtticTestCase):
         self.assert_equal(data, key.decrypt(key.id_hash(data), key.encrypt(data)))
 
     def test_keyfile(self):
-        os.environ['ATTIC_PASSPHRASE'] = 'test'
+        os.environ['BORG_PASSPHRASE'] = 'test'
         key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
         self.assert_equal(bytes_to_long(key.enc_cipher.iv, 8), 0)
         manifest = key.encrypt(b'XXX')
@@ -70,14 +70,14 @@ class KeyTestCase(AtticTestCase):
         self.assert_equal(data, key2.decrypt(key.id_hash(data), key.encrypt(data)))
 
     def test_keyfile2(self):
-        with open(os.path.join(os.environ['ATTIC_KEYS_DIR'], 'keyfile'), 'w') as fd:
+        with open(os.path.join(os.environ['BORG_KEYS_DIR'], 'keyfile'), 'w') as fd:
             fd.write(self.keyfile2_key_file)
-        os.environ['ATTIC_PASSPHRASE'] = 'passphrase'
+        os.environ['BORG_PASSPHRASE'] = 'passphrase'
         key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
         self.assert_equal(key.decrypt(self.keyfile2_id, self.keyfile2_cdata), b'payload')
 
     def test_passphrase(self):
-        os.environ['ATTIC_PASSPHRASE'] = 'test'
+        os.environ['BORG_PASSPHRASE'] = 'test'
         key = PassphraseKey.create(self.MockRepository(), None)
         self.assert_equal(bytes_to_long(key.enc_cipher.iv, 8), 0)
         self.assert_equal(hexlify(key.id_key), b'793b0717f9d8fb01c751a487e9b827897ceea62409870600013fbc6b4d8d7ca6')

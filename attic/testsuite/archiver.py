@@ -65,7 +65,7 @@ class ArchiverTestCaseBase(AtticTestCase):
     prefix = ''
 
     def setUp(self):
-        os.environ['ATTIC_CHECK_I_KNOW_WHAT_I_AM_DOING'] = '1'
+        os.environ['BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'] = '1'
         self.archiver = Archiver()
         self.tmpdir = tempfile.mkdtemp()
         self.repository_path = os.path.join(self.tmpdir, 'repository')
@@ -75,8 +75,8 @@ class ArchiverTestCaseBase(AtticTestCase):
         self.keys_path = os.path.join(self.tmpdir, 'keys')
         self.cache_path = os.path.join(self.tmpdir, 'cache')
         self.exclude_file_path = os.path.join(self.tmpdir, 'excludes')
-        os.environ['ATTIC_KEYS_DIR'] = self.keys_path
-        os.environ['ATTIC_CACHE_DIR'] = self.cache_path
+        os.environ['BORG_KEYS_DIR'] = self.keys_path
+        os.environ['BORG_CACHE_DIR'] = self.cache_path
         os.mkdir(self.input_path)
         os.mkdir(self.output_path)
         os.mkdir(self.keys_path)
@@ -190,7 +190,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         info_output = self.attic('info', self.repository_location + '::test')
         self.assert_in('Number of files: 4', info_output)
         shutil.rmtree(self.cache_path)
-        with environment_variable(ATTIC_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='1'):
+        with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='1'):
             info_output2 = self.attic('info', self.repository_location + '::test')
         # info_output2 starts with some "initializing cache" text but should
         # end the same way as info_output
@@ -244,7 +244,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_repository_swap_detection(self):
         self.create_test_files()
-        os.environ['ATTIC_PASSPHRASE'] = 'passphrase'
+        os.environ['BORG_PASSPHRASE'] = 'passphrase'
         self.attic('init', '--encryption=passphrase', self.repository_location)
         repository_id = self._extract_repository_id(self.repository_path)
         self.attic('create', self.repository_location + '::test', 'input')
@@ -257,7 +257,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_repository_swap_detection2(self):
         self.create_test_files()
         self.attic('init', '--encryption=none', self.repository_location + '_unencrypted')
-        os.environ['ATTIC_PASSPHRASE'] = 'passphrase'
+        os.environ['BORG_PASSPHRASE'] = 'passphrase'
         self.attic('init', '--encryption=passphrase', self.repository_location + '_encrypted')
         self.attic('create', self.repository_location + '_encrypted::test', 'input')
         shutil.rmtree(self.repository_path + '_encrypted')
@@ -419,7 +419,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.attic('init', self.repository_location)
         self.attic('create', self.repository_location + '::test', 'input')
         output = self.attic('verify', '-v', self.repository_location + '::test')
-        self.assert_in('"attic verify" has been deprecated', output)
+        self.assert_in('"borg verify" has been deprecated', output)
         output = self.attic('prune', self.repository_location, '--hourly=1')
         self.assert_in('"--hourly" has been deprecated. Use "--keep-hourly" instead', output)
 
@@ -502,7 +502,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                         used.add(counter)
 
         self.create_test_files()
-        os.environ['ATTIC_PASSPHRASE'] = 'passphrase'
+        os.environ['BORG_PASSPHRASE'] = 'passphrase'
         self.attic('init', '--encryption=' + method, self.repository_location)
         verify_uniqueness()
         self.attic('create', self.repository_location + '::test', 'input')

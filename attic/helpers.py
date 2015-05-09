@@ -27,7 +27,7 @@ class Error(Exception):
 
 
 class ExtensionModuleError(Error):
-    """The Attic binary extension modules does not seem to be properly installed"""
+    """The Borg binary extension modules do not seem to be properly installed"""
 
 
 class UpgradableLock:
@@ -182,14 +182,14 @@ class Statistics:
 
 def get_keys_dir():
     """Determine where to repository keys and cache"""
-    return os.environ.get('ATTIC_KEYS_DIR',
-                          os.path.join(os.path.expanduser('~'), '.attic', 'keys'))
+    return os.environ.get('BORG_KEYS_DIR',
+                          os.path.join(os.path.expanduser('~'), '.borg', 'keys'))
 
 
 def get_cache_dir():
     """Determine where to repository keys and cache"""
-    return os.environ.get('ATTIC_CACHE_DIR',
-                          os.path.join(os.path.expanduser('~'), '.cache', 'attic'))
+    return os.environ.get('BORG_CACHE_DIR',
+                          os.path.join(os.path.expanduser('~'), '.cache', 'borg'))
 
 
 def to_localtime(ts):

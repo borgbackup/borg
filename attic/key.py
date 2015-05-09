@@ -160,7 +160,7 @@ class PassphraseKey(AESKeyBase):
     @classmethod
     def create(cls, repository, args):
         key = cls()
-        passphrase = os.environ.get('ATTIC_PASSPHRASE')
+        passphrase = os.environ.get('BORG_PASSPHRASE')
         if passphrase is not None:
             passphrase2 = passphrase
         else:
@@ -182,7 +182,7 @@ class PassphraseKey(AESKeyBase):
     def detect(cls, repository, manifest_data):
         prompt = 'Enter passphrase for %s: ' % repository._location.orig
         key = cls()
-        passphrase = os.environ.get('ATTIC_PASSPHRASE')
+        passphrase = os.environ.get('BORG_PASSPHRASE')
         if passphrase is None:
             passphrase = getpass(prompt)
         while True:
@@ -215,7 +215,7 @@ class KeyfileKey(AESKeyBase):
         key = cls()
         path = cls.find_key_file(repository)
         prompt = 'Enter passphrase for key file %s: ' % path
-        passphrase = os.environ.get('ATTIC_PASSPHRASE', '')
+        passphrase = os.environ.get('BORG_PASSPHRASE', '')
         while not key.load(path, passphrase):
             passphrase = getpass(prompt)
         num_blocks = num_aes_blocks(len(manifest_data) - 41)
@@ -310,7 +310,7 @@ class KeyfileKey(AESKeyBase):
         while os.path.exists(path):
             i += 1
             path = filename + '.%d' % i
-        passphrase = os.environ.get('ATTIC_PASSPHRASE')
+        passphrase = os.environ.get('BORG_PASSPHRASE')
         if passphrase is not None:
             passphrase2 = passphrase
         else:

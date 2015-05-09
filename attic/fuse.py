@@ -30,8 +30,8 @@ class ItemCache:
         return next(msgpack.Unpacker(self.fd))
 
 
-class AtticOperations(llfuse.Operations):
-    """Export Attic archive as a fuse filesystem
+class FuseOperations(llfuse.Operations):
+    """Export archive as a fuse filesystem
     """
     def __init__(self, key, repository, manifest, archive):
         super(AtticOperations, self).__init__()
@@ -226,7 +226,7 @@ class AtticOperations(llfuse.Operations):
         return os.fsencode(item[b'source'])
 
     def mount(self, mountpoint, extra_options, foreground=False):
-        options = ['fsname=atticfs', 'ro']
+        options = ['fsname=borgfs', 'ro']
         if extra_options:
             options.extend(extra_options.split(','))
         llfuse.init(self, mountpoint, options)

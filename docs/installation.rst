@@ -36,11 +36,11 @@ Installing from PyPI using pip
 
 To install |project_name| system-wide::
 
-  $ sudo pip3 install Attic
+  $ sudo pip3 install borgbackup
 
 To install it in a user-specific account::
 
-  $ pip3 install --user Attic
+  $ pip3 install --user borgbackup
 
 Then add ``$HOME/.library/bin`` to your ``$PATH``.
 
@@ -48,7 +48,7 @@ Installing from source tarballs
 -------------------------------
 .. parsed-literal::
 
-    $ curl -O :targz_url:`Attic`
+    $ curl -O :targz_url:`Borg`
     $ tar -xvzf |package_filename|
     $ cd |package_dirname|
     $ sudo python3 setup.py install
@@ -58,20 +58,8 @@ Installing from git
 .. parsed-literal::
 
     $ git clone |git_url|
-    $ cd attic
+    $ cd borg
     $ sudo python3 setup.py install
 
 Please note that when installing from git, Cython_ is required to generate some files that
 are normally bundled with the release tarball.
-
-Packages
---------
-
-|project_name| is also part of the Debian_, Ubuntu_, `Arch Linux`_ and Slackware_
-distributions of GNU/Linux.
-
-Standalone binaries
--------------------
-
-Prebuilt standalone binaries that work on
-most Linux systems can be found :artifacts:`here <>`.

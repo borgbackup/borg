@@ -1,6 +1,6 @@
 .. include:: global.rst.inc
 
-Welcome to Attic
+Welcome to Borg
 ================
 |project_name| is a deduplicating backup program written in Python.
 The main goal of |project_name| is to provide an efficient and secure way
@@ -13,9 +13,9 @@ Easy to use
 Initialize a new backup :ref:`repository <repository_def>` and create your
 first backup :ref:`archive <archive_def>` in two lines::
 
-    $ attic init /somewhere/my-repository.attic
-    $ attic create /somewhere/my-repository.attic::Monday ~/Documents
-    $ attic create --stats /somewhere/my-repository.attic::Tuesday ~/Documents
+    $ borg init /somewhere/my-repository.borg
+    $ borg create /somewhere/my-repository.borg::Monday ~/Documents
+    $ borg create --stats /somewhere/my-repository.borg::Tuesday ~/Documents
     Archive name: Tuesday
     Archive fingerprint: 387a5e3f9b0e792e91ce87134b0f4bfe17677d9248cb5337f3fbf3a8e157942a
     Start time: Tue Mar 25 12:00:10 2014
@@ -32,10 +32,7 @@ Easy installation
 -----------------
 You can use pip to install |project_name| quickly and easily::
 
-    $ pip3 install attic
-
-|project_name| is also part of the Debian_, Ubuntu_, `Arch Linux`_ and Slackware_
-distributions of GNU/Linux.
+    $ pip3 install borgbackup
 
 Need more help with installing? See :ref:`installation`.
 
@@ -59,13 +56,18 @@ If you've found a bug or have a concrete feature request, you can add your bug
 report or feature request directly to the project's `issue tracker`_. For more
 general questions or discussions, a post to the mailing list is preferred.
 
+IRC
+---
+Join us on channel ##borgbackup on chat.freenode.net. As usual on IRC, just
+ask or tell directly and then patiently wait for replies. Stay connected.
+
 Mailing list
 ------------
 
-There is a mailing list for Attic on librelist_ that you can use for feature
-requests and general discussions about Attic. A mailing list archive is
-available `here <http://librelist.com/browser/attic/>`_.
+There is a mailing list for Borg on librelist_ that you can use for feature
+requests and general discussions about Borg. A mailing list archive is
+available `here <http://librelist.com/browser/borgbackup/>`_.
 
-To subscribe to the list, send an email to attic@librelist.com and reply
+To subscribe to the list, send an email to borgbackup@librelist.com and reply
 to the confirmation mail. Likewise, to unsubscribe, send an email to 
-attic-unsubscribe@librelist.com and reply to the confirmation mail.
+borgbackup-unsubscribe@librelist.com and reply to the confirmation mail.

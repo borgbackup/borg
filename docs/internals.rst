@@ -251,14 +251,14 @@ security but limits the maximum repository capacity to only 295
 exabytes (2**64 * 16 bytes).
 
 Encryption keys are either a passphrase, passed through the
-``ATTIC_PASSPHRASE`` environment or prompted on the commandline, or
+``BORG_PASSPHRASE`` environment or prompted on the commandline, or
 stored in automatically generated key files.
 
 Key files
 ---------
 
 When initialized with the ``init -e keyfile`` command, |project_name|
-needs an associated file in ``$HOME/.attic/keys`` to read and write
+needs an associated file in ``$HOME/.borg/keys`` to read and write
 the repository. The format is based on msgpack_, base64 encoding and
 PBKDF2_ SHA256 hashing, which is then encoded again in a msgpack_.
 
@@ -312,6 +312,6 @@ data
   described above
 
 The resulting msgpack_ is then encoded using base64 and written to the
-key file, wrapped using the standard ``textwrap`` module with a
-header. The header is a single line with the string ``ATTIC_KEY``, a
-space and a hexadecimal representation of the repository id.
+key file, wrapped using the standard ``textwrap`` module with a header.
+The header is a single line with a MAGIC string, a space and a hexadecimal
+representation of the repository id.

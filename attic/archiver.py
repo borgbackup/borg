@@ -38,7 +38,7 @@ class Archiver:
     def print_error(self, msg, *args):
         msg = args and msg % args or msg
         self.exit_code = 1
-        print('attic: ' + msg, file=sys.stderr)
+        print('borg: ' + msg, file=sys.stderr)
 
     def print_verbose(self, msg, *args, **kw):
         if self.verbose:
@@ -49,7 +49,7 @@ class Archiver:
                 print(msg, end=' ')
 
     def do_serve(self, args):
-        """Start Attic in server mode. This command is usually not used manually.
+        """Start in server mode. This command is usually not used manually.
         """
         return RepositoryServer(restrict_to_paths=args.restrict_to_paths).serve()
 
@@ -69,7 +69,7 @@ class Archiver:
         """Check repository consistency"""
         repository = self.open_repository(args.repository, exclusive=args.repair)
         if args.repair:
-            while not os.environ.get('ATTIC_CHECK_I_KNOW_WHAT_I_AM_DOING'):
+            while not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
                 self.print_error("""Warning: 'check --repair' is an experimental feature that might result
 in data loss.
 
@@ -102,7 +102,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
                           create=True, checkpoint_interval=args.checkpoint_interval,
                           numeric_owner=args.numeric_owner, progress=args.progress)
-        # Add Attic cache dir to inode_skip list
+        # Add cache dir to inode_skip list
         skip_inodes = set()
         try:
             st = os.stat(get_cache_dir())
@@ -198,7 +198,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             return
         # Status output
         # A lowercase character means a file type other than a regular file,
-        # attic usually just stores them. E.g. (d)irectory.
+        # borg usually just stores them. E.g. (d)irectory.
         # Hardlinks to already seen content are indicated by (h).
         # A uppercase character means a regular file that was (A)dded,
         # (M)odified or was (U)nchanged.
@@ -435,17 +435,17 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         Examples:
 
         # Exclude '/home/user/file.o' but not '/home/user/file.odt':
-        $ attic create -e '*.o' repo.attic /
+        $ borg create -e '*.o' repo.borg /
 
         # Exclude '/home/user/junk' and '/home/user/subdir/junk' but
         # not '/home/user/importantjunk' or '/etc/junk':
-        $ attic create -e '/home/*/junk' repo.attic /
+        $ borg create -e '/home/*/junk' repo.borg /
 
         # Exclude the contents of '/home/user/cache' but not the directory itself:
-        $ attic create -e /home/user/cache/ repo.attic /
+        $ borg create -e /home/user/cache/ repo.borg /
 
         # The file '/home/user/cache/important' is *not* backed up:
-        $ attic create -e /home/user/cache/ repo.attic / /home/user/cache/important
+        $ borg create -e /home/user/cache/ repo.borg / /home/user/cache/important
         '''
 
     def do_help(self, parser, commands, args):
@@ -474,7 +474,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             ('--yearly', '--keep-yearly', 'Warning: "--yearly" has been deprecated. Use "--keep-yearly" instead.')
         ]
         if args and args[0] == 'verify':
-            print('Warning: "attic verify" has been deprecated. Use "attic extract --dry-run" instead.')
+            print('Warning: "borg verify" has been deprecated. Use "borg extract --dry-run" instead.')
             args = ['extract', '--dry-run'] + args[1:]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
@@ -496,7 +496,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             with open(os.path.join(cache_dir, 'CACHEDIR.TAG'), 'w') as fd:
                 fd.write(textwrap.dedent("""
                     Signature: 8a477f597d28d172789f06886806bc55
-                    # This file is a cache directory tag created by Attic.
+                    # This file is a cache directory tag created by Borg.
                     # For information about cache directory tags, see:
                     #       http://www.brynosaurus.com/cachedir/
                     """).lstrip())
@@ -510,7 +510,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         if args:
             args = self.preprocess_args(args)
 
-        parser = argparse.ArgumentParser(description='Attic %s - Deduplicated Backups' % __version__)
+        parser = argparse.ArgumentParser(description='Borg %s - Deduplicated Backups' % __version__)
         subparsers = parser.add_subparsers(title='Available commands')
 
         subparser = subparsers.add_parser('serve', parents=[common_parser],
@@ -582,7 +582,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         traversing all paths specified. The archive will consume almost no disk space for
         files or parts of files that have already been stored in other archives.
 
-        See "attic help patterns" for more help on exclude patterns.
+        See "borg help patterns" for more help on exclude patterns.
         """)
 
         subparser = subparsers.add_parser('create', parents=[common_parser],
@@ -631,7 +631,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         by passing a list of ``PATHs`` as arguments. The file selection can further
         be restricted by using the ``--exclude`` option.
 
-        See "attic help patterns" for more help on exclude patterns.
+        See "borg help patterns" for more help on exclude patterns.
         """)
         subparser = subparsers.add_parser('extract', parents=[common_parser],
                                           description=self.do_extract.__doc__,

@@ -43,14 +43,14 @@ class Cache:
         if not os.path.exists(self.path):
             if warn_if_unencrypted and isinstance(key, PlaintextKey):
                 if not self._confirm('Warning: Attempting to access a previously unknown unencrypted repository',
-                                     'ATTIC_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'):
+                                     'BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'):
                     raise self.CacheInitAbortedError()
             self.create()
         self.open()
         # Warn user before sending data to a relocated repository
         if self.previous_location and self.previous_location != repository._location.canonical_path():
             msg = 'Warning: The repository at location {} was previously located at {}'.format(repository._location.canonical_path(), self.previous_location)
-            if not self._confirm(msg, 'ATTIC_RELOCATED_REPO_ACCESS_IS_OK'):
+            if not self._confirm(msg, 'BORG_RELOCATED_REPO_ACCESS_IS_OK'):
                 raise self.RepositoryAccessAborted()
 
         if sync and self.manifest.id != self.manifest_id:
@@ -84,7 +84,7 @@ class Cache:
         """
         os.makedirs(self.path)
         with open(os.path.join(self.path, 'README'), 'w') as fd:
-            fd.write('This is an Attic cache')
+            fd.write('This is a Borg cache')
         config = RawConfigParser()
         config.add_section('cache')
         config.set('cache', 'version', '1')
@@ -107,7 +107,7 @@ class Cache:
         self.config = RawConfigParser()
         self.config.read(os.path.join(self.path, 'config'))
         if self.config.getint('cache', 'version') != 1:
-            raise Exception('%s Does not look like an Attic cache')
+            raise Exception('%s Does not look like a Borg cache')
         self.id = self.config.get('cache', 'repository')
         self.manifest_id = unhexlify(self.config.get('cache', 'manifest'))
         self.timestamp = self.config.get('cache', 'timestamp', fallback=None)
@@ -118,7 +118,7 @@ class Cache:
 
     def open(self):
         if not os.path.isdir(self.path):
-            raise Exception('%s Does not look like an Attic cache' % self.path)
+            raise Exception('%s Does not look like a Borg cache' % self.path)
         self.lock = UpgradableLock(os.path.join(self.path, 'config'), exclusive=True)
         self.rollback()
 

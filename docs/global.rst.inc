@@ -27,4 +27,5 @@
 .. _Arch Linux: https://aur.archlinux.org/packages/attic/
 .. _Slackware: http://slackbuilds.org/result/?search=Attic
 .. _Cython: http://cython.org/
+.. _virtualenv: https://pypi.python.org/pypi/virtualenv/
 .. _mailing list discussion about internals: http://librelist.com/browser/attic/2014/5/6/questions-and-suggestions-about-inner-working-of-attic>

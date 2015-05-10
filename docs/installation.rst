@@ -20,6 +20,9 @@ Newer versions are available from homebrew_ on OS X and from FreeBSD ports.
 The llfuse_ python package is also required if you wish to mount an
 archive as a FUSE filesystem.
 
+Virtualenv_ can be used to build and install |project_name|
+without affecting the system Python or requiring root access.
+
 Common compilation pre-requisites
 ---------------------------------
 

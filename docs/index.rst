@@ -32,7 +32,7 @@ Easy installation
 -----------------
 You can use pip to install |project_name| quickly and easily::
 
-    $ pip install attic
+    $ pip3 install attic
 
 |project_name| is also part of the Debian_, Ubuntu_, `Arch Linux`_ and Slackware_
 distributions of GNU/Linux.

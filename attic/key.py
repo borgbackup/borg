@@ -338,12 +338,12 @@ class AES_CTR_HMAC:
         _, data = self.enc_cipher.compute_mac_and_encrypt(data)
         self.enc_iv = increment_iv(meta.iv, len(data))
         aad = get_aad(meta)
-        mac = HMAC(self.hmac_key, aad + data, sha256).digest()  # XXX mac / hash flexibility
+        mac = HMAC_SHA256(self.hmac_key, aad + data).digest()  # XXX mac / hash flexibility
         return mac, data
 
     def check_mac_and_decrypt(self, mac, meta, data):
         aad = get_aad(meta)
-        if HMAC(self.hmac_key, aad + data, sha256).digest() != mac:
+        if HMAC_SHA256(self.hmac_key, aad + data).digest() != mac:  # XXX mac / hash flexibility
             raise IntegrityError('Encryption envelope checksum mismatch')
         self.dec_cipher.reset(iv=meta.iv)
         data = self.dec_cipher.check_mac_and_decrypt(None, data)

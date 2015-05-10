@@ -71,7 +71,7 @@ class Cache:
         if env_var_override and os.environ.get(env_var_override):
             print("Yes (From {})".format(env_var_override))
             return True
-        if sys.stdin.isatty():
+        if not sys.stdin.isatty():
             return False
         try:
             answer = input('Do you want to continue? [yN] ')

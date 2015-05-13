@@ -9,6 +9,14 @@ are stored.
 
 Borg is a fork of Attic and maintained by "The Borg Collective" (see AUTHORS file).
 
+BORG IS NOT COMPATIBLE WITH ORIGINAL ATTIC.
+UNTIL FURTHER NOTICE, EXPECT THAT WE WILL BREAK COMPATIBILITY REPEATEDLY.
+THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF IF IT FITS YOUR NEEDS.
+
+Read issue #1 on the issue tracker, goals are being defined there.
+
+Please also see the LICENSE for more informations.
+
 Easy to use
 ~~~~~~~~~~~
 Initialize backup repository and create a backup archive::

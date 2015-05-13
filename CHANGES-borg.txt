@@ -1,21 +1,17 @@
-Important note about "merge" branch
-===================================
+Important note about Borg
+=========================
 
-Goal of the "merge" branch is to be conservative and only merge:
-- bug fixes
-- new features that do not impact compatibility
-- docs updates
-- etc.
+BORG IS NOT COMPATIBLE WITH ORIGINAL ATTIC.
+UNTIL FURTHER NOTICE, EXPECT THAT WE WILL BREAK COMPATIBILITY REPEATEDLY.
+THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF IF IT FITS YOUR NEEDS.
 
-BUT: THERE IS NO GUARANTEE THAT IT IS ALWAYS COMPATIBLE WITH ORIGINAL ATTIC
-nor THAT YOU CAN SWITCH BACK AND FORTH BETWEEN ORIGINAL CODE AND THIS CODE
-WITHIN THE SAME REPOSITORY WITHOUT ENCOUNTERING ISSUES.
+Read issue #1 on the issue tracker, goals are being defined there.
 
 Please also see the LICENSE for more informations.
 
 
-Stuff in "merge" that is not in "master" minus minor changes
-============================================================
+Stuff in Borg that is not in original Attic minus minor changes
+===============================================================
 
 give specific path to xattr.is_enabled(), disable symlink setattr call that always fails
 fix misleading hint the fuse ImportError handler gave, fixes #237

@@ -4,6 +4,8 @@ import sys
 from glob import glob
 
 import versioneer
+versioneer.VCS = 'git'
+versioneer.style = 'pep440'
 versioneer.versionfile_source = 'attic/_version.py'
 versioneer.versionfile_build = 'attic/_version.py'
 versioneer.tag_prefix = ''

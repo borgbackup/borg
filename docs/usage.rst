@@ -109,11 +109,11 @@ Examples
 
     # Keep 7 end of day, 4 additional end of week archives,
     # and an end of month archive for every month:
-    $ attic prune /data/myrepo --keep-daily=7 --keep-weekly=4 --monthly=-1
+    $ attic prune /data/myrepo --keep-daily=7 --keep-weekly=4 --keep-monthly=-1
 
     # Keep all backups in the last 10 days, 4 additional end of week archives,
     # and an end of month archive for every month:
-    $ attic prune /data/myrepo --keep-within=10d --keep-weekly=4 --monthly=-1
+    $ attic prune /data/myrepo --keep-within=10d --keep-weekly=4 --keep-monthly=-1
 
 
 .. include:: usage/info.rst.inc

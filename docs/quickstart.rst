@@ -68,18 +68,17 @@ A step by step example
 Automating backups
 ------------------
 
-The following example script backs up ``/home`` and
-``/var/www`` to a remote server. The script also uses the
-:ref:`borg_prune` subcommand to maintain a certain number
-of old archives::
+The following example script backs up ``/home`` and ``/var/www`` to a remote
+server. The script also uses the :ref:`borg_prune` subcommand to maintain a
+certain number of old archives::
 
     #!/bin/sh
     REPOSITORY=username@remoteserver.com:backup
 
     # Backup all of /home and /var/www except a few
     # excluded directories
-    borg create --stats                            \
-        $REPOSITORY::hostname-`date +%Y-%m-%d`      \
+    borg create --stats                             \
+        $REPOSITORY::`hostname`-`date +%Y-%m-%d`    \
         /home                                       \
         /var/www                                    \
         --exclude /home/*/.cache                    \
@@ -103,7 +102,7 @@ When repository encryption is enabled all data is encrypted using 256-bit AES_
 encryption and the integrity and authenticity is verified using `HMAC-SHA256`_.
 
 All data is encrypted before being written to the repository. This means that
-an attacker that manages to compromise the host containing an encrypted
+an attacker who manages to compromise the host containing an encrypted
 archive will not be able to access any of the data.
 
 |project_name| supports two different methods to derive the AES and HMAC keys.

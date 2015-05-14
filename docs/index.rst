@@ -2,10 +2,16 @@
 
 Welcome to Borg
 ================
-|project_name| is a deduplicating backup program written in Python.
+|project_name| is a deduplicating and compressing backup program.
+Optionally, it also supports authenticated encryption.
+
 The main goal of |project_name| is to provide an efficient and secure way
 to backup data. The data deduplication technique used makes |project_name|
-suitable for daily backups since only the changes are stored.
+suitable for daily backups since only the changes are stored. The authenticated
+encryption makes it suitable for backups to not fully trusted targets.
+
+|project_name| is written in Python (with a little bit of Cython and C for
+the speed critical parts).
 
 
 Easy to use
@@ -52,9 +58,11 @@ User's Guide
 Getting help
 ============
 
-If you've found a bug or have a concrete feature request, you can add your bug
-report or feature request directly to the project's `issue tracker`_. For more
-general questions or discussions, a post to the mailing list is preferred.
+If you've found a bug or have a concrete feature request, please create a new
+ticket on the project's `issue tracker`_ (after checking whether someone else
+already has reported the same thing).
+
+For more general questions or discussions, IRC or mailing list are preferred.
 
 IRC
 ---

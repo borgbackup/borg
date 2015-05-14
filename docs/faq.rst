@@ -73,5 +73,5 @@ If a backup stops mid-way, does the already-backed-up data stay there? I.e. does
 If it crashes with a UnicodeError, what can I do?
     Check if your encoding is set correctly. For most POSIX-like systems, try::
 
-    export LANG=en_US.UTF-8  # or similar, important is correct charset
+        export LANG=en_US.UTF-8  # or similar, important is correct charset
 

@@ -11,7 +11,7 @@ suitable for daily backups since only the changes are stored. The authenticated
 encryption makes it suitable for backups to not fully trusted targets.
 
 |project_name| is written in Python (with a little bit of Cython and C for
-the speed critical parts).
+the performance critical parts).
 
 
 Easy to use

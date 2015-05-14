@@ -3,8 +3,10 @@ from binascii import hexlify
 from datetime import datetime
 from operator import attrgetter
 import functools
+import inspect
 import io
 import os
+import signal
 import stat
 import sys
 import textwrap
@@ -14,7 +16,7 @@ from attic.archive import Archive, ArchiveChecker
 from attic.repository import Repository
 from attic.cache import Cache
 from attic.key import key_creator
-from attic.helpers import Error, location_validator, format_time, \
+from attic.helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
@@ -807,11 +809,45 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         return args.func(args)
 
 
+def sig_info_handler(signum, stack):
+    """search the stack for infos about the currently processed file and print them"""
+    for frame in inspect.getouterframes(stack):
+        func, loc = frame[3], frame[0].f_locals
+        if func in ('process_file', '_process', ):  # attic create
+            path = loc['path']
+            try:
+                pos = loc['fd'].tell()
+                total = loc['st'].st_size
+            except Exception:
+                pos, total = 0, 0
+            print("{0} {1}/{2}".format(path, format_file_size(pos), format_file_size(total)))
+            break
+        if func in ('extract_item', ):  # attic extract
+            path = loc['item'][b'path']
+            try:
+                pos = loc['fd'].tell()
+            except Exception:
+                pos = 0
+            print("{0} {1}/???".format(path, format_file_size(pos)))
+            break
+
+
+def setup_signal_handlers():
+    sigs = []
+    if hasattr(signal, 'SIGUSR1'):
+        sigs.append(signal.SIGUSR1)  # kill -USR1 pid
+    if hasattr(signal, 'SIGINFO'):
+        sigs.append(signal.SIGINFO)  # kill -INFO pid (or ctrl-t)
+    for sig in sigs:
+        signal.signal(sig, sig_info_handler)
+
+
 def main():
     # Make sure stdout and stderr have errors='replace') to avoid unicode
     # issues when print()-ing unicode file names
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=True)
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, sys.stderr.encoding, 'replace', line_buffering=True)
+    setup_signal_handlers()
     archiver = Archiver()
     try:
         exit_code = archiver.run(sys.argv[1:])

@@ -105,7 +105,7 @@ setup(
     description='Deduplicated, encrypted, authenticated and compressed backups',
     long_description=long_description,
     license='BSD',
-    platforms=['Linux', 'MacOS X'],
+    platforms=['Linux', 'MacOS X', 'FreeBSD', ],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Console',

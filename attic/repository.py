@@ -145,7 +145,14 @@ class Repository:
 
     def prepare_txn(self, transaction_id, do_cleanup=True):
         self._active_txn = True
-        self.lock.upgrade()
+        try:
+            self.lock.upgrade()
+        except UpgradableLock.WriteLockFailed:
+            # if upgrading the lock to exclusive fails, we do not have an
+            # active transaction. this is important for "serve" mode, where
+            # the repository instance lives on - even if exceptions happened.
+            self._active_txn = False
+            raise
         if not self.index:
             self.index = self.open_index(transaction_id)
         if transaction_id is None:

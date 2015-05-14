@@ -186,7 +186,8 @@ class RemoteRepository:
                             raise Repository.ObjectNotFound(res[0], self.location.orig)
                         elif error == b'InvalidRPCMethod':
                             raise InvalidRPCMethod(*res)
-                        raise self.RPCError(res.decode('utf-8'))
+                        else:
+                            raise self.RPCError(res.decode('utf-8'))
                     else:
                         yield res
                         if not waiting_for and not calls:

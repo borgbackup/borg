@@ -4,6 +4,10 @@ Borg Changelog
 Version <TBD>
 -------------
 
+- changed sw name and cli command to "borg", updated docs
+- package name and name in urls uses "borgbackup" to have less collisions
+- changed repo / cache internal magic strings from ATTIC* to BORG*,
+  changed cache location to .cache/borg/
 - give specific path to xattr.is_enabled(), disable symlink setattr call that
   always fails
 - fix misleading hint the fuse ImportError handler gave, fixes attic #237
@@ -39,6 +43,7 @@ Version <TBD>
 - implement delete <repository> (also deletes local cache)
 - better create -v output
 - upgraded versioneer, fixes attic #257
+
 
 Attic Changelog
 ===============

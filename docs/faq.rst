@@ -25,19 +25,32 @@ Can I backup from multiple servers into a single repository?
     Borg will keep an exclusive lock on the repository while creating
     or deleting archives, which may make *simultaneous* backups fail.
 
-Which file attributes are preserved?
-    The following attributes are preserved:
-
+Which file types, attributes, etc. are preserved?
+    * Directories
+    * Regular files
+    * Hardlinks (considering all files in the same archive)
+    * Symlinks (stored as symlink, the symlink is not followed)
+    * Character and block device files
+    * FIFOs ("named pipes")
     * Name
     * Contents
-    * Hardlinks and symlinks
     * Time of last modification (nanosecond precision with Python >= 3.3)
     * User ID of owner
     * Group ID of owner
-    * Unix Permission
-    * Extended attributes (xattrs)
+    * Unix Mode/Permissions (u/g/o permissions, suid, sgid, sticky)
+    * Extended Attributes (xattrs)
     * Access Control Lists (ACL_) on Linux, OS X and FreeBSD
     * BSD flags on OS X and FreeBSD
+
+Which file types, attributes, etc. are *not* preserved?
+    * UNIX domain sockets (because it does not make sense - they are meaningless
+      without the running process that created them and the process needs to
+      recreate them in any case). So, don't panic if your backup misses a UDS!
+    * The precise on-disk representation of the holes in a sparse file.
+      Archive creation has no special support for sparse files, holes are
+      backed up up as (deduplicated and compressed) runs of zero bytes.
+      Archive extraction has optional support to extract all-zero chunks as
+      holes in a sparse file.
 
 How can I specify the encryption passphrase programmatically?
     The encryption passphrase can be specified programmatically using the

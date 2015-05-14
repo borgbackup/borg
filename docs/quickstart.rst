@@ -138,17 +138,25 @@ Remote repositories
 host is accessible using SSH.  This is fastest and easiest when |project_name|
 is installed on the remote host, in which case the following syntax is used::
 
-  $ borg init user@hostname:backup
+  $ borg init user@hostname:/mnt/backup
 
 or::
 
-  $ borg init ssh://user@hostname:port/backup
+  $ borg init ssh://user@hostname:port//mnt/backup
 
-If it is not possible to install |project_name| on the remote host, 
+Remote operations over SSH can be automated with SSH keys. You can restrict the
+use of the SSH keypair by prepending a forced command to the SSH public key in
+the remote server's authorized_keys file. Only the forced command will be run
+when the key authenticates a connection. This example will start attic in server
+mode, and limit the attic server to a specific filesystem path::
+
+  command="attic serve --restrict-to-path /mnt/backup" ssh-rsa AAAAB3[...]
+
+If it is not possible to install |project_name| on the remote host,
 it is still possible to use the remote host to store a repository by
 mounting the remote filesystem, for example, using sshfs::
 
-  $ sshfs user@hostname:/path/to/folder /mnt
+  $ sshfs user@hostname:/mnt /mnt
   $ borg init /mnt/backup
   $ fusermount -u /mnt
 

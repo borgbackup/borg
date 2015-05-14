@@ -2,7 +2,7 @@
 if [ ! -d usage ]; then
   mkdir usage
 fi
-for cmd in change-passphrase check create delete extract info init list mount prune; do
+for cmd in change-passphrase check create delete extract info init list mount prune serve; do
   FILENAME="usage/$cmd.rst.inc"
   LINE=`echo -n borg $cmd | tr 'a-z- ' '-'`
   echo -e ".. _borg_$cmd:\n" > $FILENAME

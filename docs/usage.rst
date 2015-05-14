@@ -168,3 +168,15 @@ Examples
     Enter same passphrase again: 
     Key file "/home/USER/.borg/keys/mnt_backup" updated
 
+
+.. include:: usage/serve.rst.inc
+
+Examples
+~~~~~~~~
+::
+
+    # Allow an SSH keypair to only run attic, and only have access to /mnt/backup.
+    # This will help to secure an automated remote backup system.
+    $ cat ~/.ssh/authorized_keys
+    command="attic serve --restrict-to-path /mnt/backup" ssh-rsa AAAAB3[...]
+

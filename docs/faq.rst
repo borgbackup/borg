@@ -7,10 +7,13 @@ Frequently asked questions
 Which platforms are supported?
     Currently Linux, FreeBSD and MacOS X are supported.
 
+    You can try your luck on other POSIX-like systems, like Cygwin,
+    other BSDs, etc. but they are not officially supported.
 
 Can I backup VM disk images?
     Yes, the :ref:`deduplication <deduplication_def>` technique used by |project_name|
     makes sure only the modified parts of the file are stored.
+    Also, we have optional simple sparse file support for extract.
 
 Can I backup from multiple servers into a single repository?
     Yes, but in order for the deduplication used by Borg to work, it
@@ -62,7 +65,13 @@ How can I specify the encryption passphrase programmatically?
 When backing up to remote servers, is data encrypted before leaving the local machine, or do I have to trust that the remote server isn't malicious?
     Yes, everything is encrypted before leaving the local machine.
 
-If a backup stops mid-way, does the already-backed-up data stay there? I.e. does Borg resume backups?
+If a backup stops mid-way, does the already-backed-up data stay there? I.e. does |project_name| resume backups?
     Yes, during a backup a special checkpoint archive named ``<archive-name>.checkpoint`` is saved every 5 minutes
     containing all the data backed-up until that point. This means that at most 5 minutes worth of data needs to be
     retransmitted if a backup needs to be restarted.
+
+If it crashes with a UnicodeError, what can I do?
+    Check if your encoding is set correctly. For most POSIX-like systems, try::
+
+    export LANG=en_US.UTF-8  # or similar, important is correct charset
+

@@ -24,7 +24,7 @@ Examples
     # Local repository
     $ borg init /mnt/backup
 
-    # Remote repository
+    # Remote repository (accesses a remote borg via ssh)
     $ borg init user@hostname:backup
 
     # Encrypted remote repository

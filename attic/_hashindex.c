@@ -57,8 +57,10 @@ typedef struct {
 #define BUCKET_MARK_DELETED(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) = DELETED)
 #define BUCKET_MARK_EMPTY(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) = EMPTY)
 
-#define EPRINTF(msg, ...) fprintf(stderr, "hashindex: " msg "\n", ##__VA_ARGS__)
-#define EPRINTF_PATH(path, msg, ...) fprintf(stderr, "hashindex: %s: " msg "\n", path, ##__VA_ARGS__)
+#define EPRINTF_MSG(msg, ...) fprintf(stderr, "hashindex: " msg "\n", ##__VA_ARGS__)
+#define EPRINTF_MSG_PATH(path, msg, ...) fprintf(stderr, "hashindex: %s: " msg "\n", path, ##__VA_ARGS__)
+#define EPRINTF(msg, ...) fprintf(stderr, "hashindex: " msg "(%s)\n", ##__VA_ARGS__, strerror(errno))
+#define EPRINTF_PATH(path, msg, ...) fprintf(stderr, "hashindex: %s: " msg " (%s)\n", path, ##__VA_ARGS__, strerror(errno))
 
 static HashIndex *hashindex_read(const char *path);
 static int hashindex_write(HashIndex *index, const char *path);
@@ -143,7 +145,12 @@ hashindex_read(const char *path)
         return NULL;
     }
     if(fread(&header, 1, sizeof(HashHeader), fd) != sizeof(HashHeader)) {
-        EPRINTF_PATH(path, "fread failed");
+        if(ferror(fd)) {
+            EPRINTF_PATH(path, "fread failed");
+        }
+        else {
+            EPRINTF_MSG_PATH(path, "failed to read %ld bytes", sizeof(HashHeader));
+        }
         goto fail;
     }
     if(fseek(fd, 0, SEEK_END) < 0) {
@@ -159,11 +166,11 @@ hashindex_read(const char *path)
         goto fail;
     }
     if(memcmp(header.magic, MAGIC, 8)) {
-        EPRINTF_PATH(path, "Unknown file header");
+        EPRINTF_MSG_PATH(path, "Unknown file header");
         goto fail;
     }
     if(length != sizeof(HashHeader) + (off_t)_le32toh(header.num_buckets) * (header.key_size + header.value_size)) {
-        EPRINTF_PATH(path, "Incorrect file length");
+        EPRINTF_MSG_PATH(path, "Incorrect file length");
         goto fail;
     }
     if(!(index = malloc(sizeof(HashIndex)))) {
@@ -177,7 +184,12 @@ hashindex_read(const char *path)
         goto fail;
     }
     if(fread(index->data, 1, length, fd) != length) {
-        EPRINTF_PATH(path, "fread failed");
+        if(ferror(fd)) {
+            EPRINTF_PATH(path, "fread failed");
+        }
+        else {
+            EPRINTF_MSG_PATH(path, "failed to read %ld bytes", length);
+        }
         free(index->data);
         free(index);
         index = NULL;
@@ -249,7 +261,6 @@ hashindex_write(HashIndex *index, const char *path)
 
     if((fd = fopen(path, "w")) == NULL) {
         EPRINTF_PATH(path, "open failed");
-        fprintf(stderr, "Failed to open %s for writing\n", path);
         return 0;
     }
     *((uint32_t *)(index->data + 8)) = _htole32(index->num_entries);

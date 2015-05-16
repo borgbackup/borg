@@ -3,6 +3,12 @@ Attic Changelog
 
 Here you can see the full list of changes between each Attic release.
 
+Version 0.17
+------------
+
+(bugfix release, released on X)
+- Improve hashindex error messages (#298)
+
 Version 0.16
 ------------
 

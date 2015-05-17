@@ -10,6 +10,7 @@ import signal
 import stat
 import sys
 import textwrap
+import traceback
 
 from attic import __version__
 from attic.archive import Archive, ArchiveChecker
@@ -852,12 +853,14 @@ def main():
     try:
         exit_code = archiver.run(sys.argv[1:])
     except Error as e:
+        traceback.print_exc()
         archiver.print_error(e.get_message())
         exit_code = e.exit_code
     except RemoteRepository.RPCError as e:
         print(e)
         exit_code = 1
     except KeyboardInterrupt:
+        traceback.print_exc()
         archiver.print_error('Error: Keyboard interrupt')
         exit_code = 1
     else:

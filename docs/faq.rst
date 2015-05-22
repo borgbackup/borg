@@ -75,3 +75,9 @@ If it crashes with a UnicodeError, what can I do?
 
         export LANG=en_US.UTF-8  # or similar, important is correct charset
 
+Why was borg forked from Attic?
+    borg was created in may 2015 in response to the difficulty of
+    getting new merge requests and larger changes incorporated into
+    attic. more details can be found in the `fairly long discussion
+    <https://github.com/jborg/attic/issues/217>`_ in 
+    attic issue queue that led to the fork.

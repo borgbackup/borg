@@ -3,10 +3,11 @@ import re
 import shutil
 import tempfile
 from binascii import hexlify
-from attic.crypto import bytes_to_long, num_aes_blocks
-from attic.testsuite import BaseTestCase
-from attic.key import PlaintextKey, PassphraseKey, KeyfileKey
-from attic.helpers import Location, unhexlify
+
+from ..crypto import bytes_to_long, num_aes_blocks
+from ..key import PlaintextKey, PassphraseKey, KeyfileKey
+from ..helpers import Location, unhexlify
+from . import BaseTestCase
 
 
 class KeyTestCase(BaseTestCase):

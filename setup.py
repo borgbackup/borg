@@ -6,8 +6,8 @@ from glob import glob
 import versioneer
 versioneer.VCS = 'git'
 versioneer.style = 'pep440'
-versioneer.versionfile_source = 'attic/_version.py'
-versioneer.versionfile_build = 'attic/_version.py'
+versioneer.versionfile_source = 'borg/_version.py'
+versioneer.versionfile_build = 'borg/_version.py'
 versioneer.tag_prefix = ''
 versioneer.parentdir_prefix = 'borgbackup-'  # dirname like 'myproject-1.2.0'
 
@@ -21,12 +21,12 @@ try:
 except ImportError:
     from distutils.core import setup, Extension
 
-crypto_source = 'attic/crypto.pyx'
-chunker_source = 'attic/chunker.pyx'
-hashindex_source = 'attic/hashindex.pyx'
-platform_linux_source = 'attic/platform_linux.pyx'
-platform_darwin_source = 'attic/platform_darwin.pyx'
-platform_freebsd_source = 'attic/platform_freebsd.pyx'
+crypto_source = 'borg/crypto.pyx'
+chunker_source = 'borg/chunker.pyx'
+hashindex_source = 'borg/hashindex.pyx'
+platform_linux_source = 'borg/platform_linux.pyx'
+platform_darwin_source = 'borg/platform_darwin.pyx'
+platform_freebsd_source = 'borg/platform_freebsd.pyx'
 
 try:
     from Cython.Distutils import build_ext
@@ -34,13 +34,20 @@ try:
 
     class Sdist(versioneer.cmd_sdist):
         def __init__(self, *args, **kwargs):
-            for src in glob('attic/*.pyx'):
-                cython_compiler.compile(glob('attic/*.pyx'),
+            for src in glob('borg/*.pyx'):
+                cython_compiler.compile(glob('borg/*.pyx'),
                                         cython_compiler.default_options)
             versioneer.cmd_sdist.__init__(self, *args, **kwargs)
 
         def make_distribution(self):
-            self.filelist.extend(['attic/crypto.c', 'attic/chunker.c', 'attic/_chunker.c', 'attic/hashindex.c', 'attic/_hashindex.c', 'attic/platform_linux.c', 'attic/platform_freebsd.c', 'attic/platform_darwin.c'])
+            self.filelist.extend([
+                'borg/crypto.c',
+                'borg/chunker.c', 'borg/_chunker.c',
+                'borg/hashindex.c', 'borg/_hashindex.c',
+                'borg/platform_linux.c',
+                'borg/platform_freebsd.c',
+                'borg/platform_darwin.c',
+            ])
             super(Sdist, self).make_distribution()
 
 except ImportError:
@@ -68,7 +75,7 @@ def detect_openssl(prefixes):
                     return prefix
 
 
-possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl', '/usr/local/attic', '/opt/local']
+possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl', '/usr/local/borg', '/opt/local']
 if os.environ.get('BORG_OPENSSL_PREFIX'):
     possible_openssl_prefixes.insert(0, os.environ.get('BORG_OPENSSL_PREFIX'))
 ssl_prefix = detect_openssl(possible_openssl_prefixes)
@@ -85,16 +92,16 @@ cmdclass = versioneer.get_cmdclass()
 cmdclass.update({'build_ext': build_ext, 'sdist': Sdist})
 
 ext_modules = [
-    Extension('attic.crypto', [crypto_source], libraries=['crypto'], include_dirs=include_dirs, library_dirs=library_dirs),
-    Extension('attic.chunker', [chunker_source]),
-    Extension('attic.hashindex', [hashindex_source])
+    Extension('borg.crypto', [crypto_source], libraries=['crypto'], include_dirs=include_dirs, library_dirs=library_dirs),
+    Extension('borg.chunker', [chunker_source]),
+    Extension('borg.hashindex', [hashindex_source])
 ]
 if sys.platform.startswith('linux'):
-    ext_modules.append(Extension('attic.platform_linux', [platform_linux_source], libraries=['acl']))
+    ext_modules.append(Extension('borg.platform_linux', [platform_linux_source], libraries=['acl']))
 elif sys.platform.startswith('freebsd'):
-    ext_modules.append(Extension('attic.platform_freebsd', [platform_freebsd_source]))
+    ext_modules.append(Extension('borg.platform_freebsd', [platform_freebsd_source]))
 elif sys.platform == 'darwin':
-    ext_modules.append(Extension('attic.platform_darwin', [platform_darwin_source]))
+    ext_modules.append(Extension('borg.platform_darwin', [platform_darwin_source]))
 
 setup(
     name='borgbackup',
@@ -122,7 +129,7 @@ setup(
         'Topic :: Security :: Cryptography',
         'Topic :: System :: Archiving :: Backup',
     ],
-    packages=['attic', 'attic.testsuite'],
+    packages=['borg', 'borg.testsuite'],
     scripts=['scripts/borg'],
     cmdclass=cmdclass,
     ext_modules=ext_modules,

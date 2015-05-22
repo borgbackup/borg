@@ -1,4 +1,4 @@
 #!/usr/bin/env python
-from attic.archiver import main
+from borg.archiver import main
 main()
 

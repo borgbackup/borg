@@ -1,12 +1,13 @@
 import os
 import shutil
 import tempfile
-from attic.testsuite.mock import patch
-from attic.hashindex import NSIndex
-from attic.helpers import Location, IntegrityError, UpgradableLock
-from attic.remote import RemoteRepository, InvalidRPCMethod
-from attic.repository import Repository
-from attic.testsuite import BaseTestCase
+
+from ..hashindex import NSIndex
+from ..helpers import Location, IntegrityError, UpgradableLock
+from ..remote import RemoteRepository, InvalidRPCMethod
+from ..repository import Repository
+from . import BaseTestCase
+from .mock import patch
 
 
 class RepositoryTestCaseBase(BaseTestCase):

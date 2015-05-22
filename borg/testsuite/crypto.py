@@ -1,6 +1,7 @@
 from binascii import hexlify
-from attic.testsuite import BaseTestCase
-from attic.crypto import AES, bytes_to_long, bytes_to_int, long_to_bytes, pbkdf2_sha256, get_random_bytes
+
+from ..crypto import AES, bytes_to_long, bytes_to_int, long_to_bytes, pbkdf2_sha256, get_random_bytes
+from . import BaseTestCase
 
 
 class CryptoTestCase(BaseTestCase):

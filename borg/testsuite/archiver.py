@@ -10,16 +10,17 @@ import tempfile
 import time
 import unittest
 from hashlib import sha256
-from attic import xattr
-from attic.archive import Archive, ChunkBuffer, CHUNK_MAX
-from attic.archiver import Archiver
-from attic.cache import Cache
-from attic.crypto import bytes_to_long, num_aes_blocks
-from attic.helpers import Manifest
-from attic.remote import RemoteRepository, PathNotAllowed
-from attic.repository import Repository
-from attic.testsuite import BaseTestCase
-from attic.testsuite.mock import patch
+
+from .. import xattr
+from ..archive import Archive, ChunkBuffer, CHUNK_MAX
+from ..archiver import Archiver
+from ..cache import Cache
+from ..crypto import bytes_to_long, num_aes_blocks
+from ..helpers import Manifest
+from ..remote import RemoteRepository, PathNotAllowed
+from ..repository import Repository
+from . import BaseTestCase
+from .mock import patch
 
 try:
     import llfuse
@@ -95,7 +96,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         fork = kw.get('fork', False)
         if fork:
             try:
-                output = subprocess.check_output((sys.executable, '-m', 'attic.archiver') + args)
+                output = subprocess.check_output((sys.executable, '-m', 'borg.archiver') + args)
                 ret = 0
             except subprocess.CalledProcessError as e:
                 output = e.output

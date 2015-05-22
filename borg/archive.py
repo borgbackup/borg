@@ -4,8 +4,8 @@ from itertools import groupby
 import errno
 import shutil
 import tempfile
-from attic.key import key_factory
-from attic.remote import cache_if_remote
+from .key import key_factory
+from .remote import cache_if_remote
 import msgpack
 import os
 import socket
@@ -13,11 +13,11 @@ import stat
 import sys
 import time
 from io import BytesIO
-from attic import xattr
-from attic.platform import acl_get, acl_set
-from attic.chunker import Chunker
-from attic.hashindex import ChunkIndex
-from attic.helpers import parse_timestamp, Error, uid2user, user2uid, gid2group, group2gid, \
+from . import xattr
+from .platform import acl_get, acl_set
+from .chunker import Chunker
+from .hashindex import ChunkIndex
+from .helpers import parse_timestamp, Error, uid2user, user2uid, gid2group, group2gid, \
     Manifest, Statistics, decode_dict, st_mtime_ns, make_path_safe, StableDict, int_to_bigint, bigint_to_int
 
 ITEMS_BUFFER = 1024 * 1024

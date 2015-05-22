@@ -1,10 +1,12 @@
-import msgpack
-from attic.testsuite import BaseTestCase
-from attic.testsuite.mock import Mock
-from attic.archive import Archive, CacheChunkBuffer, RobustUnpacker
-from attic.key import PlaintextKey
-from attic.helpers import Manifest
 from datetime import datetime, timezone
+
+import msgpack
+
+from ..archive import Archive, CacheChunkBuffer, RobustUnpacker
+from ..key import PlaintextKey
+from ..helpers import Manifest
+from . import BaseTestCase
+from .mock import Mock
 
 
 class MockCache:

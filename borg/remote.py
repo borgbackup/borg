@@ -9,7 +9,7 @@ import sys
 import tempfile
 import traceback
 
-from attic import __version__
+from . import __version__
 
 from .hashindex import NSIndex
 from .helpers import Error, IntegrityError
@@ -123,7 +123,7 @@ class RemoteRepository:
         self.unpacker = msgpack.Unpacker(use_list=False)
         self.p = None
         if location.host == '__testsuite__':
-            args = [sys.executable, '-m', 'attic.archiver', 'serve'] + self.extra_test_args
+            args = [sys.executable, '-m', 'borg.archiver', 'serve'] + self.extra_test_args
         else:
             args = ['ssh']
             if location.port:

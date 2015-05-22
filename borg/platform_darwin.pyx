@@ -1,5 +1,5 @@
 import os
-from attic.helpers import user2uid, group2gid
+from .helpers import user2uid, group2gid
 
 API_VERSION = 2
 

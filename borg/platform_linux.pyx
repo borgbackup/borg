@@ -1,7 +1,7 @@
 import os
 import re
 from stat import S_ISLNK
-from attic.helpers import posix_acl_use_stored_uid_gid, user2uid, group2gid
+from .helpers import posix_acl_use_stored_uid_gid, user2uid, group2gid
 
 API_VERSION = 2
 

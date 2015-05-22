@@ -4,10 +4,12 @@ from datetime import datetime, timezone, timedelta
 import os
 import tempfile
 import unittest
-from attic.helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, UpgradableLock, prune_within, prune_split, to_localtime, \
-    StableDict, int_to_bigint, bigint_to_int, parse_timestamp
-from attic.testsuite import BaseTestCase
+
 import msgpack
+
+from ..helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, UpgradableLock, prune_within, prune_split, to_localtime, \
+    StableDict, int_to_bigint, bigint_to_int, parse_timestamp
+from . import BaseTestCase
 
 
 class BigIntTestCase(BaseTestCase):

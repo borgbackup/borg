@@ -86,7 +86,7 @@ If it crashes with a UnicodeError, what can I do?
         export LANG=en_US.UTF-8  # or similar, important is correct charset
 
 If I want to run |project_name| on a ARM CPU older than ARM v6?
-    You need to enable the alignment trap handler to fixup misaligned accesses:
+    You need to enable the alignment trap handler to fixup misaligned accesses::
     
         echo "2" > /proc/cpu/alignment
 
@@ -96,19 +96,22 @@ Why was Borg forked from Attic?
     establishing a bigger developer community / more open development.
 
     More details can be found in `ticket 217
-    <https://github.com/jborg/attic/issues/217>`_) that led to the fork.
+    <https://github.com/jborg/attic/issues/217>`_ that led to the fork.
 
     Borg intends to be:
 
     * simple:
+
       * as simple as possible, but no simpler
       * do the right thing by default, but offer options
     * open:
+
       * welcome feature requests
       * accept pull requests of good quality and coding style
       * give feedback on PRs that can't be accepted "as is"
       * discuss openly, don't work in the dark
     * changing:
+
       * Borg is not compatible with Attic
       * do not break compatibility accidentally, without a good reason
         or without warning. allow compatibility breaking for other cases.

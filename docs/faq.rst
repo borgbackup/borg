@@ -78,9 +78,9 @@ If it crashes with a UnicodeError, what can I do?
 Why was Borg forked from Attic?
     Borg was created in may 2015 in response to the difficulty of
     getting new merge requests and larger changes incorporated into
-    attic. more details can be found in the `fairly long discussion
-    <https://github.com/jborg/attic/issues/217>`_ in 
-    attic issue queue that led to the fork.
+    attic. more details can be found in the fairly long discussion
+    in attic issue queue (found in `ticket 217
+    <https://github.com/jborg/attic/issues/217>`_) that led to the fork.
 
     Borg intends to be:
 

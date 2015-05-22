@@ -69,7 +69,7 @@ Some of the steps detailled below might be useful also for non-git installs.
 
     # install some dependencies into virtual env
     pip install cython  # to compile .pyx -> .c
-    pip install tox   # optional, for running unit tests
+    pip install tox pytest  # optional, for running unit tests
     pip install sphinx  # optional, to build the docs
 
     # get |project_name| from github, install it

@@ -81,3 +81,19 @@ Why was borg forked from Attic?
     attic. more details can be found in the `fairly long discussion
     <https://github.com/jborg/attic/issues/217>`_ in 
     attic issue queue that led to the fork.
+
+    borg intends to be:
+
+    * simple:
+      * as simple as possible, but no simpler
+      * do the right thing by default, but offer options
+    * open:
+      * welcome feature requests
+      * accept pull requests of good quality and coding style
+      * give feedback on PRs that can't be accepted "as is"
+      * discuss openly, don't work in the dark
+    * changing:
+      * do not break compatibility accidentally, without a good reason
+        or without warning
+      * borg is not backwards-compatible with attic
+      * major versions may not be compatible with older releases

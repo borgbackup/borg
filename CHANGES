@@ -19,7 +19,7 @@ Version <TBD>
 - less memory usage: add global option --no-cache-files
 - fix traceback when trying to do unsupported passphrase change, fixes attic #189
 - datetime does not like the year 10.000, fixes attic #139
-- docs improvements, fixes, updates
+- docs and faq improvements, fixes, updates
 - cleanup crypto.pyx, make it easier to adapt to other modes
 - extract: if --stdout is given, write all extracted binary data to stdout
 - create: if "-" is given as path, read binary from stdin
@@ -40,9 +40,16 @@ Version <TBD>
 - implement rename repo::oldname newname
 - implement create --progress
 - source: refactor indicator (status) and item processing
-- implement delete <repository> (also deletes local cache)
+- implement delete repo (also deletes local cache)
 - better create -v output
-- upgraded versioneer, fixes attic #257
+- upgraded versioneer, PEP440 compliance, fixes attic #257
+- source: use py.test for better testing, flake8 for code style checks
+- source: fix tox >=2.0 compatibility
+- toplevel error handler: show tracebacks for better error analysis
+- sigusr1 / sigint handler to print current file infos - attic PR #286
+- pypi package: add python version classifiers, add FreeBSD to platforms
+- fix Repository._active_txn state when lock upgrade fails
+- RPCError: include the exception args we get from remote
 
 
 Attic Changelog

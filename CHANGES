@@ -54,7 +54,7 @@ forked from Attic:
 Version 0.16
 ------------
 
-(bugfix release, released on X)
+(bugfix release, released on May 16, 2015)
 - Fix typo preventing the security confirmation prompt from working (#303)
 - Improve handling of systems with improperly configured file system encoding (#289)
 - Fix "All archives" output for attic info. (#183)

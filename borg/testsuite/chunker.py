@@ -1,7 +1,8 @@
-from attic.chunker import Chunker, buzhash, buzhash_update
-from attic.testsuite import BaseTestCase
-from attic.archive import CHUNK_MAX
 from io import BytesIO
+
+from ..chunker import Chunker, buzhash, buzhash_update
+from ..archive import CHUNK_MAX
+from . import BaseTestCase
 
 
 class ChunkerTestCase(BaseTestCase):

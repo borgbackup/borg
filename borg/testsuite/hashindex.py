@@ -1,8 +1,9 @@
 import hashlib
 import os
 import tempfile
-from attic.hashindex import NSIndex, ChunkIndex
-from attic.testsuite import BaseTestCase
+
+from ..hashindex import NSIndex, ChunkIndex
+from . import BaseTestCase
 
 
 class HashIndexTestCase(BaseTestCase):

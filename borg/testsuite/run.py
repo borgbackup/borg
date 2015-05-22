@@ -1,5 +1,6 @@
 import unittest
-from attic.testsuite import TestLoader
+
+from . import TestLoader
 
 
 def main():

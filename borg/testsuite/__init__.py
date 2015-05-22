@@ -6,8 +6,8 @@ import sys
 import sysconfig
 import time
 import unittest
-from attic.helpers import st_mtime_ns
-from attic.xattr import get_all
+from ..helpers import st_mtime_ns
+from ..xattr import get_all
 
 try:
     import llfuse
@@ -113,7 +113,7 @@ class TestLoader(unittest.TestLoader):
     """
 
     def loadTestsFromName(self, pattern, module=None):
-        suite = self.discover('attic.testsuite', '*.py')
+        suite = self.discover('borg.testsuite', '*.py')
         tests = unittest.TestSuite()
         for test in get_tests(suite):
             if pattern.lower() in test.id().lower():

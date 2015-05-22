@@ -1,7 +1,7 @@
 include README.rst LICENSE CHANGES MANIFEST.in versioneer.py
-recursive-include attic *.pyx
+recursive-include borg *.pyx
 recursive-include docs *
 recursive-exclude docs *.pyc
 recursive-exclude docs *.pyo
 prune docs/_build
-include attic/_version.py
+include borg/_version.py

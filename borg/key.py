@@ -7,8 +7,8 @@ import hmac
 from hashlib import sha256
 import zlib
 
-from attic.crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
-from attic.helpers import IntegrityError, get_keys_dir, Error
+from .crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
+from .helpers import IntegrityError, get_keys_dir, Error
 
 PREFIX = b'\0' * 8
 

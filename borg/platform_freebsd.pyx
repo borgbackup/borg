@@ -1,5 +1,5 @@
 import os
-from attic.helpers import posix_acl_use_stored_uid_gid
+from .helpers import posix_acl_use_stored_uid_gid
 
 API_VERSION = 2
 

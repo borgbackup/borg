@@ -1,5 +1,5 @@
 from configparser import RawConfigParser
-from attic.remote import cache_if_remote
+from .remote import cache_if_remote
 import msgpack
 import os
 import sys

@@ -1,5 +1,5 @@
-from attic.lrucache import LRUCache
-from attic.testsuite import BaseTestCase
+from ..lrucache import LRUCache
+from . import BaseTestCase
 
 
 class LRUCacheTestCase(BaseTestCase):

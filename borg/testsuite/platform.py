@@ -3,8 +3,9 @@ import shutil
 import sys
 import tempfile
 import unittest
-from attic.platform import acl_get, acl_set
-from attic.testsuite import BaseTestCase
+
+from ..platform import acl_get, acl_set
+from . import BaseTestCase
 
 
 ACCESS_ACL = """

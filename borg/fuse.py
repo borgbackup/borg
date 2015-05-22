@@ -7,9 +7,9 @@ import os
 import stat
 import tempfile
 import time
-from attic.archive import Archive
-from attic.helpers import daemonize
-from attic.remote import cache_if_remote
+from .archive import Archive
+from .helpers import daemonize
+from .remote import cache_if_remote
 
 # Does this version of llfuse support ns precision?
 have_fuse_mtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')

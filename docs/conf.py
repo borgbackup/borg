@@ -1,4 +1,4 @@
-    # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # documentation build configuration file, created by
 # sphinx-quickstart on Sat Sep 10 18:18:25 2011.
@@ -11,7 +11,8 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys, os, attic
+import sys, os
+from borg import __version__ as sw_version
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -48,7 +49,7 @@ copyright = '2010-2014, Jonas Borgström'
 # built documents.
 #
 # The short X.Y version.
-version = attic.__version__.split('-')[0]
+version = sw_version.split('-')[0]
 # The full version, including alpha/beta/rc tags.
 release = version
 

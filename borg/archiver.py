@@ -12,17 +12,17 @@ import sys
 import textwrap
 import traceback
 
-from attic import __version__
-from attic.archive import Archive, ArchiveChecker
-from attic.repository import Repository
-from attic.cache import Cache
-from attic.key import key_creator
-from attic.helpers import Error, location_validator, format_time, format_file_size, \
+from . import __version__
+from .archive import Archive, ArchiveChecker
+from .repository import Repository
+from .cache import Cache
+from .key import key_creator
+from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     is_cachedir, bigint_to_int
-from attic.remote import RepositoryServer, RemoteRepository
+from .remote import RepositoryServer, RemoteRepository
 
 
 class Archiver:
@@ -296,7 +296,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
     def do_mount(self, args):
         """Mount archive or an entire repository as a FUSE fileystem"""
         try:
-            from attic.fuse import FuseOperations
+            from .fuse import FuseOperations
         except ImportError as e:
             self.print_error('loading fuse support failed [ImportError: %s]' % str(e))
             return self.exit_code
@@ -814,7 +814,7 @@ def sig_info_handler(signum, stack):
     """search the stack for infos about the currently processed file and print them"""
     for frame in inspect.getouterframes(stack):
         func, loc = frame[3], frame[0].f_locals
-        if func in ('process_file', '_process', ):  # attic create
+        if func in ('process_file', '_process', ):  # create op
             path = loc['path']
             try:
                 pos = loc['fd'].tell()
@@ -823,7 +823,7 @@ def sig_info_handler(signum, stack):
                 pos, total = 0, 0
             print("{0} {1}/{2}".format(path, format_file_size(pos), format_file_size(total)))
             break
-        if func in ('extract_item', ):  # attic extract
+        if func in ('extract_item', ):  # extract op
             path = loc['item'][b'path']
             try:
                 pos = loc['fd'].tell()

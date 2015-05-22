@@ -12,9 +12,9 @@ from fnmatch import translate
 from operator import attrgetter
 import fcntl
 
-import attic.hashindex
-import attic.chunker
-import attic.crypto
+from . import hashindex
+from . import chunker
+from . import crypto
 
 
 class Error(Exception):
@@ -71,11 +71,11 @@ class UpgradableLock:
 
 
 def check_extension_modules():
-    import attic.platform
-    if (attic.hashindex.API_VERSION != 2 or
-        attic.chunker.API_VERSION != 2 or
-        attic.crypto.API_VERSION != 2 or
-        attic.platform.API_VERSION != 2):
+    from . import platform
+    if (hashindex.API_VERSION != 2 or
+        chunker.API_VERSION != 2 or
+        crypto.API_VERSION != 2 or
+        platform.API_VERSION != 2):
         raise ExtensionModuleError
 
 

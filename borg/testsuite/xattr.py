@@ -1,8 +1,9 @@
 import os
 import tempfile
 import unittest
-from attic.testsuite import BaseTestCase
-from attic.xattr import is_enabled, getxattr, setxattr, listxattr
+
+from ..xattr import is_enabled, getxattr, setxattr, listxattr
+from . import BaseTestCase
 
 
 @unittest.skipUnless(is_enabled(), 'xattr not enabled on filesystem')

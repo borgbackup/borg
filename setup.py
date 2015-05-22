@@ -35,8 +35,7 @@ try:
     class Sdist(versioneer.cmd_sdist):
         def __init__(self, *args, **kwargs):
             for src in glob('borg/*.pyx'):
-                cython_compiler.compile(glob('borg/*.pyx'),
-                                        cython_compiler.default_options)
+                cython_compiler.compile(src, cython_compiler.default_options)
             versioneer.cmd_sdist.__init__(self, *args, **kwargs)
 
         def make_distribution(self):

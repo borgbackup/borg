@@ -26,6 +26,7 @@ class ArchiveTimestampTestCase(BaseTestCase):
         key = PlaintextKey()
         manifest = Manifest(repository, key)
         a = Archive(repository, key, manifest, 'test', create=True)
+        a.close()
         a.metadata = {b'time': isoformat}
         self.assert_equal(a.ts, expected)
 

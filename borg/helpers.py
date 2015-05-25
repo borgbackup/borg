@@ -4,6 +4,7 @@ import grp
 import msgpack
 import os
 import pwd
+import queue
 import re
 import sys
 import time
@@ -15,6 +16,8 @@ import fcntl
 from . import hashindex
 from . import chunker
 from . import crypto
+
+QUEUE_DEBUG = False
 
 
 class Error(Exception):
@@ -622,3 +625,76 @@ def int_to_bigint(value):
         return value.to_bytes((value.bit_length() + 9) // 8, 'little', signed=True)
     return value
 
+
+class DummyQueueBase:
+    msg = None  # override in child class
+
+    def put(self, item, block=True, timeout=None):
+        raise TypeError(self.msg)
+
+    def get(self, block=True, timeout=None):
+        raise TypeError(self.msg)
+
+    def task_done(self):
+        raise TypeError(self.msg)
+
+
+class TerminatedQueue(DummyQueueBase):
+    msg = "Queue has terminated"
+
+
+class DebugQueue(queue.Queue):
+    def __init__(self, name, maxsize=0):
+        super().__init__(maxsize=maxsize)
+        self._log_file = open('/tmp/borg-queue-%s.log' % name, 'a')
+        self._log_write("%s queue created with maxsize %d" % (name, self.maxsize))
+
+    def _log_write(self, msg):
+        self._log_file.write(msg + "\n")
+        self._log_file.flush()
+
+    def _log(self, op, elem=None):
+        def shorten_bytes(elem):
+            if elem is None:
+                return elem
+            return binascii.hexlify(elem[:10])
+
+        def shorten_item(item):
+            log_item = dict(
+                path=item[b'path'],
+                chunks=item.get(b'chunks', 'n/a'),
+            )
+            return "{%(path)s chunks: %(chunks)r}" % log_item
+
+        if elem is not None:
+            if isinstance(elem, dict):  # reader queue
+                log_elem = shorten_item(elem)
+            elif isinstance(elem, tuple) and len(elem) == 3:  # crypter queue
+                log_elem = (shorten_item(elem[0]), elem[1], shorten_bytes(elem[2]))
+            elif isinstance(elem, tuple) and len(elem) == 6:  # writer queue
+                log_elem = (shorten_item(elem[0]), elem[1], shorten_bytes(elem[2]), elem[3], elem[4], elem[5])
+            else:
+                raise TypeError
+        else:
+            log_elem = elem
+        self._log_write("%s: %r" % (op, log_elem))
+
+    def put(self, item, block=True, timeout=None):
+        self._log('put', item)
+        super().put(item, block=block, timeout=timeout)
+
+    def get(self, block=True, timeout=None):
+        item = super().get(block=block, timeout=timeout)
+        self._log('get', item)
+        return item
+
+    def task_done(self):
+        super().task_done()
+        self._log('task_done')
+
+
+def make_queue(name, maxsize=0, debug=QUEUE_DEBUG):
+    if debug:
+        return DebugQueue(name, maxsize)
+    else:
+        return queue.Queue(maxsize)

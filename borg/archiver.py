@@ -105,54 +105,57 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
                           create=True, checkpoint_interval=args.checkpoint_interval,
                           numeric_owner=args.numeric_owner, progress=args.progress)
-        # Add cache dir to inode_skip list
-        skip_inodes = set()
         try:
-            st = os.stat(get_cache_dir())
-            skip_inodes.add((st.st_ino, st.st_dev))
-        except IOError:
-            pass
-        # Add local repository dir to inode_skip list
-        if not args.archive.host:
+            # Add cache dir to inode_skip list
+            skip_inodes = set()
             try:
-                st = os.stat(args.archive.path)
+                st = os.stat(get_cache_dir())
                 skip_inodes.add((st.st_ino, st.st_dev))
             except IOError:
                 pass
-        for path in args.paths:
-            if path == '-':  # stdin
-                path = 'stdin'
-                self.print_verbose(path)
+            # Add local repository dir to inode_skip list
+            if not args.archive.host:
                 try:
-                    archive.process_stdin(path, cache)
-                except IOError as e:
-                    self.print_error('%s: %s', path, e)
-                continue
-            path = os.path.normpath(path)
-            if args.dontcross:
-                try:
-                    restrict_dev = os.lstat(path).st_dev
-                except OSError as e:
-                    self.print_error('%s: %s', path, e)
+                    st = os.stat(args.archive.path)
+                    skip_inodes.add((st.st_ino, st.st_dev))
+                except IOError:
+                    pass
+            for path in args.paths:
+                if path == '-':  # stdin
+                    path = 'stdin'
+                    self.print_verbose(path)
+                    try:
+                        archive.process_stdin(path, cache)
+                    except IOError as e:
+                        self.print_error('%s: %s', path, e)
                     continue
-            else:
-                restrict_dev = None
-            self._process(archive, cache, args.excludes, args.exclude_caches, skip_inodes, path, restrict_dev)
-        archive.save(timestamp=args.timestamp)
-        if args.progress:
-            archive.stats.show_progress(final=True)
-        if args.stats:
-            t = datetime.now()
-            diff = t - t0
-            print('-' * 78)
-            print('Archive name: %s' % args.archive.archive)
-            print('Archive fingerprint: %s' % hexlify(archive.id).decode('ascii'))
-            print('Start time: %s' % t0.strftime('%c'))
-            print('End time: %s' % t.strftime('%c'))
-            print('Duration: %s' % format_timedelta(diff))
-            print('Number of files: %d' % archive.stats.nfiles)
-            archive.stats.print_('This archive:', cache)
-            print('-' * 78)
+                path = os.path.normpath(path)
+                if args.dontcross:
+                    try:
+                        restrict_dev = os.lstat(path).st_dev
+                    except OSError as e:
+                        self.print_error('%s: %s', path, e)
+                        continue
+                else:
+                    restrict_dev = None
+                self._process(archive, cache, args.excludes, args.exclude_caches, skip_inodes, path, restrict_dev)
+            archive.save(timestamp=args.timestamp)
+            if args.progress:
+                archive.stats.show_progress(final=True)
+            if args.stats:
+                t = datetime.now()
+                diff = t - t0
+                print('-' * 78)
+                print('Archive name: %s' % args.archive.archive)
+                print('Archive fingerprint: %s' % hexlify(archive.id).decode('ascii'))
+                print('Start time: %s' % t0.strftime('%c'))
+                print('End time: %s' % t.strftime('%c'))
+                print('Duration: %s' % format_timedelta(diff))
+                print('Number of files: %d' % archive.stats.nfiles)
+                archive.stats.print_('This archive:', cache)
+                print('-' * 78)
+        finally:
+            archive.close()
         return self.exit_code
 
     def _process(self, archive, cache, excludes, exclude_caches, skip_inodes, path, restrict_dev):
@@ -235,9 +238,6 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 item[b'path'] = os.sep.join(orig_path.split(os.sep)[strip_components:])
                 if not item[b'path']:
                     continue
-            if not args.dry_run:
-                while dirs and not item[b'path'].startswith(dirs[-1][b'path']):
-                    archive.extract_item(dirs.pop(-1), stdout=stdout)
             self.print_verbose(remove_surrogates(orig_path))
             try:
                 if dry_run:
@@ -252,6 +252,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 self.print_error('%s: %s', remove_surrogates(orig_path), e)
 
         if not args.dry_run:
+            # need to set each directory's timestamps AFTER all files in it are
+            # created - due to the multithreaded nature and different item
+            # processing time, archive order is not as traversal order on "create".
             while dirs:
                 archive.extract_item(dirs.pop(-1))
         return self.exit_code

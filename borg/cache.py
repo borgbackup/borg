@@ -3,6 +3,7 @@ from .remote import cache_if_remote
 import msgpack
 import os
 import sys
+import threading
 from binascii import hexlify
 import shutil
 
@@ -29,9 +30,13 @@ class Cache:
         """Repository encryption method changed since last acccess, refusing to continue
         """
 
+    class ChunkSizeNotReady(Exception):
+        """computation of some chunk size is not yet finished"""
+
     def __init__(self, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True):
         self.lock = None
         self.timestamp = None
+        self.thread_lock = threading.Lock()
         self.lock = None
         self.txn_active = False
         self.repository = repository
@@ -242,8 +247,88 @@ class Cache:
         stats.update(size, csize, True)
         return id, size, csize
 
+    def chunk_modify(self, id, count=None, delta=None, size=None, csize=None):
+        """modify a self.chunks entry, return the new value.
+           must be thread safe.
+        """
+        with self.thread_lock:
+            _count, _size, _csize = self.chunks[id]
+            modified = False
+            if size is not None and size != _size:
+                assert _size == 0
+                _size = size
+                modified = True
+            if csize is not None and csize != _csize:
+                assert _csize == 0
+                _csize = csize
+                modified = True
+            if count is not None and count != _count:
+                assert _count == 0
+                _count = count
+                modified = True
+            if delta is not None and delta != 0:
+                _count += delta
+                assert _count >= 0
+                modified = True
+            if modified:
+                self.chunks[id] = _count, _size, _csize
+            return _count, _size, _csize
+
+    def add_chunk_nostats(self, cchunk, id, size, csize):
+        # do not update stats here, see postprocess
+        if not self.txn_active:
+            self.begin_txn()
+        new_chunk = cchunk is not None
+        if new_chunk:
+            # note: count = 1 already set in seen_or_announce_chunk
+            _, size, csize = self.chunk_modify(id, size=size, csize=csize)
+            self.repository.put(id, cchunk, wait=False)
+        else:
+            # note: csize might be still 0 (not yet computed) here
+            _, size, csize = self.chunk_modify(id, delta=1, size=size)
+        return size, csize, new_chunk
+
+    def postprocess_results(self, size_infos, results, stats):
+        # we need to do some post processing:
+        # - chunks that are duplicate may have csize not yet set correctly due
+        #   to the multi threaded processing. all (x, 0) sizes must be still
+        #   set using the correct size from the other duplicate chunk (not x, 0).
+        # - we need to reconstruct the correct order of the chunks.
+        # - we need to fix the stats now we have the correct csize
+        chunks = []
+        for _, id, new_chunk in sorted(results):
+            try:
+                size, csize = size_infos[id]
+            except KeyError:
+                raise self.ChunkSizeNotReady
+            chunks.append((id, size, csize, new_chunk))
+
+        # do another pass after we have made sure we have all size info
+        results = []
+        for id, size, csize, new_chunk in chunks:
+            stats.update(size, csize, new_chunk)
+            results.append((id, size, csize))
+        return results
+
     def seen_chunk(self, id):
         return self.chunks.get(id, (0, 0, 0))[0]
+
+    def seen_or_announce_chunk(self, id, size):
+        """return True if we have seen the chunk <id> already (thus, we already have it or will have it soon).
+           in case we don't have seen it, announce its (future) availability, return False.
+           must be thread safe.
+        """
+        with self.thread_lock:
+            try:
+                # did we see this id already (and is count > 0)?
+                count, _size, _csize = self.chunks[id]
+                assert size == _size
+                return count > 0
+            except KeyError:
+                # announce that we will put this chunk soon,
+                # so that deduplication knows we already have it.
+                self.chunks[id] = 1, size, 0
+                return False
 
     def chunk_incref(self, id, stats):
         if not self.txn_active:

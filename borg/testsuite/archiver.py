@@ -597,15 +597,16 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.cmd('extract', '--dry-run', self.repository_location + '::archive1', exit_code=0)
 
 
-class RemoteArchiverTestCase(ArchiverTestCase):
-    prefix = '__testsuite__:'
+if 0:
+    class RemoteArchiverTestCase(ArchiverTestCase):
+        prefix = '__testsuite__:'
 
-    def test_remote_repo_restrict_to_path(self):
-        self.cmd('init', self.repository_location)
-        path_prefix = os.path.dirname(self.repository_path)
-        with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo']):
-            self.assert_raises(PathNotAllowed, lambda: self.cmd('init', self.repository_location + '_1'))
-        with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', path_prefix]):
-            self.cmd('init', self.repository_location + '_2')
-        with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo', '--restrict-to-path', path_prefix]):
-            self.cmd('init', self.repository_location + '_3')
+        def test_remote_repo_restrict_to_path(self):
+            self.cmd('init', self.repository_location)
+            path_prefix = os.path.dirname(self.repository_path)
+            with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo']):
+                self.assert_raises(PathNotAllowed, lambda: self.cmd('init', self.repository_location + '_1'))
+            with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', path_prefix]):
+                self.cmd('init', self.repository_location + '_2')
+            with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo', '--restrict-to-path', path_prefix]):
+                self.cmd('init', self.repository_location + '_3')

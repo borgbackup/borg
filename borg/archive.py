@@ -494,6 +494,7 @@ class Archive:
 
     @staticmethod
     def list_archives(repository, key, manifest, cache=None):
+        # expensive! see also Manifest.list_archive_infos.
         for name, info in manifest.archives.items():
             yield Archive(repository, key, manifest, name, cache=cache)
 

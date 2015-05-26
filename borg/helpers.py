@@ -1,5 +1,6 @@
 import argparse
 import binascii
+from collections import namedtuple
 import grp
 import msgpack
 import os
@@ -118,6 +119,18 @@ class Manifest:
         }))
         self.id = self.key.id_hash(data)
         self.repository.put(self.MANIFEST_ID, self.key.encrypt(data))
+
+    def list_archive_infos(self, sort_by=None, reverse=False):
+        # inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
+        ArchiveInfo = namedtuple('ArchiveInfo', 'name id ts')
+        archives = []
+        for name, values in self.archives.items():
+            ts = parse_timestamp(values[b'time'].decode('utf-8'))
+            id = values[b'id']
+            archives.append(ArchiveInfo(name=name, id=id, ts=ts))
+        if sort_by is not None:
+            archives = sorted(archives, key=attrgetter(sort_by), reverse=reverse)
+        return archives
 
 
 def prune_within(archives, within):

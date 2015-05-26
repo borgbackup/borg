@@ -284,8 +284,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 stats.print_('Deleted data:', cache)
         else:
             print("You requested to completely DELETE the repository *including* all archives it contains:")
-            for archive in sorted(Archive.list_archives(repository, key, manifest), key=attrgetter('ts')):
-                print(format_archive(archive))
+            for archive_info in manifest.list_archive_infos(sort_by='ts'):
+                print(format_archive(archive_info))
             print("""Type "YES" if you understand this and want to continue.\n""")
             if input('Do you want to continue? ') == 'YES':
                 repository.destroy()
@@ -354,8 +354,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     item[b'group'] or item[b'gid'], size, format_time(mtime),
                     remove_surrogates(item[b'path']), extra))
         else:
-            for archive in sorted(Archive.list_archives(repository, key, manifest), key=attrgetter('ts')):
-                print(format_archive(archive))
+            for archive_info in manifest.list_archive_infos(sort_by='ts'):
+                print(format_archive(archive_info))
         return self.exit_code
 
     def do_info(self, args):
@@ -380,8 +380,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         repository = self.open_repository(args.repository, exclusive=True)
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest, do_files=args.cache_files)
-        archives = list(sorted(Archive.list_archives(repository, key, manifest, cache),
-                               key=attrgetter('ts'), reverse=True))
+        archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
         if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0 and args.within is None:
             self.print_error('At least one of the "within", "hourly", "daily", "weekly", "monthly" or "yearly" '
                              'settings must be specified')
@@ -412,7 +411,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 self.print_verbose('Would prune:     %s' % format_archive(archive))
             else:
                 self.print_verbose('Pruning archive: %s' % format_archive(archive))
-                archive.delete(stats)
+                Archive(repository, key, manifest, archive.name, cache).delete(stats)
         if to_delete and not args.dry_run:
             manifest.write()
             repository.commit()

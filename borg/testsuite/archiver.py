@@ -400,9 +400,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('extract', '--dry-run', self.repository_location + '::test')
         self.cmd('check', self.repository_location)
         name = sorted(os.listdir(os.path.join(self.tmpdir, 'repository', 'data', '0')), reverse=True)[0]
-        with open(os.path.join(self.tmpdir, 'repository', 'data', '0', name), 'r+') as fd:
+        with open(os.path.join(self.tmpdir, 'repository', 'data', '0', name), 'r+b') as fd:
             fd.seek(100)
-            fd.write('XXXX')
+            fd.write(b'XXXX')
         self.cmd('check', self.repository_location, exit_code=1)
 
     def test_readonly_repository(self):

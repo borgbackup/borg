@@ -136,7 +136,7 @@ hashindex_read(const char *path)
     HashHeader header;
     HashIndex *index = NULL;
 
-    if((fd = fopen(path, "r")) == NULL) {
+    if((fd = fopen(path, "rb")) == NULL) {
         EPRINTF_PATH(path, "fopen for reading failed");
         return NULL;
     }
@@ -260,7 +260,7 @@ hashindex_write(HashIndex *index, const char *path)
     };
     int ret = 1;
 
-    if((fd = fopen(path, "w")) == NULL) {
+    if((fd = fopen(path, "wb")) == NULL) {
         EPRINTF_PATH(path, "fopen for writing failed");
         return 0;
     }

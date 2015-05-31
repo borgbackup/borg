@@ -137,7 +137,7 @@ hashindex_read(const char *path)
     HashIndex *index = NULL;
 
     if((fd = fopen(path, "r")) == NULL) {
-        EPRINTF_PATH(path, "fopen failed");
+        EPRINTF_PATH(path, "fopen for reading failed");
         return NULL;
     }
     bytes_read = fread(&header, 1, sizeof(HashHeader), fd);
@@ -163,20 +163,20 @@ hashindex_read(const char *path)
         goto fail;
     }
     if(memcmp(header.magic, MAGIC, 8)) {
-        EPRINTF_MSG_PATH(path, "Unknown file header");
+        EPRINTF_MSG_PATH(path, "Unknown MAGIC in header");
         goto fail;
     }
     buckets_length = (off_t)_le32toh(header.num_buckets) * (header.key_size + header.value_size);
     if(length != sizeof(HashHeader) + buckets_length) {
-        EPRINTF_MSG_PATH(path, "Incorrect file length");
+        EPRINTF_MSG_PATH(path, "Incorrect file length (expected %ld, got %ld)", sizeof(HashHeader) + buckets_length, length);
         goto fail;
     }
     if(!(index = malloc(sizeof(HashIndex)))) {
-        EPRINTF_PATH(path, "malloc failed");
+        EPRINTF_PATH(path, "malloc header failed");
         goto fail;
     }
     if(!(index->buckets = malloc(buckets_length))) {
-        EPRINTF_PATH(path, "malloc failed");
+        EPRINTF_PATH(path, "malloc buckets failed");
         free(index);
         index = NULL;
         goto fail;
@@ -217,12 +217,12 @@ hashindex_init(int capacity, int key_size, int value_size)
     capacity = MAX(MIN_BUCKETS, capacity);
 
     if(!(index = malloc(sizeof(HashIndex)))) {
-        EPRINTF("malloc failed");
+        EPRINTF("malloc header failed");
         return NULL;
     }
     buckets_length = (off_t)capacity * (key_size + value_size);
     if(!(index->buckets = calloc(buckets_length, 1))) {
-        EPRINTF("malloc failed");
+        EPRINTF("malloc buckets failed");
         free(index);
         return NULL;
     }
@@ -261,15 +261,15 @@ hashindex_write(HashIndex *index, const char *path)
     int ret = 1;
 
     if((fd = fopen(path, "w")) == NULL) {
-        EPRINTF_PATH(path, "open failed");
+        EPRINTF_PATH(path, "fopen for writing failed");
         return 0;
     }
     if(fwrite(&header, 1, sizeof(header), fd) != sizeof(header)) {
-        EPRINTF_PATH(path, "fwrite failed");
+        EPRINTF_PATH(path, "fwrite header failed");
         ret = 0;
     }
     if(fwrite(index->buckets, 1, buckets_length, fd) != buckets_length) {
-        EPRINTF_PATH(path, "fwrite failed");
+        EPRINTF_PATH(path, "fwrite buckets failed");
         ret = 0;
     }
     if(fclose(fd) < 0) {

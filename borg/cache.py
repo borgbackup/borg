@@ -93,7 +93,7 @@ class Cache:
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             config.write(fd)
         ChunkIndex().write(os.path.join(self.path, 'chunks').encode('utf-8'))
-        with open(os.path.join(self.path, 'files'), 'w') as fd:
+        with open(os.path.join(self.path, 'files'), 'wb') as fd:
             pass  # empty file
 
     def destroy(self):

@@ -58,6 +58,13 @@ Attic Changelog
 Here you can see the full list of changes between each Attic release until Borg
 forked from Attic:
 
+Version 0.17
+------------
+
+(bugfix release, released on X)
+- Fix hashindex ARM memory alignment issue (#309)
+- Improve hashindex error messages (#298)
+
 Version 0.16
 ------------
 

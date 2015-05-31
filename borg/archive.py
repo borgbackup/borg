@@ -273,12 +273,7 @@ class Archive:
         except OSError:
             pass
         mode = item[b'mode']
-        if stat.S_ISDIR(mode):
-            if not os.path.exists(path):
-                os.makedirs(path)
-            if restore_attrs:
-                self.restore_attrs(path, item)
-        elif stat.S_ISREG(mode):
+        if stat.S_ISREG(mode):
             if not os.path.exists(os.path.dirname(path)):
                 os.makedirs(os.path.dirname(path))
             # Hard link?
@@ -300,11 +295,11 @@ class Archive:
                     fd.truncate(pos)
                     fd.flush()
                     self.restore_attrs(path, item, fd=fd.fileno())
-        elif stat.S_ISFIFO(mode):
-            if not os.path.exists(os.path.dirname(path)):
-                os.makedirs(os.path.dirname(path))
-            os.mkfifo(path)
-            self.restore_attrs(path, item)
+        elif stat.S_ISDIR(mode):
+            if not os.path.exists(path):
+                os.makedirs(path)
+            if restore_attrs:
+                self.restore_attrs(path, item)
         elif stat.S_ISLNK(mode):
             if not os.path.exists(os.path.dirname(path)):
                 os.makedirs(os.path.dirname(path))
@@ -313,6 +308,11 @@ class Archive:
                 os.unlink(path)
             os.symlink(source, path)
             self.restore_attrs(path, item, symlink=True)
+        elif stat.S_ISFIFO(mode):
+            if not os.path.exists(os.path.dirname(path)):
+                os.makedirs(os.path.dirname(path))
+            os.mkfifo(path)
+            self.restore_attrs(path, item)
         elif stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
             os.mknod(path, item[b'mode'], item[b'rdev'])
             self.restore_attrs(path, item)

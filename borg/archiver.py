@@ -168,9 +168,6 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         # Entering a new filesystem?
         if restrict_dev and st.st_dev != restrict_dev:
             return
-        # Ignore unix sockets
-        if stat.S_ISSOCK(st.st_mode):
-            return
         status = None
         if stat.S_ISREG(st.st_mode):
             try:
@@ -196,6 +193,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             status = archive.process_fifo(path, st)
         elif stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
             status = archive.process_dev(path, st)
+        elif stat.S_ISSOCK(st.st_mode):
+            # Ignore unix sockets
+            return
         else:
             self.print_error('Unknown file type: %s', path)
             return

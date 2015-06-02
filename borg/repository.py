@@ -14,6 +14,7 @@ from .lrucache import LRUCache
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
 MAGIC = b'BORG_SEG'
+MAGIC_LEN = len(MAGIC)
 TAG_PUT = 0
 TAG_DELETE = 1
 TAG_COMMIT = 2
@@ -481,7 +482,7 @@ class LoggedIO:
                     os.mkdir(dirname)
             self._write_fd = open(self.segment_filename(self.segment), 'ab')
             self._write_fd.write(MAGIC)
-            self.offset = 8
+            self.offset = MAGIC_LEN
         return self._write_fd
 
     def get_fd(self, segment):
@@ -504,9 +505,9 @@ class LoggedIO:
     def iter_objects(self, segment, include_data=False):
         fd = self.get_fd(segment)
         fd.seek(0)
-        if fd.read(8) != MAGIC:
+        if fd.read(MAGIC_LEN) != MAGIC:
             raise IntegrityError('Invalid segment header')
-        offset = 8
+        offset = MAGIC_LEN
         header = fd.read(self.header_fmt.size)
         while header:
             crc, size, tag = self.header_fmt.unpack(header)

@@ -18,8 +18,11 @@
 #error Unknown byte order
 #endif
 
+#define MAGIC "BORG_IDX"
+#define MAGIC_LEN 8
+
 typedef struct {
-    char magic[8];
+    char magic[MAGIC_LEN];
     int32_t num_entries;
     int32_t num_buckets;
     int8_t  key_size;
@@ -37,7 +40,6 @@ typedef struct {
     int upper_limit;
 } HashIndex;
 
-#define MAGIC "BORG_IDX"
 #define EMPTY _htole32(0xffffffff)
 #define DELETED _htole32(0xfffffffe)
 #define MAX_BUCKET_SIZE 512
@@ -162,7 +164,7 @@ hashindex_read(const char *path)
         EPRINTF_PATH(path, "fseek failed");
         goto fail;
     }
-    if(memcmp(header.magic, MAGIC, 8)) {
+    if(memcmp(header.magic, MAGIC, MAGIC_LEN)) {
         EPRINTF_MSG_PATH(path, "Unknown MAGIC in header");
         goto fail;
     }

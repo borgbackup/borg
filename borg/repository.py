@@ -281,8 +281,8 @@ class Repository:
                 continue
             try:
                 objects = list(self.io.iter_objects(segment))
-            except (IntegrityError, struct.error):
-                report_error('Error reading segment {}'.format(segment))
+            except IntegrityError as err:
+                report_error('Error reading segment {}: {}'.format(segment, err))
                 objects = []
                 if repair:
                     self.io.recover_segment(segment, filename)
@@ -505,18 +505,25 @@ class LoggedIO:
         fd = self.get_fd(segment)
         fd.seek(0)
         if fd.read(8) != MAGIC:
-            raise IntegrityError('Invalid segment header')
+            raise IntegrityError('Invalid segment magic')
         offset = 8
         header = fd.read(self.header_fmt.size)
         while header:
-            crc, size, tag = self.header_fmt.unpack(header)
+            try:
+                crc, size, tag = self.header_fmt.unpack(header)
+            except struct.error as err:
+                raise IntegrityError('Invalid segment entry header [offset {}]: {}'.format(offset, err))
             if size > MAX_OBJECT_SIZE:
-                raise IntegrityError('Invalid segment object size')
-            rest = fd.read(size - self.header_fmt.size)
+                raise IntegrityError('Invalid segment entry size [offset {}]'.format(offset))
+            length = size - self.header_fmt.size
+            rest = fd.read(length)
+            if len(rest) != length:
+                raise IntegrityError('Segment entry data short read [offset {}]: expected: {}, got {} bytes'.format(
+                                     offset, length, len(rest)))
             if crc32(rest, crc32(memoryview(header)[4:])) & 0xffffffff != crc:
-                raise IntegrityError('Segment checksum mismatch')
+                raise IntegrityError('Segment entry checksum mismatch [offset {}]'.format(offset))
             if tag not in (TAG_PUT, TAG_DELETE, TAG_COMMIT):
-                raise IntegrityError('Invalid segment entry header')
+                raise IntegrityError('Invalid segment entry tag [offset {}]'.format(offset))
             key = None
             if tag in (TAG_PUT, TAG_DELETE):
                 key = rest[:32]

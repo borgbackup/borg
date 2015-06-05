@@ -53,6 +53,7 @@ User's Guide
    quickstart
    usage
    faq
+   tuning
    internals
 
 Getting help

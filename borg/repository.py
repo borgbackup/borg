@@ -47,22 +47,23 @@ class Repository:
     class ObjectNotFound(Error):
         """Object with key {} not found in repository {}."""
 
-    def __init__(self, path, create=False, exclusive=False):
+    def __init__(self, path, create=False, exclusive=False, key_size=None):
         self.path = path
         self.io = None
         self.lock = None
         self.index = None
         self._active_txn = False
         if create:
-            self.create(path)
+            self.create(path, key_size)
         self.open(path, exclusive)
 
     def __del__(self):
         self.close()
 
-    def create(self, path):
+    def create(self, path, key_size):
         """Create a new empty repository at `path`
         """
+        assert key_size is not None
         if os.path.exists(path) and (not os.path.isdir(path) or os.listdir(path)):
             raise self.AlreadyExists(path)
         if not os.path.exists(path):
@@ -75,6 +76,7 @@ class Repository:
         config.set('repository', 'version', '1')
         config.set('repository', 'segments_per_dir', self.DEFAULT_SEGMENTS_PER_DIR)
         config.set('repository', 'max_segment_size', self.DEFAULT_MAX_SEGMENT_SIZE)
+        config.set('repository', 'key_size', key_size)
         config.set('repository', 'id', hexlify(os.urandom(32)).decode('ascii'))
         with open(os.path.join(path, 'config'), 'w') as fd:
             config.write(fd)
@@ -117,10 +119,12 @@ class Repository:
         if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:
             raise self.InvalidRepository(path)
         self.lock = UpgradableLock(os.path.join(path, 'config'), exclusive)
+        # legacy attic repositories always have key size 32B (256b)
+        self.key_size = self.config.getint('repository', 'key_size', fallback=32)
         self.max_segment_size = self.config.getint('repository', 'max_segment_size')
         self.segments_per_dir = self.config.getint('repository', 'segments_per_dir')
         self.id = unhexlify(self.config.get('repository', 'id').strip())
-        self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
+        self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir, self.key_size)
 
     def close(self):
         if self.lock:
@@ -140,8 +144,9 @@ class Repository:
 
     def open_index(self, transaction_id):
         if transaction_id is None:
-            return NSIndex()
-        return NSIndex.read((os.path.join(self.path, 'index.%d') % transaction_id).encode('utf-8'))
+            return NSIndex(key_size=self.key_size)
+        return NSIndex.read((os.path.join(self.path, 'index.%d') % transaction_id).encode('utf-8'),
+                            key_size=self.key_size)
 
     def prepare_txn(self, transaction_id, do_cleanup=True):
         self._active_txn = True
@@ -397,8 +402,6 @@ class LoggedIO:
 
     header_fmt = struct.Struct('<IIB')
     assert header_fmt.size == 9
-    put_header_fmt = struct.Struct('<IIB32s')
-    assert put_header_fmt.size == 41
     header_no_crc_fmt = struct.Struct('<IB')
     assert header_no_crc_fmt.size == 5
     crc_fmt = struct.Struct('<I')
@@ -407,13 +410,16 @@ class LoggedIO:
     _commit = header_no_crc_fmt.pack(9, TAG_COMMIT)
     COMMIT = crc_fmt.pack(crc32(_commit)) + _commit
 
-    def __init__(self, path, limit, segments_per_dir, capacity=90):
+    def __init__(self, path, limit, segments_per_dir, key_size, capacity=90):
         self.path = path
         self.fds = LRUCache(capacity)
         self.segment = 0
         self.limit = limit
         self.segments_per_dir = segments_per_dir
+        self.key_size = key_size
         self.offset = 0
+        self.put_header_fmt = struct.Struct('<IIB%ds' % key_size)
+        assert self.put_header_fmt.size == self.header_fmt.size + key_size
         self._write_fd = None
 
     def close(self):
@@ -519,9 +525,9 @@ class LoggedIO:
                 raise IntegrityError('Invalid segment entry header')
             key = None
             if tag in (TAG_PUT, TAG_DELETE):
-                key = rest[:32]
+                key = rest[:self.key_size]
             if include_data:
-                yield tag, key, offset, rest[32:]
+                yield tag, key, offset, rest[self.key_size:]
             else:
                 yield tag, key, offset
             offset += size

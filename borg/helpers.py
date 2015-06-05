@@ -82,8 +82,6 @@ def check_extension_modules():
 
 class Manifest:
 
-    MANIFEST_ID = b'\0' * 32
-
     def __init__(self, key, repository):
         self.archives = {}
         self.config = {}
@@ -91,9 +89,13 @@ class Manifest:
         self.repository = repository
 
     @classmethod
+    def manifest_id(cls, repository):
+        return b'\0' * repository.key_size
+
+    @classmethod
     def load(cls, repository, key=None):
         from .key import key_factory
-        cdata = repository.get(cls.MANIFEST_ID)
+        cdata = repository.get(cls.manifest_id(repository))
         if not key:
             key = key_factory(repository, cdata)
         manifest = cls(key, repository)
@@ -118,7 +120,7 @@ class Manifest:
             'config': self.config,
         }))
         self.id = self.key.id_hash(data)
-        self.repository.put(self.MANIFEST_ID, self.key.encrypt(data))
+        self.repository.put(self.manifest_id(self.repository), self.key.encrypt(data))
 
     def list_archive_infos(self, sort_by=None, reverse=False):
         # inexpensive Archive.list_archives replacement if we just need .name, .id, .ts

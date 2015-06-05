@@ -15,8 +15,9 @@ from .. import xattr
 from ..archive import Archive, ChunkBuffer, CHUNK_MAX
 from ..archiver import Archiver
 from ..cache import Cache
-from ..crypto import bytes_to_long, num_aes_blocks
+from ..crypto import bytes16_to_int, num_aes_blocks
 from ..helpers import Manifest
+from ..key import parser
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import BaseTestCase
@@ -496,8 +497,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 hash = sha256(data).digest()
                 if hash not in seen:
                     seen.add(hash)
-                    num_blocks = num_aes_blocks(len(data) - 41)
-                    nonce = bytes_to_long(data[33:41])
+                    mac, meta, data = parser(data)
+                    num_blocks = num_aes_blocks(len(data))
+                    nonce = bytes16_to_int(meta.iv)
                     for counter in range(nonce, nonce + num_blocks):
                         self.assert_not_in(counter, used)
                         used.add(counter)
@@ -576,7 +578,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 
     def test_missing_manifest(self):
         archive, repository = self.open_archive('archive1')
-        repository.delete(Manifest.MANIFEST_ID)
+        repository.delete(Manifest.manifest_id(repository))
         repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
         output = self.cmd('check', '--repair', self.repository_location, exit_code=0)
@@ -587,7 +589,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
     def test_extra_chunks(self):
         self.cmd('check', self.repository_location, exit_code=0)
         repository = Repository(self.repository_location)
-        repository.put(b'01234567890123456789012345678901', b'xxxx')
+        repository.put(b'0123456789012345', b'xxxx')
         repository.commit()
         repository.close()
         self.cmd('check', self.repository_location, exit_code=1)

@@ -34,7 +34,7 @@ Space efficient storage
 
 Optional data encryption
     All data can be protected using 256-bit AES encryption and data integrity
-    and authenticity is verified using HMAC-SHA256.
+    and authenticity is verified using a MAC (message authentication code).
 
 Off-site backups
     Borg can store data on any remote host accessible over SSH.  This is
@@ -49,6 +49,7 @@ What do I need?
 Borg requires Python 3.2 or above to work.
 Borg also requires a sufficiently recent OpenSSL (>= 1.0.0).
 In order to mount archives as filesystems, llfuse is required.
+For other python requirements, please see setup.py install_requires.
 
 How do I install it?
 --------------------

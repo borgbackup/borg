@@ -1,0 +1,48 @@
+Important note about "experimental" branch
+==========================================
+
+Goal of the "experimental" branch is to merge all the stuff:
+- changesets from master branch
+- features that DO IMPACT compatibility
+- play with new technologies
+- etc.
+
+THERE IS NO GUARANTEE THAT IT IS COMPATIBLE WITH MASTER BRANCH OR PREVIOUS
+"experimental" CODE nor THAT YOU CAN SWITCH BACK AND FORTH BETWEEN BRANCHES
+WITHIN THE SAME REPOSITORY WITHOUT ENCOUNTERING SEVERE ISSUES.
+
+Please also see the LICENSE for more informations.
+
+
+Stuff in "experimental" that is not in "master" minus minor changes
+===================================================================
+
+added tuning docs
+
+attic init --compression NN --cipher NN --mac NN ...
+(see attic init --help)
+
+new hashes:      sha512-256
+                 sha512
+                 sha1
+                 ghash (default)
+new MACs:        hmac-sha512-256
+                 hmac-sha512
+                 hmac-sha1
+                 gmac (default)
+new ciphers:     aes256-ctr + hmac-sha512-256
+                 aes256-gcm (default)
+new compression: no compression (default)
+                 zlib level 1..9 (previously, level 6 was hardcoded)
+                 lzma preset 0..9
+                 lz4 (and other) multi-threaded algos from blosc library
+
+source: more flexible type 0x03 header format, allowing to give hash algo,
+compression algo and level, encryption algo, key type.
+
+IV is stored in full length, length of stored IV/MAC/hash is flexible.
+Indexing key size (key = id_hash()) is flexible and configurable per repo.
+
+source: less hardcoding, numeric offsets / lengths
+source: flexible hashing, compression, encryption, key dispatching
+

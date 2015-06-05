@@ -95,7 +95,7 @@ class Cache:
         config.set('cache', 'manifest', '')
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             config.write(fd)
-        ChunkIndex().write(os.path.join(self.path, 'chunks').encode('utf-8'))
+        ChunkIndex(key_size=self.repository.key_size).write(os.path.join(self.path, 'chunks').encode('utf-8'))
         with open(os.path.join(self.path, 'chunks.archive'), 'wb') as fd:
             pass  # empty file
         with open(os.path.join(self.path, 'files'), 'wb') as fd:
@@ -118,7 +118,8 @@ class Cache:
         self.timestamp = self.config.get('cache', 'timestamp', fallback=None)
         self.key_type = self.config.get('cache', 'key_type', fallback=None)
         self.previous_location = self.config.get('cache', 'previous_location', fallback=None)
-        self.chunks = ChunkIndex.read(os.path.join(self.path, 'chunks').encode('utf-8'))
+        self.chunks = ChunkIndex.read(os.path.join(self.path, 'chunks').encode('utf-8'),
+                                      key_size=self.repository.key_size)
         self.files = None
 
     def open(self):
@@ -272,7 +273,7 @@ class Cache:
             return archive_name
 
         def fetch_and_build_idx(archive_id, repository, key, tmp_dir, tf_out):
-            chunk_idx = ChunkIndex()
+            chunk_idx = ChunkIndex(key_size=repository.key_size)
             cdata = repository.get(archive_id)
             data = key.decrypt(archive_id, cdata)
             add(chunk_idx, archive_id, len(data), len(cdata))
@@ -299,13 +300,13 @@ class Cache:
                 tf_out.addfile(tarinfo, f)
             os.unlink(file_tmp)
 
-        def create_master_idx(chunk_idx, tf_in, tmp_dir):
+        def create_master_idx(chunk_idx, repository, tf_in, tmp_dir):
             chunk_idx.clear()
             for tarinfo in tf_in:
                 archive_id_hex = tarinfo.name
                 tf_in.extract(archive_id_hex, tmp_dir)
                 chunk_idx_path = os.path.join(tmp_dir, archive_id_hex).encode('utf-8')
-                archive_chunk_idx = ChunkIndex.read(chunk_idx_path)
+                archive_chunk_idx = ChunkIndex.read(chunk_idx_path, key_size=repository.key_size)
                 for chunk_id, (count, size, csize) in archive_chunk_idx.iteritems():
                     add(chunk_idx, chunk_id, size, csize, incr=count)
                 os.unlink(chunk_idx_path)
@@ -334,7 +335,7 @@ class Cache:
             rename_out_archive()
             print('Merging collection into master chunks cache...')
             in_archive = open_in_archive()
-            create_master_idx(self.chunks, in_archive, tmp_dir)
+            create_master_idx(self.chunks, repository, in_archive, tmp_dir)
             close_archive(in_archive)
             print('Done.')
 

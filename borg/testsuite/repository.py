@@ -9,16 +9,15 @@ from ..repository import Repository
 from . import BaseTestCase
 from .mock import patch
 
-
 class RepositoryTestCaseBase(BaseTestCase):
     key_size = 32
 
-    def open(self, create=False):
-        return Repository(os.path.join(self.tmppath, 'repository'), create=create)
+    def open(self, create=False, key_size=None):
+        return Repository(os.path.join(self.tmppath, 'repository'), create=create, key_size=key_size)
 
     def setUp(self):
         self.tmppath = tempfile.mkdtemp()
-        self.repository = self.open(create=True)
+        self.repository = self.open(create=True, key_size=self.key_size)
 
     def tearDown(self):
         self.repository.close()
@@ -209,7 +208,8 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         return sorted(int(n) for n in os.listdir(os.path.join(self.tmppath, 'repository', 'data', '0')) if n.isdigit())[-1]
 
     def open_index(self):
-        return NSIndex.read(os.path.join(self.tmppath, 'repository', 'index.{}'.format(self.get_head())))
+        return NSIndex.read(os.path.join(self.tmppath, 'repository', 'index.{}'.format(self.get_head())),
+                            key_size=self.key_size)
 
     def corrupt_object(self, id_):
         idx = self.open_index()
@@ -317,8 +317,9 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
 class RemoteRepositoryTestCase(RepositoryTestCase):
 
-    def open(self, create=False):
-        return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')), create=create)
+    def open(self, create=False, key_size=None):
+        return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')),
+                                create=create, key_size=key_size)
 
     def test_invalid_rpc(self):
         self.assert_raises(InvalidRPCMethod, lambda: self.repository.call('__init__', None))
@@ -326,5 +327,6 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
 
 class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
 
-    def open(self, create=False):
-        return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')), create=create)
+    def open(self, create=False, key_size=None):
+        return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')),
+                                create=create, key_size=key_size)

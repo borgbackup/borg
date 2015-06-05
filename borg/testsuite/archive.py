@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import msgpack
 
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker
-from ..key import PlaintextKey
+from ..key import PlaintextKey, COMPR_DEFAULT
 from ..helpers import Manifest
 from . import BaseTestCase
 from .mock import Mock
@@ -21,9 +21,15 @@ class MockCache:
 
 class ArchiveTimestampTestCase(BaseTestCase):
 
+    class MockArgs(object):
+        repository = None
+        compression = COMPR_DEFAULT
+        mac = None
+        cipher = None
+
     def _test_timestamp_parsing(self, isoformat, expected):
         repository = Mock()
-        key = PlaintextKey()
+        key = PlaintextKey.create(None, self.MockArgs())
         manifest = Manifest(repository, key)
         a = Archive(repository, key, manifest, 'test', create=True)
         a.metadata = {b'time': isoformat}
@@ -42,10 +48,16 @@ class ArchiveTimestampTestCase(BaseTestCase):
 
 class ChunkBufferTestCase(BaseTestCase):
 
+    class MockArgs(object):
+        repository = None
+        compression = COMPR_DEFAULT
+        mac = None
+        cipher = None
+
     def test(self):
         data = [{b'foo': 1}, {b'bar': 2}]
         cache = MockCache()
-        key = PlaintextKey()
+        key = PlaintextKey.create(None, self.MockArgs())
         chunks = CacheChunkBuffer(cache, key, None)
         for d in data:
             chunks.add(d)

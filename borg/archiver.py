@@ -16,7 +16,7 @@ from . import __version__
 from .archive import Archive, ArchiveChecker
 from .repository import Repository
 from .cache import Cache
-from .key import key_creator
+from .key import key_creator, maccer_creator, COMPR_DEFAULT, HASH_DEFAULT, MAC_DEFAULT, PLAIN_DEFAULT, CIPHER_DEFAULT
 from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
@@ -30,11 +30,11 @@ class Archiver:
     def __init__(self):
         self.exit_code = 0
 
-    def open_repository(self, location, create=False, exclusive=False):
+    def open_repository(self, location, create=False, exclusive=False, key_size=None):
         if location.proto == 'ssh':
-            repository = RemoteRepository(location, create=create)
+            repository = RemoteRepository(location, create=create, key_size=key_size)
         else:
-            repository = Repository(location.path, create=create, exclusive=exclusive)
+            repository = Repository(location.path, create=create, exclusive=exclusive, key_size=key_size)
         repository._location = location
         return repository
 
@@ -59,10 +59,12 @@ class Archiver:
     def do_init(self, args):
         """Initialize an empty repository"""
         print('Initializing repository at "%s"' % args.repository.orig)
-        repository = self.open_repository(args.repository, create=True, exclusive=True)
-        key = key_creator(repository, args)
+        key_cls = key_creator(args)
+        maccer_cls = maccer_creator(args, key_cls)
+        repository = self.open_repository(args.repository, create=True, exclusive=True,
+                                          key_size=maccer_cls.digest_size)
+        key = key_cls.create(repository, args)
         manifest = Manifest(key, repository)
-        manifest.key = key
         manifest.write()
         repository.commit()
         Cache(repository, key, manifest, warn_if_unencrypted=False)
@@ -523,8 +525,39 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         init_epilog = textwrap.dedent("""
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
-        Encryption can be enabled at repository init time.
-        """)
+        Encryption can be enabled, compression, cipher and mac method can be chosen at
+        repository init time.
+
+        --compression METHODs (default: %02d):
+
+        - 00      no compression
+        - 01..09  zlib levels 1..9 (1 means low compression, 9 max. compression)
+        - 10..19  lzma levels 0..9 (0 means low compression, 9 max. compression)
+        - 20..29  lz4 (blosc) levels 0..9 (0 = no, 9 = max. compression)
+        - 30..39  lz4hc (blosc) levels 0..9 (0 = no, 9 = max. compression)
+        - 40..49  blosclz (blosc) levels 0..9 (0 = no, 9 = max. compression)
+        - 50..59  snappy (blosc) levels 0..9 (0 = no, 9 = max. compression)
+        - 60..69  zlib (blosc) levels 0..9 (0 = no, 9 = max. compression)
+
+        --cipher METHODs (default: %02d or %02d)
+
+        - 00      No encryption
+        - 01      AEAD: AES-CTR + HMAC-SHA256
+        - 02      AEAD: AES-GCM
+
+        --mac METHODs (default: %02d or %02d):
+
+        - 00      sha256 (simple hash, no MAC, faster on 32bit CPU)
+        - 01      sha512-256 (simple hash, no MAC, faster on 64bit CPU)
+        - 02      ghash (simple hash, no MAC, fastest on CPUs with AES-GCM support)
+        - 03      sha1 (simple hash, no MAC, fastest on CPUs without AES-GCM support)
+        - 04      sha512 (simple hash, no MAC, faster on 64bit CPU)
+        - 10      hmac-sha256 (MAC, faster on 32bit CPU)
+        - 11      hmac-sha512-256 (MAC, faster on 64bit CPU)
+        - 13      hmac-sha1 (MAC, fastest on CPUs without AES-GCM support)
+        - 14      hmac-sha512 (MAC, faster on 64bit CPU)
+        - 20      gmac (MAC, fastest on CPUs with AES-GCM support)
+        """ % (COMPR_DEFAULT, PLAIN_DEFAULT, CIPHER_DEFAULT, HASH_DEFAULT, MAC_DEFAULT))
         subparser = subparsers.add_parser('init', parents=[common_parser],
                                           description=self.do_init.__doc__, epilog=init_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -534,7 +567,16 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption',
                                choices=('none', 'passphrase', 'keyfile'), default='none',
-                               help='select encryption method')
+                               help='select encryption key method')
+        subparser.add_argument('-C', '--cipher', dest='cipher',
+                               type=int, default=None, metavar='METHOD',
+                               help='select cipher (0..2)')
+        subparser.add_argument('-c', '--compression', dest='compression',
+                               type=int, default=COMPR_DEFAULT, metavar='METHOD',
+                               help='select compression method (0..19)')
+        subparser.add_argument('-m', '--mac', dest='mac',
+                               type=int, default=None, metavar='METHOD',
+                               help='select hash/mac method (0..3)')
 
         check_epilog = textwrap.dedent("""
         The check command verifies the consistency of a repository and the corresponding

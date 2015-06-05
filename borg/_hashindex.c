@@ -366,7 +366,7 @@ hashindex_summarize(HashIndex *index, long long *total_size, long long *total_cs
     void *key = NULL;
 
     while((key = hashindex_next_key(index, key))) {
-        values = key + 32;
+        values = key + index->key_size;
         unique_size += values[1];
         unique_csize += values[2];
         size += values[0] * values[1];

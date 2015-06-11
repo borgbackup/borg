@@ -70,7 +70,7 @@ Where are the tests?
 The tests are in the borg/testsuite package. To run the test suite use the
 following command::
 
-  $ fakeroot -u tox  # you need to have tox installed
+  $ fakeroot -u tox  # you need to have tox and pytest installed
 
 .. |build| image:: https://travis-ci.org/borgbackup/borg.svg
         :alt: Build Status

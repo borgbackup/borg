@@ -1,6 +1,25 @@
 Borg Changelog
 ==============
 
+
+Version 0.23.1
+--------------
+
+Forgot to list some stuff implemented in 0.23.0, here they are:
+
+New features:
+
+- efficient archive list from manifest, meaning a big speedup for slow
+  repo connections and "list <repo>", "delete <repo>", "prune"
+- big speedup for chunks cache sync (esp. for slow repo connections), fixes #18
+- hashindex: improve error messages
+
+Other changes:
+
+- explicitely specify binary mode to open binary files
+- some easy micro optimizations
+
+
 Version 0.23.0
 --------------
 

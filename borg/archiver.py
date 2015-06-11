@@ -515,8 +515,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         parser = argparse.ArgumentParser(description='Borg %s - Deduplicated Backups' % __version__)
         subparsers = parser.add_subparsers(title='Available commands')
 
+        serve_epilog = textwrap.dedent("""
+        This command starts a repository server process. This command is usually not used manually.
+        """)
         subparser = subparsers.add_parser('serve', parents=[common_parser],
-                                          description=self.do_serve.__doc__)
+                                          description=self.do_serve.__doc__, epilog=serve_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_serve)
         subparser.add_argument('--restrict-to-path', dest='restrict_to_paths', action='append',
                                metavar='PATH', help='restrict repository access to PATH')

@@ -62,21 +62,19 @@ Some of the steps detailled below might be useful also for non-git installs.
     # optional: for unit testing
     apt-get install fakeroot
 
-    # install virtualenv tool, create and activate a virtual env
-    apt-get install python-virtualenv
-    virtualenv --python=python3 borg-env
-    source borg-env/bin/activate   # always do this before using!
-
-    # install some dependencies into virtual env
-    pip install cython  # to compile .pyx -> .c
-    pip install tox pytest  # optional, for running unit tests
-    pip install sphinx  # optional, to build the docs
-
     # get |project_name| from github, install it
     git clone |git_url|
+
+    apt-get install python-virtualenv
+    virtualenv --python=python3 borg-env
+    source borg-env/bin/activate   # always before using!
+
+    # install borg + dependencies into virtualenv
+    pip install cython  # compile .pyx -> .c
+    pip install tox pytest  # optional, for running unit tests
+    pip install sphinx  # optional, to build the docs
     cd borg
     pip install -e .  # in-place editable mode
 
     # optional: run all the tests, on all supported Python versions
     fakeroot -u tox
-

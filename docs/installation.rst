@@ -81,7 +81,7 @@ Some of the steps detailled below might be useful also for non-git installs.
 
 
 Korora / Fedora 21 installation (from git)
----------------------------------------
+------------------------------------------
 Note: this uses latest, unreleased development code from git.
 While we try not to break master, there are no guarantees on anything.
 

@@ -78,3 +78,29 @@ Some of the steps detailled below might be useful also for non-git installs.
 
     # optional: run all the tests, on all supported Python versions
     fakeroot -u tox
+
+
+Korora / Fedora 21 installation (from git)
+---------------------------------------
+Note: this uses latest, unreleased development code from git.
+While we try not to break master, there are no guarantees on anything.
+
+Some of the steps detailled below might be useful also for non-git installs.
+
+.. parsed-literal::
+    sudo dnf install libacl-devel
+    
+    # get |project_name| from github, install it
+    git clone |git_url|
+    virtualenv --python=python3 borg-env
+    source borg-env/bin/activate
+    
+    # install borg + dependencies into virtualenv
+    pip install cython  # compile .pyx -> .c
+    pip install tox pytest  # optional, for running unit tests
+    pip install sphinx  # optional, to build the docs
+    cd borg
+    pip install -e .  # in-place editable mode
+    
+    # optional: run all the tests, on all supported Python versions
+    fakeroot -u tox

@@ -78,3 +78,44 @@ Some of the steps detailled below might be useful also for non-git installs.
 
     # optional: run all the tests, on all supported Python versions
     fakeroot -u tox
+
+
+Korora / Fedora 21 installation (from git)
+------------------------------------------
+Note: this uses latest, unreleased development code from git.
+While we try not to break master, there are no guarantees on anything.
+
+Some of the steps detailled below might be useful also for non-git installs.
+
+.. parsed-literal::
+    # Python 3.x (>= 3.2) + Headers, Py Package Installer
+    sudo dnf install python3 python3-devel python3-pip
+
+    # we need OpenSSL + Headers for Crypto
+    sudo dnf install openssl-devel openssl
+
+    # ACL support Headers + Library
+    sudo dnf install libacl-devel libacl
+    
+    # optional: lowlevel FUSE py binding - to mount backup archives
+    sudo dnf install python3-llfuse fuse
+    
+    # optional: for unit testing
+    sudo dnf install fakeroot
+    
+    # get |project_name| from github, install it
+    git clone |git_url|
+
+    dnf install python3-virtualenv
+    virtualenv --python=python3 borg-env
+    source borg-env/bin/activate   # always before using!
+
+    # install borg + dependencies into virtualenv
+    pip install cython  # compile .pyx -> .c
+    pip install tox pytest  # optional, for running unit tests
+    pip install sphinx  # optional, to build the docs
+    cd borg
+    pip install -e .  # in-place editable mode
+
+    # optional: run all the tests, on all supported Python versions
+    fakeroot -u tox

@@ -141,7 +141,10 @@ class RemoteRepository:
         self.r_fds = [self.stdout_fd]
         self.x_fds = [self.stdin_fd, self.stdout_fd]
 
-        version = self.call('negotiate', 1)
+        try:
+            version = self.call('negotiate', 1)
+        except ConnectionClosed:
+            raise Exception('Server immediately closed connection - is Borg installed and working on the server?')
         if version != 1:
             raise Exception('Server insisted on using unsupported protocol version %d' % version)
         self.id = self.call('open', location.path, create)

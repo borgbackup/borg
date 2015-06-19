@@ -13,7 +13,7 @@ import textwrap
 import traceback
 
 from . import __version__
-from .archive import Archive, ArchiveChecker
+from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
 from .repository import Repository
 from .cache import Cache
 from .key import key_creator
@@ -21,7 +21,7 @@ from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    is_cachedir, bigint_to_int
+    is_cachedir, bigint_to_int, ChunkerParams
 from .remote import RepositoryServer, RemoteRepository
 
 
@@ -104,7 +104,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         cache = Cache(repository, key, manifest, do_files=args.cache_files)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
                           create=True, checkpoint_interval=args.checkpoint_interval,
-                          numeric_owner=args.numeric_owner, progress=args.progress)
+                          numeric_owner=args.numeric_owner, progress=args.progress,
+                          chunker_params=args.chunker_params)
         # Add cache dir to inode_skip list
         skip_inodes = set()
         try:
@@ -625,6 +626,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                metavar='yyyy-mm-ddThh:mm:ss',
                                help='manually specify the archive creation date/time (UTC). '
                                     'alternatively, give a reference file/directory.')
+        subparser.add_argument('--chunker-params', dest='chunker_params',
+                               type=ChunkerParams, default=CHUNKER_PARAMS,
+                               metavar='WINDOW_SIZE,CHUNK_MASK,CHUNK_MIN,CHUNK_MAX',
+                               help='specify the chunker parameters. default: %r' % (CHUNKER_PARAMS, ))
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to create')

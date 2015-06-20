@@ -628,8 +628,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                     'alternatively, give a reference file/directory.')
         subparser.add_argument('--chunker-params', dest='chunker_params',
                                type=ChunkerParams, default=CHUNKER_PARAMS,
-                               metavar='WINDOW_SIZE,CHUNK_MASK,CHUNK_MIN,CHUNK_MAX',
-                               help='specify the chunker parameters. default: %r' % (CHUNKER_PARAMS, ))
+                               metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
+                               help='specify the chunker parameters. default: %d,%d,%d,%d' % CHUNKER_PARAMS)
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to create')

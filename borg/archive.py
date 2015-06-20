@@ -22,13 +22,13 @@ from .helpers import parse_timestamp, Error, uid2user, user2uid, gid2group, grou
 
 ITEMS_BUFFER = 1024 * 1024
 
-CHUNK_MIN = 1024
-CHUNK_MAX = 10 * 1024 * 1024
-WINDOW_SIZE = 0xfff
-CHUNK_MASK = 0xffff
-CHUNKER_PARAMS = (WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, CHUNK_MAX)
+CHUNK_MIN_EXP = 10  # 2**10 == 1kiB
+CHUNK_MAX_EXP = 23  # 2**23 == 8MiB
+HASH_WINDOW_SIZE = 0xfff  # 4095B
+HASH_MASK_BITS = 16  # results in ~64kiB chunks statistically
 
-ZEROS = b'\0' * CHUNK_MAX
+# defaults, use --chunker-params to override
+CHUNKER_PARAMS = (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
 
 utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
 utime_supports_follow_symlinks = os.utime in getattr(os, 'supports_follow_symlinks', {})
@@ -76,8 +76,7 @@ class ChunkBuffer:
         self.packer = msgpack.Packer(unicode_errors='surrogateescape')
         self.chunks = []
         self.key = key
-        chunker_params += (self.key.chunk_seed, )
-        self.chunker = Chunker(*chunker_params)
+        self.chunker = Chunker(self.key.chunk_seed, *chunker_params)
 
     def add(self, item):
         self.buffer.write(self.packer.pack(StableDict(item)))
@@ -147,8 +146,7 @@ class Archive:
         self.pipeline = DownloadPipeline(self.repository, self.key)
         if create:
             self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats, chunker_params)
-            chunker_params += (self.key.chunk_seed, )
-            self.chunker = Chunker(*chunker_params)
+            self.chunker = Chunker(self.key.chunk_seed, *chunker_params)
             if name in manifest.archives:
                 raise self.AlreadyExists(name)
             self.last_checkpoint = time.time()
@@ -163,6 +161,7 @@ class Archive:
                 raise self.DoesNotExist(name)
             info = self.manifest.archives[name]
             self.load(info[b'id'])
+            self.zeros = b'\0' * (1 << chunker_params[1])
 
     def _load_meta(self, id):
         data = self.key.decrypt(id, self.repository.get(id))
@@ -291,7 +290,7 @@ class Archive:
                 with open(path, 'wb') as fd:
                     ids = [c[0] for c in item[b'chunks']]
                     for data in self.pipeline.fetch_many(ids, is_preloaded=True):
-                        if sparse and ZEROS.startswith(data):
+                        if sparse and self.zeros.startswith(data):
                             # all-zero chunk: create a hole in a sparse file
                             fd.seek(len(data), 1)
                         else:

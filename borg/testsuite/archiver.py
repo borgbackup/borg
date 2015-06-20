@@ -12,7 +12,7 @@ import unittest
 from hashlib import sha256
 
 from .. import xattr
-from ..archive import Archive, ChunkBuffer, CHUNK_MAX
+from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP
 from ..archiver import Archiver
 from ..cache import Cache
 from ..crypto import bytes_to_long, num_aes_blocks
@@ -213,7 +213,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         sparse_support = sys.platform != 'darwin'
         filename = os.path.join(self.input_path, 'sparse')
         content = b'foobar'
-        hole_size = 5 * CHUNK_MAX  # 5 full chunker buffers
+        hole_size = 5 * (1 << CHUNK_MAX_EXP)  # 5 full chunker buffers
         with open(filename, 'wb') as fd:
             # create a file that has a hole at the beginning and end (if the
             # OS and filesystem supports sparse files)

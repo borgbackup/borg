@@ -50,6 +50,9 @@ Examples
     NAME="root-`date +%Y-%m-%d`"
     $ borg create /mnt/backup::$NAME / --do-not-cross-mountpoints
 
+    # Backup huge files with little chunk management overhead
+    $ borg create --chunker-params 19,23,21,4095 /mnt/backup::VMs /srv/VMs
+
 
 .. include:: usage/extract.rst.inc
 

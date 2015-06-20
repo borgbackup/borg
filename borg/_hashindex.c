@@ -361,14 +361,18 @@ hashindex_get_size(HashIndex *index)
 }
 
 static void
-hashindex_summarize(HashIndex *index, long long *total_size, long long *total_csize, long long *total_unique_size, long long *total_unique_csize)
+hashindex_summarize(HashIndex *index, long long *total_size, long long *total_csize,
+                    long long *total_unique_size, long long *total_unique_csize,
+                    long long *total_unique_chunks, long long *total_chunks)
 {
-    int64_t size = 0, csize = 0, unique_size = 0, unique_csize = 0;
+    int64_t size = 0, csize = 0, unique_size = 0, unique_csize = 0, chunks = 0, unique_chunks = 0;
     const int32_t *values;
     void *key = NULL;
 
     while((key = hashindex_next_key(index, key))) {
-        values = key + 32;
+        values = key + index->key_size;
+        unique_chunks++;
+        chunks += values[0];
         unique_size += values[1];
         unique_csize += values[2];
         size += values[0] * values[1];
@@ -378,4 +382,6 @@ hashindex_summarize(HashIndex *index, long long *total_size, long long *total_cs
     *total_csize = csize;
     *total_unique_size = unique_size;
     *total_unique_csize = unique_csize;
+    *total_unique_chunks = unique_chunks;
+    *total_chunks = chunks;
 }

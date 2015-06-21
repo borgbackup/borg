@@ -1,27 +1,27 @@
 from io import BytesIO
 
 from ..chunker import Chunker, buzhash, buzhash_update
-from ..archive import CHUNK_MAX
+from ..archive import CHUNK_MAX_EXP
 from . import BaseTestCase
 
 
 class ChunkerTestCase(BaseTestCase):
 
     def test_chunkify(self):
-        data = b'0' * int(1.5 * CHUNK_MAX) + b'Y'
-        parts = [bytes(c) for c in Chunker(2, 0x3, 2, CHUNK_MAX, 0).chunkify(BytesIO(data))]
+        data = b'0' * int(1.5 * (1 << CHUNK_MAX_EXP)) + b'Y'
+        parts = [bytes(c) for c in Chunker(0, 1, CHUNK_MAX_EXP, 2, 2).chunkify(BytesIO(data))]
         self.assert_equal(len(parts), 2)
         self.assert_equal(b''.join(parts), data)
-        self.assert_equal([bytes(c) for c in Chunker(2, 0x3, 2, CHUNK_MAX, 0).chunkify(BytesIO(b''))], [])
-        self.assert_equal([bytes(c) for c in Chunker(2, 0x3, 2, CHUNK_MAX, 0).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'fooba', b'rboobaz', b'fooba', b'rboobaz', b'fooba', b'rboobaz'])
-        self.assert_equal([bytes(c) for c in Chunker(2, 0x3, 2, CHUNK_MAX, 1).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'fo', b'obarb', b'oob', b'azf', b'oobarb', b'oob', b'azf', b'oobarb', b'oobaz'])
-        self.assert_equal([bytes(c) for c in Chunker(2, 0x3, 2, CHUNK_MAX, 2).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'foob', b'ar', b'boobazfoob', b'ar', b'boobazfoob', b'ar', b'boobaz'])
-        self.assert_equal([bytes(c) for c in Chunker(3, 0x3, 3, CHUNK_MAX, 0).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'foobarboobaz' * 3])
-        self.assert_equal([bytes(c) for c in Chunker(3, 0x3, 3, CHUNK_MAX, 1).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'foobar', b'boo', b'bazfo', b'obar', b'boo', b'bazfo', b'obar', b'boobaz'])
-        self.assert_equal([bytes(c) for c in Chunker(3, 0x3, 3, CHUNK_MAX, 2).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'foo', b'barboobaz', b'foo', b'barboobaz', b'foo', b'barboobaz'])
-        self.assert_equal([bytes(c) for c in Chunker(3, 0x3, 4, CHUNK_MAX, 0).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'foobarboobaz' * 3])
-        self.assert_equal([bytes(c) for c in Chunker(3, 0x3, 4, CHUNK_MAX, 1).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'foobar', b'boobazfo', b'obar', b'boobazfo', b'obar', b'boobaz'])
-        self.assert_equal([bytes(c) for c in Chunker(3, 0x3, 4, CHUNK_MAX, 2).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'foob', b'arboobaz', b'foob', b'arboobaz', b'foob', b'arboobaz'])
+        self.assert_equal([bytes(c) for c in Chunker(0, 1, CHUNK_MAX_EXP, 2, 2).chunkify(BytesIO(b''))], [])
+        self.assert_equal([bytes(c) for c in Chunker(0, 1, CHUNK_MAX_EXP, 2, 2).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'fooba', b'rboobaz', b'fooba', b'rboobaz', b'fooba', b'rboobaz'])
+        self.assert_equal([bytes(c) for c in Chunker(1, 1, CHUNK_MAX_EXP, 2, 2).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'fo', b'obarb', b'oob', b'azf', b'oobarb', b'oob', b'azf', b'oobarb', b'oobaz'])
+        self.assert_equal([bytes(c) for c in Chunker(2, 1, CHUNK_MAX_EXP, 2, 2).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'foob', b'ar', b'boobazfoob', b'ar', b'boobazfoob', b'ar', b'boobaz'])
+        self.assert_equal([bytes(c) for c in Chunker(0, 2, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'foobarboobaz' * 3])
+        self.assert_equal([bytes(c) for c in Chunker(1, 2, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'foobar', b'boobazfo', b'obar', b'boobazfo', b'obar', b'boobaz'])
+        self.assert_equal([bytes(c) for c in Chunker(2, 2, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'foob', b'arboobaz', b'foob', b'arboobaz', b'foob', b'arboobaz'])
+        self.assert_equal([bytes(c) for c in Chunker(0, 3, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'foobarboobaz' * 3])
+        self.assert_equal([bytes(c) for c in Chunker(1, 3, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'foobarbo', b'obazfoobar', b'boobazfo', b'obarboobaz'])
+        self.assert_equal([bytes(c) for c in Chunker(2, 3, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b'foobarboobaz' * 3))], [b'foobarboobaz', b'foobarboobaz', b'foobarboobaz'])
 
     def test_buzhash(self):
         self.assert_equal(buzhash(b'abcdefghijklmnop', 0), 3795437769)

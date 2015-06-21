@@ -313,6 +313,11 @@ def timestamp(s):
         raise ValueError
 
 
+def ChunkerParams(s):
+    window_size, chunk_mask, chunk_min, chunk_max = s.split(',')
+    return int(window_size), int(chunk_mask), int(chunk_min), int(chunk_max)
+
+
 def is_cachedir(path):
     """Determines whether the specified path is a cache directory (and
     therefore should potentially be excluded from the backup) according to

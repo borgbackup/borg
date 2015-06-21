@@ -2,10 +2,31 @@ Borg Changelog
 ==============
 
 
-Version 0.23.1
+Version 0.24.0
 --------------
 
-Forgot to list some stuff implemented in 0.23.0, here they are:
+New features:
+
+- borg create --chunker-params ... to configure the chunker.
+  See docs/misc/create_chunker-params.txt for more information.
+- borg info now reports chunk counts in the chunk index.
+
+Bug fixes:
+
+- reduce memory usage, see --chunker-params, fixes #16.
+  This can be used to reduce chunk management overhead, so borg does not create
+  a huge chunks index/repo index and eats all your RAM if you back up lots of
+  data in huge files (like VM disk images).
+- better Exception msg if there is no Borg installed on the remote repo server.
+
+Other changes:
+
+- Fedora/Fedora-based install instructions added to docs.
+- added docs/misc directory for misc. writeups that won't be included "as is"
+  into the html docs.
+
+
+I forgot to list some stuff already implemented in 0.23.0, here they are:
 
 New features:
 
@@ -16,7 +37,7 @@ New features:
 
 Other changes:
 
-- explicitely specify binary mode to open binary files
+- explicitly specify binary mode to open binary files
 - some easy micro optimizations
 
 

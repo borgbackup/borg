@@ -866,19 +866,19 @@ def main():
     try:
         exit_code = archiver.run(sys.argv[1:])
     except Error as e:
-        traceback.print_exc()
-        archiver.print_error(e.get_message())
+        archiver.print_error(e.get_message() + "\n%s" % traceback.format_exc())
         exit_code = e.exit_code
     except RemoteRepository.RPCError as e:
-        print(e)
+        archiver.print_error('Error: Remote Exception.\n%s' % str(e))
+        exit_code = 1
+    except Exception:
+        archiver.print_error('Error: Local Exception.\n%s' % traceback.format_exc())
         exit_code = 1
     except KeyboardInterrupt:
-        traceback.print_exc()
-        archiver.print_error('Error: Keyboard interrupt')
+        archiver.print_error('Error: Keyboard interrupt.\n%s' % traceback.format_exc())
         exit_code = 1
-    else:
-        if exit_code:
-            archiver.print_error('Exiting with failure status due to previous errors')
+    if exit_code:
+        archiver.print_error('Exiting with failure status due to previous errors')
     sys.exit(exit_code)
 
 if __name__ == '__main__':

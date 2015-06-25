@@ -101,6 +101,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         t0 = datetime.now()
         repository = self.open_repository(args.archive, exclusive=True)
         manifest, key = Manifest.load(repository)
+        key.compression_level = args.compression
         cache = Cache(repository, key, manifest, do_files=args.cache_files)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
                           create=True, checkpoint_interval=args.checkpoint_interval,
@@ -630,6 +631,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                type=ChunkerParams, default=CHUNKER_PARAMS,
                                metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
                                help='specify the chunker parameters. default: %d,%d,%d,%d' % CHUNKER_PARAMS)
+        subparser.add_argument('-C', '--compression', dest='compression',
+                               type=int, default=0, metavar='N',
+                               help='select compression algorithm and level. 0..9 is supported and means zlib '
+                                    'level 0 (no compression, fast, default) .. zlib level 9 (high compression, slow).')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to create')

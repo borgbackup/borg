@@ -53,6 +53,7 @@ class KeyBase:
 
     def __init__(self):
         self.TYPE_STR = bytes([self.TYPE])
+        self.compression_level = 0
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
@@ -83,7 +84,7 @@ class PlaintextKey(KeyBase):
         return sha256(data).digest()
 
     def encrypt(self, data):
-        return b''.join([self.TYPE_STR, zlib.compress(data)])
+        return b''.join([self.TYPE_STR, zlib.compress(data, self.compression_level)])
 
     def decrypt(self, id, data):
         if data[0] != self.TYPE:
@@ -115,7 +116,7 @@ class AESKeyBase(KeyBase):
         return HMAC(self.id_key, data, sha256).digest()
 
     def encrypt(self, data):
-        data = zlib.compress(data)
+        data = zlib.compress(data, self.compression_level)
         self.enc_cipher.reset()
         data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(data)))
         hmac = HMAC(self.enc_hmac_key, data, sha256).digest()

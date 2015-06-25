@@ -384,8 +384,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         cache = Cache(repository, key, manifest, do_files=args.cache_files)
         archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
         if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0 and args.within is None:
-            self.print_error('At least one of the "within", "hourly", "daily", "weekly", "monthly" or "yearly" '
-                             'settings must be specified')
+            self.print_error('At least one of the "within", "keep-hourly", "keep-daily", "keep-weekly", '
+                             '"keep-monthly" or "keep-yearly" settings must be specified')
             return 1
         if args.prefix:
             archives = [archive for archive in archives if archive.name.startswith(args.prefix)]

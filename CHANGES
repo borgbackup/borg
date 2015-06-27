@@ -1,55 +1,107 @@
 Borg Changelog
 ==============
 
-Version <TBD>
--------------
+
+Version 0.24.0
+--------------
+
+New features:
+
+- borg create --chunker-params ... to configure the chunker.
+  See docs/misc/create_chunker-params.txt for more information.
+- borg info now reports chunk counts in the chunk index.
+
+Bug fixes:
+
+- reduce memory usage, see --chunker-params, fixes #16.
+  This can be used to reduce chunk management overhead, so borg does not create
+  a huge chunks index/repo index and eats all your RAM if you back up lots of
+  data in huge files (like VM disk images).
+- better Exception msg if there is no Borg installed on the remote repo server.
+
+Other changes:
+
+- Fedora/Fedora-based install instructions added to docs.
+- added docs/misc directory for misc. writeups that won't be included "as is"
+  into the html docs.
+
+
+I forgot to list some stuff already implemented in 0.23.0, here they are:
+
+New features:
+
+- efficient archive list from manifest, meaning a big speedup for slow
+  repo connections and "list <repo>", "delete <repo>", "prune"
+- big speedup for chunks cache sync (esp. for slow repo connections), fixes #18
+- hashindex: improve error messages
+
+Other changes:
+
+- explicitly specify binary mode to open binary files
+- some easy micro optimizations
+
+
+Version 0.23.0
+--------------
+
+Incompatible changes (compared to attic, fork related):
 
 - changed sw name and cli command to "borg", updated docs
-- package name and name in urls uses "borgbackup" to have less collisions
+- package name (and name in urls) uses "borgbackup" to have less collisions
 - changed repo / cache internal magic strings from ATTIC* to BORG*,
-  changed cache location to .cache/borg/
-- give specific path to xattr.is_enabled(), disable symlink setattr call that
-  always fails
-- fix misleading hint the fuse ImportError handler gave, fixes attic #237
-- source: misc. cleanups, pep8, style
-- implement check --last N
-- check: sort archives in reverse time order
+  changed cache location to .cache/borg/ - this means that it currently won't
+  accept attic repos (see issue #21 about improving that)
+
+Bug fixes:
+
 - avoid defect python-msgpack releases, fixes attic #171, fixes attic #185
-- check unpacked data from RPC for tuple type and correct length, fixes attic #127
-- less memory usage: add global option --no-cache-files
 - fix traceback when trying to do unsupported passphrase change, fixes attic #189
 - datetime does not like the year 10.000, fixes attic #139
-- docs and faq improvements, fixes, updates
-- cleanup crypto.pyx, make it easier to adapt to other modes
-- extract: if --stdout is given, write all extracted binary data to stdout
+- fix "info" all archives stats, fixes attic #183
+- fix parsing with missing microseconds, fixes attic #282
+- fix misleading hint the fuse ImportError handler gave, fixes attic #237
+- check unpacked data from RPC for tuple type and correct length, fixes attic #127
+- fix Repository._active_txn state when lock upgrade fails
+- give specific path to xattr.is_enabled(), disable symlink setattr call that
+  always fails
+- fix test setup for 32bit platforms, partial fix for attic #196
+- upgraded versioneer, PEP440 compliance, fixes attic #257
+
+New features:
+
+- less memory usage: add global option --no-cache-files
+- check --last N (only check the last N archives)
+- check: sort archives in reverse time order
+- rename repo::oldname newname (rename repository)
+- create -v output more informative
+- create --progress (backup progress indicator)
+- create --timestamp (utc string or reference file/dir)
 - create: if "-" is given as path, read binary from stdin
-- do os.fsync like recommended in the python docs
+- extract: if --stdout is given, write all extracted binary data to stdout
+- extract --sparse (simple sparse file support)
 - extra debug information for 'fread failed'
+- delete <repo> (deletes whole repo + local cache)
 - FUSE: reflect deduplication in allocated blocks
 - only allow whitelisted RPC calls in server mode
 - normalize source/exclude paths before matching
-- fix "info" all archives stats, fixes attic #183
-- implement create --timestamp, utc string or reference file/dir
-- simple sparse file support (extract --sparse)
-- fix parsing with missing microseconds, fixes attic #282
 - use posix_fadvise to not spoil the OS cache, fixes attic #252
-- source: Let chunker optionally work with os-level file descriptor.
-- source: Linux: remove duplicate os.fsencode calls
-- fix test setup for 32bit platforms, partial fix for attic #196
-- source: refactor _open_rb code a bit, so it is more consistent / regular
-- implement rename repo::oldname newname
-- implement create --progress
-- source: refactor indicator (status) and item processing
-- implement delete repo (also deletes local cache)
-- better create -v output
-- upgraded versioneer, PEP440 compliance, fixes attic #257
-- source: use py.test for better testing, flake8 for code style checks
-- source: fix tox >=2.0 compatibility
 - toplevel error handler: show tracebacks for better error analysis
 - sigusr1 / sigint handler to print current file infos - attic PR #286
-- pypi package: add python version classifiers, add FreeBSD to platforms
-- fix Repository._active_txn state when lock upgrade fails
 - RPCError: include the exception args we get from remote
+
+Other changes:
+
+- source: misc. cleanups, pep8, style
+- docs and faq improvements, fixes, updates
+- cleanup crypto.pyx, make it easier to adapt to other AES modes
+- do os.fsync like recommended in the python docs
+- source: Let chunker optionally work with os-level file descriptor.
+- source: Linux: remove duplicate os.fsencode calls
+- source: refactor _open_rb code a bit, so it is more consistent / regular
+- source: refactor indicator (status) and item processing
+- source: use py.test for better testing, flake8 for code style checks
+- source: fix tox >=2.0 compatibility (test runner)
+- pypi package: add python version classifiers, add FreeBSD to platforms
 
 
 Attic Changelog

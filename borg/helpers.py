@@ -174,11 +174,14 @@ class Statistics:
             self.usize += csize
 
     def print_(self, label, cache):
-        total_size, total_csize, unique_size, unique_csize = cache.chunks.summarize()
+        total_size, total_csize, unique_size, unique_csize, total_unique_chunks, total_chunks = cache.chunks.summarize()
         print()
         print('                       Original size      Compressed size    Deduplicated size')
         print('%-15s %20s %20s %20s' % (label, format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize)))
         print('All archives:   %20s %20s %20s' % (format_file_size(total_size), format_file_size(total_csize), format_file_size(unique_csize)))
+        print()
+        print('                       Unique chunks         Total chunks')
+        print('Chunk index:    %20d %20d' % (total_unique_chunks, total_chunks))
 
     def show_progress(self, item=None, final=False):
         if not final:
@@ -308,6 +311,11 @@ def timestamp(s):
             except ValueError:
                 continue
         raise ValueError
+
+
+def ChunkerParams(s):
+    window_size, chunk_mask, chunk_min, chunk_max = s.split(',')
+    return int(window_size), int(chunk_mask), int(chunk_min), int(chunk_max)
 
 
 def is_cachedir(path):

@@ -51,7 +51,7 @@ Which file types, attributes, etc. are *not* preserved?
       recreate them in any case). So, don't panic if your backup misses a UDS!
     * The precise on-disk representation of the holes in a sparse file.
       Archive creation has no special support for sparse files, holes are
-      backed up up as (deduplicated and compressed) runs of zero bytes.
+      backed up as (deduplicated and compressed) runs of zero bytes.
       Archive extraction has optional support to extract all-zero chunks as
       holes in a sparse file.
 

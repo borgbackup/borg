@@ -1,0 +1,40 @@
+Multithreading
+==============
+
+With crypto
+-----------
+
+master branch (single threaded)
+
+    Command being timed: "borg create repo::1 /home/tw/Desktop/"
+    User time (seconds): 13.78
+    System time (seconds): 0.40
+    Percent of CPU this job got: 83%
+    Elapsed (wall clock) time (h:mm:ss or m:ss): 0:16.98
+
+multithreading
+
+    Command being timed: "borg create repo::1 /home/tw/Desktop/"
+    User time (seconds): 24.08
+    System time (seconds): 1.16
+    Percent of CPU this job got: 249%
+    Elapsed (wall clock) time (h:mm:ss or m:ss): 0:10.11
+
+Without crypto
+--------------
+
+master branch (single threaded)
+
+    Command being timed: "borg create repo::1 /home/tw/Desktop/"
+    User time (seconds): 11.51
+    System time (seconds): 0.40
+    Percent of CPU this job got: 86%
+    Elapsed (wall clock) time (h:mm:ss or m:ss): 0:13.85
+
+multithreading
+
+    Command being timed: "borg create repo::1 /home/tw/Desktop/"
+    User time (seconds): 20.27
+    System time (seconds): 1.13
+    Percent of CPU this job got: 260%
+    Elapsed (wall clock) time (h:mm:ss or m:ss): 0:08.22

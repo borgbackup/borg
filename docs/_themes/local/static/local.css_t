@@ -161,8 +161,8 @@ p.admonition-title:after {
 }
 
 div.note {
-  background-color: #0f5;
-  border-bottom: 2px solid #d22;
+  background-color: #002211;
+  border-bottom: 2px solid #22dd22;
 }
 
 div.seealso {

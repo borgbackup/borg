@@ -14,6 +14,7 @@ from .lrucache import LRUCache
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
 MAGIC = b'BORG_SEG'
+MAGIC_LEN = len(MAGIC)
 TAG_PUT = 0
 TAG_DELETE = 1
 TAG_COMMIT = 2
@@ -281,8 +282,8 @@ class Repository:
                 continue
             try:
                 objects = list(self.io.iter_objects(segment))
-            except (IntegrityError, struct.error):
-                report_error('Error reading segment {}'.format(segment))
+            except IntegrityError as err:
+                report_error('Error reading segment {}: {}'.format(segment, err))
                 objects = []
                 if repair:
                     self.io.recover_segment(segment, filename)
@@ -481,7 +482,7 @@ class LoggedIO:
                     os.mkdir(dirname)
             self._write_fd = open(self.segment_filename(self.segment), 'ab')
             self._write_fd.write(MAGIC)
-            self.offset = 8
+            self.offset = MAGIC_LEN
         return self._write_fd
 
     def get_fd(self, segment):
@@ -504,19 +505,26 @@ class LoggedIO:
     def iter_objects(self, segment, include_data=False):
         fd = self.get_fd(segment)
         fd.seek(0)
-        if fd.read(8) != MAGIC:
-            raise IntegrityError('Invalid segment header')
-        offset = 8
+        if fd.read(MAGIC_LEN) != MAGIC:
+            raise IntegrityError('Invalid segment magic')
+        offset = MAGIC_LEN
         header = fd.read(self.header_fmt.size)
         while header:
-            crc, size, tag = self.header_fmt.unpack(header)
+            try:
+                crc, size, tag = self.header_fmt.unpack(header)
+            except struct.error as err:
+                raise IntegrityError('Invalid segment entry header [offset {}]: {}'.format(offset, err))
             if size > MAX_OBJECT_SIZE:
-                raise IntegrityError('Invalid segment object size')
-            rest = fd.read(size - self.header_fmt.size)
+                raise IntegrityError('Invalid segment entry size [offset {}]'.format(offset))
+            length = size - self.header_fmt.size
+            rest = fd.read(length)
+            if len(rest) != length:
+                raise IntegrityError('Segment entry data short read [offset {}]: expected: {}, got {} bytes'.format(
+                                     offset, length, len(rest)))
             if crc32(rest, crc32(memoryview(header)[4:])) & 0xffffffff != crc:
-                raise IntegrityError('Segment checksum mismatch')
+                raise IntegrityError('Segment entry checksum mismatch [offset {}]'.format(offset))
             if tag not in (TAG_PUT, TAG_DELETE, TAG_COMMIT):
-                raise IntegrityError('Invalid segment entry header')
+                raise IntegrityError('Invalid segment entry tag [offset {}]'.format(offset))
             key = None
             if tag in (TAG_PUT, TAG_DELETE):
                 key = rest[:32]

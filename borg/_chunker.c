@@ -79,7 +79,7 @@ typedef struct {
     int window_size, chunk_mask, min_size;
     size_t buf_size;
     uint32_t *table;
-    uint8_t *data, *read_buf;
+    uint8_t *data;
     PyObject *fd;
     int fh;
     int done, eof;
@@ -96,7 +96,6 @@ chunker_init(int window_size, int chunk_mask, int min_size, int max_size, uint32
     c->table = buzhash_init_table(seed);
     c->buf_size = max_size;
     c->data = malloc(c->buf_size);
-    c->read_buf = malloc(c->buf_size);
     return c;
 }
 
@@ -122,7 +121,6 @@ chunker_free(Chunker *c)
     Py_XDECREF(c->fd);
     free(c->table);
     free(c->data);
-    free(c->read_buf);
     free(c);
 }
 
@@ -140,9 +138,8 @@ chunker_fill(Chunker *c)
     }
     if(c->fh >= 0) {
         // if we have a os-level file descriptor, use os-level API
-        n = read(c->fh, c->read_buf, n);
+        n = read(c->fh, c->data + c->position + c->remaining, n);
         if(n > 0) {
-            memcpy(c->data + c->position + c->remaining, c->read_buf, n);
             c->remaining += n;
             c->bytes_read += n;
         }

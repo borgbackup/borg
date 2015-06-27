@@ -12,7 +12,7 @@ import unittest
 from hashlib import sha256
 
 from .. import xattr
-from ..archive import Archive, ChunkBuffer, CHUNK_MAX
+from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP
 from ..archiver import Archiver
 from ..cache import Cache
 from ..crypto import bytes_to_long, num_aes_blocks
@@ -213,7 +213,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         sparse_support = sys.platform != 'darwin'
         filename = os.path.join(self.input_path, 'sparse')
         content = b'foobar'
-        hole_size = 5 * CHUNK_MAX  # 5 full chunker buffers
+        hole_size = 5 * (1 << CHUNK_MAX_EXP)  # 5 full chunker buffers
         with open(filename, 'wb') as fd:
             # create a file that has a hole at the beginning and end (if the
             # OS and filesystem supports sparse files)
@@ -400,9 +400,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('extract', '--dry-run', self.repository_location + '::test')
         self.cmd('check', self.repository_location)
         name = sorted(os.listdir(os.path.join(self.tmpdir, 'repository', 'data', '0')), reverse=True)[0]
-        with open(os.path.join(self.tmpdir, 'repository', 'data', '0', name), 'r+') as fd:
+        with open(os.path.join(self.tmpdir, 'repository', 'data', '0', name), 'r+b') as fd:
             fd.seek(100)
-            fd.write('XXXX')
+            fd.write(b'XXXX')
         self.cmd('check', self.repository_location, exit_code=1)
 
     def test_readonly_repository(self):

@@ -13,7 +13,7 @@ import textwrap
 import traceback
 
 from . import __version__
-from .archive import Archive, ArchiveChecker
+from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
 from .repository import Repository
 from .cache import Cache
 from .key import key_creator
@@ -21,7 +21,7 @@ from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    is_cachedir, bigint_to_int
+    is_cachedir, bigint_to_int, ChunkerParams
 from .remote import RepositoryServer, RemoteRepository
 
 
@@ -101,10 +101,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         t0 = datetime.now()
         repository = self.open_repository(args.archive, exclusive=True)
         manifest, key = Manifest.load(repository)
+        key.compression_level = args.compression
         cache = Cache(repository, key, manifest, do_files=args.cache_files)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
                           create=True, checkpoint_interval=args.checkpoint_interval,
-                          numeric_owner=args.numeric_owner, progress=args.progress)
+                          numeric_owner=args.numeric_owner, progress=args.progress,
+                          chunker_params=args.chunker_params)
         try:
             # Add cache dir to inode_skip list
             skip_inodes = set()
@@ -171,9 +173,6 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         # Entering a new filesystem?
         if restrict_dev and st.st_dev != restrict_dev:
             return
-        # Ignore unix sockets
-        if stat.S_ISSOCK(st.st_mode):
-            return
         status = None
         if stat.S_ISREG(st.st_mode):
             try:
@@ -199,6 +198,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             status = archive.process_fifo(path, st)
         elif stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
             status = archive.process_dev(path, st)
+        elif stat.S_ISSOCK(st.st_mode):
+            # Ignore unix sockets
+            return
         else:
             self.print_error('Unknown file type: %s', path)
             return
@@ -287,8 +289,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 stats.print_('Deleted data:', cache)
         else:
             print("You requested to completely DELETE the repository *including* all archives it contains:")
-            for archive in sorted(Archive.list_archives(repository, key, manifest), key=attrgetter('ts')):
-                print(format_archive(archive))
+            for archive_info in manifest.list_archive_infos(sort_by='ts'):
+                print(format_archive(archive_info))
             print("""Type "YES" if you understand this and want to continue.\n""")
             if input('Do you want to continue? ') == 'YES':
                 repository.destroy()
@@ -357,8 +359,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     item[b'group'] or item[b'gid'], size, format_time(mtime),
                     remove_surrogates(item[b'path']), extra))
         else:
-            for archive in sorted(Archive.list_archives(repository, key, manifest), key=attrgetter('ts')):
-                print(format_archive(archive))
+            for archive_info in manifest.list_archive_infos(sort_by='ts'):
+                print(format_archive(archive_info))
         return self.exit_code
 
     def do_info(self, args):
@@ -383,11 +385,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         repository = self.open_repository(args.repository, exclusive=True)
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest, do_files=args.cache_files)
-        archives = list(sorted(Archive.list_archives(repository, key, manifest, cache),
-                               key=attrgetter('ts'), reverse=True))
+        archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
         if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0 and args.within is None:
-            self.print_error('At least one of the "within", "hourly", "daily", "weekly", "monthly" or "yearly" '
-                             'settings must be specified')
+            self.print_error('At least one of the "within", "keep-hourly", "keep-daily", "keep-weekly", '
+                             '"keep-monthly" or "keep-yearly" settings must be specified')
             return 1
         if args.prefix:
             archives = [archive for archive in archives if archive.name.startswith(args.prefix)]
@@ -415,7 +416,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 self.print_verbose('Would prune:     %s' % format_archive(archive))
             else:
                 self.print_verbose('Pruning archive: %s' % format_archive(archive))
-                archive.delete(stats)
+                Archive(repository, key, manifest, archive.name, cache).delete(stats)
         if to_delete and not args.dry_run:
             manifest.write()
             repository.commit()
@@ -519,8 +520,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         parser = argparse.ArgumentParser(description='Borg %s - Deduplicated Backups' % __version__)
         subparsers = parser.add_subparsers(title='Available commands')
 
+        serve_epilog = textwrap.dedent("""
+        This command starts a repository server process. This command is usually not used manually.
+        """)
         subparser = subparsers.add_parser('serve', parents=[common_parser],
-                                          description=self.do_serve.__doc__)
+                                          description=self.do_serve.__doc__, epilog=serve_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_serve)
         subparser.add_argument('--restrict-to-path', dest='restrict_to_paths', action='append',
                                metavar='PATH', help='restrict repository access to PATH')
@@ -625,6 +630,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                metavar='yyyy-mm-ddThh:mm:ss',
                                help='manually specify the archive creation date/time (UTC). '
                                     'alternatively, give a reference file/directory.')
+        subparser.add_argument('--chunker-params', dest='chunker_params',
+                               type=ChunkerParams, default=CHUNKER_PARAMS,
+                               metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
+                               help='specify the chunker parameters. default: %d,%d,%d,%d' % CHUNKER_PARAMS)
+        subparser.add_argument('-C', '--compression', dest='compression',
+                               type=int, default=0, metavar='N',
+                               help='select compression algorithm and level. 0..9 is supported and means zlib '
+                                    'level 0 (no compression, fast, default) .. zlib level 9 (high compression, slow).')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to create')
@@ -856,19 +869,19 @@ def main():
     try:
         exit_code = archiver.run(sys.argv[1:])
     except Error as e:
-        traceback.print_exc()
-        archiver.print_error(e.get_message())
+        archiver.print_error(e.get_message() + "\n%s" % traceback.format_exc())
         exit_code = e.exit_code
     except RemoteRepository.RPCError as e:
-        print(e)
+        archiver.print_error('Error: Remote Exception.\n%s' % str(e))
+        exit_code = 1
+    except Exception:
+        archiver.print_error('Error: Local Exception.\n%s' % traceback.format_exc())
         exit_code = 1
     except KeyboardInterrupt:
-        traceback.print_exc()
-        archiver.print_error('Error: Keyboard interrupt')
+        archiver.print_error('Error: Keyboard interrupt.\n%s' % traceback.format_exc())
         exit_code = 1
-    else:
-        if exit_code:
-            archiver.print_error('Exiting with failure status due to previous errors')
+    if exit_code:
+        archiver.print_error('Exiting with failure status due to previous errors')
     sys.exit(exit_code)
 
 if __name__ == '__main__':

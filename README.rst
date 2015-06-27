@@ -10,8 +10,12 @@ are stored.
 Borg is a fork of Attic and maintained by "The Borg Collective" (see AUTHORS file).
 
 BORG IS NOT COMPATIBLE WITH ORIGINAL ATTIC.
-UNTIL FURTHER NOTICE, EXPECT THAT WE WILL BREAK COMPATIBILITY REPEATEDLY.
-THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF IF IT FITS YOUR NEEDS.
+EXPECT THAT WE WILL BREAK COMPATIBILITY REPEATEDLY WHEN MAJOR RELEASE NUMBER
+CHANGES (like when going from 0.x.y to 1.0.0). Please read CHANGES document.
+
+NOT RELEASED DEVELOPMENT VERSIONS HAVE UNKNOWN COMPATIBILITY PROPERTIES.
+
+THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
 
 Read issue #1 on the issue tracker, goals are being defined there.
 
@@ -66,7 +70,7 @@ Where are the tests?
 The tests are in the borg/testsuite package. To run the test suite use the
 following command::
 
-  $ fakeroot -u tox  # you need to have tox installed
+  $ fakeroot -u tox  # you need to have tox and pytest installed
 
 .. |build| image:: https://travis-ci.org/borgbackup/borg.svg
         :alt: Build Status

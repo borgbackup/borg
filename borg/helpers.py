@@ -1,5 +1,6 @@
 import argparse
 import binascii
+from collections import namedtuple
 import grp
 import msgpack
 import os
@@ -122,6 +123,18 @@ class Manifest:
         self.id = self.key.id_hash(data)
         self.repository.put(self.MANIFEST_ID, self.key.encrypt(data))
 
+    def list_archive_infos(self, sort_by=None, reverse=False):
+        # inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
+        ArchiveInfo = namedtuple('ArchiveInfo', 'name id ts')
+        archives = []
+        for name, values in self.archives.items():
+            ts = parse_timestamp(values[b'time'].decode('utf-8'))
+            id = values[b'id']
+            archives.append(ArchiveInfo(name=name, id=id, ts=ts))
+        if sort_by is not None:
+            archives = sorted(archives, key=attrgetter(sort_by), reverse=reverse)
+        return archives
+
 
 def prune_within(archives, within):
     multiplier = {'H': 1, 'd': 24, 'w': 24*7, 'm': 24*31, 'y': 24*365}
@@ -164,11 +177,14 @@ class Statistics:
             self.usize += csize
 
     def print_(self, label, cache):
-        total_size, total_csize, unique_size, unique_csize = cache.chunks.summarize()
+        total_size, total_csize, unique_size, unique_csize, total_unique_chunks, total_chunks = cache.chunks.summarize()
         print()
         print('                       Original size      Compressed size    Deduplicated size')
         print('%-15s %20s %20s %20s' % (label, format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize)))
         print('All archives:   %20s %20s %20s' % (format_file_size(total_size), format_file_size(total_csize), format_file_size(unique_csize)))
+        print()
+        print('                       Unique chunks         Total chunks')
+        print('Chunk index:    %20d %20d' % (total_unique_chunks, total_chunks))
 
     def show_progress(self, item=None, final=False):
         if not final:
@@ -298,6 +314,11 @@ def timestamp(s):
             except ValueError:
                 continue
         raise ValueError
+
+
+def ChunkerParams(s):
+    window_size, chunk_mask, chunk_min, chunk_max = s.split(',')
+    return int(window_size), int(chunk_mask), int(chunk_min), int(chunk_max)
 
 
 def is_cachedir(path):

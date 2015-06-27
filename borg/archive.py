@@ -24,12 +24,14 @@ from .helpers import parse_timestamp, Error, uid2user, user2uid, gid2group, grou
     make_queue, TerminatedQueue
 
 ITEMS_BUFFER = 1024 * 1024
-CHUNK_MIN = 1024
-CHUNK_MAX = 10 * 1024 * 1024
-WINDOW_SIZE = 0xfff
-CHUNK_MASK = 0xffff
 
-ZEROS = b'\0' * CHUNK_MAX
+CHUNK_MIN_EXP = 10  # 2**10 == 1kiB
+CHUNK_MAX_EXP = 23  # 2**23 == 8MiB
+HASH_WINDOW_SIZE = 0xfff  # 4095B
+HASH_MASK_BITS = 16  # results in ~64kiB chunks statistically
+
+# defaults, use --chunker-params to override
+CHUNKER_PARAMS = (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
 
 utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
 utime_supports_follow_symlinks = os.utime in getattr(os, 'supports_follow_symlinks', {})
@@ -72,12 +74,12 @@ class DownloadPipeline:
 class ChunkBuffer:
     BUFFER_SIZE = 1 * 1024 * 1024
 
-    def __init__(self, key):
+    def __init__(self, key, chunker_params=CHUNKER_PARAMS):
         self.buffer = BytesIO()
         self.packer = msgpack.Packer(unicode_errors='surrogateescape')
         self.chunks = []
         self.key = key
-        self.chunker = Chunker(WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, CHUNK_MAX,self.key.chunk_seed)
+        self.chunker = Chunker(self.key.chunk_seed, *chunker_params)
 
     def add(self, item):
         self.buffer.write(self.packer.pack(StableDict(item)))
@@ -107,8 +109,8 @@ class ChunkBuffer:
 
 class CacheChunkBuffer(ChunkBuffer):
 
-    def __init__(self, cache, key, stats):
-        super(CacheChunkBuffer, self).__init__(key)
+    def __init__(self, cache, key, stats, chunker_params=CHUNKER_PARAMS):
+        super(CacheChunkBuffer, self).__init__(key, chunker_params)
         self.cache = cache
         self.stats = stats
 
@@ -317,7 +319,8 @@ class Archive:
 
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
-                 checkpoint_interval=300, numeric_owner=False, progress=False):
+                 checkpoint_interval=300, numeric_owner=False, progress=False,
+                 chunker_params=CHUNKER_PARAMS):
         self.cwd = os.getcwd()
         self.key = key
         self.repository = repository
@@ -333,8 +336,8 @@ class Archive:
         self.pipeline = DownloadPipeline(self.repository, self.key)
         if create:
             self.pp = ParallelProcessor(self)
-            self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
-            self.chunker = Chunker(WINDOW_SIZE, CHUNK_MASK, CHUNK_MIN, CHUNK_MAX, self.key.chunk_seed)
+            self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats, chunker_params)
+            self.chunker = Chunker(self.key.chunk_seed, *chunker_params)
             if name in manifest.archives:
                 raise self.AlreadyExists(name)
             self.last_checkpoint = time.time()
@@ -350,6 +353,7 @@ class Archive:
                 raise self.DoesNotExist(name)
             info = self.manifest.archives[name]
             self.load(info[b'id'])
+            self.zeros = b'\0' * (1 << chunker_params[1])
 
     def close(self):
         if self.pp:
@@ -475,12 +479,7 @@ class Archive:
         except OSError:
             pass
         mode = item[b'mode']
-        if stat.S_ISDIR(mode):
-            if not os.path.exists(path):
-                os.makedirs(path)
-            if restore_attrs:
-                self.restore_attrs(path, item)
-        elif stat.S_ISREG(mode):
+        if stat.S_ISREG(mode):
             if not os.path.exists(os.path.dirname(path)):
                 os.makedirs(os.path.dirname(path))
             # Hard link?
@@ -501,7 +500,7 @@ class Archive:
                 with open(path, 'wb') as fd:
                     ids = [c[0] for c in item[b'chunks']]
                     for data in self.pipeline.fetch_many(ids, is_preloaded=True):
-                        if sparse and ZEROS.startswith(data):
+                        if sparse and self.zeros.startswith(data):
                             # all-zero chunk: create a hole in a sparse file
                             fd.seek(len(data), 1)
                         else:
@@ -510,11 +509,11 @@ class Archive:
                     fd.truncate(pos)
                     fd.flush()
                     self.restore_attrs(path, item, fd=fd.fileno())
-        elif stat.S_ISFIFO(mode):
-            if not os.path.exists(os.path.dirname(path)):
-                os.makedirs(os.path.dirname(path))
-            os.mkfifo(path)
-            self.restore_attrs(path, item)
+        elif stat.S_ISDIR(mode):
+            if not os.path.exists(path):
+                os.makedirs(path)
+            if restore_attrs:
+                self.restore_attrs(path, item)
         elif stat.S_ISLNK(mode):
             if not os.path.exists(os.path.dirname(path)):
                 os.makedirs(os.path.dirname(path))
@@ -523,6 +522,11 @@ class Archive:
                 os.unlink(path)
             os.symlink(source, path)
             self.restore_attrs(path, item, symlink=True)
+        elif stat.S_ISFIFO(mode):
+            if not os.path.exists(os.path.dirname(path)):
+                os.makedirs(os.path.dirname(path))
+            os.mkfifo(path)
+            self.restore_attrs(path, item)
         elif stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
             os.mknod(path, item[b'mode'], item[b'rdev'])
             self.restore_attrs(path, item)
@@ -700,6 +704,7 @@ class Archive:
 
     @staticmethod
     def list_archives(repository, key, manifest, cache=None):
+        # expensive! see also Manifest.list_archive_infos.
         for name, info in manifest.archives.items():
             yield Archive(repository, key, manifest, name, cache=cache)
 

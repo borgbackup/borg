@@ -125,10 +125,9 @@ chunker_free(Chunker *c)
 }
 
 static int
-chunker_fill(Chunker *c)
+chunker_fill(Chunker *c, PyThreadState **tstatep)
 {
     size_t n;
-    PyObject *data;
     memmove(c->data, c->data + c->last, c->position + c->remaining - c->last);
     c->position -= c->last;
     c->last = 0;
@@ -161,9 +160,12 @@ chunker_fill(Chunker *c)
         #endif
     }
     else {
+        PyEval_RestoreThread(*tstatep);  // acquire GIL
+        PyObject *data;
         // no os-level file descriptor, use Python file object API
         data = PyObject_CallMethod(c->fd, "read", "i", n);
         if(!data) {
+            *tstatep = PyEval_SaveThread();  // release GIL
             return 0;
         }
         n = PyBytes_Size(data);
@@ -176,6 +178,7 @@ chunker_fill(Chunker *c)
             c->eof = 1;
         }
         Py_DECREF(data);
+        *tstatep = PyEval_SaveThread();  // release GIL
     }
     return 1;
 }
@@ -197,8 +200,9 @@ static PyObject *
 chunker_process(Chunker *c)
 {
     uint32_t sum, chunk_mask = c->chunk_mask, min_size = c->min_size, window_size = c->window_size;
-    int n = 0;
+    int n = 0, rc = 0;
     int old_last;
+    PyThreadState *tstate;
 
     if(c->done) {
         if(c->bytes_read == c->bytes_yielded)
@@ -208,7 +212,10 @@ chunker_process(Chunker *c)
         return NULL;
     }
     if(c->remaining <= window_size) {
-        if(!chunker_fill(c)) {
+        tstate = PyEval_SaveThread();  // release GIL
+        rc = chunker_fill(c, &tstate);
+        PyEval_RestoreThread(tstate);  // acquire GIL
+        if(!rc) {
             return NULL;
         }
     }
@@ -226,6 +233,7 @@ chunker_process(Chunker *c)
             return NULL;
         }
     }
+    tstate = PyEval_SaveThread();  // release GIL
     sum = buzhash(c->data + c->position, window_size, c->table);
     while(c->remaining > c->window_size && ((sum & chunk_mask) || n < min_size)) {
         sum = buzhash_update(sum, c->data[c->position],
@@ -235,7 +243,8 @@ chunker_process(Chunker *c)
         c->remaining--;
         n++;
         if(c->remaining <= window_size) {
-            if(!chunker_fill(c)) {
+            if(!chunker_fill(c, &tstate)) {
+                PyEval_RestoreThread(tstate);  // acquire GIL
                 return NULL;
             }
         }
@@ -248,5 +257,6 @@ chunker_process(Chunker *c)
     c->last = c->position;
     n = c->last - old_last;
     c->bytes_yielded += n;
+    PyEval_RestoreThread(tstate);  // acquire GIL
     return PyBuffer_FromMemory(c->data + old_last, n);
 }

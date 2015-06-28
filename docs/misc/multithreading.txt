@@ -1,40 +1,96 @@
 Multithreading
 ==============
 
-With crypto
------------
+multithreading with chunker code that releases the gil
+------------------------------------------------------
 
-master branch (single threaded)
+Duration: 1 minutes 28.78 seconds
 
-    Command being timed: "borg create repo::1 /home/tw/Desktop/"
-    User time (seconds): 13.78
-    System time (seconds): 0.40
-    Percent of CPU this job got: 83%
-    Elapsed (wall clock) time (h:mm:ss or m:ss): 0:16.98
+                       Original size      Compressed size    Deduplicated size
+This archive:                4.01 GB              3.85 GB              3.60 GB
 
-multithreading
+                       Unique chunks         Total chunks
+Chunk index:                    1597                 1724
+------------------------------------------------------------------------------
+    Command being timed: "borg create --compression 6 --chunker-params 18,23,21,4095 --stats /extra/borg/mt::1 /extra/w10.iso"
+    User time (seconds): 286.84
+    System time (seconds): 11.84
+    Percent of CPU this job got: 335%
+    Elapsed (wall clock) time (h:mm:ss or m:ss): 1:29.11
+    Maximum resident set size (kbytes): 132896
+    Average resident set size (kbytes): 0
+    Major (requiring I/O) page faults: 197
+    Minor (reclaiming a frame) page faults: 2617391
+    Voluntary context switches: 57339
+    Involuntary context switches: 99151
+    Swaps: 0
+    File system inputs: 8077456
+    File system outputs: 7043200
+    Socket messages sent: 0
+    Socket messages received: 0
+    Signals delivered: 0
+    Page size (bytes): 4096
+    Exit status: 0
 
-    Command being timed: "borg create repo::1 /home/tw/Desktop/"
-    User time (seconds): 24.08
-    System time (seconds): 1.16
-    Percent of CPU this job got: 249%
-    Elapsed (wall clock) time (h:mm:ss or m:ss): 0:10.11
+multithreaded with gil-holding chunker
+--------------------------------------
 
-Without crypto
---------------
+Duration: 1 minutes 31.72 seconds
 
-master branch (single threaded)
+                       Original size      Compressed size    Deduplicated size
+This archive:                4.01 GB              3.85 GB              3.60 GB
 
-    Command being timed: "borg create repo::1 /home/tw/Desktop/"
-    User time (seconds): 11.51
-    System time (seconds): 0.40
-    Percent of CPU this job got: 86%
-    Elapsed (wall clock) time (h:mm:ss or m:ss): 0:13.85
+                       Unique chunks         Total chunks
+Chunk index:                    1597                 1724
+------------------------------------------------------------------------------
+    Command being timed: "borg create --compression 6 --chunker-params 18,23,21,4095 --stats /extra/borg/mt::1 /extra/w10.iso"
+    User time (seconds): 283.38
+    System time (seconds): 11.97
+    Percent of CPU this job got: 320%
+    Elapsed (wall clock) time (h:mm:ss or m:ss): 1:32.06
+    Maximum resident set size (kbytes): 123640
+    Average resident set size (kbytes): 0
+    Major (requiring I/O) page faults: 198
+    Minor (reclaiming a frame) page faults: 2586472
+    Voluntary context switches: 69560
+    Involuntary context switches: 69897
+    Swaps: 0
+    File system inputs: 8083136
+    File system outputs: 7051768
+    Socket messages sent: 0
+    Socket messages received: 0
+    Signals delivered: 0
+    Page size (bytes): 4096
+    Exit status: 0
 
-multithreading
+no multithreading (code from master branch)
+-------------------------------------------
 
-    Command being timed: "borg create repo::1 /home/tw/Desktop/"
-    User time (seconds): 20.27
-    System time (seconds): 1.13
-    Percent of CPU this job got: 260%
-    Elapsed (wall clock) time (h:mm:ss or m:ss): 0:08.22
+Duration: 3 minutes 15.83 seconds
+
+                       Original size      Compressed size    Deduplicated size
+This archive:                4.01 GB              3.85 GB              3.60 GB
+
+                       Unique chunks         Total chunks
+Chunk index:                    1597                 1724
+------------------------------------------------------------------------------
+    Command being timed: "borg create --compression 6 --chunker-params 18,23,21,4095 --stats /extra/borg/mt::1 /extra/w10.iso"
+    User time (seconds): 163.02
+    System time (seconds): 5.00
+    Percent of CPU this job got: 85%
+    Elapsed (wall clock) time (h:mm:ss or m:ss): 3:16.11
+    Maximum resident set size (kbytes): 48984
+    Average resident set size (kbytes): 0
+    Major (requiring I/O) page faults: 136
+    Minor (reclaiming a frame) page faults: 154179
+    Voluntary context switches: 39641
+    Involuntary context switches: 1019
+    Swaps: 0
+    File system inputs: 8073280
+    File system outputs: 7043320
+    Socket messages sent: 0
+    Socket messages received: 0
+    Signals delivered: 0
+    Page size (bytes): 4096
+    Exit status: 0
+

@@ -590,7 +590,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         traversing all paths specified. The archive will consume almost no disk space for
         files or parts of files that have already been stored in other archives.
 
-        See "borg help patterns" for more help on exclude patterns.
+        See the output of the "borg help patterns" command for more help on exclude patterns.
         """)
 
         subparser = subparsers.add_parser('create', parents=[common_parser],
@@ -647,7 +647,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         by passing a list of ``PATHs`` as arguments. The file selection can further
         be restricted by using the ``--exclude`` option.
 
-        See "borg help patterns" for more help on exclude patterns.
+        See the output of the "borg help patterns" command for more help on exclude patterns.
         """)
         subparser = subparsers.add_parser('extract', parents=[common_parser],
                                           description=self.do_extract.__doc__,

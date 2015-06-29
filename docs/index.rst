@@ -66,7 +66,7 @@ For more general questions or discussions, IRC or mailing list are preferred.
 
 IRC
 ---
-Join us on channel ##borgbackup on chat.freenode.net. As usual on IRC, just
+Join us on channel #borgbackup on chat.freenode.net. As usual on IRC, just
 ask or tell directly and then patiently wait for replies. Stay connected.
 
 Mailing list

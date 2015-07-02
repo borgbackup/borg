@@ -355,4 +355,4 @@ representation of the repository id.
 Compression
 -----------
 
-Currently, zlib level 6 is used as compression.
+Currently, compression is disabled by default. To enable zlib compression, ``--compression level`` on the command line. Level can be anything from 0 (no compression, fast) to 9 (high compression, slow).

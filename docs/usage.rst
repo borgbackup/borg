@@ -36,6 +36,36 @@ is that 0 will always mean some sort of success and "not 0" will always mean
 some sort of warning / error / failure - but the definition of success might
 change).
 
+Environment Variables
+---------------------
+
+|project_name| uses some environment variables for automation:
+
+::
+
+    Specifying a passphrase:
+        BORG_PASSPHRASE : When set, use the value to answer the passphrase question for encrypted repositories.
+
+    Some "yes" sayers (if set, they automatically confirm that you really want to do X even if there is that warning):
+        BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK : For "Warning: Attempting to access a previously unknown unencrypted repository"
+        BORG_RELOCATED_REPO_ACCESS_IS_OK : For "Warning: The repository at location ... was previously located at ..."
+        BORG_CHECK_I_KNOW_WHAT_I_AM_DOING : For "Warning: 'check --repair' is an experimental feature that might result in data loss."
+
+    Directories:
+        BORG_KEYS_DIR : Default to '~/.borg/keys'. This directory contains keys for encrypted repositories.
+        BORG_CACHE_DIR : Default to '~/.cache/borg'. This directory contains the local cache.
+
+    Building:
+        BORG_OPENSSL_PREFIX : Adds given OpenSSL header file directory to the default locations (setup.py).
+
+
+Please note:
+
+- be very careful when using the "yes" sayers, the warnings with prompt exist for your / your data's security/safety
+- also be very careful when putting your passphrase into a script, make sure it has appropriate file permissions
+  (e.g. mode 600, root:root).
+
+
 .. include:: usage/init.rst.inc
 
 Examples

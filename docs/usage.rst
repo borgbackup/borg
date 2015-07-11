@@ -17,6 +17,27 @@ messages as it is processing.
 
 .. include:: usage/init.rst.inc
 
+Return codes
+------------
+
+|project_name| can exit with the following return codes (rc):
+
+::
+
+    0      no error, normal termination
+    1      some error occurred (this can be a complete or a partial failure)
+    128+N  killed by signal N (e.g. 137 == kill -9)
+
+
+Note: we are aware that more distinct return codes might be useful, but it is
+not clear yet which return codes should be used for which precise conditions.
+
+See issue #61 for a discussion about that. Depending on the outcome of the
+discussion there, return codes may change in future (the only thing rather sure
+is that 0 will always mean some sort of success and "not 0" will always mean
+some sort of warning / error / failure - but the definition of success might
+change).
+
 Examples
 ~~~~~~~~
 ::

@@ -2,8 +2,6 @@ from datetime import datetime
 from getpass import getuser
 from itertools import groupby
 import errno
-import shutil
-import tempfile
 from .key import key_factory
 from .remote import cache_if_remote
 import msgpack
@@ -609,10 +607,6 @@ class ArchiveChecker:
     def __init__(self):
         self.error_found = False
         self.possibly_superseded = set()
-        self.tmpdir = tempfile.mkdtemp()
-
-    def __del__(self):
-        shutil.rmtree(self.tmpdir)
 
     def check(self, repository, repair=False, last=None):
         self.report_progress('Starting archive consistency check...')

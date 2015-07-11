@@ -305,7 +305,7 @@ class RepositoryCache:
         self.cleanup()
 
     def initialize(self):
-        self.tmppath = tempfile.mkdtemp()
+        self.tmppath = tempfile.mkdtemp(prefix='borg-tmp')
         self.index = NSIndex()
         self.data_fd = open(os.path.join(self.tmppath, 'data'), 'a+b')
 

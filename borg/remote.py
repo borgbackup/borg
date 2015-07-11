@@ -25,24 +25,25 @@ class ConnectionClosed(Error):
 class PathNotAllowed(Error):
     """Repository path not allowed"""
 
+
 class InvalidRPCMethod(Error):
     """RPC method is not valid"""
 
 
 class RepositoryServer:
     rpc_methods = (
-            '__len__',
-            'check',
-            'commit',
-            'delete',
-            'get',
-            'list',
-            'negotiate',
-            'open',
-            'put',
-            'repair',
-            'rollback',
-            )
+        '__len__',
+        'check',
+        'commit',
+        'delete',
+        'get',
+        'list',
+        'negotiate',
+        'open',
+        'put',
+        'repair',
+        'rollback',
+    )
 
     def __init__(self, restrict_to_paths):
         self.repository = None
@@ -71,7 +72,7 @@ class RepositoryServer:
                     type, msgid, method, args = unpacked
                     method = method.decode('ascii')
                     try:
-                        if not method in self.rpc_methods:
+                        if method not in self.rpc_methods:
                             raise InvalidRPCMethod(method)
                         try:
                             f = getattr(self, method)

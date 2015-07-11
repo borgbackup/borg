@@ -24,7 +24,7 @@ from .mock import patch
 
 try:
     import llfuse
-    has_llfuse = True
+    has_llfuse = True or llfuse  # avoids "unused import"
 except ImportError:
     has_llfuse = False
 
@@ -143,7 +143,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('empty', size=0)
         # next code line raises OverflowError on 32bit cpu (raspberry pi 2):
         # 2600-01-01 > 2**64 ns
-        #os.utime('input/empty', (19880895600, 19880895600))
+        # os.utime('input/empty', (19880895600, 19880895600))
         # thus, we better test with something not that far in future:
         # 2038-01-19 (1970 + 2^31 - 1 seconds) is the 32bit "deadline":
         os.utime('input/empty', (2**31 - 1, 2**31 - 1))
@@ -157,9 +157,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.chmod('input/file1', 0o7755)
         os.chmod('input/dir2', 0o555)
         # Block device
-        os.mknod('input/bdev', 0o600 | stat.S_IFBLK,  os.makedev(10, 20))
+        os.mknod('input/bdev', 0o600 | stat.S_IFBLK, os.makedev(10, 20))
         # Char device
-        os.mknod('input/cdev', 0o600 | stat.S_IFCHR,  os.makedev(30, 40))
+        os.mknod('input/cdev', 0o600 | stat.S_IFCHR, os.makedev(30, 40))
         # Hard link
         os.link(os.path.join(self.input_path, 'file1'),
                 os.path.join(self.input_path, 'hardlink'))
@@ -172,7 +172,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # same for newer ubuntu and centos.
             # if this is supported just on specific platform, platform should be checked first,
             # so that the test setup for all tests using it does not fail here always for others.
-            #xattr.setxattr(os.path.join(self.input_path, 'link1'), 'user.foo_symlink', b'bar_symlink', follow_symlinks=False)
+            # xattr.setxattr(os.path.join(self.input_path, 'link1'), 'user.foo_symlink', b'bar_symlink', follow_symlinks=False)
         # FIFO node
         os.mkfifo(os.path.join(self.input_path, 'fifo1'))
         if has_lchflags:
@@ -253,7 +253,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=none', self.repository_location)
         self._set_repository_id(self.repository_path, repository_id)
         self.assert_equal(repository_id, self._extract_repository_id(self.repository_path))
-        self.assert_raises(Cache.EncryptionMethodMismatch, lambda :self.cmd('create', self.repository_location + '::test.2', 'input'))
+        self.assert_raises(Cache.EncryptionMethodMismatch, lambda: self.cmd('create', self.repository_location + '::test.2', 'input'))
 
     def test_repository_swap_detection2(self):
         self.create_test_files()
@@ -263,7 +263,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '_encrypted::test', 'input')
         shutil.rmtree(self.repository_path + '_encrypted')
         os.rename(self.repository_path + '_unencrypted', self.repository_path + '_encrypted')
-        self.assert_raises(Cache.RepositoryAccessAborted, lambda :self.cmd('create', self.repository_location + '_encrypted::test.2', 'input'))
+        self.assert_raises(Cache.RepositoryAccessAborted, lambda: self.cmd('create', self.repository_location + '_encrypted::test.2', 'input'))
 
     def test_strip_components(self):
         self.cmd('init', self.repository_location)
@@ -524,7 +524,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 class ArchiverCheckTestCase(ArchiverTestCaseBase):
 
     def setUp(self):
-        super(ArchiverCheckTestCase, self).setUp()
+        super().setUp()
         with patch.object(ChunkBuffer, 'BUFFER_SIZE', 10):
             self.cmd('init', self.repository_location)
             self.create_src_archive('archive1')

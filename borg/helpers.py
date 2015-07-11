@@ -73,10 +73,13 @@ class UpgradableLock:
 
 def check_extension_modules():
     from . import platform
-    if (hashindex.API_VERSION != 2 or
-        chunker.API_VERSION != 2 or
-        crypto.API_VERSION != 2 or
-        platform.API_VERSION != 2):
+    if hashindex.API_VERSION != 2:
+        raise ExtensionModuleError
+    if chunker.API_VERSION != 2:
+        raise ExtensionModuleError
+    if crypto.API_VERSION != 2:
+        raise ExtensionModuleError
+    if platform.API_VERSION != 2:
         raise ExtensionModuleError
 
 
@@ -529,9 +532,9 @@ class Location:
             else:
                 path = self.path
             return 'ssh://{}{}{}{}'.format('{}@'.format(self.user) if self.user else '',
-                                                        self.host,
-                                                        ':{}'.format(self.port) if self.port else '',
-                                                        path)
+                                           self.host,
+                                           ':{}'.format(self.port) if self.port else '',
+                                           path)
 
 
 def location_validator(archive=None):
@@ -606,7 +609,7 @@ def daemonize():
 class StableDict(dict):
     """A dict subclass with stable items() ordering"""
     def items(self):
-        return sorted(super(StableDict, self).items())
+        return sorted(super().items())
 
 
 if sys.version < '3.3':
@@ -642,4 +645,3 @@ def int_to_bigint(value):
     if value.bit_length() > 63:
         return value.to_bytes((value.bit_length() + 9) // 8, 'little', signed=True)
     return value
-

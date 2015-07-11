@@ -17,6 +17,7 @@ class UnsupportedPayloadError(Error):
     """Unsupported payload type {}. A newer version is required to access this repository.
     """
 
+
 class KeyfileNotFoundError(Error):
     """No key file for repository {} found in {}.
     """
@@ -231,8 +232,7 @@ class KeyfileKey(AESKeyBase):
             filename = os.path.join(keys_dir, name)
             with open(filename, 'r') as fd:
                 line = fd.readline().strip()
-                if (line and line.startswith(cls.FILE_ID) and
-                    line[len(cls.FILE_ID)+1:] == id):
+                if line and line.startswith(cls.FILE_ID) and line[len(cls.FILE_ID)+1:] == id:
                     return filename
         raise KeyfileNotFoundError(repository._location.canonical_path(), get_keys_dir())
 

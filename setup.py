@@ -47,7 +47,7 @@ try:
                 'borg/platform_freebsd.c',
                 'borg/platform_darwin.c',
             ])
-            super(Sdist, self).make_distribution()
+            super().make_distribution()
 
 except ImportError:
     class Sdist(versioneer.cmd_sdist):

@@ -21,7 +21,6 @@ class Cache:
     class RepositoryReplay(Error):
         """Cache is newer than repository, refusing to continue"""
 
-
     class CacheInitAbortedError(Error):
         """Cache initialization aborted"""
 

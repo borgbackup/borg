@@ -15,8 +15,6 @@ Like most UNIX commands |project_name| is quiet by default but the ``-v`` or
 ``--verbose`` option can be used to get the program to output more status
 messages as it is processing.
 
-.. include:: usage/init.rst.inc
-
 Return codes
 ------------
 
@@ -37,6 +35,8 @@ discussion there, return codes may change in future (the only thing rather sure
 is that 0 will always mean some sort of success and "not 0" will always mean
 some sort of warning / error / failure - but the definition of success might
 change).
+
+.. include:: usage/init.rst.inc
 
 Examples
 ~~~~~~~~

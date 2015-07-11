@@ -341,6 +341,11 @@ class Repository:
             self.index = self.open_index(self.get_transaction_id())
         return len(self.index)
 
+    def __contains__(self, id):
+        if not self.index:
+            self.index = self.open_index(self.get_transaction_id())
+        return id in self.index
+
     def list(self, limit=None, marker=None):
         if not self.index:
             self.index = self.open_index(self.get_transaction_id())

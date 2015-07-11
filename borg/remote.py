@@ -3,7 +3,6 @@ import fcntl
 import msgpack
 import os
 import select
-import shutil
 from subprocess import Popen, PIPE
 import sys
 import tempfile
@@ -11,7 +10,6 @@ import traceback
 
 from . import __version__
 
-from .hashindex import NSIndex
 from .helpers import Error, IntegrityError
 from .repository import Repository
 
@@ -292,56 +290,29 @@ class RemoteRepository:
 class RepositoryCache:
     """A caching Repository wrapper
 
-    Caches Repository GET operations using a temporary file
+    Caches Repository GET operations using a local temporary Repository.
     """
     def __init__(self, repository):
-        self.tmppath = None
-        self.index = None
-        self.data_fd = None
         self.repository = repository
-        self.entries = {}
-        self.initialize()
+        tmppath = tempfile.mkdtemp(prefix='borg-tmp')
+        self.caching_repo = Repository(tmppath, create=True, exclusive=True)
 
     def __del__(self):
-        self.cleanup()
-
-    def initialize(self):
-        self.tmppath = tempfile.mkdtemp(prefix='borg-tmp')
-        self.index = NSIndex()
-        self.data_fd = open(os.path.join(self.tmppath, 'data'), 'a+b')
-
-    def cleanup(self):
-        del self.index
-        if self.data_fd:
-            self.data_fd.close()
-        if self.tmppath:
-            shutil.rmtree(self.tmppath)
-
-    def load_object(self, offset, size):
-        self.data_fd.seek(offset)
-        data = self.data_fd.read(size)
-        assert len(data) == size
-        return data
-
-    def store_object(self, key, data):
-        self.data_fd.seek(0, os.SEEK_END)
-        self.data_fd.write(data)
-        offset = self.data_fd.tell()
-        self.index[key] = offset - len(data), len(data)
+        self.caching_repo.destroy()
 
     def get(self, key):
         return next(self.get_many([key]))
 
     def get_many(self, keys):
-        unknown_keys = [key for key in keys if key not in self.index]
+        unknown_keys = [key for key in keys if key not in self.caching_repo]
         repository_iterator = zip(unknown_keys, self.repository.get_many(unknown_keys))
         for key in keys:
             try:
-                yield self.load_object(*self.index[key])
-            except KeyError:
+                yield self.caching_repo.get(key)
+            except Repository.ObjectNotFound:
                 for key_, data in repository_iterator:
                     if key_ == key:
-                        self.store_object(key, data)
+                        self.caching_repo.put(key, data)
                         yield data
                         break
         # Consume any pending requests

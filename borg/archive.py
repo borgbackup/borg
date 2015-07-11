@@ -105,7 +105,7 @@ class ChunkBuffer:
 class CacheChunkBuffer(ChunkBuffer):
 
     def __init__(self, cache, key, stats, chunker_params=CHUNKER_PARAMS):
-        super(CacheChunkBuffer, self).__init__(key, chunker_params)
+        super().__init__(key, chunker_params)
         self.cache = cache
         self.stats = stats
 
@@ -124,7 +124,6 @@ class Archive:
 
     class IncompatibleFilesystemEncodingError(Error):
         """Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable."""
-
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False, progress=False,
@@ -230,9 +229,11 @@ class Archive:
             count, size, csize = cache.chunks[id]
             stats.update(size, csize, count == 1)
             cache.chunks[id] = count - 1, size, csize
+
         def add_file_chunks(chunks):
             for id, _, _ in chunks:
                 add(id)
+
         # This function is a bit evil since it abuses the cache to calculate
         # the stats. The cache transaction must be rolled back afterwards
         unpacker = msgpack.Unpacker(use_list=False)
@@ -549,7 +550,7 @@ class RobustUnpacker():
     item_keys = [msgpack.packb(name) for name in ('path', 'mode', 'source', 'chunks', 'rdev', 'xattrs', 'user', 'group', 'uid', 'gid', 'mtime')]
 
     def __init__(self, validator):
-        super(RobustUnpacker, self).__init__()
+        super().__init__()
         self.validator = validator
         self._buffered_data = []
         self._resync = False
@@ -804,4 +805,3 @@ class ArchiveChecker:
                 self.repository.delete(id_)
             self.manifest.write()
             self.repository.commit()
-

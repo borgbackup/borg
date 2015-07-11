@@ -1,7 +1,7 @@
 class LRUCache(dict):
 
     def __init__(self, capacity):
-        super(LRUCache, self).__init__()
+        super().__init__()
         self._lru = []
         self._capacity = capacity
 
@@ -13,7 +13,7 @@ class LRUCache(dict):
         self._lru.append(key)
         while len(self._lru) > self._capacity:
             del self[self._lru[0]]
-        return super(LRUCache, self).__setitem__(key, value)
+        return super().__setitem__(key, value)
 
     def __getitem__(self, key):
         try:
@@ -21,21 +21,21 @@ class LRUCache(dict):
             self._lru.append(key)
         except ValueError:
             pass
-        return super(LRUCache, self).__getitem__(key)
+        return super().__getitem__(key)
 
     def __delitem__(self, key):
         try:
             self._lru.remove(key)
         except ValueError:
             pass
-        return super(LRUCache, self).__delitem__(key)
+        return super().__delitem__(key)
 
     def pop(self, key, default=None):
         try:
             self._lru.remove(key)
         except ValueError:
             pass
-        return super(LRUCache, self).pop(key, default)
+        return super().pop(key, default)
 
     def _not_implemented(self, *args, **kw):
         raise NotImplementedError

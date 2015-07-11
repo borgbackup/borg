@@ -119,5 +119,3 @@ class TestLoader(unittest.TestLoader):
             if pattern.lower() in test.id().lower():
                 tests.addTest(test)
         return tests
-
-

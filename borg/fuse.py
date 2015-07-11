@@ -17,7 +17,7 @@ have_fuse_mtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
 
 class ItemCache:
     def __init__(self):
-        self.fd = tempfile.TemporaryFile()
+        self.fd = tempfile.TemporaryFile(prefix='borg-tmp')
         self.offset = 1000000
 
     def add(self, item):

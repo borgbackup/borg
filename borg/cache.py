@@ -313,7 +313,7 @@ class Cache:
         self.begin_txn()
         print('Synchronizing chunks cache...')
         # XXX we have to do stuff on disk due to lacking ChunkIndex api
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(prefix='borg-tmp') as tmp_dir:
             repository = cache_if_remote(self.repository)
             out_archive = open_out_archive()
             in_archive = open_in_archive()

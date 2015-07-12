@@ -16,10 +16,8 @@ if sys.version_info < min_python:
     print("Borg requires Python %d.%d or later" % min_python)
     sys.exit(1)
 
-try:
-    from setuptools import setup, Extension
-except ImportError:
-    from distutils.core import setup, Extension
+
+from setuptools import setup, Extension
 
 crypto_source = 'borg/crypto.pyx'
 chunker_source = 'borg/chunker.pyx'

@@ -129,7 +129,11 @@ setup(
         'Topic :: System :: Archiving :: Backup',
     ],
     packages=['borg', 'borg.testsuite'],
-    scripts=['scripts/borg'],
+    entry_points={
+        'console_scripts': [
+            'borg = borg.archiver:main',
+        ]
+    },
     cmdclass=cmdclass,
     ext_modules=ext_modules,
     # msgpack pure python data corruption was fixed in 0.4.6.

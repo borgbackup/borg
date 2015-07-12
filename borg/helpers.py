@@ -2,7 +2,6 @@ import argparse
 import binascii
 from collections import namedtuple
 import grp
-import msgpack
 import os
 import pwd
 import re
@@ -11,7 +10,8 @@ import time
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from operator import attrgetter
-import fcntl
+
+import msgpack
 
 from . import hashindex
 from . import chunker
@@ -29,46 +29,6 @@ class Error(Exception):
 
 class ExtensionModuleError(Error):
     """The Borg binary extension modules do not seem to be properly installed"""
-
-
-class UpgradableLock:
-
-    class ReadLockFailed(Error):
-        """Failed to acquire read lock on {}"""
-
-    class WriteLockFailed(Error):
-        """Failed to acquire write lock on {}"""
-
-    def __init__(self, path, exclusive=False):
-        self.path = path
-        try:
-            self.fd = open(path, 'r+')
-        except IOError:
-            self.fd = open(path, 'r')
-        try:
-            if exclusive:
-                fcntl.lockf(self.fd, fcntl.LOCK_EX)
-            else:
-                fcntl.lockf(self.fd, fcntl.LOCK_SH)
-        # Python 3.2 raises IOError, Python3.3+ raises OSError
-        except (IOError, OSError):
-            if exclusive:
-                raise self.WriteLockFailed(self.path)
-            else:
-                raise self.ReadLockFailed(self.path)
-        self.is_exclusive = exclusive
-
-    def upgrade(self):
-        try:
-            fcntl.lockf(self.fd, fcntl.LOCK_EX)
-        # Python 3.2 raises IOError, Python3.3+ raises OSError
-        except (IOError, OSError):
-            raise self.WriteLockFailed(self.path)
-        self.is_exclusive = True
-
-    def release(self):
-        fcntl.lockf(self.fd, fcntl.LOCK_UN)
-        self.fd.close()
 
 
 def check_extension_modules():

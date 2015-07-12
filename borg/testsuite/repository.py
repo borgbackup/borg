@@ -3,7 +3,8 @@ import shutil
 import tempfile
 
 from ..hashindex import NSIndex
-from ..helpers import Location, IntegrityError, UpgradableLock
+from ..helpers import Location, IntegrityError
+from ..locking import UpgradableLock
 from ..remote import RemoteRepository, InvalidRPCMethod
 from ..repository import Repository
 from . import BaseTestCase

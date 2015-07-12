@@ -159,7 +159,7 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         with patch.object(UpgradableLock, 'upgrade', side_effect=UpgradableLock.WriteLockFailed) as upgrade:
             self.reopen()
             self.assert_raises(UpgradableLock.WriteLockFailed, lambda: len(self.repository))
-            upgrade.assert_called_once()
+            upgrade.assert_called_once_with()
 
     def test_crash_before_write_index(self):
         self.add_keys()
@@ -309,7 +309,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         # Simulate a crash before compact
         with patch.object(Repository, 'compact_segments') as compact:
             self.repository.commit()
-            compact.assert_called_once()
+            compact.assert_called_once_with()
         self.reopen()
         self.check(repair=True)
         self.assert_equal(self.repository.get(bytes(32)), b'data2')

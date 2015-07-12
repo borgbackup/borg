@@ -16,10 +16,8 @@ if sys.version_info < min_python:
     print("Borg requires Python %d.%d or later" % min_python)
     sys.exit(1)
 
-try:
-    from setuptools import setup, Extension
-except ImportError:
-    from distutils.core import setup, Extension
+
+from setuptools import setup, Extension
 
 crypto_source = 'borg/crypto.pyx'
 chunker_source = 'borg/chunker.pyx'
@@ -129,7 +127,11 @@ setup(
         'Topic :: System :: Archiving :: Backup',
     ],
     packages=['borg', 'borg.testsuite'],
-    scripts=['scripts/borg'],
+    entry_points={
+        'console_scripts': [
+            'borg = borg.archiver:main',
+        ]
+    },
     cmdclass=cmdclass,
     ext_modules=ext_modules,
     # msgpack pure python data corruption was fixed in 0.4.6.

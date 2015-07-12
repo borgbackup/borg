@@ -328,3 +328,7 @@ class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
 
     def open(self, create=False):
         return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')), create=create)
+
+    def test_crash_before_compact(self):
+        # skip this test, we can't mock-patch a Repository class in another process!
+        pass

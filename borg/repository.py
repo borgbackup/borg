@@ -114,7 +114,7 @@ class Repository:
         self.path = path
         if not os.path.isdir(path):
             raise self.DoesNotExist(path)
-        self.lock = UpgradableLock(os.path.join(path, 'repo'), exclusive).acquire()
+        self.lock = UpgradableLock(os.path.join(path, 'lock'), exclusive).acquire()
         self.config = RawConfigParser()
         self.config.read(os.path.join(self.path, 'config'))
         if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:

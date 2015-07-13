@@ -26,7 +26,7 @@ README
   simple text file telling that this is a |project_name| repository
 
 config
-  repository configuration and lock file
+  repository configuration
 
 data/
   directory where the actual data is stored
@@ -36,6 +36,9 @@ hints.%d
 
 index.%d
   repository index
+
+lock.roster and lock.exclusive/*
+  used by the locking system to manage shared and exclusive locks
 
 
 Config file
@@ -54,9 +57,6 @@ This is where the ``repository.id`` is stored. It is a unique
 identifier for repositories. It will not change if you move the
 repository around so you can make a local transfer then decide to move
 the repository to another (even remote) location at a later time.
-
-|project_name| will do a POSIX read lock on the config file when operating
-on the repository.
 
 
 Keys

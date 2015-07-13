@@ -124,7 +124,7 @@ class Cache:
     def open(self):
         if not os.path.isdir(self.path):
             raise Exception('%s Does not look like a Borg cache' % self.path)
-        self.lock = UpgradableLock(os.path.join(self.path, 'repo'), exclusive=True).acquire()
+        self.lock = UpgradableLock(os.path.join(self.path, 'lock'), exclusive=True).acquire()
         self.rollback()
 
     def close(self):

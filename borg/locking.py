@@ -221,7 +221,7 @@ class UpgradableLock:
         # an exclusive lock, used for:
         # - holding while doing roster queries / updates
         # - holding while the UpgradableLock itself is exclusive
-        self._lock = ExclusiveLock(path + '.lock', id=id)
+        self._lock = ExclusiveLock(path + '.exclusive', id=id)
 
     def __enter__(self):
         return self.acquire()

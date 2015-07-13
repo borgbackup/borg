@@ -10,8 +10,9 @@ import tarfile
 import tempfile
 
 from .key import PlaintextKey
-from .helpers import Error, get_cache_dir, decode_dict, st_mtime_ns, unhexlify, UpgradableLock, int_to_bigint, \
+from .helpers import Error, get_cache_dir, decode_dict, st_mtime_ns, unhexlify, int_to_bigint, \
     bigint_to_int
+from .locking import UpgradableLock
 from .hashindex import ChunkIndex
 
 
@@ -123,7 +124,7 @@ class Cache:
     def open(self):
         if not os.path.isdir(self.path):
             raise Exception('%s Does not look like a Borg cache' % self.path)
-        self.lock = UpgradableLock(os.path.join(self.path, 'config'), exclusive=True)
+        self.lock = UpgradableLock(os.path.join(self.path, 'repo'), exclusive=True).acquire()
         self.rollback()
 
     def close(self):

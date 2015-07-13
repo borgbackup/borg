@@ -9,7 +9,8 @@ import sys
 from zlib import crc32
 
 from .hashindex import NSIndex
-from .helpers import Error, IntegrityError, read_msgpack, write_msgpack, unhexlify, UpgradableLock
+from .helpers import Error, IntegrityError, read_msgpack, write_msgpack, unhexlify
+from .locking import UpgradableLock
 from .lrucache import LRUCache
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
@@ -113,11 +114,11 @@ class Repository:
         self.path = path
         if not os.path.isdir(path):
             raise self.DoesNotExist(path)
+        self.lock = UpgradableLock(os.path.join(path, 'repo'), exclusive).acquire()
         self.config = RawConfigParser()
         self.config.read(os.path.join(self.path, 'config'))
         if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:
             raise self.InvalidRepository(path)
-        self.lock = UpgradableLock(os.path.join(path, 'config'), exclusive)
         self.max_segment_size = self.config.getint('repository', 'max_segment_size')
         self.segments_per_dir = self.config.getint('repository', 'segments_per_dir')
         self.id = unhexlify(self.config.get('repository', 'id').strip())
@@ -148,7 +149,7 @@ class Repository:
         self._active_txn = True
         try:
             self.lock.upgrade()
-        except UpgradableLock.WriteLockFailed:
+        except UpgradableLock.ExclusiveLockFailed:
             # if upgrading the lock to exclusive fails, we do not have an
             # active transaction. this is important for "serve" mode, where
             # the repository instance lives on - even if exceptions happened.

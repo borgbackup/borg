@@ -1,13 +1,11 @@
 import hashlib
 from time import mktime, strptime
 from datetime import datetime, timezone, timedelta
-import os
-import tempfile
-import unittest
 
 import msgpack
 
-from ..helpers import adjust_patterns, exclude_path, Location, format_timedelta, ExcludePattern, make_path_safe, UpgradableLock, prune_within, prune_split, \
+from ..helpers import adjust_patterns, exclude_path, Location, format_timedelta, ExcludePattern, make_path_safe, \
+    prune_within, prune_split, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp
 from . import BaseTestCase
 
@@ -117,24 +115,6 @@ class MakePathSafeTestCase(BaseTestCase):
         self.assert_equal(make_path_safe('../../foo/bar'), 'foo/bar')
         self.assert_equal(make_path_safe('/'), '.')
         self.assert_equal(make_path_safe('/'), '.')
-
-
-class UpgradableLockTestCase(BaseTestCase):
-
-    def test(self):
-        file = tempfile.NamedTemporaryFile()
-        lock = UpgradableLock(file.name)
-        lock.upgrade()
-        lock.upgrade()
-        lock.release()
-
-    @unittest.skipIf(os.getuid() == 0, 'Root can always open files for writing')
-    def test_read_only_lock_file(self):
-        file = tempfile.NamedTemporaryFile()
-        os.chmod(file.name, 0o444)
-        lock = UpgradableLock(file.name)
-        self.assert_raises(UpgradableLock.WriteLockFailed, lock.upgrade)
-        lock.release()
 
 
 class MockArchive:

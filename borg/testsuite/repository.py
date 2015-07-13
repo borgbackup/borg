@@ -3,7 +3,8 @@ import shutil
 import tempfile
 
 from ..hashindex import NSIndex
-from ..helpers import Location, IntegrityError, UpgradableLock
+from ..helpers import Location, IntegrityError
+from ..locking import UpgradableLock
 from ..remote import RemoteRepository, InvalidRPCMethod
 from ..repository import Repository
 from . import BaseTestCase
@@ -156,9 +157,9 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         for name in os.listdir(self.repository.path):
             if name.startswith('index.'):
                 os.unlink(os.path.join(self.repository.path, name))
-        with patch.object(UpgradableLock, 'upgrade', side_effect=UpgradableLock.WriteLockFailed) as upgrade:
+        with patch.object(UpgradableLock, 'upgrade', side_effect=UpgradableLock.ExclusiveLockFailed) as upgrade:
             self.reopen()
-            self.assert_raises(UpgradableLock.WriteLockFailed, lambda: len(self.repository))
+            self.assert_raises(UpgradableLock.ExclusiveLockFailed, lambda: len(self.repository))
             upgrade.assert_called_once_with()
 
     def test_crash_before_write_index(self):

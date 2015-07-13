@@ -19,6 +19,58 @@ def get_id():
     return hostname, pid, tid
 
 
+class TimeoutTimer:
+    """
+    A timer for timeout checks (can also deal with no timeout, give timeout=None [default]).
+    It can also compute and optionally execute a reasonable sleep time (e.g. to avoid
+    polling too often or to support thread/process rescheduling).
+    """
+    def __init__(self, timeout=None, sleep=None):
+        """
+        Initialize a timer.
+
+        :param timeout: time out interval [s] or None (no timeout)
+        :param sleep: sleep interval [s] (>= 0: do sleep call, <0: don't call sleep)
+                      or None (autocompute: use 10% of timeout, or 1s for no timeout)
+        """
+        if timeout is not None and timeout < 0:
+            raise ValueError("timeout must be >= 0")
+        self.timeout_interval = timeout
+        if sleep is None:
+            if timeout is None:
+                sleep = 1.0
+            else:
+                sleep = timeout / 10.0
+        self.sleep_interval = sleep
+        self.start_time = None
+        self.end_time = None
+
+    def __repr__(self):
+        return "<%s: start=%r end=%r timeout=%r sleep=%r>" % (
+            self.__class__.__name__, self.start_time, self.end_time,
+            self.timeout_interval, self.sleep_interval)
+
+    def start(self):
+        self.start_time = time.time()
+        if self.timeout_interval is not None:
+            self.end_time = self.start_time + self.timeout_interval
+        return self
+
+    def sleep(self):
+        if self.sleep_interval >= 0:
+            time.sleep(self.sleep_interval)
+
+    def timed_out(self):
+        return self.end_time is not None and time.time() >= self.end_time
+
+    def timed_out_or_sleep(self):
+        if self.timed_out():
+            return True
+        else:
+            self.sleep()
+            return False
+
+
 class ExclusiveLock:
     """An exclusive Lock based on mkdir fs operation being atomic"""
     class LockError(Error):
@@ -55,23 +107,12 @@ class ExclusiveLock:
     def __repr__(self):
         return "<%s: %r>" % (self.__class__.__name__, self.unique_name)
 
-    def _get_timing(self, timeout, sleep):
+    def acquire(self, timeout=None, sleep=None):
         if timeout is None:
             timeout = self.timeout
-        start = end = time.time()
-        if timeout is not None and timeout > 0:
-            end += timeout
         if sleep is None:
             sleep = self.sleep
-        if sleep is None:
-            if timeout is None:
-                sleep = 1.0
-            else:
-                sleep = max(0, timeout / 10.0)
-        return start, sleep, end, timeout
-
-    def acquire(self, timeout=None, sleep=None):
-        start, sleep, end, timeout = self._get_timing(timeout, sleep)
+        timer = TimeoutTimer(timeout, sleep).start()
         while True:
             try:
                 os.mkdir(self.path)
@@ -79,9 +120,8 @@ class ExclusiveLock:
                 if err.errno == errno.EEXIST:  # already locked
                     if self.by_me():
                         return self
-                    if timeout is not None and time.time() > end:
+                    if timer.timed_out_or_sleep():
                         raise self.LockTimeout(self.path)
-                    time.sleep(sleep)
                 else:
                     raise self.LockFailed(self.path, str(err))
             else:

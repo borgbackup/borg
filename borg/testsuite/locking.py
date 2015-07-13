@@ -1,6 +1,8 @@
+import time
+
 import pytest
 
-from ..locking import get_id, ExclusiveLock, UpgradableLock, LockRoster, ADD, REMOVE, SHARED, EXCLUSIVE
+from ..locking import get_id, TimeoutTimer, ExclusiveLock , UpgradableLock, LockRoster, ADD, REMOVE, SHARED, EXCLUSIVE
 
 
 ID1 = "foo", 1, 1
@@ -13,6 +15,23 @@ def test_id():
     assert isinstance(tid, int)
     assert len(hostname) > 0
     assert pid > 0
+
+
+class TestTimeoutTimer:
+    def test_timeout(self):
+        timeout = 0.5
+        t = TimeoutTimer(timeout).start()
+        assert not t.timed_out()
+        time.sleep(timeout * 1.5)
+        assert t.timed_out()
+
+    def test_notimeout_sleep(self):
+        timeout, sleep = None, 0.5
+        t = TimeoutTimer(timeout, sleep).start()
+        assert not t.timed_out_or_sleep()
+        assert time.time() >= t.start_time + 1 * sleep
+        assert not t.timed_out_or_sleep()
+        assert time.time() >= t.start_time + 2 * sleep
 
 
 @pytest.fixture()

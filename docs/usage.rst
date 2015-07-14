@@ -123,6 +123,9 @@ Examples
     # Extract the "src" directory but exclude object files
     $ borg extract /mnt/backup::my-files home/USERNAME/src --exclude '*.o'
 
+Note: currently, extract always writes into the current working directory ("."),
+      so make sure you ``cd`` to the right place before calling ``borg extract``.
+
 .. include:: usage/check.rst.inc
 
 .. include:: usage/delete.rst.inc

@@ -41,6 +41,8 @@ class RepositoryServer:
         'put',
         'repair',
         'rollback',
+        'save_key',
+        'load_key',
     )
 
     def __init__(self, restrict_to_paths):
@@ -150,6 +152,9 @@ class RemoteRepository:
 
     def __del__(self):
         self.close()
+
+    def __repr__(self):
+        return '<%s %s>' % (self.__class__.__name__, self.location.canonical_path())
 
     def call(self, cmd, *args, **kw):
         for resp in self.call_many(cmd, [args], **kw):
@@ -275,6 +280,12 @@ class RemoteRepository:
 
     def delete(self, id_, wait=True):
         return self.call('delete', id_, wait=wait)
+
+    def save_key(self, keydata):
+        return self.call('save_key', keydata)
+
+    def load_key(self):
+        return self.call('load_key')
 
     def close(self):
         if self.p:

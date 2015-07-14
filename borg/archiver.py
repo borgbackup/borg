@@ -539,7 +539,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                type=location_validator(archive=False),
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption',
-                               choices=('none', 'passphrase', 'keyfile'), default='none',
+                               choices=('none', 'passphrase', 'keyfile', 'repokey'), default='none',
                                help='select encryption method')
 
         check_epilog = textwrap.dedent("""

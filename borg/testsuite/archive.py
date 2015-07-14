@@ -23,7 +23,7 @@ class ArchiveTimestampTestCase(BaseTestCase):
 
     def _test_timestamp_parsing(self, isoformat, expected):
         repository = Mock()
-        key = PlaintextKey()
+        key = PlaintextKey(repository)
         manifest = Manifest(repository, key)
         a = Archive(repository, key, manifest, 'test', create=True)
         a.metadata = {b'time': isoformat}
@@ -45,7 +45,7 @@ class ChunkBufferTestCase(BaseTestCase):
     def test(self):
         data = [{b'foo': 1}, {b'bar': 2}]
         cache = MockCache()
-        key = PlaintextKey()
+        key = PlaintextKey(None)
         chunks = CacheChunkBuffer(cache, key, None)
         for d in data:
             chunks.add(d)

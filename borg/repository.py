@@ -62,6 +62,9 @@ class Repository:
     def __del__(self):
         self.close()
 
+    def __repr__(self):
+        return '<%s %s>' % (self.__class__.__name__, self.path)
+
     def create(self, path):
         """Create a new empty repository at `path`
         """
@@ -78,8 +81,22 @@ class Repository:
         config.set('repository', 'segments_per_dir', self.DEFAULT_SEGMENTS_PER_DIR)
         config.set('repository', 'max_segment_size', self.DEFAULT_MAX_SEGMENT_SIZE)
         config.set('repository', 'id', hexlify(os.urandom(32)).decode('ascii'))
-        with open(os.path.join(path, 'config'), 'w') as fd:
+        self.save_config(path, config)
+
+    def save_config(self, path, config):
+        config_path = os.path.join(path, 'config')
+        with open(config_path, 'w') as fd:
             config.write(fd)
+
+    def save_key(self, keydata):
+        assert self.config
+        keydata = keydata.decode('utf-8')  # remote repo: msgpack issue #99, getting bytes
+        self.config.set('repository', 'key', keydata)
+        self.save_config(self.path, self.config)
+
+    def load_key(self):
+        keydata = self.config.get('repository', 'key')
+        return keydata.encode('utf-8')  # remote repo: msgpack issue #99, returning bytes
 
     def destroy(self):
         """Destroy the repository at `self.path`

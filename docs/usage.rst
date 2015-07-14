@@ -78,8 +78,8 @@ Examples
     # Remote repository (accesses a remote borg via ssh)
     $ borg init user@hostname:backup
 
-    # Encrypted remote repository
-    $ borg init --encryption=passphrase user@hostname:backup
+    # Encrypted remote repository, using a local key file
+    $ borg init --encryption=keyfile user@hostname:backup
 
 
 .. include:: usage/create.rst.inc

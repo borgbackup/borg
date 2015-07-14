@@ -70,8 +70,9 @@ When backing up to remote encrypted repos, is encryption done locally?
 
 When backing up to remote servers, do I have to trust the remote server?
     Yes and No.
-    No, as far as data confidentiality is concerned - all your files/dirs data
-    and metadata are stored in their encrypted form into the repository.
+    No, as far as data confidentiality is concerned - if you use encryption,
+    all your files/dirs data and metadata are stored in their encrypted form
+    into the repository.
     Yes, as an attacker with access to the remote server could delete (or
     otherwise make unavailable) all your backups.
 
@@ -89,6 +90,20 @@ If I want to run |project_name| on a ARM CPU older than ARM v6?
     You need to enable the alignment trap handler to fixup misaligned accesses::
     
         echo "2" > /proc/cpu/alignment
+
+Can |project_name| add redundancy to the backup data to deal with hardware malfunction?
+    No, it can't. While that at first sounds like a good idea to defend against some
+    defect HDD sectors or SSD flash blocks, dealing with this in a reliable way needs a lot
+    of low-level storage layout information and control which we do not have (and also can't
+    get, even if we wanted).
+
+    So, if you need that, consider RAID1 or a filesystems that offers redundant storage.
+
+Can |project_name| verify data integrity of a backup archive?
+    Yes, if you want to detect accidental data damage (like bit rot), use the ``check``
+    operation. It will notice corruption using CRCs and hashes.
+    If you want to be able to detect malicious tampering also, use a encrypted repo.
+    It will then be able to check using CRCs and HMACs.
 
 Why was Borg forked from Attic?
     Borg was created in May 2015 in response to the difficulty of

@@ -2,8 +2,8 @@
 
 Welcome to Borg
 ================
-|project_name| is a deduplicating and compressing backup program.
-Optionally, it also supports authenticated encryption.
+|project_name| is a deduplicating backup program.
+Optionally, it also supports compression and authenticated encryption.
 
 The main goal of |project_name| is to provide an efficient and secure way
 to backup data. The data deduplication technique used makes |project_name|

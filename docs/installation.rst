@@ -24,7 +24,7 @@ archive as a FUSE filesystem. Only FUSE >= 2.8.0 can support llfuse.
 
 You only need Cython to compile the .pyx files to the respective .c files
 when using |project_name| code from git. For |project_name| releases, the .c
-files will be bundled.
+files will be bundled, so you won't need Cython to install a release.
 
 Platform notes
 --------------
@@ -32,7 +32,7 @@ FreeBSD: You may need to get a recent enough OpenSSL version from FreeBSD ports.
 
 Mac OS X: You may need to get a recent enough OpenSSL version from homebrew_.
 
-Mac OS X: A recent enough FUSE implementation might be unavailable.
+Mac OS X: You need OS X FUSE >= 3.0.
 
 
 Debian / Ubuntu installation (from git)
@@ -119,3 +119,31 @@ Some of the steps detailled below might be useful also for non-git installs.
 
     # optional: run all the tests, on all supported Python versions
     fakeroot -u tox
+
+
+Cygwin (from git)
+-----------------
+Please note that running under cygwin is rather experimental.
+
+You'll need at least (use the cygwin installer to fetch/install these):
+
+::
+    python3
+    python3-setuptools
+    python3-cython
+    binutils
+    gcc-core
+    git
+    libopenssl
+    make
+    openssh
+    openssl-devel
+
+You can then install ``pip`` and ``virtualenv``:
+
+::
+
+    easy_install pip
+    pip install virtualenv
+
+And now continue as for Linux (see above).

@@ -15,7 +15,7 @@ Space efficient storage
     Variable block size `deduplication`_ is used to reduce the number of bytes 
     stored by detecting redundant data. Each file is split into a number of
     variable length chunks and only chunks that have never been seen before
-    are compressed and added to the repository.
+    are added to the repository (and optionally compressed).
 
 Optional data encryption
     All data can be protected using 256-bit AES_ encryption and data integrity
@@ -23,7 +23,10 @@ Optional data encryption
 
 Off-site backups
     |project_name| can store data on any remote host accessible over SSH as
-    long as |project_name| is installed.
+    long as |project_name| is installed. If you don't have |project_name|
+    installed there, you can use some network filesytem (sshfs, nfs, ...)
+    to mount a filesystem located on your remote host and use it like it was
+    local (but that will be slower).
 
 Backups mountable as filesystems
     Backup archives are :ref:`mountable <borg_mount>` as

@@ -544,7 +544,7 @@ class Archive:
         return Archive._open_rb(path, st)
 
 
-class RobustUnpacker():
+class RobustUnpacker:
     """A restartable/robust version of the streaming msgpack unpacker
     """
     item_keys = [msgpack.packb(name) for name in ('path', 'mode', 'source', 'chunks', 'rdev', 'xattrs', 'user', 'group', 'uid', 'gid', 'mtime')]

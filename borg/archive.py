@@ -755,6 +755,10 @@ class ArchiveChecker:
                 for chunk_id, cdata in zip(items, repository.get_many(items)):
                     unpacker.feed(self.key.decrypt(chunk_id, cdata))
                     for item in unpacker:
+                        if not isinstance(item, dict):
+                            self.report_progress('Did not get expected metadata dict - archive corrupted!',
+                                                 error=True)
+                            continue
                         yield item
 
         repository = cache_if_remote(self.repository)

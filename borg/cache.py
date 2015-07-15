@@ -287,6 +287,9 @@ class Cache:
                 add(chunk_idx, item_id, len(data), len(chunk))
                 unpacker.feed(data)
                 for item in unpacker:
+                    if not isinstance(item, dict):
+                        print('Error: Did not get expected metadata dict - archive corrupted!')
+                        continue
                     if b'chunks' in item:
                         for chunk_id, size, csize in item[b'chunks']:
                             add(chunk_idx, chunk_id, size, csize)

@@ -16,6 +16,8 @@ New features:
 - borg info now reports chunk counts in the chunk index.
 - borg create --compression 0..9 to select zlib compression level, fixes #66
   (attic #295).
+- borg init --encryption repokey (to store the encryption key into the repo),
+  deprecate --encryption passphrase, fixes #85
 - improve at-end error logging, always log exceptions and set exit_code=1
 - LoggedIO: better error checks / exceptions / exception handling
 
@@ -26,6 +28,7 @@ Bug fixes:
 - better Exception msg if no Borg is installed on the remote repo server, #56
 - create a RepositoryCache implementation that can cope with >2GiB,
   fixes attic #326.
+- fix Traceback when running check --repair, attic #232
 - clarify help text, fixes #73.
 
 Other changes:
@@ -36,7 +39,12 @@ Other changes:
   - document environment variables and return codes (attic #324, attic #52)
   - web site: add related projects, fix web site url, IRC #borgbackup
   - Fedora/Fedora-based install instructions added to docs
+  - Cygwin-based install instructions added to docs
   - updated AUTHORS
+  - add FAQ entries about redundancy / integrity
+  - clarify that borg extract uses the cwd as extraction target
+  - update internals doc about chunker params, memory usage and compression
+
 - use borg-tmp as prefix for temporary files / directories
 - short prune options without "keep-" are deprecated, do not suggest them
 - improved tox configuration, documented there how to invoke it

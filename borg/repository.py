@@ -413,7 +413,7 @@ class Repository:
         self.segments.setdefault(segment, 0)
 
     def preload(self, ids):
-        """Preload objects (only applies to remote repositories
+        """Preload objects (only applies to remote repositories)
         """
 
 

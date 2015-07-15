@@ -203,7 +203,7 @@ class RemoteRepository:
                     break
             r, w, x = select.select(self.r_fds, w_fds, self.x_fds, 1)
             if x:
-                raise Exception('FD exception occured')
+                raise Exception('FD exception occurred')
             if r:
                 data = os.read(self.stdout_fd, BUFSIZE)
                 if not data:

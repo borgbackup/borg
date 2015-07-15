@@ -83,7 +83,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         os.mkdir(self.keys_path)
         os.mkdir(self.cache_path)
         with open(self.exclude_file_path, 'wb') as fd:
-            fd.write(b'input/file2\n# A commment line, then a blank line\n\n')
+            fd.write(b'input/file2\n# A comment line, then a blank line\n\n')
         self._old_wd = os.getcwd()
         os.chdir(self.tmpdir)
 

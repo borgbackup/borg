@@ -128,6 +128,7 @@ Please note that running under cygwin is rather experimental.
 You'll need at least (use the cygwin installer to fetch/install these):
 
 ::
+
     python3
     python3-setuptools
     python3-cython

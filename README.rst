@@ -34,7 +34,7 @@ Space efficient storage
   Variable block size deduplication is used to reduce the number of bytes 
   stored by detecting redundant data. Each file is split into a number of
   variable length chunks and only chunks that have never been seen before are
-  compressed and added to the repository.
+  compressed and added to the repository.i
 
 Optional data encryption
     All data can be protected using 256-bit AES encryption and data integrity
@@ -59,6 +59,14 @@ How do I install it?
 ::
 
   $ pip3 install borgbackup
+  
+**How to fix pip install errors:**
+
+"Exception: Unable to find OpenSSL >= 1.0 headers" --> Install "libssl-dev" and "openssl"
+
+"fatal error: sys/acl.h: No such file or directory" --> Install "uuid-dev" , "libacl1-dev" , "liblzo2-dev"
+
+
 
 Where are the docs?
 -------------------

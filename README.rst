@@ -34,7 +34,7 @@ Space efficient storage
   Variable block size deduplication is used to reduce the number of bytes 
   stored by detecting redundant data. Each file is split into a number of
   variable length chunks and only chunks that have never been seen before are
-  compressed and added to the repository.i
+  compressed and added to the repository.
 
 Optional data encryption
     All data can be protected using 256-bit AES encryption and data integrity

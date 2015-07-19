@@ -52,7 +52,7 @@ What do I need?
 ---------------
 Borg requires Python 3.2 or above to work.
 Borg also requires a sufficiently recent OpenSSL (>= 1.0.0).
-In order to mount archives as filesystems, llfuse is required.
+In order to mount archives as filesystems, llfuse ("python3-fuse") is required.
 
 How do I install it?
 --------------------

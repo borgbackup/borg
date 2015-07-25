@@ -52,13 +52,21 @@ What do I need?
 ---------------
 Borg requires Python 3.2 or above to work.
 Borg also requires a sufficiently recent OpenSSL (>= 1.0.0).
-In order to mount archives as filesystems, llfuse is required.
+In order to mount archives as filesystems, llfuse ("python3-fuse") is required.
 
 How do I install it?
 --------------------
 ::
 
   $ pip3 install borgbackup
+  
+**How to fix pip install errors:**
+
+"Exception: Unable to find OpenSSL >= 1.0 headers" --> Install "libssl-dev" and "openssl"
+
+"fatal error: sys/acl.h: No such file or directory" --> Install "uuid-dev" , "libacl1-dev" , "liblzo2-dev"
+
+
 
 Where are the docs?
 -------------------

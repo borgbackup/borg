@@ -123,7 +123,8 @@ Some of the steps detailled below might be useful also for non-git installs.
 
 Cygwin (from git)
 -----------------
-Please note that running under cygwin is rather experimental.
+Please note that running under cygwin is rather experimental, stuff has been
+tested with CygWin (x86-64) v2.1.0.
 
 You'll need at least (use the cygwin installer to fetch/install these):
 
@@ -144,7 +145,14 @@ You can then install ``pip`` and ``virtualenv``:
 
 ::
 
-    easy_install pip
+    easy_install-3.4 pip
     pip install virtualenv
 
 And now continue as for Linux (see above).
+
+In case that creation of the virtual env fails, try deleting this file:
+
+::
+
+    /usr/lib/python3.4/__pycache__/platform.cpython-34.pyc
+

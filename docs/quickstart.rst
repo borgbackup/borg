@@ -159,6 +159,3 @@ mounting the remote filesystem, for example, using sshfs::
   $ borg init /mnt/backup
   $ fusermount -u /mnt
 
-However, be aware that sshfs doesn't fully implement POSIX locks, so
-you must be sure to not have two processes trying to access the same
-repository at the same time.

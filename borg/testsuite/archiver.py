@@ -394,6 +394,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         repository = Repository(self.repository_path)
         self.assert_equal(len(repository), 1)
 
+    def test_delete_repo(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.create_regular_file('dir2/file2', size=1024 * 80)
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', self.repository_location + '::test.2', 'input')
+        self.cmd('delete', self.repository_location)
+        # Make sure the repo is gone
+        self.assertFalse(os.path.exists(self.repository_path))
+
     def test_corrupted_repository(self):
         self.cmd('init', self.repository_location)
         self.create_src_archive('test')

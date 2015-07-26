@@ -16,3 +16,7 @@ platform_linux.c
 *.so
 docs/usage/*.inc
 .idea/
+.cache/
+borg.build/
+borg.dist/
+borg.exe

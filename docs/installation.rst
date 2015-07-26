@@ -19,6 +19,12 @@ usually available as an optional install.
 Virtualenv_ can be used to build and install |project_name| without affecting
 the system Python or requiring root access.
 
+Important:
+if you install into a virtual environment, you need to activate
+the virtual env first (``source borg-env/bin/activate``).
+Alternatively, directly run ``borg-env/bin/borg`` (or symlink that into some
+directory that is in your PATH so you can just run ``borg``).
+
 The llfuse_ python package is also required if you wish to mount an
 archive as a FUSE filesystem. Only FUSE >= 2.8.0 can support llfuse.
 

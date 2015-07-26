@@ -288,11 +288,13 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             print("You requested to completely DELETE the repository *including* all archives it contains:")
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 print(format_archive(archive_info))
-            print("""Type "YES" if you understand this and want to continue.\n""")
-            if input('Do you want to continue? ') == 'YES':
-                repository.destroy()
-                cache.destroy()
-                print("Repository and corresponding cache were deleted.")
+            while not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
+                print("""Type "YES" if you understand this and want to continue.\n""")
+                if input('Do you want to continue? ') == 'YES':
+                    break
+            repository.destroy()
+            cache.destroy()
+            print("Repository and corresponding cache were deleted.")
         return self.exit_code
 
     def do_mount(self, args):

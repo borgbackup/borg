@@ -34,6 +34,7 @@ class RepositoryServer:
         'check',
         'commit',
         'delete',
+        'destroy',
         'get',
         'list',
         'negotiate',

@@ -139,6 +139,9 @@ Examples
     # Backup huge files with little chunk management overhead
     $ borg create --chunker-params 19,23,21,4095 /mnt/backup::VMs /srv/VMs
 
+    # Backup a raw device (must not be active/in use/mounted at that time)
+    $ dd if=/dev/sda bs=10M | borg create /mnt/backup::my-sda -
+
 
 .. include:: usage/extract.rst.inc
 

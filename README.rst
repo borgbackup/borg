@@ -38,6 +38,23 @@ Space efficient storage
   variable length chunks and only chunks that have never been seen before are
   compressed and added to the repository.
 
+  The content-defined chunking based deduplication is applied to remove
+  duplicate chunks within: 
+
+  * the current backup data set (even inside single files / streams)
+  * current and previous backups of same machine
+  * all the chunks in the same repository, even if coming from other machines
+
+  This advanced deduplication method does NOT depend on:
+ 
+  * file/directory names staying the same (so you can move your stuff around
+    without killing the deduplication, even between machines sharing a repo)
+  * complete files or time stamps staying the same (if a big file changes a
+    little, only a few new chunks will be stored - this is great for VMs or
+    raw disks)
+  * the absolute position of a data chunk inside a file (stuff may get shifted
+    and will still be found by the deduplication algorithm)
+
 Optional data encryption
     All data can be protected using 256-bit AES encryption and data integrity
     and authenticity is verified using HMAC-SHA256.

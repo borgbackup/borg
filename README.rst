@@ -28,6 +28,8 @@ Initialize backup repository and create a backup archive::
     $ borg init /mnt/backup
     $ borg create -v /mnt/backup::documents ~/Documents
 
+For a graphical frontend refer to our complementary project `BorgWeb <https://github.com/borgbackup/borgweb>`_.
+
 Main features
 ~~~~~~~~~~~~~
 Space efficient storage

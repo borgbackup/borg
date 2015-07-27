@@ -7,7 +7,7 @@ an efficient and secure way to backup data. The data deduplication
 technique used makes Borg suitable for daily backups since only changes
 are stored.
 
-Borg is a fork of Attic and maintained by "The Borg Collective" (see AUTHORS file).
+Borg is a fork of `Attic <https://github.com/jborg/attic>`_ and maintained by "`The Borg Collective <https://github.com/borgbackup/borg/blob/master/AUTHORS>`_".
 
 BORG IS NOT COMPATIBLE WITH ORIGINAL ATTIC.
 EXPECT THAT WE WILL BREAK COMPATIBILITY REPEATEDLY WHEN MAJOR RELEASE NUMBER
@@ -19,7 +19,7 @@ THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
 
 Read `issue #1 <https://github.com/borgbackup/borg/issues/1>`_ on the issue tracker, goals are being defined there.
 
-Please also see the LICENSE for more informations.
+Please also see the `LICENSE  <https://github.com/borgbackup/borg/blob/master/LICENSE>`_ for more informations.
 
 Easy to use
 ~~~~~~~~~~~

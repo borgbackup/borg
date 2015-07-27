@@ -17,7 +17,7 @@ NOT RELEASED DEVELOPMENT VERSIONS HAVE UNKNOWN COMPATIBILITY PROPERTIES.
 
 THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
 
-Read issue #1 on the issue tracker, goals are being defined there.
+Read `issue #1 <https://github.com/borgbackup/borg/issues/1>`_ on the issue tracker, goals are being defined there.
 
 Please also see the LICENSE for more informations.
 

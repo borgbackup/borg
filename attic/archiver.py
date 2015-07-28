@@ -158,6 +158,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         # Ignore unix sockets
         if stat.S_ISSOCK(st.st_mode):
             return
+        # Ignore if nodump flag set
+        if st.st_flags and stat.UF_NODUMP(st.st_flags):
+            return
         self.print_verbose(remove_surrogates(path))
         if stat.S_ISREG(st.st_mode):
             try:

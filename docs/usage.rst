@@ -77,12 +77,12 @@ Resource Usage
 
 CPU: it won't go beyond 100% of 1 core as the code is currently single-threaded.
 
-Memory (RAM): the chunks index and files index is read into memory for performance reasons.
+Memory (RAM): the chunks index and the files index are read into memory for performance reasons.
 
 Temporary files: reading data and metadata from a FUSE mounted repository will consume about the same space as the
                  deduplicated chunks used to represent them in the repository.
 
-Cache files: chunks index and files index (plus a collection of single-archive chunk indexes).
+Cache files: chunks index and files index (plus a compressed collection of single-archive chunk indexes).
 
 Chunks index: proportional to the amount of data chunks in your repo. lots of small chunks in your repo implies a big
               chunks index. you may need to tweak the chunker params (see create options) if you have a lot of data and
@@ -91,10 +91,12 @@ Chunks index: proportional to the amount of data chunks in your repo. lots of sm
 Files index: proportional to the amount of files in your last backup. can be switched off (see create options), but
              next backup will be much slower if you do.
 
-Network: if your repository is remote, all deduplicated (and optionally compressed/encrypted) of course have to go over
-         the connection (ssh: repo url). if you use a locally mounted network filesystem, additional some copy
-         operations used for transaction support go over the connection additionally. if you backup multiple sources to
-         one target repository, additional traffic happens for cache resynchronization.
+Network: if your repository is remote, all deduplicated (and optionally compressed/encrypted) data of course has to go
+         over the connection (ssh: repo url). if you use a locally mounted network filesystem, additionally some copy
+         operations used for transaction support also go over the connection. if you backup multiple sources to one
+         target repository, additional traffic happens for cache resynchronization.
+
+In case you are interested in more details, please read the internals documentation.
 
 
 .. include:: usage/init.rst.inc

@@ -53,10 +53,14 @@ Environment Variables
 
     Directories:
         BORG_KEYS_DIR : Default to '~/.borg/keys'. This directory contains keys for encrypted repositories.
-        BORG_CACHE_DIR : Default to '~/.cache/borg'. This directory contains the local cache.
+        BORG_CACHE_DIR : Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
+                         of space for dealing with big repositories).
 
     Building:
         BORG_OPENSSL_PREFIX : Adds given OpenSSL header file directory to the default locations (setup.py).
+
+    General:
+        TMPDIR : where temporary files are stored (might need a lot of temporary space for some operations)
 
 
 Please note:
@@ -64,6 +68,33 @@ Please note:
 - be very careful when using the "yes" sayers, the warnings with prompt exist for your / your data's security/safety
 - also be very careful when putting your passphrase into a script, make sure it has appropriate file permissions
   (e.g. mode 600, root:root).
+
+
+Resource Usage
+--------------
+
+|project_name| might use a lot of resources depending on the size of the data set it is dealing with.
+
+CPU: it won't go beyond 100% of 1 core as the code is currently single-threaded.
+
+Memory (RAM): the chunks index and files index is read into memory for performance reasons.
+
+Temporary files: reading data and metadata from a FUSE mounted repository will consume about the same space as the
+                 deduplicated chunks used to represent them in the repository.
+
+Cache files: chunks index and files index (plus a collection of single-archive chunk indexes).
+
+Chunks index: proportional to the amount of data chunks in your repo. lots of small chunks in your repo implies a big
+              chunks index. you may need to tweak the chunker params (see create options) if you have a lot of data and
+              you want to keep the chunks index at some reasonable size.
+
+Files index: proportional to the amount of files in your last backup. can be switched off (see create options), but
+             next backup will be much slower if you do.
+
+Network: if your repository is remote, all deduplicated (and optionally compressed/encrypted) of course have to go over
+         the connection (ssh: repo url). if you use a locally mounted network filesystem, additional some copy
+         operations used for transaction support go over the connection additionally. if you backup multiple sources to
+         one target repository, additional traffic happens for cache resynchronization.
 
 
 .. include:: usage/init.rst.inc

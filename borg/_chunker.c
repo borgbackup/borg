@@ -127,7 +127,7 @@ chunker_free(Chunker *c)
 static int
 chunker_fill(Chunker *c)
 {
-    size_t n;
+    ssize_t n;
     PyObject *data;
     memmove(c->data, c->data + c->last, c->position + c->remaining - c->last);
     c->position -= c->last;

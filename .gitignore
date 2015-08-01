@@ -6,6 +6,7 @@ env
 .tox
 hashindex.c
 chunker.c
+compress.c
 crypto.c
 platform_darwin.c
 platform_freebsd.c

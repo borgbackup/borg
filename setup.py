@@ -19,6 +19,7 @@ if sys.version_info < min_python:
 
 from setuptools import setup, Extension
 
+compress_source = 'borg/compress.pyx'
 crypto_source = 'borg/crypto.pyx'
 chunker_source = 'borg/chunker.pyx'
 hashindex_source = 'borg/hashindex.pyx'
@@ -38,6 +39,7 @@ try:
 
         def make_distribution(self):
             self.filelist.extend([
+                'borg/compress.c',
                 'borg/crypto.c',
                 'borg/chunker.c', 'borg/_chunker.c',
                 'borg/hashindex.c', 'borg/_hashindex.c',
@@ -52,6 +54,7 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             raise Exception('Cython is required to run sdist')
 
+    compress_source = compress_source.replace('.pyx', '.c')
     crypto_source = crypto_source.replace('.pyx', '.c')
     chunker_source = chunker_source.replace('.pyx', '.c')
     hashindex_source = hashindex_source.replace('.pyx', '.c')
@@ -59,7 +62,9 @@ except ImportError:
     platform_freebsd_source = platform_freebsd_source.replace('.pyx', '.c')
     platform_darwin_source = platform_darwin_source.replace('.pyx', '.c')
     from distutils.command.build_ext import build_ext
-    if not all(os.path.exists(path) for path in [crypto_source, chunker_source, hashindex_source, platform_linux_source, platform_freebsd_source]):
+    if not all(os.path.exists(path) for path in [
+        compress_source, crypto_source, chunker_source, hashindex_source,
+        platform_linux_source, platform_freebsd_source]):
         raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version')
 
 
@@ -89,6 +94,7 @@ cmdclass = versioneer.get_cmdclass()
 cmdclass.update({'build_ext': build_ext, 'sdist': Sdist})
 
 ext_modules = [
+    Extension('borg.compress', [compress_source], libraries=['lz4']),
     Extension('borg.crypto', [crypto_source], libraries=['crypto'], include_dirs=include_dirs, library_dirs=library_dirs),
     Extension('borg.chunker', [chunker_source]),
     Extension('borg.hashindex', [hashindex_source])

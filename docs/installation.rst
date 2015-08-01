@@ -9,6 +9,7 @@ Installation
 * Python_ >= 3.2
 * OpenSSL_ >= 1.0.0
 * libacl_
+* liblz4_
 * some python dependencies, see install_requires in setup.py
 
 General notes
@@ -59,6 +60,9 @@ Some of the steps detailled below might be useful also for non-git installs.
     # ACL support Headers + Library
     apt-get install libacl1-dev libacl1
 
+    # lz4 super fast compression support Headers + Library
+    apt-get install liblz4-dev liblz4-1
+
     # if you do not have gcc / make / etc. yet
     apt-get install build-essential
 
@@ -107,13 +111,16 @@ Some of the steps detailled below might be useful also for non-git installs.
 
     # ACL support Headers + Library
     sudo dnf install libacl-devel libacl
-    
+
+    # lz4 super fast compression support Headers + Library
+    sudo dnf install lz4
+
     # optional: lowlevel FUSE py binding - to mount backup archives
     sudo dnf install python3-llfuse fuse
-    
+
     # optional: for unit testing
     sudo dnf install fakeroot
-    
+
     # get |project_name| from github, install it
     git clone |git_url|
 
@@ -148,6 +155,7 @@ You'll need at least (use the cygwin installer to fetch/install these):
     gcc-core
     git
     libopenssl
+    liblz4_1 liblz4-devel  # from cygwinports.org
     make
     openssh
     openssl-devel

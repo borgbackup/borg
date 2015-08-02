@@ -5,7 +5,7 @@ python:
   - "3.4"
 # command to install dependencies
 install:
-  - "sudo apt-get install -y libacl1-dev"
+  - "sudo apt-get install -y libacl1-dev liblz4-dev"
   - "pip install --use-mirrors Cython"
   - "pip install -e ."
 # command to run tests

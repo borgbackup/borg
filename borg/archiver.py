@@ -641,12 +641,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='select compression algorithm and level, by giving a number: '
                                     '0 == no compression [default], '
                                     '1..9 == zlib level 1..9, '
-                                    '10 == lz4. '
+                                    '10 == lz4, '
+                                    '20-29 == lzma level 0..9.'
                                     'Alternatively, you can also give a name and optionally additional args: '
                                     'null == no compression, '
                                     'zlib == zlib (default level 6), '
                                     'zlib,0 .. zlib,9 == zlib (with level 0..9), '
-                                    'lz4 == lz4.')
+                                    'lz4 == lz4, '
+                                    'lzma,0 .. lzma,9 == lzma (with level 0..9).')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to create')

@@ -302,13 +302,15 @@ def CompressionSpec(s):
             return dict(name='zlib', level=compression)
         if compression == 10:
             return dict(name='lz4')
+        if 20 <= compression <= 29:
+            return dict(name='lzma', level=compression-20)
         raise ValueError
     except ValueError:
         # --compression algo[,...]
         name = compression
         if name in ('null', 'lz4', ):
             return dict(name=name)
-        if name == 'zlib':
+        if name in ('zlib', 'lzma', ):
             if count < 2:
                 level = 6  # default compression level in py stdlib
             elif count == 2:
@@ -317,7 +319,7 @@ def CompressionSpec(s):
                     raise ValueError
             else:
                 raise ValueError
-            return dict(name='zlib', level=level)
+            return dict(name=name, level=level)
         raise ValueError
 
 

@@ -1,4 +1,8 @@
 import zlib
+try:
+    import lzma
+except ImportError:
+    lzma = None
 
 cdef extern from "lz4.h":
     int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
@@ -104,6 +108,29 @@ cdef class LZ4(CompressorBase):
         return dest[:osize]
 
 
+class LZMA(CompressorBase):
+    """
+    lzma compression / decompression (python 3.3+ stdlib)
+    """
+    ID = b'\x02\x00'
+    name = 'lzma'
+
+    def __init__(self, level=6, **kwargs):
+        super().__init__(**kwargs)
+        self.level = level
+        if lzma is None:
+            raise ValueError('No lzma support found.')
+
+    def compress(self, data):
+        # we do not need integrity checks in lzma, we do that already
+        data = lzma.compress(data, preset=self.level, check=lzma.CHECK_NONE)
+        return super().compress(data)
+
+    def decompress(self, data):
+        data = super().decompress(data)
+        return lzma.decompress(data)
+
+
 class ZLIB(CompressorBase):
     """
     zlib compression / decompression (python stdlib)
@@ -137,8 +164,9 @@ COMPRESSOR_TABLE = {
     CNULL.name: CNULL,
     LZ4.name: LZ4,
     ZLIB.name: ZLIB,
+    LZMA.name: LZMA,
 }
-COMPRESSOR_LIST = [LZ4, CNULL, ZLIB, ]  # check fast stuff first
+COMPRESSOR_LIST = [LZ4, CNULL, ZLIB, LZMA, ]  # check fast stuff first
 
 def get_compressor(name, **kwargs):
     cls = COMPRESSOR_TABLE[name]

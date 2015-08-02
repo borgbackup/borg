@@ -1,4 +1,8 @@
 import zlib
+try:
+    import lzma
+except ImportError:
+    lzma = None
 
 import pytest
 
@@ -6,7 +10,7 @@ from ..compress import get_compressor, Compressor, CNULL, ZLIB, LZ4
 
 
 buffer = bytes(2**16)
-data = b'fooooooooobaaaaaaaar'
+data = b'fooooooooobaaaaaaaar' * 10
 params = dict(name='zlib', level=6, buffer=buffer)
 
 
@@ -46,6 +50,16 @@ def test_zlib():
     assert data == Compressor(**params).decompress(cdata)  # autodetect
 
 
+def test_lzma():
+    if lzma is None:
+        pytest.skip("No lzma support found.")
+    c = get_compressor(name='lzma')
+    cdata = c.compress(data)
+    assert len(cdata) < len(data)
+    assert data == c.decompress(cdata)
+    assert data == Compressor(**params).decompress(cdata)  # autodetect
+
+
 def test_autodetect_invalid():
     with pytest.raises(ValueError):
         Compressor(**params).decompress(b'\xff\xfftotalcrap')
@@ -68,13 +82,20 @@ def test_zlib_compat():
 
 
 def test_compressor():
-    for params in [
+    params_list = [
         dict(name='null', buffer=buffer),
         dict(name='lz4', buffer=buffer),
         dict(name='zlib', level=0, buffer=buffer),
         dict(name='zlib', level=6, buffer=buffer),
         dict(name='zlib', level=9, buffer=buffer),
-    ]:
+    ]
+    if lzma:
+        params_list += [
+            dict(name='lzma', level=0, buffer=buffer),
+            dict(name='lzma', level=6, buffer=buffer),
+            dict(name='lzma', level=9, buffer=buffer),
+        ]
+    for params in params_list:
         c = Compressor(**params)
         assert data == c.decompress(c.compress(data))
 

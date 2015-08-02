@@ -1,8 +1,5 @@
 import zlib
 
-from libc.stdlib cimport malloc, free
-
-
 cdef extern from "lz4.h":
     int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
     int LZ4_decompress_safe(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
@@ -40,7 +37,15 @@ class CNULL(CompressorBase):
     """
     ID = b'\x00\x00'
     name = 'null'
-    # base class does all we need
+
+    def compress(self, data):
+        return super().compress(data)
+
+    def decompress(self, data):
+        data = super().decompress(data)
+        if not isinstance(data, bytes):
+            data = bytes(data)
+        return data
 
 
 cdef class LZ4(CompressorBase):
@@ -71,6 +76,8 @@ cdef class LZ4(CompressorBase):
         self.bufsize = len(buffer)
 
     def compress(self, idata):
+        if not isinstance(idata, bytes):
+            idata = bytes(idata)  # code below does not work with memoryview
         cdef int isize = len(idata)
         cdef int osize = self.bufsize
         cdef char *source = idata
@@ -82,6 +89,8 @@ cdef class LZ4(CompressorBase):
         return super().compress(dest[:osize])
 
     def decompress(self, idata):
+        if not isinstance(idata, bytes):
+            idata = bytes(idata)  # code below does not work with memoryview
         idata = super().decompress(idata)
         cdef int isize = len(idata)
         cdef int osize = self.bufsize
@@ -141,7 +150,7 @@ class Compressor:
     compresses using a compressor with given name and parameters
     decompresses everything we can handle (autodetect)
     """
-    def __init__(self, name='zlib', **kwargs):
+    def __init__(self, name='null', **kwargs):
         self.params = kwargs
         self.compressor = get_compressor(name, **self.params)
 
@@ -149,8 +158,14 @@ class Compressor:
         return self.compressor.compress(data)
 
     def decompress(self, data):
+        hdr = bytes(data[:2])  # detect() does not work with memoryview
         for cls in COMPRESSOR_LIST:
-            if cls.detect(data):
+            if cls.detect(hdr):
                 return cls(**self.params).decompress(data)
         else:
             raise ValueError('No decompressor for this data found: %r.', data[:2])
+
+
+# a buffer used for (de)compression result, which can be slightly bigger
+# than the chunk buffer in the worst (incompressible data) case, add 10%:
+COMPR_BUFFER = bytes(int(1.1 * 2 ** 23))  # CHUNK_MAX_EXP == 23

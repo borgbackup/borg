@@ -5,6 +5,17 @@ Borg Changelog
 Version 0.24.0
 --------------
 
+Incompatible changes (compared to 0.23):
+
+- borg now always issues --umask NNN option when invoking another borg via ssh
+  on the repository server. By that, it's making sure it uses the same umask
+  for remote repos as for local ones. Because of this, you must upgrade both
+  server and client(s) to 0.24.
+- the default umask is 077 now (if you do not specify via --umask) which might
+  be a different one as you used previously. The default umask avoids that
+  you accidentially give access permissions for group and/or others to files
+  created by borg (e.g. the repository).
+
 New features:
 
 - borg create --chunker-params ... to configure the chunker, fixes #16
@@ -21,7 +32,7 @@ New features:
 - improve at-end error logging, always log exceptions and set exit_code=1
 - LoggedIO: better error checks / exceptions / exception handling
 - implement --remote-path to allow non-default-path borg locations, #125
-- implement --umask M and use 077 as default umask, #117
+- implement --umask M and use 077 as default umask for better security, #117
 
 Bug fixes:
 

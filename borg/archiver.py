@@ -512,6 +512,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false')
         common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=0o077, metavar='M',
                                    help='set umask to M (local and remote, default: 0o077)')
+        common_parser.add_argument('--remote-path', dest='remote_path', default='borg', metavar='PATH',
+                                   help='set remote path to executable (default: "borg")')
 
         # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
         if args:
@@ -823,6 +825,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         args = parser.parse_args(args or ['-h'])
         self.verbose = args.verbose
         set_umask(args.umask)
+        RemoteRepository.remote_path = args.remote_path
         update_excludes(args)
         return args.func(args)
 

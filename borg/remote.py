@@ -108,9 +108,9 @@ class RepositoryServer:
 
 class RemoteRepository:
     extra_test_args = []
+    remote_path = None
 
     class RPCError(Exception):
-
         def __init__(self, name):
             self.name = name
 
@@ -136,7 +136,7 @@ class RemoteRepository:
                 args.append('%s@%s' % (location.user, location.host))
             else:
                 args.append('%s' % location.host)
-            args += ['borg', 'serve'] + umask
+            args += [self.remote_path, 'serve'] + umask
         self.p = Popen(args, bufsize=0, stdin=PIPE, stdout=PIPE)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()

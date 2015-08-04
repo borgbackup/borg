@@ -21,7 +21,7 @@ from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    is_cachedir, bigint_to_int, ChunkerParams, set_umask
+    is_cachedir, bigint_to_int, ChunkerParams
 from .remote import RepositoryServer, RemoteRepository
 
 
@@ -824,8 +824,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
         args = parser.parse_args(args or ['-h'])
         self.verbose = args.verbose
-        set_umask(args.umask)
+        os.umask(args.umask)
         RemoteRepository.remote_path = args.remote_path
+        RemoteRepository.umask = args.umask
         update_excludes(args)
         return args.func(args)
 

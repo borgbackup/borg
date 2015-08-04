@@ -605,13 +605,3 @@ def int_to_bigint(value):
     if value.bit_length() > 63:
         return value.to_bytes((value.bit_length() + 9) // 8, 'little', signed=True)
     return value
-
-
-def set_umask(umask):
-    return os.umask(umask)
-
-
-def get_umask():
-    umask = set_umask(0)
-    set_umask(umask)
-    return umask

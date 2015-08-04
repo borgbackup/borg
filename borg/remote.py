@@ -10,7 +10,7 @@ import traceback
 
 from . import __version__
 
-from .helpers import Error, IntegrityError, get_umask
+from .helpers import Error, IntegrityError
 from .repository import Repository
 
 BUFSIZE = 10 * 1024 * 1024
@@ -109,6 +109,7 @@ class RepositoryServer:
 class RemoteRepository:
     extra_test_args = []
     remote_path = None
+    umask = None
 
     class RPCError(Exception):
         def __init__(self, name):
@@ -125,7 +126,7 @@ class RemoteRepository:
         self.unpacker = msgpack.Unpacker(use_list=False)
         self.p = None
         # use local umask also for the remote process
-        umask = ['--umask', '%03o' % get_umask()]
+        umask = ['--umask', '%03o' % self.umask]
         if location.host == '__testsuite__':
             args = [sys.executable, '-m', 'borg.archiver', 'serve'] + umask + self.extra_test_args
         else:

@@ -20,9 +20,14 @@ New features:
   deprecate --encryption passphrase, fixes #85
 - improve at-end error logging, always log exceptions and set exit_code=1
 - LoggedIO: better error checks / exceptions / exception handling
+- implement --remote-path to allow non-default-path borg locations, #125
+- implement --umask M and use 077 as default umask, #117
 
 Bug fixes:
 
+- fix segfault that happened for unreadable files (chunker: n needs to be a
+  signed size_t), #116
+- repo delete: add destroy to allowed rpc methods, fixes issue #114
 - more compatible repository locking code (based on mkdir), maybe fixes #92
   (attic #317, attic #201).
 - better Exception msg if no Borg is installed on the remote repo server, #56
@@ -34,6 +39,7 @@ Bug fixes:
 Other changes:
 
 - improved docs:
+
   - added docs/misc directory for misc. writeups that won't be included
     "as is" into the html docs.
   - document environment variables and return codes (attic #324, attic #52)
@@ -44,6 +50,11 @@ Other changes:
   - add FAQ entries about redundancy / integrity
   - clarify that borg extract uses the cwd as extraction target
   - update internals doc about chunker params, memory usage and compression
+  - add some words about resource usage
+  - document how to backup raw disk
+  - add note about how to run borg from virtual env
+  - add solutions for (ll)fuse installation problems
+  - tested and updated cygwin docs
 
 - use borg-tmp as prefix for temporary files / directories
 - short prune options without "keep-" are deprecated, do not suggest them
@@ -51,6 +62,7 @@ Other changes:
 - remove usage of unittest.mock, always use mock from pypi
 - use entrypoints instead of scripts, for better use of the wheel format and
   modern installs
+- add requirements.d/development.txt and modify tox.ini
     
 I forgot to list some stuff already implemented in 0.23.0, here they are:
 

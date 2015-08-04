@@ -425,6 +425,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # Restore permissions so shutil.rmtree is able to delete it
             os.system('chmod -R u+w ' + self.repository_path)
 
+    def test_umask(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        mode = os.stat(self.repository_path).st_mode
+        self.assertEqual(stat.S_IMODE(mode), 0o700)
+
     def test_cmdline_compatibility(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', self.repository_location)

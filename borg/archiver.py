@@ -21,7 +21,7 @@ from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    is_cachedir, bigint_to_int, ChunkerParams
+    is_cachedir, bigint_to_int, ChunkerParams, set_umask
 from .remote import RepositoryServer, RemoteRepository
 
 
@@ -220,7 +220,6 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         # be restrictive when restoring files, restore permissions later
         if sys.getfilesystemencoding() == 'ascii':
             print('Warning: File system encoding is "ascii", extracting non-ascii filenames will not be supported.')
-        os.umask(0o077)
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
         archive = Archive(repository, key, manifest, args.archive.archive,
@@ -511,6 +510,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                    default=False,
                                    help='verbose output')
         common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false')
+        common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=0o077, metavar='M',
+                                   help='set umask to M (local and remote, default: 0o077)')
 
         # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
         if args:
@@ -821,6 +822,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
         args = parser.parse_args(args or ['-h'])
         self.verbose = args.verbose
+        set_umask(args.umask)
         update_excludes(args)
         return args.func(args)
 

@@ -14,6 +14,7 @@ cdef extern from "_hashindex.c":
     void hashindex_summarize(HashIndex *index, long long *total_size, long long *total_csize,
                              long long *unique_size, long long *unique_csize,
                              long long *total_unique_chunks, long long *total_chunks)
+    void hashindex_merge(HashIndex *index, HashIndex *other)
     int hashindex_get_size(HashIndex *index)
     int hashindex_write(HashIndex *index, char *path)
     void *hashindex_get(HashIndex *index, void *key)
@@ -189,6 +190,9 @@ cdef class ChunkIndex(IndexBase):
                             &unique_size, &unique_csize,
                             &total_unique_chunks, &total_chunks)
         return total_size, total_csize, unique_size, unique_csize, total_unique_chunks, total_chunks
+
+    def merge(self, ChunkIndex other):
+        hashindex_merge(self.index, other.index)
 
 
 cdef class ChunkKeyIterator:

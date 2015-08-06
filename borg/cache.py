@@ -309,8 +309,7 @@ class Cache:
                 tf_in.extract(archive_id_hex, tmp_dir)
                 chunk_idx_path = os.path.join(tmp_dir, archive_id_hex).encode('utf-8')
                 archive_chunk_idx = ChunkIndex.read(chunk_idx_path)
-                for chunk_id, (count, size, csize) in archive_chunk_idx.iteritems():
-                    add(chunk_idx, chunk_id, size, csize, incr=count)
+                chunk_idx.merge(archive_chunk_idx)
                 os.unlink(chunk_idx_path)
 
         self.begin_txn()

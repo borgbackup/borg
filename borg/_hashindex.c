@@ -385,3 +385,22 @@ hashindex_summarize(HashIndex *index, long long *total_size, long long *total_cs
     *total_unique_chunks = unique_chunks;
     *total_chunks = chunks;
 }
+
+static void
+hashindex_merge(HashIndex *index, HashIndex *other)
+{
+    int32_t key_size = index->key_size;
+    const int32_t *other_values;
+    int32_t *my_values;
+    void *key = NULL;
+
+    while((key = hashindex_next_key(other, key))) {
+        other_values = key + key_size;
+        my_values = hashindex_get(index, key);
+        if(my_values == NULL) {
+            hashindex_set(index, key, other_values);
+        } else {
+            *my_values += *other_values;
+        }
+    }
+}

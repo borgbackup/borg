@@ -19,15 +19,15 @@ matrix:
           env: TOXENV=py34
         - language: generic
           os: osx
-          osx_image: beta-xcode6.3
+          osx_image: xcode6.4
           env: TOXENV=py32
         - language: generic
           os: osx
-          osx_image: beta-xcode6.3
+          osx_image: xcode6.4
           env: TOXENV=py33
         - language: generic
           os: osx
-          osx_image: beta-xcode6.3
+          osx_image: xcode6.4
           env: TOXENV=py34
 
 install:

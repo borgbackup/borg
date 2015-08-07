@@ -39,5 +39,5 @@ fi
 
 python -m virtualenv ~/.venv
 source ~/.venv/bin/activate
-pip install tox pytest codecov Cython
+pip install tox pytest pytest-cov codecov Cython
 pip install -e .

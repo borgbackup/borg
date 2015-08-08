@@ -85,8 +85,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 print('Repository check complete, no problems found.')
             else:
                 return 1
-        if not args.repo_only and not ArchiveChecker().check(repository, repair=args.repair, last=args.last):
-                return 1
+        if not args.repo_only and not ArchiveChecker().check(
+                repository, repair=args.repair, archive=args.repository.archive, last=args.last):
+            return 1
         return 0
 
     def do_change_passphrase(self, args):
@@ -554,6 +555,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         and other types of damage. After that the consistency and correctness of the archive
         metadata is verified.
 
+        By giving an archive name, you can specifically check that archive.
+
         The archive metadata checks can be time consuming and requires access to the key
         file and/or passphrase if encryption is enabled. These checks can be skipped using
         the --repository-only option.
@@ -563,9 +566,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                           epilog=check_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_check)
-        subparser.add_argument('repository', metavar='REPOSITORY',
-                               type=location_validator(archive=False),
-                               help='repository to check consistency of')
+        subparser.add_argument('repository', metavar='REPOSITORY_OR_ARCHIVE',
+                               type=location_validator(),
+                               help='repository or archive to check consistency of')
         subparser.add_argument('--repository-only', dest='repo_only', action='store_true',
                                default=False,
                                help='only perform repository checks')

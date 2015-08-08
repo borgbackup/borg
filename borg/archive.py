@@ -609,7 +609,7 @@ class ArchiveChecker:
         self.error_found = False
         self.possibly_superseded = set()
 
-    def check(self, repository, repair=False, last=None):
+    def check(self, repository, repair=False, archive=None, last=None):
         self.report_progress('Starting archive consistency check...')
         self.repair = repair
         self.repository = repository
@@ -619,8 +619,8 @@ class ArchiveChecker:
             self.manifest = self.rebuild_manifest()
         else:
             self.manifest, _ = Manifest.load(repository, key=self.key)
-        self.rebuild_refcounts(last=last)
-        if last is None:
+        self.rebuild_refcounts(archive=archive, last=last)
+        if last is None and archive is None:
             self.verify_chunks()
         else:
             self.report_progress('Orphaned objects check skipped (needs all archives checked)')
@@ -680,7 +680,7 @@ class ArchiveChecker:
         self.report_progress('Manifest rebuild complete', error=True)
         return manifest
 
-    def rebuild_refcounts(self, last=None):
+    def rebuild_refcounts(self, archive=None, last=None):
         """Rebuild object reference counts by walking the metadata
 
         Missing and/or incorrect data is repaired when detected
@@ -762,10 +762,17 @@ class ArchiveChecker:
                         yield item
 
         repository = cache_if_remote(self.repository)
-        num_archives = len(self.manifest.archives)
-        archive_items = sorted(self.manifest.archives.items(), reverse=True,
-                               key=lambda name_info: name_info[1][b'time'])
-        end = None if last is None else min(num_archives, last)
+        if archive is None:
+            # we need last N or all archives
+            archive_items = sorted(self.manifest.archives.items(), reverse=True,
+                                   key=lambda name_info: name_info[1][b'time'])
+            num_archives = len(self.manifest.archives)
+            end = None if last is None else min(num_archives, last)
+        else:
+            # we only want one specific archive
+            archive_items = [item for item in self.manifest.archives.items() if item[0] == archive]
+            num_archives = 1
+            end = 1
         for i, (name, info) in enumerate(archive_items[:end]):
             self.report_progress('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
             archive_id = info[b'id']

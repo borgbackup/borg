@@ -550,16 +550,39 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='select encryption method')
 
         check_epilog = textwrap.dedent("""
-        The check command verifies the consistency of a repository and the corresponding
-        archives. The underlying repository data files are first checked to detect bit rot
-        and other types of damage. After that the consistency and correctness of the archive
-        metadata is verified.
+        The check command verifies the consistency of a repository and the corresponding archives.
 
-        By giving an archive name, you can specifically check that archive.
+        First, the underlying repository data files are checked:
+        - For all segments the segment magic (header) is checked
+        - For all objects stored in the segments, all metadata (e.g. crc and size) and
+          all data is read. The read data is checked by size and CRC. Bit rot and other
+          types of accidental damage can be detected this way.
+        - If we are in repair mode and a integrity error is detected for a segment,
+          we try to recover as many objects from the segment as possible.
+        - In repair mode, it makes sure that the index is consistent with the data
+          stored in the segments.
+        - If you use a remote repo server via ssh:, the repo check is executed on the
+          repo server without causing significant network traffic.
+        - The repository check can be skipped using the --archives-only option.
 
-        The archive metadata checks can be time consuming and requires access to the key
-        file and/or passphrase if encryption is enabled. These checks can be skipped using
-        the --repository-only option.
+        Second, the consistency and correctness of the archive metadata is verified:
+        - Is the repo manifest present? If not, it is rebuilt from archive metadata
+          chunks.
+        - Check if archive metadata chunk is present. if not, remove archive from
+          manifest.
+        - For all files (items) in the archive, for all chunks referenced by these
+          files, check if chunk is present (if not and we are in repair mode, replace
+          it with a chunk of zeros).
+        - Rebuild the chunks cache (refcounts) within the given archives in memory.
+        - If we are in repair mode and we checked all the archives: delete orphaned
+          chunks from the repo, write the repo manifest
+        - if you use a remote repo server via ssh:, the archive check is executed on
+          the client machine (because if encryption is enabled, the checks will require
+          decryption and this is always done client-side, because key access will be
+          required). Archive and file (item) metadata will get fetched over the network,
+          but not content data.
+        - The archive checks can be time consuming, they can be skipped using the
+          --repository-only option.
         """)
         subparser = subparsers.add_parser('check', parents=[common_parser],
                                           description=self.do_check.__doc__,

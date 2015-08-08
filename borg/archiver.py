@@ -509,7 +509,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
                                    default=False,
                                    help='verbose output')
-        common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false')
+        common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
+                                   help='do not load/update the file metadata cache used to detect unchanged files')
         common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=0o077, metavar='M',
                                    help='set umask to M (local and remote, default: 0o077)')
         common_parser.add_argument('--remote-path', dest='remote_path', default='borg', metavar='PATH',

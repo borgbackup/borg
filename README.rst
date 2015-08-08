@@ -118,8 +118,12 @@ THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
 For more information, please also see the
 `LICENSE  <https://github.com/borgbackup/borg/blob/master/LICENSE>`_.
 
-|build|
+|build| |coverage|
 
 .. |build| image:: https://travis-ci.org/borgbackup/borg.svg
         :alt: Build Status
         :target: https://travis-ci.org/borgbackup/borg
+
+.. |coverage| image:: http://codecov.io/github/borgbackup/borg/coverage.svg?branch=master
+        :alt: Test Coverage
+        :target: http://codecov.io/github/borgbackup/borg?branch=master

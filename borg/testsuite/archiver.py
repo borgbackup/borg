@@ -243,6 +243,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         if sparse_support and hasattr(st, 'st_blocks'):
             self.assert_true(st.st_blocks * 512 < total_len / 10)  # is output sparse?
 
+    def test_unusual_filenames(self):
+        filenames = ['normal', 'with some blanks', '(with_parens)', ]
+        for filename in filenames:
+            filename = os.path.join(self.input_path, filename)
+            with open(filename, 'wb') as fd:
+                pass
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        for filename in filenames:
+            with changedir('output'):
+                self.cmd('extract', self.repository_location + '::test', os.path.join('input', filename))
+            assert os.path.exists(os.path.join('output', 'input', filename))
+
     def test_repository_swap_detection(self):
         self.create_test_files()
         os.environ['BORG_PASSPHRASE'] = 'passphrase'

@@ -1,6 +1,10 @@
 [run]
 branch = True
 source = borg
+omit =
+    borg/__init__.py
+    borg/__main__.py
+    borg/_version.py
 
 [report]
 exclude_lines =

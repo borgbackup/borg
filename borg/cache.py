@@ -307,14 +307,13 @@ class Cache:
             for tarinfo in tf_in:
                 archive_id_hex = tarinfo.name
                 archive_name = tarinfo.pax_headers['archive_name']
-                print("- processing archive: %s -> extract, " % archive_name, end='') ; sys.stdout.flush()
+                print("- extracting archive %s ..." % archive_name)
                 tf_in.extract(archive_id_hex, tmp_dir)
                 chunk_idx_path = os.path.join(tmp_dir, archive_id_hex).encode('utf-8')
-                print("read, ", end='') ; sys.stdout.flush()
+                print("- reading archive ...")
                 archive_chunk_idx = ChunkIndex.read(chunk_idx_path)
-                print("merge, ", end='') ; sys.stdout.flush()
+                print("- merging archive ...")
                 chunk_idx.merge(archive_chunk_idx)
-                print("done.")
                 os.unlink(chunk_idx_path)
 
         self.begin_txn()

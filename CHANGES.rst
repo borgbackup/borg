@@ -16,6 +16,11 @@ Incompatible changes (compared to 0.23):
   you accidentially give access permissions for group and/or others to files
   created by borg (e.g. the repository).
 
+Deprecations:
+
+- "--encryption passphrase" mode is deprecated, see #85 and #97.
+  See the new "--encryption repokey" mode for a replacement.
+
 New features:
 
 - borg create --chunker-params ... to configure the chunker, fixes #16
@@ -28,7 +33,7 @@ New features:
 - borg create --compression 0..9 to select zlib compression level, fixes #66
   (attic #295).
 - borg init --encryption repokey (to store the encryption key into the repo),
-  deprecate --encryption passphrase, fixes #85
+  fixes #85
 - improve at-end error logging, always log exceptions and set exit_code=1
 - LoggedIO: better error checks / exceptions / exception handling
 - implement --remote-path to allow non-default-path borg locations, #125

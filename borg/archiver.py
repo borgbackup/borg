@@ -537,6 +537,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
         Encryption can be enabled at repository init time.
+        Please note that the 'passphrase' encryption mode is DEPRECATED (instead of it,
+        consider using 'repokey').
         """)
         subparser = subparsers.add_parser('init', parents=[common_parser],
                                           description=self.do_init.__doc__, epilog=init_epilog,
@@ -546,8 +548,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                type=location_validator(archive=False),
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption',
-                               choices=('none', 'passphrase', 'keyfile', 'repokey'), default='none',
-                               help='select encryption method')
+                               choices=('none', 'keyfile', 'repokey', 'passphrase'), default='none',
+                               help='select encryption key mode')
 
         check_epilog = textwrap.dedent("""
         The check command verifies the consistency of a repository and the corresponding archives.

@@ -611,6 +611,7 @@ class ArchiveChecker:
 
     def check(self, repository, repair=False, archive=None, last=None):
         self.report_progress('Starting archive consistency check...')
+        self.check_all = archive is None and last is None
         self.repair = repair
         self.repository = repository
         self.init_chunks()
@@ -620,10 +621,8 @@ class ArchiveChecker:
         else:
             self.manifest, _ = Manifest.load(repository, key=self.key)
         self.rebuild_refcounts(archive=archive, last=last)
-        if last is None and archive is None:
-            self.verify_chunks()
-        else:
-            self.report_progress('Orphaned objects check skipped (needs all archives checked)')
+        self.orphan_chunks_check()
+        self.finish()
         if not self.error_found:
             self.report_progress('Archive consistency check complete, no problems found.')
         return self.repair or not self.error_found
@@ -803,16 +802,22 @@ class ArchiveChecker:
             add_reference(new_archive_id, len(data), len(cdata), cdata)
             info[b'id'] = new_archive_id
 
-    def verify_chunks(self):
-        unused = set()
-        for id_, (count, size, csize) in self.chunks.iteritems():
-            if count == 0:
-                unused.add(id_)
-        orphaned = unused - self.possibly_superseded
-        if orphaned:
-            self.report_progress('{} orphaned objects found'.format(len(orphaned)), error=True)
+    def orphan_chunks_check(self):
+        if self.check_all:
+            unused = set()
+            for id_, (count, size, csize) in self.chunks.iteritems():
+                if count == 0:
+                    unused.add(id_)
+            orphaned = unused - self.possibly_superseded
+            if orphaned:
+                self.report_progress('{} orphaned objects found'.format(len(orphaned)), error=True)
+            if self.repair:
+                for id_ in unused:
+                    self.repository.delete(id_)
+        else:
+            self.report_progress('Orphaned objects check skipped (needs all archives checked)')
+
+    def finish(self):
         if self.repair:
-            for id_ in unused:
-                self.repository.delete(id_)
             self.manifest.write()
             self.repository.commit()

@@ -5,6 +5,22 @@ Borg Changelog
 Version 0.24.0
 --------------
 
+Incompatible changes (compared to 0.23):
+
+- borg now always issues --umask NNN option when invoking another borg via ssh
+  on the repository server. By that, it's making sure it uses the same umask
+  for remote repos as for local ones. Because of this, you must upgrade both
+  server and client(s) to 0.24.
+- the default umask is 077 now (if you do not specify via --umask) which might
+  be a different one as you used previously. The default umask avoids that
+  you accidentally give access permissions for group and/or others to files
+  created by borg (e.g. the repository).
+
+Deprecations:
+
+- "--encryption passphrase" mode is deprecated, see #85 and #97.
+  See the new "--encryption repokey" mode for a replacement.
+
 New features:
 
 - borg create --chunker-params ... to configure the chunker, fixes #16
@@ -17,12 +33,21 @@ New features:
 - borg create --compression 0..9 to select zlib compression level, fixes #66
   (attic #295).
 - borg init --encryption repokey (to store the encryption key into the repo),
-  deprecate --encryption passphrase, fixes #85
+  fixes #85
 - improve at-end error logging, always log exceptions and set exit_code=1
 - LoggedIO: better error checks / exceptions / exception handling
+- implement --remote-path to allow non-default-path borg locations, #125
+- implement --umask M and use 077 as default umask for better security, #117
+- borg check: give a named single archive to it, fixes #139
+- cache sync: show progress indication
+- cache sync: reimplement the chunk index merging in C
 
 Bug fixes:
 
+- fix segfault that happened for unreadable files (chunker: n needs to be a
+  signed size_t), #116
+- fix the repair mode, #144
+- repo delete: add destroy to allowed rpc methods, fixes issue #114
 - more compatible repository locking code (based on mkdir), maybe fixes #92
   (attic #317, attic #201).
 - better Exception msg if no Borg is installed on the remote repo server, #56
@@ -30,10 +55,12 @@ Bug fixes:
   fixes attic #326.
 - fix Traceback when running check --repair, attic #232
 - clarify help text, fixes #73.
+- add help string for --no-files-cache, fixes #140
 
 Other changes:
 
 - improved docs:
+
   - added docs/misc directory for misc. writeups that won't be included
     "as is" into the html docs.
   - document environment variables and return codes (attic #324, attic #52)
@@ -44,14 +71,25 @@ Other changes:
   - add FAQ entries about redundancy / integrity
   - clarify that borg extract uses the cwd as extraction target
   - update internals doc about chunker params, memory usage and compression
+  - added docs about development
+  - add some words about resource usage in general
+  - document how to backup a raw disk
+  - add note about how to run borg from virtual env
+  - add solutions for (ll)fuse installation problems
+  - document what borg check does, fixes #138
+  - reorganize borgbackup.github.io sidebar, prev/next at top
+  - deduplicate and refactor the docs / README.rst
 
 - use borg-tmp as prefix for temporary files / directories
 - short prune options without "keep-" are deprecated, do not suggest them
-- improved tox configuration, documented there how to invoke it
+- improved tox configuration
 - remove usage of unittest.mock, always use mock from pypi
 - use entrypoints instead of scripts, for better use of the wheel format and
   modern installs
-    
+- add requirements.d/development.txt and modify tox.ini
+- use travis-ci for testing based on Linux and (new) OS X
+- use coverage.py, pytest-cov and codecov.io for test coverage support
+
 I forgot to list some stuff already implemented in 0.23.0, here they are:
 
 New features:

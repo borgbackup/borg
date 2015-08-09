@@ -11,6 +11,8 @@ import time
 import unittest
 from hashlib import sha256
 
+from mock import patch
+
 from .. import xattr
 from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP
 from ..archiver import Archiver
@@ -20,7 +22,6 @@ from ..helpers import Manifest
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import BaseTestCase
-from .mock import patch
 
 try:
     import llfuse
@@ -243,6 +244,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         if sparse_support and hasattr(st, 'st_blocks'):
             self.assert_true(st.st_blocks * 512 < total_len / 10)  # is output sparse?
 
+    def test_unusual_filenames(self):
+        filenames = ['normal', 'with some blanks', '(with_parens)', ]
+        for filename in filenames:
+            filename = os.path.join(self.input_path, filename)
+            with open(filename, 'wb') as fd:
+                pass
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        for filename in filenames:
+            with changedir('output'):
+                self.cmd('extract', self.repository_location + '::test', os.path.join('input', filename))
+            assert os.path.exists(os.path.join('output', 'input', filename))
+
     def test_repository_swap_detection(self):
         self.create_test_files()
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
@@ -424,6 +438,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         finally:
             # Restore permissions so shutil.rmtree is able to delete it
             os.system('chmod -R u+w ' + self.repository_path)
+
+    def test_umask(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        mode = os.stat(self.repository_path).st_mode
+        self.assertEqual(stat.S_IMODE(mode), 0o700)
 
     def test_cmdline_compatibility(self):
         self.create_regular_file('file1', size=1024 * 80)

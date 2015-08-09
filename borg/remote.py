@@ -108,9 +108,10 @@ class RepositoryServer:
 
 class RemoteRepository:
     extra_test_args = []
+    remote_path = None
+    umask = None
 
     class RPCError(Exception):
-
         def __init__(self, name):
             self.name = name
 
@@ -124,8 +125,10 @@ class RemoteRepository:
         self.responses = {}
         self.unpacker = msgpack.Unpacker(use_list=False)
         self.p = None
+        # use local umask also for the remote process
+        umask = ['--umask', '%03o' % self.umask]
         if location.host == '__testsuite__':
-            args = [sys.executable, '-m', 'borg.archiver', 'serve'] + self.extra_test_args
+            args = [sys.executable, '-m', 'borg.archiver', 'serve'] + umask + self.extra_test_args
         else:
             args = ['ssh']
             if location.port:
@@ -134,7 +137,7 @@ class RemoteRepository:
                 args.append('%s@%s' % (location.user, location.host))
             else:
                 args.append('%s' % location.host)
-            args += ['borg', 'serve']
+            args += [self.remote_path, 'serve'] + umask
         self.p = Popen(args, bufsize=0, stdin=PIPE, stdout=PIPE)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()

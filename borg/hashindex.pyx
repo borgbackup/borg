@@ -14,6 +14,7 @@ cdef extern from "_hashindex.c":
     void hashindex_summarize(HashIndex *index, long long *total_size, long long *total_csize,
                              long long *unique_size, long long *unique_csize,
                              long long *total_unique_chunks, long long *total_chunks)
+    void hashindex_merge(HashIndex *index, HashIndex *other)
     int hashindex_get_size(HashIndex *index)
     int hashindex_write(HashIndex *index, char *path)
     void *hashindex_get(HashIndex *index, void *key)
@@ -24,15 +25,18 @@ cdef extern from "_hashindex.c":
     int _le32toh(int v)
 
 
-_NoDefault = object()
+cdef _NoDefault = object()
 
+cimport cython
+
+@cython.internal
 cdef class IndexBase:
     cdef HashIndex *index
     key_size = 32
 
     def __cinit__(self, capacity=0, path=None):
         if path:
-            self.index = hashindex_read(<bytes>os.fsencode(path))
+            self.index = hashindex_read(os.fsencode(path))
             if not self.index:
                 raise Exception('hashindex_read failed')
         else:
@@ -49,7 +53,7 @@ cdef class IndexBase:
         return cls(path=path)
 
     def write(self, path):
-        if not hashindex_write(self.index, <bytes>os.fsencode(path)):
+        if not hashindex_write(self.index, os.fsencode(path)):
             raise Exception('hashindex_write failed')
 
     def clear(self):
@@ -186,6 +190,9 @@ cdef class ChunkIndex(IndexBase):
                             &unique_size, &unique_csize,
                             &total_unique_chunks, &total_chunks)
         return total_size, total_csize, unique_size, unique_csize, total_unique_chunks, total_chunks
+
+    def merge(self, ChunkIndex other):
+        hashindex_merge(self.index, other.index)
 
 
 cdef class ChunkKeyIterator:

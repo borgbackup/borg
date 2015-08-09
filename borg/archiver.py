@@ -86,8 +86,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 print('Repository check complete, no problems found.')
             else:
                 return 1
-        if not args.repo_only and not ArchiveChecker().check(repository, repair=args.repair, last=args.last):
-                return 1
+        if not args.repo_only and not ArchiveChecker().check(
+                repository, repair=args.repair, archive=args.repository.archive, last=args.last):
+            return 1
         return 0
 
     def do_change_passphrase(self, args):
@@ -223,7 +224,6 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         # be restrictive when restoring files, restore permissions later
         if sys.getfilesystemencoding() == 'ascii':
             print('Warning: File system encoding is "ascii", extracting non-ascii filenames will not be supported.')
-        os.umask(0o077)
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
         archive = Archive(repository, key, manifest, args.archive.archive,
@@ -513,7 +513,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
                                    default=False,
                                    help='verbose output')
-        common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false')
+        common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
+                                   help='do not load/update the file metadata cache used to detect unchanged files')
+        common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=0o077, metavar='M',
+                                   help='set umask to M (local and remote, default: 0o077)')
+        common_parser.add_argument('--remote-path', dest='remote_path', default='borg', metavar='PATH',
+                                   help='set remote path to executable (default: "borg")')
 
         # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
         if args:
@@ -535,6 +540,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
         Encryption can be enabled at repository init time.
+        Please note that the 'passphrase' encryption mode is DEPRECATED (instead of it,
+        consider using 'repokey').
         """)
         subparser = subparsers.add_parser('init', parents=[common_parser],
                                           description=self.do_init.__doc__, epilog=init_epilog,
@@ -544,27 +551,51 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                type=location_validator(archive=False),
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption',
-                               choices=('none', 'passphrase', 'keyfile', 'repokey'), default='none',
-                               help='select encryption method')
+                               choices=('none', 'keyfile', 'repokey', 'passphrase'), default='none',
+                               help='select encryption key mode')
 
         check_epilog = textwrap.dedent("""
-        The check command verifies the consistency of a repository and the corresponding
-        archives. The underlying repository data files are first checked to detect bit rot
-        and other types of damage. After that the consistency and correctness of the archive
-        metadata is verified.
+        The check command verifies the consistency of a repository and the corresponding archives.
 
-        The archive metadata checks can be time consuming and requires access to the key
-        file and/or passphrase if encryption is enabled. These checks can be skipped using
-        the --repository-only option.
+        First, the underlying repository data files are checked:
+        - For all segments the segment magic (header) is checked
+        - For all objects stored in the segments, all metadata (e.g. crc and size) and
+          all data is read. The read data is checked by size and CRC. Bit rot and other
+          types of accidental damage can be detected this way.
+        - If we are in repair mode and a integrity error is detected for a segment,
+          we try to recover as many objects from the segment as possible.
+        - In repair mode, it makes sure that the index is consistent with the data
+          stored in the segments.
+        - If you use a remote repo server via ssh:, the repo check is executed on the
+          repo server without causing significant network traffic.
+        - The repository check can be skipped using the --archives-only option.
+
+        Second, the consistency and correctness of the archive metadata is verified:
+        - Is the repo manifest present? If not, it is rebuilt from archive metadata
+          chunks (this requires reading and decrypting of all metadata and data).
+        - Check if archive metadata chunk is present. if not, remove archive from
+          manifest.
+        - For all files (items) in the archive, for all chunks referenced by these
+          files, check if chunk is present (if not and we are in repair mode, replace
+          it with a same-size chunk of zeros). This requires reading of archive and
+          file metadata, but not data.
+        - If we are in repair mode and we checked all the archives: delete orphaned
+          chunks from the repo.
+        - if you use a remote repo server via ssh:, the archive check is executed on
+          the client machine (because if encryption is enabled, the checks will require
+          decryption and this is always done client-side, because key access will be
+          required).
+        - The archive checks can be time consuming, they can be skipped using the
+          --repository-only option.
         """)
         subparser = subparsers.add_parser('check', parents=[common_parser],
                                           description=self.do_check.__doc__,
                                           epilog=check_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_check)
-        subparser.add_argument('repository', metavar='REPOSITORY',
-                               type=location_validator(archive=False),
-                               help='repository to check consistency of')
+        subparser.add_argument('repository', metavar='REPOSITORY_OR_ARCHIVE',
+                               type=location_validator(),
+                               help='repository or archive to check consistency of')
         subparser.add_argument('--repository-only', dest='repo_only', action='store_true',
                                default=False,
                                help='only perform repository checks')
@@ -833,6 +864,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
         args = parser.parse_args(args or ['-h'])
         self.verbose = args.verbose
+        os.umask(args.umask)
+        RemoteRepository.remote_path = args.remote_path
+        RemoteRepository.umask = args.umask
         update_excludes(args)
         return args.func(args)
 

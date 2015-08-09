@@ -21,3 +21,4 @@ docs/usage/*.inc
 borg.build/
 borg.dist/
 borg.exe
+.coverage

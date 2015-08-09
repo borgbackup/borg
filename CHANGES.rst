@@ -13,7 +13,7 @@ Incompatible changes (compared to 0.23):
   server and client(s) to 0.24.
 - the default umask is 077 now (if you do not specify via --umask) which might
   be a different one as you used previously. The default umask avoids that
-  you accidentially give access permissions for group and/or others to files
+  you accidentally give access permissions for group and/or others to files
   created by borg (e.g. the repository).
 
 Deprecations:
@@ -38,11 +38,15 @@ New features:
 - LoggedIO: better error checks / exceptions / exception handling
 - implement --remote-path to allow non-default-path borg locations, #125
 - implement --umask M and use 077 as default umask for better security, #117
+- borg check: give a named single archive to it, fixes #139
+- cache sync: show progress indication
+- cache sync: reimplement the chunk index merging in C
 
 Bug fixes:
 
 - fix segfault that happened for unreadable files (chunker: n needs to be a
   signed size_t), #116
+- fix the repair mode, #144
 - repo delete: add destroy to allowed rpc methods, fixes issue #114
 - more compatible repository locking code (based on mkdir), maybe fixes #92
   (attic #317, attic #201).
@@ -51,6 +55,7 @@ Bug fixes:
   fixes attic #326.
 - fix Traceback when running check --repair, attic #232
 - clarify help text, fixes #73.
+- add help string for --no-files-cache, fixes #140
 
 Other changes:
 
@@ -66,11 +71,13 @@ Other changes:
   - add FAQ entries about redundancy / integrity
   - clarify that borg extract uses the cwd as extraction target
   - update internals doc about chunker params, memory usage and compression
-  - add some words about resource usage
-  - document how to backup raw disk
+  - add some words about resource usage in general
+  - document how to backup a raw disk
   - add note about how to run borg from virtual env
   - add solutions for (ll)fuse installation problems
-  - tested and updated cygwin docs
+  - document what borg check does, fixes #138
+  - reorganize borgbackup.github.io sidebar, prev/next at top
+  - deduplicate and refactor the docs / README.rst
 
 - use borg-tmp as prefix for temporary files / directories
 - short prune options without "keep-" are deprecated, do not suggest them
@@ -79,7 +86,9 @@ Other changes:
 - use entrypoints instead of scripts, for better use of the wheel format and
   modern installs
 - add requirements.d/development.txt and modify tox.ini
-    
+- use travis-ci for linux and OS X testing
+- use coverage.py, pytest-cov and codecov.io for test coverage support
+
 I forgot to list some stuff already implemented in 0.23.0, here they are:
 
 New features:

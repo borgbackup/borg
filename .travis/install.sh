@@ -14,6 +14,7 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
         eval "$(pyenv init -)"
     fi
 
+    brew install lz4
     brew outdated pyenv || brew upgrade pyenv
 
     case "${TOXENV}" in

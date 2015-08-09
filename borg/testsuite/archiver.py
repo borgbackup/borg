@@ -11,6 +11,8 @@ import time
 import unittest
 from hashlib import sha256
 
+from mock import patch
+
 from .. import xattr
 from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP
 from ..archiver import Archiver
@@ -20,7 +22,6 @@ from ..helpers import Manifest
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import BaseTestCase
-from .mock import patch
 
 try:
     import llfuse

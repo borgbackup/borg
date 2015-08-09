@@ -71,6 +71,7 @@ Other changes:
   - add FAQ entries about redundancy / integrity
   - clarify that borg extract uses the cwd as extraction target
   - update internals doc about chunker params, memory usage and compression
+  - added docs about development
   - add some words about resource usage in general
   - document how to backup a raw disk
   - add note about how to run borg from virtual env
@@ -81,12 +82,12 @@ Other changes:
 
 - use borg-tmp as prefix for temporary files / directories
 - short prune options without "keep-" are deprecated, do not suggest them
-- improved tox configuration, documented there how to invoke it
+- improved tox configuration
 - remove usage of unittest.mock, always use mock from pypi
 - use entrypoints instead of scripts, for better use of the wheel format and
   modern installs
 - add requirements.d/development.txt and modify tox.ini
-- use travis-ci for linux and OS X testing
+- use travis-ci for testing based on Linux and (new) OS X
 - use coverage.py, pytest-cov and codecov.io for test coverage support
 
 I forgot to list some stuff already implemented in 0.23.0, here they are:

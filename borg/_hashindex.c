@@ -396,7 +396,7 @@ hashindex_merge(HashIndex *index, HashIndex *other)
 
     while((key = hashindex_next_key(other, key))) {
         other_values = key + key_size;
-        my_values = hashindex_get(index, key);
+        my_values = (int32_t *)hashindex_get(index, key);
         if(my_values == NULL) {
             hashindex_set(index, key, other_values);
         } else {

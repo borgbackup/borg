@@ -567,20 +567,19 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
         Second, the consistency and correctness of the archive metadata is verified:
         - Is the repo manifest present? If not, it is rebuilt from archive metadata
-          chunks.
+          chunks (this requires reading and decrypting of all metadata and data).
         - Check if archive metadata chunk is present. if not, remove archive from
           manifest.
         - For all files (items) in the archive, for all chunks referenced by these
           files, check if chunk is present (if not and we are in repair mode, replace
-          it with a chunk of zeros).
-        - Rebuild the chunks cache (refcounts) within the given archives in memory.
+          it with a same-size chunk of zeros). This requires reading of archive and
+          file metadata, but not data.
         - If we are in repair mode and we checked all the archives: delete orphaned
-          chunks from the repo, write the repo manifest
+          chunks from the repo.
         - if you use a remote repo server via ssh:, the archive check is executed on
           the client machine (because if encryption is enabled, the checks will require
           decryption and this is always done client-side, because key access will be
-          required). Archive and file (item) metadata will get fetched over the network,
-          but not content data.
+          required).
         - The archive checks can be time consuming, they can be skipped using the
           --repository-only option.
         """)

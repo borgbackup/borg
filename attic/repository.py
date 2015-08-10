@@ -7,6 +7,8 @@ import shutil
 import struct
 import sys
 from zlib import crc32
+import threading
+import queue
 
 from .hashindex import NSIndex
 from .helpers import Error, IntegrityError, read_msgpack, write_msgpack, unhexlify, UpgradableLock
@@ -377,7 +379,6 @@ class Repository(object):
         """Preload objects (only applies to remote repositories
         """
 
-
 class LoggedIO(object):
 
     header_fmt = struct.Struct('<IIB')
@@ -400,11 +401,13 @@ class LoggedIO(object):
         self.segments_per_dir = segments_per_dir
         self.offset = 0
         self._write_fd = None
+        self.writeback = FsyncWorker()
 
     def close(self):
         for segment in list(self.fds.keys()):
             self.fds.pop(segment).close()
         self.close_segment()
+        self.writeback.close()
         self.fds = None  # Just to make sure we're disabled
 
     def segment_iterator(self, reverse=False):
@@ -572,11 +575,65 @@ class LoggedIO(object):
         crc = self.crc_fmt.pack(crc32(header) & 0xffffffff)
         fd.write(b''.join((crc, header)))
         self.close_segment()
+        self.writeback.flush()
 
     def close_segment(self):
         if self._write_fd:
             self.segment += 1
             self.offset = 0
-            os.fsync(self._write_fd)
-            self._write_fd.close()
+            self.writeback.fsync_and_close_fd(self._write_fd)
             self._write_fd = None
+
+class FsyncWorker(object):
+    """os.fsync() in a background thread.
+
+       One fd is processed at a time.  If the thread is already working,
+       the caller will block.  This provides double-buffering.
+    """
+
+    def __init__(self):
+        self.channel = Channel()
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+
+    def _run(self):
+        while True:
+            task = self.channel.get()
+            if task == None:
+                break
+            task()
+
+    def fsync_and_close_fd(self, fd):
+        """fsync() and close() fd in the background"""
+        def task():
+            os.fsync(fd)
+            fd.close()
+        self.channel.put(task)
+
+    def flush(self):
+        """Wait for pending writeback"""
+        def task():
+            pass
+        self.channel.put(task)
+
+    def close(self):
+        self.channel.put(None)
+        self.thread.join() # wait for thread to finish
+
+class Channel(object):
+    """A blocking channel, like in CSP or Go.
+
+       This can also be considered as a Queue with zero buffer space.
+    """
+
+    def __init__(self):
+        self.q = queue.Queue()
+
+    def get(self):
+        value = self.q.get()
+        self.q.task_done()
+        return value
+
+    def put(self, item):
+        self.q.put(item)
+        self.q.join() # wait for task_done(), in reader thread

@@ -76,8 +76,12 @@ Resource Usage
 |project_name| might use a lot of resources depending on the size of the data set it is dealing with.
 
 CPU: it won't go beyond 100% of 1 core as the code is currently single-threaded.
+     Especially higher zlib and lzma compression uses significant amounts of CPU
+     cycles.
 
 Memory (RAM): the chunks index and the files index are read into memory for performance reasons.
+              compression, esp. lzma compression with high levels might need substantial amounts
+              of memory.
 
 Temporary files: reading data and metadata from a FUSE mounted repository will consume about the same space as the
                  deduplicated chunks used to represent them in the repository.
@@ -174,6 +178,18 @@ Examples
 
     # Backup a raw device (must not be active/in use/mounted at that time)
     $ dd if=/dev/sda bs=10M | borg create /mnt/backup::my-sda -
+
+    # No compression (default)
+    $ borg create /mnt/backup::repo ~
+
+    # Super fast, low compression
+    $ borg create --compression lz4 /mnt/backup::repo ~
+
+    # Less fast, higher compression (N = 0..9)
+    $ borg create --compression zlib,N /mnt/backup::repo ~
+
+    # Even slower, even higher compression (N = 0..9)
+    $ borg create --compression lzma,N /mnt/backup::repo ~
 
 
 .. include:: usage/extract.rst.inc

@@ -478,6 +478,9 @@ class LoggedIO(object):
             return fd
 
     def delete_segment(self, segment):
+        fd = self.fds.pop(segment)
+        if fd != None:
+            fd.close()
         try:
             os.unlink(self.segment_filename(segment))
         except OSError:

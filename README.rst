@@ -51,7 +51,7 @@ Main features
     authenticity is verified using HMAC-SHA256.
 
 **Compression**
-    All data can be compressed by zlib, level 0-9.
+    All data can be compressed by lz4, zlib or lzma.
 
 **Off-site backups**
     Borg can store data on any remote host accessible over SSH.  If Borg is

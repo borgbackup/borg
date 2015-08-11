@@ -589,36 +589,58 @@ class FsyncWorker(object):
 
        One fd is processed at a time.  If the thread is already working,
        the caller will block.  This provides double-buffering.
+
+       Any exceptions (from os.fsync() or fd.close()) will be re-raised
+       on the next call into FsyncWorker.  (Naturally this applies to
+       the .flush() and .close() methods as well as .fsync_and_close_fd()).
     """
 
     def __init__(self):
         self.channel = Channel()
-        self.thread = threading.Thread(target=self._run, daemon=True)
-        self.thread.start()
+        self.exception = None
+        thread = threading.Thread(target=self._run, daemon=True)
+        thread.start()
 
     def _run(self):
-        while True:
+        while True: # worker thread loop
             task = self.channel.get()
             if task == None:
-                break
-            task()
+                break # thread shutdown requested
+            try:
+                task()
+            except Exception as e:
+                self.exception = e
 
     def fsync_and_close_fd(self, fd):
         """fsync() and close() fd in the background"""
         def task():
-            os.fsync(fd)
-            fd.close()
+            try:
+                os.fsync(fd)
+            finally:
+                fd.close()
+        self.flush() # raise any pending exception
         self.channel.put(task)
 
     def flush(self):
-        """Wait for pending writeback"""
+        """Wait for any pending fsync.
+
+           This will also make sure an IOError is re-raised
+           in the calling thread, if necessary.
+        """
         def task():
             pass
         self.channel.put(task)
 
+        if self.exception != None:
+            e = self.exception
+            self.exception = None
+            raise e
+
     def close(self):
-        self.channel.put(None)
-        self.thread.join() # wait for thread to finish
+        try:
+            self.flush()
+        finally:
+            self.channel.put(None) # tell thread to shutdown
 
 class Channel(object):
     """A blocking channel, like in CSP or Go.

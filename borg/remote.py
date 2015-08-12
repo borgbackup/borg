@@ -28,7 +28,7 @@ class InvalidRPCMethod(Error):
     """RPC method is not valid"""
 
 
-class RepositoryServer:
+class RepositoryServer:  # pragma: no cover
     rpc_methods = (
         '__len__',
         'check',
@@ -129,7 +129,7 @@ class RemoteRepository:
         umask = ['--umask', '%03o' % self.umask]
         if location.host == '__testsuite__':
             args = [sys.executable, '-m', 'borg.archiver', 'serve'] + umask + self.extra_test_args
-        else:
+        else:  # pragma: no cover
             args = ['ssh']
             if location.port:
                 args += ['-p', str(location.port)]

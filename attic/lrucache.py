@@ -1,20 +1,19 @@
-class LRUCache(dict):
-
+class LRUCache:
     def __init__(self, capacity, dispose):
-        super(LRUCache, self).__init__()
+        self._cache = {}
         self._lru = []
         self._capacity = capacity
         self._dispose = dispose
 
     def __setitem__(self, key, value):
-        assert key not in self, (
+        assert key not in self._cache, (
             "Unexpected attempt to replace a cached item."
-            " If this is intended, please delete or pop the old item first."
-            " The dispose function will be called on delete (but not pop).")
+            " If this is intended, please delete the old item first."
+            " The dispose function will be called on delete.")
         self._lru.append(key)
         while len(self._lru) > self._capacity:
             del self[self._lru[0]]
-        return super(LRUCache, self).__setitem__(key, value)
+        self._cache[key] = value
 
     def __getitem__(self, key):
         try:
@@ -22,7 +21,7 @@ class LRUCache(dict):
             self._lru.append(key)
         except ValueError:
             pass
-        return super(LRUCache, self).__getitem__(key)
+        return self._cache[key]
 
     def __delitem__(self, key):
         try:
@@ -30,23 +29,22 @@ class LRUCache(dict):
         except ValueError:
             pass
         error = KeyError(key)
-        removed = super(LRUCache, self).pop(key, error)
+        removed = self._cache.pop(key, error)
         if removed == error:
             raise error
         self._dispose(removed)
 
-    def pop(self, key, default=None):
-        try:
-            self._lru.remove(key)
-        except ValueError:
-            pass
-        return super(LRUCache, self).pop(key, default)
+    def __contains__(self, key):
+        return key in self._cache
 
     def clear(self):
-        for value in self.values():
+        for value in self._cache.values():
             self._dispose(value)
-        super(LRUCache, self).clear()
+        self._cache.clear()
 
-    def _not_implemented(self, *args, **kw):
-        raise NotImplementedError
-    popitem = setdefault = update = _not_implemented
+    # useful for testing
+    def items(self):
+        return self._cache.items()
+
+    def __len__(self):
+        return len(self._cache)

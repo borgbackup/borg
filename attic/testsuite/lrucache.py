@@ -10,8 +10,7 @@ class LRUCacheTestCase(AtticTestCase):
         for i, x in enumerate('abc'):
             c[x] = i
         self.assert_equal(len(c), 2)
-        self.assert_equal(set(c), set(['b', 'c']))
-        self.assert_equal(set(c.items()), set([('b', 1), ('c', 2)]))
+        self.assert_equal(c.items(), set([('b', 1), ('c', 2)]))
         self.assert_equal(False, 'a' in c)
         self.assert_equal(True, 'b' in c)
         self.assert_raises(KeyError, lambda: c['a'])
@@ -25,10 +24,3 @@ class LRUCacheTestCase(AtticTestCase):
         self.assert_equal(len(c), 1)
         self.assert_raises(KeyError, lambda: c['c'])
         self.assert_equal(c['d'], 3)
-
-    def test_pop(self):
-        c = LRUCache(2, dispose=lambda _: None)
-        c[1] = 1
-        c[2] = 2
-        c.pop(1)
-        c[3] = 3

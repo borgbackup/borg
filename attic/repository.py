@@ -515,7 +515,9 @@ class LoggedIO(object):
             header = fd.read(self.header_fmt.size)
 
     def recover_segment(self, segment, filename):
-        self.fds.pop(segment).close()
+        fd = self.fds.pop(segment)
+        if fd is not None:
+            fd.close()
         # FIXME: save a copy of the original file
         with open(filename, 'rb') as fd:
             data = memoryview(fd.read())

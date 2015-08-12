@@ -2,11 +2,12 @@ import hashlib
 from time import mktime, strptime
 from datetime import datetime, timezone, timedelta
 
+import pytest
 import msgpack
 
 from ..helpers import adjust_patterns, exclude_path, Location, format_timedelta, ExcludePattern, make_path_safe, \
     prune_within, prune_split, \
-    StableDict, int_to_bigint, bigint_to_int, parse_timestamp
+    StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec
 from . import BaseTestCase
 
 
@@ -102,6 +103,35 @@ class PatternTestCase(BaseTestCase):
                           ['/etc/passwd', '/etc/hosts', '/home', '/home/user/.bashrc'])
         self.assert_equal(self.evaluate(['/etc/', '/var'], ['dmesg']),
                           ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg'])
+
+
+def test_compression_specs():
+    with pytest.raises(ValueError):
+        CompressionSpec('')
+    assert CompressionSpec('0') == dict(name='null')
+    assert CompressionSpec('1') == dict(name='zlib', level=1)
+    assert CompressionSpec('9') == dict(name='zlib', level=9)
+    assert CompressionSpec('10') == dict(name='lz4')
+    with pytest.raises(ValueError):
+        CompressionSpec('11')
+    assert CompressionSpec('20') == dict(name='lzma', level=0)
+    assert CompressionSpec('29') == dict(name='lzma', level=9)
+    with pytest.raises(ValueError):
+        CompressionSpec('30')
+    assert CompressionSpec('null') == dict(name='null')
+    assert CompressionSpec('lz4') == dict(name='lz4')
+    assert CompressionSpec('zlib') == dict(name='zlib', level=6)
+    assert CompressionSpec('zlib,0') == dict(name='zlib', level=0)
+    assert CompressionSpec('zlib,9') == dict(name='zlib', level=9)
+    with pytest.raises(ValueError):
+        CompressionSpec('zlib,9,invalid')
+    assert CompressionSpec('lzma') == dict(name='lzma', level=6)
+    assert CompressionSpec('lzma,0') == dict(name='lzma', level=0)
+    assert CompressionSpec('lzma,9') == dict(name='lzma', level=9)
+    with pytest.raises(ValueError):
+        CompressionSpec('lzma,9,invalid')
+    with pytest.raises(ValueError):
+        CompressionSpec('invalid')
 
 
 class MakePathSafeTestCase(BaseTestCase):

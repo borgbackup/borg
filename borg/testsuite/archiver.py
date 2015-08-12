@@ -187,7 +187,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
         self.assert_equal(len(self.cmd('list', self.repository_location).splitlines()), 2)
-        self.assert_equal(len(self.cmd('list', self.repository_location + '::test').splitlines()), 11)
+        file_count = 10 if has_lchflags else 11  # one file is UF_NODUMP
+        self.assert_equal(len(self.cmd('list', self.repository_location + '::test').splitlines()), file_count)
         self.assert_dirs_equal('input', 'output/input')
         info_output = self.cmd('info', self.repository_location + '::test')
         self.assert_in('Number of files: 4', info_output)

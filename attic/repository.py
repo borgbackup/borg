@@ -598,7 +598,8 @@ class FsyncWorker(object):
     def __init__(self):
         self.channel = Channel()
         self.exception = None
-        thread = threading.Thread(target=self._run, daemon=True)
+        thread = threading.Thread(target=self._run)
+        thread.daemon = True
         thread.start()
 
     def _run(self):

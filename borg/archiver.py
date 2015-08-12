@@ -24,6 +24,8 @@ from .helpers import Error, location_validator, format_time, format_file_size, \
     is_cachedir, bigint_to_int, ChunkerParams
 from .remote import RepositoryServer, RemoteRepository
 
+has_lchflags = hasattr(os, 'lchflags')
+
 
 class Archiver:
 
@@ -172,6 +174,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         if restrict_dev and st.st_dev != restrict_dev:
             return
         status = None
+        # Ignore if nodump flag is set
+        if has_lchflags and (st.st_flags & stat.UF_NODUMP):
+            return
         if stat.S_ISREG(st.st_mode):
             try:
                 status = archive.process_file(path, st, cache)

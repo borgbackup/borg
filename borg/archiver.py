@@ -859,7 +859,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         return args.func(args)
 
 
-def sig_info_handler(signum, stack):
+def sig_info_handler(signum, stack):  # pragma: no cover
     """search the stack for infos about the currently processed file and print them"""
     for frame in inspect.getouterframes(stack):
         func, loc = frame[3], frame[0].f_locals
@@ -882,7 +882,7 @@ def sig_info_handler(signum, stack):
             break
 
 
-def setup_signal_handlers():
+def setup_signal_handlers():  # pragma: no cover
     sigs = []
     if hasattr(signal, 'SIGUSR1'):
         sigs.append(signal.SIGUSR1)  # kill -USR1 pid
@@ -892,7 +892,7 @@ def setup_signal_handlers():
         signal.signal(sig, sig_info_handler)
 
 
-def main():
+def main():  # pragma: no cover
     # Make sure stdout and stderr have errors='replace') to avoid unicode
     # issues when print()-ing unicode file names
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=True)

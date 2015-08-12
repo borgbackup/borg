@@ -603,10 +603,10 @@ class FsyncWorker(object):
         thread.start()
 
     def _run(self):
-        while True: # worker thread loop
+        while True:  # worker thread loop
             task = self.channel.get()
-            if task == None:
-                break # thread shutdown requested
+            if task is None:
+                break  # thread shutdown requested
             try:
                 task()
             except Exception as e:
@@ -619,7 +619,7 @@ class FsyncWorker(object):
                 os.fsync(fd)
             finally:
                 fd.close()
-        self.flush() # raise any pending exception
+        self.flush()  # raise any pending exception
         self.channel.put(task)
 
     def flush(self):
@@ -632,7 +632,7 @@ class FsyncWorker(object):
             pass
         self.channel.put(task)
 
-        if self.exception != None:
+        if self.exception is not None:
             e = self.exception
             self.exception = None
             raise e
@@ -641,7 +641,7 @@ class FsyncWorker(object):
         try:
             self.flush()
         finally:
-            self.channel.put(None) # tell thread to shutdown
+            self.channel.put(None)  # tell thread to shutdown
 
 class Channel(object):
     """A blocking channel, like in CSP or Go.
@@ -659,4 +659,4 @@ class Channel(object):
 
     def put(self, item):
         self.q.put(item)
-        self.q.join() # wait for task_done(), in reader thread
+        self.q.join()  # wait for task_done(), in reader thread

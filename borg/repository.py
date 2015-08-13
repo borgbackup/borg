@@ -7,6 +7,8 @@ import shutil
 import struct
 import sys
 from zlib import crc32
+import threading
+import queue
 
 from .hashindex import NSIndex
 from .helpers import Error, IntegrityError, read_msgpack, write_msgpack, unhexlify
@@ -438,11 +440,13 @@ class LoggedIO:
         self.segments_per_dir = segments_per_dir
         self.offset = 0
         self._write_fd = None
+        self.writeback = WritebackThread()
 
     def close(self):
         for segment in list(self.fds.keys()):
             self.fds.pop(segment).close()
         self.close_segment()
+        self.writeback.close()
         self.fds = None  # Just to make sure we're disabled
 
     def segment_iterator(self, reverse=False):
@@ -622,16 +626,112 @@ class LoggedIO:
         crc = self.crc_fmt.pack(crc32(header) & 0xffffffff)
         fd.write(b''.join((crc, header)))
         self.close_segment()
+        self.writeback.flush()
 
     def close_segment(self):
         if self._write_fd:
             self.segment += 1
             self.offset = 0
-            self._write_fd.flush()
-            os.fsync(self._write_fd.fileno())
-            if hasattr(os, 'posix_fadvise'):  # python >= 3.3, only on UNIX
-                # tell the OS that it does not need to cache what we just wrote,
-                # avoids spoiling the cache for the OS and other processes.
-                os.posix_fadvise(self._write_fd.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
-            self._write_fd.close()
+            self.writeback.submit_fd(self._write_fd)
             self._write_fd = None
+
+
+class WritebackThread(object):
+    """A background thread to flush buffered writes to permanent storage.
+
+       One fd is processed at a time.  If the thread is already working,
+       the caller will block.  This provides double-buffering.  Credit
+       probably goes to Linus Torvalds because I read this message some
+       time ago :).
+
+       http://article.gmane.org/gmane.linux.kernel/988070
+       http://stackoverflow.com/a/3756466/799204
+
+       Any IO exceptions will be re-raised on the next method call.
+       (Naturally this applies to the .flush() and .close() methods as well
+       as .submit_fd()).
+    """
+
+    def __init__(self):
+        self.channel = Channel()
+        self.exception = None
+        thread = threading.Thread(target=self._run)
+        thread.daemon = True
+        thread.start()
+
+    def _run(self):
+        while True:  # worker thread loop
+            task = self.channel.get()
+            if task is None:
+                break  # thread shutdown requested
+            try:
+                task()
+            except Exception as e:
+                self.exception = e
+
+    def submit_fd(self, fd):
+        """Start flushing fd's buffered writes to permanent storage.
+
+           This requires ownership of fd; when finished the fd will be closed.
+        """
+        # Wait for pending writeback and re-raise any error
+        self.flush()
+
+        # Flush any python buffers to kernel (effectively calls os.write()).
+        # This can block just like fd.write() if we're writing too fast.
+        # So we block the caller exactly when we want to.
+        fd.flush()
+
+        # Background writeback task
+        def task():
+            try:
+                # Trigger writeback of kernel buffers and wait for all data
+                # to reach permanent storage.
+                os.fsync(fd.fileno())
+                if hasattr(os, 'posix_fadvise'):  # python >= 3.3, only on UNIX
+                    # tell the OS it does not need to cache what we just wrote,
+                    # avoids spoiling the cache for the OS and other processes.
+                    os.posix_fadvise(fd.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
+            finally:
+                fd.close()
+        self.channel.put(task)
+
+    def flush(self):
+        """Wait for any pending writeback.
+
+           This will also make sure an IOError is re-raised
+           in the calling thread, if necessary.
+        """
+        def task():
+            pass
+        self.channel.put(task)
+
+        if self.exception is not None:
+            e = self.exception
+            self.exception = None
+            raise e
+
+    def close(self):
+        try:
+            self.flush()
+        finally:
+            self.channel.put(None)  # tell thread to shutdown
+
+
+class Channel(object):
+    """A blocking channel, like in CSP or Go.
+
+       This can also be considered as a Queue with zero buffer space.
+    """
+
+    def __init__(self):
+        self.q = queue.Queue()
+
+    def get(self):
+        value = self.q.get()
+        self.q.task_done()
+        return value
+
+    def put(self, item):
+        self.q.put(item)
+        self.q.join()  # wait for task_done(), in reader thread

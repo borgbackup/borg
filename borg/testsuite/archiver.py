@@ -187,10 +187,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
         self.assert_equal(len(self.cmd('list', self.repository_location).splitlines()), 2)
-        self.assert_equal(len(self.cmd('list', self.repository_location + '::test').splitlines()), 11)
+        item_count = 10 if has_lchflags else 11  # one file is UF_NODUMP
+        self.assert_equal(len(self.cmd('list', self.repository_location + '::test').splitlines()), item_count)
+        if has_lchflags:
+            # remove the file we did not backup, so input and output become equal
+            os.remove(os.path.join('input', 'flagfile'))
         self.assert_dirs_equal('input', 'output/input')
         info_output = self.cmd('info', self.repository_location + '::test')
-        self.assert_in('Number of files: 4', info_output)
+        item_count = 3 if has_lchflags else 4  # one file is UF_NODUMP
+        self.assert_in('Number of files: %d' % item_count, info_output)
         shutil.rmtree(self.cache_path)
         with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='1'):
             info_output2 = self.cmd('info', self.repository_location + '::test')

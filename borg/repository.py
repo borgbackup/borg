@@ -336,7 +336,6 @@ class Repository:
             report_error('Adding commit tag to segment {}'.format(transaction_id))
             self.io.segment = transaction_id + 1
             self.io.write_commit()
-            self.io.close_segment()
         if current_index and not repair:
             if len(current_index) != len(self.index):
                 report_error('Index object count mismatch. {} != {}'.format(len(current_index), len(self.index)))
@@ -521,6 +520,9 @@ class LoggedIO:
             return fd
 
     def delete_segment(self, segment):
+        fd = self.fds.pop(segment)
+        if fd is not None:
+            fd.close()
         try:
             os.unlink(self.segment_filename(segment))
         except OSError:
@@ -563,7 +565,9 @@ class LoggedIO:
             header = fd.read(self.header_fmt.size)
 
     def recover_segment(self, segment, filename):
-        self.fds.pop(segment).close()
+        fd = self.fds.pop(segment)
+        if fd is not None:
+            fd.close()
         # FIXME: save a copy of the original file
         with open(filename, 'rb') as fd:
             data = memoryview(fd.read())

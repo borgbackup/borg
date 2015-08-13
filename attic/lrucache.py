@@ -1,3 +1,6 @@
+class _NotFound:
+    pass
+
 class LRUCache:
     def __init__(self, capacity, dispose):
         self._cache = {}
@@ -7,9 +10,8 @@ class LRUCache:
 
     def __setitem__(self, key, value):
         assert key not in self._cache, (
-            "Unexpected attempt to replace a cached item."
-            " If this is intended, please delete the old item first."
-            " The dispose function will be called on delete.")
+            "Unexpected attempt to replace a cached item,"
+            " without first deleting the old item.")
         self._lru.append(key)
         while len(self._lru) > self._capacity:
             del self[self._lru[0]]
@@ -28,11 +30,10 @@ class LRUCache:
             self._lru.remove(key)
         except ValueError:
             pass
-        error = KeyError(key)
-        removed = self._cache.pop(key, error)
-        if removed == error:
-            raise error
-        self._dispose(removed)
+        item = self._cache.pop(key, _NotFound)
+        if item is _NotFound:
+            raise KeyError(key)
+        self._dispose(item)
 
     def __contains__(self, key):
         return key in self._cache

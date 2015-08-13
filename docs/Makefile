@@ -73,17 +73,17 @@ qthelp:
 	@echo
 	@echo "Build finished; now you can run "qcollectiongenerator" with the" \
 	      ".qhcp project file in $(BUILDDIR)/qthelp, like this:"
-	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/attic.qhcp"
+	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/borg.qhcp"
 	@echo "To view the help file:"
-	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/attic.qhc"
+	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/borg.qhc"
 
 devhelp:
 	$(SPHINXBUILD) -b devhelp $(ALLSPHINXOPTS) $(BUILDDIR)/devhelp
 	@echo
 	@echo "Build finished."
 	@echo "To view the help file:"
-	@echo "# mkdir -p $$HOME/.local/share/devhelp/attic"
-	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/attic"
+	@echo "# mkdir -p $$HOME/.local/share/devhelp/borg"
+	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/borg"
 	@echo "# devhelp"
 
 epub:
@@ -130,17 +130,13 @@ doctest:
 	@echo "Testing of doctests in the sources finished, look at the " \
 	      "results in $(BUILDDIR)/doctest/output.txt."
 
-gh-pages: html
-	GH_PAGES_CLONE="`mktemp -d`" && \
-	git clone --branch gh-pages `git rev-parse --show-toplevel` $$GH_PAGES_CLONE && \
-	(cd $$GH_PAGES_CLONE && git rm -r *) && \
-	cp -r _build/html/* $$GH_PAGES_CLONE && \
-	(cd $$GH_PAGES_CLONE && git add -A && git commit -m 'Updated gh-pages' && git push) && \
-	rm -rf $$GH_PAGES_CLONE
+gh-io: html
+	GH_IO_CLONE="`mktemp -d`" && \
+    git clone git@github.com:borgbackup/borgbackup.github.io.git $$GH_IO_CLONE && \
+	(cd $$GH_IO_CLONE && git rm -r *) && \
+	cp -r _build/html/* $$GH_IO_CLONE && \
+	(cd $$GH_IO_CLONE && git add -A && git commit -m 'Updated borgbackup.github.io' && git push) && \
+	rm -rf $$GH_IO_CLONE
 
 inotify: html
 	while inotifywait -r . --exclude usage.rst --exclude '_build/*' ; do make html ; done
-
-upload: html
-	rsync -va -e ssh _build/html/ sushi.edgewall.com:/srv/attic/www/
-

@@ -1,6 +1,6 @@
-    # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
-# Attic documentation build configuration file, created by
+# documentation build configuration file, created by
 # sphinx-quickstart on Sat Sep 10 18:18:25 2011.
 #
 # This file is execfile()d with the current directory set to its containing dir.
@@ -11,12 +11,13 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys, os, attic
-
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-#sys.path.insert(0, os.path.abspath('.'))
+import sys, os
+sys.path.insert(0, os.path.abspath('..'))
+
+from borg import __version__ as sw_version
 
 # -- General configuration -----------------------------------------------------
 
@@ -40,15 +41,15 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'Attic - Deduplicating Archiver'
-copyright = '2010-2014, Jonas Borgström'
+project = 'Borg - Deduplicating Archiver'
+copyright = '2010-2014, Jonas Borgström, 2015 The Borg Collective (see AUTHORS file)'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
 # The short X.Y version.
-version = attic.__version__.split('-')[0]
+version = sw_version.split('-')[0]
 # The full version, including alpha/beta/rc tags.
 release = version
 
@@ -91,7 +92,7 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'attic'
+html_theme = 'local'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -120,7 +121,7 @@ html_theme_path = ['_themes']
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = []
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -133,7 +134,7 @@ html_static_path = ['_static']
 # Custom sidebar templates, maps document names to template names.
 html_sidebars = {
     'index': ['sidebarlogo.html', 'sidebarusefullinks.html', 'searchbox.html'],
-    '**': ['sidebarlogo.html', 'localtoc.html', 'relations.html', 'sidebarusefullinks.html', 'searchbox.html']
+    '**': ['sidebarlogo.html', 'relations.html', 'searchbox.html', 'localtoc.html', 'sidebarusefullinks.html']
 }
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
@@ -166,7 +167,7 @@ html_show_copyright = False
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'atticdoc'
+htmlhelp_basename = 'borgdoc'
 
 
 # -- Options for LaTeX output --------------------------------------------------
@@ -180,8 +181,8 @@ htmlhelp_basename = 'atticdoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'Attic.tex', 'Attic Documentation',
-   'Jonas Borgström', 'manual'),
+  ('index', 'Borg.tex', 'Borg Documentation',
+   'see "AUTHORS" file', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -213,14 +214,13 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 #man_pages = [
-#    ('man', 'attic', 'Attic',
-#     ['Jonas Borgström'], 1)
+#    ('man', 'borg', 'Borg',
+#     ['see "AUTHORS" file'], 1)
 #]
 
 extensions = ['sphinx.ext.extlinks']
 
 extlinks = {
-    'issue': ('https://github.com/jborg/attic/issues/%s', '#'),
-    'targz_url': ('https://pypi.python.org/packages/source/A/Attic/%%s-%s.tar.gz' % version, None),
-    'artifacts': ('https://attic-backup.org/downloads/releases/%s/%%s' % version, '')
-        }
+    'issue': ('https://github.com/borgbackup/borg/issues/%s', '#'),
+    'targz_url': ('https://pypi.python.org/packages/source/b/borgbackup/%%s-%s.tar.gz' % version, None),
+}

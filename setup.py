@@ -4,27 +4,27 @@ import sys
 from glob import glob
 
 import versioneer
-versioneer.versionfile_source = 'attic/_version.py'
-versioneer.versionfile_build = 'attic/_version.py'
+versioneer.VCS = 'git'
+versioneer.style = 'pep440'
+versioneer.versionfile_source = 'borg/_version.py'
+versioneer.versionfile_build = 'borg/_version.py'
 versioneer.tag_prefix = ''
-versioneer.parentdir_prefix = 'Attic-' # dirname like 'myproject-1.2.0'
+versioneer.parentdir_prefix = 'borgbackup-'  # dirname like 'myproject-1.2.0'
 
 min_python = (3, 2)
 if sys.version_info < min_python:
-    print("Attic requires Python %d.%d or later" % min_python)
+    print("Borg requires Python %d.%d or later" % min_python)
     sys.exit(1)
 
-try:
-    from setuptools import setup, Extension
-except ImportError:
-    from distutils.core import setup, Extension
 
-crypto_source = 'attic/crypto.pyx'
-chunker_source = 'attic/chunker.pyx'
-hashindex_source = 'attic/hashindex.pyx'
-platform_linux_source = 'attic/platform_linux.pyx'
-platform_darwin_source = 'attic/platform_darwin.pyx'
-platform_freebsd_source = 'attic/platform_freebsd.pyx'
+from setuptools import setup, Extension
+
+crypto_source = 'borg/crypto.pyx'
+chunker_source = 'borg/chunker.pyx'
+hashindex_source = 'borg/hashindex.pyx'
+platform_linux_source = 'borg/platform_linux.pyx'
+platform_darwin_source = 'borg/platform_darwin.pyx'
+platform_freebsd_source = 'borg/platform_freebsd.pyx'
 
 try:
     from Cython.Distutils import build_ext
@@ -32,14 +32,20 @@ try:
 
     class Sdist(versioneer.cmd_sdist):
         def __init__(self, *args, **kwargs):
-            for src in glob('attic/*.pyx'):
-                cython_compiler.compile(glob('attic/*.pyx'),
-                                        cython_compiler.default_options)
+            for src in glob('borg/*.pyx'):
+                cython_compiler.compile(src, cython_compiler.default_options)
             versioneer.cmd_sdist.__init__(self, *args, **kwargs)
 
         def make_distribution(self):
-            self.filelist.extend(['attic/crypto.c', 'attic/chunker.c', 'attic/_chunker.c', 'attic/hashindex.c', 'attic/_hashindex.c', 'attic/platform_linux.c', 'attic/platform_freebsd.c', 'attic/platform_darwin.c'])
-            super(Sdist, self).make_distribution()
+            self.filelist.extend([
+                'borg/crypto.c',
+                'borg/chunker.c', 'borg/_chunker.c',
+                'borg/hashindex.c', 'borg/_hashindex.c',
+                'borg/platform_linux.c',
+                'borg/platform_freebsd.c',
+                'borg/platform_darwin.c',
+            ])
+            super().make_distribution()
 
 except ImportError:
     class Sdist(versioneer.cmd_sdist):
@@ -54,7 +60,7 @@ except ImportError:
     platform_darwin_source = platform_darwin_source.replace('.pyx', '.c')
     from distutils.command.build_ext import build_ext
     if not all(os.path.exists(path) for path in [crypto_source, chunker_source, hashindex_source, platform_linux_source, platform_freebsd_source]):
-        raise ImportError('The GIT version of Attic needs Cython. Install Cython or use a released version')
+        raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version')
 
 
 def detect_openssl(prefixes):
@@ -66,9 +72,9 @@ def detect_openssl(prefixes):
                     return prefix
 
 
-possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl', '/usr/local/attic', '/opt/local']
-if os.environ.get('ATTIC_OPENSSL_PREFIX'):
-    possible_openssl_prefixes.insert(0, os.environ.get('ATTIC_OPENSSL_PREFIX'))
+possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl', '/usr/local/borg', '/opt/local']
+if os.environ.get('BORG_OPENSSL_PREFIX'):
+    possible_openssl_prefixes.insert(0, os.environ.get('BORG_OPENSSL_PREFIX'))
 ssl_prefix = detect_openssl(possible_openssl_prefixes)
 if not ssl_prefix:
     raise Exception('Unable to find OpenSSL >= 1.0 headers. (Looked here: {})'.format(', '.join(possible_openssl_prefixes)))
@@ -83,27 +89,27 @@ cmdclass = versioneer.get_cmdclass()
 cmdclass.update({'build_ext': build_ext, 'sdist': Sdist})
 
 ext_modules = [
-    Extension('attic.crypto', [crypto_source], libraries=['crypto'], include_dirs=include_dirs, library_dirs=library_dirs),
-    Extension('attic.chunker', [chunker_source]),
-    Extension('attic.hashindex', [hashindex_source])
+    Extension('borg.crypto', [crypto_source], libraries=['crypto'], include_dirs=include_dirs, library_dirs=library_dirs),
+    Extension('borg.chunker', [chunker_source]),
+    Extension('borg.hashindex', [hashindex_source])
 ]
 if sys.platform.startswith('linux'):
-    ext_modules.append(Extension('attic.platform_linux', [platform_linux_source], libraries=['acl']))
+    ext_modules.append(Extension('borg.platform_linux', [platform_linux_source], libraries=['acl']))
 elif sys.platform.startswith('freebsd'):
-    ext_modules.append(Extension('attic.platform_freebsd', [platform_freebsd_source]))
+    ext_modules.append(Extension('borg.platform_freebsd', [platform_freebsd_source]))
 elif sys.platform == 'darwin':
-    ext_modules.append(Extension('attic.platform_darwin', [platform_darwin_source]))
+    ext_modules.append(Extension('borg.platform_darwin', [platform_darwin_source]))
 
 setup(
-    name='Attic',
+    name='borgbackup',
     version=versioneer.get_version(),
-    author='Jonas Borgstrom',
-    author_email='jonas@borgstrom.se',
-    url='https://attic-backup.org/',
-    description='Deduplicated backups',
+    author='The Borg Collective (see AUTHORS file)',
+    author_email='borgbackup@librelist.com',
+    url='https://borgbackup.github.io/',
+    description='Deduplicated, encrypted, authenticated and compressed backups',
     long_description=long_description,
     license='BSD',
-    platforms=['Linux', 'MacOS X'],
+    platforms=['Linux', 'MacOS X', 'FreeBSD', ],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Console',
@@ -113,12 +119,22 @@ setup(
         'Operating System :: MacOS :: MacOS X',
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.2',
+        'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.4',
         'Topic :: Security :: Cryptography',
         'Topic :: System :: Archiving :: Backup',
     ],
-    packages=['attic', 'attic.testsuite'],
-    scripts=['scripts/attic'],
+    packages=['borg', 'borg.testsuite'],
+    entry_points={
+        'console_scripts': [
+            'borg = borg.archiver:main',
+        ]
+    },
     cmdclass=cmdclass,
     ext_modules=ext_modules,
-    install_requires=['msgpack-python']
+    # msgpack pure python data corruption was fixed in 0.4.6.
+    # Also, we might use some rather recent API features.
+    install_requires=['msgpack-python>=0.4.6']
 )

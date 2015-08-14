@@ -183,14 +183,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_test_files()
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('create', self.repository_location + '::test.2', 'input')
+        self.cmd('create', '--stats', self.repository_location + '::test.2', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
         self.assert_equal(len(self.cmd('list', self.repository_location).splitlines()), 2)
-        self.assert_equal(len(self.cmd('list', self.repository_location + '::test').splitlines()), 11)
+        item_count = 10 if has_lchflags else 11  # one file is UF_NODUMP
+        self.assert_equal(len(self.cmd('list', self.repository_location + '::test').splitlines()), item_count)
+        if has_lchflags:
+            # remove the file we did not backup, so input and output become equal
+            os.remove(os.path.join('input', 'flagfile'))
         self.assert_dirs_equal('input', 'output/input')
         info_output = self.cmd('info', self.repository_location + '::test')
-        self.assert_in('Number of files: 4', info_output)
+        item_count = 3 if has_lchflags else 4  # one file is UF_NODUMP
+        self.assert_in('Number of files: %d' % item_count, info_output)
         shutil.rmtree(self.cache_path)
         with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='1'):
             info_output2 = self.cmd('info', self.repository_location + '::test')
@@ -403,7 +408,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
         self.cmd('delete', self.repository_location + '::test')
         self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
-        self.cmd('delete', self.repository_location + '::test.2')
+        self.cmd('delete', '--stats', self.repository_location + '::test.2')
         # Make sure all data except the manifest has been deleted
         repository = Repository(self.repository_path)
         self.assert_equal(len(repository), 1)
@@ -470,9 +475,37 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_not_in('test1', output)
         self.assert_in('test2', output)
 
+    def test_prune_repository_prefix(self):
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::foo-2015-08-12-10:00', src_dir)
+        self.cmd('create', self.repository_location + '::foo-2015-08-12-20:00', src_dir)
+        self.cmd('create', self.repository_location + '::bar-2015-08-12-10:00', src_dir)
+        self.cmd('create', self.repository_location + '::bar-2015-08-12-20:00', src_dir)
+        output = self.cmd('prune', '-v', '--dry-run', self.repository_location, '--keep-daily=2', '--prefix=foo-')
+        self.assert_in('Keeping archive: foo-2015-08-12-20:00', output)
+        self.assert_in('Would prune:     foo-2015-08-12-10:00', output)
+        output = self.cmd('list', self.repository_location)
+        self.assert_in('foo-2015-08-12-10:00', output)
+        self.assert_in('foo-2015-08-12-20:00', output)
+        self.assert_in('bar-2015-08-12-10:00', output)
+        self.assert_in('bar-2015-08-12-20:00', output)
+        self.cmd('prune', self.repository_location, '--keep-daily=2', '--prefix=foo-')
+        output = self.cmd('list', self.repository_location)
+        self.assert_not_in('foo-2015-08-12-10:00', output)
+        self.assert_in('foo-2015-08-12-20:00', output)
+        self.assert_in('bar-2015-08-12-10:00', output)
+        self.assert_in('bar-2015-08-12-20:00', output)
+
     def test_usage(self):
         self.assert_raises(SystemExit, lambda: self.cmd())
         self.assert_raises(SystemExit, lambda: self.cmd('-h'))
+
+    def test_help(self):
+        assert 'Borg' in self.cmd('help')
+        assert 'patterns' in self.cmd('help', 'patterns')
+        assert 'Initialize' in self.cmd('help', 'init')
+        assert 'positional arguments' not in self.cmd('help', 'init', '--epilog-only')
+        assert 'This command initializes' not in self.cmd('help', 'init', '--usage-only')
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
     def test_fuse_mount_repository(self):

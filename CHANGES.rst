@@ -34,6 +34,30 @@ New features:
 - create --compression lzma,N (slowest, highest compression, default N is 6)
 
 
+Version 0.25.0 (not released yet)
+---------------------------------
+
+Incompatible changes (compared to 0.24):
+
+- none yet
+
+Deprecations:
+
+- none yet
+
+New features:
+
+- honor the nodump flag (UF_NODUMP) and do not backup such items
+
+Bug fixes:
+
+- close fds of segments we delete (during compaction)
+
+Other changes:
+
+- none yet
+
+
 Version 0.24.0
 --------------
 

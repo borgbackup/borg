@@ -66,13 +66,11 @@ Some of the steps detailled below might be useful also for non-git installs.
     # if you do not have gcc / make / etc. yet
     apt-get install build-essential
 
-    # optional: lowlevel FUSE py binding - to mount backup archives
+    # optional: FUSE support - to mount backup archives
     # in case you get complaints about permission denied on /etc/fuse.conf:
     # on ubuntu this means your user is not in the "fuse" group. just add
     # yourself there, log out and log in again.
-    # if it complains about not being able to find llfuse: make a symlink
-    # borg-env/lib/python3.4/site-packages/llfuse -> /usr/lib/python3/dist-packages/llfuse
-    apt-get install python3-llfuse fuse
+    apt-get install libfuse-dev fuse
 
     # optional: for unit testing
     apt-get install fakeroot
@@ -88,6 +86,7 @@ Some of the steps detailled below might be useful also for non-git installs.
     pip install cython  # compile .pyx -> .c
     pip install tox pytest  # optional, for running unit tests
     pip install sphinx  # optional, to build the docs
+    pip install llfuse  # optional, for FUSE support
     cd borg
     pip install -e .  # in-place editable mode
 
@@ -115,9 +114,9 @@ Some of the steps detailled below might be useful also for non-git installs.
     # lz4 super fast compression support Headers + Library
     sudo dnf install lz4
 
-    # optional: lowlevel FUSE py binding - to mount backup archives
-    sudo dnf install python3-llfuse fuse
-
+    # optional: FUSE support - to mount backup archives
+    sudo dnf install fuse-devel fuse
+    
     # optional: for unit testing
     sudo dnf install fakeroot
 
@@ -132,6 +131,7 @@ Some of the steps detailled below might be useful also for non-git installs.
     pip install cython  # compile .pyx -> .c
     pip install tox pytest  # optional, for running unit tests
     pip install sphinx  # optional, to build the docs
+    pip install llfuse  # optional, for FUSE support
     cd borg
     pip install -e .  # in-place editable mode
 

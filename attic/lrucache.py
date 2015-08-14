@@ -1,6 +1,3 @@
-class _NotFound:
-    pass
-
 class LRUCache:
     def __init__(self, capacity, dispose):
         self._cache = {}
@@ -18,22 +15,15 @@ class LRUCache:
         self._cache[key] = value
 
     def __getitem__(self, key):
-        try:
-            self._lru.remove(key)
-            self._lru.append(key)
-        except ValueError:
-            pass
-        return self._cache[key]
+        value = self._cache[key]  # raise KeyError if not found
+        self._lru.remove(key)
+        self._lru.append(key)
+        return value
 
     def __delitem__(self, key):
-        try:
-            self._lru.remove(key)
-        except ValueError:
-            pass
-        item = self._cache.pop(key, _NotFound)
-        if item is _NotFound:
-            raise KeyError(key)
-        self._dispose(item)
+        value = self._cache.pop(key)  # raise KeyError if not found
+        self._dispose(value)
+        self._lru.remove(key)
 
     def __contains__(self, key):
         return key in self._cache

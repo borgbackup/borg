@@ -108,17 +108,12 @@ class PatternTestCase(BaseTestCase):
 def test_compression_specs():
     with pytest.raises(ValueError):
         CompressionSpec('')
-    assert CompressionSpec('0') == dict(name='null')
+    assert CompressionSpec('0') == dict(name='zlib', level=0)
     assert CompressionSpec('1') == dict(name='zlib', level=1)
     assert CompressionSpec('9') == dict(name='zlib', level=9)
-    assert CompressionSpec('10') == dict(name='lz4')
     with pytest.raises(ValueError):
-        CompressionSpec('11')
-    assert CompressionSpec('20') == dict(name='lzma', level=0)
-    assert CompressionSpec('29') == dict(name='lzma', level=9)
-    with pytest.raises(ValueError):
-        CompressionSpec('30')
-    assert CompressionSpec('null') == dict(name='null')
+        CompressionSpec('10')
+    assert CompressionSpec('none') == dict(name='none')
     assert CompressionSpec('lz4') == dict(name='lz4')
     assert CompressionSpec('zlib') == dict(name='zlib', level=6)
     assert CompressionSpec('zlib,0') == dict(name='zlib', level=0)

@@ -68,7 +68,7 @@ class KeyBase:
         self.TYPE_STR = bytes([self.TYPE])
         self.repository = repository
         self.target = None  # key location file path / repo obj
-        self.compressor = Compressor('null', buffer=COMPR_BUFFER)
+        self.compressor = Compressor('none', buffer=COMPR_BUFFER)
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key

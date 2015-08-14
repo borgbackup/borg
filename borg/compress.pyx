@@ -35,12 +35,12 @@ cdef class CompressorBase:
         return data[2:]
 
 
-class CNULL(CompressorBase):
+class CNONE(CompressorBase):
     """
-    null compression, just pass through data
+    none - no compression, just pass through data
     """
     ID = b'\x00\x00'
-    name = 'null'
+    name = 'none'
 
     def compress(self, data):
         return super().compress(data)
@@ -161,12 +161,12 @@ class ZLIB(CompressorBase):
 
 
 COMPRESSOR_TABLE = {
-    CNULL.name: CNULL,
+    CNONE.name: CNONE,
     LZ4.name: LZ4,
     ZLIB.name: ZLIB,
     LZMA.name: LZMA,
 }
-COMPRESSOR_LIST = [LZ4, CNULL, ZLIB, LZMA, ]  # check fast stuff first
+COMPRESSOR_LIST = [LZ4, CNONE, ZLIB, LZMA, ]  # check fast stuff first
 
 def get_compressor(name, **kwargs):
     cls = COMPRESSOR_TABLE[name]

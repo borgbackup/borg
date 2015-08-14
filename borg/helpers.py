@@ -295,20 +295,14 @@ def CompressionSpec(s):
         compression = int(compression)
         if count > 1:
             raise ValueError
-        # it is just --compression N
-        if compression == 0:
-            return dict(name='null')
-        if 1 <= compression <= 9:
+        # DEPRECATED: it is just --compression N
+        if 0 <= compression <= 9:
             return dict(name='zlib', level=compression)
-        if compression == 10:
-            return dict(name='lz4')
-        if 20 <= compression <= 29:
-            return dict(name='lzma', level=compression-20)
         raise ValueError
     except ValueError:
         # --compression algo[,...]
         name = compression
-        if name in ('null', 'lz4', ):
+        if name in ('none', 'lz4', ):
             return dict(name=name)
         if name in ('zlib', 'lzma', ):
             if count < 2:

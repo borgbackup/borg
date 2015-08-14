@@ -668,17 +668,13 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
                                help='specify the chunker parameters. default: %d,%d,%d,%d' % CHUNKER_PARAMS)
         subparser.add_argument('-C', '--compression', dest='compression',
-                               type=CompressionSpec, default=dict(name='null'), metavar='COMPRESSION',
-                               help='select compression algorithm and level, by giving a number: '
-                                    '0 == no compression [default], '
-                                    '1..9 == zlib level 1..9, '
-                                    '10 == lz4, '
-                                    '20-29 == lzma level 0..9.'
-                                    'Alternatively, you can also give a name and optionally additional args: '
-                                    'null == no compression, '
+                               type=CompressionSpec, default=dict(name='none'), metavar='COMPRESSION',
+                               help='select compression algorithm (and level): '
+                                    'none == no compression (default), '
+                                    'lz4 == lz4, '
                                     'zlib == zlib (default level 6), '
                                     'zlib,0 .. zlib,9 == zlib (with level 0..9), '
-                                    'lz4 == lz4, '
+                                    'lzma == lzma (default level 6), '
                                     'lzma,0 .. lzma,9 == lzma (with level 0..9).')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),

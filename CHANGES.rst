@@ -1,6 +1,38 @@
 Borg Changelog
 ==============
 
+Compression branch
+------------------
+
+Compatibility notes:
+
+- the new compression code is very compatible: as long as you stay with zlib
+  compression, older borg releases will still be able to read data from a
+  repo/archive made with the new code (note: this is not the case for the
+  default "none" compression, use "zlib,0" if you want a "no compression" mode
+  that can be read by older borg). Also the new code is able to read repos and
+  archives made with older borg versions (for all zlib levels  0..9).
+
+Deprecations:
+
+- --compression N (with N being a number, as in 0.24) is deprecated.
+  We keep the --compression 0..9 for now to not break scripts, but it is
+  deprecated and will be removed later, so better fix your scripts now:
+  --compression 0 (as in 0.24) is the same as --compression zlib,0 (now).
+  BUT: if you do not want compression, you rather want --compression none
+  (which is the default).
+  --compression 1 (in 0.24) is the same as --compression zlib,1 (now)
+  --compression 9 (in 0.24) is the same as --compression zlib,9 (now)
+
+New features:
+
+- create --compression none (default, means: do not compress, just pass through
+  data "as is". this is more efficient than zlib level 0 as used in borg 0.24)
+- create --compression lz4 (super-fast, but not very high compression)
+  Please note that borgbackup needs lz4 library as additional requirement.
+- create --compression zlib,N (slower, higher compression, default for N is 6)
+- create --compression lzma,N (slowest, highest compression, default N is 6)
+
 
 Version 0.24.0
 --------------

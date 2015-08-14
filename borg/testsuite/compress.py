@@ -6,7 +6,7 @@ except ImportError:
 
 import pytest
 
-from ..compress import get_compressor, Compressor, CNULL, ZLIB, LZ4
+from ..compress import get_compressor, Compressor, CNONE, ZLIB, LZ4
 
 
 buffer = bytes(2**16)
@@ -15,8 +15,8 @@ params = dict(name='zlib', level=6, buffer=buffer)
 
 
 def test_get_compressor():
-    c = get_compressor(name='null')
-    assert isinstance(c, CNULL)
+    c = get_compressor(name='none')
+    assert isinstance(c, CNONE)
     c = get_compressor(name='lz4', buffer=buffer)
     assert isinstance(c, LZ4)
     c = get_compressor(name='zlib')
@@ -26,7 +26,7 @@ def test_get_compressor():
 
 
 def test_cnull():
-    c = get_compressor(name='null')
+    c = get_compressor(name='none')
     cdata = c.compress(data)
     assert len(cdata) > len(data)
     assert data in cdata  # it's not compressed and just in there 1:1
@@ -83,7 +83,7 @@ def test_zlib_compat():
 
 def test_compressor():
     params_list = [
-        dict(name='null', buffer=buffer),
+        dict(name='none', buffer=buffer),
         dict(name='lz4', buffer=buffer),
         dict(name='zlib', level=0, buffer=buffer),
         dict(name='zlib', level=6, buffer=buffer),

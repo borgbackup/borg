@@ -1,0 +1,17 @@
+[run]
+branch = True
+source = borg
+omit =
+    borg/__init__.py
+    borg/__main__.py
+    borg/_version.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if 0:
+    if __name__ == .__main__.:
+ignore_errors = True

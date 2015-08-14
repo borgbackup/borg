@@ -1,0 +1,174 @@
+@import url("basic.css");
+@import url(//fonts.googleapis.com/css?family=Black+Ops+One);
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: black;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+div.related {
+  display: none;
+  background-color: black;
+  padding: .4em;
+  width: 800px;
+  margin: 0 auto;
+}
+
+div.related a {
+  color: white;
+  text-decoration: none;
+}
+
+div.document {
+  width: 1030px;
+  margin: 0 auto;
+}
+
+div.documentwrapper {
+  float: right;
+  width: 760px;
+  padding: 0 20px 20px 20px;
+  color: #00aa00;
+  background-color: #000000;
+  margin-bottom: 2em;
+}
+
+div.sphinxsidebar {
+  margin-left: 0;
+  padding-right: 20px;
+  width: 230px;
+  background: #081008;
+  position: absolute;
+  top: 0;
+  min-height: 100%;
+}
+
+h1, h2, h3 {
+  font-weight: normal;
+  color: #33dd33;
+}
+
+h1 {
+  margin: .8em 0 .5em;
+  font-size: 200%;
+}
+
+h2 {
+  margin: 1.2em 0 .6em;
+  font-size: 140%;
+}
+
+h3 {
+  margin: 1.2em 0 .6em;
+  font-size: 110%;
+}
+
+ul {
+  padding-left: 1.2em;
+  margin-bottom: .3em;
+}
+
+ul ul {
+  font-size: 95%;
+}
+
+li {
+  margin: .1em 0;
+}
+
+a:link {
+  color: #dddd00;
+  text-decoration: none;
+}
+
+a:visited {
+  color: #990000;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #dd0000;
+  border-bottom: 1px dotted #dd0000;
+}
+
+div.sphinxsidebar a:link, div.sphinxsidebar a:visited {
+  border-bottom: 1px dotted #555;
+}
+
+div.sphinxsidebar {
+  color: #00aa00;
+  background: 0000000;
+}
+
+div.sphinxsidebar input {
+  color: #00cc00;
+  background: 0000000;
+  border: 1px solid #444444;
+}
+
+pre {
+  padding: 10px 20px;
+  background: #101010;
+  color: #22cc22;
+  line-height: 1.5em;
+  border-bottom: 2px solid black;
+}
+
+pre a:link,
+pre a:visited {
+  color: #00b0e4;
+}
+
+div.sidebarlogo .title {
+  font-family: 'Black Ops One', cursive;
+  font-size: 500%;
+}
+
+div.sidebarlogo a {
+  color: #00dd00;
+}
+
+div.sidebarlogo .subtitle {
+  font-style: italic;
+  color: #777;
+}
+
+tt span.pre {
+  font-size: 110%;
+}
+
+dt {
+  font-size: 95%;
+}
+
+div.admonition p.admonition-title + p {
+  display: inline;
+}
+
+div.admonition p {
+  margin-bottom: 5px;
+}
+
+p.admonition-title {
+  display: inline;
+}
+
+p.admonition-title:after {
+  content: ":";
+}
+
+div.note {
+  background-color: #002211;
+  border-bottom: 2px solid #22dd22;
+}
+
+div.seealso {
+  background-color: #0fe;
+  border: 1px solid #0f6;
+  border-radius: .4em;
+  box-shadow: 2px 2px #dd6;
+}
+

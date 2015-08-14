@@ -1,12 +1,47 @@
+sudo: required
+
 language: python
-python:
-  - "3.2"
-  - "3.3"
-  - "3.4"
-# command to install dependencies
+
+cache:
+    directories:
+        - $HOME/.cache/pip
+
+matrix:
+    include:
+        - python: 3.2
+          os: linux
+          env: TOXENV=py32
+        - python: 3.3
+          os: linux
+          env: TOXENV=py33
+        - python: 3.4
+          os: linux
+          env: TOXENV=py34
+        - language: generic
+          os: osx
+          osx_image: xcode6.4
+          env: TOXENV=py32
+        - language: generic
+          os: osx
+          osx_image: xcode6.4
+          env: TOXENV=py33
+        - language: generic
+          os: osx
+          osx_image: xcode6.4
+          env: TOXENV=py34
+
 install:
-  - "sudo apt-get install -y libacl1-dev"
-  - "pip install --use-mirrors Cython"
-  - "pip install -e ."
-# command to run tests
-script: fakeroot -u python -m attic.testsuite.run -vb
+    - ./.travis/install.sh
+
+script:
+    - ./.travis/run.sh
+
+after_success:
+    - ./.travis/upload_coverage.sh
+
+notifications:
+    irc:
+        channels:
+            - "irc.freenode.org#borgbackup"
+        use_notice: true
+        skip_join: true

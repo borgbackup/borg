@@ -1,8 +1,9 @@
 Borg Changelog
 ==============
 
-Compression branch
-------------------
+
+Version 0.25.0 (not released yet)
+---------------------------------
 
 Compatibility notes:
 
@@ -24,6 +25,7 @@ Deprecations:
   --compression 1 (in 0.24) is the same as --compression zlib,1 (now)
   --compression 9 (in 0.24) is the same as --compression zlib,9 (now)
 
+
 New features:
 
 - create --compression none (default, means: do not compress, just pass through
@@ -32,21 +34,6 @@ New features:
   Please note that borgbackup needs lz4 library as additional requirement.
 - create --compression zlib,N (slower, higher compression, default for N is 6)
 - create --compression lzma,N (slowest, highest compression, default N is 6)
-
-
-Version 0.25.0 (not released yet)
----------------------------------
-
-Incompatible changes (compared to 0.24):
-
-- none yet
-
-Deprecations:
-
-- none yet
-
-New features:
-
 - honor the nodump flag (UF_NODUMP) and do not backup such items
 
 Bug fixes:

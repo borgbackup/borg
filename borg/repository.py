@@ -432,7 +432,8 @@ class LoggedIO:
 
     def __init__(self, path, limit, segments_per_dir, capacity=90):
         self.path = path
-        self.fds = LRUCache(capacity)
+        self.fds = LRUCache(capacity,
+                            dispose=lambda fd: fd.close())
         self.segment = 0
         self.limit = limit
         self.segments_per_dir = segments_per_dir
@@ -440,9 +441,8 @@ class LoggedIO:
         self._write_fd = None
 
     def close(self):
-        for segment in list(self.fds.keys()):
-            self.fds.pop(segment).close()
         self.close_segment()
+        self.fds.clear()
         self.fds = None  # Just to make sure we're disabled
 
     def segment_iterator(self, reverse=False):
@@ -516,9 +516,8 @@ class LoggedIO:
             return fd
 
     def delete_segment(self, segment):
-        fd = self.fds.pop(segment)
-        if fd is not None:
-            fd.close()
+        if segment in self.fds:
+            del self.fds[segment]
         try:
             os.unlink(self.segment_filename(segment))
         except OSError:
@@ -561,9 +560,8 @@ class LoggedIO:
             header = fd.read(self.header_fmt.size)
 
     def recover_segment(self, segment, filename):
-        fd = self.fds.pop(segment)
-        if fd is not None:
-            fd.close()
+        if segment in self.fds:
+            del self.fds[segment]
         # FIXME: save a copy of the original file
         with open(filename, 'rb') as fd:
             data = memoryview(fd.read())

@@ -1,42 +1,41 @@
-class LRUCache(dict):
-
-    def __init__(self, capacity):
-        super().__init__()
+class LRUCache:
+    def __init__(self, capacity, dispose):
+        self._cache = {}
         self._lru = []
         self._capacity = capacity
+        self._dispose = dispose
 
     def __setitem__(self, key, value):
-        try:
-            self._lru.remove(key)
-        except ValueError:
-            pass
+        assert key not in self._cache, (
+            "Unexpected attempt to replace a cached item,"
+            " without first deleting the old item.")
         self._lru.append(key)
         while len(self._lru) > self._capacity:
             del self[self._lru[0]]
-        return super().__setitem__(key, value)
+        self._cache[key] = value
 
     def __getitem__(self, key):
-        try:
-            self._lru.remove(key)
-            self._lru.append(key)
-        except ValueError:
-            pass
-        return super().__getitem__(key)
+        value = self._cache[key]  # raise KeyError if not found
+        self._lru.remove(key)
+        self._lru.append(key)
+        return value
 
     def __delitem__(self, key):
-        try:
-            self._lru.remove(key)
-        except ValueError:
-            pass
-        return super().__delitem__(key)
+        value = self._cache.pop(key)  # raise KeyError if not found
+        self._dispose(value)
+        self._lru.remove(key)
 
-    def pop(self, key, default=None):
-        try:
-            self._lru.remove(key)
-        except ValueError:
-            pass
-        return super().pop(key, default)
+    def __contains__(self, key):
+        return key in self._cache
 
-    def _not_implemented(self, *args, **kw):
-        raise NotImplementedError
-    popitem = setdefault = update = _not_implemented
+    def clear(self):
+        for value in self._cache.values():
+            self._dispose(value)
+        self._cache.clear()
+
+    # useful for testing
+    def items(self):
+        return self._cache.items()
+
+    def __len__(self):
+        return len(self._cache)

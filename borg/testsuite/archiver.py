@@ -202,7 +202,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
         self.assert_equal(len(self.cmd('list', self.repository_location).splitlines()), 2)
-        expected =  [
+        expected =  set([
             'input',
             'input/bdev',
             'input/cdev',
@@ -214,7 +214,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             'input/flagfile',
             'input/hardlink',
             'input/link1',
-        ]
+        ])
         if not have_root:
             # we could not create these device files without (fake)root
             expected.remove('input/bdev')
@@ -223,7 +223,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # remove the file we did not backup, so input and output become equal
             expected.remove('input/flagfile') # this file is UF_NODUMP
             os.remove(os.path.join('input', 'flagfile'))
-        self.assert_equal(self.cmd('list', '--short', self.repository_location + '::test').splitlines(), expected)
+        self.assert_equal(set(self.cmd('list', '--short', self.repository_location + '::test').splitlines()), expected)
         self.assert_dirs_equal('input', 'output/input')
         info_output = self.cmd('info', self.repository_location + '::test')
         item_count = 3 if has_lchflags else 4  # one file is UF_NODUMP

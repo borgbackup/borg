@@ -58,7 +58,9 @@ class environment_variable:
 
     def __exit__(self, *args, **kw):
         for k, v in self.old_values.items():
-            if v is not None:
+            if v is None:
+                del os.environ[k]
+            else:
                 os.environ[k] = v
 
 
@@ -89,8 +91,8 @@ class ArchiverTestCaseBase(BaseTestCase):
         os.chdir(self.tmpdir)
 
     def tearDown(self):
-        shutil.rmtree(self.tmpdir)
         os.chdir(self._old_wd)
+        shutil.rmtree(self.tmpdir)
 
     def cmd(self, *args, **kw):
         exit_code = kw.get('exit_code', 0)

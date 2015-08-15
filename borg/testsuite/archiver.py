@@ -12,6 +12,7 @@ import unittest
 from hashlib import sha256
 
 from mock import patch
+import pytest
 
 from .. import xattr
 from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP
@@ -32,6 +33,12 @@ except ImportError:
 has_lchflags = hasattr(os, 'lchflags')
 
 src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__), '..')
+
+# Python <= 3.2 raises OSError instead of PermissionError (See #164)
+try:
+    PermissionError = PermissionError
+except NameError:
+    PermissionError = OSError
 
 
 class changedir:
@@ -154,15 +161,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('flagfile', size=1024)
         # Directory
         self.create_regular_file('dir2/file2', size=1024 * 80)
-        # File owner
-        os.chown('input/file1', 100, 200)
         # File mode
         os.chmod('input/file1', 0o7755)
-        os.chmod('input/dir2', 0o555)
-        # Block device
-        os.mknod('input/bdev', 0o600 | stat.S_IFBLK, os.makedev(10, 20))
-        # Char device
-        os.mknod('input/cdev', 0o600 | stat.S_IFCHR, os.makedev(30, 40))
         # Hard link
         os.link(os.path.join(self.input_path, 'file1'),
                 os.path.join(self.input_path, 'hardlink'))
@@ -180,20 +180,50 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.mkfifo(os.path.join(self.input_path, 'fifo1'))
         if has_lchflags:
             os.lchflags(os.path.join(self.input_path, 'flagfile'), stat.UF_NODUMP)
+        try:
+            # Block device
+            os.mknod('input/bdev', 0o600 | stat.S_IFBLK, os.makedev(10, 20))
+            # Char device
+            os.mknod('input/cdev', 0o600 | stat.S_IFCHR, os.makedev(30, 40))
+            # File mode
+            os.chmod('input/dir2', 0o555)  # if we take away write perms, we need root to remove contents
+            # File owner
+            os.chown('input/file1', 100, 200)
+            have_root = True  # we have (fake)root
+        except PermissionError:
+            have_root = False
+        return have_root
 
     def test_basic_functionality(self):
-        self.create_test_files()
+        have_root = self.create_test_files()
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
         self.cmd('create', '--stats', self.repository_location + '::test.2', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
         self.assert_equal(len(self.cmd('list', self.repository_location).splitlines()), 2)
-        item_count = 10 if has_lchflags else 11  # one file is UF_NODUMP
-        self.assert_equal(len(self.cmd('list', self.repository_location + '::test').splitlines()), item_count)
+        expected =  [
+            'input',
+            'input/bdev',
+            'input/cdev',
+            'input/dir2',
+            'input/dir2/file2',
+            'input/empty',
+            'input/fifo1',
+            'input/file1',
+            'input/flagfile',
+            'input/hardlink',
+            'input/link1',
+        ]
+        if not have_root:
+            # we could not create these device files without (fake)root
+            expected.remove('input/bdev')
+            expected.remove('input/cdev')
         if has_lchflags:
             # remove the file we did not backup, so input and output become equal
+            expected.remove('input/flagfile') # this file is UF_NODUMP
             os.remove(os.path.join('input', 'flagfile'))
+        self.assert_equal(self.cmd('list', '--short', self.repository_location + '::test').splitlines(), expected)
         self.assert_dirs_equal('input', 'output/input')
         info_output = self.cmd('info', self.repository_location + '::test')
         item_count = 3 if has_lchflags else 4  # one file is UF_NODUMP
@@ -436,6 +466,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.write(b'XXXX')
         self.cmd('check', self.repository_location, exit_code=1)
 
+    # we currently need to be able to create a lock directory inside the repo:
+    @pytest.mark.xfail(reason="we need to be able to create the lock directory inside the repo")
     def test_readonly_repository(self):
         self.cmd('init', self.repository_location)
         self.create_src_archive('test')

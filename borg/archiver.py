@@ -337,34 +337,38 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         repository = self.open_repository(args.src)
         manifest, key = Manifest.load(repository)
         if args.src.archive:
-            tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 0o10: '-', 0o12: 'l', 0o14: 's'}
             archive = Archive(repository, key, manifest, args.src.archive)
-            for item in archive.iter_items():
-                type = tmap.get(item[b'mode'] // 4096, '?')
-                mode = format_file_mode(item[b'mode'])
-                size = 0
-                if type == '-':
+            if args.short:
+                for item in archive.iter_items():
+                    print(remove_surrogates(item[b'path']))
+            else:
+                tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 0o10: '-', 0o12: 'l', 0o14: 's'}
+                for item in archive.iter_items():
+                    type = tmap.get(item[b'mode'] // 4096, '?')
+                    mode = format_file_mode(item[b'mode'])
+                    size = 0
+                    if type == '-':
+                        try:
+                            size = sum(size for _, size, _ in item[b'chunks'])
+                        except KeyError:
+                            pass
                     try:
-                        size = sum(size for _, size, _ in item[b'chunks'])
-                    except KeyError:
-                        pass
-                try:
-                    mtime = datetime.fromtimestamp(bigint_to_int(item[b'mtime']) / 1e9)
-                except ValueError:
-                    # likely a broken mtime and datetime did not want to go beyond year 9999
-                    mtime = datetime(9999, 12, 31, 23, 59, 59)
-                if b'source' in item:
-                    if type == 'l':
-                        extra = ' -> %s' % item[b'source']
+                        mtime = datetime.fromtimestamp(bigint_to_int(item[b'mtime']) / 1e9)
+                    except ValueError:
+                        # likely a broken mtime and datetime did not want to go beyond year 9999
+                        mtime = datetime(9999, 12, 31, 23, 59, 59)
+                    if b'source' in item:
+                        if type == 'l':
+                            extra = ' -> %s' % item[b'source']
+                        else:
+                            type = 'h'
+                            extra = ' link to %s' % item[b'source']
                     else:
-                        type = 'h'
-                        extra = ' link to %s' % item[b'source']
-                else:
-                    extra = ''
-                print('%s%s %-6s %-6s %8d %s %s%s' % (
-                    type, mode, item[b'user'] or item[b'uid'],
-                    item[b'group'] or item[b'gid'], size, format_time(mtime),
-                    remove_surrogates(item[b'path']), extra))
+                        extra = ''
+                    print('%s%s %-6s %-6s %8d %s %s%s' % (
+                        type, mode, item[b'user'] or item[b'uid'],
+                        item[b'group'] or item[b'gid'], size, format_time(mtime),
+                        remove_surrogates(item[b'path']), extra))
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 print(format_archive(archive_info))
@@ -766,6 +770,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                           epilog=list_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_list)
+        subparser.add_argument('--short', dest='short',
+                               action='store_true', default=False,
+                               help='only print file/directory names, nothing else')
         subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
                                help='repository/archive to list contents of')
         mount_epilog = textwrap.dedent("""

@@ -48,5 +48,5 @@ class TestLRUCache:
         assert 2 not in c
         assert f2.closed
         c.clear()
-        assert not c.items()
+        assert c.items() == set()
         assert f3.closed

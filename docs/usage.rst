@@ -76,8 +76,7 @@ Resource Usage
 |project_name| might use a lot of resources depending on the size of the data set it is dealing with.
 
 CPU: it won't go beyond 100% of 1 core as the code is currently single-threaded.
-     Especially higher zlib and lzma compression uses significant amounts of CPU
-     cycles.
+     Especially higher zlib and lzma compression levels use significant amounts of CPU cycles.
 
 Memory (RAM): the chunks index and the files index are read into memory for performance reasons.
               compression, esp. lzma compression with high levels might need substantial amounts

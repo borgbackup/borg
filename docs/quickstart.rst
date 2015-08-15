@@ -101,11 +101,13 @@ If you have a quick repo storage and you want a little compression:
 
     $ borg create --compression lz4 /mnt/backup::repo ~
 
-If you have a medium fast repo storage and you want a bit more compression (N=0..9):
+If you have a medium fast repo storage and you want a bit more compression (N=0..9,
+0 means no compression, 9 means high compression):
 
     $ borg create --compression zlib,N /mnt/backup::repo ~
 
-If you have a very slow repo storage and you want high compression (N=0..9):
+If you have a very slow repo storage and you want high compression (N=0..9, 0 means
+low compression, 9 means high compression):
 
     $ borg create --compression lzma,N /mnt/backup::repo ~
 

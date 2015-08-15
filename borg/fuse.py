@@ -17,7 +17,7 @@ have_fuse_mtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
 
 class ItemCache:
     def __init__(self):
-        self.fd = tempfile.TemporaryFile()
+        self.fd = tempfile.TemporaryFile(prefix='borg-tmp')
         self.offset = 1000000
 
     def add(self, item):
@@ -34,7 +34,7 @@ class FuseOperations(llfuse.Operations):
     """Export archive as a fuse filesystem
     """
     def __init__(self, key, repository, manifest, archive):
-        super(FuseOperations, self).__init__()
+        super().__init__()
         self._inode_count = 0
         self.key = key
         self.repository = cache_if_remote(repository)

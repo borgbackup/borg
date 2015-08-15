@@ -2,12 +2,14 @@ import os
 import shutil
 import tempfile
 
+from mock import patch
+
 from ..hashindex import NSIndex
-from ..helpers import Location, IntegrityError, UpgradableLock
+from ..helpers import Location, IntegrityError
+from ..locking import UpgradableLock
 from ..remote import RemoteRepository, InvalidRPCMethod
 from ..repository import Repository
 from . import BaseTestCase
-from .mock import patch
 
 
 class RepositoryTestCaseBase(BaseTestCase):
@@ -156,10 +158,10 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         for name in os.listdir(self.repository.path):
             if name.startswith('index.'):
                 os.unlink(os.path.join(self.repository.path, name))
-        with patch.object(UpgradableLock, 'upgrade', side_effect=UpgradableLock.WriteLockFailed) as upgrade:
+        with patch.object(UpgradableLock, 'upgrade', side_effect=UpgradableLock.ExclusiveLockFailed) as upgrade:
             self.reopen()
-            self.assert_raises(UpgradableLock.WriteLockFailed, lambda: len(self.repository))
-            upgrade.assert_called_once()
+            self.assert_raises(UpgradableLock.ExclusiveLockFailed, lambda: len(self.repository))
+            upgrade.assert_called_once_with()
 
     def test_crash_before_write_index(self):
         self.add_keys()
@@ -309,7 +311,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         # Simulate a crash before compact
         with patch.object(Repository, 'compact_segments') as compact:
             self.repository.commit()
-            compact.assert_called_once()
+            compact.assert_called_once_with()
         self.reopen()
         self.check(repair=True)
         self.assert_equal(self.repository.get(bytes(32)), b'data2')
@@ -328,3 +330,7 @@ class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
 
     def open(self, create=False):
         return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')), create=create)
+
+    def test_crash_before_compact(self):
+        # skip this test, we can't mock-patch a Repository class in another process!
+        pass

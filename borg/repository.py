@@ -9,7 +9,8 @@ import sys
 from zlib import crc32
 
 from .hashindex import NSIndex
-from .helpers import Error, IntegrityError, read_msgpack, write_msgpack, unhexlify, UpgradableLock
+from .helpers import Error, IntegrityError, read_msgpack, write_msgpack, unhexlify
+from .locking import UpgradableLock
 from .lrucache import LRUCache
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
@@ -61,6 +62,9 @@ class Repository:
     def __del__(self):
         self.close()
 
+    def __repr__(self):
+        return '<%s %s>' % (self.__class__.__name__, self.path)
+
     def create(self, path):
         """Create a new empty repository at `path`
         """
@@ -77,8 +81,22 @@ class Repository:
         config.set('repository', 'segments_per_dir', self.DEFAULT_SEGMENTS_PER_DIR)
         config.set('repository', 'max_segment_size', self.DEFAULT_MAX_SEGMENT_SIZE)
         config.set('repository', 'id', hexlify(os.urandom(32)).decode('ascii'))
-        with open(os.path.join(path, 'config'), 'w') as fd:
+        self.save_config(path, config)
+
+    def save_config(self, path, config):
+        config_path = os.path.join(path, 'config')
+        with open(config_path, 'w') as fd:
             config.write(fd)
+
+    def save_key(self, keydata):
+        assert self.config
+        keydata = keydata.decode('utf-8')  # remote repo: msgpack issue #99, getting bytes
+        self.config.set('repository', 'key', keydata)
+        self.save_config(self.path, self.config)
+
+    def load_key(self):
+        keydata = self.config.get('repository', 'key')
+        return keydata.encode('utf-8')  # remote repo: msgpack issue #99, returning bytes
 
     def destroy(self):
         """Destroy the repository at `self.path`
@@ -113,11 +131,11 @@ class Repository:
         self.path = path
         if not os.path.isdir(path):
             raise self.DoesNotExist(path)
+        self.lock = UpgradableLock(os.path.join(path, 'lock'), exclusive).acquire()
         self.config = RawConfigParser()
         self.config.read(os.path.join(self.path, 'config'))
         if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:
             raise self.InvalidRepository(path)
-        self.lock = UpgradableLock(os.path.join(path, 'config'), exclusive)
         self.max_segment_size = self.config.getint('repository', 'max_segment_size')
         self.segments_per_dir = self.config.getint('repository', 'segments_per_dir')
         self.id = unhexlify(self.config.get('repository', 'id').strip())
@@ -148,7 +166,7 @@ class Repository:
         self._active_txn = True
         try:
             self.lock.upgrade()
-        except UpgradableLock.WriteLockFailed:
+        except UpgradableLock.ExclusiveLockFailed:
             # if upgrading the lock to exclusive fails, we do not have an
             # active transaction. this is important for "serve" mode, where
             # the repository instance lives on - even if exceptions happened.
@@ -316,7 +334,6 @@ class Repository:
             report_error('Adding commit tag to segment {}'.format(transaction_id))
             self.io.segment = transaction_id + 1
             self.io.write_commit()
-            self.io.close_segment()
         if current_index and not repair:
             if len(current_index) != len(self.index):
                 report_error('Index object count mismatch. {} != {}'.format(len(current_index), len(self.index)))
@@ -340,6 +357,11 @@ class Repository:
         if not self.index:
             self.index = self.open_index(self.get_transaction_id())
         return len(self.index)
+
+    def __contains__(self, id):
+        if not self.index:
+            self.index = self.open_index(self.get_transaction_id())
+        return id in self.index
 
     def list(self, limit=None, marker=None):
         if not self.index:
@@ -390,7 +412,7 @@ class Repository:
         self.segments.setdefault(segment, 0)
 
     def preload(self, ids):
-        """Preload objects (only applies to remote repositories
+        """Preload objects (only applies to remote repositories)
         """
 
 
@@ -410,7 +432,8 @@ class LoggedIO:
 
     def __init__(self, path, limit, segments_per_dir, capacity=90):
         self.path = path
-        self.fds = LRUCache(capacity)
+        self.fds = LRUCache(capacity,
+                            dispose=lambda fd: fd.close())
         self.segment = 0
         self.limit = limit
         self.segments_per_dir = segments_per_dir
@@ -418,9 +441,8 @@ class LoggedIO:
         self._write_fd = None
 
     def close(self):
-        for segment in list(self.fds.keys()):
-            self.fds.pop(segment).close()
         self.close_segment()
+        self.fds.clear()
         self.fds = None  # Just to make sure we're disabled
 
     def segment_iterator(self, reverse=False):
@@ -494,6 +516,8 @@ class LoggedIO:
             return fd
 
     def delete_segment(self, segment):
+        if segment in self.fds:
+            del self.fds[segment]
         try:
             os.unlink(self.segment_filename(segment))
         except OSError:
@@ -536,7 +560,8 @@ class LoggedIO:
             header = fd.read(self.header_fmt.size)
 
     def recover_segment(self, segment, filename):
-        self.fds.pop(segment).close()
+        if segment in self.fds:
+            del self.fds[segment]
         # FIXME: save a copy of the original file
         with open(filename, 'rb') as fd:
             data = memoryview(fd.read())

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 from borg.archiver import main
 main()
 

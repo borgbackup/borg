@@ -2,7 +2,6 @@ import argparse
 import binascii
 from collections import namedtuple
 import grp
-import msgpack
 import os
 import pwd
 import queue
@@ -12,7 +11,8 @@ import time
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from operator import attrgetter
-import fcntl
+
+import msgpack
 
 from . import hashindex
 from . import chunker
@@ -34,52 +34,15 @@ class ExtensionModuleError(Error):
     """The Borg binary extension modules do not seem to be properly installed"""
 
 
-class UpgradableLock:
-
-    class ReadLockFailed(Error):
-        """Failed to acquire read lock on {}"""
-
-    class WriteLockFailed(Error):
-        """Failed to acquire write lock on {}"""
-
-    def __init__(self, path, exclusive=False):
-        self.path = path
-        try:
-            self.fd = open(path, 'r+')
-        except IOError:
-            self.fd = open(path, 'r')
-        try:
-            if exclusive:
-                fcntl.lockf(self.fd, fcntl.LOCK_EX)
-            else:
-                fcntl.lockf(self.fd, fcntl.LOCK_SH)
-        # Python 3.2 raises IOError, Python3.3+ raises OSError
-        except (IOError, OSError):
-            if exclusive:
-                raise self.WriteLockFailed(self.path)
-            else:
-                raise self.ReadLockFailed(self.path)
-        self.is_exclusive = exclusive
-
-    def upgrade(self):
-        try:
-            fcntl.lockf(self.fd, fcntl.LOCK_EX)
-        # Python 3.2 raises IOError, Python3.3+ raises OSError
-        except (IOError, OSError):
-            raise self.WriteLockFailed(self.path)
-        self.is_exclusive = True
-
-    def release(self):
-        fcntl.lockf(self.fd, fcntl.LOCK_UN)
-        self.fd.close()
-
-
 def check_extension_modules():
     from . import platform
-    if (hashindex.API_VERSION != 2 or
-        chunker.API_VERSION != 2 or
-        crypto.API_VERSION != 2 or
-        platform.API_VERSION != 2):
+    if hashindex.API_VERSION != 2:
+        raise ExtensionModuleError
+    if chunker.API_VERSION != 2:
+        raise ExtensionModuleError
+    if crypto.API_VERSION != 2:
+        raise ExtensionModuleError
+    if platform.API_VERSION != 2:
         raise ExtensionModuleError
 
 
@@ -318,7 +281,43 @@ def timestamp(s):
 
 def ChunkerParams(s):
     window_size, chunk_mask, chunk_min, chunk_max = s.split(',')
+    if int(chunk_max) > 23:
+        # do not go beyond 2**23 (8MB) chunk size now,
+        # COMPR_BUFFER can only cope with up to this size
+        raise ValueError
     return int(window_size), int(chunk_mask), int(chunk_min), int(chunk_max)
+
+
+def CompressionSpec(s):
+    values = s.split(',')
+    count = len(values)
+    if count < 1:
+        raise ValueError
+    compression = values[0]
+    try:
+        compression = int(compression)
+        if count > 1:
+            raise ValueError
+        # DEPRECATED: it is just --compression N
+        if 0 <= compression <= 9:
+            return dict(name='zlib', level=compression)
+        raise ValueError
+    except ValueError:
+        # --compression algo[,...]
+        name = compression
+        if name in ('none', 'lz4', ):
+            return dict(name=name)
+        if name in ('zlib', 'lzma', ):
+            if count < 2:
+                level = 6  # default compression level in py stdlib
+            elif count == 2:
+                level = int(values[1])
+                if not 0 <= level <= 9:
+                    raise ValueError
+            else:
+                raise ValueError
+            return dict(name=name, level=level)
+        raise ValueError
 
 
 def is_cachedir(path):
@@ -532,9 +531,9 @@ class Location:
             else:
                 path = self.path
             return 'ssh://{}{}{}{}'.format('{}@'.format(self.user) if self.user else '',
-                                                        self.host,
-                                                        ':{}'.format(self.port) if self.port else '',
-                                                        path)
+                                           self.host,
+                                           ':{}'.format(self.port) if self.port else '',
+                                           path)
 
 
 def location_validator(archive=None):
@@ -609,7 +608,7 @@ def daemonize():
 class StableDict(dict):
     """A dict subclass with stable items() ordering"""
     def items(self):
-        return sorted(super(StableDict, self).items())
+        return sorted(super().items())
 
 
 if sys.version < '3.3':

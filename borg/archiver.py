@@ -14,6 +14,7 @@ import traceback
 
 from . import __version__
 from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
+from .compress import Compressor, COMPR_BUFFER
 from .repository import Repository
 from .cache import Cache
 from .key import key_creator
@@ -21,8 +22,10 @@ from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    is_cachedir, bigint_to_int, ChunkerParams
+    is_cachedir, bigint_to_int, ChunkerParams, CompressionSpec
 from .remote import RepositoryServer, RemoteRepository
+
+has_lchflags = hasattr(os, 'lchflags')
 
 
 class Archiver:
@@ -85,8 +88,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 print('Repository check complete, no problems found.')
             else:
                 return 1
-        if not args.repo_only and not ArchiveChecker().check(repository, repair=args.repair, last=args.last):
-                return 1
+        if not args.repo_only and not ArchiveChecker().check(
+                repository, repair=args.repair, archive=args.repository.archive, last=args.last):
+            return 1
         return 0
 
     def do_change_passphrase(self, args):
@@ -101,7 +105,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         t0 = datetime.now()
         repository = self.open_repository(args.archive, exclusive=True)
         manifest, key = Manifest.load(repository)
-        key.compression_level = args.compression
+        compr_args = dict(buffer=COMPR_BUFFER)
+        compr_args.update(args.compression)
+        key.compressor = Compressor(**compr_args)
         cache = Cache(repository, key, manifest, do_files=args.cache_files)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
                           create=True, checkpoint_interval=args.checkpoint_interval,
@@ -174,6 +180,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         if restrict_dev and st.st_dev != restrict_dev:
             return
         status = None
+        # Ignore if nodump flag is set
+        if has_lchflags and (st.st_flags & stat.UF_NODUMP):
+            return
         if stat.S_ISREG(st.st_mode):
             try:
                 status = archive.process_file(path, st, cache)
@@ -223,7 +232,6 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         # be restrictive when restoring files, restore permissions later
         if sys.getfilesystemencoding() == 'ascii':
             print('Warning: File system encoding is "ascii", extracting non-ascii filenames will not be supported.')
-        os.umask(0o077)
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
         archive = Archive(repository, key, manifest, args.archive.archive,
@@ -291,11 +299,13 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             print("You requested to completely DELETE the repository *including* all archives it contains:")
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 print(format_archive(archive_info))
-            print("""Type "YES" if you understand this and want to continue.\n""")
-            if input('Do you want to continue? ') == 'YES':
-                repository.destroy()
-                cache.destroy()
-                print("Repository and corresponding cache were deleted.")
+            while not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
+                print("""Type "YES" if you understand this and want to continue.\n""")
+                if input('Do you want to continue? ') == 'YES':
+                    break
+            repository.destroy()
+            cache.destroy()
+            print("Repository and corresponding cache were deleted.")
         return self.exit_code
 
     def do_mount(self, args):
@@ -330,34 +340,38 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         repository = self.open_repository(args.src)
         manifest, key = Manifest.load(repository)
         if args.src.archive:
-            tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 0o10: '-', 0o12: 'l', 0o14: 's'}
             archive = Archive(repository, key, manifest, args.src.archive)
-            for item in archive.iter_items():
-                type = tmap.get(item[b'mode'] // 4096, '?')
-                mode = format_file_mode(item[b'mode'])
-                size = 0
-                if type == '-':
+            if args.short:
+                for item in archive.iter_items():
+                    print(remove_surrogates(item[b'path']))
+            else:
+                tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 0o10: '-', 0o12: 'l', 0o14: 's'}
+                for item in archive.iter_items():
+                    type = tmap.get(item[b'mode'] // 4096, '?')
+                    mode = format_file_mode(item[b'mode'])
+                    size = 0
+                    if type == '-':
+                        try:
+                            size = sum(size for _, size, _ in item[b'chunks'])
+                        except KeyError:
+                            pass
                     try:
-                        size = sum(size for _, size, _ in item[b'chunks'])
-                    except KeyError:
-                        pass
-                try:
-                    mtime = datetime.fromtimestamp(bigint_to_int(item[b'mtime']) / 1e9)
-                except ValueError:
-                    # likely a broken mtime and datetime did not want to go beyond year 9999
-                    mtime = datetime(9999, 12, 31, 23, 59, 59)
-                if b'source' in item:
-                    if type == 'l':
-                        extra = ' -> %s' % item[b'source']
+                        mtime = datetime.fromtimestamp(bigint_to_int(item[b'mtime']) / 1e9)
+                    except ValueError:
+                        # likely a broken mtime and datetime did not want to go beyond year 9999
+                        mtime = datetime(9999, 12, 31, 23, 59, 59)
+                    if b'source' in item:
+                        if type == 'l':
+                            extra = ' -> %s' % item[b'source']
+                        else:
+                            type = 'h'
+                            extra = ' link to %s' % item[b'source']
                     else:
-                        type = 'h'
-                        extra = ' link to %s' % item[b'source']
-                else:
-                    extra = ''
-                print('%s%s %-6s %-6s %8d %s %s%s' % (
-                    type, mode, item[b'user'] or item[b'uid'],
-                    item[b'group'] or item[b'gid'], size, format_time(mtime),
-                    remove_surrogates(item[b'path']), extra))
+                        extra = ''
+                    print('%s%s %-6s %-6s %8d %s %s%s' % (
+                        type, mode, item[b'user'] or item[b'uid'],
+                        item[b'group'] or item[b'gid'], size, format_time(mtime),
+                        remove_surrogates(item[b'path']), extra))
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 print(format_archive(archive_info))
@@ -511,7 +525,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
                                    default=False,
                                    help='verbose output')
-        common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false')
+        common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
+                                   help='do not load/update the file metadata cache used to detect unchanged files')
+        common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=0o077, metavar='M',
+                                   help='set umask to M (local and remote, default: 0o077)')
+        common_parser.add_argument('--remote-path', dest='remote_path', default='borg', metavar='PATH',
+                                   help='set remote path to executable (default: "borg")')
 
         # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
         if args:
@@ -533,6 +552,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
         Encryption can be enabled at repository init time.
+        Please note that the 'passphrase' encryption mode is DEPRECATED (instead of it,
+        consider using 'repokey').
         """)
         subparser = subparsers.add_parser('init', parents=[common_parser],
                                           description=self.do_init.__doc__, epilog=init_epilog,
@@ -542,27 +563,51 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                type=location_validator(archive=False),
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption',
-                               choices=('none', 'passphrase', 'keyfile'), default='none',
-                               help='select encryption method')
+                               choices=('none', 'keyfile', 'repokey', 'passphrase'), default='none',
+                               help='select encryption key mode')
 
         check_epilog = textwrap.dedent("""
-        The check command verifies the consistency of a repository and the corresponding
-        archives. The underlying repository data files are first checked to detect bit rot
-        and other types of damage. After that the consistency and correctness of the archive
-        metadata is verified.
+        The check command verifies the consistency of a repository and the corresponding archives.
 
-        The archive metadata checks can be time consuming and requires access to the key
-        file and/or passphrase if encryption is enabled. These checks can be skipped using
-        the --repository-only option.
+        First, the underlying repository data files are checked:
+        - For all segments the segment magic (header) is checked
+        - For all objects stored in the segments, all metadata (e.g. crc and size) and
+          all data is read. The read data is checked by size and CRC. Bit rot and other
+          types of accidental damage can be detected this way.
+        - If we are in repair mode and a integrity error is detected for a segment,
+          we try to recover as many objects from the segment as possible.
+        - In repair mode, it makes sure that the index is consistent with the data
+          stored in the segments.
+        - If you use a remote repo server via ssh:, the repo check is executed on the
+          repo server without causing significant network traffic.
+        - The repository check can be skipped using the --archives-only option.
+
+        Second, the consistency and correctness of the archive metadata is verified:
+        - Is the repo manifest present? If not, it is rebuilt from archive metadata
+          chunks (this requires reading and decrypting of all metadata and data).
+        - Check if archive metadata chunk is present. if not, remove archive from
+          manifest.
+        - For all files (items) in the archive, for all chunks referenced by these
+          files, check if chunk is present (if not and we are in repair mode, replace
+          it with a same-size chunk of zeros). This requires reading of archive and
+          file metadata, but not data.
+        - If we are in repair mode and we checked all the archives: delete orphaned
+          chunks from the repo.
+        - if you use a remote repo server via ssh:, the archive check is executed on
+          the client machine (because if encryption is enabled, the checks will require
+          decryption and this is always done client-side, because key access will be
+          required).
+        - The archive checks can be time consuming, they can be skipped using the
+          --repository-only option.
         """)
         subparser = subparsers.add_parser('check', parents=[common_parser],
                                           description=self.do_check.__doc__,
                                           epilog=check_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_check)
-        subparser.add_argument('repository', metavar='REPOSITORY',
-                               type=location_validator(archive=False),
-                               help='repository to check consistency of')
+        subparser.add_argument('repository', metavar='REPOSITORY_OR_ARCHIVE',
+                               type=location_validator(),
+                               help='repository or archive to check consistency of')
         subparser.add_argument('--repository-only', dest='repo_only', action='store_true',
                                default=False,
                                help='only perform repository checks')
@@ -593,7 +638,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         traversing all paths specified. The archive will consume almost no disk space for
         files or parts of files that have already been stored in other archives.
 
-        See "borg help patterns" for more help on exclude patterns.
+        See the output of the "borg help patterns" command for more help on exclude patterns.
         """)
 
         subparser = subparsers.add_parser('create', parents=[common_parser],
@@ -635,9 +680,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
                                help='specify the chunker parameters. default: %d,%d,%d,%d' % CHUNKER_PARAMS)
         subparser.add_argument('-C', '--compression', dest='compression',
-                               type=int, default=0, metavar='N',
-                               help='select compression algorithm and level. 0..9 is supported and means zlib '
-                                    'level 0 (no compression, fast, default) .. zlib level 9 (high compression, slow).')
+                               type=CompressionSpec, default=dict(name='none'), metavar='COMPRESSION',
+                               help='select compression algorithm (and level): '
+                                    'none == no compression (default), '
+                                    'lz4 == lz4, '
+                                    'zlib == zlib (default level 6), '
+                                    'zlib,0 .. zlib,9 == zlib (with level 0..9), '
+                                    'lzma == lzma (default level 6), '
+                                    'lzma,0 .. lzma,9 == lzma (with level 0..9).')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to create')
@@ -650,7 +700,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         by passing a list of ``PATHs`` as arguments. The file selection can further
         be restricted by using the ``--exclude`` option.
 
-        See "borg help patterns" for more help on exclude patterns.
+        See the output of the "borg help patterns" command for more help on exclude patterns.
         """)
         subparser = subparsers.add_parser('extract', parents=[common_parser],
                                           description=self.do_extract.__doc__,
@@ -723,6 +773,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                           epilog=list_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_list)
+        subparser.add_argument('--short', dest='short',
+                               action='store_true', default=False,
+                               help='only print file/directory names, nothing else')
         subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
                                help='repository/archive to list contents of')
         mount_epilog = textwrap.dedent("""
@@ -822,11 +875,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
         args = parser.parse_args(args or ['-h'])
         self.verbose = args.verbose
+        os.umask(args.umask)
+        RemoteRepository.remote_path = args.remote_path
+        RemoteRepository.umask = args.umask
         update_excludes(args)
         return args.func(args)
 
 
-def sig_info_handler(signum, stack):
+def sig_info_handler(signum, stack):  # pragma: no cover
     """search the stack for infos about the currently processed file and print them"""
     for frame in inspect.getouterframes(stack):
         func, loc = frame[3], frame[0].f_locals
@@ -849,7 +905,7 @@ def sig_info_handler(signum, stack):
             break
 
 
-def setup_signal_handlers():
+def setup_signal_handlers():  # pragma: no cover
     sigs = []
     if hasattr(signal, 'SIGUSR1'):
         sigs.append(signal.SIGUSR1)  # kill -USR1 pid
@@ -859,7 +915,7 @@ def setup_signal_handlers():
         signal.signal(sig, sig_info_handler)
 
 
-def main():
+def main():  # pragma: no cover
     # Make sure stdout and stderr have errors='replace') to avoid unicode
     # issues when print()-ing unicode file names
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=True)

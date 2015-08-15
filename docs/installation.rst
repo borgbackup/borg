@@ -9,6 +9,7 @@ Installation
 * Python_ >= 3.2
 * OpenSSL_ >= 1.0.0
 * libacl_
+* liblz4_
 * some python dependencies, see install_requires in setup.py
 
 General notes
@@ -19,12 +20,18 @@ usually available as an optional install.
 Virtualenv_ can be used to build and install |project_name| without affecting
 the system Python or requiring root access.
 
+Important:
+if you install into a virtual environment, you need to activate
+the virtual env first (``source borg-env/bin/activate``).
+Alternatively, directly run ``borg-env/bin/borg`` (or symlink that into some
+directory that is in your PATH so you can just run ``borg``).
+
 The llfuse_ python package is also required if you wish to mount an
 archive as a FUSE filesystem. Only FUSE >= 2.8.0 can support llfuse.
 
 You only need Cython to compile the .pyx files to the respective .c files
 when using |project_name| code from git. For |project_name| releases, the .c
-files will be bundled.
+files will be bundled, so you won't need Cython to install a release.
 
 Platform notes
 --------------
@@ -32,7 +39,7 @@ FreeBSD: You may need to get a recent enough OpenSSL version from FreeBSD ports.
 
 Mac OS X: You may need to get a recent enough OpenSSL version from homebrew_.
 
-Mac OS X: A recent enough FUSE implementation might be unavailable.
+Mac OS X: You need OS X FUSE >= 3.0.
 
 
 Debian / Ubuntu installation (from git)
@@ -53,11 +60,17 @@ Some of the steps detailled below might be useful also for non-git installs.
     # ACL support Headers + Library
     apt-get install libacl1-dev libacl1
 
+    # lz4 super fast compression support Headers + Library
+    apt-get install liblz4-dev liblz4-1
+
     # if you do not have gcc / make / etc. yet
     apt-get install build-essential
 
-    # optional: lowlevel FUSE py binding - to mount backup archives
-    apt-get install python3-llfuse fuse
+    # optional: FUSE support - to mount backup archives
+    # in case you get complaints about permission denied on /etc/fuse.conf:
+    # on ubuntu this means your user is not in the "fuse" group. just add
+    # yourself there, log out and log in again.
+    apt-get install libfuse-dev fuse
 
     # optional: for unit testing
     apt-get install fakeroot
@@ -73,6 +86,7 @@ Some of the steps detailled below might be useful also for non-git installs.
     pip install cython  # compile .pyx -> .c
     pip install tox pytest  # optional, for running unit tests
     pip install sphinx  # optional, to build the docs
+    pip install llfuse  # optional, for FUSE support
     cd borg
     pip install -e .  # in-place editable mode
 
@@ -96,13 +110,16 @@ Some of the steps detailled below might be useful also for non-git installs.
 
     # ACL support Headers + Library
     sudo dnf install libacl-devel libacl
-    
-    # optional: lowlevel FUSE py binding - to mount backup archives
-    sudo dnf install python3-llfuse fuse
+
+    # lz4 super fast compression support Headers + Library
+    sudo dnf install lz4
+
+    # optional: FUSE support - to mount backup archives
+    sudo dnf install fuse-devel fuse
     
     # optional: for unit testing
     sudo dnf install fakeroot
-    
+
     # get |project_name| from github, install it
     git clone |git_url|
 
@@ -114,8 +131,47 @@ Some of the steps detailled below might be useful also for non-git installs.
     pip install cython  # compile .pyx -> .c
     pip install tox pytest  # optional, for running unit tests
     pip install sphinx  # optional, to build the docs
+    pip install llfuse  # optional, for FUSE support
     cd borg
     pip install -e .  # in-place editable mode
 
     # optional: run all the tests, on all supported Python versions
     fakeroot -u tox
+
+
+Cygwin (from git)
+-----------------
+Please note that running under cygwin is rather experimental, stuff has been
+tested with CygWin (x86-64) v2.1.0.
+
+You'll need at least (use the cygwin installer to fetch/install these):
+
+::
+
+    python3
+    python3-setuptools
+    python3-cython
+    binutils
+    gcc-core
+    git
+    libopenssl
+    liblz4_1 liblz4-devel  # from cygwinports.org
+    make
+    openssh
+    openssl-devel
+
+You can then install ``pip`` and ``virtualenv``:
+
+::
+
+    easy_install-3.4 pip
+    pip install virtualenv
+
+And now continue as for Linux (see above).
+
+In case that creation of the virtual env fails, try deleting this file:
+
+::
+
+    /usr/lib/python3.4/__pycache__/platform.cpython-34.pyc
+

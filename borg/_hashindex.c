@@ -145,10 +145,12 @@ hashindex_read(const char *path)
     bytes_read = fread(&header, 1, sizeof(HashHeader), fd);
     if(bytes_read != sizeof(HashHeader)) {
         if(ferror(fd)) {
-            EPRINTF_PATH(path, "fread header failed (expected %ld, got %ld)", sizeof(HashHeader), bytes_read);
+            EPRINTF_PATH(path, "fread header failed (expected %ju, got %ju)",
+                         (uintmax_t) sizeof(HashHeader), (uintmax_t) bytes_read);
         }
         else {
-            EPRINTF_MSG_PATH(path, "fread header failed (expected %ld, got %ld)", sizeof(HashHeader), bytes_read);
+            EPRINTF_MSG_PATH(path, "fread header failed (expected %ju, got %ju)",
+                             (uintmax_t) sizeof(HashHeader), (uintmax_t) bytes_read);
         }
         goto fail;
     }
@@ -170,7 +172,8 @@ hashindex_read(const char *path)
     }
     buckets_length = (off_t)_le32toh(header.num_buckets) * (header.key_size + header.value_size);
     if(length != sizeof(HashHeader) + buckets_length) {
-        EPRINTF_MSG_PATH(path, "Incorrect file length (expected %ld, got %ld)", sizeof(HashHeader) + buckets_length, length);
+        EPRINTF_MSG_PATH(path, "Incorrect file length (expected %ju, got %ju)",
+                         (uintmax_t) sizeof(HashHeader) + buckets_length, (uintmax_t) length);
         goto fail;
     }
     if(!(index = malloc(sizeof(HashIndex)))) {
@@ -186,10 +189,12 @@ hashindex_read(const char *path)
     bytes_read = fread(index->buckets, 1, buckets_length, fd);
     if(bytes_read != buckets_length) {
         if(ferror(fd)) {
-            EPRINTF_PATH(path, "fread buckets failed (expected %ld, got %ld)", buckets_length, bytes_read);
+            EPRINTF_PATH(path, "fread buckets failed (expected %ju, got %ju)",
+                         (uintmax_t) buckets_length, (uintmax_t) bytes_read);
         }
         else {
-            EPRINTF_MSG_PATH(path, "fread buckets failed (expected %ld, got %ld)", buckets_length, bytes_read);
+            EPRINTF_MSG_PATH(path, "fread buckets failed (expected %ju, got %ju)",
+                             (uintmax_t) buckets_length, (uintmax_t) bytes_read);
         }
         free(index->buckets);
         free(index);
@@ -384,4 +389,23 @@ hashindex_summarize(HashIndex *index, long long *total_size, long long *total_cs
     *total_unique_csize = unique_csize;
     *total_unique_chunks = unique_chunks;
     *total_chunks = chunks;
+}
+
+static void
+hashindex_merge(HashIndex *index, HashIndex *other)
+{
+    int32_t key_size = index->key_size;
+    const int32_t *other_values;
+    int32_t *my_values;
+    void *key = NULL;
+
+    while((key = hashindex_next_key(other, key))) {
+        other_values = key + key_size;
+        my_values = (int32_t *)hashindex_get(index, key);
+        if(my_values == NULL) {
+            hashindex_set(index, key, other_values);
+        } else {
+            *my_values += *other_values;
+        }
+    }
 }

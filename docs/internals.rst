@@ -26,7 +26,7 @@ README
   simple text file telling that this is a |project_name| repository
 
 config
-  repository configuration and lock file
+  repository configuration
 
 data/
   directory where the actual data is stored
@@ -36,6 +36,9 @@ hints.%d
 
 index.%d
   repository index
+
+lock.roster and lock.exclusive/*
+  used by the locking system to manage shared and exclusive locks
 
 
 Config file
@@ -54,9 +57,6 @@ This is where the ``repository.id`` is stored. It is a unique
 identifier for repositories. It will not change if you move the
 repository around so you can make a local transfer then decide to move
 the repository to another (even remote) location at a later time.
-
-|project_name| will do a POSIX read lock on the config file when operating
-on the repository.
 
 
 Keys
@@ -168,13 +168,27 @@ A chunk is stored as an object as well, of course.
 Chunks
 ------
 
-|project_name| uses a rolling hash computed by the Buzhash_ algorithm, with a
-window size of 4095 bytes (`0xFFF`), with a minimum chunk size of 1024 bytes.
-It triggers (chunks) when the last 16 bits of the hash are zero, producing
-chunks of 64kiB on average.
+The |project_name| chunker uses a rolling hash computed by the Buzhash_ algorithm.
+It triggers (chunks) when the last HASH_MASK_BITS bits of the hash are zero,
+producing chunks of 2^HASH_MASK_BITS Bytes on average.
+
+create --chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE
+can be used to tune the chunker parameters, the default is:
+
+- CHUNK_MIN_EXP = 10 (minimum chunk size = 2^10 B = 1 kiB)
+- CHUNK_MAX_EXP = 23 (maximum chunk size = 2^23 B = 8 MiB)
+- HASH_MASK_BITS = 16 (statistical medium chunk size ~= 2^16 B = 64 kiB)
+- HASH_WINDOW_SIZE = 4095 [B] (`0xFFF`)
+
+The default parameters are OK for relatively small backup data volumes and
+repository sizes and a lot of available memory (RAM) and disk space for the
+chunk index. If that does not apply, you are advised to tune these parameters
+to keep the chunk count lower than with the defaults.
 
 The buzhash table is altered by XORing it with a seed randomly generated once
-for the archive, and stored encrypted in the keyfile.
+for the archive, and stored encrypted in the keyfile. This is to prevent chunk
+size based fingerprinting attacks on your encrypted repo contents (to guess
+what files you have based on a specific set of chunk sizes).
 
 
 Indexes / Caches
@@ -243,7 +257,7 @@ Indexes / Caches memory usage
 
 Here is the estimated memory usage of |project_name|:
 
-  chunk_count ~= total_file_size / 65536
+  chunk_count ~= total_file_size / 2 ^ HASH_MASK_BITS
 
   repo_index_usage = chunk_count * 40
 
@@ -252,20 +266,32 @@ Here is the estimated memory usage of |project_name|:
   files_cache_usage = total_file_count * 240 + chunk_count * 80
 
   mem_usage ~= repo_index_usage + chunks_cache_usage + files_cache_usage
-             = total_file_count * 240 + total_file_size / 400
+             = chunk_count * 164 + total_file_count * 240
 
 All units are Bytes.
 
-It is assuming every chunk is referenced exactly once and that typical chunk size is 64kiB.
+It is assuming every chunk is referenced exactly once (if you have a lot of
+duplicate chunks, you will have less chunks than estimated above).
+
+It is also assuming that typical chunk size is 2^HASH_MASK_BITS (if you have
+a lot of files smaller than this statistical medium chunk size, you will have
+more chunks than estimated above, because 1 file is at least 1 chunk).
 
 If a remote repository is used the repo index will be allocated on the remote side.
 
-E.g. backing up a total count of 1Mi files with a total size of 1TiB:
+E.g. backing up a total count of 1Mi files with a total size of 1TiB.
 
-  mem_usage  =  1 * 2**20 * 240  +  1 * 2**40 / 400  =  2.8GiB
+a) with create --chunker-params 10,23,16,4095 (default):
 
-Note: there is a commandline option to switch off the files cache. You'll save
-some memory, but it will need to read / chunk all the files then.
+  mem_usage  =  2.8GiB
+
+b) with create --chunker-params 10,23,20,4095 (custom):
+
+  mem_usage  =  0.4GiB
+
+Note: there is also the --no-files-cache option to switch off the files cache.
+You'll save some memory, but it will need to read / chunk all the files then as
+it can not skip unmodified files then.
 
 
 Encryption
@@ -290,6 +316,7 @@ limits the maximum repository capacity to only 295 exabytes (2**64 * 16 bytes).
 Encryption keys are either derived from a passphrase or kept in a key file.
 The passphrase is passed through the ``BORG_PASSPHRASE`` environment variable
 or prompted for interactive usage.
+
 
 Key files
 ---------
@@ -355,4 +382,35 @@ representation of the repository id.
 Compression
 -----------
 
-Currently, zlib level 6 is used as compression.
+|project_name| supports the following compression methods:
+
+- none (no compression, pass through data 1:1)
+- lz4 (low compression, but super fast)
+- zlib (level 0-9, level 0 is no compression [but still adding zlib overhead],
+  level 1 is low, level 9 is high compression)
+- lzma (level 0-9, level 0 is low, level 9 is high compression).
+
+Speed:  none > lz4 > zlib > lzma
+Compression: lzma > zlib > lz4 > none
+
+Be careful, higher zlib and especially lzma compression levels might take a
+lot of resources (CPU and memory).
+
+The overall speed of course also depends on the speed of your target storage.
+If that is slow, using a higher compression level might yield better overall
+performance. You need to experiment a bit. Maybe just watch your CPU load, if
+that is relatively low, increase compression until 1 core is 70-100% loaded.
+
+Even if your target storage is rather fast, you might see interesting effects:
+while doing no compression at all (none) is a operation that takes no time, it
+likely will need to store more data to the storage compared to using lz4.
+The time needed to transfer and store the additional data might be much more
+than if you had used lz4 (which is super fast, but still might compress your
+data about 2:1). This is assuming your data is compressible (if you backup
+already compressed data, trying to compress them at backup time is usually
+pointless).
+
+Compression is applied after deduplication, thus using different compression
+methods in one repo does not influence deduplication.
+
+See ``borg create --help`` about how to specify the compression level and its default.

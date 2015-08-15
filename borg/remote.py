@@ -3,7 +3,6 @@ import fcntl
 import msgpack
 import os
 import select
-import shutil
 from subprocess import Popen, PIPE
 import sys
 import tempfile
@@ -11,7 +10,6 @@ import traceback
 
 from . import __version__
 
-from .hashindex import NSIndex
 from .helpers import Error, IntegrityError
 from .repository import Repository
 
@@ -25,24 +23,28 @@ class ConnectionClosed(Error):
 class PathNotAllowed(Error):
     """Repository path not allowed"""
 
+
 class InvalidRPCMethod(Error):
     """RPC method is not valid"""
 
 
-class RepositoryServer:
+class RepositoryServer:  # pragma: no cover
     rpc_methods = (
-            '__len__',
-            'check',
-            'commit',
-            'delete',
-            'get',
-            'list',
-            'negotiate',
-            'open',
-            'put',
-            'repair',
-            'rollback',
-            )
+        '__len__',
+        'check',
+        'commit',
+        'delete',
+        'destroy',
+        'get',
+        'list',
+        'negotiate',
+        'open',
+        'put',
+        'repair',
+        'rollback',
+        'save_key',
+        'load_key',
+    )
 
     def __init__(self, restrict_to_paths):
         self.repository = None
@@ -71,7 +73,7 @@ class RepositoryServer:
                     type, msgid, method, args = unpacked
                     method = method.decode('ascii')
                     try:
-                        if not method in self.rpc_methods:
+                        if method not in self.rpc_methods:
                             raise InvalidRPCMethod(method)
                         try:
                             f = getattr(self, method)
@@ -106,9 +108,10 @@ class RepositoryServer:
 
 class RemoteRepository:
     extra_test_args = []
+    remote_path = None
+    umask = None
 
     class RPCError(Exception):
-
         def __init__(self, name):
             self.name = name
 
@@ -122,9 +125,11 @@ class RemoteRepository:
         self.responses = {}
         self.unpacker = msgpack.Unpacker(use_list=False)
         self.p = None
+        # use local umask also for the remote process
+        umask = ['--umask', '%03o' % self.umask]
         if location.host == '__testsuite__':
-            args = [sys.executable, '-m', 'borg.archiver', 'serve'] + self.extra_test_args
-        else:
+            args = [sys.executable, '-m', 'borg.archiver', 'serve'] + umask + self.extra_test_args
+        else:  # pragma: no cover
             args = ['ssh']
             if location.port:
                 args += ['-p', str(location.port)]
@@ -132,7 +137,7 @@ class RemoteRepository:
                 args.append('%s@%s' % (location.user, location.host))
             else:
                 args.append('%s' % location.host)
-            args += ['borg', 'serve']
+            args += [self.remote_path, 'serve'] + umask
         self.p = Popen(args, bufsize=0, stdin=PIPE, stdout=PIPE)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()
@@ -151,6 +156,9 @@ class RemoteRepository:
 
     def __del__(self):
         self.close()
+
+    def __repr__(self):
+        return '<%s %s>' % (self.__class__.__name__, self.location.canonical_path())
 
     def call(self, cmd, *args, **kw):
         for resp in self.call_many(cmd, [args], **kw):
@@ -199,7 +207,7 @@ class RemoteRepository:
                     break
             r, w, x = select.select(self.r_fds, w_fds, self.x_fds, 1)
             if x:
-                raise Exception('FD exception occured')
+                raise Exception('FD exception occurred')
             if r:
                 data = os.read(self.stdout_fd, BUFSIZE)
                 if not data:
@@ -277,6 +285,12 @@ class RemoteRepository:
     def delete(self, id_, wait=True):
         return self.call('delete', id_, wait=wait)
 
+    def save_key(self, keydata):
+        return self.call('save_key', keydata)
+
+    def load_key(self):
+        return self.call('load_key')
+
     def close(self):
         if self.p:
             self.p.stdin.close()
@@ -291,56 +305,29 @@ class RemoteRepository:
 class RepositoryCache:
     """A caching Repository wrapper
 
-    Caches Repository GET operations using a temporary file
+    Caches Repository GET operations using a local temporary Repository.
     """
     def __init__(self, repository):
-        self.tmppath = None
-        self.index = None
-        self.data_fd = None
         self.repository = repository
-        self.entries = {}
-        self.initialize()
+        tmppath = tempfile.mkdtemp(prefix='borg-tmp')
+        self.caching_repo = Repository(tmppath, create=True, exclusive=True)
 
     def __del__(self):
-        self.cleanup()
-
-    def initialize(self):
-        self.tmppath = tempfile.mkdtemp()
-        self.index = NSIndex()
-        self.data_fd = open(os.path.join(self.tmppath, 'data'), 'a+b')
-
-    def cleanup(self):
-        del self.index
-        if self.data_fd:
-            self.data_fd.close()
-        if self.tmppath:
-            shutil.rmtree(self.tmppath)
-
-    def load_object(self, offset, size):
-        self.data_fd.seek(offset)
-        data = self.data_fd.read(size)
-        assert len(data) == size
-        return data
-
-    def store_object(self, key, data):
-        self.data_fd.seek(0, os.SEEK_END)
-        self.data_fd.write(data)
-        offset = self.data_fd.tell()
-        self.index[key] = offset - len(data), len(data)
+        self.caching_repo.destroy()
 
     def get(self, key):
         return next(self.get_many([key]))
 
     def get_many(self, keys):
-        unknown_keys = [key for key in keys if key not in self.index]
+        unknown_keys = [key for key in keys if key not in self.caching_repo]
         repository_iterator = zip(unknown_keys, self.repository.get_many(unknown_keys))
         for key in keys:
             try:
-                yield self.load_object(*self.index[key])
-            except KeyError:
+                yield self.caching_repo.get(key)
+            except Repository.ObjectNotFound:
                 for key_, data in repository_iterator:
                     if key_ == key:
-                        self.store_object(key, data)
+                        self.caching_repo.put(key, data)
                         yield data
                         break
         # Consume any pending requests

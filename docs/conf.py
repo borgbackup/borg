@@ -11,13 +11,13 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys, os
-from borg import __version__ as sw_version
-
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-#sys.path.insert(0, os.path.abspath('.'))
+import sys, os
+sys.path.insert(0, os.path.abspath('..'))
+
+from borg import __version__ as sw_version
 
 # -- General configuration -----------------------------------------------------
 
@@ -42,7 +42,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Borg - Deduplicating Archiver'
-copyright = '2010-2014, Jonas Borgström'
+copyright = '2010-2014, Jonas Borgström, 2015 The Borg Collective (see AUTHORS file)'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -134,7 +134,7 @@ html_static_path = []
 # Custom sidebar templates, maps document names to template names.
 html_sidebars = {
     'index': ['sidebarlogo.html', 'sidebarusefullinks.html', 'searchbox.html'],
-    '**': ['sidebarlogo.html', 'localtoc.html', 'relations.html', 'sidebarusefullinks.html', 'searchbox.html']
+    '**': ['sidebarlogo.html', 'relations.html', 'searchbox.html', 'localtoc.html', 'sidebarusefullinks.html']
 }
 # Additional templates that should be rendered to pages, maps page names to
 # template names.

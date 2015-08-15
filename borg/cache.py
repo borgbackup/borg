@@ -11,8 +11,9 @@ import tarfile
 import tempfile
 
 from .key import PlaintextKey
-from .helpers import Error, get_cache_dir, decode_dict, st_mtime_ns, unhexlify, UpgradableLock, int_to_bigint, \
+from .helpers import Error, get_cache_dir, decode_dict, st_mtime_ns, unhexlify, int_to_bigint, \
     bigint_to_int
+from .locking import UpgradableLock
 from .hashindex import ChunkIndex
 
 
@@ -21,7 +22,6 @@ class Cache:
     """
     class RepositoryReplay(Error):
         """Cache is newer than repository, refusing to continue"""
-
 
     class CacheInitAbortedError(Error):
         """Cache initialization aborted"""
@@ -129,7 +129,7 @@ class Cache:
     def open(self):
         if not os.path.isdir(self.path):
             raise Exception('%s Does not look like a Borg cache' % self.path)
-        self.lock = UpgradableLock(os.path.join(self.path, 'config'), exclusive=True)
+        self.lock = UpgradableLock(os.path.join(self.path, 'lock'), exclusive=True).acquire()
         self.rollback()
 
     def close(self):
@@ -292,6 +292,9 @@ class Cache:
                 add(chunk_idx, item_id, len(data), len(chunk))
                 unpacker.feed(data)
                 for item in unpacker:
+                    if not isinstance(item, dict):
+                        print('Error: Did not get expected metadata dict - archive corrupted!')
+                        continue
                     if b'chunks' in item:
                         for chunk_id, size, csize in item[b'chunks']:
                             add(chunk_idx, chunk_id, size, csize)
@@ -308,17 +311,20 @@ class Cache:
             chunk_idx.clear()
             for tarinfo in tf_in:
                 archive_id_hex = tarinfo.name
+                archive_name = tarinfo.pax_headers['archive_name']
+                print("- extracting archive %s ..." % archive_name)
                 tf_in.extract(archive_id_hex, tmp_dir)
                 chunk_idx_path = os.path.join(tmp_dir, archive_id_hex).encode('utf-8')
+                print("- reading archive ...")
                 archive_chunk_idx = ChunkIndex.read(chunk_idx_path)
-                for chunk_id, (count, size, csize) in archive_chunk_idx.iteritems():
-                    add(chunk_idx, chunk_id, size, csize, incr=count)
+                print("- merging archive ...")
+                chunk_idx.merge(archive_chunk_idx)
                 os.unlink(chunk_idx_path)
 
         self.begin_txn()
         print('Synchronizing chunks cache...')
         # XXX we have to do stuff on disk due to lacking ChunkIndex api
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(prefix='borg-tmp') as tmp_dir:
             repository = cache_if_remote(self.repository)
             out_archive = open_out_archive()
             in_archive = open_in_archive()

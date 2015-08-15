@@ -2,8 +2,6 @@ from datetime import datetime
 from getpass import getuser
 from itertools import groupby
 import errno
-import shutil
-import tempfile
 import threading
 from .key import key_factory
 from .remote import cache_if_remote
@@ -110,7 +108,7 @@ class ChunkBuffer:
 class CacheChunkBuffer(ChunkBuffer):
 
     def __init__(self, cache, key, stats, chunker_params=CHUNKER_PARAMS):
-        super(CacheChunkBuffer, self).__init__(key, chunker_params)
+        super().__init__(key, chunker_params)
         self.cache = cache
         self.stats = stats
 
@@ -317,7 +315,6 @@ class Archive:
     class IncompatibleFilesystemEncodingError(Error):
         """Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable."""
 
-
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False, progress=False,
                  chunker_params=CHUNKER_PARAMS):
@@ -432,9 +429,11 @@ class Archive:
             count, size, csize = cache.chunks[id]
             stats.update(size, csize, count == 1)
             cache.chunks[id] = count - 1, size, csize
+
         def add_file_chunks(chunks):
             for id, _, _ in chunks:
                 add(id)
+
         # This function is a bit evil since it abuses the cache to calculate
         # the stats. The cache transaction must be rolled back afterwards
         unpacker = msgpack.Unpacker(use_list=False)
@@ -751,13 +750,13 @@ class Archive:
         return Archive._open_rb(path, st)
 
 
-class RobustUnpacker():
+class RobustUnpacker:
     """A restartable/robust version of the streaming msgpack unpacker
     """
     item_keys = [msgpack.packb(name) for name in ('path', 'mode', 'source', 'chunks', 'rdev', 'xattrs', 'user', 'group', 'uid', 'gid', 'mtime')]
 
     def __init__(self, validator):
-        super(RobustUnpacker, self).__init__()
+        super().__init__()
         self.validator = validator
         self._buffered_data = []
         self._resync = False
@@ -815,13 +814,10 @@ class ArchiveChecker:
     def __init__(self):
         self.error_found = False
         self.possibly_superseded = set()
-        self.tmpdir = tempfile.mkdtemp()
 
-    def __del__(self):
-        shutil.rmtree(self.tmpdir)
-
-    def check(self, repository, repair=False, last=None):
+    def check(self, repository, repair=False, archive=None, last=None):
         self.report_progress('Starting archive consistency check...')
+        self.check_all = archive is None and last is None
         self.repair = repair
         self.repository = repository
         self.init_chunks()
@@ -830,11 +826,9 @@ class ArchiveChecker:
             self.manifest = self.rebuild_manifest()
         else:
             self.manifest, _ = Manifest.load(repository, key=self.key)
-        self.rebuild_refcounts(last=last)
-        if last is None:
-            self.verify_chunks()
-        else:
-            self.report_progress('Orphaned objects check skipped (needs all archives checked)')
+        self.rebuild_refcounts(archive=archive, last=last)
+        self.orphan_chunks_check()
+        self.finish()
         if not self.error_found:
             self.report_progress('Archive consistency check complete, no problems found.')
         return self.repair or not self.error_found
@@ -842,7 +836,7 @@ class ArchiveChecker:
     def init_chunks(self):
         """Fetch a list of all object keys from repository
         """
-        # Explicity set the initial hash table capacity to avoid performance issues
+        # Explicitly set the initial hash table capacity to avoid performance issues
         # due to hash table "resonance"
         capacity = int(len(self.repository) * 1.2)
         self.chunks = ChunkIndex(capacity)
@@ -891,7 +885,7 @@ class ArchiveChecker:
         self.report_progress('Manifest rebuild complete', error=True)
         return manifest
 
-    def rebuild_refcounts(self, last=None):
+    def rebuild_refcounts(self, archive=None, last=None):
         """Rebuild object reference counts by walking the metadata
 
         Missing and/or incorrect data is repaired when detected
@@ -966,13 +960,24 @@ class ArchiveChecker:
                 for chunk_id, cdata in zip(items, repository.get_many(items)):
                     unpacker.feed(self.key.decrypt(chunk_id, cdata))
                     for item in unpacker:
+                        if not isinstance(item, dict):
+                            self.report_progress('Did not get expected metadata dict - archive corrupted!',
+                                                 error=True)
+                            continue
                         yield item
 
         repository = cache_if_remote(self.repository)
-        num_archives = len(self.manifest.archives)
-        archive_items = sorted(self.manifest.archives.items(), reverse=True,
-                               key=lambda name_info: name_info[1][b'time'])
-        end = None if last is None else min(num_archives, last)
+        if archive is None:
+            # we need last N or all archives
+            archive_items = sorted(self.manifest.archives.items(), reverse=True,
+                                   key=lambda name_info: name_info[1][b'time'])
+            num_archives = len(self.manifest.archives)
+            end = None if last is None else min(num_archives, last)
+        else:
+            # we only want one specific archive
+            archive_items = [item for item in self.manifest.archives.items() if item[0] == archive]
+            num_archives = 1
+            end = 1
         for i, (name, info) in enumerate(archive_items[:end]):
             self.report_progress('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
             archive_id = info[b'id']
@@ -1003,17 +1008,22 @@ class ArchiveChecker:
             add_reference(new_archive_id, len(data), len(cdata), cdata)
             info[b'id'] = new_archive_id
 
-    def verify_chunks(self):
-        unused = set()
-        for id_, (count, size, csize) in self.chunks.iteritems():
-            if count == 0:
-                unused.add(id_)
-        orphaned = unused - self.possibly_superseded
-        if orphaned:
-            self.report_progress('{} orphaned objects found'.format(len(orphaned)), error=True)
+    def orphan_chunks_check(self):
+        if self.check_all:
+            unused = set()
+            for id_, (count, size, csize) in self.chunks.iteritems():
+                if count == 0:
+                    unused.add(id_)
+            orphaned = unused - self.possibly_superseded
+            if orphaned:
+                self.report_progress('{} orphaned objects found'.format(len(orphaned)), error=True)
+            if self.repair:
+                for id_ in unused:
+                    self.repository.delete(id_)
+        else:
+            self.report_progress('Orphaned objects check skipped (needs all archives checked)')
+
+    def finish(self):
         if self.repair:
-            for id_ in unused:
-                self.repository.delete(id_)
             self.manifest.write()
             self.repository.commit()
-

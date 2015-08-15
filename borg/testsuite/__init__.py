@@ -73,7 +73,7 @@ class BaseTestCase(unittest.TestCase):
             d1 = [filename] + [getattr(s1, a) for a in attrs]
             d2 = [filename] + [getattr(s2, a) for a in attrs]
             if not os.path.islink(path1) or utime_supports_fd:
-                # Older versions of llfuse does not support ns precision properly
+                # Older versions of llfuse do not support ns precision properly
                 if fuse and not have_fuse_mtime_ns:
                     d1.append(round(st_mtime_ns(s1), -4))
                     d2.append(round(st_mtime_ns(s2), -4))
@@ -94,30 +94,3 @@ class BaseTestCase(unittest.TestCase):
                 return
             time.sleep(.1)
         raise Exception('wait_for_mount(%s) timeout' % path)
-
-
-def get_tests(suite):
-    """Generates a sequence of tests from a test suite
-    """
-    for item in suite:
-        try:
-            # TODO: This could be "yield from..." with Python 3.3+
-            for i in get_tests(item):
-                yield i
-        except TypeError:
-            yield item
-
-
-class TestLoader(unittest.TestLoader):
-    """A customized test loader that properly detects and filters our test cases
-    """
-
-    def loadTestsFromName(self, pattern, module=None):
-        suite = self.discover('borg.testsuite', '*.py')
-        tests = unittest.TestSuite()
-        for test in get_tests(suite):
-            if pattern.lower() in test.id().lower():
-                tests.addTest(test)
-        return tests
-
-

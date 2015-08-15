@@ -6,6 +6,7 @@ env
 .tox
 hashindex.c
 chunker.c
+compress.c
 crypto.c
 platform_darwin.c
 platform_freebsd.c
@@ -16,3 +17,8 @@ platform_linux.c
 *.so
 docs/usage/*.inc
 .idea/
+.cache/
+borg.build/
+borg.dist/
+borg.exe
+.coverage

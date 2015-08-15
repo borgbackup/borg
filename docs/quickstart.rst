@@ -89,6 +89,31 @@ certain number of old archives::
     # and 6 monthly archives.
     borg prune -v $REPOSITORY --keep-daily=7 --keep-weekly=4 --keep-monthly=6
 
+.. backup_compression:
+
+Backup compression
+------------------
+
+Default is no compression, but we support different methods with high speed
+or high compression:
+
+If you have a quick repo storage and you want a little compression:
+
+    $ borg create --compression lz4 /mnt/backup::repo ~
+
+If you have a medium fast repo storage and you want a bit more compression (N=0..9,
+0 means no compression, 9 means high compression):
+
+    $ borg create --compression zlib,N /mnt/backup::repo ~
+
+If you have a very slow repo storage and you want high compression (N=0..9, 0 means
+low compression, 9 means high compression):
+
+    $ borg create --compression lzma,N /mnt/backup::repo ~
+
+You'll need to experiment a bit to find the best compression for your use case.
+Keep an eye on CPU load and throughput.
+
 .. _encrypted_repos:
 
 Repository encryption

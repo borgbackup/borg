@@ -14,6 +14,7 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
         eval "$(pyenv init -)"
     fi
 
+    brew install lz4
     brew outdated pyenv || brew upgrade pyenv
 
     case "${TOXENV}" in
@@ -34,6 +35,9 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
     python -m pip install --user virtualenv
 else
     pip install virtualenv
+    sudo add-apt-repository -y ppa:gezakovacs/lz4
+    sudo apt-get update
+    sudo apt-get install -y liblz4-dev
     sudo apt-get install -y libacl1-dev
 fi
 

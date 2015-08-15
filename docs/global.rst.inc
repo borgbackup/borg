@@ -13,6 +13,7 @@
 .. _PBKDF2: https://en.wikipedia.org/wiki/PBKDF2
 .. _ACL: https://en.wikipedia.org/wiki/Access_control_list
 .. _libacl: http://savannah.nongnu.org/projects/acl/
+.. _liblz4: https://github.com/Cyan4973/lz4
 .. _OpenSSL: https://www.openssl.org/
 .. _Python: http://www.python.org/
 .. _Buzhash: https://en.wikipedia.org/wiki/Buzhash

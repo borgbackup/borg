@@ -278,7 +278,43 @@ def timestamp(s):
 
 def ChunkerParams(s):
     window_size, chunk_mask, chunk_min, chunk_max = s.split(',')
+    if int(chunk_max) > 23:
+        # do not go beyond 2**23 (8MB) chunk size now,
+        # COMPR_BUFFER can only cope with up to this size
+        raise ValueError
     return int(window_size), int(chunk_mask), int(chunk_min), int(chunk_max)
+
+
+def CompressionSpec(s):
+    values = s.split(',')
+    count = len(values)
+    if count < 1:
+        raise ValueError
+    compression = values[0]
+    try:
+        compression = int(compression)
+        if count > 1:
+            raise ValueError
+        # DEPRECATED: it is just --compression N
+        if 0 <= compression <= 9:
+            return dict(name='zlib', level=compression)
+        raise ValueError
+    except ValueError:
+        # --compression algo[,...]
+        name = compression
+        if name in ('none', 'lz4', ):
+            return dict(name=name)
+        if name in ('zlib', 'lzma', ):
+            if count < 2:
+                level = 6  # default compression level in py stdlib
+            elif count == 2:
+                level = int(values[1])
+                if not 0 <= level <= 9:
+                    raise ValueError
+            else:
+                raise ValueError
+            return dict(name=name, level=level)
+        raise ValueError
 
 
 def is_cachedir(path):

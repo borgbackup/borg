@@ -4,6 +4,9 @@
 Support
 =======
 
+Please first read the docs and the FAQ section in the docs, a lot of stuff is
+documented / explained there.
+
 Issue Tracker
 -------------
 

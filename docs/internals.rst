@@ -382,10 +382,35 @@ representation of the repository id.
 Compression
 -----------
 
-|project_name| currently always pipes all data through a zlib compressor which
-supports compression levels 0 (no compression, fast) to 9 (high compression, slow).
+|project_name| supports the following compression methods:
+
+- none (no compression, pass through data 1:1)
+- lz4 (low compression, but super fast)
+- zlib (level 0-9, level 0 is no compression [but still adding zlib overhead],
+  level 1 is low, level 9 is high compression)
+- lzma (level 0-9, level 0 is low, level 9 is high compression).
+
+Speed:  none > lz4 > zlib > lzma
+Compression: lzma > zlib > lz4 > none
+
+Be careful, higher zlib and especially lzma compression levels might take a
+lot of resources (CPU and memory).
+
+The overall speed of course also depends on the speed of your target storage.
+If that is slow, using a higher compression level might yield better overall
+performance. You need to experiment a bit. Maybe just watch your CPU load, if
+that is relatively low, increase compression until 1 core is 70-100% loaded.
+
+Even if your target storage is rather fast, you might see interesting effects:
+while doing no compression at all (none) is a operation that takes no time, it
+likely will need to store more data to the storage compared to using lz4.
+The time needed to transfer and store the additional data might be much more
+than if you had used lz4 (which is super fast, but still might compress your
+data about 2:1). This is assuming your data is compressible (if you backup
+already compressed data, trying to compress them at backup time is usually
+pointless).
+
+Compression is applied after deduplication, thus using different compression
+methods in one repo does not influence deduplication.
 
 See ``borg create --help`` about how to specify the compression level and its default.
-
-Note: zlib level 0 creates a little bit more output data than it gets as input,
-due to zlib protocol overhead.

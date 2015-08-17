@@ -112,7 +112,7 @@ Some of the steps detailled below might be useful also for non-git installs.
     sudo dnf install libacl-devel libacl
 
     # lz4 super fast compression support Headers + Library
-    sudo dnf install lz4
+    sudo dnf install lz4-devel
 
     # optional: FUSE support - to mount backup archives
     sudo dnf install fuse-devel fuse

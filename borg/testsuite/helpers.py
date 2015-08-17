@@ -7,7 +7,7 @@ import msgpack
 
 from ..helpers import adjust_patterns, exclude_path, Location, format_timedelta, ExcludePattern, make_path_safe, \
     prune_within, prune_split, \
-    StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec
+    StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams
 from . import BaseTestCase
 
 
@@ -127,6 +127,13 @@ def test_compression_specs():
         CompressionSpec('lzma,9,invalid')
     with pytest.raises(ValueError):
         CompressionSpec('invalid')
+
+
+def test_chunkerparams():
+    assert ChunkerParams('19,23,21,4095') == (19, 23, 21, 4095)
+    assert ChunkerParams('10,23,16,4095') == (10, 23, 16, 4095)
+    with pytest.raises(ValueError):
+        ChunkerParams('19,24,21,4095')
 
 
 class MakePathSafeTestCase(BaseTestCase):

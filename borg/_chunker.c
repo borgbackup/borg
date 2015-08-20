@@ -83,7 +83,8 @@ typedef struct {
     PyObject *fd;
     int fh;
     int done, eof;
-    size_t remaining, bytes_read, bytes_yielded, position, last;
+    size_t remaining, position, last;
+    off_t bytes_read, bytes_yielded;
 } Chunker;
 
 static Chunker *

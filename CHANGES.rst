@@ -60,7 +60,7 @@ Other changes:
   - update docs about compression
   - update development docs about fakeroot
   - internals: add some words about lock files / locking system
-
+  - support: mention BountySource and for what it can be used
 
 
 Version 0.24.0

@@ -35,3 +35,23 @@ to the confirmation mail.
 
 To unsubscribe, send an email to borgbackup-unsubscribe@librelist.com and reply
 to the confirmation mail.
+
+Bounties and Fundraisers
+------------------------
+
+We use `BountySource <https://www.bountysource.com/teams/borgbackup>`_ to allow
+monetary contributions to the project and the developers, who push it forward.
+
+There, you can give general funds to the borgbackup members (the developers will
+then spend the funds as they deem fit). If you do not have some specific bounty
+(see below), you can use this as a general way to say "Thank You!" and support
+the software / project you like.
+
+If you want to encourage developers to fix some specific issue or implement some
+specific feature suggestion, you can post a bounty or back an existing one (they
+always refer to an issue in our `issue tracker`_).
+
+As a developer, you can become a Bounty Hunter and win bounties by contributing
+to |project_name|, a free and open source software project.
+
+We might also use BountySource to fund raise for some bigger goals.

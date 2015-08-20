@@ -128,6 +128,7 @@ static int
 chunker_fill(Chunker *c)
 {
     ssize_t n;
+    size_t offset, length;
     PyObject *data;
     memmove(c->data, c->data + c->last, c->position + c->remaining - c->last);
     c->position -= c->last;
@@ -137,6 +138,7 @@ chunker_fill(Chunker *c)
         return 1;
     }
     if(c->fh >= 0) {
+        offset = c->bytes_read;
         // if we have a os-level file descriptor, use os-level API
         n = read(c->fh, c->data + c->position + c->remaining, n);
         if(n > 0) {
@@ -151,13 +153,16 @@ chunker_fill(Chunker *c)
             // some error happened
             return 0;
         }
+        length = c->bytes_read - offset;
         #if ( _XOPEN_SOURCE >= 600 || _POSIX_C_SOURCE >= 200112L )
-        // We tell the OS that we do not need the data of this file any more
-        // that it maybe has in the cache. This avoids that we spoil the
+        // We tell the OS that we do not need the data that we just have read any
+        // more (that it maybe has in the cache). This avoids that we spoil the
         // complete cache with data that we only read once and (due to cache
         // size limit) kick out data from the cache that might be still useful
         // for the OS or other processes.
-        posix_fadvise(c->fh, (off_t) 0, (off_t) 0, POSIX_FADV_DONTNEED);
+        if (length > 0) {
+            posix_fadvise(c->fh, (off_t) offset, (off_t) length, POSIX_FADV_DONTNEED);
+        }
         #endif
     }
     else {

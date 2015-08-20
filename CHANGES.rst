@@ -25,24 +25,41 @@ Deprecations:
   --compression 1 (in 0.24) is the same as --compression zlib,1 (now)
   --compression 9 (in 0.24) is the same as --compression zlib,9 (now)
 
-
 New features:
 
 - create --compression none (default, means: do not compress, just pass through
   data "as is". this is more efficient than zlib level 0 as used in borg 0.24)
 - create --compression lz4 (super-fast, but not very high compression)
-  Please note that borgbackup needs lz4 library as additional requirement.
+  Please note that borgbackup needs lz4 library as additional requirement (#156).
 - create --compression zlib,N (slower, higher compression, default for N is 6)
 - create --compression lzma,N (slowest, highest compression, default N is 6)
 - honor the nodump flag (UF_NODUMP) and do not backup such items
+- list --short just outputs a simple list of the files/directories in an archive
 
 Bug fixes:
 
+- fixed --chunker-params parameter order confusion / malfunction, fixes #154
 - close fds of segments we delete (during compaction)
+- close files which fell out the lrucache
+- fadvise DONTNEED now is only called for the byte range actually read, not for
+  the whole file, fixes #158.
 
 Other changes:
 
-- none yet
+- remove fakeroot requirement for tests, tests run faster without fakeroot
+  (test setup does not fail any more without fakeroot, so you can run with or
+  without fakeroot), fixes #151 and #91.
+- more tests for archiver
+- recover_segment(): don't assume we have an fd for segment
+- lrucache refactoring / cleanup, add dispose function, py.test tests
+- generalize hashindex code for any key length (less hardcoding)
+- lock roster: catch file not found in remove() method and ignore it
+- improved docs:
+
+  - replace hack for llfuse with proper solution (install libfuse-dev)
+  - update docs about compression
+  - internals: add some words about lock files / locking system
+
 
 
 Version 0.24.0

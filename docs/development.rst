@@ -26,7 +26,9 @@ Running the tests
 
 The tests are in the borg/testsuite package.
 
-To run them, you need to have fakeroot, tox and pytest installed.
+To run all the tests, you need to have fakeroot installed. If you do not have
+fakeroot, you still will be able to run most tests, just leave away the
+`fakeroot -u` from the given command lines.
 
 To run the test suite use the following command::
 
@@ -47,7 +49,6 @@ Some more advanced examples::
 
 Important notes:
 
-- Without fakeroot -u some tests will fail.
 - When using -- to give options to py.test, you MUST also give borg.testsuite[.module].
 
 Building the docs with Sphinx

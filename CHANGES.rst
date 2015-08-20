@@ -58,6 +58,7 @@ Other changes:
 
   - replace hack for llfuse with proper solution (install libfuse-dev)
   - update docs about compression
+  - update development docs about fakeroot
   - internals: add some words about lock files / locking system
 
 

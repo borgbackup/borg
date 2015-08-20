@@ -163,7 +163,7 @@ chunker_fill(Chunker *c)
         // size limit) kick out data from the cache that might be still useful
         // for the OS or other processes.
         if (length > 0) {
-            posix_fadvise(c->fh, (off_t) offset, (off_t) length, POSIX_FADV_DONTNEED);
+            posix_fadvise(c->fh, offset, length, POSIX_FADV_DONTNEED);
         }
         #endif
     }

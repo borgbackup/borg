@@ -41,6 +41,32 @@ lock.roster and lock.exclusive/*
   used by the locking system to manage shared and exclusive locks
 
 
+Lock files
+----------
+
+|project_name| uses locks to get (exclusive or shared) access to the cache and
+the repository.
+
+The locking system is based on creating a directory `lock.exclusive` (for
+exclusive locks). Inside the lock directory, there is a file indication
+hostname, process id and thread id of the lock holder.
+
+There is also a json file `lock.roster` that keeps a directory of all shared
+and exclusive lockers.
+
+If the process can create the `lock.exclusive` directory for a resource, it has
+the lock for it. If creation fails (because the directory has already been
+created by some other process), lock acquisition fails.
+
+The cache lock is usually in `~/.cache/borg/REPOID/lock.*`.
+The repository lock is in `repository/lock.*`.
+
+In case you run into troubles with the locks, you can just delete the `lock.*`
+directory and file IF you first make sure that no |project_name| process is
+running on any machine that accesses this resource. Be very careful, the cache
+or repository might get damaged if multiple processes use it at the same time.
+
+
 Config file
 -----------
 

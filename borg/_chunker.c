@@ -96,6 +96,7 @@ chunker_init(int window_size, int chunk_mask, int min_size, int max_size, uint32
     c->table = buzhash_init_table(seed);
     c->buf_size = max_size;
     c->data = malloc(c->buf_size);
+    c->fh = -1;
     return c;
 }
 

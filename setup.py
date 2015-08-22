@@ -101,7 +101,9 @@ elif sys.platform == 'darwin':
 
 setup(
     name='borgbackup',
-    use_scm_version=True,
+    use_scm_version={
+        'write_to': 'borg/_version.py',
+    },
     author='The Borg Collective (see AUTHORS file)',
     author_email='borgbackup@librelist.com',
     url='https://borgbackup.github.io/',

@@ -328,7 +328,11 @@ class Archive:
             try:
                 xattr.setxattr(fd or path, k, v, follow_symlinks=False)
             except OSError as e:
-                if e.errno != errno.ENOTSUP:
+                if e.errno not in (errno.ENOTSUP, errno.EACCES, ):
+                    # only raise if the errno is not on our ignore list:
+                    # ENOTSUP == xattrs not supported here
+                    # EACCES == permission denied to set this specific xattr
+                    #           (this may happen related to security.* keys)
                     raise
         uid = gid = None
         if not self.numeric_owner:

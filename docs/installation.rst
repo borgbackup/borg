@@ -42,8 +42,8 @@ Mac OS X: You may need to get a recent enough OpenSSL version from homebrew_.
 Mac OS X: You need OS X FUSE >= 3.0.
 
 
-Debian / Ubuntu installation (from git)
----------------------------------------
+Debian Jessie / Ubuntu 14.04 installation (from git)
+----------------------------------------------------
 Note: this uses latest, unreleased development code from git.
 While we try not to break master, there are no guarantees on anything.
 

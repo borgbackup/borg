@@ -323,14 +323,13 @@ class Archive:
             raise Exception('Unknown archive item type %r' % item[b'mode'])
 
     def restore_attrs(self, path, item, symlink=False, fd=None):
-        xattrs = item.get(b'xattrs')
-        if xattrs:
-                for k, v in xattrs.items():
-                    try:
-                        xattr.setxattr(fd or path, k, v, follow_symlinks=False)
-                    except OSError as e:
-                        if e.errno != errno.ENOTSUP:
-                            raise
+        xattrs = item.get(b'xattrs', {})
+        for k, v in xattrs.items():
+            try:
+                xattr.setxattr(fd or path, k, v, follow_symlinks=False)
+            except OSError as e:
+                if e.errno != errno.ENOTSUP:
+                    raise
         uid = gid = None
         if not self.numeric_owner:
             uid = user2uid(item[b'user'])

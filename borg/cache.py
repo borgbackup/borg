@@ -213,9 +213,6 @@ class Cache:
         so it has complete and current information about all backup archives.
         Finally, it builds the master chunks index by merging all indices from
         the tar.
-
-        Note: compression (esp. xz) is very effective in keeping the tar
-              relatively small compared to the files it contains.
         """
         in_archive_path = os.path.join(self.path, 'chunks.archive')
         out_archive_path = os.path.join(self.path, 'chunks.archive.tmp')
@@ -234,8 +231,10 @@ class Cache:
             return tf
 
         def open_out_archive():
-            for compression in ('xz', 'bz2', 'gz'):
-                # xz needs py 3.3, bz2 and gz also work on 3.2
+            for compression in ('gz', ):
+                # 'xz' needs py 3.3 and is expensive on the cpu
+                # 'bz2' also works on 3.2 and is expensive on the cpu
+                # 'gz' also works on 3.2 and is less expensive on the cpu
                 try:
                     tf = tarfile.open(out_archive_path, 'w:'+compression, format=tarfile.PAX_FORMAT)
                     break

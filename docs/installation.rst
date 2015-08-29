@@ -19,24 +19,24 @@ and tools) followed by the generic installation of |project_name| itself:
 
 Below, we describe different ways to install |project_name|.
 
-- (dist package) - easy and fast, needs a distribution and platform specific
+- **dist package** - easy and fast, needs a distribution and platform specific
   binary package (for your Linux/*BSD/OS X/... distribution).
-- (wheel) - easy and fast, needs a platform specific borgbackup binary wheel,
+- **wheel** - easy and fast, needs a platform specific borgbackup binary wheel,
   which matches your platform [OS and CPU]).
-- (pypi) - installing a source package from pypi needs more installation steps
+- **pypi** - installing a source package from pypi needs more installation steps
   and will compile stuff - try this if there is no binary wheel that works for
   you.
-- (git) - for developers and power users who want to have the latest code or
+- **git** - for developers and power users who want to have the latest code or
   use revision control (each release is tagged).
 
-Even though Python 3 is not the default Python version on many systems, it is
-usually available as an optional install.
+**Python 3**: Even though this is not the default Python version on many systems,
+it is usually available as an optional install.
 
 Virtualenv_ can be used to build and install |project_name| without affecting
 the system Python or requiring root access.
 
 Important:
-If you install into a virtual environment, you need to activate
+If you install into a virtual environment, you need to **activate**
 the virtual env first (``source borg-env/bin/activate``).
 Alternatively, directly run ``borg-env/bin/borg`` (or symlink that into some
 directory that is in your PATH so you can just run ``borg``).
@@ -46,7 +46,7 @@ simple use cases.
 The llfuse_ python package is also required if you wish to mount an
 archive as a FUSE filesystem. Only FUSE >= 2.8.0 can support llfuse.
 
-You only need Cython to compile the .pyx files to the respective .c files
+You only need **Cython** to compile the .pyx files to the respective .c files
 when using |project_name| code from git. For |project_name| releases, the .c
 files will be bundled, so you won't need Cython to install a release.
 
@@ -61,8 +61,8 @@ Mac OS X: You need OS X FUSE >= 3.0.
 
 Installation (dist package)
 ---------------------------
-Some Linux, *BSD and OS X distributions might offer a ready-to-use
-|project_name| package (which can be easily installed in the usual way).
+Some Linux, BSD and OS X distributions might offer a ready-to-use
+`borgbackup` package (which can be easily installed in the usual way).
 
 As |project_name| is still relatively new, such a package might be not
 available for your system yet. Please ask package maintainers to build a
@@ -92,14 +92,15 @@ Installation (wheel)
 This uses the latest binary wheel release.
 
 .. parsed-literal::
+
     # Check https://github.com/borgbackup/borg/issues/147 for the correct
     # platform-specific binary wheel, download and install it:
 
     # system-wide installation, needs sudo/root permissions:
-    sudo pip install borgbackup-*.whl
+    sudo pip install borgbackup.whl
 
     # home directory installation, no sudo/root needed:
-    pip install --user borgbackup-*.whl
+    pip install --user borgbackup.whl
 
 
 Debian Jessie / Ubuntu 14.04 preparations (git/pypi)
@@ -135,9 +136,8 @@ Debian Jessie / Ubuntu 14.04 preparations (git/pypi)
 Korora / Fedora 21 preparations (git/pypi)
 ------------------------------------------
 
-Some of the steps detailled below might be useful also for non-git installs.
-
 .. parsed-literal::
+
     # Python 3.x (>= 3.2) + Headers, Py Package Installer, VirtualEnv
     sudo dnf install python3 python3-devel python3-pip python3-virtualenv
 
@@ -196,6 +196,7 @@ Installation (pypi)
 This uses the latest (source package) release from PyPi.
 
 .. parsed-literal::
+
     virtualenv --python=python3 borg-env
     source borg-env/bin/activate   # always before using!
 
@@ -213,6 +214,7 @@ This uses latest, unreleased development code from git.
 While we try not to break master, there are no guarantees on anything.
 
 .. parsed-literal::
+
     # get |project_name| from github, install it
     git clone |git_url|
 

@@ -567,6 +567,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         The check command verifies the consistency of a repository and the corresponding archives.
 
         First, the underlying repository data files are checked:
+
         - For all segments the segment magic (header) is checked
         - For all objects stored in the segments, all metadata (e.g. crc and size) and
           all data is read. The read data is checked by size and CRC. Bit rot and other
@@ -580,6 +581,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         - The repository check can be skipped using the --archives-only option.
 
         Second, the consistency and correctness of the archive metadata is verified:
+
         - Is the repo manifest present? If not, it is rebuilt from archive metadata
           chunks (this requires reading and decrypting of all metadata and data).
         - Check if archive metadata chunk is present. if not, remove archive from

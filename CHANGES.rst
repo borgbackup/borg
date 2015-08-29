@@ -2,18 +2,18 @@ Borg Changelog
 ==============
 
 
-Version 0.25.0 (not released yet)
----------------------------------
+Version 0.25.0
+--------------
 
 Compatibility notes:
 
+- lz4 compression library (liblz4) is a new requirement (#156)
 - the new compression code is very compatible: as long as you stay with zlib
   compression, older borg releases will still be able to read data from a
   repo/archive made with the new code (note: this is not the case for the
   default "none" compression, use "zlib,0" if you want a "no compression" mode
   that can be read by older borg). Also the new code is able to read repos and
   archives made with older borg versions (for all zlib levels  0..9).
-- lz4 compression library (liblz4) is a new requirement (#156)
 
 Deprecations:
 

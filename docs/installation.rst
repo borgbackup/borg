@@ -14,6 +14,20 @@ Installation
 
 General notes
 -------------
+You need to do some platform specific preparation steps (to install libraries
+and tools) followed by the generic installation of |project_name| itself:
+
+Below, we describe different ways to install |project_name|.
+
+- (dist package) - easy and fast, needs a distribution and platform specific
+  binary package (for your Linux/*BSD/OS X/... distribution).
+- (wheel) - easy and fast, needs a platform specific borgbackup binary wheel,
+  which matches your platform [OS and CPU]).
+- (pypi) - installing a source package from pypi needs more installation steps
+  and will compile stuff - try this if there is no binary wheel that works for
+  you.
+- (git) - for developers and power users who want to have the latest code or
+  use revision control (each release is tagged).
 
 Even though Python 3 is not the default Python version on many systems, it is
 usually available as an optional install.
@@ -22,10 +36,12 @@ Virtualenv_ can be used to build and install |project_name| without affecting
 the system Python or requiring root access.
 
 Important:
-if you install into a virtual environment, you need to activate
+If you install into a virtual environment, you need to activate
 the virtual env first (``source borg-env/bin/activate``).
 Alternatively, directly run ``borg-env/bin/borg`` (or symlink that into some
 directory that is in your PATH so you can just run ``borg``).
+Using a virtual environment is optional, but recommended except for the most
+simple use cases.
 
 The llfuse_ python package is also required if you wish to mount an
 archive as a FUSE filesystem. Only FUSE >= 2.8.0 can support llfuse.
@@ -43,10 +59,51 @@ Mac OS X: You may need to get a recent enough OpenSSL version from homebrew_.
 Mac OS X: You need OS X FUSE >= 3.0.
 
 
-Debian Jessie / Ubuntu 14.04 installation preparations (git)
-------------------------------------------------------------
+Installation (dist package)
+---------------------------
+Some Linux, *BSD and OS X distributions might offer a ready-to-use
+|project_name| package (which can be easily installed in the usual way).
 
-Some of the steps detailled below might be useful also for non-git installs.
+As |project_name| is still relatively new, such a package might be not
+available for your system yet. Please ask package maintainers to build a
+package or, if you can package / submit it yourself, please help us with
+that!
+
+If a package is available, it might be interesting for you to check its version
+and compare that to our latest release and review the change log (see links on
+our web site).
+
+
+Debian Jessie / Ubuntu 14.04 preparations (wheel)
+-------------------------------------------------
+
+.. parsed-literal::
+
+    # Python stuff we need
+    apt-get install python3 python3-pip
+
+    # Libraries we need (fuse is optional)
+    apt-get install openssl libacl1 liblz4-1 fuse
+
+
+Installation (wheel)
+--------------------
+
+This uses the latest binary wheel release.
+
+.. parsed-literal::
+    # Check https://github.com/borgbackup/borg/issues/147 for the correct
+    # platform-specific binary wheel, download and install it:
+
+    # system-wide installation, needs sudo/root permissions:
+    sudo pip install borgbackup-*.whl
+
+    # home directory installation, no sudo/root needed:
+    pip install --user borgbackup-*.whl
+
+
+Debian Jessie / Ubuntu 14.04 preparations (git/pypi)
+----------------------------------------------------
 
 .. parsed-literal::
 
@@ -75,8 +132,8 @@ Some of the steps detailled below might be useful also for non-git installs.
     apt-get install fakeroot
 
 
-Korora / Fedora 21 installation preparations (git)
---------------------------------------------------
+Korora / Fedora 21 preparations (git/pypi)
+------------------------------------------
 
 Some of the steps detailled below might be useful also for non-git installs.
 
@@ -100,8 +157,8 @@ Some of the steps detailled below might be useful also for non-git installs.
     sudo dnf install fakeroot
 
 
-Cygwin installation preparations (git)
---------------------------------------
+Cygwin preparations (git/pypi)
+------------------------------
 
 Please note that running under cygwin is rather experimental, stuff has been
 tested with CygWin (x86-64) v2.1.0.
@@ -110,17 +167,12 @@ You'll need at least (use the cygwin installer to fetch/install these):
 
 ::
 
-    python3
-    python3-setuptools
-    python3-cython
-    binutils
-    gcc-core
-    git
-    libopenssl
+    python3 python3-setuptools
+    python3-cython  # not needed for releases
+    binutils gcc-core
+    libopenssl openssl-devel
     liblz4_1 liblz4-devel  # from cygwinports.org
-    make
-    openssh
-    openssl-devel
+    git make openssh
 
 You can then install ``pip`` and ``virtualenv``:
 
@@ -138,13 +190,26 @@ In case that creation of the virtual env fails, try deleting this file:
     /usr/lib/python3.4/__pycache__/platform.cpython-34.pyc
 
 
-Generic: Installing borgbackup (git)
-------------------------------------
+Installation (pypi)
+-------------------
 
-After you have done the installation preparations, you can now fetch and build
-|project_name|.
+This uses the latest (source package) release from PyPi.
 
-Note: this uses latest, unreleased development code from git.
+.. parsed-literal::
+    virtualenv --python=python3 borg-env
+    source borg-env/bin/activate   # always before using!
+
+    # install borg + dependencies into virtualenv
+    pip install llfuse  # optional, for FUSE support
+    pip install borgbackup
+
+Note: we install into a virtual environment here, but this is not a requirement.
+
+
+Installation (git)
+------------------
+
+This uses latest, unreleased development code from git.
 While we try not to break master, there are no guarantees on anything.
 
 .. parsed-literal::
@@ -155,13 +220,13 @@ While we try not to break master, there are no guarantees on anything.
     source borg-env/bin/activate   # always before using!
 
     # install borg + dependencies into virtualenv
-    pip install cython  # compile .pyx -> .c
-    pip install tox pytest  # optional, for running unit tests
     pip install sphinx  # optional, to build the docs
     pip install llfuse  # optional, for FUSE support
     cd borg
+    pip install -r requirements.d/development.txt
     pip install -e .  # in-place editable mode
 
     # optional: run all the tests, on all supported Python versions
     fakeroot -u tox
 
+Note: as a developer or power user, you always want to use a virtual environment.

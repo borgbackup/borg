@@ -97,7 +97,8 @@ Can |project_name| add redundancy to the backup data to deal with hardware malfu
     of low-level storage layout information and control which we do not have (and also can't
     get, even if we wanted).
 
-    So, if you need that, consider RAID1 or a filesystems that offers redundant storage.
+    So, if you need that, consider RAID1 or a filesystem that offers redundant storage
+    or just make 2 backups to different locations / different hardware.
 
 Can |project_name| verify data integrity of a backup archive?
     Yes, if you want to detect accidental data damage (like bit rot), use the ``check``

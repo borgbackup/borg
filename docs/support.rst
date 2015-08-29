@@ -4,15 +4,15 @@
 Support
 =======
 
-Please first read the docs and the FAQ section in the docs, a lot of stuff is
-documented / explained there.
+Please first read the docs and existing issue tracker issues and mailing
+list posts, a lot of stuff is already documented / explained / discussed /
+filed there.
 
 Issue Tracker
 -------------
 
 If you've found a bug or have a concrete feature request, please create a new
-ticket on the project's `issue tracker`_ (after checking whether someone else
-already has reported the same thing).
+ticket on the project's `issue tracker`_.
 
 For more general questions or discussions, IRC or mailing list are preferred.
 
@@ -48,10 +48,10 @@ then spend the funds as they deem fit). If you do not have some specific bounty
 the software / project you like.
 
 If you want to encourage developers to fix some specific issue or implement some
-specific feature suggestion, you can post a bounty or back an existing one (they
-always refer to an issue in our `issue tracker`_).
+specific feature suggestion, you can post a new bounty or back an existing one
+(they always refer to an issue in our `issue tracker`_).
 
-As a developer, you can become a Bounty Hunter and win bounties by contributing
-to |project_name|, a free and open source software project.
+As a developer, you can become a Bounty Hunter and win bounties (earn money) by
+contributing to |project_name|, a free and open source software project.
 
 We might also use BountySource to fund raise for some bigger goals.

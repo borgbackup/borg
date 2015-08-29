@@ -13,6 +13,7 @@ Compatibility notes:
   default "none" compression, use "zlib,0" if you want a "no compression" mode
   that can be read by older borg). Also the new code is able to read repos and
   archives made with older borg versions (for all zlib levels  0..9).
+- lz4 compression library (liblz4) is a new requirement (#156)
 
 Deprecations:
 
@@ -30,7 +31,6 @@ New features:
 - create --compression none (default, means: do not compress, just pass through
   data "as is". this is more efficient than zlib level 0 as used in borg 0.24)
 - create --compression lz4 (super-fast, but not very high compression)
-  Please note that borgbackup needs lz4 library as additional requirement (#156).
 - create --compression zlib,N (slower, higher compression, default for N is 6)
 - create --compression lzma,N (slowest, highest compression, default N is 6)
 - honor the nodump flag (UF_NODUMP) and do not backup such items
@@ -43,6 +43,8 @@ Bug fixes:
 - close files which fell out the lrucache
 - fadvise DONTNEED now is only called for the byte range actually read, not for
   the whole file, fixes #158.
+- fix issue with negative "all archives" size, fixes #165
+- restore_xattrs: ignore if setxattr fails with EACCES, fixes #162
 
 Other changes:
 
@@ -54,6 +56,7 @@ Other changes:
 - lrucache refactoring / cleanup, add dispose function, py.test tests
 - generalize hashindex code for any key length (less hardcoding)
 - lock roster: catch file not found in remove() method and ignore it
+- travis CI: use requirements file
 - improved docs:
 
   - replace hack for llfuse with proper solution (install libfuse-dev)
@@ -61,6 +64,9 @@ Other changes:
   - update development docs about fakeroot
   - internals: add some words about lock files / locking system
   - support: mention BountySource and for what it can be used
+  - theme: use a lighter green
+  - add pypi, wheel, dist package based install docs
+  - split install docs into system-specific preparations and generic instructions
 
 
 Version 0.24.0

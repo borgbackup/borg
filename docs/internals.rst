@@ -8,7 +8,6 @@ This page documents the internal data structures and storage
 mechanisms of |project_name|. It is partly based on `mailing list
 discussion about internals`_ and also on static code analysis.
 
-It may not be exactly up to date with the current source code.
 
 Repository and Archives
 -----------------------
@@ -151,6 +150,9 @@ Each archive info contains:
 It is the last object stored, in the last segment, and is replaced
 each time.
 
+The Archive
+-----------
+
 The archive metadata does not contain the file items directly. Only
 references to other objects that contain that data. An archive is an
 object that contains:
@@ -162,6 +164,10 @@ object that contains:
 * hostname
 * username
 * time
+
+
+The Item
+--------
 
 Each item represents a file, directory or other fs item and is stored as an
 ``item`` dictionary that contains:
@@ -220,7 +226,7 @@ what files you have based on a specific set of chunk sizes).
 Indexes / Caches
 ----------------
 
-The files cache is stored in ``cache/files`` and is indexed on the
+The **files cache** is stored in ``cache/files`` and is indexed on the
 ``file path hash``. At backup time, it is used to quickly determine whether we
 need to chunk a given file (or whether it is unchanged and we already have all
 its pieces).
@@ -239,7 +245,7 @@ archives in different setups.
 The files cache is stored as a python associative array storing
 python objects, which generates a lot of overhead.
 
-The chunks cache is stored in ``cache/chunks`` and is indexed on the
+The **chunks cache** is stored in ``cache/chunks`` and is indexed on the
 ``chunk id_hash``. It is used to determine whether we already have a specific
 chunk, to count references to it and also for statistics.
 It contains:
@@ -248,7 +254,7 @@ It contains:
 * size
 * encrypted/compressed size
 
-The repository index is stored in ``repo/index.%d`` and is indexed on the
+The **repository index** is stored in ``repo/index.%d`` and is indexed on the
 ``chunk id_hash``. It is used to determine a chunk's location in the repository.
 It contains:
 

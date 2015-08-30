@@ -235,7 +235,7 @@ class IncludePattern:
     def __init__(self, pattern, normalize=False):
         # inner method used to create the class method 'match'
         def match(path):
-            return (path+os.path.sep).startswith(pattern)
+            return (path+os.path.sep).startswith(self.pattern)
 
         # HFS+ converts paths to a canonical form, so don't require
         # users to enter an exact match

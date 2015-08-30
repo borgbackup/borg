@@ -243,8 +243,7 @@ class IncludePattern:
         self.pattern = os.path.normpath(pattern).rstrip(os.path.sep)+os.path.sep
 
     def __repr__(self):
-        return '%s(%s)%s' % (type(self), self.pattern,
-                "normalized" if self.normalized else '')
+        return '%s(%s)' % (type(self), self.pattern)
 
 
 class ExcludePattern(IncludePattern):

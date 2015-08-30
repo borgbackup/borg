@@ -5,9 +5,10 @@ from datetime import datetime, timezone, timedelta
 import pytest
 import msgpack
 
-from ..helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
-    prune_within, prune_split, \
-    StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams
+from ..helpers import (adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern,
+        ExcludePattern, make_path_safe, prune_within, prune_split, StableDict, int_to_bigint,
+        bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams)
+
 from . import BaseTestCase
 
 

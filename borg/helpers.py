@@ -7,6 +7,8 @@ import pwd
 import re
 import sys
 import time
+import unicodedata
+
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from operator import attrgetter
@@ -220,20 +222,40 @@ def exclude_path(path, patterns):
 # unify the two cases, we add a path separator to the end of
 # the path before matching.
 
+##### !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+##### For discussion only, don't merge this code!
+##### !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 class IncludePattern:
     """Literal files or directories listed on the command line
     for some operations (e.g. extract, but not create).
     If a directory is specified, all paths that start with that
     path match as well.  A trailing slash makes no difference.
     """
-    def __init__(self, pattern):
+    def __init__(self, pattern, normalize=False):
+        # inner method used to create the class method 'match'
+        def match(path):
+            return (path+os.path.sep).startswith(pattern)
+
+        # HFS+ converts paths to a canonical form, so don't require
+        # users to enter an exact match
+        if normalize: # NOTE: could alternately be if sys.platform in ('darwin'):
+            # repository paths will be mostly in NFD, as the OSX exception list
+            # to NFD is small, so normalize to that form for best performance
+            pattern = unicodedata.normalize("NFD", pattern)
+            self.match = lambda p: match(unicodedata.normalize("NFD", p))
+            self.normalized = True
+        # Windows and Unix filesystems allow different forms, so users
+        # always have to enter an exact match
+        else:
+            self.match = match
+            self.normalized = False
+
         self.pattern = os.path.normpath(pattern).rstrip(os.path.sep)+os.path.sep
 
-    def match(self, path):
-        return (path+os.path.sep).startswith(self.pattern)
-
     def __repr__(self):
-        return '%s(%s)' % (type(self), self.pattern)
+        return '%s(%s)%s' % (type(self), self.pattern,
+                "normalized" if self.normalized else '')
 
 
 class ExcludePattern(IncludePattern):

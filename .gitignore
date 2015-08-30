@@ -4,6 +4,7 @@ build
 dist
 env
 .tox
+.python-version
 hashindex.c
 chunker.c
 compress.c
@@ -16,6 +17,7 @@ platform_linux.c
 *.pyo
 *.so
 docs/usage/*.inc
+.eggs/
 .idea/
 .cache/
 borg/_version.py

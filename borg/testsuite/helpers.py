@@ -1,3 +1,4 @@
+import sys
 import hashlib
 from time import mktime, strptime
 from datetime import datetime, timezone, timedelta
@@ -11,6 +12,9 @@ from ..helpers import (adjust_patterns, exclude_path, Location, format_timedelta
 
 from . import BaseTestCase
 
+
+only_on_osx = pytest.mark.skipif(not sys.platform.startswith('darwin'), reason='OS X only test')
+skip_if_osx = pytest.mark.skipif(sys.platform.startswith('darwin'), reason='OS X only test')
 
 class BigIntTestCase(BaseTestCase):
 
@@ -178,36 +182,56 @@ class PatternTestCase(BaseTestCase):
         self.assert_equal(self.evaluate(['/etc/', '/var'], ['dmesg']),
                           ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg'])
 
-class OSXPatternNormalizationTestCase(BaseTestCase):
+
+@only_on_osx
+class OSXPatternAndPathNormalizationTestCase(BaseTestCase):
+
+    def testComposedUnicode(self):
+        pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
+        ni = IncludePattern(pattern)
+
+        assert ni.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert ni.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+
+    def testDecomposedUnicode(self):
+        pattern = 'ba\N{COMBINING ACUTE ACCENT}'
+        ni = IncludePattern(pattern)
+
+        assert ni.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert ni.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+
+    def testInvalidUnicode(self):
+        pattern = str(b'ba\x80', 'latin1')
+        ni = IncludePattern(pattern)
+
+        assert not ni.match("ba/foo")
+        assert ni.match(str(b"ba\x80/foo", 'latin1'))
+
+
+@skip_if_osx
+class NonOSXPatternAndPathNormalizationTestCase(BaseTestCase):
+
     def testComposedUnicode(self):
         pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
         i = IncludePattern(pattern)
-        ni = IncludePattern(pattern, normalize=True)
 
         assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
         assert not i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert ni.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert ni.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-    
+
     def testDecomposedUnicode(self):
         pattern = 'ba\N{COMBINING ACUTE ACCENT}'
         i = IncludePattern(pattern)
-        ni = IncludePattern(pattern, normalize=True)
 
         assert not i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
         assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert ni.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert ni.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-    
+
     def testInvalidUnicode(self):
         pattern = str(b'ba\x80', 'latin1')
         i = IncludePattern(pattern)
-        ni = IncludePattern(pattern, normalize=True)
 
         assert not i.match("ba/foo")
         assert i.match(str(b"ba\x80/foo", 'latin1'))
-        assert not ni.match("ba/foo")
-        assert ni.match(str(b"ba\x80/foo", 'latin1'))
+
 
 def test_compression_specs():
     with pytest.raises(ValueError):

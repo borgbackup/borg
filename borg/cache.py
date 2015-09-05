@@ -347,9 +347,9 @@ class Cache:
     def add_chunk(self, id, data, stats):
         if not self.txn_active:
             self.begin_txn()
-        if self.seen_chunk(id):
-            return self.chunk_incref(id, stats)
         size = len(data)
+        if self.seen_chunk(id, size):
+            return self.chunk_incref(id, stats)
         data = self.key.encrypt(data)
         csize = len(data)
         self.repository.put(id, data, wait=False)
@@ -357,8 +357,14 @@ class Cache:
         stats.update(size, csize, True)
         return id, size, csize
 
-    def seen_chunk(self, id):
-        return self.chunks.get(id, (0, 0, 0))[0]
+    def seen_chunk(self, id, size=None):
+        refcount, stored_size, _ = self.chunks.get(id, (0, None, None))
+        if size is not None and stored_size is not None and size != stored_size:
+            # we already have a chunk with that id, but different size.
+            # this is either a hash collision (unlikely) or corruption or a bug.
+            raise Exception("chunk has same id [%r], but different size (stored: %d new: %d)!" % (
+                            id, stored_size, size))
+        return refcount
 
     def chunk_incref(self, id, stats):
         if not self.txn_active:

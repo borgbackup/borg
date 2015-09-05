@@ -3,6 +3,7 @@ from .remote import cache_if_remote
 import errno
 import msgpack
 import os
+import stat
 import sys
 from binascii import hexlify
 import shutil
@@ -387,7 +388,7 @@ class Cache:
             stats.update(-size, -csize, False)
 
     def file_known_and_unchanged(self, path_hash, st):
-        if not self.do_files:
+        if not (self.do_files and stat.S_ISREG(st.st_mode)):
             return None
         if self.files is None:
             self._read_files()
@@ -404,7 +405,7 @@ class Cache:
             return None
 
     def memorize_file(self, path_hash, st, ids):
-        if not self.do_files:
+        if not (self.do_files and stat.S_ISREG(st.st_mode)):
             return
         # Entry: Age, inode, size, mtime, chunk ids
         mtime_ns = st_mtime_ns(st)

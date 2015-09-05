@@ -210,6 +210,11 @@ Examples
     # Even slower, even higher compression (N = 0..9)
     $ borg create --compression lzma,N /mnt/backup::repo ~
 
+    # Backup some LV snapshots (you have to create the snapshots before this
+    # and remove them afterwards). We also backup the output of lvdisplay so
+    # we can see the LV sizes at restore time. See also "borg extract" examples.
+    $ lvdisplay > lvdisplay.txt
+    $ borg create --read-special /mnt/backup::repo lvdisplay.txt /dev/vg0/*-snapshot
 
 .. include:: usage/extract.rst.inc
 
@@ -228,6 +233,11 @@ Examples
 
     # Extract the "src" directory but exclude object files
     $ borg extract /mnt/backup::my-files home/USERNAME/src --exclude '*.o'
+
+    # Restore LV snapshots (the target LVs /dev/vg0/* of correct size have
+    # to be already available and will be overwritten by this command!)
+    $ borg extract --stdout /mnt/backup::repo dev/vg0/root-snapshot > /dev/vg0/root
+    $ borg extract --stdout /mnt/backup::repo dev/vg0/home-snapshot > /dev/vg0/home
 
 Note: currently, extract always writes into the current working directory ("."),
       so make sure you ``cd`` to the right place before calling ``borg extract``.

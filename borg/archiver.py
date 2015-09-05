@@ -145,7 +145,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     continue
             else:
                 restrict_dev = None
-            self._process(archive, cache, args.excludes, args.exclude_caches, skip_inodes, path, restrict_dev)
+            self._process(archive, cache, args.excludes, args.exclude_caches, skip_inodes, path, restrict_dev,
+                          read_special=args.read_special)
         archive.save(timestamp=args.timestamp)
         if args.progress:
             archive.stats.show_progress(final=True)
@@ -163,7 +164,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             print('-' * 78)
         return self.exit_code
 
-    def _process(self, archive, cache, excludes, exclude_caches, skip_inodes, path, restrict_dev):
+    def _process(self, archive, cache, excludes, exclude_caches, skip_inodes, path, restrict_dev,
+                 read_special=False):
         if exclude_path(path, excludes):
             return
         try:
@@ -180,7 +182,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         # Ignore if nodump flag is set
         if has_lchflags and (st.st_flags & stat.UF_NODUMP):
             return
-        if stat.S_ISREG(st.st_mode):
+        if (stat.S_ISREG(st.st_mode) or
+            read_special and not stat.S_ISDIR(st.st_mode)):
             try:
                 status = archive.process_file(path, st, cache)
             except IOError as e:
@@ -197,7 +200,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 for filename in sorted(entries):
                     entry_path = os.path.normpath(os.path.join(path, filename))
                     self._process(archive, cache, excludes, exclude_caches, skip_inodes,
-                                  entry_path, restrict_dev)
+                                  entry_path, restrict_dev, read_special=read_special)
         elif stat.S_ISLNK(st.st_mode):
             status = archive.process_symlink(path, st)
         elif stat.S_ISFIFO(st.st_mode):
@@ -687,6 +690,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                     'zlib,0 .. zlib,9 == zlib (with level 0..9), '
                                     'lzma == lzma (default level 6), '
                                     'lzma,0 .. lzma,9 == lzma (with level 0..9).')
+        subparser.add_argument('--read-special', dest='read_special',
+                               action='store_true', default=False,
+                               help='open and read special files as if they were regular files')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to create')

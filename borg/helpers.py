@@ -488,13 +488,34 @@ class Location:
                          r'(?P<path>[^:]+)(?:::(?P<archive>.+))?$')
     scp_re = re.compile(r'((?:(?P<user>[^@]+)@)?(?P<host>[^:/]+):)?'
                         r'(?P<path>[^:]+)(?:::(?P<archive>.+))?$')
+    # get the repo from BORG_RE env and the optional archive from param.
+    # if the syntax requires giving REPOSITORY (see "borg mount"),
+    # use "::" to let it use the env var.
+    # if REPOSITORY argument is optional, it'll automatically use the env.
+    env_re = re.compile(r'(?:::(?P<archive>.+)?)?$')
 
-    def __init__(self, text):
+    def __init__(self, text=''):
         self.orig = text
-        if not self.parse(text):
+        if not self.parse(self.orig):
             raise ValueError
 
     def parse(self, text):
+        valid = self._parse(text)
+        if valid:
+            return True
+        m = self.env_re.match(text)
+        if not m:
+            return False
+        repo = os.environ.get('BORG_REPO')
+        if repo is None:
+            return False
+        valid = self._parse(repo)
+        if not valid:
+            return False
+        self.archive = m.group('archive')
+        return True
+
+    def _parse(self, text):
         m = self.ssh_re.match(text)
         if m:
             self.proto = m.group('proto')

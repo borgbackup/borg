@@ -18,7 +18,7 @@ from .compress import Compressor, COMPR_BUFFER
 from .repository import Repository
 from .cache import Cache
 from .key import key_creator
-from .helpers import Error, location_validator, format_time, format_file_size, \
+from .helpers import Error, location_validator, Location, format_time, format_file_size, \
     format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
@@ -560,7 +560,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                           description=self.do_init.__doc__, epilog=init_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_init)
-        subparser.add_argument('repository', metavar='REPOSITORY',
+        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default=Location(),
                                type=location_validator(archive=False),
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption',
@@ -608,7 +608,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                           epilog=check_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_check)
-        subparser.add_argument('repository', metavar='REPOSITORY_OR_ARCHIVE',
+        subparser.add_argument('repository', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default=Location(),
                                type=location_validator(),
                                help='repository or archive to check consistency of')
         subparser.add_argument('--repository-only', dest='repo_only', action='store_true',
@@ -633,7 +633,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                           epilog=change_passphrase_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_change_passphrase)
-        subparser.add_argument('repository', metavar='REPOSITORY',
+        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default=Location(),
                                type=location_validator(archive=False))
 
         create_epilog = textwrap.dedent("""
@@ -767,7 +767,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the deleted archive')
-        subparser.add_argument('target', metavar='TARGET',
+        subparser.add_argument('target', metavar='TARGET', nargs='?', default=Location(),
                                type=location_validator(),
                                help='archive or repository to delete')
 
@@ -782,7 +782,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('--short', dest='short',
                                action='store_true', default=False,
                                help='only print file/directory names, nothing else')
-        subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
+        subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default=Location(),
+                               type=location_validator(),
                                help='repository/archive to list contents of')
         mount_epilog = textwrap.dedent("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -865,7 +866,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='number of yearly archives to keep')
         subparser.add_argument('-p', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')
-        subparser.add_argument('repository', metavar='REPOSITORY',
+        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default=Location(),
                                type=location_validator(archive=False),
                                help='repository to prune')
 

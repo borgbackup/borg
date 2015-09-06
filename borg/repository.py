@@ -50,14 +50,14 @@ class Repository:
         """Object with key {} not found in repository {}."""
 
     def __init__(self, path, create=False, exclusive=False):
-        self.path = path
+        self.path = os.path.abspath(path)
         self.io = None
         self.lock = None
         self.index = None
         self._active_txn = False
         if create:
-            self.create(path)
-        self.open(path, exclusive)
+            self.create(self.path)
+        self.open(self.path, exclusive)
 
     def __del__(self):
         self.close()

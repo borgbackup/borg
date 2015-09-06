@@ -130,7 +130,7 @@ static int
 chunker_fill(Chunker *c)
 {
     ssize_t n;
-    size_t offset, length;
+    off_t offset, length;
     PyObject *data;
     memmove(c->data, c->data + c->last, c->position + c->remaining - c->last);
     c->position -= c->last;

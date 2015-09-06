@@ -2,6 +2,27 @@ Borg Changelog
 ==============
 
 
+Version 0.26.0 (not released yet)
+---------------------------------
+
+New features:
+
+- BORG_REPO env var to specify the default repo, #168
+- read special files as if they were regular files, #79
+
+Bug fixes:
+
+- borg mount repo: use absolute path, attic #200, attic #137
+- chunker: use off_t to get 64bit on 32bit platform, #178
+- initialize chunker fd to -1, so it's not equal to STDIN_FILENO (0)
+- fix reaction to "no" answer at delete repo prompt, #182
+
+Other changes:
+
+- detect inconsistency / corruption / hash collision, #170
+- replace versioneer with setuptools_scm, #106
+
+
 Version 0.25.0
 --------------
 

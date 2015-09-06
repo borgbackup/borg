@@ -41,9 +41,15 @@ Environment Variables
 
 |project_name| uses some environment variables for automation:
 
-Specifying a passphrase:
+General:
+    BORG_REPO
+        When set, use the value to give the default repository location. If a command needs an archive
+        parameter, you can abbreviate as `::archive`. If a command needs a repository parameter, you
+        can either leave it away or abbreviate as `::`, if a positional parameter is required.
     BORG_PASSPHRASE
         When set, use the value to answer the passphrase question for encrypted repositories.
+    TMPDIR
+        where temporary files are stored (might need a lot of temporary space for some operations)
 
 Some "yes" sayers (if set, they automatically confirm that you really want to do X even if there is that warning):
     BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK
@@ -63,10 +69,6 @@ Directories:
 Building:
     BORG_OPENSSL_PREFIX
         Adds given OpenSSL header file directory to the default locations (setup.py).
-
-General:
-    TMPDIR
-        where temporary files are stored (might need a lot of temporary space for some operations)
 
 
 Please note:

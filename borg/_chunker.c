@@ -83,7 +83,8 @@ typedef struct {
     PyObject *fd;
     int fh;
     int done, eof;
-    size_t remaining, bytes_read, bytes_yielded, position, last;
+    size_t remaining, position, last;
+    off_t bytes_read, bytes_yielded;
 } Chunker;
 
 static Chunker *
@@ -96,6 +97,7 @@ chunker_init(int window_size, int chunk_mask, int min_size, int max_size, uint32
     c->table = buzhash_init_table(seed);
     c->buf_size = max_size;
     c->data = malloc(c->buf_size);
+    c->fh = -1;
     return c;
 }
 
@@ -128,7 +130,7 @@ static int
 chunker_fill(Chunker *c)
 {
     ssize_t n;
-    size_t offset, length;
+    off_t offset, length;
     PyObject *data;
     memmove(c->data, c->data + c->last, c->position + c->remaining - c->last);
     c->position -= c->last;
@@ -161,7 +163,7 @@ chunker_fill(Chunker *c)
         // size limit) kick out data from the cache that might be still useful
         // for the OS or other processes.
         if (length > 0) {
-            posix_fadvise(c->fh, (off_t) offset, (off_t) length, POSIX_FADV_DONTNEED);
+            posix_fadvise(c->fh, offset, length, POSIX_FADV_DONTNEED);
         }
         #endif
     }

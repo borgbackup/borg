@@ -485,6 +485,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         mode = os.stat(self.repository_path).st_mode
         self.assertEqual(stat.S_IMODE(mode), 0o700)
 
+    def test_create_dry_run(self):
+        self.cmd('init', self.repository_location)
+        self.cmd('create', '--dry-run', self.repository_location + '::test', 'input')
+        # Make sure no archive has been created
+        repository = Repository(self.repository_path)
+        manifest, key = Manifest.load(repository)
+        self.assert_equal(len(manifest.archives), 0)
+
     def test_cmdline_compatibility(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', self.repository_location)

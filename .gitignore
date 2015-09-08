@@ -18,6 +18,7 @@ platform_linux.c
 docs/usage/*.inc
 .idea/
 .cache/
+borg/_version.py
 borg.build/
 borg.dist/
 borg.exe

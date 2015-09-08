@@ -121,7 +121,7 @@ Repository encryption
 
 Repository encryption is enabled at repository creation time::
 
-    $ borg init --encryption=passphrase|keyfile PATH
+    $ borg init --encryption=repokey|keyfile PATH
 
 When repository encryption is enabled all data is encrypted using 256-bit AES_
 encryption and the integrity and authenticity is verified using `HMAC-SHA256`_.
@@ -130,28 +130,29 @@ All data is encrypted before being written to the repository. This means that
 an attacker who manages to compromise the host containing an encrypted
 archive will not be able to access any of the data.
 
-|project_name| supports two different methods to derive the AES and HMAC keys.
+|project_name| supports different methods to store the AES and HMAC keys.
 
-Passphrase based encryption
-    This method uses a user supplied passphrase to derive the keys using the
-    PBKDF2_ key derivation function. This method is convenient to use since
-    there is no key file to keep track of and secure as long as a *strong*
-    passphrase is used.
+``repokey`` mode
+    The key is stored inside the repository (in its "config" file).
+    Use this mode if you trust in your good passphrase giving you enough
+    protection.
 
-    .. Note::
-        For automated backups the passphrase can be specified using the
-        `BORG_PASSPHRASE` environment variable.
+``keyfile`` mode
+    The key is stored on your local disk (in ``~/.borg/keys/``).
+    Use this mode if you want "passphrase and having-the-key" security.
 
-Key file based encryption
-    This method generates random keys at repository initialization time that
-    are stored in a password protected file in the ``~/.borg/keys/`` directory.
-    The key file is a printable text file. This method is secure and suitable
-    for automated backups.
+In both modes, the key is stored in encrypted form and can be only decrypted
+by providing the correct passphrase.
 
-    .. Note::
-        The repository data is totally inaccessible without the key file
-        so it must be kept **safe**.
+For automated backups the passphrase can be specified using the
+`BORG_PASSPHRASE` environment variable.
 
+**The repository data is totally inaccessible without the key:**
+    Make a backup copy of the key file (``keyfile`` mode) or repo config
+    file (``repokey`` mode) and keep it at a safe place, so you still have
+    the key in case it gets corrupted or lost.
+    The backup that is encrypted with that key won't help you with that,
+    of course.
 
 .. _remote_repos:
 

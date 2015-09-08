@@ -380,8 +380,8 @@ hashindex_summarize(HashIndex *index, long long *total_size, long long *total_cs
         chunks += values[0];
         unique_size += values[1];
         unique_csize += values[2];
-        size += values[0] * values[1];
-        csize += values[0] * values[2];
+        size += (int64_t) values[0] * values[1];
+        csize += (int64_t) values[0] * values[2];
     }
     *total_size = size;
     *total_csize = csize;

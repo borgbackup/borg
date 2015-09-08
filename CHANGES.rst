@@ -2,11 +2,33 @@ Borg Changelog
 ==============
 
 
-Version 0.25.0 (not released yet)
+Version 0.26.0 (not released yet)
 ---------------------------------
+
+New features:
+
+- BORG_REPO env var to specify the default repo, #168
+- read special files as if they were regular files, #79
+
+Bug fixes:
+
+- borg mount repo: use absolute path, attic #200, attic #137
+- chunker: use off_t to get 64bit on 32bit platform, #178
+- initialize chunker fd to -1, so it's not equal to STDIN_FILENO (0)
+- fix reaction to "no" answer at delete repo prompt, #182
+
+Other changes:
+
+- detect inconsistency / corruption / hash collision, #170
+- replace versioneer with setuptools_scm, #106
+
+
+Version 0.25.0
+--------------
 
 Compatibility notes:
 
+- lz4 compression library (liblz4) is a new requirement (#156)
 - the new compression code is very compatible: as long as you stay with zlib
   compression, older borg releases will still be able to read data from a
   repo/archive made with the new code (note: this is not the case for the
@@ -25,24 +47,47 @@ Deprecations:
   --compression 1 (in 0.24) is the same as --compression zlib,1 (now)
   --compression 9 (in 0.24) is the same as --compression zlib,9 (now)
 
-
 New features:
 
 - create --compression none (default, means: do not compress, just pass through
   data "as is". this is more efficient than zlib level 0 as used in borg 0.24)
 - create --compression lz4 (super-fast, but not very high compression)
-  Please note that borgbackup needs lz4 library as additional requirement.
 - create --compression zlib,N (slower, higher compression, default for N is 6)
 - create --compression lzma,N (slowest, highest compression, default N is 6)
 - honor the nodump flag (UF_NODUMP) and do not backup such items
+- list --short just outputs a simple list of the files/directories in an archive
 
 Bug fixes:
 
+- fixed --chunker-params parameter order confusion / malfunction, fixes #154
 - close fds of segments we delete (during compaction)
+- close files which fell out the lrucache
+- fadvise DONTNEED now is only called for the byte range actually read, not for
+  the whole file, fixes #158.
+- fix issue with negative "all archives" size, fixes #165
+- restore_xattrs: ignore if setxattr fails with EACCES, fixes #162
 
 Other changes:
 
-- none yet
+- remove fakeroot requirement for tests, tests run faster without fakeroot
+  (test setup does not fail any more without fakeroot, so you can run with or
+  without fakeroot), fixes #151 and #91.
+- more tests for archiver
+- recover_segment(): don't assume we have an fd for segment
+- lrucache refactoring / cleanup, add dispose function, py.test tests
+- generalize hashindex code for any key length (less hardcoding)
+- lock roster: catch file not found in remove() method and ignore it
+- travis CI: use requirements file
+- improved docs:
+
+  - replace hack for llfuse with proper solution (install libfuse-dev)
+  - update docs about compression
+  - update development docs about fakeroot
+  - internals: add some words about lock files / locking system
+  - support: mention BountySource and for what it can be used
+  - theme: use a lighter green
+  - add pypi, wheel, dist package based install docs
+  - split install docs into system-specific preparations and generic instructions
 
 
 Version 0.24.0

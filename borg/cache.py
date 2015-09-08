@@ -3,6 +3,7 @@ from .remote import cache_if_remote
 import errno
 import msgpack
 import os
+import stat
 import sys
 import threading
 from binascii import hexlify
@@ -40,7 +41,6 @@ class Cache:
         self.lock = None
         self.timestamp = None
         self.thread_lock = threading.Lock()
-        self.lock = None
         self.txn_active = False
         self.repository = repository
         self.key = key
@@ -352,9 +352,9 @@ class Cache:
     def add_chunk(self, id, data, stats):
         if not self.txn_active:
             self.begin_txn()
-        if self.seen_chunk(id):
-            return self.chunk_incref(id, stats)
         size = len(data)
+        if self.seen_chunk(id, size):
+            return self.chunk_incref(id, stats)
         data = self.key.encrypt(data)
         csize = len(data)
         self.repository.put(id, data, wait=False)
@@ -425,8 +425,14 @@ class Cache:
             results.append((id, size, csize))
         return results
 
-    def seen_chunk(self, id):
-        return self.chunks.get(id, (0, 0, 0))[0]
+    def seen_chunk(self, id, size=None):
+        refcount, stored_size, _ = self.chunks.get(id, (0, None, None))
+        if size is not None and stored_size is not None and size != stored_size:
+            # we already have a chunk with that id, but different size.
+            # this is either a hash collision (unlikely) or corruption or a bug.
+            raise Exception("chunk has same id [%r], but different size (stored: %d new: %d)!" % (
+                            id, stored_size, size))
+        return refcount
 
     def seen_or_announce_chunk(self, id, size):
         """return True if we have seen the chunk <id> already (thus, we already have it or will have it soon).
@@ -437,7 +443,9 @@ class Cache:
             try:
                 # did we see this id already (and is count > 0)?
                 count, _size, _csize = self.chunks[id]
-                assert size == _size
+                if size != _size:
+                    raise Exception("chunk has same id [%r], but different size (stored: %d new: %d)!" % (
+                        id, _size, size))
                 return count > 0
             except KeyError:
                 # announce that we will put this chunk soon,
@@ -466,7 +474,7 @@ class Cache:
             stats.update(-size, -csize, False)
 
     def file_known_and_unchanged(self, path_hash, st):
-        if not self.do_files:
+        if not (self.do_files and stat.S_ISREG(st.st_mode)):
             return None
         if self.files is None:
             self._read_files()
@@ -483,7 +491,7 @@ class Cache:
             return None
 
     def memorize_file(self, path_hash, st, ids):
-        if not self.do_files:
+        if not (self.do_files and stat.S_ISREG(st.st_mode)):
             return
         # Entry: Age, inode, size, mtime, chunk ids
         mtime_ns = st_mtime_ns(st)

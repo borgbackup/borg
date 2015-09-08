@@ -86,6 +86,18 @@ If it crashes with a UnicodeError, what can I do?
 
         export LANG=en_US.UTF-8  # or similar, important is correct charset
 
+I can't extract non-ascii filenames by giving them on the commandline on OS X!?
+    This is due to different ways to represent some characters in unicode.
+    HFS+ likes the decomposed form while the commandline seems to be the composed
+    form usually. If you run into that, for now maybe just try:
+
+    - avoiding the non-ascii characters on the commandline by e.g. extracting
+      the parent directory (or even everything)
+    - try to enter the composed form on the commandline
+    - mount the repo using FUSE and use some file manager
+
+    See issue #143 on the issue tracker for more about this.
+
 If I want to run |project_name| on a ARM CPU older than ARM v6?
     You need to enable the alignment trap handler to fixup misaligned accesses::
     
@@ -97,7 +109,8 @@ Can |project_name| add redundancy to the backup data to deal with hardware malfu
     of low-level storage layout information and control which we do not have (and also can't
     get, even if we wanted).
 
-    So, if you need that, consider RAID1 or a filesystems that offers redundant storage.
+    So, if you need that, consider RAID1 or a filesystem that offers redundant storage
+    or just make 2 backups to different locations / different hardware.
 
 Can |project_name| verify data integrity of a backup archive?
     Yes, if you want to detect accidental data damage (like bit rot), use the ``check``

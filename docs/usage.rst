@@ -41,26 +41,34 @@ Environment Variables
 
 |project_name| uses some environment variables for automation:
 
-::
+General:
+    BORG_REPO
+        When set, use the value to give the default repository location. If a command needs an archive
+        parameter, you can abbreviate as `::archive`. If a command needs a repository parameter, you
+        can either leave it away or abbreviate as `::`, if a positional parameter is required.
+    BORG_PASSPHRASE
+        When set, use the value to answer the passphrase question for encrypted repositories.
+    TMPDIR
+        where temporary files are stored (might need a lot of temporary space for some operations)
 
-    Specifying a passphrase:
-        BORG_PASSPHRASE : When set, use the value to answer the passphrase question for encrypted repositories.
+Some "yes" sayers (if set, they automatically confirm that you really want to do X even if there is that warning):
+    BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK
+        For "Warning: Attempting to access a previously unknown unencrypted repository"
+    BORG_RELOCATED_REPO_ACCESS_IS_OK
+        For "Warning: The repository at location ... was previously located at ..."
+    BORG_CHECK_I_KNOW_WHAT_I_AM_DOING
+        For "Warning: 'check --repair' is an experimental feature that might result in data loss."
 
-    Some "yes" sayers (if set, they automatically confirm that you really want to do X even if there is that warning):
-        BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK : For "Warning: Attempting to access a previously unknown unencrypted repository"
-        BORG_RELOCATED_REPO_ACCESS_IS_OK : For "Warning: The repository at location ... was previously located at ..."
-        BORG_CHECK_I_KNOW_WHAT_I_AM_DOING : For "Warning: 'check --repair' is an experimental feature that might result in data loss."
+Directories:
+    BORG_KEYS_DIR
+        Default to '~/.borg/keys'. This directory contains keys for encrypted repositories.
+    BORG_CACHE_DIR
+        Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
+        of space for dealing with big repositories).
 
-    Directories:
-        BORG_KEYS_DIR : Default to '~/.borg/keys'. This directory contains keys for encrypted repositories.
-        BORG_CACHE_DIR : Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
-                         of space for dealing with big repositories).
-
-    Building:
-        BORG_OPENSSL_PREFIX : Adds given OpenSSL header file directory to the default locations (setup.py).
-
-    General:
-        TMPDIR : where temporary files are stored (might need a lot of temporary space for some operations)
+Building:
+    BORG_OPENSSL_PREFIX
+        Adds given OpenSSL header file directory to the default locations (setup.py).
 
 
 Please note:
@@ -75,29 +83,43 @@ Resource Usage
 
 |project_name| might use a lot of resources depending on the size of the data set it is dealing with.
 
-CPU: it won't go beyond 100% of 1 core as the code is currently single-threaded.
-     Especially higher zlib and lzma compression levels use significant amounts of CPU cycles.
+CPU:
+    It won't go beyond 100% of 1 core as the code is currently single-threaded.
+    Especially higher zlib and lzma compression levels use significant amounts
+    of CPU cycles.
 
-Memory (RAM): the chunks index and the files index are read into memory for performance reasons.
-              compression, esp. lzma compression with high levels might need substantial amounts
-              of memory.
+Memory (RAM):
+    The chunks index and the files index are read into memory for performance
+    reasons.
+    Compression, esp. lzma compression with high levels might need substantial
+    amounts of memory.
 
-Temporary files: reading data and metadata from a FUSE mounted repository will consume about the same space as the
-                 deduplicated chunks used to represent them in the repository.
+Temporary files:
+    Reading data and metadata from a FUSE mounted repository will consume about
+    the same space as the deduplicated chunks used to represent them in the
+    repository.
 
-Cache files: chunks index and files index (plus a compressed collection of single-archive chunk indexes).
+Cache files:
+    Contains the chunks index and files index (plus a compressed collection of
+    single-archive chunk indexes).
 
-Chunks index: proportional to the amount of data chunks in your repo. lots of small chunks in your repo implies a big
-              chunks index. you may need to tweak the chunker params (see create options) if you have a lot of data and
-              you want to keep the chunks index at some reasonable size.
+Chunks index:
+    Proportional to the amount of data chunks in your repo. Lots of small chunks
+    in your repo imply a big chunks index. You may need to tweak the chunker
+    params (see create options) if you have a lot of data and you want to keep
+    the chunks index at some reasonable size.
 
-Files index: proportional to the amount of files in your last backup. can be switched off (see create options), but
-             next backup will be much slower if you do.
+Files index:
+    Proportional to the amount of files in your last backup. Can be switched
+    off (see create options), but next backup will be much slower if you do.
 
-Network: if your repository is remote, all deduplicated (and optionally compressed/encrypted) data of course has to go
-         over the connection (ssh: repo url). if you use a locally mounted network filesystem, additionally some copy
-         operations used for transaction support also go over the connection. if you backup multiple sources to one
-         target repository, additional traffic happens for cache resynchronization.
+Network:
+    If your repository is remote, all deduplicated (and optionally compressed/
+    encrypted) data of course has to go over the connection (ssh: repo url).
+    If you use a locally mounted network filesystem, additionally some copy
+    operations used for transaction support also go over the connection. If
+    you backup multiple sources to one target repository, additional traffic
+    happens for cache resynchronization.
 
 In case you are interested in more details, please read the internals documentation.
 
@@ -190,6 +212,11 @@ Examples
     # Even slower, even higher compression (N = 0..9)
     $ borg create --compression lzma,N /mnt/backup::repo ~
 
+    # Backup some LV snapshots (you have to create the snapshots before this
+    # and remove them afterwards). We also backup the output of lvdisplay so
+    # we can see the LV sizes at restore time. See also "borg extract" examples.
+    $ lvdisplay > lvdisplay.txt
+    $ borg create --read-special /mnt/backup::repo lvdisplay.txt /dev/vg0/*-snapshot
 
 .. include:: usage/extract.rst.inc
 
@@ -208,6 +235,11 @@ Examples
 
     # Extract the "src" directory but exclude object files
     $ borg extract /mnt/backup::my-files home/USERNAME/src --exclude '*.o'
+
+    # Restore LV snapshots (the target LVs /dev/vg0/* of correct size have
+    # to be already available and will be overwritten by this command!)
+    $ borg extract --stdout /mnt/backup::repo dev/vg0/root-snapshot > /dev/vg0/root
+    $ borg extract --stdout /mnt/backup::repo dev/vg0/home-snapshot > /dev/vg0/home
 
 Note: currently, extract always writes into the current working directory ("."),
       so make sure you ``cd`` to the right place before calling ``borg extract``.

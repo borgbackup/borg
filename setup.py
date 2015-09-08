@@ -3,14 +3,6 @@ import os
 import sys
 from glob import glob
 
-import versioneer
-versioneer.VCS = 'git'
-versioneer.style = 'pep440'
-versioneer.versionfile_source = 'borg/_version.py'
-versioneer.versionfile_build = 'borg/_version.py'
-versioneer.tag_prefix = ''
-versioneer.parentdir_prefix = 'borgbackup-'  # dirname like 'myproject-1.2.0'
-
 min_python = (3, 2)
 if sys.version_info < min_python:
     print("Borg requires Python %d.%d or later" % min_python)
@@ -18,6 +10,8 @@ if sys.version_info < min_python:
 
 
 from setuptools import setup, Extension
+from setuptools.command.sdist import sdist
+
 
 compress_source = 'borg/compress.pyx'
 crypto_source = 'borg/crypto.pyx'
@@ -31,11 +25,11 @@ try:
     from Cython.Distutils import build_ext
     import Cython.Compiler.Main as cython_compiler
 
-    class Sdist(versioneer.cmd_sdist):
+    class Sdist(sdist):
         def __init__(self, *args, **kwargs):
             for src in glob('borg/*.pyx'):
                 cython_compiler.compile(src, cython_compiler.default_options)
-            versioneer.cmd_sdist.__init__(self, *args, **kwargs)
+            super().__init__(*args, **kwargs)
 
         def make_distribution(self):
             self.filelist.extend([
@@ -50,7 +44,7 @@ try:
             super().make_distribution()
 
 except ImportError:
-    class Sdist(versioneer.cmd_sdist):
+    class Sdist(sdist):
         def __init__(self, *args, **kwargs):
             raise Exception('Cython is required to run sdist')
 
@@ -90,8 +84,7 @@ library_dirs = [os.path.join(ssl_prefix, 'lib')]
 with open('README.rst', 'r') as fd:
     long_description = fd.read()
 
-cmdclass = versioneer.get_cmdclass()
-cmdclass.update({'build_ext': build_ext, 'sdist': Sdist})
+cmdclass = {'build_ext': build_ext, 'sdist': Sdist}
 
 ext_modules = [
     Extension('borg.compress', [compress_source], libraries=['lz4']),
@@ -108,7 +101,9 @@ elif sys.platform == 'darwin':
 
 setup(
     name='borgbackup',
-    version=versioneer.get_version(),
+    use_scm_version={
+        'write_to': 'borg/_version.py',
+    },
     author='The Borg Collective (see AUTHORS file)',
     author_email='borgbackup@librelist.com',
     url='https://borgbackup.github.io/',
@@ -140,7 +135,8 @@ setup(
     },
     cmdclass=cmdclass,
     ext_modules=ext_modules,
+    setup_requires=['setuptools_scm>=1.7'],
     # msgpack pure python data corruption was fixed in 0.4.6.
     # Also, we might use some rather recent API features.
-    install_requires=['msgpack-python>=0.4.6']
+    install_requires=['msgpack-python>=0.4.6'],
 )

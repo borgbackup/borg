@@ -533,14 +533,17 @@ class Archive:
             raise Exception('Unknown archive item type %r' % item[b'mode'])
 
     def restore_attrs(self, path, item, symlink=False, fd=None):
-        xattrs = item.get(b'xattrs')
-        if xattrs:
-                for k, v in xattrs.items():
-                    try:
-                        xattr.setxattr(fd or path, k, v, follow_symlinks=False)
-                    except OSError as e:
-                        if e.errno != errno.ENOTSUP:
-                            raise
+        xattrs = item.get(b'xattrs', {})
+        for k, v in xattrs.items():
+            try:
+                xattr.setxattr(fd or path, k, v, follow_symlinks=False)
+            except OSError as e:
+                if e.errno not in (errno.ENOTSUP, errno.EACCES, ):
+                    # only raise if the errno is not on our ignore list:
+                    # ENOTSUP == xattrs not supported here
+                    # EACCES == permission denied to set this specific xattr
+                    #           (this may happen related to security.* keys)
+                    raise
         uid = gid = None
         if not self.numeric_owner:
             uid = user2uid(item[b'user'])
@@ -657,7 +660,7 @@ class Archive:
             b'mtime': int_to_bigint(int(time.time()) * 1000000000)
         }
         self.add_item_queued(item)
-        return 'A'
+        return 'i'  # stdin
 
     def process_file(self, path, st, cache):
         status = None

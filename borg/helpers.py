@@ -280,12 +280,12 @@ def timestamp(s):
 
 
 def ChunkerParams(s):
-    window_size, chunk_mask, chunk_min, chunk_max = s.split(',')
+    chunk_min, chunk_max, chunk_mask, window_size = s.split(',')
     if int(chunk_max) > 23:
         # do not go beyond 2**23 (8MB) chunk size now,
         # COMPR_BUFFER can only cope with up to this size
-        raise ValueError
-    return int(window_size), int(chunk_mask), int(chunk_min), int(chunk_max)
+        raise ValueError('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)')
+    return int(chunk_min), int(chunk_max), int(chunk_mask), int(window_size)
 
 
 def CompressionSpec(s):
@@ -469,13 +469,34 @@ class Location:
                          r'(?P<path>[^:]+)(?:::(?P<archive>.+))?$')
     scp_re = re.compile(r'((?:(?P<user>[^@]+)@)?(?P<host>[^:/]+):)?'
                         r'(?P<path>[^:]+)(?:::(?P<archive>.+))?$')
+    # get the repo from BORG_RE env and the optional archive from param.
+    # if the syntax requires giving REPOSITORY (see "borg mount"),
+    # use "::" to let it use the env var.
+    # if REPOSITORY argument is optional, it'll automatically use the env.
+    env_re = re.compile(r'(?:::(?P<archive>.+)?)?$')
 
-    def __init__(self, text):
+    def __init__(self, text=''):
         self.orig = text
-        if not self.parse(text):
+        if not self.parse(self.orig):
             raise ValueError
 
     def parse(self, text):
+        valid = self._parse(text)
+        if valid:
+            return True
+        m = self.env_re.match(text)
+        if not m:
+            return False
+        repo = os.environ.get('BORG_REPO')
+        if repo is None:
+            return False
+        valid = self._parse(repo)
+        if not valid:
+            return False
+        self.archive = m.group('archive')
+        return True
+
+    def _parse(self, text):
         m = self.ssh_re.match(text)
         if m:
             self.proto = m.group('proto')

@@ -176,7 +176,11 @@ class LockRoster:
             json.dump(data, f)
 
     def remove(self):
-        os.unlink(self.path)
+        try:
+            os.unlink(self.path)
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
 
     def get(self, key):
         roster = self.load()

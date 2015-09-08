@@ -455,6 +455,7 @@ class Archive:
             b'mtime': int_to_bigint(int(time.time()) * 1000000000)
         }
         self.add_item(item)
+        return 'i'  # stdin
 
     def process_file(self, path, st, cache):
         status = None

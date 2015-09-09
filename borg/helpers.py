@@ -7,6 +7,8 @@ import pwd
 import re
 import sys
 import time
+import unicodedata
+
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from operator import attrgetter
@@ -224,13 +226,21 @@ class IncludePattern:
     """Literal files or directories listed on the command line
     for some operations (e.g. extract, but not create).
     If a directory is specified, all paths that start with that
-    path match as well.  A trailing slash makes no difference.
+    path match as well. A trailing slash makes no difference.
     """
     def __init__(self, pattern):
-        self.pattern = os.path.normpath(pattern).rstrip(os.path.sep)+os.path.sep
+        def match(path):
+            return (path+os.path.sep).startswith(self.pattern)
 
-    def match(self, path):
-        return (path+os.path.sep).startswith(self.pattern)
+        if sys.platform.startswith('darwin'):
+            # NOTE: On OS X bytecode normalisation is needed
+            # to match some paths containig non ascii chars.
+            pattern = unicodedata.normalize("NFD", pattern)
+            self.match = lambda p: match(unicodedata.normalize("NFD", p))
+        else:
+            self.match = match
+
+        self.pattern = os.path.normpath(pattern).rstrip(os.path.sep)+os.path.sep
 
     def __repr__(self):
         return '%s(%s)' % (type(self), self.pattern)

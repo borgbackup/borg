@@ -1,6 +1,7 @@
 import argparse
 import binascii
 from collections import namedtuple
+from functools import wraps
 import grp
 import os
 import pwd
@@ -222,9 +223,22 @@ def exclude_path(path, patterns):
 # unify the two cases, we add a path separator to the end of
 # the path before matching.
 
-##### !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-##### For discussion only, don't merge this code!
-##### !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+def normalized(func):
+    """ Decorator for the Pattern match methods, returning a wrapper that
+    normalizes OSX paths to match the normalized pattern on OSX, and 
+    returning the original method on other platforms"""
+    @wraps(func)
+    def normalize_wrapper(self, path):
+        return func(self, unicodedata.normalize("NFD", path))
+
+    if sys.platform in ('darwin',):
+        # HFS+ converts paths to a canonical form, so users shouldn't be
+        # required to enter an exact match
+        return normalize_wrapper
+    else:
+        # Windows and Unix filesystems allow different forms, so users
+        # always have to enter an exact match
+        return func
 
 class IncludePattern:
     """Literal files or directories listed on the command line
@@ -233,22 +247,14 @@ class IncludePattern:
     path match as well.  A trailing slash makes no difference.
     """
     def __init__(self, pattern):
-        def match(path):
-            return (path+os.path.sep).startswith(self.pattern)
-
-        # HFS+ converts paths to a canonical form, so users shouldn't be
-        # required to enter an exact match
         if sys.platform in ('darwin',):
-            # repository paths will be mostly in NFD, as the OSX exception list
-            # to NFD is small, so normalize to that form for best performance
             pattern = unicodedata.normalize("NFD", pattern)
-            self.match = lambda p: match(unicodedata.normalize("NFD", p))
-        # Windows and Unix filesystems allow different forms, so users
-        # always have to enter an exact match
-        else:
-            self.match = match
 
         self.pattern = os.path.normpath(pattern).rstrip(os.path.sep)+os.path.sep
+
+    @normalized
+    def match(self, path):
+        return (path+os.path.sep).startswith(self.pattern)
 
     def __repr__(self):
         return '%s(%s)' % (type(self), self.pattern)
@@ -259,29 +265,21 @@ class ExcludePattern(IncludePattern):
     exclude the contents of a directory, but not the directory itself.
     """
     def __init__(self, pattern):
-        def match(path):
-            return self.regex.match(path+os.path.sep) is not None
-
         if pattern.endswith(os.path.sep):
             self.pattern = os.path.normpath(pattern).rstrip(os.path.sep)+os.path.sep+'*'+os.path.sep
         else:
             self.pattern = os.path.normpath(pattern)+os.path.sep+'*'
 
-        # HFS+ converts paths to a canonical form, so users shouldn't be
-        # required to enter an exact match
         if sys.platform in ('darwin',):
-            # repository paths will be mostly in NFD, as the OSX exception list
-            # to NFD is small, so normalize to that form for best performance
             self.pattern = unicodedata.normalize("NFD", self.pattern)
-            self.match = lambda p: match(unicodedata.normalize("NFD", p))
-        # Windows and Unix filesystems allow different forms, so users
-        # always have to enter an exact match
-        else:
-            self.match = match
 
         # fnmatch and re.match both cache compiled regular expressions.
         # Nevertheless, this is about 10 times faster.
         self.regex = re.compile(translate(self.pattern))
+
+    @normalized
+    def match(self, path):
+        return self.regex.match(path+os.path.sep) is not None
 
     def __repr__(self):
         return '%s(%s)' % (type(self), self.pattern)

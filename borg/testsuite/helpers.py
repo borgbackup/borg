@@ -212,21 +212,8 @@ class PatternNonAsciiTestCase(BaseTestCase):
         assert e.match(str(b"ba\x80/foo", 'latin1'))
 
 
-#@pytest.mark.skipif(sys.platform not in ('darwin',), reason='OS X test')
+@pytest.mark.skipif(sys.platform not in ('darwin',), reason='OS X test')
 class OSXPatternNormalizationTestCase(BaseTestCase):
-    # monkey patch sys.platform to allow testing on non-OSX during development
-    # remove and uncomment OSX-only decorator before push
-    def setUp(self):
-        self.oldplatform = sys.platform
-        sys.platform = 'darwin'
-        pass
-
-    # monkey patch sys.platform to allow testing on non-OSX during development
-    # remove and uncomment OSX-only decorator before push
-    def tearDown(self):
-        sys.platform = self.oldplatform
-        pass
-        
     def testComposedUnicode(self):
         pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
         i = IncludePattern(pattern)

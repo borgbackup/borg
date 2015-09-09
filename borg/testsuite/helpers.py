@@ -180,51 +180,37 @@ class PatternTestCase(BaseTestCase):
 
 
 @pytest.mark.skipif(sys.platform.startswith('darwin'), reason='all but OS X test')
-class IncludePatternNonAsciiTestCase(BaseTestCase):
+class PatternNonAsciiTestCase(BaseTestCase):
     def testComposedUnicode(self):
         pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
         i = IncludePattern(pattern)
+        e = ExcludePattern(pattern)
 
         assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
         assert not i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-
-    def testDecomposedUnicode(self):
-        pattern = 'ba\N{COMBINING ACUTE ACCENT}'
-        i = IncludePattern(pattern)
-
-        assert not i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-    
-    def testInvalidUnicode(self):
-        pattern = str(b'ba\x80', 'latin1')
-        i = IncludePattern(pattern)
-
-        assert not i.match("ba/foo")
-        assert i.match(str(b"ba\x80/foo", 'latin1'))
-
-
-@pytest.mark.skipif(sys.platform.startswith('darwin'), reason='all but OS X test')
-class ExcludePatternNonAsciiTestCase(BaseTestCase):
-    def testComposedUnicode(self):
-        pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
-        e = ExcludePattern(pattern)
-
         assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
         assert not e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
 
     def testDecomposedUnicode(self):
         pattern = 'ba\N{COMBINING ACUTE ACCENT}'
+        i = IncludePattern(pattern)
         e = ExcludePattern(pattern)
 
+        assert not i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
         assert not e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
         assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
     
     def testInvalidUnicode(self):
         pattern = str(b'ba\x80', 'latin1')
+        i = IncludePattern(pattern)
         e = ExcludePattern(pattern)
 
+        assert not i.match("ba/foo")
+        assert i.match(str(b"ba\x80/foo", 'latin1'))
         assert not e.match("ba/foo")
         assert e.match(str(b"ba\x80/foo", 'latin1'))
+
 
 #@pytest.mark.skipif(sys.platform.startswith('darwin'), reason='OS X only test')
 class OSXPatternNormalizationTestCase(BaseTestCase):

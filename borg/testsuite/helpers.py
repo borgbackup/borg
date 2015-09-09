@@ -3,9 +3,10 @@ from time import mktime, strptime
 from datetime import datetime, timezone, timedelta
 
 import pytest
+import sys
 import msgpack
 
-from ..helpers import adjust_patterns, exclude_path, Location, format_timedelta, ExcludePattern, make_path_safe, \
+from ..helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
     prune_within, prune_split, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams
 from . import BaseTestCase
@@ -176,6 +177,99 @@ class PatternTestCase(BaseTestCase):
                           ['/etc/passwd', '/etc/hosts', '/home', '/home/user/.bashrc'])
         self.assert_equal(self.evaluate(['/etc/', '/var'], ['dmesg']),
                           ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg'])
+
+
+@pytest.mark.skipif(sys.platform.startswith('darwin'), reason='all but OS X test')
+class IncludePatternNonAsciiTestCase(BaseTestCase):
+    def testComposedUnicode(self):
+        pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
+        i = IncludePattern(pattern)
+
+        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert not i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+
+    def testDecomposedUnicode(self):
+        pattern = 'ba\N{COMBINING ACUTE ACCENT}'
+        i = IncludePattern(pattern)
+
+        assert not i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+    
+    def testInvalidUnicode(self):
+        pattern = str(b'ba\x80', 'latin1')
+        i = IncludePattern(pattern)
+
+        assert not i.match("ba/foo")
+        assert i.match(str(b"ba\x80/foo", 'latin1'))
+
+
+@pytest.mark.skipif(sys.platform.startswith('darwin'), reason='all but OS X test')
+class ExcludePatternNonAsciiTestCase(BaseTestCase):
+    def testComposedUnicode(self):
+        pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
+        e = ExcludePattern(pattern)
+
+        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert not e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+
+    def testDecomposedUnicode(self):
+        pattern = 'ba\N{COMBINING ACUTE ACCENT}'
+        e = ExcludePattern(pattern)
+
+        assert not e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+    
+    def testInvalidUnicode(self):
+        pattern = str(b'ba\x80', 'latin1')
+        e = ExcludePattern(pattern)
+
+        assert not e.match("ba/foo")
+        assert e.match(str(b"ba\x80/foo", 'latin1'))
+
+#@pytest.mark.skipif(sys.platform.startswith('darwin'), reason='OS X only test')
+class OSXPatternNormalizationTestCase(BaseTestCase):
+    # monkey patch sys.platform to allow testing on non-OSX during development
+    # remove and uncomment OSX-only decorator before push
+    def setUp(self):
+        self.oldplatform = sys.platform
+        sys.platform = 'darwin'
+        pass
+
+    # monkey patch sys.platform to allow testing on non-OSX during development
+    # remove and uncomment OSX-only decorator before push
+    def tearDown(self):
+        sys.platform = self.oldplatform
+        pass
+        
+    def testComposedUnicode(self):
+        pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
+        i = IncludePattern(pattern)
+        e = ExcludePattern(pattern)
+
+        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+    
+    def testDecomposedUnicode(self):
+        pattern = 'ba\N{COMBINING ACUTE ACCENT}'
+        i = IncludePattern(pattern)
+        e = ExcludePattern(pattern)
+
+        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+    
+    def testInvalidUnicode(self):
+        pattern = str(b'ba\x80', 'latin1')
+        i = IncludePattern(pattern)
+        e = ExcludePattern(pattern)
+
+        assert not i.match("ba/foo")
+        assert i.match(str(b"ba\x80/foo", 'latin1'))
+        assert not e.match("ba/foo")
+        assert e.match(str(b"ba\x80/foo", 'latin1'))
 
 
 def test_compression_specs():

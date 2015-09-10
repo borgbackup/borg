@@ -41,9 +41,15 @@ Environment Variables
 
 |project_name| uses some environment variables for automation:
 
-Specifying a passphrase:
+General:
+    BORG_REPO
+        When set, use the value to give the default repository location. If a command needs an archive
+        parameter, you can abbreviate as `::archive`. If a command needs a repository parameter, you
+        can either leave it away or abbreviate as `::`, if a positional parameter is required.
     BORG_PASSPHRASE
         When set, use the value to answer the passphrase question for encrypted repositories.
+    TMPDIR
+        where temporary files are stored (might need a lot of temporary space for some operations)
 
 Some "yes" sayers (if set, they automatically confirm that you really want to do X even if there is that warning):
     BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK
@@ -63,10 +69,6 @@ Directories:
 Building:
     BORG_OPENSSL_PREFIX
         Adds given OpenSSL header file directory to the default locations (setup.py).
-
-General:
-    TMPDIR
-        where temporary files are stored (might need a lot of temporary space for some operations)
 
 
 Please note:
@@ -210,6 +212,11 @@ Examples
     # Even slower, even higher compression (N = 0..9)
     $ borg create --compression lzma,N /mnt/backup::repo ~
 
+    # Backup some LV snapshots (you have to create the snapshots before this
+    # and remove them afterwards). We also backup the output of lvdisplay so
+    # we can see the LV sizes at restore time. See also "borg extract" examples.
+    $ lvdisplay > lvdisplay.txt
+    $ borg create --read-special /mnt/backup::repo lvdisplay.txt /dev/vg0/*-snapshot
 
 .. include:: usage/extract.rst.inc
 
@@ -228,6 +235,11 @@ Examples
 
     # Extract the "src" directory but exclude object files
     $ borg extract /mnt/backup::my-files home/USERNAME/src --exclude '*.o'
+
+    # Restore LV snapshots (the target LVs /dev/vg0/* of correct size have
+    # to be already available and will be overwritten by this command!)
+    $ borg extract --stdout /mnt/backup::repo dev/vg0/root-snapshot > /dev/vg0/root
+    $ borg extract --stdout /mnt/backup::repo dev/vg0/home-snapshot > /dev/vg0/home
 
 Note: currently, extract always writes into the current working directory ("."),
       so make sure you ``cd`` to the right place before calling ``borg extract``.

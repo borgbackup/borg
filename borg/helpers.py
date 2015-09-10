@@ -1,12 +1,15 @@
 import argparse
 import binascii
 from collections import namedtuple
+from functools import wraps
 import grp
 import os
 import pwd
 import re
 import sys
 import time
+import unicodedata
+
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from operator import attrgetter
@@ -220,6 +223,23 @@ def exclude_path(path, patterns):
 # unify the two cases, we add a path separator to the end of
 # the path before matching.
 
+def normalized(func):
+    """ Decorator for the Pattern match methods, returning a wrapper that
+    normalizes OSX paths to match the normalized pattern on OSX, and 
+    returning the original method on other platforms"""
+    @wraps(func)
+    def normalize_wrapper(self, path):
+        return func(self, unicodedata.normalize("NFD", path))
+
+    if sys.platform in ('darwin',):
+        # HFS+ converts paths to a canonical form, so users shouldn't be
+        # required to enter an exact match
+        return normalize_wrapper
+    else:
+        # Windows and Unix filesystems allow different forms, so users
+        # always have to enter an exact match
+        return func
+
 class IncludePattern:
     """Literal files or directories listed on the command line
     for some operations (e.g. extract, but not create).
@@ -227,8 +247,12 @@ class IncludePattern:
     path match as well.  A trailing slash makes no difference.
     """
     def __init__(self, pattern):
+        if sys.platform in ('darwin',):
+            pattern = unicodedata.normalize("NFD", pattern)
+
         self.pattern = os.path.normpath(pattern).rstrip(os.path.sep)+os.path.sep
 
+    @normalized
     def match(self, path):
         return (path+os.path.sep).startswith(self.pattern)
 
@@ -245,10 +269,15 @@ class ExcludePattern(IncludePattern):
             self.pattern = os.path.normpath(pattern).rstrip(os.path.sep)+os.path.sep+'*'+os.path.sep
         else:
             self.pattern = os.path.normpath(pattern)+os.path.sep+'*'
+
+        if sys.platform in ('darwin',):
+            self.pattern = unicodedata.normalize("NFD", self.pattern)
+
         # fnmatch and re.match both cache compiled regular expressions.
         # Nevertheless, this is about 10 times faster.
         self.regex = re.compile(translate(self.pattern))
 
+    @normalized
     def match(self, path):
         return self.regex.match(path+os.path.sep) is not None
 
@@ -466,13 +495,34 @@ class Location:
                          r'(?P<path>[^:]+)(?:::(?P<archive>.+))?$')
     scp_re = re.compile(r'((?:(?P<user>[^@]+)@)?(?P<host>[^:/]+):)?'
                         r'(?P<path>[^:]+)(?:::(?P<archive>.+))?$')
+    # get the repo from BORG_RE env and the optional archive from param.
+    # if the syntax requires giving REPOSITORY (see "borg mount"),
+    # use "::" to let it use the env var.
+    # if REPOSITORY argument is optional, it'll automatically use the env.
+    env_re = re.compile(r'(?:::(?P<archive>.+)?)?$')
 
-    def __init__(self, text):
+    def __init__(self, text=''):
         self.orig = text
-        if not self.parse(text):
+        if not self.parse(self.orig):
             raise ValueError
 
     def parse(self, text):
+        valid = self._parse(text)
+        if valid:
+            return True
+        m = self.env_re.match(text)
+        if not m:
+            return False
+        repo = os.environ.get('BORG_REPO')
+        if repo is None:
+            return False
+        valid = self._parse(repo)
+        if not valid:
+            return False
+        self.archive = m.group('archive')
+        return True
+
+    def _parse(self, text):
         m = self.ssh_re.match(text)
         if m:
             self.proto = m.group('proto')

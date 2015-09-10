@@ -102,17 +102,21 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
     def do_create(self, args):
         """Create new archive"""
+        dry_run = args.dry_run
         t0 = datetime.now()
-        repository = self.open_repository(args.archive, exclusive=True)
-        manifest, key = Manifest.load(repository)
-        compr_args = dict(buffer=COMPR_BUFFER)
-        compr_args.update(args.compression)
-        key.compressor = Compressor(**compr_args)
-        cache = Cache(repository, key, manifest, do_files=args.cache_files)
-        archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
-                          create=True, checkpoint_interval=args.checkpoint_interval,
-                          numeric_owner=args.numeric_owner, progress=args.progress,
-                          chunker_params=args.chunker_params)
+        if not dry_run:
+            repository = self.open_repository(args.archive, exclusive=True)
+            manifest, key = Manifest.load(repository)
+            compr_args = dict(buffer=COMPR_BUFFER)
+            compr_args.update(args.compression)
+            key.compressor = Compressor(**compr_args)
+            cache = Cache(repository, key, manifest, do_files=args.cache_files)
+            archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
+                              create=True, checkpoint_interval=args.checkpoint_interval,
+                              numeric_owner=args.numeric_owner, progress=args.progress,
+                              chunker_params=args.chunker_params)
+        else:
+            archive = cache = None
         # Add cache dir to inode_skip list
         skip_inodes = set()
         try:
@@ -130,11 +134,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         for path in args.paths:
             if path == '-':  # stdin
                 path = 'stdin'
-                self.print_verbose(path)
-                try:
-                    archive.process_stdin(path, cache)
-                except IOError as e:
-                    self.print_error('%s: %s', path, e)
+                if not dry_run:
+                    try:
+                        status = archive.process_stdin(path, cache)
+                    except IOError as e:
+                        self.print_error('%s: %s', path, e)
+                else:
+                    status = '-'
+                self.print_verbose("%1s %s", status, path)
                 continue
             path = os.path.normpath(path)
             if args.dontcross:
@@ -145,25 +152,28 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     continue
             else:
                 restrict_dev = None
-            self._process(archive, cache, args.excludes, args.exclude_caches, skip_inodes, path, restrict_dev)
-        archive.save(timestamp=args.timestamp)
-        if args.progress:
-            archive.stats.show_progress(final=True)
-        if args.stats:
-            t = datetime.now()
-            diff = t - t0
-            print('-' * 78)
-            print('Archive name: %s' % args.archive.archive)
-            print('Archive fingerprint: %s' % hexlify(archive.id).decode('ascii'))
-            print('Start time: %s' % t0.strftime('%c'))
-            print('End time: %s' % t.strftime('%c'))
-            print('Duration: %s' % format_timedelta(diff))
-            print('Number of files: %d' % archive.stats.nfiles)
-            archive.stats.print_('This archive:', cache)
-            print('-' * 78)
+            self._process(archive, cache, args.excludes, args.exclude_caches, skip_inodes, path, restrict_dev,
+                          read_special=args.read_special, dry_run=dry_run)
+        if not dry_run:
+            archive.save(timestamp=args.timestamp)
+            if args.progress:
+                archive.stats.show_progress(final=True)
+            if args.stats:
+                t = datetime.now()
+                diff = t - t0
+                print('-' * 78)
+                print('Archive name: %s' % args.archive.archive)
+                print('Archive fingerprint: %s' % hexlify(archive.id).decode('ascii'))
+                print('Start time: %s' % t0.strftime('%c'))
+                print('End time: %s' % t.strftime('%c'))
+                print('Duration: %s' % format_timedelta(diff))
+                print('Number of files: %d' % archive.stats.nfiles)
+                archive.stats.print_('This archive:', cache)
+                print('-' * 78)
         return self.exit_code
 
-    def _process(self, archive, cache, excludes, exclude_caches, skip_inodes, path, restrict_dev):
+    def _process(self, archive, cache, excludes, exclude_caches, skip_inodes, path, restrict_dev,
+                 read_special=False, dry_run=False):
         if exclude_path(path, excludes):
             return
         try:
@@ -180,15 +190,18 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         # Ignore if nodump flag is set
         if has_lchflags and (st.st_flags & stat.UF_NODUMP):
             return
-        if stat.S_ISREG(st.st_mode):
-            try:
-                status = archive.process_file(path, st, cache)
-            except IOError as e:
-                self.print_error('%s: %s', path, e)
+        if (stat.S_ISREG(st.st_mode) or
+            read_special and not stat.S_ISDIR(st.st_mode)):
+            if not dry_run:
+                try:
+                    status = archive.process_file(path, st, cache)
+                except IOError as e:
+                    self.print_error('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
             if exclude_caches and is_cachedir(path):
                 return
-            status = archive.process_dir(path, st)
+            if not dry_run:
+                status = archive.process_dir(path, st)
             try:
                 entries = os.listdir(path)
             except OSError as e:
@@ -197,13 +210,17 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 for filename in sorted(entries):
                     entry_path = os.path.normpath(os.path.join(path, filename))
                     self._process(archive, cache, excludes, exclude_caches, skip_inodes,
-                                  entry_path, restrict_dev)
+                                  entry_path, restrict_dev, read_special=read_special,
+                                  dry_run=dry_run)
         elif stat.S_ISLNK(st.st_mode):
-            status = archive.process_symlink(path, st)
+            if not dry_run:
+                status = archive.process_symlink(path, st)
         elif stat.S_ISFIFO(st.st_mode):
-            status = archive.process_fifo(path, st)
+            if not dry_run:
+                status = archive.process_fifo(path, st)
         elif stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
-            status = archive.process_dev(path, st)
+            if not dry_run:
+                status = archive.process_dev(path, st)
         elif stat.S_ISSOCK(st.st_mode):
             # Ignore unix sockets
             return
@@ -219,7 +236,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         # Note: A/M/U is relative to the "files" cache, not to the repo.
         # This would be an issue if the files cache is not used.
         if status is None:
-            status = '?'  # need to add a status code somewhere
+            if not dry_run:
+                status = '?'  # need to add a status code somewhere
+            else:
+                status = '-'  # dry run, item was not backed up
         # output ALL the stuff - it can be easily filtered using grep.
         # even stuff considered unchanged might be interesting.
         self.print_verbose("%1s %s", status, remove_surrogates(path))
@@ -296,10 +316,11 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             print("You requested to completely DELETE the repository *including* all archives it contains:")
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 print(format_archive(archive_info))
-            while not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
+            if not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
                 print("""Type "YES" if you understand this and want to continue.\n""")
-                if input('Do you want to continue? ') == 'YES':
-                    break
+                if input('Do you want to continue? ') != 'YES':
+                    self.exit_code = 1
+                    return self.exit_code
             repository.destroy()
             cache.destroy()
             print("Repository and corresponding cache were deleted.")
@@ -556,7 +577,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                           description=self.do_init.__doc__, epilog=init_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_init)
-        subparser.add_argument('repository', metavar='REPOSITORY',
+        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption',
@@ -604,7 +625,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                           epilog=check_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_check)
-        subparser.add_argument('repository', metavar='REPOSITORY_OR_ARCHIVE',
+        subparser.add_argument('repository', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='repository or archive to check consistency of')
         subparser.add_argument('--repository-only', dest='repo_only', action='store_true',
@@ -629,7 +650,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                           epilog=change_passphrase_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_change_passphrase)
-        subparser.add_argument('repository', metavar='REPOSITORY',
+        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 
         create_epilog = textwrap.dedent("""
@@ -687,6 +708,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                     'zlib,0 .. zlib,9 == zlib (with level 0..9), '
                                     'lzma == lzma (default level 6), '
                                     'lzma,0 .. lzma,9 == lzma (with level 0..9).')
+        subparser.add_argument('--read-special', dest='read_special',
+                               action='store_true', default=False,
+                               help='open and read special files as if they were regular files')
+        subparser.add_argument('-n', '--dry-run', dest='dry_run',
+                               action='store_true', default=False,
+                               help='do not create a backup archive')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to create')
@@ -760,7 +787,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the deleted archive')
-        subparser.add_argument('target', metavar='TARGET',
+        subparser.add_argument('target', metavar='TARGET', nargs='?', default='',
                                type=location_validator(),
                                help='archive or repository to delete')
 
@@ -775,7 +802,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('--short', dest='short',
                                action='store_true', default=False,
                                help='only print file/directory names, nothing else')
-        subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
+        subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
+                               type=location_validator(),
                                help='repository/archive to list contents of')
         mount_epilog = textwrap.dedent("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -858,7 +886,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='number of yearly archives to keep')
         subparser.add_argument('-p', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')
-        subparser.add_argument('repository', metavar='REPOSITORY',
+        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to prune')
 

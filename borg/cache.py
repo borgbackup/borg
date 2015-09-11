@@ -97,8 +97,7 @@ class Cache:
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             config.write(fd)
         ChunkIndex().write(os.path.join(self.path, 'chunks').encode('utf-8'))
-        with open(os.path.join(self.path, 'chunks.archive'), 'wb') as fd:
-            pass  # empty file
+        os.makedirs(os.path.join(self.path, 'chunks.archive.d'))
         with open(os.path.join(self.path, 'files'), 'wb') as fd:
             pass  # empty file
 
@@ -154,7 +153,6 @@ class Cache:
         os.mkdir(txn_dir)
         shutil.copy(os.path.join(self.path, 'config'), txn_dir)
         shutil.copy(os.path.join(self.path, 'chunks'), txn_dir)
-        shutil.copy(os.path.join(self.path, 'chunks.archive'), txn_dir)
         shutil.copy(os.path.join(self.path, 'files'), txn_dir)
         os.rename(os.path.join(self.path, 'txn.tmp'),
                   os.path.join(self.path, 'txn.active'))
@@ -196,7 +194,6 @@ class Cache:
         if os.path.exists(txn_dir):
             shutil.copy(os.path.join(txn_dir, 'config'), self.path)
             shutil.copy(os.path.join(txn_dir, 'chunks'), self.path)
-            shutil.copy(os.path.join(txn_dir, 'chunks.archive'), self.path)
             shutil.copy(os.path.join(txn_dir, 'files'), self.path)
             os.rename(txn_dir, os.path.join(self.path, 'txn.tmp'))
             if os.path.exists(os.path.join(self.path, 'txn.tmp')):
@@ -207,54 +204,31 @@ class Cache:
     def sync(self):
         """Re-synchronize chunks cache with repository.
 
-        If present, uses a compressed tar archive of known backup archive
-        indices, so it only needs to fetch infos from repo and build a chunk
-        index once per backup archive.
-        If out of sync, the tar gets rebuilt from known + fetched chunk infos,
-        so it has complete and current information about all backup archives.
-        Finally, it builds the master chunks index by merging all indices from
-        the tar.
-
-        Note: compression (esp. xz) is very effective in keeping the tar
-              relatively small compared to the files it contains.
+        Maintains a directory with known backup archive indexes, so it only
+        needs to fetch infos from repo and build a chunk index once per backup
+        archive.
+        If out of sync, missing archive indexes get added, outdated indexes
+        get removed and a new master chunks index is built by merging all
+        archive indexes.
         """
-        in_archive_path = os.path.join(self.path, 'chunks.archive')
-        out_archive_path = os.path.join(self.path, 'chunks.archive.tmp')
+        archive_path = os.path.join(self.path, 'chunks.archive.d')
 
-        def open_in_archive():
-            try:
-                tf = tarfile.open(in_archive_path, 'r')
-            except OSError as e:
-                if e.errno != errno.ENOENT:
-                    raise
-                # file not found
-                tf = None
-            except tarfile.ReadError:
-                # empty file?
-                tf = None
-            return tf
+        def mkpath(id, suffix=''):
+            id_hex = hexlify(id).decode('ascii')
+            path = os.path.join(archive_path, id_hex + suffix)
+            return path.encode('utf-8')
 
-        def open_out_archive():
-            for compression in ('xz', 'bz2', 'gz'):
-                # xz needs py 3.3, bz2 and gz also work on 3.2
-                try:
-                    tf = tarfile.open(out_archive_path, 'w:'+compression, format=tarfile.PAX_FORMAT)
-                    break
-                except tarfile.CompressionError:
-                    continue
-            else:  # shouldn't happen
-                tf = None
-            return tf
+        def cached_archives():
+            fns = os.listdir(archive_path)
+            # filenames with 64 hex digits == 256bit
+            return set(unhexlify(fn) for fn in fns if len(fn) == 64)
 
-        def close_archive(tf):
-            if tf:
-                tf.close()
+        def repo_archives():
+            return set(info[b'id'] for info in self.manifest.archives.values())
 
-        def delete_in_archive():
-            os.unlink(in_archive_path)
-
-        def rename_out_archive():
-            os.rename(out_archive_path, in_archive_path)
+        def cleanup_outdated(ids):
+            for id in ids:
+                os.unlink(mkpath(id))
 
         def add(chunk_idx, id, size, csize, incr=1):
             try:
@@ -263,16 +237,7 @@ class Cache:
             except KeyError:
                 chunk_idx[id] = incr, size, csize
 
-        def transfer_known_idx(archive_id, tf_in, tf_out):
-            archive_id_hex = hexlify(archive_id).decode('ascii')
-            tarinfo = tf_in.getmember(archive_id_hex)
-            archive_name = tarinfo.pax_headers['archive_name']
-            print('Already known archive:', archive_name)
-            f_in = tf_in.extractfile(archive_id_hex)
-            tf_out.addfile(tarinfo, f_in)
-            return archive_name
-
-        def fetch_and_build_idx(archive_id, repository, key, tmp_dir, tf_out):
+        def fetch_and_build_idx(archive_id, repository, key):
             chunk_idx = ChunkIndex()
             cdata = repository.get(archive_id)
             data = key.decrypt(archive_id, cdata)
@@ -281,7 +246,6 @@ class Cache:
             if archive[b'version'] != 1:
                 raise Exception('Unknown archive metadata version')
             decode_dict(archive, (b'name',))
-            print('Analyzing new archive:', archive[b'name'])
             unpacker = msgpack.Unpacker()
             for item_id, chunk in zip(archive[b'items'], repository.get_many(archive[b'items'])):
                 data = key.decrypt(item_id, chunk)
@@ -294,56 +258,72 @@ class Cache:
                     if b'chunks' in item:
                         for chunk_id, size, csize in item[b'chunks']:
                             add(chunk_idx, chunk_id, size, csize)
-            archive_id_hex = hexlify(archive_id).decode('ascii')
-            file_tmp = os.path.join(tmp_dir, archive_id_hex).encode('utf-8')
-            chunk_idx.write(file_tmp)
-            tarinfo = tf_out.gettarinfo(file_tmp, archive_id_hex)
-            tarinfo.pax_headers['archive_name'] = archive[b'name']
-            with open(file_tmp, 'rb') as f:
-                tf_out.addfile(tarinfo, f)
-            os.unlink(file_tmp)
+            fn = mkpath(archive_id)
+            fn_tmp = mkpath(archive_id, suffix='.tmp')
+            try:
+                chunk_idx.write(fn_tmp)
+            except Exception:
+                os.unlink(fn_tmp)
+            else:
+                os.rename(fn_tmp, fn)
+            return chunk_idx
 
-        def create_master_idx(chunk_idx, tf_in, tmp_dir):
+        def lookup_name(archive_id):
+            for name, info in self.manifest.archives.items():
+                if info[b'id'] == archive_id:
+                    return name
+
+        def create_master_idx(chunk_idx):
+            print('Synchronizing chunks cache...')
+            cached_ids = cached_archives()
+            archive_ids = repo_archives()
+            print('Archives: %d, w/ cached Idx: %d, w/ outdated Idx: %d, w/o cached Idx: %d.' % (
+                len(archive_ids), len(cached_ids),
+                len(cached_ids - archive_ids), len(archive_ids - cached_ids), ))
+            # deallocates old hashindex, creates empty hashindex:
             chunk_idx.clear()
-            for tarinfo in tf_in:
-                archive_id_hex = tarinfo.name
-                archive_name = tarinfo.pax_headers['archive_name']
-                print("- extracting archive %s ..." % archive_name)
-                tf_in.extract(archive_id_hex, tmp_dir)
-                chunk_idx_path = os.path.join(tmp_dir, archive_id_hex).encode('utf-8')
-                print("- reading archive ...")
-                archive_chunk_idx = ChunkIndex.read(chunk_idx_path)
-                print("- merging archive ...")
-                chunk_idx.merge(archive_chunk_idx)
-                os.unlink(chunk_idx_path)
+            cleanup_outdated(cached_ids - archive_ids)
+            if archive_ids:
+                chunk_idx = None
+                for archive_id in archive_ids:
+                    archive_name = lookup_name(archive_id)
+                    if archive_id in cached_ids:
+                        archive_chunk_idx_path = mkpath(archive_id)
+                        print("Reading cached archive chunk index for %s ..." % archive_name)
+                        archive_chunk_idx = ChunkIndex.read(archive_chunk_idx_path)
+                    else:
+                        print('Fetching and building archive index for %s ...' % archive_name)
+                        archive_chunk_idx = fetch_and_build_idx(archive_id, repository, self.key)
+                    print("Merging into master chunks index ...")
+                    if chunk_idx is None:
+                        # we just use the first archive's idx as starting point,
+                        # to avoid growing the hash table from 0 size and also
+                        # to save 1 merge call.
+                        chunk_idx = archive_chunk_idx
+                    else:
+                        chunk_idx.merge(archive_chunk_idx)
+            print('Done.')
+            return chunk_idx
+
+        def legacy_cleanup():
+            """bring old cache dirs into the desired state (cleanup and adapt)"""
+            try:
+                os.unlink(os.path.join(self.path, 'chunks.archive'))
+            except:
+                pass
+            try:
+                os.unlink(os.path.join(self.path, 'chunks.archive.tmp'))
+            except:
+                pass
+            try:
+                os.mkdir(archive_path)
+            except:
+                pass
 
         self.begin_txn()
-        print('Synchronizing chunks cache...')
-        # XXX we have to do stuff on disk due to lacking ChunkIndex api
-        with tempfile.TemporaryDirectory(prefix='borg-tmp') as tmp_dir:
-            repository = cache_if_remote(self.repository)
-            out_archive = open_out_archive()
-            in_archive = open_in_archive()
-            if in_archive:
-                known_ids = set(unhexlify(hexid) for hexid in in_archive.getnames())
-            else:
-                known_ids = set()
-            archive_ids = set(info[b'id'] for info in self.manifest.archives.values())
-            print('Rebuilding archive collection. Known: %d Repo: %d Unknown: %d' % (
-                len(known_ids), len(archive_ids), len(archive_ids - known_ids), ))
-            for archive_id in archive_ids & known_ids:
-                transfer_known_idx(archive_id, in_archive, out_archive)
-            close_archive(in_archive)
-            delete_in_archive()  # free disk space
-            for archive_id in archive_ids - known_ids:
-                fetch_and_build_idx(archive_id, repository, self.key, tmp_dir, out_archive)
-            close_archive(out_archive)
-            rename_out_archive()
-            print('Merging collection into master chunks cache...')
-            in_archive = open_in_archive()
-            create_master_idx(self.chunks, in_archive, tmp_dir)
-            close_archive(in_archive)
-            print('Done.')
+        repository = cache_if_remote(self.repository)
+        legacy_cleanup()
+        self.chunks = create_master_idx(self.chunks)
 
     def add_chunk(self, id, data, stats):
         if not self.txn_active:

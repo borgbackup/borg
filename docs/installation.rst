@@ -201,7 +201,8 @@ This uses the latest (source package) release from PyPi.
     source borg-env/bin/activate   # always before using!
 
     # install borg + dependencies into virtualenv
-    pip install llfuse  # optional, for FUSE support
+    pip install 'llfuse<0.41'  # optional, for FUSE support
+                               # 0.41 and 0.41.1 have unicode issues at install time
     pip install borgbackup
 
 Note: we install into a virtual environment here, but this is not a requirement.
@@ -223,7 +224,8 @@ While we try not to break master, there are no guarantees on anything.
 
     # install borg + dependencies into virtualenv
     pip install sphinx  # optional, to build the docs
-    pip install llfuse  # optional, for FUSE support
+    pip install 'llfuse<0.41'  # optional, for FUSE support
+                               # 0.41 and 0.41.1 have unicode issues at install time
     cd borg
     pip install -r requirements.d/development.txt
     pip install -e .  # in-place editable mode

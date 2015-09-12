@@ -323,14 +323,17 @@ class Archive:
             raise Exception('Unknown archive item type %r' % item[b'mode'])
 
     def restore_attrs(self, path, item, symlink=False, fd=None):
-        xattrs = item.get(b'xattrs')
-        if xattrs:
-                for k, v in xattrs.items():
-                    try:
-                        xattr.setxattr(fd or path, k, v, follow_symlinks=False)
-                    except OSError as e:
-                        if e.errno != errno.ENOTSUP:
-                            raise
+        xattrs = item.get(b'xattrs', {})
+        for k, v in xattrs.items():
+            try:
+                xattr.setxattr(fd or path, k, v, follow_symlinks=False)
+            except OSError as e:
+                if e.errno not in (errno.ENOTSUP, errno.EACCES, ):
+                    # only raise if the errno is not on our ignore list:
+                    # ENOTSUP == xattrs not supported here
+                    # EACCES == permission denied to set this specific xattr
+                    #           (this may happen related to security.* keys)
+                    raise
         uid = gid = None
         if not self.numeric_owner:
             uid = user2uid(item[b'user'])
@@ -452,6 +455,7 @@ class Archive:
             b'mtime': int_to_bigint(int(time.time()) * 1000000000)
         }
         self.add_item(item)
+        return 'i'  # stdin
 
     def process_file(self, path, st, cache):
         status = None
@@ -609,8 +613,9 @@ class ArchiveChecker:
         self.error_found = False
         self.possibly_superseded = set()
 
-    def check(self, repository, repair=False, last=None):
+    def check(self, repository, repair=False, archive=None, last=None):
         self.report_progress('Starting archive consistency check...')
+        self.check_all = archive is None and last is None
         self.repair = repair
         self.repository = repository
         self.init_chunks()
@@ -619,11 +624,9 @@ class ArchiveChecker:
             self.manifest = self.rebuild_manifest()
         else:
             self.manifest, _ = Manifest.load(repository, key=self.key)
-        self.rebuild_refcounts(last=last)
-        if last is None:
-            self.verify_chunks()
-        else:
-            self.report_progress('Orphaned objects check skipped (needs all archives checked)')
+        self.rebuild_refcounts(archive=archive, last=last)
+        self.orphan_chunks_check()
+        self.finish()
         if not self.error_found:
             self.report_progress('Archive consistency check complete, no problems found.')
         return self.repair or not self.error_found
@@ -631,7 +634,7 @@ class ArchiveChecker:
     def init_chunks(self):
         """Fetch a list of all object keys from repository
         """
-        # Explicity set the initial hash table capacity to avoid performance issues
+        # Explicitly set the initial hash table capacity to avoid performance issues
         # due to hash table "resonance"
         capacity = int(len(self.repository) * 1.2)
         self.chunks = ChunkIndex(capacity)
@@ -680,7 +683,7 @@ class ArchiveChecker:
         self.report_progress('Manifest rebuild complete', error=True)
         return manifest
 
-    def rebuild_refcounts(self, last=None):
+    def rebuild_refcounts(self, archive=None, last=None):
         """Rebuild object reference counts by walking the metadata
 
         Missing and/or incorrect data is repaired when detected
@@ -762,10 +765,17 @@ class ArchiveChecker:
                         yield item
 
         repository = cache_if_remote(self.repository)
-        num_archives = len(self.manifest.archives)
-        archive_items = sorted(self.manifest.archives.items(), reverse=True,
-                               key=lambda name_info: name_info[1][b'time'])
-        end = None if last is None else min(num_archives, last)
+        if archive is None:
+            # we need last N or all archives
+            archive_items = sorted(self.manifest.archives.items(), reverse=True,
+                                   key=lambda name_info: name_info[1][b'time'])
+            num_archives = len(self.manifest.archives)
+            end = None if last is None else min(num_archives, last)
+        else:
+            # we only want one specific archive
+            archive_items = [item for item in self.manifest.archives.items() if item[0] == archive]
+            num_archives = 1
+            end = 1
         for i, (name, info) in enumerate(archive_items[:end]):
             self.report_progress('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
             archive_id = info[b'id']
@@ -796,16 +806,22 @@ class ArchiveChecker:
             add_reference(new_archive_id, len(data), len(cdata), cdata)
             info[b'id'] = new_archive_id
 
-    def verify_chunks(self):
-        unused = set()
-        for id_, (count, size, csize) in self.chunks.iteritems():
-            if count == 0:
-                unused.add(id_)
-        orphaned = unused - self.possibly_superseded
-        if orphaned:
-            self.report_progress('{} orphaned objects found'.format(len(orphaned)), error=True)
+    def orphan_chunks_check(self):
+        if self.check_all:
+            unused = set()
+            for id_, (count, size, csize) in self.chunks.iteritems():
+                if count == 0:
+                    unused.add(id_)
+            orphaned = unused - self.possibly_superseded
+            if orphaned:
+                self.report_progress('{} orphaned objects found'.format(len(orphaned)), error=True)
+            if self.repair:
+                for id_ in unused:
+                    self.repository.delete(id_)
+        else:
+            self.report_progress('Orphaned objects check skipped (needs all archives checked)')
+
+    def finish(self):
         if self.repair:
-            for id_ in unused:
-                self.repository.delete(id_)
             self.manifest.write()
             self.repository.commit()

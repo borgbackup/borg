@@ -50,14 +50,14 @@ class Repository:
         """Object with key {} not found in repository {}."""
 
     def __init__(self, path, create=False, exclusive=False):
-        self.path = path
+        self.path = os.path.abspath(path)
         self.io = None
         self.lock = None
         self.index = None
         self._active_txn = False
         if create:
-            self.create(path)
-        self.open(path, exclusive)
+            self.create(self.path)
+        self.open(self.path, exclusive)
 
     def __del__(self):
         self.close()
@@ -334,7 +334,6 @@ class Repository:
             report_error('Adding commit tag to segment {}'.format(transaction_id))
             self.io.segment = transaction_id + 1
             self.io.write_commit()
-            self.io.close_segment()
         if current_index and not repair:
             if len(current_index) != len(self.index):
                 report_error('Index object count mismatch. {} != {}'.format(len(current_index), len(self.index)))
@@ -433,7 +432,8 @@ class LoggedIO:
 
     def __init__(self, path, limit, segments_per_dir, capacity=90):
         self.path = path
-        self.fds = LRUCache(capacity)
+        self.fds = LRUCache(capacity,
+                            dispose=lambda fd: fd.close())
         self.segment = 0
         self.limit = limit
         self.segments_per_dir = segments_per_dir
@@ -441,9 +441,8 @@ class LoggedIO:
         self._write_fd = None
 
     def close(self):
-        for segment in list(self.fds.keys()):
-            self.fds.pop(segment).close()
         self.close_segment()
+        self.fds.clear()
         self.fds = None  # Just to make sure we're disabled
 
     def segment_iterator(self, reverse=False):
@@ -517,6 +516,8 @@ class LoggedIO:
             return fd
 
     def delete_segment(self, segment):
+        if segment in self.fds:
+            del self.fds[segment]
         try:
             os.unlink(self.segment_filename(segment))
         except OSError:
@@ -559,7 +560,8 @@ class LoggedIO:
             header = fd.read(self.header_fmt.size)
 
     def recover_segment(self, segment, filename):
-        self.fds.pop(segment).close()
+        if segment in self.fds:
+            del self.fds[segment]
         # FIXME: save a copy of the original file
         with open(filename, 'rb') as fd:
             data = memoryview(fd.read())

@@ -2,8 +2,112 @@ Borg Changelog
 ==============
 
 
+Version 0.26.0 (not released yet)
+---------------------------------
+
+New features:
+
+- BORG_REPO env var to specify the default repo, #168
+- read special files as if they were regular files, #79
+
+Bug fixes:
+
+- borg mount repo: use absolute path, attic #200, attic #137
+- chunker: use off_t to get 64bit on 32bit platform, #178
+- initialize chunker fd to -1, so it's not equal to STDIN_FILENO (0)
+- fix reaction to "no" answer at delete repo prompt, #182
+
+Other changes:
+
+- detect inconsistency / corruption / hash collision, #170
+- replace versioneer with setuptools_scm, #106
+
+
+Version 0.25.0
+--------------
+
+Compatibility notes:
+
+- lz4 compression library (liblz4) is a new requirement (#156)
+- the new compression code is very compatible: as long as you stay with zlib
+  compression, older borg releases will still be able to read data from a
+  repo/archive made with the new code (note: this is not the case for the
+  default "none" compression, use "zlib,0" if you want a "no compression" mode
+  that can be read by older borg). Also the new code is able to read repos and
+  archives made with older borg versions (for all zlib levels  0..9).
+
+Deprecations:
+
+- --compression N (with N being a number, as in 0.24) is deprecated.
+  We keep the --compression 0..9 for now to not break scripts, but it is
+  deprecated and will be removed later, so better fix your scripts now:
+  --compression 0 (as in 0.24) is the same as --compression zlib,0 (now).
+  BUT: if you do not want compression, you rather want --compression none
+  (which is the default).
+  --compression 1 (in 0.24) is the same as --compression zlib,1 (now)
+  --compression 9 (in 0.24) is the same as --compression zlib,9 (now)
+
+New features:
+
+- create --compression none (default, means: do not compress, just pass through
+  data "as is". this is more efficient than zlib level 0 as used in borg 0.24)
+- create --compression lz4 (super-fast, but not very high compression)
+- create --compression zlib,N (slower, higher compression, default for N is 6)
+- create --compression lzma,N (slowest, highest compression, default N is 6)
+- honor the nodump flag (UF_NODUMP) and do not backup such items
+- list --short just outputs a simple list of the files/directories in an archive
+
+Bug fixes:
+
+- fixed --chunker-params parameter order confusion / malfunction, fixes #154
+- close fds of segments we delete (during compaction)
+- close files which fell out the lrucache
+- fadvise DONTNEED now is only called for the byte range actually read, not for
+  the whole file, fixes #158.
+- fix issue with negative "all archives" size, fixes #165
+- restore_xattrs: ignore if setxattr fails with EACCES, fixes #162
+
+Other changes:
+
+- remove fakeroot requirement for tests, tests run faster without fakeroot
+  (test setup does not fail any more without fakeroot, so you can run with or
+  without fakeroot), fixes #151 and #91.
+- more tests for archiver
+- recover_segment(): don't assume we have an fd for segment
+- lrucache refactoring / cleanup, add dispose function, py.test tests
+- generalize hashindex code for any key length (less hardcoding)
+- lock roster: catch file not found in remove() method and ignore it
+- travis CI: use requirements file
+- improved docs:
+
+  - replace hack for llfuse with proper solution (install libfuse-dev)
+  - update docs about compression
+  - update development docs about fakeroot
+  - internals: add some words about lock files / locking system
+  - support: mention BountySource and for what it can be used
+  - theme: use a lighter green
+  - add pypi, wheel, dist package based install docs
+  - split install docs into system-specific preparations and generic instructions
+
+
 Version 0.24.0
 --------------
+
+Incompatible changes (compared to 0.23):
+
+- borg now always issues --umask NNN option when invoking another borg via ssh
+  on the repository server. By that, it's making sure it uses the same umask
+  for remote repos as for local ones. Because of this, you must upgrade both
+  server and client(s) to 0.24.
+- the default umask is 077 now (if you do not specify via --umask) which might
+  be a different one as you used previously. The default umask avoids that
+  you accidentally give access permissions for group and/or others to files
+  created by borg (e.g. the repository).
+
+Deprecations:
+
+- "--encryption passphrase" mode is deprecated, see #85 and #97.
+  See the new "--encryption repokey" mode for a replacement.
 
 New features:
 
@@ -17,12 +121,21 @@ New features:
 - borg create --compression 0..9 to select zlib compression level, fixes #66
   (attic #295).
 - borg init --encryption repokey (to store the encryption key into the repo),
-  deprecate --encryption passphrase, fixes #85
+  fixes #85
 - improve at-end error logging, always log exceptions and set exit_code=1
 - LoggedIO: better error checks / exceptions / exception handling
+- implement --remote-path to allow non-default-path borg locations, #125
+- implement --umask M and use 077 as default umask for better security, #117
+- borg check: give a named single archive to it, fixes #139
+- cache sync: show progress indication
+- cache sync: reimplement the chunk index merging in C
 
 Bug fixes:
 
+- fix segfault that happened for unreadable files (chunker: n needs to be a
+  signed size_t), #116
+- fix the repair mode, #144
+- repo delete: add destroy to allowed rpc methods, fixes issue #114
 - more compatible repository locking code (based on mkdir), maybe fixes #92
   (attic #317, attic #201).
 - better Exception msg if no Borg is installed on the remote repo server, #56
@@ -30,10 +143,12 @@ Bug fixes:
   fixes attic #326.
 - fix Traceback when running check --repair, attic #232
 - clarify help text, fixes #73.
+- add help string for --no-files-cache, fixes #140
 
 Other changes:
 
 - improved docs:
+
   - added docs/misc directory for misc. writeups that won't be included
     "as is" into the html docs.
   - document environment variables and return codes (attic #324, attic #52)
@@ -44,14 +159,25 @@ Other changes:
   - add FAQ entries about redundancy / integrity
   - clarify that borg extract uses the cwd as extraction target
   - update internals doc about chunker params, memory usage and compression
+  - added docs about development
+  - add some words about resource usage in general
+  - document how to backup a raw disk
+  - add note about how to run borg from virtual env
+  - add solutions for (ll)fuse installation problems
+  - document what borg check does, fixes #138
+  - reorganize borgbackup.github.io sidebar, prev/next at top
+  - deduplicate and refactor the docs / README.rst
 
 - use borg-tmp as prefix for temporary files / directories
 - short prune options without "keep-" are deprecated, do not suggest them
-- improved tox configuration, documented there how to invoke it
+- improved tox configuration
 - remove usage of unittest.mock, always use mock from pypi
 - use entrypoints instead of scripts, for better use of the wheel format and
   modern installs
-    
+- add requirements.d/development.txt and modify tox.ini
+- use travis-ci for testing based on Linux and (new) OS X
+- use coverage.py, pytest-cov and codecov.io for test coverage support
+
 I forgot to list some stuff already implemented in 0.23.0, here they are:
 
 New features:

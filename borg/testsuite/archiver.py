@@ -11,6 +11,9 @@ import time
 import unittest
 from hashlib import sha256
 
+from mock import patch
+import pytest
+
 from .. import xattr
 from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP
 from ..archiver import Archiver
@@ -20,7 +23,6 @@ from ..helpers import Manifest
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import BaseTestCase
-from .mock import patch
 
 try:
     import llfuse
@@ -31,6 +33,12 @@ except ImportError:
 has_lchflags = hasattr(os, 'lchflags')
 
 src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__), '..')
+
+# Python <= 3.2 raises OSError instead of PermissionError (See #164)
+try:
+    PermissionError = PermissionError
+except NameError:
+    PermissionError = OSError
 
 
 class changedir:
@@ -57,7 +65,9 @@ class environment_variable:
 
     def __exit__(self, *args, **kw):
         for k, v in self.old_values.items():
-            if v is not None:
+            if v is None:
+                del os.environ[k]
+            else:
                 os.environ[k] = v
 
 
@@ -88,8 +98,8 @@ class ArchiverTestCaseBase(BaseTestCase):
         os.chdir(self.tmpdir)
 
     def tearDown(self):
-        shutil.rmtree(self.tmpdir)
         os.chdir(self._old_wd)
+        shutil.rmtree(self.tmpdir)
 
     def cmd(self, *args, **kw):
         exit_code = kw.get('exit_code', 0)
@@ -151,15 +161,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('flagfile', size=1024)
         # Directory
         self.create_regular_file('dir2/file2', size=1024 * 80)
-        # File owner
-        os.chown('input/file1', 100, 200)
         # File mode
         os.chmod('input/file1', 0o7755)
-        os.chmod('input/dir2', 0o555)
-        # Block device
-        os.mknod('input/bdev', 0o600 | stat.S_IFBLK, os.makedev(10, 20))
-        # Char device
-        os.mknod('input/cdev', 0o600 | stat.S_IFCHR, os.makedev(30, 40))
         # Hard link
         os.link(os.path.join(self.input_path, 'file1'),
                 os.path.join(self.input_path, 'hardlink'))
@@ -177,19 +180,54 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.mkfifo(os.path.join(self.input_path, 'fifo1'))
         if has_lchflags:
             os.lchflags(os.path.join(self.input_path, 'flagfile'), stat.UF_NODUMP)
+        try:
+            # Block device
+            os.mknod('input/bdev', 0o600 | stat.S_IFBLK, os.makedev(10, 20))
+            # Char device
+            os.mknod('input/cdev', 0o600 | stat.S_IFCHR, os.makedev(30, 40))
+            # File mode
+            os.chmod('input/dir2', 0o555)  # if we take away write perms, we need root to remove contents
+            # File owner
+            os.chown('input/file1', 100, 200)
+            have_root = True  # we have (fake)root
+        except PermissionError:
+            have_root = False
+        return have_root
 
     def test_basic_functionality(self):
-        self.create_test_files()
+        have_root = self.create_test_files()
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('create', self.repository_location + '::test.2', 'input')
+        self.cmd('create', '--stats', self.repository_location + '::test.2', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
         self.assert_equal(len(self.cmd('list', self.repository_location).splitlines()), 2)
-        self.assert_equal(len(self.cmd('list', self.repository_location + '::test').splitlines()), 11)
+        expected =  [
+            'input',
+            'input/bdev',
+            'input/cdev',
+            'input/dir2',
+            'input/dir2/file2',
+            'input/empty',
+            'input/fifo1',
+            'input/file1',
+            'input/flagfile',
+            'input/hardlink',
+            'input/link1',
+        ]
+        if not have_root:
+            # we could not create these device files without (fake)root
+            expected.remove('input/bdev')
+            expected.remove('input/cdev')
+        if has_lchflags:
+            # remove the file we did not backup, so input and output become equal
+            expected.remove('input/flagfile') # this file is UF_NODUMP
+            os.remove(os.path.join('input', 'flagfile'))
+        self.assert_equal(self.cmd('list', '--short', self.repository_location + '::test').splitlines(), expected)
         self.assert_dirs_equal('input', 'output/input')
         info_output = self.cmd('info', self.repository_location + '::test')
-        self.assert_in('Number of files: 4', info_output)
+        item_count = 3 if has_lchflags else 4  # one file is UF_NODUMP
+        self.assert_in('Number of files: %d' % item_count, info_output)
         shutil.rmtree(self.cache_path)
         with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='1'):
             info_output2 = self.cmd('info', self.repository_location + '::test')
@@ -242,6 +280,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_equal(st.st_size, total_len)
         if sparse_support and hasattr(st, 'st_blocks'):
             self.assert_true(st.st_blocks * 512 < total_len / 10)  # is output sparse?
+
+    def test_unusual_filenames(self):
+        filenames = ['normal', 'with some blanks', '(with_parens)', ]
+        for filename in filenames:
+            filename = os.path.join(self.input_path, filename)
+            with open(filename, 'wb') as fd:
+                pass
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        for filename in filenames:
+            with changedir('output'):
+                self.cmd('extract', self.repository_location + '::test', os.path.join('input', filename))
+            assert os.path.exists(os.path.join('output', 'input', filename))
 
     def test_repository_swap_detection(self):
         self.create_test_files()
@@ -389,10 +440,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
         self.cmd('delete', self.repository_location + '::test')
         self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
-        self.cmd('delete', self.repository_location + '::test.2')
+        self.cmd('delete', '--stats', self.repository_location + '::test.2')
         # Make sure all data except the manifest has been deleted
         repository = Repository(self.repository_path)
         self.assert_equal(len(repository), 1)
+
+    def test_delete_repo(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.create_regular_file('dir2/file2', size=1024 * 80)
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', self.repository_location + '::test.2', 'input')
+        self.cmd('delete', self.repository_location)
+        # Make sure the repo is gone
+        self.assertFalse(os.path.exists(self.repository_path))
 
     def test_corrupted_repository(self):
         self.cmd('init', self.repository_location)
@@ -405,6 +466,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.write(b'XXXX')
         self.cmd('check', self.repository_location, exit_code=1)
 
+    # we currently need to be able to create a lock directory inside the repo:
+    @pytest.mark.xfail(reason="we need to be able to create the lock directory inside the repo")
     def test_readonly_repository(self):
         self.cmd('init', self.repository_location)
         self.create_src_archive('test')
@@ -414,6 +477,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         finally:
             # Restore permissions so shutil.rmtree is able to delete it
             os.system('chmod -R u+w ' + self.repository_path)
+
+    def test_umask(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        mode = os.stat(self.repository_path).st_mode
+        self.assertEqual(stat.S_IMODE(mode), 0o700)
+
+    def test_create_dry_run(self):
+        self.cmd('init', self.repository_location)
+        self.cmd('create', '--dry-run', self.repository_location + '::test', 'input')
+        # Make sure no archive has been created
+        repository = Repository(self.repository_path)
+        manifest, key = Manifest.load(repository)
+        self.assert_equal(len(manifest.archives), 0)
 
     def test_cmdline_compatibility(self):
         self.create_regular_file('file1', size=1024 * 80)
@@ -439,9 +517,37 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_not_in('test1', output)
         self.assert_in('test2', output)
 
+    def test_prune_repository_prefix(self):
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::foo-2015-08-12-10:00', src_dir)
+        self.cmd('create', self.repository_location + '::foo-2015-08-12-20:00', src_dir)
+        self.cmd('create', self.repository_location + '::bar-2015-08-12-10:00', src_dir)
+        self.cmd('create', self.repository_location + '::bar-2015-08-12-20:00', src_dir)
+        output = self.cmd('prune', '-v', '--dry-run', self.repository_location, '--keep-daily=2', '--prefix=foo-')
+        self.assert_in('Keeping archive: foo-2015-08-12-20:00', output)
+        self.assert_in('Would prune:     foo-2015-08-12-10:00', output)
+        output = self.cmd('list', self.repository_location)
+        self.assert_in('foo-2015-08-12-10:00', output)
+        self.assert_in('foo-2015-08-12-20:00', output)
+        self.assert_in('bar-2015-08-12-10:00', output)
+        self.assert_in('bar-2015-08-12-20:00', output)
+        self.cmd('prune', self.repository_location, '--keep-daily=2', '--prefix=foo-')
+        output = self.cmd('list', self.repository_location)
+        self.assert_not_in('foo-2015-08-12-10:00', output)
+        self.assert_in('foo-2015-08-12-20:00', output)
+        self.assert_in('bar-2015-08-12-10:00', output)
+        self.assert_in('bar-2015-08-12-20:00', output)
+
     def test_usage(self):
         self.assert_raises(SystemExit, lambda: self.cmd())
         self.assert_raises(SystemExit, lambda: self.cmd('-h'))
+
+    def test_help(self):
+        assert 'Borg' in self.cmd('help')
+        assert 'patterns' in self.cmd('help', 'patterns')
+        assert 'Initialize' in self.cmd('help', 'init')
+        assert 'positional arguments' not in self.cmd('help', 'init', '--epilog-only')
+        assert 'This command initializes' not in self.cmd('help', 'init', '--usage-only')
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
     def test_fuse_mount_repository(self):

@@ -1,12 +1,12 @@
 from datetime import datetime, timezone
 
 import msgpack
+from mock import Mock
 
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker
 from ..key import PlaintextKey
 from ..helpers import Manifest
 from . import BaseTestCase
-from .mock import Mock
 
 
 class MockCache:

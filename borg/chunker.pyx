@@ -20,7 +20,7 @@ cdef extern from "_chunker.c":
 cdef class Chunker:
     cdef _Chunker *chunker
 
-    def __cinit__(self, seed, chunk_min_exp, chunk_max_exp, hash_mask_bits, hash_window_size):
+    def __cinit__(self, int seed, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size):
         min_size = 1 << chunk_min_exp
         max_size = 1 << chunk_max_exp
         hash_mask = (1 << hash_mask_bits) - 1

@@ -89,6 +89,31 @@ certain number of old archives::
     # and 6 monthly archives.
     borg prune -v $REPOSITORY --keep-daily=7 --keep-weekly=4 --keep-monthly=6
 
+.. backup_compression:
+
+Backup compression
+------------------
+
+Default is no compression, but we support different methods with high speed
+or high compression:
+
+If you have a quick repo storage and you want a little compression:
+
+    $ borg create --compression lz4 /mnt/backup::repo ~
+
+If you have a medium fast repo storage and you want a bit more compression (N=0..9,
+0 means no compression, 9 means high compression):
+
+    $ borg create --compression zlib,N /mnt/backup::repo ~
+
+If you have a very slow repo storage and you want high compression (N=0..9, 0 means
+low compression, 9 means high compression):
+
+    $ borg create --compression lzma,N /mnt/backup::repo ~
+
+You'll need to experiment a bit to find the best compression for your use case.
+Keep an eye on CPU load and throughput.
+
 .. _encrypted_repos:
 
 Repository encryption
@@ -96,7 +121,7 @@ Repository encryption
 
 Repository encryption is enabled at repository creation time::
 
-    $ borg init --encryption=passphrase|keyfile PATH
+    $ borg init --encryption=repokey|keyfile PATH
 
 When repository encryption is enabled all data is encrypted using 256-bit AES_
 encryption and the integrity and authenticity is verified using `HMAC-SHA256`_.
@@ -105,28 +130,29 @@ All data is encrypted before being written to the repository. This means that
 an attacker who manages to compromise the host containing an encrypted
 archive will not be able to access any of the data.
 
-|project_name| supports two different methods to derive the AES and HMAC keys.
+|project_name| supports different methods to store the AES and HMAC keys.
 
-Passphrase based encryption
-    This method uses a user supplied passphrase to derive the keys using the
-    PBKDF2_ key derivation function. This method is convenient to use since
-    there is no key file to keep track of and secure as long as a *strong*
-    passphrase is used.
+``repokey`` mode
+    The key is stored inside the repository (in its "config" file).
+    Use this mode if you trust in your good passphrase giving you enough
+    protection.
 
-    .. Note::
-        For automated backups the passphrase can be specified using the
-        `BORG_PASSPHRASE` environment variable.
+``keyfile`` mode
+    The key is stored on your local disk (in ``~/.borg/keys/``).
+    Use this mode if you want "passphrase and having-the-key" security.
 
-Key file based encryption
-    This method generates random keys at repository initialization time that
-    are stored in a password protected file in the ``~/.borg/keys/`` directory.
-    The key file is a printable text file. This method is secure and suitable
-    for automated backups.
+In both modes, the key is stored in encrypted form and can be only decrypted
+by providing the correct passphrase.
 
-    .. Note::
-        The repository data is totally inaccessible without the key file
-        so it must be kept **safe**.
+For automated backups the passphrase can be specified using the
+`BORG_PASSPHRASE` environment variable.
 
+**The repository data is totally inaccessible without the key:**
+    Make a backup copy of the key file (``keyfile`` mode) or repo config
+    file (``repokey`` mode) and keep it at a safe place, so you still have
+    the key in case it gets corrupted or lost.
+    The backup that is encrypted with that key won't help you with that,
+    of course.
 
 .. _remote_repos:
 
@@ -159,6 +185,3 @@ mounting the remote filesystem, for example, using sshfs::
   $ borg init /mnt/backup
   $ fusermount -u /mnt
 
-However, be aware that sshfs doesn't fully implement POSIX locks, so
-you must be sure to not have two processes trying to access the same
-repository at the same time.

@@ -2,13 +2,14 @@ import os
 import shutil
 import tempfile
 
+from mock import patch
+
 from ..hashindex import NSIndex
 from ..helpers import Location, IntegrityError
 from ..locking import UpgradableLock
 from ..remote import RemoteRepository, InvalidRPCMethod
 from ..repository import Repository
 from . import BaseTestCase
-from .mock import patch
 
 
 class RepositoryTestCaseBase(BaseTestCase):

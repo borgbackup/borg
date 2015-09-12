@@ -2,11 +2,13 @@ import hashlib
 from time import mktime, strptime
 from datetime import datetime, timezone, timedelta
 
+import pytest
+import sys
 import msgpack
 
-from ..helpers import adjust_patterns, exclude_path, Location, format_timedelta, ExcludePattern, make_path_safe, \
+from ..helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
     prune_within, prune_split, \
-    StableDict, int_to_bigint, bigint_to_int, parse_timestamp
+    StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams
 from . import BaseTestCase
 
 
@@ -22,42 +24,115 @@ class BigIntTestCase(BaseTestCase):
         self.assert_equal(bigint_to_int(int_to_bigint(2**70)), 2**70)
 
 
-class LocationTestCase(BaseTestCase):
+class TestLocationWithoutEnv:
+    def test_ssh(self, monkeypatch):
+        monkeypatch.delenv('BORG_REPO', raising=False)
+        assert repr(Location('ssh://user@host:1234/some/path::archive')) == \
+               "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive='archive')"
+        assert repr(Location('ssh://user@host:1234/some/path')) == \
+               "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive=None)"
 
-    def test(self):
-        self.assert_equal(
-            repr(Location('ssh://user@host:1234/some/path::archive')),
-            "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive='archive')"
-        )
-        self.assert_equal(
-            repr(Location('file:///some/path::archive')),
-            "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')"
-        )
-        self.assert_equal(
-            repr(Location('user@host:/some/path::archive')),
-            "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='archive')"
-        )
-        self.assert_equal(
-            repr(Location('path::archive')),
-            "Location(proto='file', user=None, host=None, port=None, path='path', archive='archive')"
-        )
-        self.assert_equal(
-            repr(Location('/some/absolute/path::archive')),
-            "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive='archive')"
-        )
-        self.assert_equal(
-            repr(Location('some/relative/path::archive')),
-            "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='archive')"
-        )
-        self.assert_raises(ValueError, lambda: Location('ssh://localhost:22/path:archive'))
+    def test_file(self, monkeypatch):
+        monkeypatch.delenv('BORG_REPO', raising=False)
+        assert repr(Location('file:///some/path::archive')) == \
+               "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')"
+        assert repr(Location('file:///some/path')) == \
+               "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive=None)"
 
-    def test_canonical_path(self):
+    def test_scp(self, monkeypatch):
+        monkeypatch.delenv('BORG_REPO', raising=False)
+        assert repr(Location('user@host:/some/path::archive')) == \
+               "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='archive')"
+        assert repr(Location('user@host:/some/path')) == \
+               "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
+
+    def test_folder(self, monkeypatch):
+        monkeypatch.delenv('BORG_REPO', raising=False)
+        assert repr(Location('path::archive')) == \
+               "Location(proto='file', user=None, host=None, port=None, path='path', archive='archive')"
+        assert repr(Location('path')) == \
+               "Location(proto='file', user=None, host=None, port=None, path='path', archive=None)"
+
+    def test_abspath(self, monkeypatch):
+        monkeypatch.delenv('BORG_REPO', raising=False)
+        assert repr(Location('/some/absolute/path::archive')) == \
+               "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive='archive')"
+        assert repr(Location('/some/absolute/path')) == \
+               "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive=None)"
+
+    def test_relpath(self, monkeypatch):
+        monkeypatch.delenv('BORG_REPO', raising=False)
+        assert repr(Location('some/relative/path::archive')) == \
+               "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='archive')"
+        assert repr(Location('some/relative/path')) == \
+               "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive=None)"
+
+    def test_underspecified(self, monkeypatch):
+        monkeypatch.delenv('BORG_REPO', raising=False)
+        with pytest.raises(ValueError):
+            Location('::archive')
+        with pytest.raises(ValueError):
+            Location('::')
+        with pytest.raises(ValueError):
+            Location()
+
+    def test_no_double_colon(self, monkeypatch):
+        monkeypatch.delenv('BORG_REPO', raising=False)
+        with pytest.raises(ValueError):
+            Location('ssh://localhost:22/path:archive')
+
+    def test_canonical_path(self, monkeypatch):
+        monkeypatch.delenv('BORG_REPO', raising=False)
         locations = ['some/path::archive', 'file://some/path::archive', 'host:some/path::archive',
                      'host:~user/some/path::archive', 'ssh://host/some/path::archive',
                      'ssh://user@host:1234/some/path::archive']
         for location in locations:
-            self.assert_equal(Location(location).canonical_path(),
-                              Location(Location(location).canonical_path()).canonical_path())
+            assert Location(location).canonical_path() == \
+                   Location(Location(location).canonical_path()).canonical_path()
+
+
+class TestLocationWithEnv:
+    def test_ssh(self, monkeypatch):
+        monkeypatch.setenv('BORG_REPO', 'ssh://user@host:1234/some/path')
+        assert repr(Location('::archive')) == \
+               "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive='archive')"
+        assert repr(Location()) == \
+               "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive=None)"
+
+    def test_file(self, monkeypatch):
+        monkeypatch.setenv('BORG_REPO', 'file:///some/path')
+        assert repr(Location('::archive')) == \
+               "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')"
+        assert repr(Location()) == \
+               "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive=None)"
+
+    def test_scp(self, monkeypatch):
+        monkeypatch.setenv('BORG_REPO', 'user@host:/some/path')
+        assert repr(Location('::archive')) == \
+               "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='archive')"
+        assert repr(Location()) == \
+               "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
+
+    def test_folder(self, monkeypatch):
+        monkeypatch.setenv('BORG_REPO', 'path')
+        assert repr(Location('::archive')) == \
+               "Location(proto='file', user=None, host=None, port=None, path='path', archive='archive')"
+        assert repr(Location()) == \
+               "Location(proto='file', user=None, host=None, port=None, path='path', archive=None)"
+
+    def test_abspath(self, monkeypatch):
+        monkeypatch.setenv('BORG_REPO', '/some/absolute/path')
+        assert repr(Location('::archive')) == \
+               "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive='archive')"
+        assert repr(Location()) == \
+               "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive=None)"
+
+    def test_relpath(self, monkeypatch):
+        monkeypatch.setenv('BORG_REPO', 'some/relative/path')
+        assert repr(Location('::archive')) == \
+               "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='archive')"
+        assert repr(Location()) == \
+               "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive=None)"
 
 
 class FormatTimedeltaTestCase(BaseTestCase):
@@ -102,6 +177,103 @@ class PatternTestCase(BaseTestCase):
                           ['/etc/passwd', '/etc/hosts', '/home', '/home/user/.bashrc'])
         self.assert_equal(self.evaluate(['/etc/', '/var'], ['dmesg']),
                           ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg'])
+
+
+@pytest.mark.skipif(sys.platform in ('darwin',), reason='all but OS X test')
+class PatternNonAsciiTestCase(BaseTestCase):
+    def testComposedUnicode(self):
+        pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
+        i = IncludePattern(pattern)
+        e = ExcludePattern(pattern)
+
+        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert not i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert not e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+
+    def testDecomposedUnicode(self):
+        pattern = 'ba\N{COMBINING ACUTE ACCENT}'
+        i = IncludePattern(pattern)
+        e = ExcludePattern(pattern)
+
+        assert not i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+        assert not e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+    
+    def testInvalidUnicode(self):
+        pattern = str(b'ba\x80', 'latin1')
+        i = IncludePattern(pattern)
+        e = ExcludePattern(pattern)
+
+        assert not i.match("ba/foo")
+        assert i.match(str(b"ba\x80/foo", 'latin1'))
+        assert not e.match("ba/foo")
+        assert e.match(str(b"ba\x80/foo", 'latin1'))
+
+
+@pytest.mark.skipif(sys.platform not in ('darwin',), reason='OS X test')
+class OSXPatternNormalizationTestCase(BaseTestCase):
+    def testComposedUnicode(self):
+        pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
+        i = IncludePattern(pattern)
+        e = ExcludePattern(pattern)
+
+        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+    
+    def testDecomposedUnicode(self):
+        pattern = 'ba\N{COMBINING ACUTE ACCENT}'
+        i = IncludePattern(pattern)
+        e = ExcludePattern(pattern)
+
+        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+    
+    def testInvalidUnicode(self):
+        pattern = str(b'ba\x80', 'latin1')
+        i = IncludePattern(pattern)
+        e = ExcludePattern(pattern)
+
+        assert not i.match("ba/foo")
+        assert i.match(str(b"ba\x80/foo", 'latin1'))
+        assert not e.match("ba/foo")
+        assert e.match(str(b"ba\x80/foo", 'latin1'))
+
+
+def test_compression_specs():
+    with pytest.raises(ValueError):
+        CompressionSpec('')
+    assert CompressionSpec('0') == dict(name='zlib', level=0)
+    assert CompressionSpec('1') == dict(name='zlib', level=1)
+    assert CompressionSpec('9') == dict(name='zlib', level=9)
+    with pytest.raises(ValueError):
+        CompressionSpec('10')
+    assert CompressionSpec('none') == dict(name='none')
+    assert CompressionSpec('lz4') == dict(name='lz4')
+    assert CompressionSpec('zlib') == dict(name='zlib', level=6)
+    assert CompressionSpec('zlib,0') == dict(name='zlib', level=0)
+    assert CompressionSpec('zlib,9') == dict(name='zlib', level=9)
+    with pytest.raises(ValueError):
+        CompressionSpec('zlib,9,invalid')
+    assert CompressionSpec('lzma') == dict(name='lzma', level=6)
+    assert CompressionSpec('lzma,0') == dict(name='lzma', level=0)
+    assert CompressionSpec('lzma,9') == dict(name='lzma', level=9)
+    with pytest.raises(ValueError):
+        CompressionSpec('lzma,9,invalid')
+    with pytest.raises(ValueError):
+        CompressionSpec('invalid')
+
+
+def test_chunkerparams():
+    assert ChunkerParams('19,23,21,4095') == (19, 23, 21, 4095)
+    assert ChunkerParams('10,23,16,4095') == (10, 23, 16, 4095)
+    with pytest.raises(ValueError):
+        ChunkerParams('19,24,21,4095')
 
 
 class MakePathSafeTestCase(BaseTestCase):

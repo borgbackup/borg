@@ -6,6 +6,11 @@ from ..hashindex import NSIndex, ChunkIndex
 from . import BaseTestCase
 
 
+def H(x):
+    # make some 32byte long thing that depends on x
+    return bytes('%-0.32d' % x, 'ascii')
+
+
 class HashIndexTestCase(BaseTestCase):
 
     def _generic_test(self, cls, make_value, sha):
@@ -78,3 +83,20 @@ class HashIndexTestCase(BaseTestCase):
         second_half = list(idx.iteritems(marker=all[49][0]))
         self.assert_equal(len(second_half), 50)
         self.assert_equal(second_half, all[50:])
+
+    def test_chunkindex_merge(self):
+        idx1 = ChunkIndex()
+        idx1[H(1)] = 1, 100, 100
+        idx1[H(2)] = 2, 200, 200
+        idx1[H(3)] = 3, 300, 300
+        # no H(4) entry
+        idx2 = ChunkIndex()
+        idx2[H(1)] = 4, 100, 100
+        idx2[H(2)] = 5, 200, 200
+        # no H(3) entry
+        idx2[H(4)] = 6, 400, 400
+        idx1.merge(idx2)
+        assert idx1[H(1)] == (5, 100, 100)
+        assert idx1[H(2)] == (7, 200, 200)
+        assert idx1[H(3)] == (3, 300, 300)
+        assert idx1[H(4)] == (6, 400, 400)

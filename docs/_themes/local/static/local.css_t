@@ -31,7 +31,7 @@ div.documentwrapper {
   float: right;
   width: 760px;
   padding: 0 20px 20px 20px;
-  color: #00aa00;
+  color: #00cc00;
   background-color: #000000;
   margin-bottom: 2em;
 }
@@ -48,7 +48,7 @@ div.sphinxsidebar {
 
 h1, h2, h3 {
   font-weight: normal;
-  color: #33dd33;
+  color: #33ff33;
 }
 
 h1 {
@@ -99,12 +99,12 @@ div.sphinxsidebar a:link, div.sphinxsidebar a:visited {
 }
 
 div.sphinxsidebar {
-  color: #00aa00;
+  color: #00cc00;
   background: 0000000;
 }
 
 div.sphinxsidebar input {
-  color: #00cc00;
+  color: #00ff00;
   background: 0000000;
   border: 1px solid #444444;
 }
@@ -171,4 +171,3 @@ div.seealso {
   border-radius: .4em;
   box-shadow: 2px 2px #dd6;
 }
-

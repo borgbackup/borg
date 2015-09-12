@@ -8,7 +8,6 @@ This page documents the internal data structures and storage
 mechanisms of |project_name|. It is partly based on `mailing list
 discussion about internals`_ and also on static code analysis.
 
-It may not be exactly up to date with the current source code.
 
 Repository and Archives
 -----------------------
@@ -39,6 +38,32 @@ index.%d
 
 lock.roster and lock.exclusive/*
   used by the locking system to manage shared and exclusive locks
+
+
+Lock files
+----------
+
+|project_name| uses locks to get (exclusive or shared) access to the cache and
+the repository.
+
+The locking system is based on creating a directory `lock.exclusive` (for
+exclusive locks). Inside the lock directory, there is a file indication
+hostname, process id and thread id of the lock holder.
+
+There is also a json file `lock.roster` that keeps a directory of all shared
+and exclusive lockers.
+
+If the process can create the `lock.exclusive` directory for a resource, it has
+the lock for it. If creation fails (because the directory has already been
+created by some other process), lock acquisition fails.
+
+The cache lock is usually in `~/.cache/borg/REPOID/lock.*`.
+The repository lock is in `repository/lock.*`.
+
+In case you run into troubles with the locks, you can just delete the `lock.*`
+directory and file IF you first make sure that no |project_name| process is
+running on any machine that accesses this resource. Be very careful, the cache
+or repository might get damaged if multiple processes use it at the same time.
 
 
 Config file
@@ -125,6 +150,9 @@ Each archive info contains:
 It is the last object stored, in the last segment, and is replaced
 each time.
 
+The Archive
+-----------
+
 The archive metadata does not contain the file items directly. Only
 references to other objects that contain that data. An archive is an
 object that contains:
@@ -136,6 +164,10 @@ object that contains:
 * hostname
 * username
 * time
+
+
+The Item
+--------
 
 Each item represents a file, directory or other fs item and is stored as an
 ``item`` dictionary that contains:
@@ -194,7 +226,7 @@ what files you have based on a specific set of chunk sizes).
 Indexes / Caches
 ----------------
 
-The files cache is stored in ``cache/files`` and is indexed on the
+The **files cache** is stored in ``cache/files`` and is indexed on the
 ``file path hash``. At backup time, it is used to quickly determine whether we
 need to chunk a given file (or whether it is unchanged and we already have all
 its pieces).
@@ -213,7 +245,7 @@ archives in different setups.
 The files cache is stored as a python associative array storing
 python objects, which generates a lot of overhead.
 
-The chunks cache is stored in ``cache/chunks`` and is indexed on the
+The **chunks cache** is stored in ``cache/chunks`` and is indexed on the
 ``chunk id_hash``. It is used to determine whether we already have a specific
 chunk, to count references to it and also for statistics.
 It contains:
@@ -222,7 +254,7 @@ It contains:
 * size
 * encrypted/compressed size
 
-The repository index is stored in ``repo/index.%d`` and is indexed on the
+The **repository index** is stored in ``repo/index.%d`` and is indexed on the
 ``chunk id_hash``. It is used to determine a chunk's location in the repository.
 It contains:
 
@@ -382,10 +414,35 @@ representation of the repository id.
 Compression
 -----------
 
-|project_name| currently always pipes all data through a zlib compressor which
-supports compression levels 0 (no compression, fast) to 9 (high compression, slow).
+|project_name| supports the following compression methods:
+
+- none (no compression, pass through data 1:1)
+- lz4 (low compression, but super fast)
+- zlib (level 0-9, level 0 is no compression [but still adding zlib overhead],
+  level 1 is low, level 9 is high compression)
+- lzma (level 0-9, level 0 is low, level 9 is high compression).
+
+Speed:  none > lz4 > zlib > lzma
+Compression: lzma > zlib > lz4 > none
+
+Be careful, higher zlib and especially lzma compression levels might take a
+lot of resources (CPU and memory).
+
+The overall speed of course also depends on the speed of your target storage.
+If that is slow, using a higher compression level might yield better overall
+performance. You need to experiment a bit. Maybe just watch your CPU load, if
+that is relatively low, increase compression until 1 core is 70-100% loaded.
+
+Even if your target storage is rather fast, you might see interesting effects:
+while doing no compression at all (none) is a operation that takes no time, it
+likely will need to store more data to the storage compared to using lz4.
+The time needed to transfer and store the additional data might be much more
+than if you had used lz4 (which is super fast, but still might compress your
+data about 2:1). This is assuming your data is compressible (if you backup
+already compressed data, trying to compress them at backup time is usually
+pointless).
+
+Compression is applied after deduplication, thus using different compression
+methods in one repo does not influence deduplication.
 
 See ``borg create --help`` about how to specify the compression level and its default.
-
-Note: zlib level 0 creates a little bit more output data than it gets as input,
-due to zlib protocol overhead.

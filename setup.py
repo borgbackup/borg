@@ -14,12 +14,6 @@ if my_python < min_python:
 # Also, we might use some rather recent API features.
 install_requires=['msgpack-python>=0.4.6', ]
 
-if (my_python < (3, 2, 4) or
-    (3, 3, 0) <= my_python < (3, 3, 1)):
-    # argparse in stdlib does not work there due to a bug,
-    # pull a fixed argparse from pypi
-    install_requires.append("argparse>=1.4.0")
-
 
 from setuptools import setup, Extension
 from setuptools.command.sdist import sdist
@@ -161,7 +155,7 @@ setup(
         'Topic :: Security :: Cryptography',
         'Topic :: System :: Archiving :: Backup',
     ],
-    packages=['borg', 'borg.testsuite'],
+    packages=['borg', 'borg.testsuite', 'borg.support', ],
     entry_points={
         'console_scripts': [
             'borg = borg.archiver:main',

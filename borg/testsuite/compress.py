@@ -93,7 +93,7 @@ def test_compressor():
         params_list += [
             dict(name='lzma', level=0, buffer=buffer),
             dict(name='lzma', level=6, buffer=buffer),
-            dict(name='lzma', level=9, buffer=buffer),
+            # we do not test lzma on level 9 because of the huge memory needs
         ]
     for params in params_list:
         c = Compressor(**params)

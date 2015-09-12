@@ -127,7 +127,7 @@ Debian Jessie / Ubuntu 14.04 preparations (git/pypi)
     # in case you get complaints about permission denied on /etc/fuse.conf:
     # on ubuntu this means your user is not in the "fuse" group. just add
     # yourself there, log out and log in again.
-    apt-get install libfuse-dev fuse
+    apt-get install libfuse-dev fuse pkg-config
 
     # optional: for unit testing
     apt-get install fakeroot
@@ -151,7 +151,7 @@ Korora / Fedora 21 preparations (git/pypi)
     sudo dnf install lz4-devel
 
     # optional: FUSE support - to mount backup archives
-    sudo dnf install fuse-devel fuse
+    sudo dnf install fuse-devel fuse pkgconfig
     
     # optional: for unit testing
     sudo dnf install fakeroot

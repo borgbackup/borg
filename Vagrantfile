@@ -1,12 +1,6 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# TODO
-# add pkg-config to sphinx docs, needed for fuse
-# reduce lzma compression level to << 9 in unit tests, needs more memory than vagrant box has
-# /usr/local/include/lz4.h for freebsd - use same code as for finding the openssl headers
-# llfuse <0.41 >0.41.1 broken install due to UnicodeError
-
 def packages_prepare_wheezy
   return <<-EOF
       # debian 7 wheezy does not have lz4, but it is available from wheezy-backports:
@@ -28,7 +22,6 @@ def packages_debianoid
     apt-get install -y libssl-dev libacl1-dev liblz4-dev
     apt-get install -y libfuse-dev fuse pkg-config
     apt-get install -y fakeroot build-essential git
-    apt-get install -y curl
     # this way it works on older dists (like ubuntu 12.04) also:
     easy_install3 pip
     pip3 install virtualenv
@@ -42,7 +35,6 @@ def packages_freebsd
     pkg install -y openssl liblz4
     pkg install -y fusefs-libs pkgconf
     pkg install -y fakeroot git
-    pkg install -y curl
     easy_install-3.4 pip
     pip3 install virtualenv
     # make FUSE work
@@ -100,10 +92,16 @@ end
 Vagrant.configure(2) do |config|
   # use rsync to copy content to the folder
   config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync"
+  # do not let the VM access . on the host machine via the default shared folder!
   config.vm.synced_folder ".", "/vagrant", disabled: true
 
   # fix permissions on synced folder
   config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
+
+  config.vm.provider :virtualbox do |v|
+    v.gui = false
+    v.cpus = 2
+  end
 
   config.vm.define "trusty64" do |b|
     b.vm.box = "ubuntu/trusty64"
@@ -134,12 +132,11 @@ Vagrant.configure(2) do |config|
   # BSD
   config.vm.define "freebsd" do |b|
     b.vm.box = "geoffgarside/freebsd-10.2"
-    #b.vm.base_mac = "11:22:33:44:56:67"
     b.vm.provision "packages freebsd", :type => :shell, :inline => packages_freebsd
     b.vm.provision "prepare user", :type => :shell, :privileged => false, :inline => prepare_user("freebsd")
   end
 
-  # OS X
+  # OS X - TODO: make rsync/ssh work
   config.vm.define "darwin" do |b|
     b.vm.box = "jhcook/yosemite-clitools"
     b.vm.provision "packages darwin", :type => :shell, :privileged => false, :inline => packages_darwin

@@ -264,7 +264,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         st = os.stat(filename)
         self.assert_equal(st.st_size, total_len)
         if sparse_support and hasattr(st, 'st_blocks'):
-            self.assert_true(st.st_blocks * 512 < total_len / 10)  # is input sparse?
+            self.assert_true(st.st_blocks * 512 < total_len / 9)  # is input sparse?
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
         with changedir('output'):
@@ -279,7 +279,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         st = os.stat(filename)
         self.assert_equal(st.st_size, total_len)
         if sparse_support and hasattr(st, 'st_blocks'):
-            self.assert_true(st.st_blocks * 512 < total_len / 10)  # is output sparse?
+            self.assert_true(st.st_blocks * 512 < total_len / 9)  # is output sparse?
 
     def test_unusual_filenames(self):
         filenames = ['normal', 'with some blanks', '(with_parens)', ]

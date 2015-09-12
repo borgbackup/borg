@@ -4,9 +4,21 @@ import sys
 from glob import glob
 
 min_python = (3, 2)
-if sys.version_info < min_python:
+my_python = sys.version_info
+
+if my_python < min_python:
     print("Borg requires Python %d.%d or later" % min_python)
     sys.exit(1)
+
+# msgpack pure python data corruption was fixed in 0.4.6.
+# Also, we might use some rather recent API features.
+install_requires=['msgpack-python>=0.4.6', ]
+
+if (my_python < (3, 2, 4) or
+    (3, 3, 0) <= my_python < (3, 3, 1)):
+    # argparse in stdlib does not work there due to a bug,
+    # pull a fixed argparse from pypi
+    install_requires.append("argparse>=1.4.0")
 
 
 from setuptools import setup, Extension
@@ -158,7 +170,5 @@ setup(
     cmdclass=cmdclass,
     ext_modules=ext_modules,
     setup_requires=['setuptools_scm>=1.7'],
-    # msgpack pure python data corruption was fixed in 0.4.6.
-    # Also, we might use some rather recent API features.
-    install_requires=['msgpack-python>=0.4.6'],
+    install_requires=install_requires,
 )

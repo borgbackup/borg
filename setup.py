@@ -71,14 +71,36 @@ def detect_openssl(prefixes):
                     return prefix
 
 
+def detect_lz4(prefixes):
+    for prefix in prefixes:
+        filename = os.path.join(prefix, 'include', 'lz4.h')
+        if os.path.exists(filename):
+            with open(filename, 'r') as fd:
+                if 'LZ4_decompress_safe' in fd.read():
+                    return prefix
+
+
+include_dirs = []
+library_dirs = []
+
 possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl', '/usr/local/borg', '/opt/local']
 if os.environ.get('BORG_OPENSSL_PREFIX'):
     possible_openssl_prefixes.insert(0, os.environ.get('BORG_OPENSSL_PREFIX'))
 ssl_prefix = detect_openssl(possible_openssl_prefixes)
 if not ssl_prefix:
     raise Exception('Unable to find OpenSSL >= 1.0 headers. (Looked here: {})'.format(', '.join(possible_openssl_prefixes)))
-include_dirs = [os.path.join(ssl_prefix, 'include')]
-library_dirs = [os.path.join(ssl_prefix, 'lib')]
+include_dirs.append(os.path.join(ssl_prefix, 'include'))
+library_dirs.append(os.path.join(ssl_prefix, 'lib'))
+
+
+possible_lz4_prefixes = ['/usr', '/usr/local', '/usr/local/borg', '/opt/local']
+if os.environ.get('BORG_LZ4_PREFIX'):
+    possible_openssl_prefixes.insert(0, os.environ.get('BORG_LZ4_PREFIX'))
+lz4_prefix = detect_lz4(possible_lz4_prefixes)
+if not lz4_prefix:
+    raise Exception('Unable to find LZ4 headers. (Looked here: {})'.format(', '.join(possible_lz4_prefixes)))
+include_dirs.append(os.path.join(lz4_prefix, 'include'))
+library_dirs.append(os.path.join(lz4_prefix, 'lib'))
 
 
 with open('README.rst', 'r') as fd:
@@ -87,7 +109,7 @@ with open('README.rst', 'r') as fd:
 cmdclass = {'build_ext': build_ext, 'sdist': Sdist}
 
 ext_modules = [
-    Extension('borg.compress', [compress_source], libraries=['lz4']),
+    Extension('borg.compress', [compress_source], libraries=['lz4'], include_dirs=include_dirs, library_dirs=library_dirs),
     Extension('borg.crypto', [crypto_source], libraries=['crypto'], include_dirs=include_dirs, library_dirs=library_dirs),
     Extension('borg.chunker', [chunker_source]),
     Extension('borg.hashindex', [hashindex_source])

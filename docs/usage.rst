@@ -69,6 +69,8 @@ Directories:
 Building:
     BORG_OPENSSL_PREFIX
         Adds given OpenSSL header file directory to the default locations (setup.py).
+    BORG_LZ4_PREFIX
+        Adds given LZ4 header file directory to the default locations (setup.py).
 
 
 Please note:

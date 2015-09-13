@@ -15,6 +15,22 @@ def packages_prepare_precise
   EOF
 end
 
+def packages_centos
+  return <<-EOF
+    yum install -y epel-release
+    yum update -y
+    yum install -y python34 python34-devel
+    ln -s /usr/bin/python3.4 /usr/bin/python3
+    yum install -y openssl-devel openssl
+    yum install -y libacl-devel libacl
+    yum install -y lz4-devel
+    yum install -y fuse-devel fuse pkgconfig
+    yum install -y fakeroot gcc git
+    yum install -y python-pip
+    pip install virtualenv
+  EOF
+end
+
 def packages_debianoid
   return <<-EOF
     apt-get update
@@ -121,6 +137,12 @@ Vagrant.configure(2) do |config|
   config.vm.provider :virtualbox do |v|
     #v.gui = true
     v.cpus = 2
+  end
+
+  config.vm.define "centos7" do |b|
+    b.vm.box = "centos/7"
+    b.vm.provision "packages centos7 64", :type => :shell, :inline => packages_centos
+    b.vm.provision "prepare user", :type => :shell, :privileged => false, :inline => prepare_user("centos7_64")
   end
 
   config.vm.define "trusty64" do |b|

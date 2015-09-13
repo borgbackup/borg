@@ -49,11 +49,26 @@ end
 def packages_darwin
   return <<-EOF
     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-    brew update || brew update
-    brew outdated openssl || brew upgrade openssl
-    brew outdated pyenv || brew upgrade pyenv
+    brew update
+    # this installs osxfuse 2.8.0 (which is based on libfuse 2.7.3).
+    # llfuse later complains about needing (libfuse) 2.8.0 at least.
+    #brew install caskroom/cask/brew-cask
+    #brew cask install osxfuse  # needs cask install because of apple's unsigned kext ban
+    # get osxfuse 3.0.x pre-release code from github:
+    curl https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.0.5/osxfuse-3.0.5.dmg -L >osxfuse.dmg
+    MOUNTDIR=$(echo `hdiutil mount osxfuse.dmg | tail -1 | awk '{$1="" ; print $0}'` | xargs -0 echo) \
+    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for OS X 3.0.5.pkg" -target /
+    brew install openssl
     brew install lz4
-    brew install osxfuse
+    # looks dirty, is there a better way without root?:
+    mkdir -p /usr/local/opt/lz4
+    ln -s /usr/local/Cellar/lz4/r*/include /usr/local/opt/lz4/
+    ln -s /usr/local/Cellar/lz4/r*/lib /usr/local/opt/lz4/
+    brew install fakeroot
+    brew install pyenv
+    if which pyenv > /dev/null; then
+        eval "$(pyenv init -)"
+    fi
     pyenv install 3.4.3
     pyenv global 3.4.3
     pyenv rehash
@@ -66,8 +81,13 @@ def prepare_user(boxname)
     echo export 'PATH=/usr/local/bin:$PATH' >> ~/.profile
     . ~/.profile
 
+    # initialize python on darwin
+    if which pyenv > /dev/null; then
+        eval "$(pyenv init -)"
+    fi
+
     cd /vagrant/borg
-    virtualenv --python=python3 borg-env
+    python -m virtualenv --python=python3 borg-env
     . borg-env/bin/activate
 
     cd borg
@@ -99,7 +119,7 @@ Vagrant.configure(2) do |config|
   config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
 
   config.vm.provider :virtualbox do |v|
-    v.gui = false
+    #v.gui = true
     v.cpus = 2
   end
 
@@ -136,7 +156,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "prepare user", :type => :shell, :privileged => false, :inline => prepare_user("freebsd")
   end
 
-  # OS X - TODO: make rsync/ssh work
+  # OS X
   config.vm.define "darwin" do |b|
     b.vm.box = "jhcook/yosemite-clitools"
     b.vm.provision "packages darwin", :type => :shell, :privileged => false, :inline => packages_darwin

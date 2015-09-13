@@ -99,7 +99,7 @@ include_dirs.append(os.path.join(ssl_prefix, 'include'))
 library_dirs.append(os.path.join(ssl_prefix, 'lib'))
 
 
-possible_lz4_prefixes = ['/usr', '/usr/local', '/usr/local/borg', '/opt/local']
+possible_lz4_prefixes = ['/usr', '/usr/local', '/usr/local/opt/lz4', '/usr/local/lz4', '/usr/local/borg', '/opt/local']
 if os.environ.get('BORG_LZ4_PREFIX'):
     possible_openssl_prefixes.insert(0, os.environ.get('BORG_LZ4_PREFIX'))
 lz4_prefix = detect_lz4(possible_lz4_prefixes)

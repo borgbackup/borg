@@ -62,6 +62,28 @@ def packages_freebsd
   EOF
 end
 
+def packages_openbsd
+  return <<-EOF
+    . ~/.profile
+    mkdir -p /home/vagrant/borg
+    rsync -aH /vagrant/borg/ /home/vagrant/borg/
+    rm -rf /vagrant/borg
+    ln -sf /home/vagrant/borg /vagrant/
+    pkg_add bash
+    chsh -s /usr/local/bin/bash vagrant
+    pkg_add python-3.4.2
+    pkg_add py3-setuptools
+    ln -sf /usr/local/bin/python3.4 /usr/local/bin/python3
+    ln -sf /usr/local/bin/python3.4 /usr/local/bin/python
+    pkg_add openssl
+    pkg_add lz4
+    # pkg_add fuse  # does not install, sdl dependency missing
+    pkg_add git  # no fakeroot
+    easy_install-3.4 pip
+    pip3 install virtualenv
+  EOF
+end
+
 def packages_darwin
   return <<-EOF
     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
@@ -176,6 +198,12 @@ Vagrant.configure(2) do |config|
     b.vm.box = "geoffgarside/freebsd-10.2"
     b.vm.provision "packages freebsd", :type => :shell, :inline => packages_freebsd
     b.vm.provision "prepare user", :type => :shell, :privileged => false, :inline => prepare_user("freebsd")
+  end
+
+  config.vm.define "openbsd" do |b|
+    b.vm.box = "bodgit/openbsd-5.7-amd64"
+    b.vm.provision "packages openbsd", :type => :shell, :inline => packages_openbsd
+    b.vm.provision "prepare user", :type => :shell, :privileged => false, :inline => prepare_user("openbsd")
   end
 
   # OS X

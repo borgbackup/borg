@@ -156,7 +156,7 @@ chunker_fill(Chunker *c)
             return 0;
         }
         length = c->bytes_read - offset;
-        #if ( _XOPEN_SOURCE >= 600 || _POSIX_C_SOURCE >= 200112L )
+        #if ( ( _XOPEN_SOURCE >= 600 || _POSIX_C_SOURCE >= 200112L ) && defined(POSIX_FADV_DONTNEED) )
         // We tell the OS that we do not need the data that we just have read any
         // more (that it maybe has in the cache). This avoids that we spoil the
         // complete cache with data that we only read once and (due to cache

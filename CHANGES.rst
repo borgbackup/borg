@@ -7,8 +7,11 @@ Version 0.26.0 (not released yet)
 
 New features:
 
+- Faster cache sync (do all in one pass, remove tar/compression stuff), #163
 - BORG_REPO env var to specify the default repo, #168
 - read special files as if they were regular files, #79
+- implement borg create --dry-run, attic issue #267
+- Normalize paths before pattern matching on OS X, #143
 
 Bug fixes:
 
@@ -16,11 +19,30 @@ Bug fixes:
 - chunker: use off_t to get 64bit on 32bit platform, #178
 - initialize chunker fd to -1, so it's not equal to STDIN_FILENO (0)
 - fix reaction to "no" answer at delete repo prompt, #182
+- setup.py: detect lz4.h header file location
+- to support python < 3.2.4, add less buggy argparse lib from 3.2.6 (#194)
+- fix for obtaining 'char *' from temporary Python value (old code causes
+  a compile error on Mint 17.2)
+- llfuse 0.41 install troubles on some platforms, require < 0.41
+  (UnicodeDecodeError exception due to non-ascii llfuse setup.py)
+- cython code: add some int types to get rid of unspecific python add /
+  subtract operations (avoid undefined symbol FPE_... error on some platforms)
+- fix verbose mode display of stdin backup
 
 Other changes:
 
 - detect inconsistency / corruption / hash collision, #170
 - replace versioneer with setuptools_scm, #106
+- docs: pkg-config is needed for llfuse installation
+- xattr tests: ignore security.selinux attribute showing up
+- fix tests on ext3, seems to need a bit more space for a sparse file
+- do not test lzma level 9 compression (avoid MemoryError)
+- use vagrant to do easy cross-platform testing (#196), currently:
+  debian 7 wheezy 32bit, debian 8 jessie 64bit
+  ubuntu 12.04 32bit, ubuntu 14.04 64bit
+  centos 7 64bit
+  freebsd 10.2
+  darwin (OS X Yosemite)
 
 
 Version 0.25.0

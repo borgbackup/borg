@@ -162,7 +162,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # Directory
         self.create_regular_file('dir2/file2', size=1024 * 80)
         # File mode
-        os.chmod('input/file1', 0o6755)
+        os.chmod('input/file1', 0o4755)
         # Hard link
         os.link(os.path.join(self.input_path, 'file1'),
                 os.path.join(self.input_path, 'hardlink'))

@@ -1,6 +1,24 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
+# Automated creation of testing environments on misc. platforms
+# Usage:
+#   vagrant up OS
+#   vagrant ssh OS command
+#   vagrant halt OS
+#
+# packages_OS goals:
+# - have all dependencies installed
+# - have a working "virtualenv" command
+# - have a working "python3" command
+#
+# packages_prepare_OS goals: (for some older OS)
+# - adds additional package sources, so packages_OS can find all it needs.
+#
+# prepare_user goals:
+# - have a working "borg-env" virtual env installed, with code from "borg".
+#   both directories are in /vagrant/borg/.
+
 def packages_prepare_wheezy
   return <<-EOF
       # debian 7 wheezy does not have lz4, but it is available from wheezy-backports:
@@ -92,12 +110,18 @@ def packages_netbsd
   #cd pkgsrc/bootstrap
   #./bootstrap
   #PATH="/usr/pkg/sbin:$PATH"
+  hostname netbsd  # the box we use has an invalid hostname
   PKG_PATH="ftp://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/amd64/6.1.5/All/"
   export PKG_PATH
   pkg_add python34 py34-setuptools
   ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python
   ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python3
   pkg_add mozilla-rootcerts lz4 git
+  mkdir -p /usr/local/opt/lz4/include
+  mkdir -p /usr/local/opt/lz4/lib
+  ln -s /usr/pkg/include/lz4*.h /usr/local/opt/lz4/include/
+  ln -s /usr/pkg/lib/liblz4* /usr/local/opt/lz4/lib/
+  touch /etc/openssl/openssl.cnf  # avoids a flood of "can't open ..."
   mozilla-rootcerts install
   #pkg_add pkg-config fuse-2.9.3  # llfuse does not support netbsd
   easy_install-3.4 pip
@@ -131,7 +155,7 @@ def packages_darwin
     pyenv install 3.4.3
     pyenv global 3.4.3
     pyenv rehash
-    python -m pip install --user virtualenv
+    python -m pip install virtualenv
   EOF
 end
 
@@ -146,11 +170,12 @@ def prepare_user(boxname)
     fi
 
     cd /vagrant/borg
-    python -m virtualenv --python=python3 borg-env
+    #python -m virtualenv --python=python3 borg-env
+    virtualenv --python=python3 borg-env
     . borg-env/bin/activate
 
     cd borg
-    pip install -U pip setuptools
+    # pip install -U pip setuptools  # we fetch a current virtualenv, so these are fresh also
     pip install 'llfuse<0.41'  # 0.41 does not install due to UnicodeDecodeError
     pip install -r requirements.d/development.txt
     pip install -e .

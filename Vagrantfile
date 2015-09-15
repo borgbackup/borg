@@ -84,6 +84,27 @@ def packages_openbsd
   EOF
 end
 
+def packages_netbsd
+  # ftp://ftp.netbsd.org/pub/pkgsrc/packages/NetBSD/amd64/6.1.5/All/
+  return <<-EOF
+  #ftp ftp://ftp.NetBSD.org/pub/pkgsrc/current/pkgsrc.tar.gz
+  #tar xzf pkgsrc.tar.gz
+  #cd pkgsrc/bootstrap
+  #./bootstrap
+  #PATH="/usr/pkg/sbin:$PATH"
+  PKG_PATH="ftp://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/amd64/6.1.5/All/"
+  export PKG_PATH
+  pkg_add python34 py34-setuptools
+  ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python
+  ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python3
+  pkg_add mozilla-rootcerts lz4 git
+  mozilla-rootcerts install
+  #pkg_add pkg-config fuse-2.9.3  # llfuse does not support netbsd
+  easy_install-3.4 pip
+  pip install virtualenv
+  EOF
+end
+
 def packages_darwin
   return <<-EOF
     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
@@ -204,6 +225,15 @@ Vagrant.configure(2) do |config|
     b.vm.box = "bodgit/openbsd-5.7-amd64"
     b.vm.provision "packages openbsd", :type => :shell, :inline => packages_openbsd
     b.vm.provision "prepare user", :type => :shell, :privileged => false, :inline => prepare_user("openbsd")
+  end
+
+  config.vm.define "netbsd" do |b|
+    #b.vm.box = "Kralian/netbsd_6.1.5_amd64"
+    b.vm.box = "alex-skimlinks/netbsd-6.1.5-amd64"
+    b.ssh.shell = "ksh -l"
+    #b.ssh.shell = "sh"
+    b.vm.provision "packages netbsd", :type => :shell, :inline => packages_netbsd
+    b.vm.provision "prepare user", :type => :shell, :privileged => false, :inline => prepare_user("netbsd")
   end
 
   # OS X

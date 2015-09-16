@@ -6,6 +6,7 @@ Frequently asked questions
 
 Which platforms are supported?
     Currently Linux, FreeBSD and MacOS X are supported.
+    OpenBSD and NetBSD work also, except for xattrs and ACLs.
 
     You can try your luck on other POSIX-like systems, like Cygwin,
     other BSDs, etc. but they are not officially supported.

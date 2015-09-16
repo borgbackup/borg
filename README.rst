@@ -65,7 +65,7 @@ Main features
 
 **Platforms Borg works on**
   * Linux
-  * FreeBSD
+  * FreeBSD, OpenBSD, NetBSD
   * Mac OS X
   * Cygwin (unsupported)
 

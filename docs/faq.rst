@@ -41,7 +41,7 @@ Which file types, attributes, etc. are preserved?
     * User ID of owner
     * Group ID of owner
     * Unix Mode/Permissions (u/g/o permissions, suid, sgid, sticky)
-    * Extended Attributes (xattrs)
+    * Extended Attributes (xattrs) on Linux, OS X and FreeBSD
     * Access Control Lists (ACL_) on Linux, OS X and FreeBSD
     * BSD flags on OS X and FreeBSD
 

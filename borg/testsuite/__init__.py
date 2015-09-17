@@ -2,6 +2,7 @@ from contextlib import contextmanager
 import filecmp
 import os
 import posix
+import stat
 import sys
 import sysconfig
 import time
@@ -72,6 +73,11 @@ class BaseTestCase(unittest.TestCase):
                 attrs.append('st_nlink')
             d1 = [filename] + [getattr(s1, a) for a in attrs]
             d2 = [filename] + [getattr(s2, a) for a in attrs]
+            # ignore st_rdev if file is not a block/char device, fixes #203
+            if not stat.S_ISCHR(d1[1]) and not stat.S_ISBLK(d1[1]):
+                d1[4] = None
+            if not stat.S_ISCHR(d2[1]) and not stat.S_ISBLK(d2[1]):
+                d2[4] = None
             if not os.path.islink(path1) or utime_supports_fd:
                 # Older versions of llfuse do not support ns precision properly
                 if fuse and not have_fuse_mtime_ns:

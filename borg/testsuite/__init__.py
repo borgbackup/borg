@@ -28,6 +28,8 @@ elif 'HAVE_UTIMES' in sysconfig.get_config_vars():
 else:
     st_mtime_ns_round = -9
 
+if sys.platform.startswith('netbsd'):
+    st_mtime_ns_round = -4  # only >1 microsecond resolution here?
 
 has_mtime_ns = sys.version >= '3.3'
 utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})

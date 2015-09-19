@@ -862,6 +862,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         If a prefix is set with -p, then only archives that start with the prefix are
         considered for deletion and only those archives count towards the totals
         specified by the rules.
+        Otherwise, *all* archives in the repository are candidates for deletion!
         """)
         subparser = subparsers.add_parser('prune', parents=[common_parser],
                                           description=self.do_prune.__doc__,

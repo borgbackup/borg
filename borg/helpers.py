@@ -250,6 +250,7 @@ class IncludePattern:
     path match as well.  A trailing slash makes no difference.
     """
     def __init__(self, pattern):
+        self.pattern_orig = pattern
         self.match_count = 0
 
         if sys.platform in ('darwin',):
@@ -267,12 +268,16 @@ class IncludePattern:
     def __repr__(self):
         return '%s(%s)' % (type(self), self.pattern)
 
+    def __str__(self):
+        return self.pattern_orig
+
 
 class ExcludePattern(IncludePattern):
     """Shell glob patterns to exclude.  A trailing slash means to
     exclude the contents of a directory, but not the directory itself.
     """
     def __init__(self, pattern):
+        self.pattern_orig = pattern
         self.match_count = 0
 
         if pattern.endswith(os.path.sep):
@@ -296,6 +301,9 @@ class ExcludePattern(IncludePattern):
 
     def __repr__(self):
         return '%s(%s)' % (type(self), self.pattern)
+
+    def __str__(self):
+        return self.pattern_orig
 
 
 def timestamp(s):

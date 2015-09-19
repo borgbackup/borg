@@ -65,7 +65,7 @@ except ImportError:
     if not all(os.path.exists(path) for path in [
         compress_source, crypto_source, chunker_source, hashindex_source,
         platform_linux_source, platform_freebsd_source]):
-        raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version')
+        raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 
 
 def detect_openssl(prefixes):

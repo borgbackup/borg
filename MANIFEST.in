@@ -1,4 +1,4 @@
-include README.rst AUTHORS LICENSE CHANGES.rst MANIFEST.in versioneer.py
+include README.rst AUTHORS LICENSE CHANGES.rst MANIFEST.in
 recursive-include borg *.pyx
 recursive-include docs *
 recursive-exclude docs *.pyc

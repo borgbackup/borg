@@ -490,18 +490,20 @@ class Location:
     """Object representing a repository / archive location
     """
     proto = user = host = port = path = archive = None
+    # borg mount's FUSE filesystem creates one level of directories from
+    # the archive names. Thus, we must not accept "/" in archive names.
     ssh_re = re.compile(r'(?P<proto>ssh)://(?:(?P<user>[^@]+)@)?'
                         r'(?P<host>[^:/#]+)(?::(?P<port>\d+))?'
-                        r'(?P<path>[^:]+)(?:::(?P<archive>.+))?$')
+                        r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
     file_re = re.compile(r'(?P<proto>file)://'
-                         r'(?P<path>[^:]+)(?:::(?P<archive>.+))?$')
+                         r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
     scp_re = re.compile(r'((?:(?P<user>[^@]+)@)?(?P<host>[^:/]+):)?'
-                        r'(?P<path>[^:]+)(?:::(?P<archive>.+))?$')
+                        r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
     # get the repo from BORG_RE env and the optional archive from param.
     # if the syntax requires giving REPOSITORY (see "borg mount"),
     # use "::" to let it use the env var.
     # if REPOSITORY argument is optional, it'll automatically use the env.
-    env_re = re.compile(r'(?:::(?P<archive>.+)?)?$')
+    env_re = re.compile(r'(?:::(?P<archive>[^/]+)?)?$')
 
     def __init__(self, text=''):
         self.orig = text

@@ -4,4 +4,6 @@ recursive-include docs *
 recursive-exclude docs *.pyc
 recursive-exclude docs *.pyo
 prune docs/_build
+prune .travis
+exclude .coveragerc .gitattributes .gitignore .travis.yml Vagrantfile
 include borg/_version.py

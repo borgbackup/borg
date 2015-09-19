@@ -21,7 +21,7 @@ from .repository import Repository
 from .cache import Cache
 from .key import key_creator
 from .helpers import Error, location_validator, format_time, format_file_size, \
-    format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
+    format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     is_cachedir, bigint_to_int, ChunkerParams, CompressionSpec
@@ -286,6 +286,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         if not args.dry_run:
             while dirs:
                 archive.extract_item(dirs.pop(-1))
+        for pattern in patterns:
+            if isinstance(pattern, IncludePattern) and  pattern.match_count == 0:
+                self.print_error("Warning: Include pattern '%s' never matched.", pattern)
         return self.exit_code
 
     def do_rename(self, args):

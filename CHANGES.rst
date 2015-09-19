@@ -1,8 +1,8 @@
 Borg Changelog
 ==============
 
-Version 0.26.0 (not released yet)
----------------------------------
+Version 0.26.0
+--------------
 
 New features:
 
@@ -39,22 +39,27 @@ Other changes:
 
 - detect inconsistency / corruption / hash collision, #170
 - replace versioneer with setuptools_scm, #106
-- docs: pkg-config is needed for llfuse installation
-- help/docs: be more clear about pruning, attic issue #132
-- xattr tests: ignore security.selinux attribute showing up
-- fix tests on ext3, seems to need a bit more space for a sparse file
-- do not test lzma level 9 compression (avoid MemoryError)
-- tests: work around strange mtime granularity issue on netbsd, fixes #204
-- tests: ignore st_rdev if file is not a block/char device, fixes #203
-- test setup: stay away from the setgid and sticky mode bits
+- docs:
+
+  - pkg-config is needed for llfuse installation
+  - be more clear about pruning, attic issue #132
+- unit tests:
+
+  - xattr: ignore security.selinux attribute showing up
+  - ext3 seems to need a bit more space for a sparse file
+  - do not test lzma level 9 compression (avoid MemoryError)
+  - work around strange mtime granularity issue on netbsd, fixes #204
+  - ignore st_rdev if file is not a block/char device, fixes #203
+  - stay away from the setgid and sticky mode bits
 - use Vagrant to do easy cross-platform testing (#196), currently:
-  Debian 7 "wheezy" 32bit, Debian 8 "jessie" 64bit
-  Ubuntu 12.04 32bit, Ubuntu 14.04 64bit
-  Centos 7 64bit
-  FreeBSD 10.2 64bit
-  OpenBSD 5.7 64bit
-  NetBSD 6.1.5 64bit
-  Darwin (OS X Yosemite)
+
+  - Debian 7 "wheezy" 32bit, Debian 8 "jessie" 64bit
+  - Ubuntu 12.04 32bit, Ubuntu 14.04 64bit
+  - Centos 7 64bit
+  - FreeBSD 10.2 64bit
+  - OpenBSD 5.7 64bit
+  - NetBSD 6.1.5 64bit
+  - Darwin (OS X Yosemite)
 
 
 Version 0.25.0

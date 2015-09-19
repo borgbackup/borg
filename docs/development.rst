@@ -80,11 +80,12 @@ Checklist::
 - is Travis CI happy also?
 - update CHANGES.rst (compare to git log). check version number of upcoming release.
 - check MANIFEST.in and setup.py - are they complete?
-- cd docs ; make html  # to update the usage include files
 - tag the release::
 
   git tag -s -m "tagged release" 0.26.0
 
+- cd docs ; make html  # to update the usage include files
+- update website with the html
 - create a release on PyPi::
 
     python setup.py register sdist upload --identity="Thomas Waldmann" --sign

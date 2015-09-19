@@ -1,7 +1,6 @@
 Borg Changelog
 ==============
 
-
 Version 0.26.0 (not released yet)
 ---------------------------------
 
@@ -12,6 +11,8 @@ New features:
 - read special files as if they were regular files, #79
 - implement borg create --dry-run, attic issue #267
 - Normalize paths before pattern matching on OS X, #143
+- support OpenBSD and NetBSD (except xattrs/ACLs)
+- support / run tests on Python 3.5
 
 Bug fixes:
 
@@ -28,21 +29,32 @@ Bug fixes:
 - cython code: add some int types to get rid of unspecific python add /
   subtract operations (avoid undefined symbol FPE_... error on some platforms)
 - fix verbose mode display of stdin backup
+- extract: warn if a include pattern never matched, fixes #209,
+  implement counters for Include/ExcludePatterns
+- archive names with slashes are invalid, attic issue #180
+- chunker: add a check whether the POSIX_FADV_DONTNEED constant is defined -
+  fixes building on OpenBSD.
 
 Other changes:
 
 - detect inconsistency / corruption / hash collision, #170
 - replace versioneer with setuptools_scm, #106
 - docs: pkg-config is needed for llfuse installation
+- help/docs: be more clear about pruning, attic issue #132
 - xattr tests: ignore security.selinux attribute showing up
 - fix tests on ext3, seems to need a bit more space for a sparse file
 - do not test lzma level 9 compression (avoid MemoryError)
-- use vagrant to do easy cross-platform testing (#196), currently:
-  debian 7 wheezy 32bit, debian 8 jessie 64bit
-  ubuntu 12.04 32bit, ubuntu 14.04 64bit
-  centos 7 64bit
-  freebsd 10.2
-  darwin (OS X Yosemite)
+- tests: work around strange mtime granularity issue on netbsd, fixes #204
+- tests: ignore st_rdev if file is not a block/char device, fixes #203
+- test setup: stay away from the setgid and sticky mode bits
+- use Vagrant to do easy cross-platform testing (#196), currently:
+  Debian 7 "wheezy" 32bit, Debian 8 "jessie" 64bit
+  Ubuntu 12.04 32bit, Ubuntu 14.04 64bit
+  Centos 7 64bit
+  FreeBSD 10.2 64bit
+  OpenBSD 5.7 64bit
+  NetBSD 6.1.5 64bit
+  Darwin (OS X Yosemite)
 
 
 Version 0.25.0

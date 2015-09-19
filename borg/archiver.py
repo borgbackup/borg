@@ -286,7 +286,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         if not args.dry_run:
             while dirs:
                 archive.extract_item(dirs.pop(-1))
-        for pattern in patterns:
+        for pattern in (patterns or []):
             if isinstance(pattern, IncludePattern) and  pattern.match_count == 0:
                 self.print_error("Warning: Include pattern '%s' never matched.", pattern)
         return self.exit_code

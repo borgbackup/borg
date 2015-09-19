@@ -51,6 +51,7 @@ Important notes:
 
 - When using -- to give options to py.test, you MUST also give borg.testsuite[.module].
 
+
 Building the docs with Sphinx
 -----------------------------
 
@@ -66,3 +67,32 @@ Now run::
   make html
 
 Then point a web browser at docs/_build/html/index.html.
+
+
+Creating a new release
+----------------------
+
+Checklist::
+
+- all issues for this milestone closed?
+- any low hanging fruit left on the issue tracker?
+- run tox on all supported platforms via vagrant, check for test fails.
+- is Travis CI happy also?
+- update CHANGES.rst (compare to git log). check version number of upcoming release.
+- check MANIFEST.in and setup.py - are they complete?
+- tag the release::
+
+  git tag -s -m "tagged release" 0.26.0
+
+- create a release on PyPi::
+
+    python setup.py register sdist upload --identity="Thomas Waldmann" --sign
+
+- close release milestone.
+- announce on::
+
+  - mailing list
+  - Twitter
+  - IRC channel (topic)
+
+- create binary wheels and link them from issue tracker: https://github.com/borgbackup/borg/issues/147

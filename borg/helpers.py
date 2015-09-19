@@ -242,6 +242,7 @@ def normalized(func):
         # always have to enter an exact match
         return func
 
+
 class IncludePattern:
     """Literal files or directories listed on the command line
     for some operations (e.g. extract, but not create).
@@ -249,6 +250,9 @@ class IncludePattern:
     path match as well.  A trailing slash makes no difference.
     """
     def __init__(self, pattern):
+        self.pattern_orig = pattern
+        self.match_count = 0
+
         if sys.platform in ('darwin',):
             pattern = unicodedata.normalize("NFD", pattern)
 
@@ -256,10 +260,16 @@ class IncludePattern:
 
     @normalized
     def match(self, path):
-        return (path+os.path.sep).startswith(self.pattern)
+        matches = (path+os.path.sep).startswith(self.pattern)
+        if matches:
+            self.match_count += 1
+        return matches
 
     def __repr__(self):
         return '%s(%s)' % (type(self), self.pattern)
+
+    def __str__(self):
+        return self.pattern_orig
 
 
 class ExcludePattern(IncludePattern):
@@ -267,6 +277,9 @@ class ExcludePattern(IncludePattern):
     exclude the contents of a directory, but not the directory itself.
     """
     def __init__(self, pattern):
+        self.pattern_orig = pattern
+        self.match_count = 0
+
         if pattern.endswith(os.path.sep):
             self.pattern = os.path.normpath(pattern).rstrip(os.path.sep)+os.path.sep+'*'+os.path.sep
         else:
@@ -281,10 +294,16 @@ class ExcludePattern(IncludePattern):
 
     @normalized
     def match(self, path):
-        return self.regex.match(path+os.path.sep) is not None
+        matches = self.regex.match(path+os.path.sep) is not None
+        if matches:
+            self.match_count += 1
+        return matches
 
     def __repr__(self):
         return '%s(%s)' % (type(self), self.pattern)
+
+    def __str__(self):
+        return self.pattern_orig
 
 
 def timestamp(s):

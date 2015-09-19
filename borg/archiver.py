@@ -718,7 +718,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='do not create a backup archive')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
-                               help='archive to create')
+                               help='name of archive to create (must be also a valid directory name)')
         subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
                                help='paths to archive')
 

@@ -81,6 +81,11 @@ class TestLocationWithoutEnv:
         with pytest.raises(ValueError):
             Location('ssh://localhost:22/path:archive')
 
+    def test_no_slashes(self, monkeypatch):
+        monkeypatch.delenv('BORG_REPO', raising=False)
+        with pytest.raises(ValueError):
+            Location('/some/path/to/repo::archive_name_with/slashes/is_invalid')
+
     def test_canonical_path(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
         locations = ['some/path::archive', 'file://some/path::archive', 'host:some/path::archive',
@@ -133,6 +138,11 @@ class TestLocationWithEnv:
                "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='archive')"
         assert repr(Location()) == \
                "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive=None)"
+
+    def test_no_slashes(self, monkeypatch):
+        monkeypatch.setenv('BORG_REPO', '/some/absolute/path')
+        with pytest.raises(ValueError):
+            Location('::archive_name_with/slashes/is_invalid')
 
 
 class FormatTimedeltaTestCase(BaseTestCase):

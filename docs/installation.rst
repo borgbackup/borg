@@ -8,7 +8,7 @@ Installation
 
 * Python_ >= 3.2
 * OpenSSL_ >= 1.0.0
-* libacl_
+* libacl_ (that pulls in libattr_ also)
 * liblz4_
 * some python dependencies, see install_requires in setup.py
 

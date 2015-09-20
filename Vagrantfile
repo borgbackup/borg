@@ -11,6 +11,7 @@
 # - have all dependencies installed
 # - have a working "virtualenv" command
 # - have a working "python3" command
+# - have a working "python3.4" command on platforms where we build a binary
 #
 # packages_prepare_OS goals: (for some older OS)
 # - adds additional package sources, so packages_OS can find all it needs.
@@ -18,6 +19,8 @@
 # prepare_user goals:
 # - have a working "borg-env" virtual env installed, with code from "borg".
 #   both directories are in /vagrant/borg/.
+# - have a working "borg-env34" virtual env installed, with code from "borg"
+#   and pyinstaller.
 
 def packages_prepare_wheezy
   return <<-EOF
@@ -30,6 +33,15 @@ def packages_prepare_precise
   return <<-EOF
       # ubuntu 12.04 precise does not have lz4, but it is available from a ppa:
       add-apt-repository -y ppa:gezakovacs/lz4
+      # we build the 32bit binary here also, using pyinstaller and py3.4.
+      add-apt-repository -y ppa:fkrull/deadsnakes
+  EOF
+end
+
+def packages_prepare_trusty
+  return <<-EOF
+      # we build the 64bit binary here also, using pyinstaller and py3.4.
+      add-apt-repository -y ppa:fkrull/deadsnakes
   EOF
 end
 
@@ -52,7 +64,9 @@ end
 def packages_debianoid
   return <<-EOF
     apt-get update
+    apt-get install -y python-dev  # pyinstaller needs py2
     apt-get install -y python3-dev python3-setuptools
+    apt-get install -y python3.4-dev  # for pyinstaller / binary building
     apt-get install -y libssl-dev libacl1-dev liblz4-dev
     apt-get install -y libfuse-dev fuse pkg-config
     apt-get install -y fakeroot build-essential git
@@ -170,15 +184,25 @@ def prepare_user(boxname)
     fi
 
     cd /vagrant/borg
-    #python -m virtualenv --python=python3 borg-env
+    # this is the env with the STANDARD python3.x on this platform
     virtualenv --python=python3 borg-env
     . borg-env/bin/activate
-
     cd borg
-    # pip install -U pip setuptools  # we fetch a current virtualenv, so these are fresh also
     pip install 'llfuse<0.41'  # 0.41 does not install due to UnicodeDecodeError
     pip install -r requirements.d/development.txt
     pip install -e .
+
+    # on some platforms, we build a borg binary (and use py3.4 for it)
+    if which python3.4 > /dev/null; then
+        cd /vagrant/borg
+        virtualenv --python=python3.4 borg-env34
+        . borg-env34/bin/activate
+        cd borg
+        pip install 'PyInstaller==3.0.dev2'
+        pip install 'llfuse<0.41'  # 0.41 does not install due to UnicodeDecodeError
+        pip install -r requirements.d/development.txt
+        pip install -e .
+    fi
 
     echo
     echo "Run:"
@@ -189,6 +213,7 @@ end
 
 def fix_perms
   return <<-EOF
+    . ~/.profile
     chown -R vagrant /vagrant/borg
   EOF
 end
@@ -215,6 +240,7 @@ Vagrant.configure(2) do |config|
 
   config.vm.define "trusty64" do |b|
     b.vm.box = "ubuntu/trusty64"
+    b.vm.provision "packages prepare trusty", :type => :shell, :inline => packages_prepare_trusty
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "prepare user", :type => :shell, :privileged => false, :inline => prepare_user("trusty64")
   end

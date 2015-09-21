@@ -166,7 +166,7 @@ def packages_darwin
     if which pyenv > /dev/null; then
         eval "$(pyenv init -)"
     fi
-    pyenv install 3.4.3
+    env PYTHON_CONFIGURE_OPTS="--enable-framework" pyenv install 3.4.3
     pyenv global 3.4.3
     pyenv rehash
     python -m pip install virtualenv

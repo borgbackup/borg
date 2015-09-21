@@ -98,3 +98,35 @@ Checklist::
   - IRC channel (topic)
 
 - create binary wheels and link them from issue tracker: https://github.com/borgbackup/borg/issues/147
+- create standalone binaries and link them from issue tracker: https://github.com/borgbackup/borg/issues/214
+
+
+Creating binary wheels
+----------------------
+
+With virtual env activated::
+
+    pip install wheel
+    python setup.py bdist_wheel
+    ls -l dist/*.whl
+
+Note: Binary wheels are rather specific for the platform they get built on.
+      E.g. a wheel built for Ubuntu 14.04 64bit likely will not work on Centos7 64bit.
+
+
+Creating standalone binaries
+----------------------------
+
+With virtual env activated::
+
+  pip install pyinstaller==3.0.dev2  # or a later 3.x release
+  pyinstaller -F -n borg-PLATFORM borg/__main__.py
+  ls -l dist/*
+
+On less good supported platforms than Linux, there might be issues with pyinstaller
+not finding the dynamic python library (libpython*) or with pyinstaller not having
+a pre-compiled "bootloader" for the platform or with not supporting the platform at
+all.
+
+Note: Standalone binaries built with pyinstaller are supposed to work on same OS,
+      same architecture (x86 32bit, amd64 64bit) without external dependencies.

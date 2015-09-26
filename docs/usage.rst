@@ -214,12 +214,6 @@ Examples
     # Even slower, even higher compression (N = 0..9)
     $ borg create --compression lzma,N /mnt/backup::repo ~
 
-    # Backup some LV snapshots (you have to create the snapshots before this
-    # and remove them afterwards). We also backup the output of lvdisplay so
-    # we can see the LV sizes at restore time. See also "borg extract" examples.
-    $ lvdisplay > lvdisplay.txt
-    $ borg create --read-special /mnt/backup::repo lvdisplay.txt /dev/vg0/*-snapshot
-
 .. include:: usage/extract.rst.inc
 
 Examples
@@ -237,11 +231,6 @@ Examples
 
     # Extract the "src" directory but exclude object files
     $ borg extract /mnt/backup::my-files home/USERNAME/src --exclude '*.o'
-
-    # Restore LV snapshots (the target LVs /dev/vg0/* of correct size have
-    # to be already available and will be overwritten by this command!)
-    $ borg extract --stdout /mnt/backup::repo dev/vg0/root-snapshot > /dev/vg0/root
-    $ borg extract --stdout /mnt/backup::repo dev/vg0/home-snapshot > /dev/vg0/home
 
 Note: currently, extract always writes into the current working directory ("."),
       so make sure you ``cd`` to the right place before calling ``borg extract``.
@@ -356,4 +345,71 @@ Examples
     # This will help to secure an automated remote backup system.
     $ cat ~/.ssh/authorized_keys
     command="borg serve --restrict-to-path /mnt/backup" ssh-rsa AAAAB3[...]
+
+
+Additional Notes
+================
+
+Here are misc. notes about topics that are maybe not covered in enough detail in the usage section.
+
+--read-special
+--------------
+
+The option --read-special is not intended for normal, filesystem-level (full or
+partly-recursive) backups. You only give this option if you want to do something
+rather ... special - and if you have hand-picked some files that you want to treat
+that way.
+
+`borg create --read-special` will open all files without doing any special treatment
+according to the file type (the only exception here are directories: they will be
+recursed into). Just imagine what happens if you do `cat filename` - the content
+you will see there is what borg will backup for that filename.
+
+So, for example, symlinks will be followed, block device content will be read,
+named pipes / UNIX domain sockets will be read.
+
+You need to be careful with what you give as filename when using --read-special,
+e.g. if you give /dev/zero, your backup will never terminate.
+
+The given files' metadata is saved as it would be saved without --read-special
+(e.g. its name, its size [might be 0], its mode, etc.) - but additionally, also
+the content read from it will be saved for it.
+
+Restoring such files' content is currently only supported one at a time via --stdout
+option (and you have to redirect stdout to where ever it shall go, maybe directly
+into an existing device file of your choice or indirectly via dd).
+
+Example
+~~~~~~~
+
+Imagine you have made some snapshots of logical volumes (LVs) you want to backup.
+
+Note: For some scenarios, this is a good method to get "crash-like" consistency
+(I call it crash-like because it is the same as you would get if you just hit the
+reset button or your machine would abrubtly and completely crash).
+This is better than no consistency at all and a good method for some use cases,
+but likely not good enough if you have databases running.
+
+Then you create a backup archive of all these snapshots. The backup process will
+see a "frozen" state of the logical volumes, while the processes working in the
+original volumes continue changing the data stored there.
+
+You also add the output of `lvdisplay` to your backup, so you can see the LV sizes
+in case you ever need to recreate and restore them.
+
+After the backup has completed, you remove the snapshots again.
+
+::
+    $ # create snapshots here
+    $ lvdisplay > lvdisplay.txt
+    $ borg create --read-special /mnt/backup::repo lvdisplay.txt /dev/vg0/*-snapshot
+    $ # remove snapshots here
+
+Now, let's see how to restore some LVs from such a backup.
+
+    $ borg extract /mnt/backup::repo lvdisplay.txt
+    $ # create empty LVs with correct sizes here (look into lvdisplay.txt).
+    $ # we assume that you created an empty root and home LV and overwrite it now:
+    $ borg extract --stdout /mnt/backup::repo dev/vg0/root-snapshot > /dev/vg0/root
+    $ borg extract --stdout /mnt/backup::repo dev/vg0/home-snapshot > /dev/vg0/home
 

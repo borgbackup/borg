@@ -1,6 +1,19 @@
 Borg Changelog
 ==============
 
+Version 0.26.1
+--------------
+
+This is a minor update, just docs and new pyinstaller binaries.
+
+- docs update about python and binary requirements
+- better docs for --read-special, fix #220
+- re-built the binaries, fix #218 and #213 (glibc version issue)
+- update web site about single-file pyinstaller binaries
+
+Note: if you did a python-based installation, there is no need to upgrade.
+
+
 Version 0.26.0
 --------------
 

@@ -4,9 +4,15 @@
 Installation
 ============
 
-|project_name| requires:
+|project_name| pyinstaller binary installation requires:
 
-* Python_ >= 3.2
+* Linux: glibc >= 2.12 (ok for most supported Linux releases)
+* MacOS X: 10.10 (unknown whether it works for older releases)
+* FreeBSD: 10.2 (unknown whether it works for older releases)
+
+|project_name| non-binary installation requires:
+
+* Python_ >= 3.2.2
 * OpenSSL_ >= 1.0.0
 * libacl_ (that pulls in libattr_ also)
 * liblz4_
@@ -21,6 +27,8 @@ Below, we describe different ways to install |project_name|.
 
 - **dist package** - easy and fast, needs a distribution and platform specific
   binary package (for your Linux/*BSD/OS X/... distribution).
+- **pyinstaller binary** - easy and fast, we provide a ready-to-use binary file
+  that just works on the supported platforms
 - **wheel** - easy and fast, needs a platform specific borgbackup binary wheel,
   which matches your platform [OS and CPU]).
 - **pypi** - installing a source package from pypi needs more installation steps
@@ -74,8 +82,8 @@ and compare that to our latest release and review the change log (see links on
 our web site).
 
 
-Installation (binary)
----------------------
+Installation (pyinstaller binary)
+---------------------------------
 For some platforms we offer a ready-to-use standalone borg binary.
 
 It is supposed to work without requiring installation or preparations.

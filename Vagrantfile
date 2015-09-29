@@ -1,11 +1,19 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# Automated creation of testing environments on misc. platforms
+# Automated creation of testing environment and standalones of borg-backup for various platforms.
+#
 # Usage:
-#   vagrant up OS
-#   vagrant ssh OS -c command
-#   vagrant halt OS
+#   To create and provision the VM:
+#     vagrant up OS
+#   To enter an ssh session in the VM:
+#     vagrant ssh OS command
+#   To shut down the VM:
+#     vagrant halt OS
+#   To shut down and destroy the VM:
+#     vagrant destroy OS
+#   To copy files from the VM (in this case, the pyinstaller-generated binaries)
+#     rsync -av -e 'vagrant ssh OS' --  :~/vagrant/borg/borg/dist/borg ./
 
 def packages_prepare_wheezy
   return <<-EOF

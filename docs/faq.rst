@@ -4,16 +4,9 @@
 Frequently asked questions
 ==========================
 
-Which platforms are supported?
-    Currently Linux, FreeBSD and MacOS X are supported.
-    OpenBSD and NetBSD work also, except for xattrs and ACLs.
-
-    You can try your luck on other POSIX-like systems, like Cygwin,
-    other BSDs, etc. but they are not officially supported.
-
 Can I backup VM disk images?
-    Yes, the :ref:`deduplication <deduplication_def>` technique used by |project_name|
-    makes sure only the modified parts of the file are stored.
+    Yes, the :ref:`deduplication <deduplication_def>` technique used by
+    |project_name| makes sure only the modified parts of the file are stored.
     Also, we have optional simple sparse file support for extract.
 
 Can I backup from multiple servers into a single repository?
@@ -47,9 +40,10 @@ Which file types, attributes, etc. are preserved?
     * BSD flags on OS X and FreeBSD
 
 Which file types, attributes, etc. are *not* preserved?
-    * UNIX domain sockets (because it does not make sense - they are meaningless
-      without the running process that created them and the process needs to
-      recreate them in any case). So, don't panic if your backup misses a UDS!
+    * UNIX domain sockets (because it does not make sense - they are
+      meaningless without the running process that created them and the process
+      needs to recreate them in any case). So, don't panic if your backup
+      misses a UDS!
     * The precise on-disk representation of the holes in a sparse file.
       Archive creation has no special support for sparse files, holes are
       backed up as (deduplicated and compressed) runs of zero bytes.
@@ -77,52 +71,51 @@ When backing up to remote servers, do I have to trust the remote server?
     Yes, as an attacker with access to the remote server could delete (or
     otherwise make unavailable) all your backups.
 
-If a backup stops mid-way, does the already-backed-up data stay there? I.e. does |project_name| resume backups?
-    Yes, during a backup a special checkpoint archive named ``<archive-name>.checkpoint`` is saved every 5 minutes
-    containing all the data backed-up until that point. This means that at most 5 minutes worth of data needs to be
-    retransmitted if a backup needs to be restarted.
+If a backup stops mid-way, does the already-backed-up data stay there?
+    Yes, |project_name| supports resuming backups.
+    During a backup a special checkpoint archive named ``<archive-name>.checkpoint``
+    is saved every checkpoint interval (the default value for this is 5
+    minutes) containing all the data backed-up until that point. This means
+    that at most <checkpoint interval> worth of data needs to be retransmitted
+    if a backup needs to be restarted.
+    Once your backup has finished successfully, you can delete all ``*.checkpoint``
+    archives.
 
 If it crashes with a UnicodeError, what can I do?
     Check if your encoding is set correctly. For most POSIX-like systems, try::
 
         export LANG=en_US.UTF-8  # or similar, important is correct charset
 
-I can't extract non-ascii filenames by giving them on the commandline on OS X!?
-    This is due to different ways to represent some characters in unicode.
-    HFS+ likes the decomposed form while the commandline seems to be the composed
-    form usually. If you run into that, for now maybe just try:
+I can't extract non-ascii filenames by giving them on the commandline!?
+    This might be due to different ways to represent some characters in unicode
+    or due to other non-ascii encoding issues.
+    If you run into that, try this:
 
-    - avoiding the non-ascii characters on the commandline by e.g. extracting
+    - avoid the non-ascii characters on the commandline by e.g. extracting
       the parent directory (or even everything)
-    - try to enter the composed form on the commandline
     - mount the repo using FUSE and use some file manager
 
-    See issue #143 on the issue tracker for more about this.
-
-If I want to run |project_name| on a ARM CPU older than ARM v6?
-    You need to enable the alignment trap handler to fixup misaligned accesses::
-    
-        echo "2" > /proc/cpu/alignment
-
 Can |project_name| add redundancy to the backup data to deal with hardware malfunction?
-    No, it can't. While that at first sounds like a good idea to defend against some
-    defect HDD sectors or SSD flash blocks, dealing with this in a reliable way needs a lot
-    of low-level storage layout information and control which we do not have (and also can't
-    get, even if we wanted).
+    No, it can't. While that at first sounds like a good idea to defend against
+    some defect HDD sectors or SSD flash blocks, dealing with this in a
+    reliable way needs a lot of low-level storage layout information and
+    control which we do not have (and also can't get, even if we wanted).
 
-    So, if you need that, consider RAID1 or a filesystem that offers redundant storage
-    or just make 2 backups to different locations / different hardware.
+    So, if you need that, consider RAID or a filesystem that offers redundant
+    storage or just make backups to different locations / different hardware.
+
+    See also `ticket 225 <https://github.com/borgbackup/borg/issues/225>`_.
 
 Can |project_name| verify data integrity of a backup archive?
-    Yes, if you want to detect accidental data damage (like bit rot), use the ``check``
-    operation. It will notice corruption using CRCs and hashes.
-    If you want to be able to detect malicious tampering also, use a encrypted repo.
-    It will then be able to check using CRCs and HMACs.
+    Yes, if you want to detect accidental data damage (like bit rot), use the
+    ``check`` operation. It will notice corruption using CRCs and hashes.
+    If you want to be able to detect malicious tampering also, use a encrypted
+    repo. It will then be able to check using CRCs and HMACs.
 
 Why was Borg forked from Attic?
-    Borg was created in May 2015 in response to the difficulty of
-    getting new code or larger changes incorporated into Attic and
-    establishing a bigger developer community / more open development.
+    Borg was created in May 2015 in response to the difficulty of getting new
+    code or larger changes incorporated into Attic and establishing a bigger
+    developer community / more open development.
 
     More details can be found in `ticket 217
     <https://github.com/jborg/attic/issues/217>`_ that led to the fork.

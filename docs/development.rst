@@ -59,7 +59,7 @@ The documentation (in reStructuredText format, .rst) is in docs/.
 
 To build the html version of it, you need to have sphinx installed::
 
-  pip3 install sphinx
+  pip3 install sphinx  # important: this will install sphinx with Python 3
 
 Now run::
 
@@ -67,6 +67,28 @@ Now run::
   make html
 
 Then point a web browser at docs/_build/html/index.html.
+
+Using Vagrant
+-------------
+
+We use Vagrant for the automated creation of testing environment and borgbackup
+standalone binaries for various platforms.
+
+For better security, there is no automatic sync in the VM to host direction.
+The plugin `vagrant-scp` is useful to copy stuff from the VMs to the host.
+
+Usage::
+
+   To create and provision the VM:
+     vagrant up OS
+   To create an ssh session to the VM:
+     vagrant ssh OS command
+   To shut down the VM:
+     vagrant halt OS
+   To shut down and destroy the VM:
+     vagrant destroy OS
+   To copy files from the VM (in this case, the generated binary):
+     vagrant scp OS:/vagrant/borg/borg/dist/borg .
 
 
 Creating a new release
@@ -106,7 +128,7 @@ Creating binary wheels
 
 With virtual env activated::
 
-    pip install wheel
+    pip install -U wheel
     python setup.py bdist_wheel
     ls -l dist/*.whl
 
@@ -117,16 +139,15 @@ Note: Binary wheels are rather specific for the platform they get built on.
 Creating standalone binaries
 ----------------------------
 
+Make sure you have everything built and installed (including llfuse and fuse).
+
 With virtual env activated::
 
-  pip install pyinstaller==3.0.dev2  # or a later 3.x release
-  pyinstaller -F -n borg-PLATFORM borg/__main__.py
+  pip install pyinstaller==3.0.dev2  # or a later 3.x release or git checkout
+  pyinstaller -F -n borg-PLATFORM --hidden-import=logging.config borg/__main__.py
   ls -l dist/*
 
-On less good supported platforms than Linux, there might be issues with pyinstaller
-not finding the dynamic python library (libpython*) or with pyinstaller not having
-a pre-compiled "bootloader" for the platform or with not supporting the platform at
-all.
+If you encounter issues, see also our `Vagrantfile` for details.
 
 Note: Standalone binaries built with pyinstaller are supposed to work on same OS,
       same architecture (x86 32bit, amd64 64bit) without external dependencies.

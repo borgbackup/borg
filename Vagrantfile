@@ -1,11 +1,7 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# Automated creation of testing environments on misc. platforms
-# Usage:
-#   vagrant up OS
-#   vagrant ssh OS -c command
-#   vagrant halt OS
+# Automated creation of testing environments / binaries on misc. platforms
 
 def packages_prepare_wheezy
   return <<-EOF

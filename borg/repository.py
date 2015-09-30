@@ -538,7 +538,7 @@ class LoggedIO:
                 crc, size, tag = self.header_fmt.unpack(header)
             except struct.error as err:
                 raise IntegrityError('Invalid segment entry header [offset {}]: {}'.format(offset, err))
-            if size > MAX_OBJECT_SIZE:
+            if size > MAX_OBJECT_SIZE or size < self.header_fmt.size:
                 raise IntegrityError('Invalid segment entry size [offset {}]'.format(offset))
             length = size - self.header_fmt.size
             rest = fd.read(length)

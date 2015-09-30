@@ -145,10 +145,11 @@ usage: $(shell borg help | grep -A1 "Available commands:" | tail -1 | sed 's/[{}
 
 # generate help file based on usage
 usage/%.rst.inc: ../borg/archiver.py
-	printf ".. _borg_$*:\n\n" > $@
-	printf "borg $*\n" >> $@
-	echo -n borg $* | tr 'a-z- ' '-' >> $@
-	printf "\n::\n\n" >> $@
-	borg help $* --usage-only | sed -e 's/^/    /' >> $@
-	printf "\nDescription\n~~~~~~~~~~~\n" >> $@
-	borg help $* --epilog-only >> $@
+	@echo generating usage for $*
+	@printf ".. _borg_$*:\n\n" > $@
+	@printf "borg $*\n" >> $@
+	@echo -n borg $* | tr 'a-z- ' '-' >> $@
+	@printf "\n::\n\n" >> $@
+	@borg help $* --usage-only | sed -e 's/^/    /' >> $@
+	@printf "\nDescription\n~~~~~~~~~~~\n" >> $@
+	@borg help $* --epilog-only >> $@

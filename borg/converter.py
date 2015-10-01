@@ -27,9 +27,11 @@ class AtticRepositoryConverter(Repository):
         # partial open: just hold on to the lock
         self.lock = UpgradableLock(os.path.join(self.path, 'lock'),
                                    exclusive=True).acquire()
-        self.convert_segments(segments, dryrun)
-        self.lock.release()
-        self.lock = None
+        try:
+            self.convert_segments(segments, dryrun)
+        finally:
+            self.lock.release()
+            self.lock = None
         self.convert_cache(dryrun)
 
     @staticmethod

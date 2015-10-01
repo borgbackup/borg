@@ -62,7 +62,6 @@ class AtticRepositoryConverter(Repository):
 
     @staticmethod
     def header_replace(filename, old_magic, new_magic):
-        print("changing header on %s" % filename)
         with open(filename, 'r+b') as segment:
             segment.seek(0)
             # only write if necessary

@@ -630,7 +630,7 @@ class ArchiveChecker:
         self.orphan_chunks_check()
         self.finish()
         if not self.error_found:
-            self.report_progress('Archive consistency check complete, no problems found.')
+            logging.info('Archive consistency check complete, no problems found.')
         return self.repair or not self.error_found
 
     def init_chunks(self):
@@ -779,7 +779,7 @@ class ArchiveChecker:
             num_archives = 1
             end = 1
         for i, (name, info) in enumerate(archive_items[:end]):
-            self.report_progress('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
+            logging.info('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
             archive_id = info[b'id']
             if archive_id not in self.chunks:
                 self.report_progress('Archive metadata block is missing', error=True)

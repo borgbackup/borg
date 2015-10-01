@@ -82,7 +82,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 if input('Do you want to continue? ') == 'Yes I am sure':
                     break
         if not args.archives_only:
-            logging.info('Starting repository check...')
+            logging.warning('Starting repository check...')
             if repository.check(repair=args.repair):
                 logging.info('Repository check complete, no problems found.')
             else:
@@ -160,15 +160,15 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             if args.stats:
                 t = datetime.now()
                 diff = t - t0
-                logging.info('-' * 78)
-                logging.info('Archive name: %s' % args.archive.archive)
-                logging.info('Archive fingerprint: %s' % hexlify(archive.id).decode('ascii'))
-                logging.info('Start time: %s' % t0.strftime('%c'))
-                logging.info('End time: %s' % t.strftime('%c'))
-                logging.info('Duration: %s' % format_timedelta(diff))
-                logging.info('Number of files: %d' % archive.stats.nfiles)
-                archive.stats.print_('This archive:', cache)
-                logging.info('-' * 78)
+                logging.warning('-' * 78)
+                logging.warning('Archive name: %s' % args.archive.archive)
+                logging.warning('Archive fingerprint: %s' % hexlify(archive.id).decode('ascii'))
+                logging.warning('Start time: %s' % t0.strftime('%c'))
+                logging.warning('End time: %s' % t.strftime('%c'))
+                logging.warning('Duration: %s' % format_timedelta(diff))
+                logging.warning('Number of files: %d' % archive.stats.nfiles)
+                logging.warning(archive.stats.print_('This archive:', cache))
+                logging.warning('-' * 78)
         return self.exit_code
 
     def _process(self, archive, cache, excludes, exclude_caches, skip_inodes, path, restrict_dev,
@@ -313,7 +313,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             repository.commit()
             cache.commit()
             if args.stats:
-                stats.print_('Deleted data:', cache)
+                logging.warning(stats.print_('Deleted data:', cache))
         else:
             logging.warning("You requested to completely DELETE the repository *including* all archives it contains:")
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
@@ -363,7 +363,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             archive = Archive(repository, key, manifest, args.src.archive)
             if args.short:
                 for item in archive.iter_items():
-                    logging.info(remove_surrogates(item[b'path']))
+                    print(remove_surrogates(item[b'path']), file=sys.stderr)
             else:
                 tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 0o10: '-', 0o12: 'l', 0o14: 's'}
                 for item in archive.iter_items():
@@ -388,13 +388,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                             extra = ' link to %s' % item[b'source']
                     else:
                         extra = ''
-                    logging.info('%s%s %-6s %-6s %8d %s %s%s' % (
+                    print('%s%s %-6s %-6s %8d %s %s%s' % (
                         type, mode, item[b'user'] or item[b'uid'],
                         item[b'group'] or item[b'gid'], size, format_time(mtime),
-                        remove_surrogates(item[b'path']), extra))
+                        remove_surrogates(item[b'path']), extra),
+                          file=sys.stderr)
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
-                logging.info(format_archive(archive_info))
+                print(format_archive(archive_info), file=sys.stderr)
         return self.exit_code
 
     def do_info(self, args):
@@ -404,14 +405,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         cache = Cache(repository, key, manifest, do_files=args.cache_files)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
         stats = archive.calc_stats(cache)
-        logging.info('Name:', archive.name)
-        logging.info('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
-        logging.info('Hostname:', archive.metadata[b'hostname'])
-        logging.info('Username:', archive.metadata[b'username'])
-        logging.info('Time: %s' % to_localtime(archive.ts).strftime('%c'))
-        logging.info('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
-        logging.info('Number of files: %d' % stats.nfiles)
-        stats.print_('This archive:', cache)
+        logging.warning('Name:', archive.name)
+        logging.warning('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
+        logging.warning('Hostname:', archive.metadata[b'hostname'])
+        logging.warning('Username:', archive.metadata[b'username'])
+        logging.warning('Time: %s' % to_localtime(archive.ts).strftime('%c'))
+        logging.warning('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
+        logging.warning('Number of files: %d' % stats.nfiles)
+        logging.warning(stats.print_('This archive:', cache))
         return self.exit_code
 
     def do_prune(self, args):
@@ -456,7 +457,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             repository.commit()
             cache.commit()
         if args.stats:
-            stats.print_('Deleted data:', cache)
+            logging.warning(stats.print_('Deleted data:', cache))
         return self.exit_code
 
     helptext = {}
@@ -493,10 +494,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         if not args.topic:
             parser.print_help()
         elif args.topic in self.helptext:
-            logging.info(self.helptext[args.topic])
+            print(self.helptext[args.topic], file=sys.stderr)
         elif args.topic in commands:
             if args.epilog_only:
-                logging.info(commands[args.topic].epilog)
+                print(commands[args.topic].epilog, file=sys.stderr)
             elif args.usage_only:
                 commands[args.topic].epilog = None
                 commands[args.topic].print_help()
@@ -515,11 +516,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
            0: logging.WARNING,
            1: logging.INFO,
            2: logging.DEBUG }
-        # default to INFO, --verbose turns into DEBUG
-        # XXX: ideally, we'd default to being silent, that is only
-        # show warnings and above, but we're retaining current output
-        # for now.
-        l.setLevel(levels[int(self.verbose)+1])
+        # default to WARNING, -v goes to INFO and -vv to DEBUG
+        l.setLevel(levels[args.verbose])
 
     def preprocess_args(self, args):
         deprecations = [
@@ -558,9 +556,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     #       http://www.brynosaurus.com/cachedir/
                     """).lstrip())
         common_parser = argparse.ArgumentParser(add_help=False)
-        common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
-                                   default=False,
-                                   help='verbose output')
+        common_parser.add_argument('-v', '--verbose', dest='verbose', action='count',
+                                   help='verbose output, defaults to warnings only')
         common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
                                    help='do not load/update the file metadata cache used to detect unchanged files')
         common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=0o077, metavar='M',
@@ -920,7 +917,6 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='additional help on TOPIC')
 
         args = parser.parse_args(args or ['-h'])
-        self.verbose = args.verbose
         self.setup_logging(args)
         os.umask(args.umask)
         RemoteRepository.remote_path = args.remote_path

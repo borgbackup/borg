@@ -151,7 +151,7 @@ class Statistics:
         buf += "\n"
         buf += '                       Unique chunks         Total chunks'
         buf += 'Chunk index:    %20d %20d' % (total_unique_chunks, total_chunks)
-        logging.info(buf)
+        return buf
 
     def show_progress(self, item=None, final=False):
         if not final:

@@ -1,7 +1,7 @@
 from binascii import hexlify
 import os
 
-from .helpers import IntegrityError, get_keys_dir
+from .helpers import get_keys_dir
 from .repository import Repository, MAGIC
 from .key import KeyfileKey, KeyfileNotFoundError
 

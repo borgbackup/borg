@@ -80,7 +80,7 @@ class ConversionTestCase(BaseTestCase):
         try:
             keyfile = self.find_attic_keyfile()
         except KeyfileNotFoundError:
-            print("no key file found for repository, not converting")
+            print("no key file found for repository")
         else:
             self.convert_keyfiles(keyfile)
         self.repository.close()

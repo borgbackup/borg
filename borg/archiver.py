@@ -17,7 +17,7 @@ import traceback
 from . import __version__
 from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
 from .compress import Compressor, COMPR_BUFFER
-from .converter import AtticRepositoryConverter, NotImplementedException
+from .converter import AtticRepositoryConverter
 from .repository import Repository
 from .cache import Cache
 from .key import key_creator
@@ -468,7 +468,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         repo = AtticRepositoryConverter(os.path.join(args.repository, 'repository'), create=False)
         try:
             repo.convert(args.dry_run)
-        except NotImplementedException as e:
+        except NotImplementedError as e:
             print("warning: %s" % e)
         return self.exit_code
 

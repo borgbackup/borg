@@ -5,9 +5,6 @@ from .helpers import get_keys_dir
 from .repository import Repository, MAGIC
 from .key import KeyfileKey, KeyfileNotFoundError
 
-class NotImplementedException(Exception):
-    pass
-
 class AtticRepositoryConverter(Repository):
     def convert(self, dryrun=True):
         """convert an attic repository to a borg repository
@@ -108,7 +105,7 @@ class AtticRepositoryConverter(Repository):
           `Cache.open()`, edit in place and then `Cache.close()` to
           make sure we have locking right
         """
-        raise NotImplementedException('cache conversion not implemented, next borg backup will take longer to rebuild those caches')
+        raise NotImplementedError('cache conversion not implemented, next borg backup will take longer to rebuild those caches')
 
 class AtticKeyfileKey(KeyfileKey):
     """backwards compatible Attic key file parser"""

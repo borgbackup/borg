@@ -12,7 +12,7 @@ except ImportError:
 pytestmark = pytest.mark.skipif(attic is None,
                                 reason = 'cannot find an attic install')
 
-from ..converter import AtticRepositoryConverter, NotImplementedException, AtticKeyfileKey
+from ..converter import AtticRepositoryConverter, AtticKeyfileKey
 from ..helpers import get_keys_dir
 from ..key import KeyfileKey
 from ..repository import Repository, MAGIC
@@ -87,7 +87,7 @@ class EncryptedConversionTestCase(ConversionTestCase):
         # check should fail because of magic number
         self.check_repo(False)
         print("opening attic repository with borg and converting")
-        with pytest.raises(NotImplementedException):
+        with pytest.raises(NotImplementedError):
             self.open(self.tmppath, repo_type = AtticRepositoryConverter).convert(dryrun=False)
         # check that the new keyfile is alright
         keyfile = os.path.join(get_keys_dir(),

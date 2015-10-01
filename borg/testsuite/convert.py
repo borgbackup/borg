@@ -51,12 +51,16 @@ class ConversionTestCase(BaseTestCase):
     def tearDown(self):
         shutil.rmtree(self.tmppath)
 
-    def test_convert(self):
+    def check_repo(self, state = True):
+        if not state:
+            print("this will show an error, this is expected")
         self.repository = self.open(self.tmppath)
-        # check should fail because of magic number
-        print("this will show an error, it is expected")
-        assert not self.repository.check() # can't check raises() because check() handles the error
+        assert self.repository.check() is state # can't check raises() because check() handles the error
         self.repository.close()
+
+    def test_convert(self):
+        # check should fail because of magic number
+        self.check_repo(False)
         print("opening attic repository with borg and converting")
         with pytest.raises(NotImplementedException):
             self.open(self.tmppath, repo_type = AtticRepositoryConverter).convert(dryrun=False)
@@ -65,6 +69,4 @@ class ConversionTestCase(BaseTestCase):
                                os.path.basename(self.key.path))
         with open(keyfile, 'r') as f:
             assert f.read().startswith(KeyfileKey.FILE_ID)
-        self.repository = self.open(self.tmppath)
-        assert self.repository.check()
-        self.repository.close()
+        self.check_repo()

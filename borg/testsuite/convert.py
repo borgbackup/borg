@@ -87,7 +87,8 @@ class AtticRepositoryConverter(Repository):
         with pytest.raises(NotImplementedException):
             self.convert_cache()
 
-    def convert_segments(self, segments):
+    @staticmethod
+    def convert_segments(segments):
         '''convert repository segments from attic to borg
 
         replacement pattern is `s/ATTICSEG/BORG_SEG/` in files in
@@ -120,7 +121,8 @@ class AtticRepositoryConverter(Repository):
         implementation.'''
         return AtticKeyfileKey.find_key_file(self)
 
-    def convert_keyfiles(self, keyfile):
+    @staticmethod
+    def convert_keyfiles(keyfile):
 
         '''convert key files from attic to borg
 

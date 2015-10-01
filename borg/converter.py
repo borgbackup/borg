@@ -111,7 +111,7 @@ class AtticRepositoryConverter(Repository):
         raise NotImplementedException('cache conversion not implemented, next borg backup will take longer to rebuild those caches')
 
 class AtticKeyfileKey(KeyfileKey):
-    """backwards compatible Attick key file parser"""
+    """backwards compatible Attic key file parser"""
     FILE_ID = 'ATTIC KEY'
 
     # verbatim copy from attic

@@ -59,7 +59,7 @@ class ConversionTestCase(BaseTestCase):
         self.repository.close()
         print("opening attic repository with borg and converting")
         with pytest.raises(NotImplementedException):
-            self.open(self.tmppath, repo_type = AtticRepositoryConverter).convert()
+            self.open(self.tmppath, repo_type = AtticRepositoryConverter).convert(dryrun=False)
         # check that the new keyfile is alright
         keyfile = os.path.join(get_keys_dir(),
                                os.path.basename(self.key.path))

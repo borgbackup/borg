@@ -9,7 +9,7 @@ class NotImplementedException(Exception):
     pass
 
 class AtticRepositoryConverter(Repository):
-    def convert(self):
+    def convert(self, dryrun=True):
         '''convert an attic repository to a borg repository
 
         those are the files that need to be converted here, from most
@@ -23,13 +23,13 @@ class AtticRepositoryConverter(Repository):
         except KeyfileNotFoundError:
             print("no key file found for repository")
         else:
-            self.convert_keyfiles(keyfile)
+            self.convert_keyfiles(keyfile, dryrun)
         self.close()
-        self.convert_segments(segments)
-        self.convert_cache()
+        self.convert_segments(segments, dryrun)
+        self.convert_cache(dryrun)
 
     @staticmethod
-    def convert_segments(segments):
+    def convert_segments(segments, dryrun):
         '''convert repository segments from attic to borg
 
         replacement pattern is `s/ATTICSEG/BORG_SEG/` in files in
@@ -39,6 +39,8 @@ class AtticRepositoryConverter(Repository):
         replace the 8 first bytes of all regular files in there.'''
         for filename in segments:
             print("converting segment %s in place" % filename)
+            if dryrun:
+                continue
             with open(filename, 'r+b') as segment:
                 segment.seek(0)
                 segment.write(MAGIC)
@@ -63,7 +65,7 @@ class AtticRepositoryConverter(Repository):
         return AtticKeyfileKey.find_key_file(self)
 
     @staticmethod
-    def convert_keyfiles(keyfile):
+    def convert_keyfiles(keyfile, dryrun):
 
         '''convert key files from attic to borg
 
@@ -85,13 +87,14 @@ class AtticRepositoryConverter(Repository):
         keyfile = os.path.join(get_keys_dir(),
                                os.path.basename(keyfile))
         print("writing borg keyfile to %s" % keyfile)
-        with open(keyfile, 'w') as f:
-            f.write(data)
-        with open(keyfile, 'r') as f:
-            data = f.read()
-        assert data.startswith(KeyfileKey.FILE_ID)
+        if not dryrun:
+            with open(keyfile, 'w') as f:
+                f.write(data)
+            with open(keyfile, 'r') as f:
+                data = f.read()
+            assert data.startswith(KeyfileKey.FILE_ID)
 
-    def convert_cache(self):
+    def convert_cache(self, dryrun):
         '''convert caches from attic to borg
 
         those are all hash indexes, so we need to
@@ -109,7 +112,7 @@ class AtticRepositoryConverter(Repository):
           `Cache.open()`, edit in place and then `Cache.close()` to
           make sure we have locking right
         '''
-        raise NotImplementedException('not implemented')
+        raise NotImplementedException('cache conversion not implemented, next borg backup will take longer to rebuild those caches')
 
 class AtticKeyfileKey(KeyfileKey):
     '''backwards compatible Attick key file parser'''

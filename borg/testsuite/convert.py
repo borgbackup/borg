@@ -19,21 +19,22 @@ from ..repository import Repository, MAGIC
 pytestmark = pytest.mark.skipif(attic is None,
                                 reason='cannot find an attic install')
 
-def repo_open(path, repo_type=Repository, create=False):
-    return repo_type(os.path.join(str(path), 'repository'), create=create)
-
 def repo_valid(path):
-    repository = repo_open(str(path))
+    repository = Repository(str(path), create=False)
     # can't check raises() because check() handles the error
     state = repository.check()
     repository.close()
     return state
 
+def key_valid(path):
+    keyfile = os.path.join(get_keys_dir(),
+                           os.path.basename(path))
+    with open(keyfile, 'r') as f:
+        return f.read().startswith(KeyfileKey.FILE_ID)
+
 @pytest.fixture(autouse=True)
 def attic_repo(tmpdir):
-    attic_repo = repo_open(str(tmpdir),
-                                repo_type=attic.repository.Repository,
-                                create=True)
+    attic_repo = attic.repository.Repository(str(tmpdir), create=True)
     # throw some stuff in that repo, copied from `RepositoryTestCase.test1`
     for x in range(100):
         attic_repo.put(('%-32d' % x).encode('ascii'), b'SOMEDATA')
@@ -45,7 +46,7 @@ def test_convert_segments(tmpdir, attic_repo):
     # check should fail because of magic number
     assert not repo_valid(tmpdir)
     print("opening attic repository with borg and converting")
-    repo = repo_open(tmpdir, repo_type=AtticRepositoryConverter)
+    repo = AtticRepositoryConverter(str(tmpdir), create=False)
     segments = [filename for i, filename in repo.io.segment_iterator()]
     repo.close()
     repo.convert_segments(segments, dryrun=False)
@@ -72,27 +73,17 @@ def attic_key_file(attic_repo, tmpdir):
                                        MockArgs(keys_dir))
 
 def test_keys(tmpdir, attic_repo, attic_key_file):
-    repository = repo_open(tmpdir,
-                           repo_type=AtticRepositoryConverter)
+    repository = AtticRepositoryConverter(str(tmpdir), create=False)
     keyfile = AtticKeyfileKey.find_key_file(repository)
     AtticRepositoryConverter.convert_keyfiles(keyfile, dryrun=False)
-
-    # check that the new keyfile is alright
-    keyfile = os.path.join(get_keys_dir(),
-                           os.path.basename(attic_key_file.path))
-    with open(keyfile, 'r') as f:
-        assert f.read().startswith(KeyfileKey.FILE_ID)
+    assert key_valid(attic_key_file.path)
 
 def test_convert_all(tmpdir, attic_repo, attic_key_file):
     # check should fail because of magic number
     assert not repo_valid(tmpdir)
     print("opening attic repository with borg and converting")
-    repo = repo_open(tmpdir, repo_type=AtticRepositoryConverter)
+    repo = AtticRepositoryConverter(str(tmpdir), create=False)
     with pytest.raises(NotImplementedError):
         repo.convert(dryrun=False)
-    # check that the new keyfile is alright
-    keyfile = os.path.join(get_keys_dir(),
-                           os.path.basename(attic_key_file.path))
-    with open(keyfile, 'r') as f:
-        assert f.read().startswith(KeyfileKey.FILE_ID)
+    assert key_valid(attic_key_file.path)
     assert repo_valid(tmpdir)

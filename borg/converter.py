@@ -39,11 +39,10 @@ class AtticRepositoryConverter(Repository):
         replace the 8 first bytes of all regular files in there."""
         for filename in segments:
             print("converting segment %s in place" % filename)
-            if dryrun:
-                continue
-            with open(filename, 'r+b') as segment:
-                segment.seek(0)
-                segment.write(MAGIC)
+            if not dryrun:
+                with open(filename, 'r+b') as segment:
+                    segment.seek(0)
+                    segment.write(MAGIC)
 
     def find_attic_keyfile(self):
         """find the attic keyfiles

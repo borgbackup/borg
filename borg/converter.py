@@ -35,7 +35,7 @@ class AtticRepositoryConverter(Repository):
         replacement pattern is `s/ATTICSEG/BORG_SEG/` in files in
         `$ATTIC_REPO/data/**`.
 
-        luckily the segment length didn't change so we can just
+        luckily the magic string length didn't change so we can just
         replace the 8 first bytes of all regular files in there."""
         for filename in segments:
             print("converting segment %s in place" % filename)
@@ -75,7 +75,7 @@ class AtticRepositoryConverter(Repository):
         `$HOME/.borg/keys`.
 
         no need to decrypt to convert. we need to rewrite the whole
-        key file because magic number length changed, but that's not a
+        key file because magic string length changed, but that's not a
         problem because the keyfiles are small (compared to, say,
         all the segments)."""
         print("converting keyfile %s" % keyfile)

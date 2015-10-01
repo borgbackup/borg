@@ -909,19 +909,19 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         convert_epilog = textwrap.dedent("""
         convert will convert an existing Attic repository to Borg in place.
 
-        it will change the magic numbers in the repository's segments
-        to match the new Borg magic numbers. the keyfiles found in
+        it will change the magic strings in the repository's segments
+        to match the new Borg magic strings. the keyfiles found in
         $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
         copied to $BORG_KEYS_DIR or ~/.borg/keys.
 
         the cache files are *not* currently converted, which will
-        result in a much longer backup the first time. you can run
+        result in a much longer backup the first time. you must run
         `borg check --repair` to rebuild those files after the
         conversion.
 
         the conversion can IRREMEDIABLY DAMAGE YOUR REPOSITORY! Attic
         will also NOT BE ABLE TO READ THE BORG REPOSITORY ANYMORE, as
-        the magic numbers will have changed.
+        the magic strings will have changed.
 
         it is recommended you run this on a copy of the Attic
         repository, in case something goes wrong, for example:

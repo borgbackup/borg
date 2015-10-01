@@ -7,6 +7,7 @@ from operator import attrgetter
 import functools
 import inspect
 import io
+import logging
 import os
 import signal
 import stat
@@ -46,15 +47,11 @@ class Archiver:
     def print_error(self, msg, *args):
         msg = args and msg % args or msg
         self.exit_code = 1
-        print('borg: ' + msg, file=sys.stderr)
+        logging.error('borg: ' + msg)
 
     def print_verbose(self, msg, *args, **kw):
-        if self.verbose:
-            msg = args and msg % args or msg
-            if kw.get('newline', True):
-                print(msg)
-            else:
-                print(msg, end=' ')
+        msg = args and msg % args or msg
+        logging.info(msg)
 
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
@@ -63,7 +60,7 @@ class Archiver:
 
     def do_init(self, args):
         """Initialize an empty repository"""
-        print('Initializing repository at "%s"' % args.repository.orig)
+        logging.info('Initializing repository at "%s"' % args.repository.orig)
         repository = self.open_repository(args.repository, create=True, exclusive=True)
         key = key_creator(repository, args)
         manifest = Manifest(key, repository)
@@ -85,9 +82,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 if input('Do you want to continue? ') == 'Yes I am sure':
                     break
         if not args.archives_only:
-            print('Starting repository check...')
+            logging.info('Starting repository check...')
             if repository.check(repair=args.repair):
-                print('Repository check complete, no problems found.')
+                logging.info('Repository check complete, no problems found.')
             else:
                 return 1
         if not args.repo_only and not ArchiveChecker().check(
@@ -163,15 +160,15 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             if args.stats:
                 t = datetime.now()
                 diff = t - t0
-                print('-' * 78)
-                print('Archive name: %s' % args.archive.archive)
-                print('Archive fingerprint: %s' % hexlify(archive.id).decode('ascii'))
-                print('Start time: %s' % t0.strftime('%c'))
-                print('End time: %s' % t.strftime('%c'))
-                print('Duration: %s' % format_timedelta(diff))
-                print('Number of files: %d' % archive.stats.nfiles)
+                logging.info('-' * 78)
+                logging.info('Archive name: %s' % args.archive.archive)
+                logging.info('Archive fingerprint: %s' % hexlify(archive.id).decode('ascii'))
+                logging.info('Start time: %s' % t0.strftime('%c'))
+                logging.info('End time: %s' % t.strftime('%c'))
+                logging.info('Duration: %s' % format_timedelta(diff))
+                logging.info('Number of files: %d' % archive.stats.nfiles)
                 archive.stats.print_('This archive:', cache)
-                print('-' * 78)
+                logging.info('-' * 78)
         return self.exit_code
 
     def _process(self, archive, cache, excludes, exclude_caches, skip_inodes, path, restrict_dev,
@@ -250,7 +247,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         """Extract archive contents"""
         # be restrictive when restoring files, restore permissions later
         if sys.getfilesystemencoding() == 'ascii':
-            print('Warning: File system encoding is "ascii", extracting non-ascii filenames will not be supported.')
+            logging.warning('Warning: File system encoding is "ascii", extracting non-ascii filenames will not be supported.')
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
         archive = Archive(repository, key, manifest, args.archive.archive,
@@ -318,17 +315,17 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             if args.stats:
                 stats.print_('Deleted data:', cache)
         else:
-            print("You requested to completely DELETE the repository *including* all archives it contains:")
+            logging.warning("You requested to completely DELETE the repository *including* all archives it contains:")
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
-                print(format_archive(archive_info))
+                logging.warning(format_archive(archive_info))
             if not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
-                print("""Type "YES" if you understand this and want to continue.\n""")
+                print("""Type "YES" if you understand this and want to continue.""")
                 if input('Do you want to continue? ') != 'YES':
                     self.exit_code = 1
                     return self.exit_code
             repository.destroy()
             cache.destroy()
-            print("Repository and corresponding cache were deleted.")
+            logging.info("Repository and corresponding cache were deleted.")
         return self.exit_code
 
     def do_mount(self, args):
@@ -366,7 +363,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             archive = Archive(repository, key, manifest, args.src.archive)
             if args.short:
                 for item in archive.iter_items():
-                    print(remove_surrogates(item[b'path']))
+                    logging.info(remove_surrogates(item[b'path']))
             else:
                 tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 0o10: '-', 0o12: 'l', 0o14: 's'}
                 for item in archive.iter_items():
@@ -391,13 +388,13 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                             extra = ' link to %s' % item[b'source']
                     else:
                         extra = ''
-                    print('%s%s %-6s %-6s %8d %s %s%s' % (
+                    logging.info('%s%s %-6s %-6s %8d %s %s%s' % (
                         type, mode, item[b'user'] or item[b'uid'],
                         item[b'group'] or item[b'gid'], size, format_time(mtime),
                         remove_surrogates(item[b'path']), extra))
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
-                print(format_archive(archive_info))
+                logging.info(format_archive(archive_info))
         return self.exit_code
 
     def do_info(self, args):
@@ -407,13 +404,13 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         cache = Cache(repository, key, manifest, do_files=args.cache_files)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
         stats = archive.calc_stats(cache)
-        print('Name:', archive.name)
-        print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
-        print('Hostname:', archive.metadata[b'hostname'])
-        print('Username:', archive.metadata[b'username'])
-        print('Time: %s' % to_localtime(archive.ts).strftime('%c'))
-        print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
-        print('Number of files: %d' % stats.nfiles)
+        logging.info('Name:', archive.name)
+        logging.info('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
+        logging.info('Hostname:', archive.metadata[b'hostname'])
+        logging.info('Username:', archive.metadata[b'username'])
+        logging.info('Time: %s' % to_localtime(archive.ts).strftime('%c'))
+        logging.info('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
+        logging.info('Number of files: %d' % stats.nfiles)
         stats.print_('This archive:', cache)
         return self.exit_code
 
@@ -496,10 +493,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         if not args.topic:
             parser.print_help()
         elif args.topic in self.helptext:
-            print(self.helptext[args.topic])
+            logging.info(self.helptext[args.topic])
         elif args.topic in commands:
             if args.epilog_only:
-                print(commands[args.topic].epilog)
+                logging.info(commands[args.topic].epilog)
             elif args.usage_only:
                 commands[args.topic].epilog = None
                 commands[args.topic].print_help()
@@ -508,6 +505,21 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         else:
             parser.error('No help available on %s' % (args.topic,))
         return self.exit_code
+
+    def setup_logging(self, args):
+        logging.raiseExceptions = False
+        l = logging.getLogger('')
+        sh = logging.StreamHandler(sys.stderr)
+        l.addHandler(sh)
+        levels = { None: logging.WARNING,
+           0: logging.WARNING,
+           1: logging.INFO,
+           2: logging.DEBUG }
+        # default to INFO, --verbose turns into DEBUG
+        # XXX: ideally, we'd default to being silent, that is only
+        # show warnings and above, but we're retaining current output
+        # for now.
+        l.setLevel(levels[int(self.verbose)+1])
 
     def preprocess_args(self, args):
         deprecations = [
@@ -518,16 +530,17 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             ('--yearly', '--keep-yearly', 'Warning: "--yearly" has been deprecated. Use "--keep-yearly" instead.')
         ]
         if args and args[0] == 'verify':
-            print('Warning: "borg verify" has been deprecated. Use "borg extract --dry-run" instead.')
+            print('Warning: "borg verify" has been deprecated. Use "borg extract --dry-run" instead.', file=sys.stderr)
             args = ['extract', '--dry-run'] + args[1:]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
                 if arg.startswith(old_name):
                     args[i] = arg.replace(old_name, new_name)
-                    print(warning)
+                    print(warning, file=sys.stderr)
         return args
 
     def run(self, args=None):
+        # show all logging by default for starters
         check_extension_modules()
         keys_dir = get_keys_dir()
         if not os.path.exists(keys_dir):
@@ -908,6 +921,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
         args = parser.parse_args(args or ['-h'])
         self.verbose = args.verbose
+        self.setup_logging(args)
         os.umask(args.umask)
         RemoteRepository.remote_path = args.remote_path
         RemoteRepository.umask = args.umask
@@ -926,7 +940,7 @@ def sig_info_handler(signum, stack):  # pragma: no cover
                 total = loc['st'].st_size
             except Exception:
                 pos, total = 0, 0
-            print("{0} {1}/{2}".format(path, format_file_size(pos), format_file_size(total)))
+            logging.warning("{0} {1}/{2}".format(path, format_file_size(pos), format_file_size(total)))
             break
         if func in ('extract_item', ):  # extract op
             path = loc['item'][b'path']
@@ -934,7 +948,7 @@ def sig_info_handler(signum, stack):  # pragma: no cover
                 pos = loc['fd'].tell()
             except Exception:
                 pos = 0
-            print("{0} {1}/???".format(path, format_file_size(pos)))
+            logging.warning("{0} {1}/???".format(path, format_file_size(pos)))
             break
 
 

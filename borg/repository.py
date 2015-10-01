@@ -2,6 +2,7 @@ from configparser import RawConfigParser
 from binascii import hexlify
 from itertools import islice
 import errno
+import logging
 import os
 import shutil
 import struct
@@ -278,7 +279,7 @@ class Repository:
         def report_error(msg):
             nonlocal error_found
             error_found = True
-            print(msg, file=sys.stderr)
+            logging.error(msg)
 
         assert not self._active_txn
         try:
@@ -566,7 +567,7 @@ class LoggedIO:
         with open(filename, 'rb') as fd:
             data = memoryview(fd.read())
         os.rename(filename, filename + '.beforerecover')
-        print('attempting to recover ' + filename, file=sys.stderr)
+        logging.info('attempting to recover ' + filename)
         with open(filename, 'wb') as fd:
             fd.write(MAGIC)
             while len(data) >= self.header_fmt.size:

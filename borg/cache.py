@@ -1,6 +1,7 @@
 from configparser import RawConfigParser
 from .remote import cache_if_remote
 import errno
+import logging
 import msgpack
 import os
 import stat
@@ -71,9 +72,9 @@ class Cache:
         self.close()
 
     def _confirm(self, message, env_var_override=None):
-        print(message, file=sys.stderr)
+        logging.warning(message)
         if env_var_override and os.environ.get(env_var_override):
-            print("Yes (From {})".format(env_var_override))
+            logging.warning("Yes (From {})".format(env_var_override))
             return True
         if not sys.stdin.isatty():
             return False
@@ -253,7 +254,7 @@ class Cache:
                 unpacker.feed(data)
                 for item in unpacker:
                     if not isinstance(item, dict):
-                        print('Error: Did not get expected metadata dict - archive corrupted!')
+                        logging.error('Error: Did not get expected metadata dict - archive corrupted!')
                         continue
                     if b'chunks' in item:
                         for chunk_id, size, csize in item[b'chunks']:
@@ -274,10 +275,10 @@ class Cache:
                     return name
 
         def create_master_idx(chunk_idx):
-            print('Synchronizing chunks cache...')
+            logging.info('Synchronizing chunks cache...')
             cached_ids = cached_archives()
             archive_ids = repo_archives()
-            print('Archives: %d, w/ cached Idx: %d, w/ outdated Idx: %d, w/o cached Idx: %d.' % (
+            logging.info('Archives: %d, w/ cached Idx: %d, w/ outdated Idx: %d, w/o cached Idx: %d.' % (
                 len(archive_ids), len(cached_ids),
                 len(cached_ids - archive_ids), len(archive_ids - cached_ids), ))
             # deallocates old hashindex, creates empty hashindex:
@@ -289,12 +290,12 @@ class Cache:
                     archive_name = lookup_name(archive_id)
                     if archive_id in cached_ids:
                         archive_chunk_idx_path = mkpath(archive_id)
-                        print("Reading cached archive chunk index for %s ..." % archive_name)
+                        logging.info("Reading cached archive chunk index for %s ..." % archive_name)
                         archive_chunk_idx = ChunkIndex.read(archive_chunk_idx_path)
                     else:
-                        print('Fetching and building archive index for %s ...' % archive_name)
+                        logging.info('Fetching and building archive index for %s ...' % archive_name)
                         archive_chunk_idx = fetch_and_build_idx(archive_id, repository, self.key)
-                    print("Merging into master chunks index ...")
+                    logging.info("Merging into master chunks index ...")
                     if chunk_idx is None:
                         # we just use the first archive's idx as starting point,
                         # to avoid growing the hash table from 0 size and also
@@ -302,7 +303,7 @@ class Cache:
                         chunk_idx = archive_chunk_idx
                     else:
                         chunk_idx.merge(archive_chunk_idx)
-            print('Done.')
+            logging.info('Done.')
             return chunk_idx
 
         def legacy_cleanup():

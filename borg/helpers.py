@@ -5,6 +5,7 @@ import binascii
 from collections import namedtuple
 from functools import wraps
 import grp
+import logging
 import os
 import pwd
 import re
@@ -150,7 +151,7 @@ class Statistics:
         buf += "\n"
         buf += '                       Unique chunks         Total chunks'
         buf += 'Chunk index:    %20d %20d' % (total_unique_chunks, total_chunks)
-        print(buf)
+        logging.info(buf)
 
     def show_progress(self, item=None, final=False):
         if not final:
@@ -161,8 +162,8 @@ class Statistics:
                 format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize), path)
         else:
             msg = ' ' * 79
-        print(msg, end='\r')
-        sys.stdout.flush()
+        print(msg, file=sys.stderr, end='\r')
+        sys.stderr.flush()
 
 
 def get_keys_dir():

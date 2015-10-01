@@ -2,6 +2,8 @@ from datetime import datetime
 from getpass import getuser
 from itertools import groupby
 import errno
+import logging
+
 from .key import key_factory
 from .remote import cache_if_remote
 import msgpack
@@ -650,7 +652,7 @@ class ArchiveChecker:
     def report_progress(self, msg, error=False):
         if error:
             self.error_found = True
-        print(msg, file=sys.stderr if error else sys.stdout)
+        logging.log(logging.ERROR if error else logging.WARNING, msg)
 
     def identify_key(self, repository):
         cdata = repository.get(next(self.chunks.iteritems())[0])

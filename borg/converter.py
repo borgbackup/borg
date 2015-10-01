@@ -2,6 +2,7 @@ from binascii import hexlify
 import os
 
 from .helpers import get_keys_dir
+from .locking import UpgradableLock
 from .repository import Repository, MAGIC
 from .key import KeyfileKey, KeyfileNotFoundError
 
@@ -22,7 +23,12 @@ class AtticRepositoryConverter(Repository):
         else:
             self.convert_keyfiles(keyfile, dryrun)
         self.close()
+        # partial open: just hold on to the lock
+        self.lock = UpgradableLock(os.path.join(self.path, 'lock'),
+                                   exclusive=True).acquire()
         self.convert_segments(segments, dryrun)
+        self.lock.release()
+        self.lock = None
         self.convert_cache(dryrun)
 
     @staticmethod
@@ -34,6 +40,7 @@ class AtticRepositoryConverter(Repository):
 
         luckily the magic string length didn't change so we can just
         replace the 8 first bytes of all regular files in there."""
+        print("converting %d segments..." % len(segments))
         for filename in segments:
             print("converting segment %s in place" % filename)
             if not dryrun:

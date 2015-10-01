@@ -3,9 +3,14 @@ import pytest
 import shutil
 import tempfile
 
-import attic.repository
-import attic.key
-import attic.helpers
+try:
+    import attic.repository
+    import attic.key
+    import attic.helpers
+except ImportError:
+    attic = None
+pytestmark = pytest.mark.skipif(attic is None,
+                                reason = 'cannot find an attic install')
 
 from ..converter import AtticRepositoryConverter, NotImplementedException
 from ..helpers import get_keys_dir

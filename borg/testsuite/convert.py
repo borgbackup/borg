@@ -1,7 +1,8 @@
 import os
-import pytest
 import shutil
 import tempfile
+
+import pytest
 
 try:
     import attic.repository

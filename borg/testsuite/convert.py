@@ -37,22 +37,21 @@ class ConversionTestCase(BaseTestCase):
     def tearDown(self):
         shutil.rmtree(self.tmppath)
 
-    def check_repo(self, state = True):
-        if not state:
-            print("this will show an error, this is expected")
+    def repo_valid(self,):
         repository = self.open(self.tmppath)
-        assert repository.check() is state # can't check raises() because check() handles the error
+        state = repository.check() # can't check raises() because check() handles the error
         repository.close()
+        return state
 
     def test_convert_segments(self):
         # check should fail because of magic number
-        self.check_repo(False)
+        assert not self.repo_valid()
         print("opening attic repository with borg and converting")
         repo = self.open(self.tmppath, repo_type = AtticRepositoryConverter)
         segments = [ filename for i, filename in repo.io.segment_iterator() ]
         repo.close()
         repo.convert_segments(segments, dryrun=False)
-        self.check_repo()
+        assert self.repo_valid()
 
 class EncryptedConversionTestCase(ConversionTestCase):
     class MockArgs:
@@ -86,7 +85,7 @@ class EncryptedConversionTestCase(ConversionTestCase):
 
     def test_convert_all(self):
         # check should fail because of magic number
-        self.check_repo(False)
+        assert not self.repo_valid()
         print("opening attic repository with borg and converting")
         with pytest.raises(NotImplementedError):
             self.open(self.tmppath, repo_type = AtticRepositoryConverter).convert(dryrun=False)
@@ -95,4 +94,4 @@ class EncryptedConversionTestCase(ConversionTestCase):
                                os.path.basename(self.key.path))
         with open(keyfile, 'r') as f:
             assert f.read().startswith(KeyfileKey.FILE_ID)
-        self.check_repo()
+        assert self.repo_valid()

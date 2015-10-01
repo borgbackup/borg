@@ -919,7 +919,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         `borg check --repair` to rebuild those files after the
         conversion.
 
-        the conversion can IRREMEDIABLY DAMAGE YOUR REPOSITORY! Attic
+        the conversion can PERMANENTLY DAMAGE YOUR REPOSITORY! Attic
         will also NOT BE ABLE TO READ THE BORG REPOSITORY ANYMORE, as
         the magic strings will have changed.
 

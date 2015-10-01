@@ -64,7 +64,6 @@ def attic_repo(tmpdir):
     return attic_repo
 
 
-@pytest.mark.usefixtures("tmpdir")
 def test_convert_segments(tmpdir, attic_repo):
     """test segment conversion
 

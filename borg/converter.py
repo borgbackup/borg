@@ -48,7 +48,7 @@ class AtticRepositoryConverter(Repository):
         """find the attic keyfiles
 
         the keyfiles are loaded by `KeyfileKey.find_key_file()`. that
-        finds the keys with the right identifier for the repo
+        finds the keys with the right identifier for the repo.
 
         this is expected to look into $HOME/.attic/keys or
         $ATTIC_KEYS_DIR for key files matching the given Borg

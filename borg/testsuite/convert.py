@@ -19,6 +19,7 @@ from ..repository import Repository, MAGIC
 pytestmark = pytest.mark.skipif(attic is None,
                                 reason='cannot find an attic install')
 
+
 def repo_valid(path):
     """
     utility function to check if borg can open a repository
@@ -32,6 +33,7 @@ def repo_valid(path):
     repository.close()
     return state
 
+
 def key_valid(path):
     """
     check that the new keyfile is alright
@@ -43,6 +45,7 @@ def key_valid(path):
                            os.path.basename(path))
     with open(keyfile, 'r') as f:
         return f.read().startswith(KeyfileKey.FILE_ID)
+
 
 @pytest.fixture(autouse=True)
 def attic_repo(tmpdir):
@@ -58,6 +61,7 @@ def attic_repo(tmpdir):
         attic_repo.put(('%-32d' % x).encode('ascii'), b'SOMEDATA')
     attic_repo.close()
     return attic_repo
+
 
 @pytest.mark.usefixtures("tmpdir")
 def test_convert_segments(tmpdir, attic_repo):
@@ -80,6 +84,7 @@ def test_convert_segments(tmpdir, attic_repo):
     repo.convert_segments(segments, dryrun=False)
     assert repo_valid(tmpdir)
 
+
 class MockArgs:
     """
     mock attic location
@@ -89,6 +94,7 @@ class MockArgs:
     """
     def __init__(self, path):
         self.repository = attic.helpers.Location(path)
+
 
 @pytest.fixture()
 def attic_key_file(attic_repo, tmpdir):
@@ -116,6 +122,7 @@ def attic_key_file(attic_repo, tmpdir):
     return attic.key.KeyfileKey.create(attic_repo,
                                        MockArgs(keys_dir))
 
+
 def test_keys(tmpdir, attic_repo, attic_key_file):
     """test key conversion
 
@@ -132,6 +139,7 @@ def test_keys(tmpdir, attic_repo, attic_key_file):
     keyfile = AtticKeyfileKey.find_key_file(repository)
     AtticRepositoryConverter.convert_keyfiles(keyfile, dryrun=False)
     assert key_valid(attic_key_file.path)
+
 
 def test_convert_all(tmpdir, attic_repo, attic_key_file):
     """test all conversion steps

@@ -89,9 +89,6 @@ class AtticRepositoryConverter(Repository):
         if not dryrun:
             with open(keyfile, 'w') as f:
                 f.write(data)
-            with open(keyfile, 'r') as f:
-                data = f.read()
-            assert data.startswith(KeyfileKey.FILE_ID)
 
     def convert_cache(self, dryrun):
         """convert caches from attic to borg

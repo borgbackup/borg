@@ -154,10 +154,13 @@ class AtticRepositoryConverter(Repository):
                 if not os.path.exists(borg_cache_dir):
                     os.makedirs(borg_cache_dir)
                 borg_cache = os.path.join(borg_cache_dir, cache)
-                print("copying attic cache from %s to %s" % (attic_cache, borg_cache))
-                if not dryrun:
-                    shutil.copy(attic_cache, borg_cache)
-                caches += [borg_cache]
+                if os.path.exists(borg_cache):
+                    print("borg cache already exists in %s, skipping conversion of %s" % (borg_cache, attic_cache))
+                else:
+                    print("copying attic cache from %s to %s" % (attic_cache, borg_cache))
+                    if not dryrun:
+                        shutil.copyfile(attic_cache, borg_cache)
+                    caches += [borg_cache]
             else:
                 print("no %s cache found in %s" % (cache, attic_cache))
 

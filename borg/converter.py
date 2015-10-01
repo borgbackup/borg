@@ -118,7 +118,7 @@ class AtticRepositoryConverter(Repository):
           `Cache.open()`, edit in place and then `Cache.close()` to
           make sure we have locking right
         """
-        raise NotImplementedError('cache conversion not implemented, next borg backup will take longer to rebuild those caches')
+        raise NotImplementedError('cache conversion not implemented, next borg backup will take longer to rebuild those caches. use borg check --repair to rebuild now')
 
 class AtticKeyfileKey(KeyfileKey):
     """backwards compatible Attic key file parser"""

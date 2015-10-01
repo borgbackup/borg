@@ -93,11 +93,8 @@ class AtticRepositoryConverter(Repository):
         print("converting keyfile %s" % keyfile)
         with open(keyfile, 'r') as f:
             data = f.read()
-        data = data.replace(AtticKeyfileKey.FILE_ID,
-                            KeyfileKey.FILE_ID,
-                            1)
-        keyfile = os.path.join(get_keys_dir(),
-                               os.path.basename(keyfile))
+        data = data.replace(AtticKeyfileKey.FILE_ID, KeyfileKey.FILE_ID, 1)
+        keyfile = os.path.join(get_keys_dir(), os.path.basename(keyfile))
         print("writing borg keyfile to %s" % keyfile)
         if not dryrun:
             with open(keyfile, 'w') as f:

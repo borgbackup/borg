@@ -1,5 +1,6 @@
 from binascii import hexlify
 import os
+import time
 
 from .helpers import get_keys_dir
 from .locking import UpgradableLock
@@ -41,12 +42,17 @@ class AtticRepositoryConverter(Repository):
         luckily the magic string length didn't change so we can just
         replace the 8 first bytes of all regular files in there."""
         print("converting %d segments..." % len(segments))
+        i = 0
         for filename in segments:
-            print("converting segment %s in place" % filename)
-            if not dryrun:
+            print("\rconverting segment %s in place (%d/%d)" % (filename, i, len(segments)), end='')
+            i += 1
+            if dryrun:
+                time.sleep(0.001)
+            else:
                 with open(filename, 'r+b') as segment:
                     segment.seek(0)
                     segment.write(MAGIC)
+        print()
 
     def find_attic_keyfile(self):
         """find the attic keyfiles

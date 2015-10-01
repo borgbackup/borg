@@ -463,9 +463,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             stats.print_('Deleted data:', cache)
         return self.exit_code
 
-    def do_convert(self, parser, commands, args):
+    def do_convert(self, args):
         """convert a repository from attic to borg"""
-        repo = AtticRepositoryConverter(os.path.join(args.repository, 'repository'), create=False)
+        repo = AtticRepositoryConverter(args.repository.path, create=False)
         try:
             repo.convert(args.dry_run)
         except NotImplementedError as e:

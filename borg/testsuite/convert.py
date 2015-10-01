@@ -16,41 +16,6 @@ from . import BaseTestCase
 class NotImplementedException(Exception):
     pass
 
-class AtticKeyfileKey(KeyfileKey):
-    '''backwards compatible Attick key file parser'''
-    FILE_ID = 'ATTIC KEY'
-
-    # verbatim copy from attic
-    @staticmethod
-    def get_keys_dir():
-        """Determine where to repository keys and cache"""
-        return os.environ.get('ATTIC_KEYS_DIR',
-                              os.path.join(os.path.expanduser('~'), '.attic', 'keys'))
-
-    @classmethod
-    def find_key_file(cls, repository):
-        '''copy of attic's `find_key_file`_
-
-        this has two small modifications:
-
-        1. it uses the above `get_keys_dir`_ instead of the global one,
-           assumed to be borg's
-
-        2. it uses `repository.path`_ instead of
-           `repository._location.canonical_path`_ because we can't
-           assume the repository has been opened by the archiver yet
-        '''
-        get_keys_dir = cls.get_keys_dir
-        id = hexlify(repository.id).decode('ascii')
-        keys_dir = get_keys_dir()
-        for name in os.listdir(keys_dir):
-            filename = os.path.join(keys_dir, name)
-            with open(filename, 'r') as fd:
-                line = fd.readline().strip()
-                if line and line.startswith(cls.FILE_ID) and line[10:] == id:
-                    return filename
-        raise KeyfileNotFoundError(repository.path, get_keys_dir())
-
 class ConversionTestCase(BaseTestCase):
 
     class MockArgs:
@@ -81,13 +46,17 @@ class ConversionTestCase(BaseTestCase):
         self.key = attic.key.KeyfileKey.create(self.attic_repo, self.MockArgs(self.tmppath))
         self.attic_repo.close()
 
+    def tearDown(self):
+        shutil.rmtree(self.tmppath)
+
     def test_convert(self):
         self.repository = self.open(self.tmppath)
         # check should fail because of magic number
         print("this will show an error, it is expected")
         assert not self.repository.check() # can't check raises() because check() handles the error
         self.repository.close()
-        self.convert()
+        print("opening attic repository with borg and converting")
+        self.open(self.tmppath, repo_type = AtticRepositoryConverter).convert()
         # check that the new keyfile is alright
         keyfile = os.path.join(get_keys_dir(),
                                os.path.basename(self.key.path))
@@ -97,6 +66,7 @@ class ConversionTestCase(BaseTestCase):
         assert self.repository.check()
         self.repository.close()
 
+class AtticRepositoryConverter(Repository):
     def convert(self):
         '''convert an attic repository to a borg repository
 
@@ -104,17 +74,15 @@ class ConversionTestCase(BaseTestCase):
         important to least important: segments, key files, and various
         caches, the latter being optional, as they will be rebuilt if
         missing.'''
-        print("opening attic repository with borg")
-        self.repository = self.open(self.tmppath)
         print("reading segments from attic repository using borg")
-        segments = [ filename for i, filename in self.repository.io.segment_iterator() ]
+        segments = [ filename for i, filename in self.io.segment_iterator() ]
         try:
             keyfile = self.find_attic_keyfile()
         except KeyfileNotFoundError:
             print("no key file found for repository")
         else:
             self.convert_keyfiles(keyfile)
-        self.repository.close()
+        self.close()
         self.convert_segments(segments)
         with pytest.raises(NotImplementedException):
             self.convert_cache()
@@ -150,7 +118,7 @@ class ConversionTestCase(BaseTestCase):
         this is split in a separate function in case we want to use
         the attic code here directly, instead of our local
         implementation.'''
-        return AtticKeyfileKey.find_key_file(self.repository)
+        return AtticKeyfileKey.find_key_file(self)
 
     def convert_keyfiles(self, keyfile):
 
@@ -200,5 +168,37 @@ class ConversionTestCase(BaseTestCase):
         '''
         raise NotImplementedException('not implemented')
 
-    def tearDown(self):
-        shutil.rmtree(self.tmppath)
+class AtticKeyfileKey(KeyfileKey):
+    '''backwards compatible Attick key file parser'''
+    FILE_ID = 'ATTIC KEY'
+
+    # verbatim copy from attic
+    @staticmethod
+    def get_keys_dir():
+        """Determine where to repository keys and cache"""
+        return os.environ.get('ATTIC_KEYS_DIR',
+                              os.path.join(os.path.expanduser('~'), '.attic', 'keys'))
+
+    @classmethod
+    def find_key_file(cls, repository):
+        '''copy of attic's `find_key_file`_
+
+        this has two small modifications:
+
+        1. it uses the above `get_keys_dir`_ instead of the global one,
+           assumed to be borg's
+
+        2. it uses `repository.path`_ instead of
+           `repository._location.canonical_path`_ because we can't
+           assume the repository has been opened by the archiver yet
+        '''
+        get_keys_dir = cls.get_keys_dir
+        id = hexlify(repository.id).decode('ascii')
+        keys_dir = get_keys_dir()
+        for name in os.listdir(keys_dir):
+            filename = os.path.join(keys_dir, name)
+            with open(filename, 'r') as fd:
+                line = fd.readline().strip()
+                if line and line.startswith(cls.FILE_ID) and line[10:] == id:
+                    return filename
+        raise KeyfileNotFoundError(repository.path, get_keys_dir())

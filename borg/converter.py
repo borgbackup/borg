@@ -147,7 +147,7 @@ class AtticRepositoryConverter(Repository):
 
         # XXX: untested, because generating cache files is a PITA, see
         # Archiver.do_create() for proof
-        for cache in [ 'files', 'chunks' ]:
+        for cache in [ 'files', 'chunks', 'config' ]:
             attic_cache = os.path.join(attic_cache_dir, hexlify(self.id).decode('ascii'), cache)
             if os.path.exists(attic_cache):
                 borg_cache_dir = os.path.join(get_cache_dir(), hexlify(self.id).decode('ascii'))

@@ -218,7 +218,7 @@ latex_documents = [
 #     ['see "AUTHORS" file'], 1)
 #]
 
-extensions = ['sphinx.ext.extlinks']
+extensions = ['sphinx.ext.extlinks', 'sphinx.ext.autodoc', 'sphinx.ext.todo', 'sphinx.ext.coverage', 'sphinx.ext.viewcode']
 
 extlinks = {
     'issue': ('https://github.com/borgbackup/borg/issues/%s', '#'),

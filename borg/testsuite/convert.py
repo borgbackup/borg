@@ -53,6 +53,7 @@ class ConversionTestCase(BaseTestCase):
     def test_convert(self):
         self.repository = self.open(self.tmppath)
         # check should fail because of magic number
+        print("this will show an error, it is expected")
         assert not self.repository.check() # can't check raises() because check() handles the error
         self.repository.close()
         self.convert()
@@ -72,7 +73,9 @@ class ConversionTestCase(BaseTestCase):
         important to least important: segments, key files, and various
         caches, the latter being optional, as they will be rebuilt if
         missing.'''
+        print("opening attic repository with borg")
         self.repository = self.open(self.tmppath)
+        print("reading segments from attic repository using borg")
         segments = [ filename for i, filename in self.repository.io.segment_iterator() ]
         try:
             keyfile = self.find_attic_keyfile()
@@ -94,7 +97,7 @@ class ConversionTestCase(BaseTestCase):
         luckily the segment length didn't change so we can just
         replace the 8 first bytes of all regular files in there.'''
         for filename in segments:
-            print("converting segment %s..." % filename)
+            print("converting segment %s in place" % filename)
             with open(filename, 'r+b') as segment:
                 segment.seek(0)
                 segment.write(MAGIC)

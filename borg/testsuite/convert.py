@@ -37,10 +37,17 @@ class ConversionTestCase(BaseTestCase):
         # throw some stuff in that repo, copied from `RepositoryTestCase.test1`_
         for x in range(100):
             self.attic_repo.put(('%-32d' % x).encode('ascii'), b'SOMEDATA')
-        self.keysdir = self.MockArgs(self.tmppath)
+
+        # we use the repo dir for the created keyfile, because we do
+        # not want to clutter existing keyfiles
         os.environ['ATTIC_KEYS_DIR'] = self.tmppath
+
+        # we use the same directory for the converted files, which
+        # will clutter the previously created one, which we don't care
+        # about anyways. in real runs, the original key will be retained.
+        os.environ['BORG_KEYS_DIR'] = self.tmppath
         os.environ['ATTIC_PASSPHRASE'] = 'test'
-        self.key = attic.key.KeyfileKey.create(self.attic_repo, self.keysdir)
+        self.key = attic.key.KeyfileKey.create(self.attic_repo, self.MockArgs(self.tmppath))
         self.attic_repo.close()
 
     def test_convert(self):
@@ -48,7 +55,6 @@ class ConversionTestCase(BaseTestCase):
         # check should fail because of magic number
         assert not self.repository.check() # can't check raises() because check() handles the error
         self.repository.close()
-        os.environ['BORG_KEYS_DIR'] = self.tmppath
         self.convert()
         # check that the new keyfile is alright
         keyfile = os.path.join(get_keys_dir(),
@@ -96,6 +102,9 @@ class ConversionTestCase(BaseTestCase):
     def find_attic_keyfile(self):
         '''find the attic keyfiles
 
+        the keyfiles are loaded by `KeyfileKey.find_key_file()`. that
+        finds the keys with the right identifier for the repo
+
         this is expected to look into $HOME/.attic/keys or
         $ATTIC_KEYS_DIR for key files matching the given Borg
         repository.
@@ -119,10 +128,10 @@ class ConversionTestCase(BaseTestCase):
         `$HOME/.attic/keys`, and moved to `$BORG_KEYS_DIR` or
         `$HOME/.borg/keys`.
 
-        the keyfiles are loaded by `KeyfileKey.find_key_file()`. that
-        finds the keys with the right identifier for the repo, no need
-        to decrypt to convert. will need to rewrite the whole key file
-        because magic number length changed.'''
+        no need to decrypt to convert. we need to rewrite the whole
+        key file because magic number length changed, but that's not a
+        problem because the keyfiles are small (compared to, say,
+        all the segments).'''
         print("converting keyfile %s" % keyfile)
         with open(keyfile, 'r') as f:
             data = f.read()

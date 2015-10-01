@@ -17,7 +17,11 @@ class AtticRepositoryConverter(Repository):
         those are the files that need to be converted here, from most
         important to least important: segments, key files, and various
         caches, the latter being optional, as they will be rebuilt if
-        missing."""
+        missing.
+
+        we nevertheless do the order in reverse, as we prefer to do
+        the fast stuff first, to improve interactivity.
+        """
         print("reading segments from attic repository using borg")
         # we need to open it to load the configuration and other fields
         self.open(self.path, exclusive=False)
@@ -33,8 +37,8 @@ class AtticRepositoryConverter(Repository):
         self.lock = UpgradableLock(os.path.join(self.path, 'lock'),
                                    exclusive=True).acquire()
         try:
-            self.convert_segments(segments, dryrun)
             self.convert_cache(dryrun)
+            self.convert_segments(segments, dryrun)
         finally:
             self.lock.release()
             self.lock = None
@@ -146,13 +150,21 @@ class AtticRepositoryConverter(Repository):
         for cache in [ 'files', 'chunks' ]:
             attic_cache = os.path.join(attic_cache_dir, hexlify(self.id).decode('ascii'), cache)
             if os.path.exists(attic_cache):
-                borg_cache = os.path.join(get_cache_dir(), hexlify(self.id).decode('ascii'), cache)
-                shutil.copy(attic_cache, borg_cache)
+                borg_cache_dir = os.path.join(get_cache_dir(), hexlify(self.id).decode('ascii'))
+                if not os.path.exists(borg_cache_dir):
+                    os.makedirs(borg_cache_dir)
+                borg_cache = os.path.join(borg_cache_dir, cache)
+                print("copying attic cache from %s to %s" % (attic_cache, borg_cache))
+                if not dryrun:
+                    shutil.copy(attic_cache, borg_cache)
                 caches += [borg_cache]
+            else:
+                print("no %s cache found in %s" % (cache, attic_cache))
 
         for cache in caches:
             print("converting cache %s" % cache)
-            AtticRepositoryConverter.header_replace(cache, b'ATTICIDX', b'BORG_IDX')
+            if not dryrun:
+                AtticRepositoryConverter.header_replace(cache, b'ATTICIDX', b'BORG_IDX')
 
 
 class AtticKeyfileKey(KeyfileKey):

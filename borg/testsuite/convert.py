@@ -10,14 +10,15 @@ try:
     import attic.helpers
 except ImportError:
     attic = None
-pytestmark = pytest.mark.skipif(attic is None,
-                                reason='cannot find an attic install')
 
 from ..converter import AtticRepositoryConverter, AtticKeyfileKey
 from ..helpers import get_keys_dir
 from ..key import KeyfileKey
 from ..repository import Repository, MAGIC
 from . import BaseTestCase
+
+pytestmark = pytest.mark.skipif(attic is None,
+                                reason='cannot find an attic install')
 
 
 class ConversionTestCase(BaseTestCase):

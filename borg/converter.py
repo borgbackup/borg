@@ -1,8 +1,9 @@
 from binascii import hexlify
 import os
+import shutil
 import time
 
-from .helpers import get_keys_dir
+from .helpers import get_keys_dir, get_cache_dir
 from .locking import UpgradableLock
 from .repository import Repository, MAGIC
 from .key import KeyfileKey, KeyfileNotFoundError
@@ -124,7 +125,7 @@ class AtticRepositoryConverter(Repository):
           `Repository.open()`, which i'm not sure we should use
           because it may write data on `Repository.close()`...
 
-        * the `files` and `chunks` cache (in
+        * the `files` and `chunks` cache (in `$ATTIC_CACHE_DIR` or
           `$HOME/.cache/attic/<repoid>/`), which we could just drop,
           but if we'd want to convert, we could open it with the
           `Cache.open()`, edit in place and then `Cache.close()` to
@@ -136,6 +137,20 @@ class AtticRepositoryConverter(Repository):
             print('no index file found for repository %s' % self.path)
         else:
             caches += [os.path.join(self.path, 'index.%d' % transaction_id).encode('utf-8')]
+
+        # copy of attic's get_cache_dir()
+        attic_cache_dir = os.environ.get('ATTIC_CACHE_DIR',
+                          os.path.join(os.path.expanduser('~'), '.cache', 'attic'))
+
+        # XXX: untested, because generating cache files is a PITA, see
+        # Archiver.do_create() for proof
+        for cache in [ 'files', 'chunks' ]:
+            attic_cache = os.path.join(attic_cache_dir, hexlify(self.id).decode('ascii'), cache)
+            if os.path.exists(attic_cache):
+                borg_cache = os.path.join(get_cache_dir(), hexlify(self.id).decode('ascii'), cache)
+                shutil.copy(attic_cache, borg_cache)
+                caches += [borg_cache]
+
         for cache in caches:
             print("converting cache %s" % cache)
             AtticRepositoryConverter.header_replace(cache, b'ATTICIDX', b'BORG_IDX')

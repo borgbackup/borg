@@ -17,6 +17,7 @@ import traceback
 from . import __version__
 from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
 from .compress import Compressor, COMPR_BUFFER
+from .converter import AtticRepositoryConverter, NotImplementedException
 from .repository import Repository
 from .cache import Cache
 from .key import key_creator
@@ -462,6 +463,15 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             stats.print_('Deleted data:', cache)
         return self.exit_code
 
+    def do_convert(self, parser, commands, args):
+        '''convert a repository from attic to borg'''
+        repo = AtticRepositoryConverter(os.path.join(args.repository, 'repository'), create=False)
+        try:
+            repo.convert(args.dry_run)
+        except NotImplementedException as e:
+            print("warning: %s" % e)
+        return self.exit_code
+
     helptext = {}
     helptext['patterns'] = '''
         Exclude patterns use a variant of shell pattern syntax, with '*' matching any
@@ -895,6 +905,43 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to prune')
+
+        convert_epilog = textwrap.dedent("""
+        convert will convert an existing Attic repository to Borg in place.
+
+        it will change the magic numbers in the repository's segments
+        to match the new Borg magic numbers. the keyfiles found in
+        $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
+        copied to $BORG_KEYS_DIR or ~/.borg/keys.
+
+        the cache files are *not* currently converted, which will
+        result in a much longer backup the first time. you can run
+        `borg check --repair` to rebuild those files after the
+        conversion.
+
+        the conversion can IRREMEDIABLY DAMAGE YOUR REPOSITORY! Attic
+        will also NOT BE ABLE TO READ THE BORG REPOSITORY ANYMORE, as
+        the magic numbers will have changed.
+
+        it is recommended you run this on a copy of the Attic
+        repository, in case something goes wrong, for example:
+
+        cp -a attic borg
+        borg convert -n borg
+        borg convert borg
+
+        you have been warned.""")
+        subparser = subparsers.add_parser('convert', parents=[common_parser],
+                                          description=self.do_convert.__doc__,
+                                          epilog=convert_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.set_defaults(func=self.do_convert)
+        subparser.add_argument('-n', '--dry-run', dest='dry_run',
+                               default=False, action='store_true',
+                               help='do not change repository')
+        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='path to the attic repository to be converted')
 
         subparser = subparsers.add_parser('help', parents=[common_parser],
                                           description='Extra help')

@@ -59,6 +59,7 @@ def attic_repo(tmpdir):
     # throw some stuff in that repo, copied from `RepositoryTestCase.test1`
     for x in range(100):
         attic_repo.put(('%-32d' % x).encode('ascii'), b'SOMEDATA')
+    attic_repo.commit()
     attic_repo.close()
     return attic_repo
 
@@ -82,6 +83,7 @@ def test_convert_segments(tmpdir, attic_repo):
     segments = [filename for i, filename in repo.io.segment_iterator()]
     repo.close()
     repo.convert_segments(segments, dryrun=False)
+    repo.convert_cache(dryrun=False)
     assert repo_valid(tmpdir)
 
 
@@ -157,7 +159,6 @@ def test_convert_all(tmpdir, attic_repo, attic_key_file):
     assert not repo_valid(tmpdir)
     print("opening attic repository with borg and converting")
     repo = AtticRepositoryConverter(str(tmpdir), create=False)
-    with pytest.raises(NotImplementedError):
-        repo.convert(dryrun=False)
+    repo.convert(dryrun=False)
     assert key_valid(attic_key_file.path)
     assert repo_valid(tmpdir)

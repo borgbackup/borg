@@ -18,6 +18,8 @@ class AtticRepositoryConverter(Repository):
         caches, the latter being optional, as they will be rebuilt if
         missing."""
         print("reading segments from attic repository using borg")
+        # we need to open it to load the configuration and other fields
+        self.open(self.path, exclusive=False)
         segments = [ filename for i, filename in self.io.segment_iterator() ]
         try:
             keyfile = self.find_attic_keyfile()
@@ -31,10 +33,10 @@ class AtticRepositoryConverter(Repository):
                                    exclusive=True).acquire()
         try:
             self.convert_segments(segments, dryrun)
+            self.convert_cache(dryrun)
         finally:
             self.lock.release()
             self.lock = None
-        self.convert_cache(dryrun)
 
     @staticmethod
     def convert_segments(segments, dryrun):
@@ -54,13 +56,18 @@ class AtticRepositoryConverter(Repository):
             if dryrun:
                 time.sleep(0.001)
             else:
-                with open(filename, 'r+b') as segment:
-                    segment.seek(0)
-                    # only write if necessary
-                    if (segment.read(len(ATTIC_MAGIC)) == ATTIC_MAGIC):
-                        segment.seek(0)
-                        segment.write(MAGIC)
+                AtticRepositoryConverter.header_replace(filename, ATTIC_MAGIC, MAGIC)
         print()
+
+    @staticmethod
+    def header_replace(filename, old_magic, new_magic):
+        print("changing header on %s" % filename)
+        with open(filename, 'r+b') as segment:
+            segment.seek(0)
+            # only write if necessary
+            if (segment.read(len(old_magic)) == old_magic):
+                segment.seek(0)
+                segment.write(new_magic)
 
     def find_attic_keyfile(self):
         """find the attic keyfiles
@@ -123,7 +130,16 @@ class AtticRepositoryConverter(Repository):
           `Cache.open()`, edit in place and then `Cache.close()` to
           make sure we have locking right
         """
-        raise NotImplementedError('cache conversion not implemented, next borg backup will take longer to rebuild those caches. use borg check --repair to rebuild now')
+        caches = []
+        transaction_id = self.get_index_transaction_id()
+        if transaction_id is None:
+            print('no index file found for repository %s' % self.path)
+        else:
+            caches += [os.path.join(self.path, 'index.%d' % transaction_id).encode('utf-8')]
+        for cache in caches:
+            print("converting cache %s" % cache)
+            AtticRepositoryConverter.header_replace(cache, b'ATTICIDX', b'BORG_IDX')
+
 
 class AtticKeyfileKey(KeyfileKey):
     """backwards compatible Attic key file parser"""

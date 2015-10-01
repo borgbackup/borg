@@ -7,6 +7,8 @@ from .locking import UpgradableLock
 from .repository import Repository, MAGIC
 from .key import KeyfileKey, KeyfileNotFoundError
 
+ATTIC_MAGIC = b'ATTICSEG'
+
 class AtticRepositoryConverter(Repository):
     def convert(self, dryrun=True):
         """convert an attic repository to a borg repository
@@ -54,7 +56,10 @@ class AtticRepositoryConverter(Repository):
             else:
                 with open(filename, 'r+b') as segment:
                     segment.seek(0)
-                    segment.write(MAGIC)
+                    # only write if necessary
+                    if (segment.read(len(ATTIC_MAGIC)) == ATTIC_MAGIC):
+                        segment.seek(0)
+                        segment.write(MAGIC)
         print()
 
     def find_attic_keyfile(self):

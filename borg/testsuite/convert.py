@@ -35,6 +35,7 @@ class ConversionTestCase(BaseTestCase):
         # throw some stuff in that repo, copied from `RepositoryTestCase.test1`_
         for x in range(100):
             self.attic_repo.put(('%-32d' % x).encode('ascii'), b'SOMEDATA')
+        self.attic_repo.close()
 
         # we use the repo dir for the created keyfile, because we do
         # not want to clutter existing keyfiles
@@ -46,7 +47,6 @@ class ConversionTestCase(BaseTestCase):
         os.environ['BORG_KEYS_DIR'] = self.tmppath
         os.environ['ATTIC_PASSPHRASE'] = 'test'
         self.key = attic.key.KeyfileKey.create(self.attic_repo, self.MockArgs(self.tmppath))
-        self.attic_repo.close()
 
     def tearDown(self):
         shutil.rmtree(self.tmppath)

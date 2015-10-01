@@ -10,12 +10,12 @@ class NotImplementedException(Exception):
 
 class AtticRepositoryConverter(Repository):
     def convert(self, dryrun=True):
-        '''convert an attic repository to a borg repository
+        """convert an attic repository to a borg repository
 
         those are the files that need to be converted here, from most
         important to least important: segments, key files, and various
         caches, the latter being optional, as they will be rebuilt if
-        missing.'''
+        missing."""
         print("reading segments from attic repository using borg")
         segments = [ filename for i, filename in self.io.segment_iterator() ]
         try:
@@ -30,13 +30,13 @@ class AtticRepositoryConverter(Repository):
 
     @staticmethod
     def convert_segments(segments, dryrun):
-        '''convert repository segments from attic to borg
+        """convert repository segments from attic to borg
 
         replacement pattern is `s/ATTICSEG/BORG_SEG/` in files in
         `$ATTIC_REPO/data/**`.
 
         luckily the segment length didn't change so we can just
-        replace the 8 first bytes of all regular files in there.'''
+        replace the 8 first bytes of all regular files in there."""
         for filename in segments:
             print("converting segment %s in place" % filename)
             if dryrun:
@@ -46,7 +46,7 @@ class AtticRepositoryConverter(Repository):
                 segment.write(MAGIC)
 
     def find_attic_keyfile(self):
-        '''find the attic keyfiles
+        """find the attic keyfiles
 
         the keyfiles are loaded by `KeyfileKey.find_key_file()`. that
         finds the keys with the right identifier for the repo
@@ -61,13 +61,13 @@ class AtticRepositoryConverter(Repository):
 
         this is split in a separate function in case we want to use
         the attic code here directly, instead of our local
-        implementation.'''
+        implementation."""
         return AtticKeyfileKey.find_key_file(self)
 
     @staticmethod
     def convert_keyfiles(keyfile, dryrun):
 
-        '''convert key files from attic to borg
+        """convert key files from attic to borg
 
         replacement pattern is `s/ATTIC KEY/BORG_KEY/` in
         `get_keys_dir()`, that is `$ATTIC_KEYS_DIR` or
@@ -77,7 +77,7 @@ class AtticRepositoryConverter(Repository):
         no need to decrypt to convert. we need to rewrite the whole
         key file because magic number length changed, but that's not a
         problem because the keyfiles are small (compared to, say,
-        all the segments).'''
+        all the segments)."""
         print("converting keyfile %s" % keyfile)
         with open(keyfile, 'r') as f:
             data = f.read()
@@ -95,7 +95,7 @@ class AtticRepositoryConverter(Repository):
             assert data.startswith(KeyfileKey.FILE_ID)
 
     def convert_cache(self, dryrun):
-        '''convert caches from attic to borg
+        """convert caches from attic to borg
 
         those are all hash indexes, so we need to
         `s/ATTICIDX/BORG_IDX/` in a few locations:
@@ -111,11 +111,11 @@ class AtticRepositoryConverter(Repository):
           but if we'd want to convert, we could open it with the
           `Cache.open()`, edit in place and then `Cache.close()` to
           make sure we have locking right
-        '''
+        """
         raise NotImplementedException('cache conversion not implemented, next borg backup will take longer to rebuild those caches')
 
 class AtticKeyfileKey(KeyfileKey):
-    '''backwards compatible Attick key file parser'''
+    """backwards compatible Attick key file parser"""
     FILE_ID = 'ATTIC KEY'
 
     # verbatim copy from attic
@@ -127,7 +127,7 @@ class AtticKeyfileKey(KeyfileKey):
 
     @classmethod
     def find_key_file(cls, repository):
-        '''copy of attic's `find_key_file`_
+        """copy of attic's `find_key_file`_
 
         this has two small modifications:
 
@@ -137,7 +137,7 @@ class AtticKeyfileKey(KeyfileKey):
         2. it uses `repository.path`_ instead of
            `repository._location.canonical_path`_ because we can't
            assume the repository has been opened by the archiver yet
-        '''
+        """
         get_keys_dir = cls.get_keys_dir
         id = hexlify(repository.id).decode('ascii')
         keys_dir = get_keys_dir()

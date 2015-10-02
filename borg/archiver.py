@@ -161,8 +161,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 archive.stats.show_progress(final=True)
             if args.stats:
                 archive.end = datetime.now()
+                print('-' * 78)
                 print(str(archive))
                 print(archive.stats.print_('This archive:', cache))
+                print('-' * 78)
         return self.exit_code
 
     def _process(self, archive, cache, excludes, exclude_caches, skip_inodes, path, restrict_dev,

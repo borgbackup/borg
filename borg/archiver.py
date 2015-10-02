@@ -541,7 +541,6 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         return args
 
     def run(self, args=None):
-        # show all logging by default for starters
         check_extension_modules()
         keys_dir = get_keys_dir()
         if not os.path.exists(keys_dir):

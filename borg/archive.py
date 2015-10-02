@@ -1,3 +1,4 @@
+from binascii import hexlify
 from datetime import datetime
 from getpass import getuser
 from itertools import groupby
@@ -18,7 +19,7 @@ from . import xattr
 from .platform import acl_get, acl_set
 from .chunker import Chunker
 from .hashindex import ChunkIndex
-from .helpers import parse_timestamp, Error, uid2user, user2uid, gid2group, group2gid, \
+from .helpers import parse_timestamp, format_timedelta, Error, uid2user, user2uid, gid2group, group2gid, \
     Manifest, Statistics, decode_dict, st_mtime_ns, make_path_safe, StableDict, int_to_bigint, bigint_to_int
 
 ITEMS_BUFFER = 1024 * 1024
@@ -130,7 +131,8 @@ class Archive:
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False, progress=False,
-                 chunker_params=CHUNKER_PARAMS):
+                 chunker_params=CHUNKER_PARAMS,
+                 start=datetime.now(), end=datetime.now()):
         self.cwd = os.getcwd()
         self.key = key
         self.repository = repository
@@ -143,6 +145,8 @@ class Archive:
         self.name = name
         self.checkpoint_interval = checkpoint_interval
         self.numeric_owner = numeric_owner
+        self.start = start
+        self.end = end
         self.pipeline = DownloadPipeline(self.repository, self.key)
         if create:
             self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats, chunker_params)
@@ -181,6 +185,24 @@ class Archive:
     def ts(self):
         """Timestamp of archive creation in UTC"""
         return parse_timestamp(self.metadata[b'time'])
+
+    @property
+    def fpr(self):
+        return hexlify(self.id).decode('ascii')
+
+    @property
+    def duration(self):
+        return format_timedelta(self.end-self.start)
+
+    def __str__(self):
+        buf = '''Archive name: {0.name}
+Archive fingerprint: {0.fpr}
+Start time: {0.start:%c}
+End time: {0.end:%c}
+Duration: {0.duration}
+Number of files: {0.stats.nfiles}
+This archive: {0.cache}'''.format(self)
+        return buf
 
     def __repr__(self):
         return 'Archive(%r)' % self.name

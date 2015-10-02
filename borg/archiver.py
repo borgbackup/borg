@@ -115,7 +115,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
                               create=True, checkpoint_interval=args.checkpoint_interval,
                               numeric_owner=args.numeric_owner, progress=args.progress,
-                              chunker_params=args.chunker_params)
+                              chunker_params=args.chunker_params, start=t0)
         else:
             archive = cache = None
         # Add cache dir to inode_skip list
@@ -160,17 +160,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             if args.progress:
                 archive.stats.show_progress(final=True)
             if args.stats:
-                t = datetime.now()
-                diff = t - t0
-                print('-' * 78)
-                print('Archive name: %s' % args.archive.archive)
-                print('Archive fingerprint: %s' % hexlify(archive.id).decode('ascii'))
-                print('Start time: %s' % t0.strftime('%c'))
-                print('End time: %s' % t.strftime('%c'))
-                print('Duration: %s' % format_timedelta(diff))
-                print('Number of files: %d' % archive.stats.nfiles)
+                archive.end = datetime.now()
+                print(str(archive))
                 print(archive.stats.print_('This archive:', cache))
-                print('-' * 78)
         return self.exit_code
 
     def _process(self, archive, cache, excludes, exclude_caches, skip_inodes, path, restrict_dev,

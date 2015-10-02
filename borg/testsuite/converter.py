@@ -47,7 +47,7 @@ def key_valid(path):
         return f.read().startswith(KeyfileKey.FILE_ID)
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture()
 def attic_repo(tmpdir):
     """
     create an attic repo with some stuff in it

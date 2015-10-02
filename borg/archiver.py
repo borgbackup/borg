@@ -162,15 +162,15 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             if args.stats:
                 t = datetime.now()
                 diff = t - t0
-                logger.warning('-' * 78)
-                logger.warning('Archive name: %s' % args.archive.archive)
-                logger.warning('Archive fingerprint: %s' % hexlify(archive.id).decode('ascii'))
-                logger.warning('Start time: %s' % t0.strftime('%c'))
-                logger.warning('End time: %s' % t.strftime('%c'))
-                logger.warning('Duration: %s' % format_timedelta(diff))
-                logger.warning('Number of files: %d' % archive.stats.nfiles)
-                logger.warning(archive.stats.print_('This archive:', cache))
-                logger.warning('-' * 78)
+                print('-' * 78)
+                print('Archive name: %s' % args.archive.archive)
+                print('Archive fingerprint: %s' % hexlify(archive.id).decode('ascii'))
+                print('Start time: %s' % t0.strftime('%c'))
+                print('End time: %s' % t.strftime('%c'))
+                print('Duration: %s' % format_timedelta(diff))
+                print('Number of files: %d' % archive.stats.nfiles)
+                print(archive.stats.print_('This archive:', cache))
+                print('-' * 78)
         return self.exit_code
 
     def _process(self, archive, cache, excludes, exclude_caches, skip_inodes, path, restrict_dev,
@@ -317,11 +317,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             if args.stats:
                 logger.warning(stats.print_('Deleted data:', cache))
         else:
-            logger.warning("You requested to completely DELETE the repository *including* all archives it contains:")
+            print("You requested to completely DELETE the repository *including* all archives it contains:", file=sys.stderr)
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
-                logger.warning(format_archive(archive_info))
+                print(format_archive(archive_info), file=sys.stderr)
             if not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
-                print("""Type "YES" if you understand this and want to continue.""")
+                print("""Type "YES" if you understand this and want to continue.""", file=sys.stderr)
+                # XXX: prompt may end up on stdout, but we'll assume that input() does the right thing
                 if input('Do you want to continue? ') != 'YES':
                     self.exit_code = 1
                     return self.exit_code
@@ -365,7 +366,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             archive = Archive(repository, key, manifest, args.src.archive)
             if args.short:
                 for item in archive.iter_items():
-                    print(remove_surrogates(item[b'path']), file=sys.stderr)
+                    print(remove_surrogates(item[b'path']))
             else:
                 tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 0o10: '-', 0o12: 'l', 0o14: 's'}
                 for item in archive.iter_items():
@@ -393,11 +394,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     print('%s%s %-6s %-6s %8d %s %s%s' % (
                         type, mode, item[b'user'] or item[b'uid'],
                         item[b'group'] or item[b'gid'], size, format_time(mtime),
-                        remove_surrogates(item[b'path']), extra),
-                          file=sys.stderr)
+                        remove_surrogates(item[b'path']), extra))
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
-                print(format_archive(archive_info), file=sys.stderr)
+                print(format_archive(archive_info))
         return self.exit_code
 
     def do_info(self, args):
@@ -407,14 +407,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         cache = Cache(repository, key, manifest, do_files=args.cache_files)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
         stats = archive.calc_stats(cache)
-        logger.warning('Name:', archive.name)
-        logger.warning('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
-        logger.warning('Hostname:', archive.metadata[b'hostname'])
-        logger.warning('Username:', archive.metadata[b'username'])
-        logger.warning('Time: %s' % to_localtime(archive.ts).strftime('%c'))
-        logger.warning('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
-        logger.warning('Number of files: %d' % stats.nfiles)
-        logger.warning(stats.print_('This archive:', cache))
+        print('Name:', archive.name)
+        print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
+        print('Hostname:', archive.metadata[b'hostname'])
+        print('Username:', archive.metadata[b'username'])
+        print('Time: %s' % to_localtime(archive.ts).strftime('%c'))
+        print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
+        print('Number of files: %d' % stats.nfiles)
+        print(stats.print_('This archive:', cache))
         return self.exit_code
 
     def do_prune(self, args):
@@ -496,10 +496,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         if not args.topic:
             parser.print_help()
         elif args.topic in self.helptext:
-            print(self.helptext[args.topic], file=sys.stderr)
+            print(self.helptext[args.topic])
         elif args.topic in commands:
             if args.epilog_only:
-                print(commands[args.topic].epilog, file=sys.stderr)
+                print(commands[args.topic].epilog)
             elif args.usage_only:
                 commands[args.topic].epilog = None
                 commands[args.topic].print_help()
@@ -531,13 +531,13 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             ('--yearly', '--keep-yearly', 'Warning: "--yearly" has been deprecated. Use "--keep-yearly" instead.')
         ]
         if args and args[0] == 'verify':
-            print('Warning: "borg verify" has been deprecated. Use "borg extract --dry-run" instead.', file=sys.stderr)
+            print('Warning: "borg verify" has been deprecated. Use "borg extract --dry-run" instead.')
             args = ['extract', '--dry-run'] + args[1:]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
                 if arg.startswith(old_name):
                     args[i] = arg.replace(old_name, new_name)
-                    print(warning, file=sys.stderr)
+                    print(warning)
         return args
 
     def run(self, args=None):

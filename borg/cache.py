@@ -74,9 +74,9 @@ class Cache:
         self.close()
 
     def _confirm(self, message, env_var_override=None):
-        logger.warning(message)
+        print(message, file=sys.stderr)
         if env_var_override and os.environ.get(env_var_override):
-            logger.warning("Yes (From {})".format(env_var_override))
+            print("Yes (From {})".format(env_var_override), file=sys.stderr)
             return True
         if not sys.stdin.isatty():
             return False

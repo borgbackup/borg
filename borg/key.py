@@ -196,9 +196,9 @@ class Passphrase(str):
                     logger.info('Remember your passphrase. Your data will be inaccessible without it.')
                     return passphrase
                 else:
-                    logger.warning('Passphrases do not match')
+                    print('Passphrases do not match', file=sys.stderr)
             else:
-                logger.warning('Passphrase must not be blank')
+                print('Passphrase must not be blank', file=sys.stderr)
 
     def __repr__(self):
         return '<Passphrase "***hidden***">'

@@ -1,5 +1,6 @@
 from configparser import RawConfigParser
 from .remote import cache_if_remote
+from collections import namedtuple
 import errno
 import logging
 logger = logging.getLogger(__name__)
@@ -15,7 +16,7 @@ import tempfile
 
 from .key import PlaintextKey
 from .helpers import Error, get_cache_dir, decode_dict, st_mtime_ns, unhexlify, int_to_bigint, \
-    bigint_to_int
+    bigint_to_int, format_file_size
 from .locking import UpgradableLock
 from .hashindex import ChunkIndex
 
@@ -72,6 +73,21 @@ class Cache:
 
     def __del__(self):
         self.close()
+
+    def __str__(self):
+        return format(self, """All archives:   {0.total_size:>20s} {0.total_csize:>20s} {0.unique_csize:>20s}
+
+                       Unique chunks         Total chunks
+Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
+
+    def __format__(self, format_spec):
+        # XXX: this should really be moved down to `hashindex.pyx`
+        Summary = namedtuple('Summary', ['total_size', 'total_csize', 'unique_size', 'unique_csize', 'total_unique_chunks', 'total_chunks'])
+        stats = Summary(*self.chunks.summarize())._asdict()
+        for field in ['total_size', 'total_csize', 'unique_csize']:
+            stats[field] = format_file_size(stats[field])
+        stats = Summary(**stats)
+        return format_spec.format(stats)
 
     def _confirm(self, message, env_var_override=None):
         print(message, file=sys.stderr)

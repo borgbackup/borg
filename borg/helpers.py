@@ -145,15 +145,19 @@ class Statistics:
             self.usize += csize
 
     def print_(self, label, cache):
-        total_size, total_csize, unique_size, unique_csize, total_unique_chunks, total_chunks = cache.chunks.summarize()
-        buf = "\n"
-        buf += '                       Original size      Compressed size    Deduplicated size'
-        buf += '%-15s %20s %20s %20s' % (label, format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize))
-        buf += 'All archives:   %20s %20s %20s' % (format_file_size(total_size), format_file_size(total_csize), format_file_size(unique_csize))
+        buf = str(self) % label
         buf += "\n"
-        buf += '                       Unique chunks         Total chunks'
-        buf += 'Chunk index:    %20d %20d' % (total_unique_chunks, total_chunks)
+        buf += str(cache)
         return buf
+
+    def __str__(self):
+        return format(self, """                       Original size      Compressed size    Deduplicated size
+%-15s {0.osize:>20s} {0.csize:>20s} {0.usize:>20s}""")
+
+    def __format__(self, format_spec):
+        fields = ['osize', 'csize', 'usize']
+        FormattedStats = namedtuple('FormattedStats', fields)
+        return format_spec.format(FormattedStats(*map(format_file_size, [ getattr(self, x) for x in fields ])))
 
     def show_progress(self, item=None, final=False):
         if not final:

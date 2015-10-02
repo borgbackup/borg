@@ -925,9 +925,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         it is recommended you run this on a copy of the Attic
         repository, in case something goes wrong, for example:
 
-        cp -a attic borg
-        borg convert -n borg
-        borg convert borg
+            cp -a attic borg
+            borg convert -n borg
+            borg convert borg
 
         you have been warned.""")
         subparser = subparsers.add_parser('convert', parents=[common_parser],

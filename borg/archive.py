@@ -201,7 +201,7 @@ Start time: {0.start:%c}
 End time: {0.end:%c}
 Duration: {0.duration}
 Number of files: {0.stats.nfiles}
-This archive: {0.cache}'''.format(self)
+{0.cache}'''.format(self)
         return buf
 
     def __repr__(self):

@@ -513,7 +513,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         logging.raiseExceptions = False
         l = logging.getLogger('')
         sh = logging.StreamHandler(sys.stderr)
-        sh.setFormatter(logging.Formatter('%(name)s: %(message)s'))
+        # other formatters will probably want this, but let's remove
+        # clutter on stderr
+        #sh.setFormatter(logging.Formatter('%(name)s: %(message)s'))
         l.addHandler(sh)
         levels = { None: logging.WARNING,
            0: logging.WARNING,

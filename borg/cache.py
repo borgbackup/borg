@@ -219,9 +219,12 @@ class Cache:
             return path.encode('utf-8')
 
         def cached_archives():
-            fns = os.listdir(archive_path)
-            # filenames with 64 hex digits == 256bit
-            return set(unhexlify(fn) for fn in fns if len(fn) == 64)
+            if self.do_cache:
+                fns = os.listdir(archive_path)
+                # filenames with 64 hex digits == 256bit
+                return set(unhexlify(fn) for fn in fns if len(fn) == 64)
+            else:
+                return set()
 
         def repo_archives():
             return set(info[b'id'] for info in self.manifest.archives.values())
@@ -258,14 +261,15 @@ class Cache:
                     if b'chunks' in item:
                         for chunk_id, size, csize in item[b'chunks']:
                             add(chunk_idx, chunk_id, size, csize)
-            fn = mkpath(archive_id)
-            fn_tmp = mkpath(archive_id, suffix='.tmp')
-            try:
-                chunk_idx.write(fn_tmp)
-            except Exception:
-                os.unlink(fn_tmp)
-            else:
-                os.rename(fn_tmp, fn)
+            if self.do_cache:
+                fn = mkpath(archive_id)
+                fn_tmp = mkpath(archive_id, suffix='.tmp')
+                try:
+                    chunk_idx.write(fn_tmp)
+                except Exception:
+                    os.unlink(fn_tmp)
+                else:
+                    os.rename(fn_tmp, fn)
             return chunk_idx
 
         def lookup_name(archive_id):
@@ -323,6 +327,9 @@ class Cache:
         self.begin_txn()
         repository = cache_if_remote(self.repository)
         legacy_cleanup()
+        # TEMPORARY HACK: to avoid archive index caching, create a FILE named ~/.cache/borg/REPOID/chunks.archive.d -
+        # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local disk)
+        self.do_cache = os.path.isdir(archive_path)
         self.chunks = create_master_idx(self.chunks)
 
     def add_chunk(self, id, data, stats):

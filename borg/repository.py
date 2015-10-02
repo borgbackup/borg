@@ -3,6 +3,8 @@ from binascii import hexlify
 from itertools import islice
 import errno
 import logging
+logger = logging.getLogger(__name__)
+
 import os
 import shutil
 import struct
@@ -279,7 +281,7 @@ class Repository:
         def report_error(msg):
             nonlocal error_found
             error_found = True
-            logging.error(msg)
+            logger.error(msg)
 
         assert not self._active_txn
         try:
@@ -567,7 +569,7 @@ class LoggedIO:
         with open(filename, 'rb') as fd:
             data = memoryview(fd.read())
         os.rename(filename, filename + '.beforerecover')
-        logging.info('attempting to recover ' + filename)
+        logger.info('attempting to recover ' + filename)
         with open(filename, 'wb') as fd:
             fd.write(MAGIC)
             while len(data) >= self.header_fmt.size:

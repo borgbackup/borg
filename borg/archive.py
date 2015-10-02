@@ -3,6 +3,7 @@ from getpass import getuser
 from itertools import groupby
 import errno
 import logging
+logger = logging.getLogger(__name__)
 
 from .key import key_factory
 from .remote import cache_if_remote
@@ -630,7 +631,7 @@ class ArchiveChecker:
         self.orphan_chunks_check()
         self.finish()
         if not self.error_found:
-            logging.info('Archive consistency check complete, no problems found.')
+            logger.info('Archive consistency check complete, no problems found.')
         return self.repair or not self.error_found
 
     def init_chunks(self):
@@ -652,7 +653,7 @@ class ArchiveChecker:
     def report_progress(self, msg, error=False):
         if error:
             self.error_found = True
-        logging.log(logging.ERROR if error else logging.WARNING, msg)
+        logger.log(logging.ERROR if error else logging.WARNING, msg)
 
     def identify_key(self, repository):
         cdata = repository.get(next(self.chunks.iteritems())[0])
@@ -779,7 +780,7 @@ class ArchiveChecker:
             num_archives = 1
             end = 1
         for i, (name, info) in enumerate(archive_items[:end]):
-            logging.info('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
+            logger.info('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
             archive_id = info[b'id']
             if archive_id not in self.chunks:
                 self.report_progress('Archive metadata block is missing', error=True)

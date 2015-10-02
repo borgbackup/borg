@@ -69,7 +69,7 @@ class AtticRepositoryConverter(Repository):
         with open(filename, 'r+b') as segment:
             segment.seek(0)
             # only write if necessary
-            if (segment.read(len(old_magic)) == old_magic):
+            if segment.read(len(old_magic)) == old_magic:
                 segment.seek(0)
                 segment.write(new_magic)
 

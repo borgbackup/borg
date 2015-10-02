@@ -914,10 +914,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
         copied to $BORG_KEYS_DIR or ~/.borg/keys.
 
-        the cache files are *not* currently converted, which will
-        result in a much longer backup the first time. you must run
-        `borg check --repair` to rebuild those files after the
-        conversion.
+        the cache files are converted, but the cache layout between Borg
+        and Attic changed, so it is possible the first backup after the
+        conversion takes longer than expected due to the cache resync.
 
         the conversion can PERMANENTLY DAMAGE YOUR REPOSITORY! Attic
         will also NOT BE ABLE TO READ THE BORG REPOSITORY ANYMORE, as

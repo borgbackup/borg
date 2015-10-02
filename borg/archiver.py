@@ -315,7 +315,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             repository.commit()
             cache.commit()
             if args.stats:
-                logger.warning(stats.print_('Deleted data:', cache))
+                logger.info(stats.print_('Deleted data:', cache))
         else:
             print("You requested to completely DELETE the repository *including* all archives it contains:", file=sys.stderr)
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
@@ -459,7 +459,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             repository.commit()
             cache.commit()
         if args.stats:
-            logger.warning(stats.print_('Deleted data:', cache))
+            logger.info(stats.print_('Deleted data:', cache))
         return self.exit_code
 
     helptext = {}

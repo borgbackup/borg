@@ -57,7 +57,7 @@ class AtticRepositoryConverter(Repository):
         for filename in segments:
             i += 1
             print("\rconverting segment %d/%d in place, %.2f%% done (%s)"
-                  % (i, len(segments), float(i)/len(segments), filename), end='')
+                  % (i, len(segments), 100*float(i)/len(segments), filename), end='')
             if dryrun:
                 time.sleep(0.001)
             else:

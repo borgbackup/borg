@@ -319,17 +319,19 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             if args.stats:
                 stats.print_('Deleted data:', cache)
         else:
-            print("You requested to completely DELETE the repository *including* all archives it contains:")
-            for archive_info in manifest.list_archive_infos(sort_by='ts'):
-                print(format_archive(archive_info))
-            if not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
-                print("""Type "YES" if you understand this and want to continue.\n""")
-                if input('Do you want to continue? ') != 'YES':
-                    self.exit_code = 1
-                    return self.exit_code
-            repository.destroy()
+            if not args.cache_only:
+                print("You requested to completely DELETE the repository *including* all archives it contains:")
+                for archive_info in manifest.list_archive_infos(sort_by='ts'):
+                    print(format_archive(archive_info))
+                if not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
+                    print("""Type "YES" if you understand this and want to continue.\n""")
+                    if input('Do you want to continue? ') != 'YES':
+                        self.exit_code = 1
+                        return self.exit_code
+                repository.destroy()
+                print("Repository deleted.")
             cache.destroy()
-            print("Repository and corresponding cache were deleted.")
+            print("Cache deleted.")
         return self.exit_code
 
     def do_mount(self, args):
@@ -811,6 +813,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the deleted archive')
+        subparser.add_argument('-c', '--cache-only', dest='cache_only',
+                               action='store_true', default=False,
+                               help='delete only the local cache for the given repository')
         subparser.add_argument('target', metavar='TARGET', nargs='?', default='',
                                type=location_validator(),
                                help='archive or repository to delete')

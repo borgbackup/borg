@@ -25,7 +25,7 @@ def packages_debianoid
     apt-get install -y fakeroot build-essential git
     apt-get install -y python3-dev python3-setuptools
     # for building python:
-    apt-get install zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev
+    apt-get install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev
     # this way it works on older dists (like ubuntu 12.04) also:
     easy_install3 pip
     pip3 install virtualenv

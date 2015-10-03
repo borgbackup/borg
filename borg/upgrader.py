@@ -11,11 +11,11 @@ from .key import KeyfileKey, KeyfileNotFoundError
 ATTIC_MAGIC = b'ATTICSEG'
 
 
-class AtticRepositoryConverter(Repository):
-    def convert(self, dryrun=True):
+class AtticRepositoryUpgrader(Repository):
+    def upgrade(self, dryrun=True):
         """convert an attic repository to a borg repository
 
-        those are the files that need to be converted here, from most
+        those are the files that need to be upgraded here, from most
         important to least important: segments, key files, and various
         caches, the latter being optional, as they will be rebuilt if
         missing.
@@ -62,7 +62,7 @@ class AtticRepositoryConverter(Repository):
             if dryrun:
                 time.sleep(0.001)
             else:
-                AtticRepositoryConverter.header_replace(filename, ATTIC_MAGIC, MAGIC)
+                AtticRepositoryUpgrader.header_replace(filename, ATTIC_MAGIC, MAGIC)
         print()
 
     @staticmethod
@@ -197,7 +197,7 @@ class AtticRepositoryConverter(Repository):
             for cache in caches:
                 print("converting cache %s" % cache)
                 if not dryrun:
-                    AtticRepositoryConverter.header_replace(cache, b'ATTICIDX', b'BORG_IDX')
+                    AtticRepositoryUpgrader.header_replace(cache, b'ATTICIDX', b'BORG_IDX')
 
 
 class AtticKeyfileKey(KeyfileKey):

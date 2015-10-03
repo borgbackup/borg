@@ -17,7 +17,7 @@ import traceback
 from . import __version__
 from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
 from .compress import Compressor, COMPR_BUFFER
-from .converter import AtticRepositoryConverter
+from .upgrader import AtticRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache
 from .key import key_creator
@@ -463,11 +463,20 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             stats.print_('Deleted data:', cache)
         return self.exit_code
 
-    def do_convert(self, args):
-        """convert a repository from attic to borg"""
-        repo = AtticRepositoryConverter(args.repository.path, create=False)
+    def do_upgrade(self, args):
+        """upgrade a repository from a previous version"""
+        # XXX: currently only upgrades from Attic repositories, but may
+        # eventually be extended to deal with major upgrades for borg
+        # itself.
+        #
+        # in this case, it should auto-detect the current repository
+        # format and fire up necessary upgrade mechanism. this remains
+        # to be implemented.
+
+        # XXX: should auto-detect if it is an attic repository here
+        repo = AtticRepositoryUpgrader(args.repository.path, create=False)
         try:
-            repo.convert(args.dry_run)
+            repo.upgrade(args.dry_run)
         except NotImplementedError as e:
             print("warning: %s" % e)
         return self.exit_code
@@ -906,8 +915,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                type=location_validator(archive=False),
                                help='repository to prune')
 
-        convert_epilog = textwrap.dedent("""
-        convert will convert an existing Attic repository to Borg in place.
+        upgrade_epilog = textwrap.dedent("""
+        upgrade an existing Borg repository in place. this currently
+        only support converting an Attic repository, but may
+        eventually be extended to cover major Borg upgrades as well.
 
         it will change the magic strings in the repository's segments
         to match the new Borg magic strings. the keyfiles found in
@@ -928,21 +939,21 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         repository, in case something goes wrong, for example:
 
             cp -a attic borg
-            borg convert -n borg
-            borg convert borg
+            borg upgrade -n borg
+            borg upgrade borg
 
         you have been warned.""")
-        subparser = subparsers.add_parser('convert', parents=[common_parser],
-                                          description=self.do_convert.__doc__,
-                                          epilog=convert_epilog,
+        subparser = subparsers.add_parser('upgrade', parents=[common_parser],
+                                          description=self.do_upgrade.__doc__,
+                                          epilog=upgrade_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
-        subparser.set_defaults(func=self.do_convert)
+        subparser.set_defaults(func=self.do_upgrade)
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
                                help='do not change repository')
         subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
-                               help='path to the attic repository to be converted')
+                               help='path to the repository to be upgraded')
 
         subparser = subparsers.add_parser('help', parents=[common_parser],
                                           description='Extra help')

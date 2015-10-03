@@ -11,7 +11,7 @@ try:
 except ImportError:
     attic = None
 
-from ..converter import AtticRepositoryConverter, AtticKeyfileKey
+from ..upgrader import AtticRepositoryUpgrader, AtticKeyfileKey
 from ..helpers import get_keys_dir
 from ..key import KeyfileKey
 from ..repository import Repository, MAGIC
@@ -78,7 +78,7 @@ def test_convert_segments(tmpdir, attic_repo):
     # check should fail because of magic number
     assert not repo_valid(tmpdir)
     print("opening attic repository with borg and converting")
-    repo = AtticRepositoryConverter(str(tmpdir), create=False)
+    repo = AtticRepositoryUpgrader(str(tmpdir), create=False)
     segments = [filename for i, filename in repo.io.segment_iterator()]
     repo.close()
     repo.convert_segments(segments, dryrun=False)
@@ -136,9 +136,9 @@ def test_keys(tmpdir, attic_repo, attic_key_file):
     define above)
     :param attic_key_file: an attic.key.KeyfileKey (fixture created above)
     """
-    repository = AtticRepositoryConverter(str(tmpdir), create=False)
+    repository = AtticRepositoryUpgrader(str(tmpdir), create=False)
     keyfile = AtticKeyfileKey.find_key_file(repository)
-    AtticRepositoryConverter.convert_keyfiles(keyfile, dryrun=False)
+    AtticRepositoryUpgrader.convert_keyfiles(keyfile, dryrun=False)
     assert key_valid(attic_key_file.path)
 
 
@@ -157,7 +157,7 @@ def test_convert_all(tmpdir, attic_repo, attic_key_file):
     # check should fail because of magic number
     assert not repo_valid(tmpdir)
     print("opening attic repository with borg and converting")
-    repo = AtticRepositoryConverter(str(tmpdir), create=False)
-    repo.convert(dryrun=False)
+    repo = AtticRepositoryUpgrader(str(tmpdir), create=False)
+    repo.upgrade(dryrun=False)
     assert key_valid(attic_key_file.path)
     assert repo_valid(tmpdir)

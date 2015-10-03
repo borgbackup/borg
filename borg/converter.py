@@ -10,6 +10,7 @@ from .key import KeyfileKey, KeyfileNotFoundError
 
 ATTIC_MAGIC = b'ATTICSEG'
 
+
 class AtticRepositoryConverter(Repository):
     def convert(self, dryrun=True):
         """convert an attic repository to a borg repository
@@ -25,7 +26,7 @@ class AtticRepositoryConverter(Repository):
         print("reading segments from attic repository using borg")
         # we need to open it to load the configuration and other fields
         self.open(self.path, exclusive=False)
-        segments = [ filename for i, filename in self.io.segment_iterator() ]
+        segments = [filename for i, filename in self.io.segment_iterator()]
         try:
             keyfile = self.find_attic_keyfile()
         except KeyfileNotFoundError:
@@ -121,7 +122,7 @@ class AtticRepositoryConverter(Repository):
 
         those are all hash indexes, so we need to
         `s/ATTICIDX/BORG_IDX/` in a few locations:
-        
+
         * the repository index (in `$ATTIC_REPO/index.%d`, where `%d`
           is the `Repository.get_index_transaction_id()`), which we
           should probably update, with a lock, see
@@ -143,28 +144,29 @@ class AtticRepositoryConverter(Repository):
 
         # copy of attic's get_cache_dir()
         attic_cache_dir = os.environ.get('ATTIC_CACHE_DIR',
-                          os.path.join(os.path.expanduser('~'), '.cache', 'attic'))
+                                         os.path.join(os.path.expanduser('~'),
+                                                      '.cache', 'attic'))
         attic_cache_dir = os.path.join(attic_cache_dir, hexlify(self.id).decode('ascii'))
         borg_cache_dir = os.path.join(get_cache_dir(), hexlify(self.id).decode('ascii'))
 
-        def copy_cache_file(file):
-            """copy the given attic cache file into the borg directory
+        def copy_cache_file(path):
+            """copy the given attic cache path into the borg directory
 
             does nothing if dryrun is True. also expects
             attic_cache_dir and borg_cache_dir to be set in the parent
             scope, to the directories path including the repository
             identifier.
 
-            :params file: the basename of the cache file to copy
+            :params path: the basename of the cache file to copy
             (example: "files" or "chunks") as a string
 
             :returns: the borg file that was created or None if non
             was created.
 
             """
-            attic_file = os.path.join(attic_cache_dir, file)
+            attic_file = os.path.join(attic_cache_dir, path)
             if os.path.exists(attic_file):
-                borg_file = os.path.join(borg_cache_dir, file)
+                borg_file = os.path.join(borg_cache_dir, path)
                 if os.path.exists(borg_file):
                     print("borg cache file already exists in %s, skipping conversion of %s" % (borg_file, attic_file))
                 else:
@@ -173,7 +175,7 @@ class AtticRepositoryConverter(Repository):
                         shutil.copyfile(attic_file, borg_file)
                     return borg_file
             else:
-                print("no %s cache file found in %s" % (file, attic_file))
+                print("no %s cache file found in %s" % (path, attic_file))
             return None
 
         if os.path.exists(attic_cache_dir):
@@ -183,10 +185,10 @@ class AtticRepositoryConverter(Repository):
 
         # XXX: untested, because generating cache files is a PITA, see
         # Archiver.do_create() for proof
-        for cache in [ 'files', 'chunks' ]:
+        for cache in ['files', 'chunks']:
             copied = copy_cache_file(cache)
             if copied:
-                caches += [copied]
+                caches.append(copied)
 
         for cache in caches:
             print("converting cache %s" % cache)

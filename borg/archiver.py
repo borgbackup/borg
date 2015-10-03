@@ -20,6 +20,7 @@ import traceback
 from . import __version__
 from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
 from .compress import Compressor, COMPR_BUFFER
+from .upgrader import AtticRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache
 from .key import key_creator
@@ -311,18 +312,20 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             if args.stats:
                 logger.info(stats.print_('Deleted data:', cache))
         else:
-            print("You requested to completely DELETE the repository *including* all archives it contains:", file=sys.stderr)
-            for archive_info in manifest.list_archive_infos(sort_by='ts'):
-                print(format_archive(archive_info), file=sys.stderr)
-            if not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
-                print("""Type "YES" if you understand this and want to continue.""", file=sys.stderr)
-                # XXX: prompt may end up on stdout, but we'll assume that input() does the right thing
-                if input('Do you want to continue? ') != 'YES':
-                    self.exit_code = 1
-                    return self.exit_code
-            repository.destroy()
+            if not args.cache_only:
+                print("You requested to completely DELETE the repository *including* all archives it contains:", file=sys.stderr)
+                for archive_info in manifest.list_archive_infos(sort_by='ts'):
+                    print(format_archive(archive_info), file=sys.stderr)
+                if not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
+                    print("""Type "YES" if you understand this and want to continue.\n""", file=sys.stderr)
+                    # XXX: prompt may end up on stdout, but we'll assume that input() does the right thing
+                    if input('Do you want to continue? ') != 'YES':
+                        self.exit_code = 1
+                        return self.exit_code
+                repository.destroy()
+                logger.info("Repository deleted.")
             cache.destroy()
-            logger.info("Repository and corresponding cache were deleted.")
+            logger.info("Cache deleted.")
         return self.exit_code
 
     def do_mount(self, args):
@@ -454,6 +457,24 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             cache.commit()
         if args.stats:
             logger.info(stats.print_('Deleted data:', cache))
+        return self.exit_code
+
+    def do_upgrade(self, args):
+        """upgrade a repository from a previous version"""
+        # XXX: currently only upgrades from Attic repositories, but may
+        # eventually be extended to deal with major upgrades for borg
+        # itself.
+        #
+        # in this case, it should auto-detect the current repository
+        # format and fire up necessary upgrade mechanism. this remains
+        # to be implemented.
+
+        # XXX: should auto-detect if it is an attic repository here
+        repo = AtticRepositoryUpgrader(args.repository.path, create=False)
+        try:
+            repo.upgrade(args.dry_run)
+        except NotImplementedError as e:
+            print("warning: %s" % e)
         return self.exit_code
 
     helptext = {}
@@ -800,6 +821,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the deleted archive')
+        subparser.add_argument('-c', '--cache-only', dest='cache_only',
+                               action='store_true', default=False,
+                               help='delete only the local cache for the given repository')
         subparser.add_argument('target', metavar='TARGET', nargs='?', default='',
                                type=location_validator(),
                                help='archive or repository to delete')
@@ -903,6 +927,53 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to prune')
+
+        upgrade_epilog = textwrap.dedent("""
+        upgrade an existing Borg repository in place. this currently
+        only support converting an Attic repository, but may
+        eventually be extended to cover major Borg upgrades as well.
+
+        it will change the magic strings in the repository's segments
+        to match the new Borg magic strings. the keyfiles found in
+        $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
+        copied to $BORG_KEYS_DIR or ~/.borg/keys.
+
+        the cache files are converted, from $ATTIC_CACHE_DIR or
+        ~/.cache/attic to $BORG_CACHE_DIR or ~/.cache/borg, but the
+        cache layout between Borg and Attic changed, so it is possible
+        the first backup after the conversion takes longer than expected
+        due to the cache resync.
+
+        it is recommended you run this on a copy of the Attic
+        repository, in case something goes wrong, for example:
+
+            cp -a attic borg
+            borg upgrade -n borg
+            borg upgrade borg
+
+        upgrade should be able to resume if interrupted, although it
+        will still iterate over all segments. if you want to start
+        from scratch, use `borg delete` over the copied repository to
+        make sure the cache files are also removed:
+
+            borg delete borg
+
+        the conversion can PERMANENTLY DAMAGE YOUR REPOSITORY! Attic
+        will also NOT BE ABLE TO READ THE BORG REPOSITORY ANYMORE, as
+        the magic strings will have changed.
+
+        you have been warned.""")
+        subparser = subparsers.add_parser('upgrade', parents=[common_parser],
+                                          description=self.do_upgrade.__doc__,
+                                          epilog=upgrade_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.set_defaults(func=self.do_upgrade)
+        subparser.add_argument('-n', '--dry-run', dest='dry_run',
+                               default=False, action='store_true',
+                               help='do not change repository')
+        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='path to the repository to be upgraded')
 
         subparser = subparsers.add_parser('help', parents=[common_parser],
                                           description='Extra help')

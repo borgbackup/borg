@@ -1,4 +1,4 @@
-from configparser import RawConfigParser
+import configparser
 from .remote import cache_if_remote
 from collections import namedtuple
 import errno
@@ -108,7 +108,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
         os.makedirs(self.path)
         with open(os.path.join(self.path, 'README'), 'w') as fd:
             fd.write('This is a Borg cache')
-        config = RawConfigParser()
+        config = configparser.RawConfigParser()
         config.add_section('cache')
         config.set('cache', 'version', '1')
         config.set('cache', 'repository', hexlify(self.repository.id).decode('ascii'))
@@ -128,10 +128,17 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
         shutil.rmtree(self.path)
 
     def _do_open(self):
-        self.config = RawConfigParser()
-        self.config.read(os.path.join(self.path, 'config'))
-        if self.config.getint('cache', 'version') != 1:
-            raise Exception('%s Does not look like a Borg cache')
+        self.config = configparser.RawConfigParser()
+        config_path = os.path.join(self.path, 'config')
+        self.config.read(config_path)
+        try:
+            cache_version = self.config.getint('cache', 'version')
+            wanted_version = 1
+            if  cache_version != wanted_version:
+                raise Exception('%s has unexpected cache version %d (wanted: %d).' % (
+                    config_path, cache_version, wanted_version))
+        except configparser.NoSectionError as e:
+            raise Exception('%s does not look like a Borg cache.' % config_path)
         self.id = self.config.get('cache', 'repository')
         self.manifest_id = unhexlify(self.config.get('cache', 'manifest'))
         self.timestamp = self.config.get('cache', 'timestamp', fallback=None)
@@ -238,9 +245,12 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
             return path.encode('utf-8')
 
         def cached_archives():
-            fns = os.listdir(archive_path)
-            # filenames with 64 hex digits == 256bit
-            return set(unhexlify(fn) for fn in fns if len(fn) == 64)
+            if self.do_cache:
+                fns = os.listdir(archive_path)
+                # filenames with 64 hex digits == 256bit
+                return set(unhexlify(fn) for fn in fns if len(fn) == 64)
+            else:
+                return set()
 
         def repo_archives():
             return set(info[b'id'] for info in self.manifest.archives.values())
@@ -277,14 +287,15 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
                     if b'chunks' in item:
                         for chunk_id, size, csize in item[b'chunks']:
                             add(chunk_idx, chunk_id, size, csize)
-            fn = mkpath(archive_id)
-            fn_tmp = mkpath(archive_id, suffix='.tmp')
-            try:
-                chunk_idx.write(fn_tmp)
-            except Exception:
-                os.unlink(fn_tmp)
-            else:
-                os.rename(fn_tmp, fn)
+            if self.do_cache:
+                fn = mkpath(archive_id)
+                fn_tmp = mkpath(archive_id, suffix='.tmp')
+                try:
+                    chunk_idx.write(fn_tmp)
+                except Exception:
+                    os.unlink(fn_tmp)
+                else:
+                    os.rename(fn_tmp, fn)
             return chunk_idx
 
         def lookup_name(archive_id):
@@ -342,6 +353,9 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
         self.begin_txn()
         repository = cache_if_remote(self.repository)
         legacy_cleanup()
+        # TEMPORARY HACK: to avoid archive index caching, create a FILE named ~/.cache/borg/REPOID/chunks.archive.d -
+        # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local disk)
+        self.do_cache = os.path.isdir(archive_path)
         self.chunks = create_master_idx(self.chunks)
 
     def add_chunk(self, id, data, stats):

@@ -36,7 +36,7 @@ help:
 clean:
 	-rm -rf $(BUILDDIR)/*
 
-html: usage
+html: usage api.rst
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
@@ -153,3 +153,18 @@ usage/%.rst.inc: ../borg/archiver.py
 	@borg help $* --usage-only | sed -e 's/^/    /' >> $@
 	@printf "\nDescription\n~~~~~~~~~~~\n" >> $@
 	@borg help $* --epilog-only >> $@
+
+api.rst: Makefile
+	@echo "auto-generating API documentation"
+	@echo "Borg Backup API documentation" > $@
+	@echo "=============================" >> $@
+	@echo "" >> $@
+	@for mod in ../borg/*.pyx ../borg/*.py; do \
+		if echo "$$mod" | grep -q "/_"; then \
+			continue ; \
+		fi ; \
+		printf ".. automodule:: "; \
+		echo "$$mod" | sed "s!\.\./!!;s/\.pyx\?//;s!/!.!"; \
+		echo "    :members:"; \
+		echo "    :undoc-members:"; \
+	done >> $@

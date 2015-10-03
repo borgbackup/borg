@@ -85,9 +85,12 @@ certain number of old archives::
         --exclude /home/Ben/Music/Justin\ Bieber    \
         --exclude '*.pyc'
 
-    # Use the `prune` subcommand to maintain 7 daily, 4 weekly
-    # and 6 monthly archives.
-    borg prune -v $REPOSITORY --keep-daily=7 --keep-weekly=4 --keep-monthly=6
+    # Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
+    # archives of THIS machine. --prefix `hostname`- is very important to
+    # limit prune's operation to this machine's archives and not apply to
+    # other machine's archives also.
+    borg prune -v $REPOSITORY --prefix `hostname`- \
+        --keep-daily=7 --keep-weekly=4 --keep-monthly=6
 
 .. backup_compression:
 

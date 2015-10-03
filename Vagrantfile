@@ -1,11 +1,7 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# Automated creation of testing environments on misc. platforms
-# Usage:
-#   vagrant up OS
-#   vagrant ssh OS -c command
-#   vagrant halt OS
+# Automated creation of testing environments / binaries on misc. platforms
 
 def packages_prepare_wheezy
   return <<-EOF
@@ -28,6 +24,8 @@ def packages_debianoid
     apt-get install -y libssl-dev libacl1-dev liblz4-dev libfuse-dev fuse pkg-config
     apt-get install -y fakeroot build-essential git
     apt-get install -y python3-dev python3-setuptools
+    # for building python:
+    apt-get install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev
     # this way it works on older dists (like ubuntu 12.04) also:
     easy_install3 pip
     pip3 install virtualenv
@@ -349,12 +347,29 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "wheezy32" do |b|
-    b.vm.box = "puppetlabs/debian-7.8-32-nocm"
+    b.vm.box = "boxcutter/debian79-i386"
     b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("wheezy32")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy32")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("wheezy32")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("wheezy32")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("wheezy32")
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller("wheezy32")
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("wheezy32")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("wheezy32")
+  end
+
+  config.vm.define "wheezy64" do |b|
+    b.vm.box = "boxcutter/debian79"
+    b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy64")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("wheezy64")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("wheezy64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("wheezy64")
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller("wheezy64")
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("wheezy64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("wheezy64")
   end
 
   # OS X

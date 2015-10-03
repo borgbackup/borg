@@ -1,4 +1,4 @@
-from configparser import RawConfigParser
+import configparser
 from .remote import cache_if_remote
 import errno
 import msgpack
@@ -89,7 +89,7 @@ class Cache:
         os.makedirs(self.path)
         with open(os.path.join(self.path, 'README'), 'w') as fd:
             fd.write('This is a Borg cache')
-        config = RawConfigParser()
+        config = configparser.RawConfigParser()
         config.add_section('cache')
         config.set('cache', 'version', '1')
         config.set('cache', 'repository', hexlify(self.repository.id).decode('ascii'))
@@ -109,10 +109,17 @@ class Cache:
         shutil.rmtree(self.path)
 
     def _do_open(self):
-        self.config = RawConfigParser()
-        self.config.read(os.path.join(self.path, 'config'))
-        if self.config.getint('cache', 'version') != 1:
-            raise Exception('%s Does not look like a Borg cache')
+        self.config = configparser.RawConfigParser()
+        config_path = os.path.join(self.path, 'config')
+        self.config.read(config_path)
+        try:
+            cache_version = self.config.getint('cache', 'version')
+            wanted_version = 1
+            if  cache_version != wanted_version:
+                raise Exception('%s has unexpected cache version %d (wanted: %d).' % (
+                    config_path, cache_version, wanted_version))
+        except configparser.NoSectionError as e:
+            raise Exception('%s does not look like a Borg cache.' % config_path)
         self.id = self.config.get('cache', 'repository')
         self.manifest_id = unhexlify(self.config.get('cache', 'manifest'))
         self.timestamp = self.config.get('cache', 'timestamp', fallback=None)

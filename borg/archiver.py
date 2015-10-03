@@ -931,16 +931,23 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         the first backup after the conversion takes longer than expected
         due to the cache resync.
 
-        the conversion can PERMANENTLY DAMAGE YOUR REPOSITORY! Attic
-        will also NOT BE ABLE TO READ THE BORG REPOSITORY ANYMORE, as
-        the magic strings will have changed.
-
         it is recommended you run this on a copy of the Attic
         repository, in case something goes wrong, for example:
 
             cp -a attic borg
             borg upgrade -n borg
             borg upgrade borg
+
+        upgrade should be able to resume if interrupted, although it
+        will still iterate over all segments. if you want to start
+        from scratch, use `borg delete` over the copied repository to
+        make sure the cache files are also removed:
+
+            borg delete borg
+
+        the conversion can PERMANENTLY DAMAGE YOUR REPOSITORY! Attic
+        will also NOT BE ABLE TO READ THE BORG REPOSITORY ANYMORE, as
+        the magic strings will have changed.
 
         you have been warned.""")
         subparser = subparsers.add_parser('upgrade', parents=[common_parser],

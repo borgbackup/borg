@@ -184,20 +184,17 @@ class AtticRepositoryUpgrader(Repository):
             if not os.path.exists(borg_cache_dir):
                 os.makedirs(borg_cache_dir)
 
-            # non-binary file that we don't need to convert, just copy
-            copy_cache_file('config')
+            # file that we don't have a header to convert, just copy
+            for cache in ['config', 'files']:
+                copy_cache_file(cache)
 
             # we need to convert the headers of those files, copy first
-            for cache in ['files', 'chunks']:
+            for cache in ['chunks']:
                 copied = copy_cache_file(cache)
                 if copied:
-                    caches.append(copied)
-
-            # actually convert the headers of the detected files
-            for cache in caches:
-                print("converting cache %s" % cache)
-                if not dryrun:
-                    AtticRepositoryUpgrader.header_replace(cache, b'ATTICIDX', b'BORG_IDX')
+                    print("converting cache %s" % cache)
+                    if not dryrun:
+                        AtticRepositoryUpgrader.header_replace(cache, b'ATTICIDX', b'BORG_IDX')
 
 
 class AtticKeyfileKey(KeyfileKey):

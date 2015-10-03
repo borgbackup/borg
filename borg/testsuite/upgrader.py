@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 import os
 import shutil
 import tempfile
@@ -77,7 +79,7 @@ def test_convert_segments(tmpdir, attic_repo):
     """
     # check should fail because of magic number
     assert not repo_valid(tmpdir)
-    print("opening attic repository with borg and converting")
+    logger.info("opening attic repository with borg and converting")
     repo = AtticRepositoryUpgrader(str(tmpdir), create=False)
     segments = [filename for i, filename in repo.io.segment_iterator()]
     repo.close()
@@ -156,7 +158,7 @@ def test_convert_all(tmpdir, attic_repo, attic_key_file):
     """
     # check should fail because of magic number
     assert not repo_valid(tmpdir)
-    print("opening attic repository with borg and converting")
+    logger.info("opening attic repository with borg and converting")
     repo = AtticRepositoryUpgrader(str(tmpdir), create=False)
     repo.upgrade(dryrun=False)
     assert key_valid(attic_key_file.path)

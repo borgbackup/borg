@@ -178,22 +178,26 @@ class AtticRepositoryConverter(Repository):
                 print("no %s cache file found in %s" % (path, attic_file))
             return None
 
+        # XXX: untested, because generating cache files is a PITA, see
+        # Archiver.do_create() for proof
         if os.path.exists(attic_cache_dir):
             if not os.path.exists(borg_cache_dir):
                 os.makedirs(borg_cache_dir)
+
+            # non-binary file that we don't need to convert, just copy
             copy_cache_file('config')
 
-        # XXX: untested, because generating cache files is a PITA, see
-        # Archiver.do_create() for proof
-        for cache in ['files', 'chunks']:
-            copied = copy_cache_file(cache)
-            if copied:
-                caches.append(copied)
+            # we need to convert the headers of those files, copy first
+            for cache in ['files', 'chunks']:
+                copied = copy_cache_file(cache)
+                if copied:
+                    caches.append(copied)
 
-        for cache in caches:
-            print("converting cache %s" % cache)
-            if not dryrun:
-                AtticRepositoryConverter.header_replace(cache, b'ATTICIDX', b'BORG_IDX')
+            # actually convert the headers of the detected files
+            for cache in caches:
+                print("converting cache %s" % cache)
+                if not dryrun:
+                    AtticRepositoryConverter.header_replace(cache, b'ATTICIDX', b'BORG_IDX')
 
 
 class AtticKeyfileKey(KeyfileKey):

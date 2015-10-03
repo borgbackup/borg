@@ -144,25 +144,49 @@ class AtticRepositoryConverter(Repository):
         # copy of attic's get_cache_dir()
         attic_cache_dir = os.environ.get('ATTIC_CACHE_DIR',
                           os.path.join(os.path.expanduser('~'), '.cache', 'attic'))
+        attic_cache_dir = os.path.join(attic_cache_dir, hexlify(self.id).decode('ascii'))
+        borg_cache_dir = os.path.join(get_cache_dir(), hexlify(self.id).decode('ascii'))
+
+        def copy_cache_file(file):
+            """copy the given attic cache file into the borg directory
+
+            does nothing if dryrun is True. also expects
+            attic_cache_dir and borg_cache_dir to be set in the parent
+            scope, to the directories path including the repository
+            identifier.
+
+            :params file: the basename of the cache file to copy
+            (example: "files" or "chunks") as a string
+
+            :returns: the borg file that was created or None if non
+            was created.
+
+            """
+            attic_file = os.path.join(attic_cache_dir, file)
+            if os.path.exists(attic_file):
+                borg_file = os.path.join(borg_cache_dir, file)
+                if os.path.exists(borg_file):
+                    print("borg cache file already exists in %s, skipping conversion of %s" % (borg_file, attic_file))
+                else:
+                    print("copying attic cache file from %s to %s" % (attic_file, borg_file))
+                    if not dryrun:
+                        shutil.copyfile(attic_file, borg_file)
+                    return borg_file
+            else:
+                print("no %s cache file found in %s" % (file, attic_file))
+            return None
+
+        if os.path.exists(attic_cache_dir):
+            if not os.path.exists(borg_cache_dir):
+                os.makedirs(borg_cache_dir)
+            copy_cache_file('config')
 
         # XXX: untested, because generating cache files is a PITA, see
         # Archiver.do_create() for proof
-        for cache in [ 'files', 'chunks', 'config' ]:
-            attic_cache = os.path.join(attic_cache_dir, hexlify(self.id).decode('ascii'), cache)
-            if os.path.exists(attic_cache):
-                borg_cache_dir = os.path.join(get_cache_dir(), hexlify(self.id).decode('ascii'))
-                if not os.path.exists(borg_cache_dir):
-                    os.makedirs(borg_cache_dir)
-                borg_cache = os.path.join(borg_cache_dir, cache)
-                if os.path.exists(borg_cache):
-                    print("borg cache already exists in %s, skipping conversion of %s" % (borg_cache, attic_cache))
-                else:
-                    print("copying attic cache from %s to %s" % (attic_cache, borg_cache))
-                    if not dryrun:
-                        shutil.copyfile(attic_cache, borg_cache)
-                    caches += [borg_cache]
-            else:
-                print("no %s cache found in %s" % (cache, attic_cache))
+        for cache in [ 'files', 'chunks' ]:
+            copied = copy_cache_file(cache)
+            if copied:
+                caches += [copied]
 
         for cache in caches:
             print("converting cache %s" % cache)

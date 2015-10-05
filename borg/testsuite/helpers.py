@@ -1,13 +1,14 @@
 import hashlib
 from time import mktime, strptime
 from datetime import datetime, timezone, timedelta
+import os
 
 import pytest
 import sys
 import msgpack
 
 from ..helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
-    prune_within, prune_split, \
+    prune_within, prune_split, get_cache_dir, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams
 from . import BaseTestCase
 
@@ -381,3 +382,12 @@ class TestParseTimestamp(BaseTestCase):
     def test(self):
         self.assert_equal(parse_timestamp('2015-04-19T20:25:00.226410'), datetime(2015, 4, 19, 20, 25, 0, 226410, timezone.utc))
         self.assert_equal(parse_timestamp('2015-04-19T20:25:00'), datetime(2015, 4, 19, 20, 25, 0, 0, timezone.utc))
+
+
+def test_get_cache_dir():
+    """test that get_cache_dir respects environement"""
+    assert get_cache_dir() == os.path.join(os.path.expanduser('~'), '.cache', 'borg')
+    os.environ['XDG_CACHE_HOME'] = '/var/tmp/.cache'
+    assert get_cache_dir() == os.path.join('/var/tmp/.cache', 'borg')
+    os.environ['BORG_CACHE_DIR'] = '/var/tmp'
+    assert get_cache_dir() == '/var/tmp'

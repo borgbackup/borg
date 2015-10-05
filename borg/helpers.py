@@ -172,8 +172,8 @@ def get_keys_dir():
 
 def get_cache_dir():
     """Determine where to repository keys and cache"""
-    return os.environ.get('BORG_CACHE_DIR',
-                          os.path.join(os.path.expanduser('~'), '.cache', 'borg'))
+    xdg_cache = os.environ.get('XDG_CACHE_HOME', os.path.join(os.path.expanduser('~'), '.cache'))
+    return os.environ.get('BORG_CACHE_DIR', os.path.join(xdg_cache, 'borg'))
 
 
 def to_localtime(ts):

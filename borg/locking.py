@@ -169,6 +169,9 @@ class LockRoster:
             if err.errno != errno.ENOENT:
                 raise
             data = {}
+        except ValueError:
+            # corrupt/empty roster file?
+            data = {}
         return data
 
     def save(self, data):

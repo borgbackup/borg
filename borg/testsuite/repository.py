@@ -325,6 +325,10 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
     def test_invalid_rpc(self):
         self.assert_raises(InvalidRPCMethod, lambda: self.repository.call('__init__', None))
 
+    def test_ssh_cmd(self):
+        assert self.repository.umask is not None
+        assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', 'example.com', 'borg', 'serve'] + self.repository.umask_flag()
+
 
 class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
 

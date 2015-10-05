@@ -386,8 +386,16 @@ class TestParseTimestamp(BaseTestCase):
 
 def test_get_cache_dir():
     """test that get_cache_dir respects environement"""
+    # reset BORG_CACHE_DIR in order to test default
+    old_env = None
+    if os.environ.get('BORG_CACHE_DIR'):
+        old_env = os.environ['BORG_CACHE_DIR']
+        del(os.environ['BORG_CACHE_DIR'])
     assert get_cache_dir() == os.path.join(os.path.expanduser('~'), '.cache', 'borg')
     os.environ['XDG_CACHE_HOME'] = '/var/tmp/.cache'
     assert get_cache_dir() == os.path.join('/var/tmp/.cache', 'borg')
     os.environ['BORG_CACHE_DIR'] = '/var/tmp'
     assert get_cache_dir() == '/var/tmp'
+    # reset old env
+    if old_env is not None:
+        os.environ['BORG_CACHE_DIR'] = old_env

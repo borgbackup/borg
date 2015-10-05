@@ -108,8 +108,9 @@ class RepositoryServer:  # pragma: no cover
 
 class RemoteRepository:
     extra_test_args = []
-    remote_path = None
-    umask = None
+    remote_path = 'borg'
+    # default umask, overriden by --umask, defaults to read/write only for owner
+    umask = 0o077
 
     class RPCError(Exception):
         def __init__(self, name):

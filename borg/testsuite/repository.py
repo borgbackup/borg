@@ -328,6 +328,8 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
     def test_ssh_cmd(self):
         assert self.repository.umask is not None
         assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', 'example.com', 'borg', 'serve'] + self.repository.umask_flag()
+        os.environ['BORG_RSH'] = 'ssh --foo'
+        assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', '--foo', 'example.com', 'borg', 'serve'] + self.repository.umask_flag()
 
 
 class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):

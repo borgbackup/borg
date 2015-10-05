@@ -3,6 +3,7 @@ import fcntl
 import msgpack
 import os
 import select
+import shlex
 from subprocess import Popen, PIPE
 import sys
 import tempfile
@@ -160,7 +161,7 @@ class RemoteRepository:
         return ['--umask', '%03o' % self.umask]
 
     def ssh_cmd(self, location):
-        args = ['ssh']
+        args = shlex.split(os.environ.get('BORG_RSH', 'ssh'))
         if location.port:
             args += ['-p', str(location.port)]
         if location.user:

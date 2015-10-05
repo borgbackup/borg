@@ -133,7 +133,7 @@ class RemoteRepository:
         # safe.
         if location.host == '__testsuite__':
             args = [sys.executable, '-m', 'borg.archiver', 'serve' ] + self.extra_test_args
-        else:
+        else:  # pragma: no cover
             args = self.ssh_cmd()
         self.p = Popen(args, bufsize=0, stdin=PIPE, stdout=PIPE)
         self.stdin_fd = self.p.stdin.fileno()

@@ -48,6 +48,8 @@ General:
         can either leave it away or abbreviate as `::`, if a positional parameter is required.
     BORG_PASSPHRASE
         When set, use the value to answer the passphrase question for encrypted repositories.
+    BORG_RSH
+        When set, use this command instead of ``ssh``.
     TMPDIR
         where temporary files are stored (might need a lot of temporary space for some operations)
 

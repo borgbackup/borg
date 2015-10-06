@@ -1,8 +1,6 @@
 from binascii import hexlify, a2b_base64, b2a_base64
 import configparser
 import getpass
-import logging
-logger = logging.getLogger(__name__)
 
 import os
 import msgpack
@@ -13,6 +11,8 @@ from hashlib import sha256
 from .crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
 from .compress import Compressor, COMPR_BUFFER
 from .helpers import IntegrityError, get_keys_dir, Error
+from .logger import create_logger
+logger = create_logger()
 
 PREFIX = b'\0' * 8
 

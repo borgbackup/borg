@@ -5,8 +5,6 @@ import binascii
 from collections import namedtuple
 from functools import wraps
 import grp
-import logging
-logger = logging.getLogger(__name__)
 
 import os
 import pwd

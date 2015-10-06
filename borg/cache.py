@@ -2,8 +2,6 @@ import configparser
 from .remote import cache_if_remote
 from collections import namedtuple
 import errno
-import logging
-logger = logging.getLogger(__name__)
 
 import msgpack
 import os
@@ -15,6 +13,8 @@ import tarfile
 import tempfile
 
 from .key import PlaintextKey
+from .logger import create_logger
+logger = create_logger()
 from .helpers import Error, get_cache_dir, decode_dict, st_mtime_ns, unhexlify, int_to_bigint, \
     bigint_to_int, format_file_size
 from .locking import UpgradableLock

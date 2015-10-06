@@ -4,10 +4,12 @@ from getpass import getuser
 from itertools import groupby
 import errno
 import logging
-logger = logging.getLogger(__name__)
 
+from .logger import create_logger
+logger = create_logger()
 from .key import key_factory
 from .remote import cache_if_remote
+
 import msgpack
 import os
 import socket

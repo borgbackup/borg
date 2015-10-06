@@ -7,8 +7,6 @@ from operator import attrgetter
 import functools
 import inspect
 import io
-import logging
-logger = logging.getLogger(__name__)
 
 import os
 import signal
@@ -20,7 +18,8 @@ import traceback
 from . import __version__
 from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
 from .compress import Compressor, COMPR_BUFFER
-from .logger import setup_logging
+from .logger import create_logger, setup_logging
+logger = create_logger()
 from .upgrader import AtticRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache

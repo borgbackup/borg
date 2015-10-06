@@ -1,6 +1,41 @@
 Borg Changelog
 ==============
 
+Version 0.27.0
+--------------
+
+New features:
+
+- "borg upgrade" command - attic -> borg one time converter / migration, #21
+- temporary hack to avoid using lots of disk space for chunks.archive.d, #235:
+  To use it: rm -rf chunks.archive.d ; touch chunks.archive.d
+- respect XDG_CACHE_HOME, attic #181
+- add support for arbitrary SSH commands, attic #99
+- borg delete --cache-only REPO (only delete cache, not REPO), attic #123
+
+
+Bug fixes:
+
+- use Debian 7 (wheezy) to build pyinstaller borgbackup binaries, fixes slow
+  down observed when running the Centos6-built binary on Ubuntu, #222
+- do not crash on empty lock.roster, fixes #232
+- fix multiple issues with the cache config version check, #234
+- fix segment entry header size check, attic #352
+  plus other error handling improvements / code deduplication there.
+- always give segment and offset in repo IntegrityErrors
+
+
+Other changes:
+
+- stop producing binary wheels, remove docs about it, #147
+- docs:
+  - add warning about prune
+  - generate usage include files only as needed
+  - development docs: add Vagrant section
+  - update / improve / reformat FAQ
+  - hint to single-file pyinstaller binaries from README
+
+
 Version 0.26.1
 --------------
 

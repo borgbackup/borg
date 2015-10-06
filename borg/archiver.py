@@ -20,6 +20,7 @@ import traceback
 from . import __version__
 from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
 from .compress import Compressor, COMPR_BUFFER
+from .logger import setup_logging
 from .upgrader import AtticRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache
@@ -524,21 +525,6 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             parser.error('No help available on %s' % (args.topic,))
         return self.exit_code
 
-    def setup_logging(self, args):
-        logging.raiseExceptions = False
-        l = logging.getLogger('')
-        sh = logging.StreamHandler(sys.stderr)
-        # other formatters will probably want this, but let's remove
-        # clutter on stderr
-        #sh.setFormatter(logging.Formatter('%(name)s: %(message)s'))
-        l.addHandler(sh)
-        levels = { None: logging.WARNING,
-           0: logging.WARNING,
-           1: logging.INFO,
-           2: logging.DEBUG }
-        # default to WARNING, -v goes to INFO and -vv to DEBUG
-        l.setLevel(levels[args.verbose])
-
     def preprocess_args(self, args):
         deprecations = [
             ('--hourly', '--keep-hourly', 'Warning: "--hourly" has been deprecated. Use "--keep-hourly" instead.'),
@@ -986,7 +972,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='additional help on TOPIC')
 
         args = parser.parse_args(args or ['-h'])
-        self.setup_logging(args)
+        setup_logging(args)
         os.umask(args.umask)
         RemoteRepository.remote_path = args.remote_path
         RemoteRepository.umask = args.umask

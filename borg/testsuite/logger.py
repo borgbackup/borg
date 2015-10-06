@@ -8,8 +8,8 @@ import sys
 from mock import Mock
 import pytest
 
-from ..logger import setup_logging
-logger = logging.getLogger(__name__)
+from ..logger import find_parent_module, create_logger, setup_logging
+logger = create_logger()
 
 @pytest.fixture()
 def io_logger():
@@ -38,3 +38,6 @@ def test_multiple_loggers(io_logger):
     logger = logging.getLogger('borg.testsuite.logger')
     logger.info('hello world 2')
     assert io_logger.getvalue() == "borg.testsuite.logger: hello world 2\n"
+
+def test_parent_module():
+    assert find_parent_module() == __name__

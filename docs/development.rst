@@ -119,21 +119,7 @@ Checklist::
   - Twitter
   - IRC channel (topic)
 
-- create binary wheels and link them from issue tracker: https://github.com/borgbackup/borg/issues/147
 - create standalone binaries and link them from issue tracker: https://github.com/borgbackup/borg/issues/214
-
-
-Creating binary wheels
-----------------------
-
-With virtual env activated::
-
-    pip install -U wheel
-    python setup.py bdist_wheel
-    ls -l dist/*.whl
-
-Note: Binary wheels are rather specific for the platform they get built on.
-      E.g. a wheel built for Ubuntu 14.04 64bit likely will not work on Centos7 64bit.
 
 
 Creating standalone binaries

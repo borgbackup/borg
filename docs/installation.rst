@@ -29,11 +29,8 @@ Below, we describe different ways to install |project_name|.
   binary package (for your Linux/*BSD/OS X/... distribution).
 - **pyinstaller binary** - easy and fast, we provide a ready-to-use binary file
   that just works on the supported platforms
-- **wheel** - easy and fast, needs a platform specific borgbackup binary wheel,
-  which matches your platform [OS and CPU]).
 - **pypi** - installing a source package from pypi needs more installation steps
-  and will compile stuff - try this if there is no binary wheel that works for
-  you.
+  and will need a compiler, development headers, etc..
 - **git** - for developers and power users who want to have the latest code or
   use revision control (each release is tagged).
 
@@ -89,35 +86,6 @@ For some platforms we offer a ready-to-use standalone borg binary.
 It is supposed to work without requiring installation or preparations.
 
 Check https://github.com/borgbackup/borg/issues/214 for available binaries.
-
-
-Debian Jessie / Ubuntu 14.04 preparations (wheel)
--------------------------------------------------
-
-.. parsed-literal::
-
-    # Python stuff we need
-    apt-get install python3 python3-pip
-
-    # Libraries we need (fuse is optional)
-    apt-get install openssl libacl1 liblz4-1 fuse
-
-
-Installation (wheel)
---------------------
-
-This uses the latest binary wheel release.
-
-.. parsed-literal::
-
-    # Check https://github.com/borgbackup/borg/issues/147 for the correct
-    # platform-specific binary wheel, download and install it:
-
-    # system-wide installation, needs sudo/root permissions:
-    sudo pip install borgbackup.whl
-
-    # home directory installation, no sudo/root needed:
-    pip install --user borgbackup.whl
 
 
 Debian Jessie / Ubuntu 14.04 preparations (git/pypi)

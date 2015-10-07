@@ -98,7 +98,7 @@ Checklist:
 
 - make sure all issues for this milestone are closed or move to the
   next milestone
-- look and fix any low hanging fruit left on the issue tracker
+- find and fix any low hanging fruit left on the issue tracker
 - run tox on all supported platforms via vagrant, check for test failures
 - check that Travis CI is also happy
 - update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``

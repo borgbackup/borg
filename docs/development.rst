@@ -94,32 +94,39 @@ Usage::
 Creating a new release
 ----------------------
 
-Checklist::
+Checklist:
 
-- all issues for this milestone closed?
-- any low hanging fruit left on the issue tracker?
-- run tox on all supported platforms via vagrant, check for test fails.
-- is Travis CI happy also?
-- update CHANGES.rst (compare to git log). check version number of upcoming release.
-- check MANIFEST.in and setup.py - are they complete?
+- make sure all issues for this milestone are closed or move to the
+  next milestone
+- find and fix any low hanging fruit left on the issue tracker
+- run tox on all supported platforms via vagrant, check for test failures
+- check that Travis CI is also happy
+- update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``
+- check version number of upcoming release in ``CHANGES.rst``
+- verify that ``MANIFEST.in`` and ``setup.py`` are complete
 - tag the release::
 
-  git tag -s -m "tagged release" 0.26.0
+    git tag -s -m "tagged release" 0.26.0
 
-- cd docs ; make html  # to update the usage include files
-- update website with the html
+- update usage include files::
+
+    cd docs ; make html
+
+- update website with the html (XXX: how?)
 - create a release on PyPi::
 
     python setup.py register sdist upload --identity="Thomas Waldmann" --sign
 
-- close release milestone.
+- close release milestone on Github
 - announce on::
 
-  - mailing list
-  - Twitter
-  - IRC channel (topic)
+ - `mailing list <mailto:borgbackup@librelist.org>`_
+ - Twitter (your personnal account, if you have one)
+ - `IRC channel <irc://irc.freenode.net/borgbackup>`_ (change ``/topic``
 
-- create standalone binaries and link them from issue tracker: https://github.com/borgbackup/borg/issues/214
+- create a Github release, include:
+  * standalone binaries (see below for how to create them)
+  * a link to ``CHANGES.rst``
 
 
 Creating standalone binaries
@@ -131,9 +138,10 @@ With virtual env activated::
 
   pip install pyinstaller>=3.0  # or git checkout master
   pyinstaller -F -n borg-PLATFORM --hidden-import=logging.config borg/__main__.py
-  ls -l dist/*
+  for file in dist/borg-*; do gpg --armor --detach-sign $file; done
 
 If you encounter issues, see also our `Vagrantfile` for details.
 
-Note: Standalone binaries built with pyinstaller are supposed to work on same OS,
-      same architecture (x86 32bit, amd64 64bit) without external dependencies.
+.. note:: Standalone binaries built with pyinstaller are supposed to
+          work on same OS, same architecture (x86 32bit, amd64 64bit)
+          without external dependencies.

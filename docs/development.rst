@@ -100,26 +100,27 @@ Checklist::
 - any low hanging fruit left on the issue tracker?
 - run tox on all supported platforms via vagrant, check for test fails.
 - is Travis CI happy also?
-- update CHANGES.rst (compare to git log). check version number of upcoming release.
+- update CHANGES.rst (compare to git log)
+- check version number of upcoming release
 - check MANIFEST.in and setup.py - are they complete?
 - tag the release::
 
   git tag -s -m "tagged release" 0.26.0
 
 - cd docs ; make html  # to update the usage include files
-- update website with the html
+- update website with the html (XXX: how?)
 - create a release on PyPi::
 
     python setup.py register sdist upload --identity="Thomas Waldmann" --sign
 
-- close release milestone.
+- close release milestone
 - announce on::
 
-  - mailing list
-  - Twitter
-  - IRC channel (topic)
+  - `mailing list <mailto:borgbackup@librelist.org>`_
+  - Twitter (XXX: how? where?)
+  - `IRC channel <irc://irc.freenode.net/borgbackup>`_ (change ``/topic``
 
-- create standalone binaries and link them from issue tracker: https://github.com/borgbackup/borg/issues/214
+- create standalone binaries and upload them to the Github release
 
 
 Creating standalone binaries

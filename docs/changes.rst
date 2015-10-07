@@ -70,12 +70,12 @@ Bug fixes:
 - fix reaction to "no" answer at delete repo prompt, #182
 - setup.py: detect lz4.h header file location
 - to support python < 3.2.4, add less buggy argparse lib from 3.2.6 (#194)
-- fix for obtaining 'char *' from temporary Python value (old code causes
+- fix for obtaining ``char *`` from temporary Python value (old code causes
   a compile error on Mint 17.2)
 - llfuse 0.41 install troubles on some platforms, require < 0.41
   (UnicodeDecodeError exception due to non-ascii llfuse setup.py)
 - cython code: add some int types to get rid of unspecific python add /
-  subtract operations (avoid undefined symbol FPE_... error on some platforms)
+  subtract operations (avoid ``undefined symbol FPE_``... error on some platforms)
 - fix verbose mode display of stdin backup
 - extract: warn if a include pattern never matched, fixes #209,
   implement counters for Include/ExcludePatterns
@@ -385,6 +385,7 @@ Version 0.14
 ------------
 
 (feature release, released on Dec 17, 2014)
+
 - Added support for stripping leading path segments (#95)
   "attic extract --strip-segments X"
 - Add workaround for old Linux systems without acl_extended_file_no_follow (#96)

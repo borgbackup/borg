@@ -96,8 +96,8 @@ Creating a new release
 
 Checklist:
 
-- make sure all issues for this milestone are closed or moved them to
-  the next milestone
+- make sure all issues for this milestone are closed or move to the
+  next milestone
 - look and fix any low hanging fruit left on the issue tracker
 - run tox on all supported platforms via vagrant, check for test failures
 - check that Travis CI is also happy

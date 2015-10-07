@@ -1,27 +1,11 @@
-Borg Contributors ("The Borg Collective")
-=========================================
+.. include:: global.rst.inc
 
-- Thomas Waldmann <tw@waldmann-edv.de>
-- Antoine Beaupré
-- Radek Podgorny <radek@podgorny.cz>
-- Yuri D'Elia
+.. include:: ../AUTHORS
 
-Attic authors
--------------
+License
+=======
 
-Borg is a fork of Attic. Attic is written and maintained
-by Jonas Borgström and various contributors:
+.. _license:
 
-Development Lead
-````````````````
-- Jonas Borgström <jonas@borgstrom.se>
-
-Patches and Suggestions
-```````````````````````
-- Brian Johnson
-- Cyril Roussillon
-- Dan Christensen
-- Jeremy Maitin-Shepard
-- Johann Klähn
-- Petros Moisiadis
-- Thomas Waldmann
+.. include:: ../LICENSE
+   :literal:

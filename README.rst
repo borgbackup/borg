@@ -9,9 +9,10 @@ since only changes are stored.
 The authenticated encryption technique makes it suitable for backups to not
 fully trusted targets.
 
-See the :doc:`installation manual <installation>` or, if you have already
+See the `installation manual`_ or, if you have already
 downloaded Borg, ``docs/installation.rst`` to get started with Borg.
 
+.. _installation manual: http://borgbackup.github.io/borgbackup/installation.html
 
 Main features
 ~~~~~~~~~~~~~
@@ -109,7 +110,9 @@ Notes
 -----
 
 Borg is a fork of `Attic <https://github.com/jborg/attic>`_ and maintained by
-":doc:`The Borg collective <authors>`".
+"`The Borg collective`_".
+
+.. _The Borg collective: http://borgbackup.github.io/borgbackup/authors.html
 
 Read `issue #1 <https://github.com/borgbackup/borg/issues/1>`_ about the initial
 considerations regarding project goals and policy of the Borg project.
@@ -117,15 +120,19 @@ considerations regarding project goals and policy of the Borg project.
 BORG IS NOT COMPATIBLE WITH ORIGINAL ATTIC.
 EXPECT THAT WE WILL BREAK COMPATIBILITY REPEATEDLY WHEN MAJOR RELEASE NUMBER
 CHANGES (like when going from 0.x.y to 1.0.0). Please read the
-:doc:`changelog <changes>` (or ``CHANGES.rst`` in the source
-distribution) for more information.
+`changelog`_ (or ``CHANGES.rst`` in the source distribution) for more
+information.
+
+.. _changelog: https://borgbackup.github.io/borgbackup/changes.html
 
 NOT RELEASED DEVELOPMENT VERSIONS HAVE UNKNOWN COMPATIBILITY PROPERTIES.
 
 THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
 
-For more information, please also see the
-`LICENSE  <https://github.com/borgbackup/borg/blob/master/LICENSE>`_.
+Borg is distributed under a 3-clause BSD license, see `the license`_
+for the complete license.
+
+.. _the license: https://borgbackup.github.io/borgbackup/authors.html#license
 
 |build| |coverage|
 

@@ -16,4 +16,5 @@ Borg Documentation
    changes
    internals
    development
+   authors
    api

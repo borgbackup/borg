@@ -113,27 +113,18 @@ Checklist:
     cd docs ; make html
 
 - update website with the html (XXX: how?)
-- write a release notes announcement, with:
-
-  1. a single summary paragraph, outlining major changes, security
-     issues, or deprecation warnings, and generally the severity of
-     the release, with a pointer to ``CHANGES.rst``
-  2. instructions for installing and upgrading borg (pointers to the
-     regular install docs, except for new installation/upgrade methods)
-  3. known issues (to be updated as we go along)
-
-- create a release on PyPi with the above release notes::
+- create a release on PyPi::
 
     python setup.py register sdist upload --identity="Thomas Waldmann" --sign
 
-- announce the release notes on:
+- close release milestone on Github
+- announce on::
 
  - `mailing list <mailto:borgbackup@librelist.org>`_
  - Twitter (your personnal account, if you have one)
  - `IRC channel <irc://irc.freenode.net/borgbackup>`_ (change ``/topic``
 
-- create standalone binaries (see below)
-- upload standalone binaries to the Github release, integrate release notes
+- create standalone binaries (see below) and upload them to the Github release
 
 
 Creating standalone binaries

@@ -124,7 +124,9 @@ Checklist:
  - Twitter (your personnal account, if you have one)
  - `IRC channel <irc://irc.freenode.net/borgbackup>`_ (change ``/topic``
 
-- create standalone binaries (see below) and upload them to the Github release
+- create a Github release, include:
+  * standalone binaries (see below for how to create them)
+  * a link to ``CHANGES.rst``
 
 
 Creating standalone binaries

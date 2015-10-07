@@ -85,7 +85,7 @@ For some platforms we offer a ready-to-use standalone borg binary.
 
 It is supposed to work without requiring installation or preparations.
 
-Check https://github.com/borgbackup/borg/issues/214 for available binaries.
+Check https://github.com/borgbackup/borg/releases for available binaries.
 
 
 Debian Jessie / Ubuntu 14.04 preparations (git/pypi)

@@ -3,6 +3,10 @@ import os
 import sys
 from glob import glob
 
+from distutils.command.build import build
+from distutils.core import Command
+from distutils.errors import DistutilsOptionError
+
 min_python = (3, 2)
 my_python = sys.version_info
 
@@ -115,8 +119,42 @@ elif not on_rtd:
 
 with open('README.rst', 'r') as fd:
     long_description = fd.read()
+class build_api(Command):
+    description = "generate a basic api.rst file based on the modules available"
 
-cmdclass = {'build_ext': build_ext, 'sdist': Sdist}
+    user_options = [
+        ('output=', 'O', 'output directory'),
+    ]
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        print("auto-generating API documentation")
+        with open("docs/api.rst", "w") as api:
+            api.write("""
+Borg Backup API documentation"
+=============================
+""")
+            for mod in glob('borg/*.py') + glob('borg/*.pyx'):
+                print("examining module %s" % mod)
+                if "/_" not in mod:
+                    api.write("""
+.. automodule:: %s
+    :members:
+    :undoc-members:
+""" % mod)
+
+# (function, predicate), see http://docs.python.org/2/distutils/apiref.html#distutils.cmd.Command.sub_commands
+build.sub_commands.append(('build_api', None))
+
+cmdclass = {
+    'build_ext': build_ext,
+    'build_api': build_api,
+    'sdist': Sdist
+}
 
 ext_modules = []
 if not on_rtd:

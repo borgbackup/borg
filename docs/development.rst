@@ -129,7 +129,7 @@ Make sure you have everything built and installed (including llfuse and fuse).
 
 With virtual env activated::
 
-  pip install pyinstaller==3.0.dev2  # or a later 3.x release or git checkout
+  pip install pyinstaller>=3.0  # or git checkout master
   pyinstaller -F -n borg-PLATFORM --hidden-import=logging.config borg/__main__.py
   ls -l dist/*
 

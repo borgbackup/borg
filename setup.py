@@ -10,6 +10,9 @@ if my_python < min_python:
     print("Borg requires Python %d.%d or later" % min_python)
     sys.exit(1)
 
+# Are we building on ReadTheDocs?
+on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
+
 # msgpack pure python data corruption was fixed in 0.4.6.
 # Also, we might use some rather recent API features.
 install_requires=['msgpack-python>=0.4.6', ]
@@ -64,7 +67,7 @@ except ImportError:
     from distutils.command.build_ext import build_ext
     if not all(os.path.exists(path) for path in [
         compress_source, crypto_source, chunker_source, hashindex_source,
-        platform_linux_source, platform_freebsd_source]):
+        platform_linux_source, platform_freebsd_source]) and not on_rtd:
         raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 
 
@@ -103,10 +106,11 @@ possible_lz4_prefixes = ['/usr', '/usr/local', '/usr/local/opt/lz4', '/usr/local
 if os.environ.get('BORG_LZ4_PREFIX'):
     possible_openssl_prefixes.insert(0, os.environ.get('BORG_LZ4_PREFIX'))
 lz4_prefix = detect_lz4(possible_lz4_prefixes)
-if not lz4_prefix:
+if lz4_prefix:
+    include_dirs.append(os.path.join(lz4_prefix, 'include'))
+    library_dirs.append(os.path.join(lz4_prefix, 'lib'))
+elif not on_rtd:
     raise Exception('Unable to find LZ4 headers. (Looked here: {})'.format(', '.join(possible_lz4_prefixes)))
-include_dirs.append(os.path.join(lz4_prefix, 'include'))
-library_dirs.append(os.path.join(lz4_prefix, 'lib'))
 
 
 with open('README.rst', 'r') as fd:
@@ -114,18 +118,20 @@ with open('README.rst', 'r') as fd:
 
 cmdclass = {'build_ext': build_ext, 'sdist': Sdist}
 
-ext_modules = [
+ext_modules = []
+if not on_rtd:
+    ext_modules += [
     Extension('borg.compress', [compress_source], libraries=['lz4'], include_dirs=include_dirs, library_dirs=library_dirs),
     Extension('borg.crypto', [crypto_source], libraries=['crypto'], include_dirs=include_dirs, library_dirs=library_dirs),
     Extension('borg.chunker', [chunker_source]),
     Extension('borg.hashindex', [hashindex_source])
 ]
-if sys.platform.startswith('linux'):
-    ext_modules.append(Extension('borg.platform_linux', [platform_linux_source], libraries=['acl']))
-elif sys.platform.startswith('freebsd'):
-    ext_modules.append(Extension('borg.platform_freebsd', [platform_freebsd_source]))
-elif sys.platform == 'darwin':
-    ext_modules.append(Extension('borg.platform_darwin', [platform_darwin_source]))
+    if sys.platform.startswith('linux'):
+        ext_modules.append(Extension('borg.platform_linux', [platform_linux_source], libraries=['acl']))
+    elif sys.platform.startswith('freebsd'):
+        ext_modules.append(Extension('borg.platform_freebsd', [platform_freebsd_source]))
+    elif sys.platform == 'darwin':
+        ext_modules.append(Extension('borg.platform_darwin', [platform_darwin_source]))
 
 setup(
     name='borgbackup',

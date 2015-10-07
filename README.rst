@@ -9,7 +9,8 @@ since only changes are stored.
 The authenticated encryption technique makes it suitable for backups to not
 fully trusted targets.
 
-`Borg Installation docs <http://borgbackup.github.io/borgbackup/installation.html>`_
+See the `installation manual <installation>`_ or, if you have already
+downloaded Borg, ``docs/installation.rst`` to get started with Borg.
 
 
 Main features
@@ -115,7 +116,8 @@ considerations regarding project goals and policy of the Borg project.
 
 BORG IS NOT COMPATIBLE WITH ORIGINAL ATTIC.
 EXPECT THAT WE WILL BREAK COMPATIBILITY REPEATEDLY WHEN MAJOR RELEASE NUMBER
-CHANGES (like when going from 0.x.y to 1.0.0). Please read CHANGES document.
+CHANGES (like when going from 0.x.y to 1.0.0). Please read the
+`changelog`_ (or ``CHANGES.rst`` in the source distribution) for more information.
 
 NOT RELEASED DEVELOPMENT VERSIONS HAVE UNKNOWN COMPATIBILITY PROPERTIES.
 

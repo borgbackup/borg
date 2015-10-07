@@ -66,15 +66,15 @@ Main features
     backup examination and restores (e.g. by using a regular file manager).
 
 **Easy installation on multiple platforms**
-    We offer a single-file binaries
+    We offer single-file binaries
     that does not require installing anything - you can just run it on
     the supported platforms:
 
     * Linux
     * Mac OS X
     * FreeBSD
-    * OpenBSD and NetBSD (for both: no xattrs/ACLs support yet)
-    * Cygwin (unsupported)
+    * OpenBSD and NetBSD (no xattrs/ACLs support or binaries yet)
+    * Cygwin (not supported, no binaries yet)
 
 **Free and Open Source Software**
   * security and functionality can be audited independently

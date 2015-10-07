@@ -6,7 +6,7 @@ Installation
 
 |project_name| pyinstaller binary installation requires:
 
-* Linux: glibc >= 2.12 (ok for most supported Linux releases)
+* Linux: glibc >= 2.13 (ok for most supported Linux releases)
 * MacOS X: 10.10 (unknown whether it works for older releases)
 * FreeBSD: 10.2 (unknown whether it works for older releases)
 

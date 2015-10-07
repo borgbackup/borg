@@ -62,6 +62,7 @@ def packages_darwin
     brew install lz4
     brew install fakeroot
     brew install git
+    brew install pkgconfig
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
   EOF
 end

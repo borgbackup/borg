@@ -68,6 +68,11 @@ Now run::
 
 Then point a web browser at docs/_build/html/index.html.
 
+To update the web site, copy (and add, commit and push) the contents of the
+`_build` directory to the `borgbackup` directory in the web site's repository:
+https://github.com/borgbackup/borgbackup.github.io
+
+
 Using Vagrant
 -------------
 
@@ -91,48 +96,11 @@ Usage::
      vagrant scp OS:/vagrant/borg/borg/dist/borg .
 
 
-Creating a new release
-----------------------
-
-Checklist:
-
-- make sure all issues for this milestone are closed or move to the
-  next milestone
-- find and fix any low hanging fruit left on the issue tracker
-- run tox on all supported platforms via vagrant, check for test failures
-- check that Travis CI is also happy
-- update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``
-- check version number of upcoming release in ``CHANGES.rst``
-- verify that ``MANIFEST.in`` and ``setup.py`` are complete
-- tag the release::
-
-    git tag -s -m "tagged release" 0.26.0
-
-- update usage include files::
-
-    cd docs ; make html
-
-- update website with the html (XXX: how?)
-- create a release on PyPi::
-
-    python setup.py register sdist upload --identity="Thomas Waldmann" --sign
-
-- close release milestone on Github
-- announce on::
-
- - `mailing list <mailto:borgbackup@librelist.org>`_
- - Twitter (your personnal account, if you have one)
- - `IRC channel <irc://irc.freenode.net/borgbackup>`_ (change ``/topic``
-
-- create a Github release, include:
-  * standalone binaries (see below for how to create them)
-  * a link to ``CHANGES.rst``
-
-
 Creating standalone binaries
 ----------------------------
 
 Make sure you have everything built and installed (including llfuse and fuse).
+When using the Vagrant VMs, pyinstaller will already be installed.
 
 With virtual env activated::
 
@@ -145,3 +113,37 @@ If you encounter issues, see also our `Vagrantfile` for details.
 .. note:: Standalone binaries built with pyinstaller are supposed to
           work on same OS, same architecture (x86 32bit, amd64 64bit)
           without external dependencies.
+
+
+Creating a new release
+----------------------
+
+Checklist:
+
+- make sure all issues for this milestone are closed or moved to the
+  next milestone
+- find and fix any low hanging fruit left on the issue tracker
+- run tox on all supported platforms via vagrant, check for test failures
+- check that Travis CI is also happy
+- update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``
+- check version number of upcoming release in ``CHANGES.rst``
+- verify that ``MANIFEST.in`` and ``setup.py`` are complete
+- tag the release::
+
+    git tag -s -m "tagged/signed release X.Y.Z" X.Y.Z
+
+- build fresh docs and update the web site with them
+- create a release on PyPi::
+
+    python setup.py register sdist upload --identity="Thomas Waldmann" --sign
+
+- close release milestone on Github
+- announce on::
+
+ - `mailing list <mailto:borgbackup@librelist.org>`_
+ - Twitter (follow @ThomasJWaldmann for these tweets)
+ - `IRC channel <irc://irc.freenode.net/borgbackup>`_ (change ``/topic``
+
+- create a Github release, include:
+  * standalone binaries (see above for how to create them)
+  * a link to ``CHANGES.rst``

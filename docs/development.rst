@@ -138,7 +138,7 @@ With virtual env activated::
 
   pip install pyinstaller>=3.0  # or git checkout master
   pyinstaller -F -n borg-PLATFORM --hidden-import=logging.config borg/__main__.py
-  gpg --armor --detach-sign dist/borg-*
+  for file in dist/borg-*; do gpg --armor --detach-sign $file; done
 
 If you encounter issues, see also our `Vagrantfile` for details.
 

@@ -94,7 +94,7 @@ Usage::
 Creating a new release
 ----------------------
 
-Checklist::
+Checklist:
 
 - make sure all issues for this milestone are closed or moved them to
   the next milestone
@@ -106,11 +106,11 @@ Checklist::
 - verify that ``MANIFEST.in`` and ``setup.py`` are complete
 - tag the release::
 
-  git tag -s -m "tagged release" 0.26.0
+    git tag -s -m "tagged release" 0.26.0
 
 - update usage include files::
 
-  cd docs ; make html
+    cd docs ; make html
 
 - update website with the html (XXX: how?)
 - write a release notes announcement, with:
@@ -126,11 +126,11 @@ Checklist::
 
     python setup.py register sdist upload --identity="Thomas Waldmann" --sign
 
-- announce the release notes on::
+- announce the release notes on:
 
-  - `mailing list <mailto:borgbackup@librelist.org>`_
-  - Twitter (XXX: how? where?)
-  - `IRC channel <irc://irc.freenode.net/borgbackup>`_ (change ``/topic``
+ - `mailing list <mailto:borgbackup@librelist.org>`_
+ - Twitter (XXX: how? where?)
+ - `IRC channel <irc://irc.freenode.net/borgbackup>`_ (change ``/topic``
 
 - create standalone binaries (see below)
 - upload standalone binaries to the Github release, integrate release notes

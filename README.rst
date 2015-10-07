@@ -9,7 +9,7 @@ since only changes are stored.
 The authenticated encryption technique makes it suitable for backups to not
 fully trusted targets.
 
-See the `installation manual <installation>`_ or, if you have already
+See the :doc:`installation manual <installation>` or, if you have already
 downloaded Borg, ``docs/installation.rst`` to get started with Borg.
 
 

@@ -129,7 +129,7 @@ Checklist:
 - announce the release notes on:
 
  - `mailing list <mailto:borgbackup@librelist.org>`_
- - Twitter (XXX: how? where?)
+ - Twitter (your personnal account, if you have one)
  - `IRC channel <irc://irc.freenode.net/borgbackup>`_ (change ``/topic``
 
 - create standalone binaries (see below)

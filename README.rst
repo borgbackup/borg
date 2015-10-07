@@ -64,16 +64,16 @@ Main features
     Backup archives are mountable as userspace filesystems for easy interactive
     backup examination and restores (e.g. by using a regular file manager).
 
-**Easy installation**
-    For Linux, Mac OS X and FreeBSD, we offer a single-file pyinstaller binary
-    that does not require installing anything - you can just run it.
+**Easy installation on multiple platforms**
+    We offer a single-file binaries
+    that does not require installing anything - you can just run it on
+    the supported platforms:
 
-**Platforms Borg works on**
-  * Linux
-  * Mac OS X
-  * FreeBSD
-  * OpenBSD and NetBSD (for both: no xattrs/ACLs support yet)
-  * Cygwin (unsupported)
+    * Linux
+    * Mac OS X
+    * FreeBSD
+    * OpenBSD and NetBSD (for both: no xattrs/ACLs support yet)
+    * Cygwin (unsupported)
 
 **Free and Open Source Software**
   * security and functionality can be audited independently

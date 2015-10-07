@@ -109,7 +109,7 @@ Notes
 -----
 
 Borg is a fork of `Attic <https://github.com/jborg/attic>`_ and maintained by
-"`The Borg Collective <https://github.com/borgbackup/borg/blob/master/AUTHORS>`_".
+":doc:`The Borg collective <authors>`".
 
 Read `issue #1 <https://github.com/borgbackup/borg/issues/1>`_ about the initial
 considerations regarding project goals and policy of the Borg project.
@@ -117,7 +117,8 @@ considerations regarding project goals and policy of the Borg project.
 BORG IS NOT COMPATIBLE WITH ORIGINAL ATTIC.
 EXPECT THAT WE WILL BREAK COMPATIBILITY REPEATEDLY WHEN MAJOR RELEASE NUMBER
 CHANGES (like when going from 0.x.y to 1.0.0). Please read the
-`changelog`_ (or ``CHANGES.rst`` in the source distribution) for more information.
+:doc:`changelog <changes>` (or ``CHANGES.rst`` in the source
+distribution) for more information.
 
 NOT RELEASED DEVELOPMENT VERSIONS HAVE UNKNOWN COMPATIBILITY PROPERTIES.
 

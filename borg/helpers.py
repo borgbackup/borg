@@ -16,8 +16,6 @@ from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from operator import attrgetter
 
-import msgpack
-
 def have_cython():
     """allow for a way to disable Cython includes
 
@@ -37,6 +35,7 @@ if have_cython():
     from . import hashindex
     from . import chunker
     from . import crypto
+    import msgpack
 
 
 class Error(Exception):

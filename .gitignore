@@ -2,7 +2,7 @@ MANIFEST
 docs/_build
 build
 dist
-env
+borg-env
 .tox
 hashindex.c
 chunker.c

@@ -182,15 +182,15 @@ class build_api(Command):
 
     def run(self):
         print("auto-generating API documentation")
-        with open("docs/api.rst", "w") as api:
-            api.write("""
+        with open("docs/api.rst", "w") as doc:
+            doc.write("""
 Borg Backup API documentation"
 =============================
 """)
             for mod in glob('borg/*.py') + glob('borg/*.pyx'):
                 print("examining module %s" % mod)
                 if "/_" not in mod:
-                    api.write("""
+                    doc.write("""
 .. automodule:: %s
     :members:
     :undoc-members:

@@ -16,7 +16,7 @@ if my_python < min_python:
     sys.exit(1)
 
 # Are we building on ReadTheDocs?
-on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
+on_rtd = os.environ.get('READTHEDOCS')
 
 # msgpack pure python data corruption was fixed in 0.4.6.
 # Also, we might use some rather recent API features.

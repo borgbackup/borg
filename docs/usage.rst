@@ -64,8 +64,8 @@ Some "yes" sayers (if set, they automatically confirm that you really want to do
         Disables the loading of Cython modules. This is currently
         experimental and is used only to generate usage docs at build
         time. It is unlikely to produce good results on a regular
-        run. The variable should be set to the calling class, and
-        should be unique. It is currently only used by ``build_usage``.
+        run. The variable should be set to the name of the  calling class, and
+        should be unique across all of borg. It is currently only used by ``build_usage``.
 
 Directories:
     BORG_KEYS_DIR

@@ -13,8 +13,8 @@ import time
 from io import BytesIO
 from . import xattr
 from .helpers import parse_timestamp, Error, uid2user, user2uid, gid2group, group2gid, \
-    Manifest, Statistics, decode_dict, st_mtime_ns, make_path_safe, StableDict, int_to_bigint, bigint_to_int, detect_cython
-if detect_cython():
+    Manifest, Statistics, decode_dict, st_mtime_ns, make_path_safe, StableDict, int_to_bigint, bigint_to_int, have_cython
+if have_cython():
     from .platform import acl_get, acl_set
     from .chunker import Chunker
     from .hashindex import ChunkIndex

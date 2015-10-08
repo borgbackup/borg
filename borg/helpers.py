@@ -18,7 +18,7 @@ from operator import attrgetter
 
 import msgpack
 
-def detect_cython():
+def have_cython():
     """allow for a way to disable Cython includes
 
     this is used during usage docs build, in setup.py. It is to avoid
@@ -33,7 +33,7 @@ def detect_cython():
     """
     return not os.environ.get('BORG_CYTHON_DISABLE')
 
-if detect_cython():
+if have_cython():
     from . import hashindex
     from . import chunker
     from . import crypto

@@ -13,7 +13,7 @@ from . import __version__
 from .helpers import Error, IntegrityError, have_cython
 from .repository import Repository
 
-if have_cython:
+if have_cython():
     import msgpack
 
 BUFSIZE = 10 * 1024 * 1024

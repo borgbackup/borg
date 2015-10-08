@@ -220,6 +220,7 @@ class build_py_custom(build_py):
     def run(self):
         super().run()
         self.announce('calling custom build steps', level=log.INFO)
+        self.run_command('build_ext')
         self.run_command('build_api')
         self.run_command('build_usage')
 

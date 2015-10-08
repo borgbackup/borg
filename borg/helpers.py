@@ -28,6 +28,8 @@ def detect_cython():
     we simply check an environment variable (``BORG_CYTHON_DISABLE``)
     which, when set (to anything) will disable includes of Cython
     libraries in key places to enable usage docs to be built.
+
+    :returns: True if Cython is available, False otherwise.
     """
     return not os.environ.get('BORG_CYTHON_DISABLE')
 

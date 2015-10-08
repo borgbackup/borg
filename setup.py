@@ -153,17 +153,17 @@ class build_usage(Command):
         for command, parser in choices.items():
             if command is 'help':
                 continue
-            with open('docs/usage/%s.rst.inc' % command, 'w') as cmdfile:
+            with open('docs/usage/%s.rst.inc' % command, 'w') as doc:
                 print('generating help for %s' % command)
                 params = {"command": command,
                           "underline": '-' * len('borg ' + command)}
-                cmdfile.write(".. _borg_{command}:\n\n".format(**params))
-                cmdfile.write("borg {command}\n{underline}\n::\n\n".format(**params))
+                doc.write(".. _borg_{command}:\n\n".format(**params))
+                doc.write("borg {command}\n{underline}\n::\n\n".format(**params))
                 epilog = parser.epilog
                 parser.epilog = None
-                cmdfile.write(re.sub("^", "    ", parser.format_help(), flags=re.M))
-                cmdfile.write("\nDescription\n~~~~~~~~~~~\n")
-                cmdfile.write(epilog)
+                doc.write(re.sub("^", "    ", parser.format_help(), flags=re.M))
+                doc.write("\nDescription\n~~~~~~~~~~~\n")
+                doc.write(epilog)
 
 
 class build_api(Command):

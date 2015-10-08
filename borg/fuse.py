@@ -2,14 +2,16 @@ from collections import defaultdict
 import errno
 import io
 import llfuse
-import msgpack
 import os
 import stat
 import tempfile
 import time
 from .archive import Archive
-from .helpers import daemonize
+from .helpers import daemonize, have_cython
 from .remote import cache_if_remote
+
+if have_cython:
+    import msgpack
 
 # Does this version of llfuse support ns precision?
 have_fuse_mtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')

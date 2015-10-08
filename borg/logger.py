@@ -8,8 +8,7 @@ The way to use this is as follows:
     logger = create_logger()
 
 * then each module uses logger.info/warning/debug/etc according to the
-  level it believes is appropriate. a first conversion was done, but
-  can be revised later on:
+  level it believes is appropriate:
 
     logger.debug('some intricate details you usually do not care about')
     logger.info('verbose progress information')

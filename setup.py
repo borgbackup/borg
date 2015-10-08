@@ -203,7 +203,7 @@ build.sub_commands.append(('build_usage', None))
 
 
 class build_py_custom(build_py):
-    """override build_py to also build our stuf
+    """override build_py to also build our stuff
 
     it is unclear why this is necessary, but in some environments
     (Readthedocs.org, specifically), the above

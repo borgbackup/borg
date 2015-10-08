@@ -2,7 +2,6 @@ import configparser
 from .remote import cache_if_remote
 from collections import namedtuple
 import errno
-
 import msgpack
 import os
 import stat

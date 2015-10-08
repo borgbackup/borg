@@ -1,7 +1,6 @@
 from binascii import hexlify, a2b_base64, b2a_base64
 import configparser
 import getpass
-
 import os
 import msgpack
 import textwrap

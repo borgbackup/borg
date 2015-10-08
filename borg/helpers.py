@@ -5,7 +5,6 @@ import binascii
 from collections import namedtuple
 from functools import wraps
 import grp
-
 import os
 import pwd
 import re

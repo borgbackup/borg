@@ -15,7 +15,7 @@ from .helpers import Error, get_cache_dir, decode_dict, st_mtime_ns, unhexlify, 
 from .locking import UpgradableLock
 from .hashindex import ChunkIndex
 
-if have_cython:
+if have_cython():
     import msgpack
 
 

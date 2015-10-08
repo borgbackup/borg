@@ -140,9 +140,6 @@ class build_usage(Command):
         # allows us to build docs without the C modules fully loaded during help generation
         if 'BORG_CYTHON_DISABLE' not in os.environ:
             os.environ['BORG_CYTHON_DISABLE'] = self.__class__.__name__
-        from borg.helpers import have_cython
-        print('have_cython? %s' % have_cython())
-        print("CYTHON ENV: %s" % os.environ.get('BORG_CYTHON_DISABLE'))
         from borg.archiver import Archiver
         parser = Archiver().build_parser(prog='borg')
         choices = {}

@@ -10,7 +10,7 @@ from .archive import Archive
 from .helpers import daemonize, have_cython
 from .remote import cache_if_remote
 
-if have_cython:
+if have_cython():
     import msgpack
 
 # Does this version of llfuse support ns precision?

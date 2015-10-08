@@ -4,7 +4,7 @@ from itertools import groupby
 import errno
 from .key import key_factory
 from .remote import cache_if_remote
-import msgpack
+
 import os
 import socket
 import stat
@@ -18,6 +18,7 @@ if have_cython():
     from .platform import acl_get, acl_set
     from .chunker import Chunker
     from .hashindex import ChunkIndex
+    import msgpack
 
 ITEMS_BUFFER = 1024 * 1024
 

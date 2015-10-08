@@ -7,9 +7,10 @@ import textwrap
 import hmac
 from hashlib import sha256
 
-from .crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
-from .compress import Compressor, COMPR_BUFFER
-from .helpers import IntegrityError, get_keys_dir, Error
+from .helpers import IntegrityError, get_keys_dir, Error, have_cython
+if have_cython():
+    from .crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
+    from .compress import Compressor, COMPR_BUFFER
 
 PREFIX = b'\0' * 8
 

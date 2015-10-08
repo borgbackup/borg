@@ -8,8 +8,9 @@ import struct
 import sys
 from zlib import crc32
 
-from .hashindex import NSIndex
-from .helpers import Error, IntegrityError, read_msgpack, write_msgpack, unhexlify
+from .helpers import Error, IntegrityError, read_msgpack, write_msgpack, unhexlify, have_cython
+if have_cython():
+    from .hashindex import NSIndex
 from .locking import UpgradableLock
 from .lrucache import LRUCache
 

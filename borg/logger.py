@@ -19,7 +19,7 @@ The way to use this is as follows:
   <https://docs.python.org/3/howto/logging.html#when-to-use-logging>`_
   for more information
 
-* console interaction happens on stderr, that include interactive
+* console interaction happens on stderr, that includes interactive
   reporting functions like `help`, `info` and `list`
 
 * ...except ``input()`` is special, because we can't control the
@@ -76,7 +76,7 @@ def find_parent_module():
 
 def create_logger(name=None):
     """create a Logger object with the proper path, which is returned by
-    find_parent_module() by default, or is provided on the commandline
+    find_parent_module() by default, or is provided via the commandline
 
     this is really a shortcut for:
 

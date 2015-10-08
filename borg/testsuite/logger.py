@@ -11,6 +11,7 @@ import pytest
 from ..logger import find_parent_module, create_logger, setup_logging
 logger = create_logger()
 
+
 @pytest.fixture()
 def io_logger():
     io = StringIO()
@@ -22,9 +23,11 @@ def io_logger():
     logger.setLevel(logging.DEBUG)
     return io
 
+
 def test_setup_logging(io_logger):
     logger.info('hello world')
     assert io_logger.getvalue() == "borg.testsuite.logger: hello world\n"
+
 
 def test_multiple_loggers(io_logger):
     logger = logging.getLogger(__name__)
@@ -38,6 +41,7 @@ def test_multiple_loggers(io_logger):
     logger = logging.getLogger('borg.testsuite.logger')
     logger.info('hello world 2')
     assert io_logger.getvalue() == "borg.testsuite.logger: hello world 2\n"
+
 
 def test_parent_module():
     assert find_parent_module() == __name__

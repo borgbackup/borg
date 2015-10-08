@@ -35,6 +35,7 @@ import inspect
 import logging
 import sys
 
+
 def setup_logging(args, stream=None):
     """setup logging module according to the arguments provided
 
@@ -46,15 +47,17 @@ def setup_logging(args, stream=None):
     sh = logging.StreamHandler(stream)
     # other formatters will probably want this, but let's remove
     # clutter on stderr
-    #sh.setFormatter(logging.Formatter('%(name)s: %(message)s'))
+    # example:
+    # sh.setFormatter(logging.Formatter('%(name)s: %(message)s'))
     l.addHandler(sh)
-    levels = { None: logging.WARNING,
-       0: logging.WARNING,
-       1: logging.INFO,
-       2: logging.DEBUG }
+    levels = {None: logging.WARNING,
+              0: logging.WARNING,
+              1: logging.INFO,
+              2: logging.DEBUG}
     # default to WARNING, -v goes to INFO and -vv to DEBUG
     l.setLevel(levels[args.verbose])
     return sh,
+
 
 def find_parent_module():
     """find the name of a the first module calling this module
@@ -73,6 +76,7 @@ def find_parent_module():
         # somehow we failed to find our module
         # return the logger module name by default
         return __name__
+
 
 def create_logger(name=None):
     """create a Logger object with the proper path, which is returned by

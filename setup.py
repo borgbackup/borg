@@ -1,5 +1,6 @@
 # -*- encoding: utf-8 *-*
 import os
+import re
 import sys
 from glob import glob
 
@@ -119,6 +120,54 @@ elif not on_rtd:
 
 with open('README.rst', 'r') as fd:
     long_description = fd.read()
+
+class build_usage(Command):
+    description = "generate usage for each command"
+
+    user_options = [
+        ('output=', 'O', 'output directory'),
+    ]
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        import pdb
+        print('generating usage docs')
+        from borg.archiver import Archiver
+        parser = Archiver().build_parser(prog='borg')
+        choices = {}
+        for action in parser._actions:
+            if action.choices is not None:
+                choices.update(action.choices)
+        print('found commands: %s' % list(choices.keys()))
+        if not os.path.exists('docs/usage'):
+            os.mkdir('docs/usage')
+        for command, parser in choices.items():
+            if command is 'help':
+                continue
+            with open('docs/usage/%s.rst.inc' % command, 'w') as cmdfile:
+                print('generating help for %s' % command)
+                cmdfile.write(""".. _borg_{command}:
+
+borg {command}
+{underline}
+::
+
+""".format(**{"command": command,
+                              "underline": '-' * len('borg ' + command)}))
+                epilog = parser.epilog
+                parser.epilog = None
+                cmdfile.write(re.sub("^", "    ", parser.format_help(), flags=re.M))
+                cmdfile.write("""
+Description
+~~~~~~~~~~~
+""")
+                cmdfile.write(epilog)
+
+
 class build_api(Command):
     description = "generate a basic api.rst file based on the modules available"
 
@@ -149,10 +198,12 @@ Borg Backup API documentation"
 
 # (function, predicate), see http://docs.python.org/2/distutils/apiref.html#distutils.cmd.Command.sub_commands
 build.sub_commands.append(('build_api', None))
+build.sub_commands.append(('build_usage', None))
 
 cmdclass = {
     'build_ext': build_ext,
     'build_api': build_api,
+    'build_usage': build_usage,
     'sdist': Sdist
 }
 

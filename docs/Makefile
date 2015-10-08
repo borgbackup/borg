@@ -36,7 +36,7 @@ help:
 clean:
 	-rm -rf $(BUILDDIR)/*
 
-html: usage
+html:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
@@ -139,17 +139,3 @@ gh-io: html
 
 inotify: html
 	while inotifywait -r . --exclude usage.rst --exclude '_build/*' ; do make html ; done
-
-# generate list of targets
-usage: $(shell borg help | grep -A1 "Available commands:" | tail -1 | sed 's/[{} ]//g;s/,\|^/.rst.inc usage\//g;s/^.rst.inc//;s/usage\/help//')
-
-# generate help file based on usage
-usage/%.rst.inc: ../borg/archiver.py
-	@echo generating usage for $*
-	@printf ".. _borg_$*:\n\n" > $@
-	@printf "borg $*\n" >> $@
-	@echo -n borg $* | tr 'a-z- ' '-' >> $@
-	@printf "\n::\n\n" >> $@
-	@borg help $* --usage-only | sed -e 's/^/    /' >> $@
-	@printf "\nDescription\n~~~~~~~~~~~\n" >> $@
-	@borg help $* --epilog-only >> $@

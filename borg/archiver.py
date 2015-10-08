@@ -548,24 +548,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     print(warning)
         return args
 
-    def run(self, args=None):
-        check_extension_modules()
-        keys_dir = get_keys_dir()
-        if not os.path.exists(keys_dir):
-            os.makedirs(keys_dir)
-            os.chmod(keys_dir, stat.S_IRWXU)
-        cache_dir = get_cache_dir()
-        if not os.path.exists(cache_dir):
-            os.makedirs(cache_dir)
-            os.chmod(cache_dir, stat.S_IRWXU)
-            with open(os.path.join(cache_dir, 'CACHEDIR.TAG'), 'w') as fd:
-                fd.write(textwrap.dedent("""
-                    Signature: 8a477f597d28d172789f06886806bc55
-                    # This file is a cache directory tag created by Borg.
-                    # For information about cache directory tags, see:
-                    #       http://www.brynosaurus.com/cachedir/
-                    """).lstrip())
-        common_parser = argparse.ArgumentParser(add_help=False)
+    def build_parser(self, args=None, prog=None):
+        common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
         common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
                                    default=False,
                                    help='verbose output')
@@ -576,11 +560,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         common_parser.add_argument('--remote-path', dest='remote_path', default=RemoteRepository.remote_path, metavar='PATH',
                                    help='set remote path to executable (default: "%(default)s")')
 
-        # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
-        if args:
-            args = self.preprocess_args(args)
-
-        parser = argparse.ArgumentParser(description='Borg %s - Deduplicated Backups' % __version__)
+        parser = argparse.ArgumentParser(prog=prog, description='Borg %s - Deduplicated Backups' % __version__)
         subparsers = parser.add_subparsers(title='Available commands')
 
         serve_epilog = textwrap.dedent("""
@@ -976,6 +956,30 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
         subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
                                help='additional help on TOPIC')
+        return parser
+
+    def run(self, args=None):
+        check_extension_modules()
+        keys_dir = get_keys_dir()
+        if not os.path.exists(keys_dir):
+            os.makedirs(keys_dir)
+            os.chmod(keys_dir, stat.S_IRWXU)
+        cache_dir = get_cache_dir()
+        if not os.path.exists(cache_dir):
+            os.makedirs(cache_dir)
+            os.chmod(cache_dir, stat.S_IRWXU)
+            with open(os.path.join(cache_dir, 'CACHEDIR.TAG'), 'w') as fd:
+                fd.write(textwrap.dedent("""
+                    Signature: 8a477f597d28d172789f06886806bc55
+                    # This file is a cache directory tag created by Borg.
+                    # For information about cache directory tags, see:
+                    #       http://www.brynosaurus.com/cachedir/
+                    """).lstrip())
+
+        # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
+        if args:
+            args = self.preprocess_args(args)
+        parser = self.build_parser(args)
 
         args = parser.parse_args(args or ['-h'])
         self.verbose = args.verbose

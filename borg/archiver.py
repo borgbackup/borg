@@ -85,7 +85,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 if input('Do you want to continue? ') == 'Yes I am sure':
                     break
         if not args.archives_only:
-            logger.warning('Starting repository check...')
+            logger.info('Starting repository check...')
             if repository.check(repair=args.repair):
                 logger.info('Repository check complete, no problems found.')
             else:

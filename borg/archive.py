@@ -677,7 +677,7 @@ class ArchiveChecker:
     def report_progress(self, msg, error=False):
         if error:
             self.error_found = True
-        logger.log(logging.ERROR if error else logging.WARNING, msg)
+        logger.log(logging.ERROR if error else logging.INFO, msg)
 
     def identify_key(self, repository):
         cdata = repository.get(next(self.chunks.iteritems())[0])
@@ -804,7 +804,7 @@ class ArchiveChecker:
             num_archives = 1
             end = 1
         for i, (name, info) in enumerate(archive_items[:end]):
-            logger.info('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
+            self.report_progress('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
             archive_id = info[b'id']
             if archive_id not in self.chunks:
                 self.report_progress('Archive metadata block is missing', error=True)

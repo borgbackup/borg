@@ -15,18 +15,18 @@ import textwrap
 import traceback
 
 from . import __version__
-if not os.environ.get('BORG_GEN_USAGE', False):
+from .helpers import Error, location_validator, format_time, format_file_size, \
+    format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
+    get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
+    Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
+    is_cachedir, bigint_to_int, ChunkerParams, CompressionSpec, detect_cython
+if not detect_cython():
     from .compress import Compressor, COMPR_BUFFER
     from .upgrader import AtticRepositoryUpgrader
     from .repository import Repository
     from .cache import Cache
     from .key import key_creator
 from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
-from .helpers import Error, location_validator, format_time, format_file_size, \
-    format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
-    get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
-    Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    is_cachedir, bigint_to_int, ChunkerParams, CompressionSpec
 from .remote import RepositoryServer, RemoteRepository
 
 has_lchflags = hasattr(os, 'lchflags')

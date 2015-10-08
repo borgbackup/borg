@@ -60,6 +60,12 @@ Some "yes" sayers (if set, they automatically confirm that you really want to do
         For "Warning: The repository at location ... was previously located at ..."
     BORG_CHECK_I_KNOW_WHAT_I_AM_DOING
         For "Warning: 'check --repair' is an experimental feature that might result in data loss."
+    BORG_CYTHON_DISABLE
+        Disables the loading of Cython modules. This is currently
+        experimentaly and is used only to generate usage docs at build
+        time, it's unlikely to produce good results on a regular
+        run. The variable should be set to the calling class, and
+        should be unique. It is currently only used by ``build_usage``.
 
 Directories:
     BORG_KEYS_DIR

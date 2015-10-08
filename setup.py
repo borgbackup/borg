@@ -135,10 +135,14 @@ class build_usage(Command):
 
     def run(self):
         print('generating usage docs')
-        # XXX: gross hack: allows us to skip loading C modules during help generation
-        os.environ['BORG_GEN_USAGE'] = "True"
+        # allows us to build docs without the C modules fully loaded during help generation
+        if 'BORG_CYTHON_DISABLE' not in os.environ:
+            os.environ['BORG_CYTHON_DISABLE'] = self.__class__.__name__
         from borg.archiver import Archiver
         parser = Archiver().build_parser(prog='borg')
+        # return to regular Cython configuration, if we changed it
+        if os.environ.get('BORG_CYTHON_DISABLE') == self.__class__.__name__:
+            del os.environ['BORG_CYTHON_DISABLE']
         choices = {}
         for action in parser._actions:
             if action.choices is not None:

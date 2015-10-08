@@ -8,9 +8,9 @@ import struct
 import sys
 from zlib import crc32
 
-if not os.environ.get('BORG_GEN_USAGE', False):
+from .helpers import Error, IntegrityError, read_msgpack, write_msgpack, unhexlify, detect_cython
+if not detect_cython():
     from .hashindex import NSIndex
-from .helpers import Error, IntegrityError, read_msgpack, write_msgpack, unhexlify
 from .locking import UpgradableLock
 from .lrucache import LRUCache
 

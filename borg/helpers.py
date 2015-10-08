@@ -29,9 +29,9 @@ def detect_cython():
     which, when set (to anything) will disable includes of Cython
     libraries in key places to enable usage docs to be built.
     """
-    return os.environ.get('BORG_CYTHON_DISABLE')
+    return not os.environ.get('BORG_CYTHON_DISABLE')
 
-if not detect_cython():
+if detect_cython():
     from . import hashindex
     from . import chunker
     from . import crypto

@@ -20,7 +20,7 @@ from .helpers import Error, location_validator, format_time, format_file_size, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     is_cachedir, bigint_to_int, ChunkerParams, CompressionSpec, detect_cython
-if not detect_cython():
+if detect_cython():
     from .compress import Compressor, COMPR_BUFFER
     from .upgrader import AtticRepositoryUpgrader
     from .repository import Repository

@@ -7,6 +7,8 @@ from glob import glob
 from distutils.command.build import build
 from distutils.core import Command
 from distutils.errors import DistutilsOptionError
+from distutils import log
+from setuptools.command.build_py import build_py
 
 min_python = (3, 2)
 my_python = sys.version_info
@@ -195,13 +197,38 @@ Borg Backup API documentation"
 """ % mod)
 
 # (function, predicate), see http://docs.python.org/2/distutils/apiref.html#distutils.cmd.Command.sub_commands
+# seems like this doesn't work on RTD, see below for build_py hack.
 build.sub_commands.append(('build_api', None))
 build.sub_commands.append(('build_usage', None))
+
+
+class build_py_custom(build_py):
+    """override build_py to also build our stuf
+
+    it is unclear why this is necessary, but in some environments
+    (Readthedocs.org, specifically), the above
+    ``build.sub_commands.append()`` doesn't seem to have an effect:
+    our custom build commands seem to be ignored when running
+    ``setup.py install``.
+
+    This class overrides the ``build_py`` target by forcing it to run
+    our custom steps as well.
+
+    See also the `bug report on RTD
+    <https://github.com/rtfd/readthedocs.org/issues/1740>`_.
+    """
+    def run(self):
+        super().run()
+        self.announce('calling custom build steps', level=log.INFO)
+        self.run_command('build_api')
+        self.run_command('build_usage')
+
 
 cmdclass = {
     'build_ext': build_ext,
     'build_api': build_api,
     'build_usage': build_usage,
+    'build_py': build_py_custom,
     'sdist': Sdist
 }
 

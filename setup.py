@@ -142,9 +142,6 @@ class build_usage(Command):
             os.environ['BORG_CYTHON_DISABLE'] = self.__class__.__name__
         from borg.archiver import Archiver
         parser = Archiver().build_parser(prog='borg')
-        # return to regular Cython configuration, if we changed it
-        if os.environ.get('BORG_CYTHON_DISABLE') == self.__class__.__name__:
-            del os.environ['BORG_CYTHON_DISABLE']
         choices = {}
         for action in parser._actions:
             if action.choices is not None:
@@ -166,6 +163,9 @@ class build_usage(Command):
                 doc.write(re.sub("^", "    ", parser.format_help(), flags=re.M))
                 doc.write("\nDescription\n~~~~~~~~~~~\n")
                 doc.write(epilog)
+        # return to regular Cython configuration, if we changed it
+        if os.environ.get('BORG_CYTHON_DISABLE') == self.__class__.__name__:
+            del os.environ['BORG_CYTHON_DISABLE']
 
 
 class build_api(Command):

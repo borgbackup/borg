@@ -151,21 +151,14 @@ class build_usage(Command):
                 continue
             with open('docs/usage/%s.rst.inc' % command, 'w') as cmdfile:
                 print('generating help for %s' % command)
-                cmdfile.write(""".. _borg_{command}:
-
-borg {command}
-{underline}
-::
-
-""".format(**{"command": command,
-                              "underline": '-' * len('borg ' + command)}))
+                params = {"command": command,
+                          "underline": '-' * len('borg ' + command)}
+                cmdfile.write(".. _borg_{command}:\n\n".format(**params))
+                cmdfile.write("borg {command}\n{underline}\n::\n\n".format(**params))
                 epilog = parser.epilog
                 parser.epilog = None
                 cmdfile.write(re.sub("^", "    ", parser.format_help(), flags=re.M))
-                cmdfile.write("""
-Description
-~~~~~~~~~~~
-""")
+                cmdfile.write("\nDescription\n~~~~~~~~~~~\n")
                 cmdfile.write(epilog)
 
 

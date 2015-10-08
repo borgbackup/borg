@@ -148,7 +148,8 @@ class Statistics:
         return buf
 
     def __str__(self):
-        return format(self, """                       Original size      Compressed size    Deduplicated size
+        return format(self, """\
+                       Original size      Compressed size    Deduplicated size
 %-15s {0.osize:>20s} {0.csize:>20s} {0.usize:>20s}""")
 
     def __format__(self, format_spec):

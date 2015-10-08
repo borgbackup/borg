@@ -74,7 +74,8 @@ class Cache:
         self.close()
 
     def __str__(self):
-        return format(self, """All archives:   {0.total_size:>20s} {0.total_csize:>20s} {0.unique_csize:>20s}
+        return format(self, """\
+All archives:   {0.total_size:>20s} {0.total_csize:>20s} {0.unique_csize:>20s}
 
                        Unique chunks         Total chunks
 Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")

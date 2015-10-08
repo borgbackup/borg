@@ -136,6 +136,8 @@ class build_usage(Command):
     def run(self):
         import pdb
         print('generating usage docs')
+        # XXX: gross hack: allows us to skip loading C modules during help generation
+        os.environ['BORG_GEN_USAGE'] = "True"
         from borg.archiver import Archiver
         parser = Archiver().build_parser(prog='borg')
         choices = {}

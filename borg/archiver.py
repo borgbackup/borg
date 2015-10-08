@@ -15,12 +15,13 @@ import textwrap
 import traceback
 
 from . import __version__
+if not os.environ.get('BORG_GEN_USAGE', False):
+    from .compress import Compressor, COMPR_BUFFER
+    from .upgrader import AtticRepositoryUpgrader
+    from .repository import Repository
+    from .cache import Cache
+    from .key import key_creator
 from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
-from .compress import Compressor, COMPR_BUFFER
-from .upgrader import AtticRepositoryUpgrader
-from .repository import Repository
-from .cache import Cache
-from .key import key_creator
 from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \

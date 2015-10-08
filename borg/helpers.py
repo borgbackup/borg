@@ -18,9 +18,10 @@ from operator import attrgetter
 
 import msgpack
 
-from . import hashindex
-from . import chunker
-from . import crypto
+if not os.environ.get('BORG_GEN_USAGE', False):
+    from . import hashindex
+    from . import chunker
+    from . import crypto
 
 
 class Error(Exception):

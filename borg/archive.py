@@ -10,7 +10,6 @@ logger = create_logger()
 from .key import key_factory
 from .remote import cache_if_remote
 
-import msgpack
 import os
 import socket
 import stat
@@ -18,11 +17,16 @@ import sys
 import time
 from io import BytesIO
 from . import xattr
-from .platform import acl_get, acl_set
-from .chunker import Chunker
-from .hashindex import ChunkIndex
-from .helpers import parse_timestamp, format_timedelta, Error, uid2user, user2uid, gid2group, group2gid, \
-    Manifest, Statistics, decode_dict, st_mtime_ns, make_path_safe, StableDict, int_to_bigint, bigint_to_int
+from .helpers import parse_timestamp, Error, uid2user, user2uid, gid2group, group2gid, format_timedelta, \
+    Manifest, Statistics, decode_dict, st_mtime_ns, make_path_safe, StableDict, int_to_bigint, bigint_to_int, have_cython
+if have_cython():
+    from .platform import acl_get, acl_set
+    from .chunker import Chunker
+    from .hashindex import ChunkIndex
+    import msgpack
+else:
+    import mock
+    msgpack = mock.Mock()
 
 ITEMS_BUFFER = 1024 * 1024
 

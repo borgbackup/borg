@@ -2,7 +2,6 @@ import configparser
 from .remote import cache_if_remote
 from collections import namedtuple
 import errno
-import msgpack
 import os
 import stat
 import sys
@@ -15,9 +14,12 @@ from .key import PlaintextKey
 from .logger import create_logger
 logger = create_logger()
 from .helpers import Error, get_cache_dir, decode_dict, st_mtime_ns, unhexlify, int_to_bigint, \
-    bigint_to_int, format_file_size
+    bigint_to_int, format_file_size, have_cython
 from .locking import UpgradableLock
 from .hashindex import ChunkIndex
+
+if have_cython():
+    import msgpack
 
 
 class Cache:

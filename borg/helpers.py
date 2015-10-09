@@ -16,11 +16,26 @@ from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from operator import attrgetter
 
-import msgpack
+def have_cython():
+    """allow for a way to disable Cython includes
 
-from . import hashindex
-from . import chunker
-from . import crypto
+    this is used during usage docs build, in setup.py. It is to avoid
+    loading the Cython libraries which are built, but sometimes not in
+    the search path (namely, during Tox runs).
+
+    we simply check an environment variable (``BORG_CYTHON_DISABLE``)
+    which, when set (to anything) will disable includes of Cython
+    libraries in key places to enable usage docs to be built.
+
+    :returns: True if Cython is available, False otherwise.
+    """
+    return not os.environ.get('BORG_CYTHON_DISABLE')
+
+if have_cython():
+    from . import hashindex
+    from . import chunker
+    from . import crypto
+    import msgpack
 
 
 class Error(Exception):
@@ -178,8 +193,8 @@ def get_keys_dir():
 
 def get_cache_dir():
     """Determine where to repository keys and cache"""
-    return os.environ.get('BORG_CACHE_DIR',
-                          os.path.join(os.path.expanduser('~'), '.cache', 'borg'))
+    xdg_cache = os.environ.get('XDG_CACHE_HOME', os.path.join(os.path.expanduser('~'), '.cache'))
+    return os.environ.get('BORG_CACHE_DIR', os.path.join(xdg_cache, 'borg'))
 
 
 def to_localtime(ts):

@@ -62,6 +62,7 @@ def packages_darwin
     brew install lz4
     brew install fakeroot
     brew install git
+    brew install pkgconfig
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
   EOF
 end
@@ -204,7 +205,7 @@ def install_pyinstaller(boxname)
     . borg-env/bin/activate
     git clone https://github.com/pyinstaller/pyinstaller.git
     cd pyinstaller
-    git checkout develop
+    git checkout master
     pip install -e .
   EOF
 end
@@ -216,7 +217,7 @@ def install_pyinstaller_bootloader(boxname)
     . borg-env/bin/activate
     git clone https://github.com/pyinstaller/pyinstaller.git
     cd pyinstaller
-    git checkout python3
+    git checkout master
     # build bootloader, if it is not included
     cd bootloader
     python ./waf all

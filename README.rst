@@ -9,8 +9,10 @@ since only changes are stored.
 The authenticated encryption technique makes it suitable for backups to not
 fully trusted targets.
 
-`Borg Installation docs <http://borgbackup.github.io/borgbackup/installation.html>`_
+See the `installation manual`_ or, if you have already
+downloaded Borg, ``docs/installation.rst`` to get started with Borg.
 
+.. _installation manual: http://borgbackup.github.io/borgbackup/installation.html
 
 Main features
 ~~~~~~~~~~~~~
@@ -63,16 +65,16 @@ Main features
     Backup archives are mountable as userspace filesystems for easy interactive
     backup examination and restores (e.g. by using a regular file manager).
 
-**Easy installation**
-    For Linux, Mac OS X and FreeBSD, we offer a single-file pyinstaller binary
-    that does not require installing anything - you can just run it.
+**Easy installation on multiple platforms**
+    We offer single-file binaries
+    that does not require installing anything - you can just run it on
+    the supported platforms:
 
-**Platforms Borg works on**
-  * Linux
-  * Mac OS X
-  * FreeBSD
-  * OpenBSD and NetBSD (for both: no xattrs/ACLs support yet)
-  * Cygwin (unsupported)
+    * Linux
+    * Mac OS X
+    * FreeBSD
+    * OpenBSD and NetBSD (no xattrs/ACLs support or binaries yet)
+    * Cygwin (not supported, no binaries yet)
 
 **Free and Open Source Software**
   * security and functionality can be audited independently
@@ -108,21 +110,29 @@ Notes
 -----
 
 Borg is a fork of `Attic <https://github.com/jborg/attic>`_ and maintained by
-"`The Borg Collective <https://github.com/borgbackup/borg/blob/master/AUTHORS>`_".
+"`The Borg collective`_".
+
+.. _The Borg collective: http://borgbackup.github.io/borgbackup/authors.html
 
 Read `issue #1 <https://github.com/borgbackup/borg/issues/1>`_ about the initial
 considerations regarding project goals and policy of the Borg project.
 
 BORG IS NOT COMPATIBLE WITH ORIGINAL ATTIC.
 EXPECT THAT WE WILL BREAK COMPATIBILITY REPEATEDLY WHEN MAJOR RELEASE NUMBER
-CHANGES (like when going from 0.x.y to 1.0.0). Please read CHANGES document.
+CHANGES (like when going from 0.x.y to 1.0.0). Please read the
+`changelog`_ (or ``CHANGES.rst`` in the source distribution) for more
+information.
+
+.. _changelog: https://borgbackup.github.io/borgbackup/changes.html
 
 NOT RELEASED DEVELOPMENT VERSIONS HAVE UNKNOWN COMPATIBILITY PROPERTIES.
 
 THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
 
-For more information, please also see the
-`LICENSE  <https://github.com/borgbackup/borg/blob/master/LICENSE>`_.
+Borg is distributed under a 3-clause BSD license, see `the license`_
+for the complete license.
+
+.. _the license: https://borgbackup.github.io/borgbackup/authors.html#license
 
 |build| |coverage|
 

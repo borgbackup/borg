@@ -68,10 +68,8 @@ Now run::
 
 Then point a web browser at docs/_build/html/index.html.
 
-To update the web site, copy (and add, commit and push) the contents of the
-`_build` directory to the `borgbackup` directory in the web site's repository:
-https://github.com/borgbackup/borgbackup.github.io
-
+The website is updated automatically through Github web hooks on the
+main repository.
 
 Using Vagrant
 -------------

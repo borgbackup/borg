@@ -184,7 +184,7 @@ class build_api(Command):
         print("auto-generating API documentation")
         with open("docs/api.rst", "w") as doc:
             doc.write("""
-Borg Backup API documentation"
+Borg Backup API documentation
 =============================
 """)
             for mod in glob('borg/*.py') + glob('borg/*.pyx'):

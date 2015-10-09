@@ -1,14 +1,66 @@
 Borg Changelog
 ==============
 
-
-Version 0.26.0 (not released yet)
----------------------------------
+Version 0.27.0
+--------------
 
 New features:
 
+- "borg upgrade" command - attic -> borg one time converter / migration, #21
+- temporary hack to avoid using lots of disk space for chunks.archive.d, #235:
+  To use it: rm -rf chunks.archive.d ; touch chunks.archive.d
+- respect XDG_CACHE_HOME, attic #181
+- add support for arbitrary SSH commands, attic #99
+- borg delete --cache-only REPO (only delete cache, not REPO), attic #123
+
+
+Bug fixes:
+
+- use Debian 7 (wheezy) to build pyinstaller borgbackup binaries, fixes slow
+  down observed when running the Centos6-built binary on Ubuntu, #222
+- do not crash on empty lock.roster, fixes #232
+- fix multiple issues with the cache config version check, #234
+- fix segment entry header size check, attic #352
+  plus other error handling improvements / code deduplication there.
+- always give segment and offset in repo IntegrityErrors
+
+
+Other changes:
+
+- stop producing binary wheels, remove docs about it, #147
+- docs:
+  - add warning about prune
+  - generate usage include files only as needed
+  - development docs: add Vagrant section
+  - update / improve / reformat FAQ
+  - hint to single-file pyinstaller binaries from README
+
+
+Version 0.26.1
+--------------
+
+This is a minor update, just docs and new pyinstaller binaries.
+
+- docs update about python and binary requirements
+- better docs for --read-special, fix #220
+- re-built the binaries, fix #218 and #213 (glibc version issue)
+- update web site about single-file pyinstaller binaries
+
+Note: if you did a python-based installation, there is no need to upgrade.
+
+
+Version 0.26.0
+--------------
+
+New features:
+
+- Faster cache sync (do all in one pass, remove tar/compression stuff), #163
 - BORG_REPO env var to specify the default repo, #168
 - read special files as if they were regular files, #79
+- implement borg create --dry-run, attic issue #267
+- Normalize paths before pattern matching on OS X, #143
+- support OpenBSD and NetBSD (except xattrs/ACLs)
+- support / run tests on Python 3.5
 
 Bug fixes:
 
@@ -16,11 +68,46 @@ Bug fixes:
 - chunker: use off_t to get 64bit on 32bit platform, #178
 - initialize chunker fd to -1, so it's not equal to STDIN_FILENO (0)
 - fix reaction to "no" answer at delete repo prompt, #182
+- setup.py: detect lz4.h header file location
+- to support python < 3.2.4, add less buggy argparse lib from 3.2.6 (#194)
+- fix for obtaining 'char *' from temporary Python value (old code causes
+  a compile error on Mint 17.2)
+- llfuse 0.41 install troubles on some platforms, require < 0.41
+  (UnicodeDecodeError exception due to non-ascii llfuse setup.py)
+- cython code: add some int types to get rid of unspecific python add /
+  subtract operations (avoid undefined symbol FPE_... error on some platforms)
+- fix verbose mode display of stdin backup
+- extract: warn if a include pattern never matched, fixes #209,
+  implement counters for Include/ExcludePatterns
+- archive names with slashes are invalid, attic issue #180
+- chunker: add a check whether the POSIX_FADV_DONTNEED constant is defined -
+  fixes building on OpenBSD.
 
 Other changes:
 
 - detect inconsistency / corruption / hash collision, #170
 - replace versioneer with setuptools_scm, #106
+- docs:
+
+  - pkg-config is needed for llfuse installation
+  - be more clear about pruning, attic issue #132
+- unit tests:
+
+  - xattr: ignore security.selinux attribute showing up
+  - ext3 seems to need a bit more space for a sparse file
+  - do not test lzma level 9 compression (avoid MemoryError)
+  - work around strange mtime granularity issue on netbsd, fixes #204
+  - ignore st_rdev if file is not a block/char device, fixes #203
+  - stay away from the setgid and sticky mode bits
+- use Vagrant to do easy cross-platform testing (#196), currently:
+
+  - Debian 7 "wheezy" 32bit, Debian 8 "jessie" 64bit
+  - Ubuntu 12.04 32bit, Ubuntu 14.04 64bit
+  - Centos 7 64bit
+  - FreeBSD 10.2 64bit
+  - OpenBSD 5.7 64bit
+  - NetBSD 6.1.5 64bit
+  - Darwin (OS X Yosemite)
 
 
 Version 0.25.0

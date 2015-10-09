@@ -1,12 +1,14 @@
 import hashlib
 from time import mktime, strptime
 from datetime import datetime, timezone, timedelta
+import os
 
 import pytest
+import sys
 import msgpack
 
-from ..helpers import adjust_patterns, exclude_path, Location, format_timedelta, ExcludePattern, make_path_safe, \
-    prune_within, prune_split, \
+from ..helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
+    prune_within, prune_split, get_cache_dir, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams
 from . import BaseTestCase
 
@@ -80,6 +82,11 @@ class TestLocationWithoutEnv:
         with pytest.raises(ValueError):
             Location('ssh://localhost:22/path:archive')
 
+    def test_no_slashes(self, monkeypatch):
+        monkeypatch.delenv('BORG_REPO', raising=False)
+        with pytest.raises(ValueError):
+            Location('/some/path/to/repo::archive_name_with/slashes/is_invalid')
+
     def test_canonical_path(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
         locations = ['some/path::archive', 'file://some/path::archive', 'host:some/path::archive',
@@ -133,6 +140,11 @@ class TestLocationWithEnv:
         assert repr(Location()) == \
                "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive=None)"
 
+    def test_no_slashes(self, monkeypatch):
+        monkeypatch.setenv('BORG_REPO', '/some/absolute/path')
+        with pytest.raises(ValueError):
+            Location('::archive_name_with/slashes/is_invalid')
+
 
 class FormatTimedeltaTestCase(BaseTestCase):
 
@@ -176,6 +188,72 @@ class PatternTestCase(BaseTestCase):
                           ['/etc/passwd', '/etc/hosts', '/home', '/home/user/.bashrc'])
         self.assert_equal(self.evaluate(['/etc/', '/var'], ['dmesg']),
                           ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg'])
+
+
+@pytest.mark.skipif(sys.platform in ('darwin',), reason='all but OS X test')
+class PatternNonAsciiTestCase(BaseTestCase):
+    def testComposedUnicode(self):
+        pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
+        i = IncludePattern(pattern)
+        e = ExcludePattern(pattern)
+
+        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert not i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert not e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+
+    def testDecomposedUnicode(self):
+        pattern = 'ba\N{COMBINING ACUTE ACCENT}'
+        i = IncludePattern(pattern)
+        e = ExcludePattern(pattern)
+
+        assert not i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+        assert not e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+    
+    def testInvalidUnicode(self):
+        pattern = str(b'ba\x80', 'latin1')
+        i = IncludePattern(pattern)
+        e = ExcludePattern(pattern)
+
+        assert not i.match("ba/foo")
+        assert i.match(str(b"ba\x80/foo", 'latin1'))
+        assert not e.match("ba/foo")
+        assert e.match(str(b"ba\x80/foo", 'latin1'))
+
+
+@pytest.mark.skipif(sys.platform not in ('darwin',), reason='OS X test')
+class OSXPatternNormalizationTestCase(BaseTestCase):
+    def testComposedUnicode(self):
+        pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
+        i = IncludePattern(pattern)
+        e = ExcludePattern(pattern)
+
+        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+    
+    def testDecomposedUnicode(self):
+        pattern = 'ba\N{COMBINING ACUTE ACCENT}'
+        i = IncludePattern(pattern)
+        e = ExcludePattern(pattern)
+
+        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+    
+    def testInvalidUnicode(self):
+        pattern = str(b'ba\x80', 'latin1')
+        i = IncludePattern(pattern)
+        e = ExcludePattern(pattern)
+
+        assert not i.match("ba/foo")
+        assert i.match(str(b"ba\x80/foo", 'latin1'))
+        assert not e.match("ba/foo")
+        assert e.match(str(b"ba\x80/foo", 'latin1'))
 
 
 def test_compression_specs():
@@ -304,3 +382,20 @@ class TestParseTimestamp(BaseTestCase):
     def test(self):
         self.assert_equal(parse_timestamp('2015-04-19T20:25:00.226410'), datetime(2015, 4, 19, 20, 25, 0, 226410, timezone.utc))
         self.assert_equal(parse_timestamp('2015-04-19T20:25:00'), datetime(2015, 4, 19, 20, 25, 0, 0, timezone.utc))
+
+
+def test_get_cache_dir():
+    """test that get_cache_dir respects environement"""
+    # reset BORG_CACHE_DIR in order to test default
+    old_env = None
+    if os.environ.get('BORG_CACHE_DIR'):
+        old_env = os.environ['BORG_CACHE_DIR']
+        del(os.environ['BORG_CACHE_DIR'])
+    assert get_cache_dir() == os.path.join(os.path.expanduser('~'), '.cache', 'borg')
+    os.environ['XDG_CACHE_HOME'] = '/var/tmp/.cache'
+    assert get_cache_dir() == os.path.join('/var/tmp/.cache', 'borg')
+    os.environ['BORG_CACHE_DIR'] = '/var/tmp'
+    assert get_cache_dir() == '/var/tmp'
+    # reset old env
+    if old_env is not None:
+        os.environ['BORG_CACHE_DIR'] = old_env

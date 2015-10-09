@@ -37,7 +37,8 @@ cdef class IndexBase:
     def __cinit__(self, capacity=0, path=None, key_size=32):
         self.key_size = key_size
         if path:
-            self.index = hashindex_read(os.fsencode(path))
+            path = os.fsencode(path)
+            self.index = hashindex_read(path)
             if not self.index:
                 raise Exception('hashindex_read failed')
         else:
@@ -54,7 +55,8 @@ cdef class IndexBase:
         return cls(path=path)
 
     def write(self, path):
-        if not hashindex_write(self.index, os.fsencode(path)):
+        path = os.fsencode(path)
+        if not hashindex_write(self.index, path):
             raise Exception('hashindex_write failed')
 
     def clear(self):

@@ -1,4 +1,6 @@
-import argparse
+from .support import argparse  # see support/__init__.py docstring
+                               # DEPRECATED - remove after requiring py 3.4
+
 from binascii import hexlify
 from datetime import datetime
 from operator import attrgetter
@@ -15,11 +17,12 @@ import traceback
 from . import __version__
 from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
 from .compress import Compressor, COMPR_BUFFER
+from .upgrader import AtticRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache
 from .key import key_creator
 from .helpers import Error, location_validator, format_time, format_file_size, \
-    format_file_mode, ExcludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
+    format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     is_cachedir, bigint_to_int, ChunkerParams, CompressionSpec
@@ -288,6 +291,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             # processing time, archive order is not as traversal order on "create".
             while dirs:
                 archive.extract_item(dirs.pop(-1))
+        for pattern in (patterns or []):
+            if isinstance(pattern, IncludePattern) and  pattern.match_count == 0:
+                self.print_error("Warning: Include pattern '%s' never matched.", pattern)
         return self.exit_code
 
     def do_rename(self, args):
@@ -317,17 +323,19 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             if args.stats:
                 stats.print_('Deleted data:', cache)
         else:
-            print("You requested to completely DELETE the repository *including* all archives it contains:")
-            for archive_info in manifest.list_archive_infos(sort_by='ts'):
-                print(format_archive(archive_info))
-            if not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
-                print("""Type "YES" if you understand this and want to continue.\n""")
-                if input('Do you want to continue? ') != 'YES':
-                    self.exit_code = 1
-                    return self.exit_code
-            repository.destroy()
+            if not args.cache_only:
+                print("You requested to completely DELETE the repository *including* all archives it contains:")
+                for archive_info in manifest.list_archive_infos(sort_by='ts'):
+                    print(format_archive(archive_info))
+                if not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
+                    print("""Type "YES" if you understand this and want to continue.\n""")
+                    if input('Do you want to continue? ') != 'YES':
+                        self.exit_code = 1
+                        return self.exit_code
+                repository.destroy()
+                print("Repository deleted.")
             cache.destroy()
-            print("Repository and corresponding cache were deleted.")
+            print("Cache deleted.")
         return self.exit_code
 
     def do_mount(self, args):
@@ -461,6 +469,24 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             stats.print_('Deleted data:', cache)
         return self.exit_code
 
+    def do_upgrade(self, args):
+        """upgrade a repository from a previous version"""
+        # XXX: currently only upgrades from Attic repositories, but may
+        # eventually be extended to deal with major upgrades for borg
+        # itself.
+        #
+        # in this case, it should auto-detect the current repository
+        # format and fire up necessary upgrade mechanism. this remains
+        # to be implemented.
+
+        # XXX: should auto-detect if it is an attic repository here
+        repo = AtticRepositoryUpgrader(args.repository.path, create=False)
+        try:
+            repo.upgrade(args.dry_run)
+        except NotImplementedError as e:
+            print("warning: %s" % e)
+        return self.exit_code
+
     helptext = {}
     helptext['patterns'] = '''
         Exclude patterns use a variant of shell pattern syntax, with '*' matching any
@@ -549,10 +575,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                    help='verbose output')
         common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
                                    help='do not load/update the file metadata cache used to detect unchanged files')
-        common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=0o077, metavar='M',
-                                   help='set umask to M (local and remote, default: 0o077)')
-        common_parser.add_argument('--remote-path', dest='remote_path', default='borg', metavar='PATH',
-                                   help='set remote path to executable (default: "borg")')
+        common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=RemoteRepository.umask, metavar='M',
+                                   help='set umask to M (local and remote, default: %(default)s)')
+        common_parser.add_argument('--remote-path', dest='remote_path', default=RemoteRepository.remote_path, metavar='PATH',
+                                   help='set remote path to executable (default: "%(default)s")')
 
         # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
         if args:
@@ -720,7 +746,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='do not create a backup archive')
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
-                               help='archive to create')
+                               help='name of archive to create (must be also a valid directory name)')
         subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
                                help='paths to archive')
 
@@ -791,6 +817,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the deleted archive')
+        subparser.add_argument('-c', '--cache-only', dest='cache_only',
+                               action='store_true', default=False,
+                               help='delete only the local cache for the given repository')
         subparser.add_argument('target', metavar='TARGET', nargs='?', default='',
                                type=location_validator(),
                                help='archive or repository to delete')
@@ -864,6 +893,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         If a prefix is set with -p, then only archives that start with the prefix are
         considered for deletion and only those archives count towards the totals
         specified by the rules.
+        Otherwise, *all* archives in the repository are candidates for deletion!
         """)
         subparser = subparsers.add_parser('prune', parents=[common_parser],
                                           description=self.do_prune.__doc__,
@@ -893,6 +923,53 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to prune')
+
+        upgrade_epilog = textwrap.dedent("""
+        upgrade an existing Borg repository in place. this currently
+        only support converting an Attic repository, but may
+        eventually be extended to cover major Borg upgrades as well.
+
+        it will change the magic strings in the repository's segments
+        to match the new Borg magic strings. the keyfiles found in
+        $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
+        copied to $BORG_KEYS_DIR or ~/.borg/keys.
+
+        the cache files are converted, from $ATTIC_CACHE_DIR or
+        ~/.cache/attic to $BORG_CACHE_DIR or ~/.cache/borg, but the
+        cache layout between Borg and Attic changed, so it is possible
+        the first backup after the conversion takes longer than expected
+        due to the cache resync.
+
+        it is recommended you run this on a copy of the Attic
+        repository, in case something goes wrong, for example:
+
+            cp -a attic borg
+            borg upgrade -n borg
+            borg upgrade borg
+
+        upgrade should be able to resume if interrupted, although it
+        will still iterate over all segments. if you want to start
+        from scratch, use `borg delete` over the copied repository to
+        make sure the cache files are also removed:
+
+            borg delete borg
+
+        the conversion can PERMANENTLY DAMAGE YOUR REPOSITORY! Attic
+        will also NOT BE ABLE TO READ THE BORG REPOSITORY ANYMORE, as
+        the magic strings will have changed.
+
+        you have been warned.""")
+        subparser = subparsers.add_parser('upgrade', parents=[common_parser],
+                                          description=self.do_upgrade.__doc__,
+                                          epilog=upgrade_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.set_defaults(func=self.do_upgrade)
+        subparser.add_argument('-n', '--dry-run', dest='dry_run',
+                               default=False, action='store_true',
+                               help='do not change repository')
+        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='path to the repository to be upgraded')
 
         subparser = subparsers.add_parser('help', parents=[common_parser],
                                           description='Extra help')

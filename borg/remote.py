@@ -3,6 +3,7 @@ import fcntl
 import msgpack
 import os
 import select
+import shlex
 from subprocess import Popen, PIPE
 import sys
 import tempfile
@@ -108,8 +109,9 @@ class RepositoryServer:  # pragma: no cover
 
 class RemoteRepository:
     extra_test_args = []
-    remote_path = None
-    umask = None
+    remote_path = 'borg'
+    # default umask, overriden by --umask, defaults to read/write only for owner
+    umask = 0o077
 
     class RPCError(Exception):
         def __init__(self, name):
@@ -125,19 +127,14 @@ class RemoteRepository:
         self.responses = {}
         self.unpacker = msgpack.Unpacker(use_list=False)
         self.p = None
-        # use local umask also for the remote process
-        umask = ['--umask', '%03o' % self.umask]
+        # XXX: ideally, the testsuite would subclass Repository and
+        # override ssh_cmd() instead of this crude hack, although
+        # __testsuite__ is not a valid domain name so this is pretty
+        # safe.
         if location.host == '__testsuite__':
-            args = [sys.executable, '-m', 'borg.archiver', 'serve'] + umask + self.extra_test_args
+            args = [sys.executable, '-m', 'borg.archiver', 'serve' ] + self.extra_test_args
         else:  # pragma: no cover
-            args = ['ssh']
-            if location.port:
-                args += ['-p', str(location.port)]
-            if location.user:
-                args.append('%s@%s' % (location.user, location.host))
-            else:
-                args.append('%s' % location.host)
-            args += [self.remote_path, 'serve'] + umask
+            args = self.ssh_cmd(location)
         self.p = Popen(args, bufsize=0, stdin=PIPE, stdout=PIPE)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()
@@ -159,6 +156,21 @@ class RemoteRepository:
 
     def __repr__(self):
         return '<%s %s>' % (self.__class__.__name__, self.location.canonical_path())
+
+    def umask_flag(self):
+        return ['--umask', '%03o' % self.umask]
+
+    def ssh_cmd(self, location):
+        args = shlex.split(os.environ.get('BORG_RSH', 'ssh'))
+        if location.port:
+            args += ['-p', str(location.port)]
+        if location.user:
+            args.append('%s@%s' % (location.user, location.host))
+        else:
+            args.append('%s' % location.host)
+        # use local umask also for the remote process
+        args += [self.remote_path, 'serve'] + self.umask_flag()
+        return args
 
     def call(self, cmd, *args, **kw):
         for resp in self.call_many(cmd, [args], **kw):

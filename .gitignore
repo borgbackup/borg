@@ -23,3 +23,4 @@ borg.build/
 borg.dist/
 borg.exe
 .coverage
+.vagrant

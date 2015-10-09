@@ -4,9 +4,15 @@ import sys
 from glob import glob
 
 min_python = (3, 2)
-if sys.version_info < min_python:
+my_python = sys.version_info
+
+if my_python < min_python:
     print("Borg requires Python %d.%d or later" % min_python)
     sys.exit(1)
+
+# msgpack pure python data corruption was fixed in 0.4.6.
+# Also, we might use some rather recent API features.
+install_requires=['msgpack-python>=0.4.6', ]
 
 
 from setuptools import setup, Extension
@@ -59,7 +65,7 @@ except ImportError:
     if not all(os.path.exists(path) for path in [
         compress_source, crypto_source, chunker_source, hashindex_source,
         platform_linux_source, platform_freebsd_source]):
-        raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version')
+        raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 
 
 def detect_openssl(prefixes):
@@ -71,14 +77,36 @@ def detect_openssl(prefixes):
                     return prefix
 
 
+def detect_lz4(prefixes):
+    for prefix in prefixes:
+        filename = os.path.join(prefix, 'include', 'lz4.h')
+        if os.path.exists(filename):
+            with open(filename, 'r') as fd:
+                if 'LZ4_decompress_safe' in fd.read():
+                    return prefix
+
+
+include_dirs = []
+library_dirs = []
+
 possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl', '/usr/local/borg', '/opt/local']
 if os.environ.get('BORG_OPENSSL_PREFIX'):
     possible_openssl_prefixes.insert(0, os.environ.get('BORG_OPENSSL_PREFIX'))
 ssl_prefix = detect_openssl(possible_openssl_prefixes)
 if not ssl_prefix:
     raise Exception('Unable to find OpenSSL >= 1.0 headers. (Looked here: {})'.format(', '.join(possible_openssl_prefixes)))
-include_dirs = [os.path.join(ssl_prefix, 'include')]
-library_dirs = [os.path.join(ssl_prefix, 'lib')]
+include_dirs.append(os.path.join(ssl_prefix, 'include'))
+library_dirs.append(os.path.join(ssl_prefix, 'lib'))
+
+
+possible_lz4_prefixes = ['/usr', '/usr/local', '/usr/local/opt/lz4', '/usr/local/lz4', '/usr/local/borg', '/opt/local']
+if os.environ.get('BORG_LZ4_PREFIX'):
+    possible_openssl_prefixes.insert(0, os.environ.get('BORG_LZ4_PREFIX'))
+lz4_prefix = detect_lz4(possible_lz4_prefixes)
+if not lz4_prefix:
+    raise Exception('Unable to find LZ4 headers. (Looked here: {})'.format(', '.join(possible_lz4_prefixes)))
+include_dirs.append(os.path.join(lz4_prefix, 'include'))
+library_dirs.append(os.path.join(lz4_prefix, 'lib'))
 
 
 with open('README.rst', 'r') as fd:
@@ -87,7 +115,7 @@ with open('README.rst', 'r') as fd:
 cmdclass = {'build_ext': build_ext, 'sdist': Sdist}
 
 ext_modules = [
-    Extension('borg.compress', [compress_source], libraries=['lz4']),
+    Extension('borg.compress', [compress_source], libraries=['lz4'], include_dirs=include_dirs, library_dirs=library_dirs),
     Extension('borg.crypto', [crypto_source], libraries=['crypto'], include_dirs=include_dirs, library_dirs=library_dirs),
     Extension('borg.chunker', [chunker_source]),
     Extension('borg.hashindex', [hashindex_source])
@@ -110,13 +138,15 @@ setup(
     description='Deduplicated, encrypted, authenticated and compressed backups',
     long_description=long_description,
     license='BSD',
-    platforms=['Linux', 'MacOS X', 'FreeBSD', ],
+    platforms=['Linux', 'MacOS X', 'FreeBSD', 'OpenBSD', 'NetBSD', ],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Console',
         'Intended Audience :: System Administrators',
         'License :: OSI Approved :: BSD License',
         'Operating System :: POSIX :: BSD :: FreeBSD',
+        'Operating System :: POSIX :: BSD :: OpenBSD',
+        'Operating System :: POSIX :: BSD :: NetBSD',
         'Operating System :: MacOS :: MacOS X',
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python',
@@ -124,10 +154,11 @@ setup(
         'Programming Language :: Python :: 3.2',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
         'Topic :: Security :: Cryptography',
         'Topic :: System :: Archiving :: Backup',
     ],
-    packages=['borg', 'borg.testsuite'],
+    packages=['borg', 'borg.testsuite', 'borg.support', ],
     entry_points={
         'console_scripts': [
             'borg = borg.archiver:main',
@@ -136,7 +167,5 @@ setup(
     cmdclass=cmdclass,
     ext_modules=ext_modules,
     setup_requires=['setuptools_scm>=1.7'],
-    # msgpack pure python data corruption was fixed in 0.4.6.
-    # Also, we might use some rather recent API features.
-    install_requires=['msgpack-python>=0.4.6'],
+    install_requires=install_requires,
 )

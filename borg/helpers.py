@@ -1,6 +1,9 @@
-import argparse
+from .support import argparse  # see support/__init__.py docstring
+                               # DEPRECATED - remove after requiring py 3.4
+
 import binascii
 from collections import namedtuple
+from functools import wraps
 import grp
 import os
 import pwd
@@ -8,6 +11,8 @@ import queue
 import re
 import sys
 import time
+import unicodedata
+
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from operator import attrgetter
@@ -170,8 +175,8 @@ def get_keys_dir():
 
 def get_cache_dir():
     """Determine where to repository keys and cache"""
-    return os.environ.get('BORG_CACHE_DIR',
-                          os.path.join(os.path.expanduser('~'), '.cache', 'borg'))
+    xdg_cache = os.environ.get('XDG_CACHE_HOME', os.path.join(os.path.expanduser('~'), '.cache'))
+    return os.environ.get('BORG_CACHE_DIR', os.path.join(xdg_cache, 'borg'))
 
 
 def to_localtime(ts):
@@ -223,6 +228,24 @@ def exclude_path(path, patterns):
 # unify the two cases, we add a path separator to the end of
 # the path before matching.
 
+def normalized(func):
+    """ Decorator for the Pattern match methods, returning a wrapper that
+    normalizes OSX paths to match the normalized pattern on OSX, and 
+    returning the original method on other platforms"""
+    @wraps(func)
+    def normalize_wrapper(self, path):
+        return func(self, unicodedata.normalize("NFD", path))
+
+    if sys.platform in ('darwin',):
+        # HFS+ converts paths to a canonical form, so users shouldn't be
+        # required to enter an exact match
+        return normalize_wrapper
+    else:
+        # Windows and Unix filesystems allow different forms, so users
+        # always have to enter an exact match
+        return func
+
+
 class IncludePattern:
     """Literal files or directories listed on the command line
     for some operations (e.g. extract, but not create).
@@ -230,13 +253,26 @@ class IncludePattern:
     path match as well.  A trailing slash makes no difference.
     """
     def __init__(self, pattern):
+        self.pattern_orig = pattern
+        self.match_count = 0
+
+        if sys.platform in ('darwin',):
+            pattern = unicodedata.normalize("NFD", pattern)
+
         self.pattern = os.path.normpath(pattern).rstrip(os.path.sep)+os.path.sep
 
+    @normalized
     def match(self, path):
-        return (path+os.path.sep).startswith(self.pattern)
+        matches = (path+os.path.sep).startswith(self.pattern)
+        if matches:
+            self.match_count += 1
+        return matches
 
     def __repr__(self):
         return '%s(%s)' % (type(self), self.pattern)
+
+    def __str__(self):
+        return self.pattern_orig
 
 
 class ExcludePattern(IncludePattern):
@@ -244,19 +280,33 @@ class ExcludePattern(IncludePattern):
     exclude the contents of a directory, but not the directory itself.
     """
     def __init__(self, pattern):
+        self.pattern_orig = pattern
+        self.match_count = 0
+
         if pattern.endswith(os.path.sep):
             self.pattern = os.path.normpath(pattern).rstrip(os.path.sep)+os.path.sep+'*'+os.path.sep
         else:
             self.pattern = os.path.normpath(pattern)+os.path.sep+'*'
+
+        if sys.platform in ('darwin',):
+            self.pattern = unicodedata.normalize("NFD", self.pattern)
+
         # fnmatch and re.match both cache compiled regular expressions.
         # Nevertheless, this is about 10 times faster.
         self.regex = re.compile(translate(self.pattern))
 
+    @normalized
     def match(self, path):
-        return self.regex.match(path+os.path.sep) is not None
+        matches = self.regex.match(path+os.path.sep) is not None
+        if matches:
+            self.match_count += 1
+        return matches
 
     def __repr__(self):
         return '%s(%s)' % (type(self), self.pattern)
+
+    def __str__(self):
+        return self.pattern_orig
 
 
 def timestamp(s):
@@ -462,18 +512,20 @@ class Location:
     """Object representing a repository / archive location
     """
     proto = user = host = port = path = archive = None
+    # borg mount's FUSE filesystem creates one level of directories from
+    # the archive names. Thus, we must not accept "/" in archive names.
     ssh_re = re.compile(r'(?P<proto>ssh)://(?:(?P<user>[^@]+)@)?'
                         r'(?P<host>[^:/#]+)(?::(?P<port>\d+))?'
-                        r'(?P<path>[^:]+)(?:::(?P<archive>.+))?$')
+                        r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
     file_re = re.compile(r'(?P<proto>file)://'
-                         r'(?P<path>[^:]+)(?:::(?P<archive>.+))?$')
+                         r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
     scp_re = re.compile(r'((?:(?P<user>[^@]+)@)?(?P<host>[^:/]+):)?'
-                        r'(?P<path>[^:]+)(?:::(?P<archive>.+))?$')
+                        r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
     # get the repo from BORG_RE env and the optional archive from param.
     # if the syntax requires giving REPOSITORY (see "borg mount"),
     # use "::" to let it use the env var.
     # if REPOSITORY argument is optional, it'll automatically use the env.
-    env_re = re.compile(r'(?:::(?P<archive>.+)?)?$')
+    env_re = re.compile(r'(?:::(?P<archive>[^/]+)?)?$')
 
     def __init__(self, text=''):
         self.orig = text

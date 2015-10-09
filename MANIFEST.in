@@ -1,7 +1,9 @@
-include README.rst AUTHORS LICENSE CHANGES.rst MANIFEST.in versioneer.py
+include README.rst AUTHORS LICENSE CHANGES.rst MANIFEST.in
 recursive-include borg *.pyx
 recursive-include docs *
 recursive-exclude docs *.pyc
 recursive-exclude docs *.pyo
 prune docs/_build
+prune .travis
+exclude .coveragerc .gitattributes .gitignore .travis.yml Vagrantfile
 include borg/_version.py

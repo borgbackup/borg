@@ -51,6 +51,7 @@ Important notes:
 
 - When using -- to give options to py.test, you MUST also give borg.testsuite[.module].
 
+
 Building the docs with Sphinx
 -----------------------------
 
@@ -58,7 +59,7 @@ The documentation (in reStructuredText format, .rst) is in docs/.
 
 To build the html version of it, you need to have sphinx installed::
 
-  pip3 install sphinx
+  pip3 install sphinx  # important: this will install sphinx with Python 3
 
 Now run::
 
@@ -66,3 +67,73 @@ Now run::
   make html
 
 Then point a web browser at docs/_build/html/index.html.
+
+Using Vagrant
+-------------
+
+We use Vagrant for the automated creation of testing environment and borgbackup
+standalone binaries for various platforms.
+
+For better security, there is no automatic sync in the VM to host direction.
+The plugin `vagrant-scp` is useful to copy stuff from the VMs to the host.
+
+Usage::
+
+   To create and provision the VM:
+     vagrant up OS
+   To create an ssh session to the VM:
+     vagrant ssh OS command
+   To shut down the VM:
+     vagrant halt OS
+   To shut down and destroy the VM:
+     vagrant destroy OS
+   To copy files from the VM (in this case, the generated binary):
+     vagrant scp OS:/vagrant/borg/borg/dist/borg .
+
+
+Creating a new release
+----------------------
+
+Checklist::
+
+- all issues for this milestone closed?
+- any low hanging fruit left on the issue tracker?
+- run tox on all supported platforms via vagrant, check for test fails.
+- is Travis CI happy also?
+- update CHANGES.rst (compare to git log). check version number of upcoming release.
+- check MANIFEST.in and setup.py - are they complete?
+- tag the release::
+
+  git tag -s -m "tagged release" 0.26.0
+
+- cd docs ; make html  # to update the usage include files
+- update website with the html
+- create a release on PyPi::
+
+    python setup.py register sdist upload --identity="Thomas Waldmann" --sign
+
+- close release milestone.
+- announce on::
+
+  - mailing list
+  - Twitter
+  - IRC channel (topic)
+
+- create standalone binaries and link them from issue tracker: https://github.com/borgbackup/borg/issues/214
+
+
+Creating standalone binaries
+----------------------------
+
+Make sure you have everything built and installed (including llfuse and fuse).
+
+With virtual env activated::
+
+  pip install pyinstaller>=3.0  # or git checkout master
+  pyinstaller -F -n borg-PLATFORM --hidden-import=logging.config borg/__main__.py
+  ls -l dist/*
+
+If you encounter issues, see also our `Vagrantfile` for details.
+
+Note: Standalone binaries built with pyinstaller are supposed to work on same OS,
+      same architecture (x86 32bit, amd64 64bit) without external dependencies.

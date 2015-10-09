@@ -52,7 +52,7 @@ bytes_to_long = lambda x, offset=0: _long.unpack_from(x, offset)[0]
 long_to_bytes = lambda x: _long.pack(x)
 
 
-def num_aes_blocks(length):
+def num_aes_blocks(int length):
     """Return the number of AES blocks required to encrypt/decrypt *length* bytes of data.
        Note: this is only correct for modes without padding, like AES-CTR.
     """

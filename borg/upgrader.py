@@ -26,8 +26,8 @@ class AtticRepositoryUpgrader(Repository):
         we nevertheless do the order in reverse, as we prefer to do
         the fast stuff first, to improve interactivity.
         """
-        logger.info("reading segments from attic repository using borg")
-        # we need to open it to load the configuration and other fields
+        logger.info("opening attic repository with borg and converting")
+        # we need to open the repo to load configuration, keyfiles and segments
         self.open(self.path, exclusive=False)
         segments = [filename for i, filename in self.io.segment_iterator()]
         try:

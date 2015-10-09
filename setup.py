@@ -189,7 +189,8 @@ Borg Backup API documentation
 """)
             for mod in glob('borg/*.py') + glob('borg/*.pyx'):
                 print("examining module %s" % mod)
-                if "/_" not in mod:
+                mod = mod.replace('.pyx', '').replace('.py', '').replace('/', '.')
+                if "._" not in mod:
                     doc.write("""
 .. automodule:: %s
     :members:

@@ -184,12 +184,13 @@ class build_api(Command):
         print("auto-generating API documentation")
         with open("docs/api.rst", "w") as doc:
             doc.write("""
-Borg Backup API documentation"
+Borg Backup API documentation
 =============================
 """)
             for mod in glob('borg/*.py') + glob('borg/*.pyx'):
                 print("examining module %s" % mod)
-                if "/_" not in mod:
+                mod = mod.replace('.pyx', '').replace('.py', '').replace('/', '.')
+                if "._" not in mod:
                     doc.write("""
 .. automodule:: %s
     :members:
@@ -255,7 +256,7 @@ setup(
     },
     author='The Borg Collective (see AUTHORS file)',
     author_email='borgbackup@librelist.com',
-    url='https://borgbackup.github.io/',
+    url='https://borgbackup.readthedocs.org/',
     description='Deduplicated, encrypted, authenticated and compressed backups',
     long_description=long_description,
     license='BSD',

@@ -43,6 +43,6 @@ fi
 
 python -m virtualenv ~/.venv
 source ~/.venv/bin/activate
-pip install -r requirements.d/travis.txt
+pip install -r requirements.d/development.txt
 pip install codecov
 pip install -e .

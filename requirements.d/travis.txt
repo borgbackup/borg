@@ -1,5 +1,0 @@
-tox
-mock
-pytest
-pytest-cov<2.0.0
-Cython

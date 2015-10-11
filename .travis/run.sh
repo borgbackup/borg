@@ -17,7 +17,7 @@ source ~/.venv/bin/activate
 
 if [[ "$(uname -s)" == "Darwin" ]]; then
     # no fakeroot on OS X
-    sudo tox -e $TOXENV
+    sudo tox -e $TOXENV -r
 else
-    fakeroot -u tox
+    fakeroot -u tox -r
 fi

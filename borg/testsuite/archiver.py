@@ -71,6 +71,29 @@ class environment_variable:
                 os.environ[k] = v
 
 
+def exec_cmd(*args, archiver=None, fork=False, **kw):
+    if fork:
+        try:
+            borg = (sys.executable, '-m', 'borg.archiver')
+            output = subprocess.check_output(borg + args)
+            ret = 0
+        except subprocess.CalledProcessError as e:
+            output = e.output
+            ret = e.returncode
+        return ret, os.fsdecode(output)
+    else:
+        stdin, stdout, stderr = sys.stdin, sys.stdout, sys.stderr
+        try:
+            sys.stdin = StringIO()
+            sys.stdout = sys.stderr = output = StringIO()
+            if archiver is None:
+                archiver = Archiver()
+            ret = archiver.run(list(args))
+            return ret, output.getvalue()
+        finally:
+            sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
+
+
 class ArchiverTestCaseBase(BaseTestCase):
 
     prefix = ''
@@ -102,34 +125,12 @@ class ArchiverTestCaseBase(BaseTestCase):
         shutil.rmtree(self.tmpdir)
 
     def cmd(self, *args, **kw):
-        exit_code = kw.get('exit_code', 0)
-        fork = kw.get('fork', False)
-        if fork:
-            try:
-                output = subprocess.check_output((sys.executable, '-m', 'borg.archiver') + args)
-                ret = 0
-            except subprocess.CalledProcessError as e:
-                output = e.output
-                ret = e.returncode
-            output = os.fsdecode(output)
-            if ret != exit_code:
-                print(output)
-            self.assert_equal(exit_code, ret)
-            return output
-        args = list(args)
-        stdin, stdout, stderr = sys.stdin, sys.stdout, sys.stderr
-        try:
-            sys.stdin = StringIO()
-            output = StringIO()
-            sys.stdout = sys.stderr = output
-            ret = self.archiver.run(args)
-            sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
-            if ret != exit_code:
-                print(output.getvalue())
-            self.assert_equal(exit_code, ret)
-            return output.getvalue()
-        finally:
-            sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
+        exit_code = kw.pop('exit_code', 0)
+        ret, output = exec_cmd(*args, archiver=self.archiver, **kw)
+        if ret != exit_code:
+            print(output)
+        self.assert_equal(ret, exit_code)
+        return output
 
     def create_src_archive(self, name):
         self.cmd('create', self.repository_location + '::' + name, src_dir)

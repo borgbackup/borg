@@ -369,54 +369,58 @@ Examples
 
 
 Additional Notes
-================
+----------------
 
 Here are misc. notes about topics that are maybe not covered in enough detail in the usage section.
 
 --read-special
---------------
+~~~~~~~~~~~~~~
 
-The option --read-special is not intended for normal, filesystem-level (full or
+The option ``--read-special`` is not intended for normal, filesystem-level (full or
 partly-recursive) backups. You only give this option if you want to do something
-rather ... special - and if you have hand-picked some files that you want to treat
+rather ... special -- and if you have hand-picked some files that you want to treat
 that way.
 
-`borg create --read-special` will open all files without doing any special treatment
-according to the file type (the only exception here are directories: they will be
-recursed into). Just imagine what happens if you do `cat filename` - the content
-you will see there is what borg will backup for that filename.
+``borg create --read-special`` will open all files without doing any special
+treatment according to the file type (the only exception here are directories:
+they will be recursed into). Just imagine what happens if you do ``cat
+filename`` --- the content you will see there is what borg will backup for that
+filename.
 
 So, for example, symlinks will be followed, block device content will be read,
 named pipes / UNIX domain sockets will be read.
 
-You need to be careful with what you give as filename when using --read-special,
-e.g. if you give /dev/zero, your backup will never terminate.
+You need to be careful with what you give as filename when using ``--read-special``,
+e.g. if you give ``/dev/zero``, your backup will never terminate.
 
-The given files' metadata is saved as it would be saved without --read-special
-(e.g. its name, its size [might be 0], its mode, etc.) - but additionally, also
-the content read from it will be saved for it.
+The given files' metadata is saved as it would be saved without
+``--read-special`` (e.g. its name, its size [might be 0], its mode, etc.) - but
+additionally, also the content read from it will be saved for it.
 
-Restoring such files' content is currently only supported one at a time via --stdout
-option (and you have to redirect stdout to where ever it shall go, maybe directly
-into an existing device file of your choice or indirectly via dd).
+Restoring such files' content is currently only supported one at a time via
+``--stdout`` option (and you have to redirect stdout to where ever it shall go,
+maybe directly into an existing device file of your choice or indirectly via
+``dd``).
 
 Example
 ~~~~~~~
 
 Imagine you have made some snapshots of logical volumes (LVs) you want to backup.
 
-Note: For some scenarios, this is a good method to get "crash-like" consistency
-(I call it crash-like because it is the same as you would get if you just hit the
-reset button or your machine would abrubtly and completely crash).
-This is better than no consistency at all and a good method for some use cases,
-but likely not good enough if you have databases running.
+.. note::
+
+    For some scenarios, this is a good method to get "crash-like" consistency
+    (I call it crash-like because it is the same as you would get if you just
+    hit the reset button or your machine would abrubtly and completely crash).
+    This is better than no consistency at all and a good method for some use
+    cases, but likely not good enough if you have databases running.
 
 Then you create a backup archive of all these snapshots. The backup process will
 see a "frozen" state of the logical volumes, while the processes working in the
 original volumes continue changing the data stored there.
 
-You also add the output of `lvdisplay` to your backup, so you can see the LV sizes
-in case you ever need to recreate and restore them.
+You also add the output of ``lvdisplay`` to your backup, so you can see the LV
+sizes in case you ever need to recreate and restore them.
 
 After the backup has completed, you remove the snapshots again. ::
 

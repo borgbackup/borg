@@ -418,15 +418,14 @@ original volumes continue changing the data stored there.
 You also add the output of `lvdisplay` to your backup, so you can see the LV sizes
 in case you ever need to recreate and restore them.
 
-After the backup has completed, you remove the snapshots again.
+After the backup has completed, you remove the snapshots again. ::
 
-::
     $ # create snapshots here
     $ lvdisplay > lvdisplay.txt
     $ borg create --read-special /mnt/backup::repo lvdisplay.txt /dev/vg0/*-snapshot
     $ # remove snapshots here
 
-Now, let's see how to restore some LVs from such a backup.
+Now, let's see how to restore some LVs from such a backup. ::
 
     $ borg extract /mnt/backup::repo lvdisplay.txt
     $ # create empty LVs with correct sizes here (look into lvdisplay.txt).

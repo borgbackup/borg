@@ -13,6 +13,7 @@ import pytest
 from .archiver import changedir, exec_cmd
 
 
+# TODO: use fixture params to test python code and binary
 @pytest.fixture
 def cmd():
     return exec_cmd
@@ -41,7 +42,7 @@ def testdata(request, tmpdir_factory):
     p = tmpdir_factory.mktemp('data')
     data_type = request.param
     if data_type == 'zeros':
-        # note: do not use a binary zero (\0) to avoid sparse detection
+        # do not use a binary zero (\0) to avoid sparse detection
         data = lambda: b'0' * size
     if data_type == 'random':
         rnd = open('/dev/urandom', 'rb')

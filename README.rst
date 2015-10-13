@@ -12,7 +12,7 @@ fully trusted targets.
 See the `installation manual`_ or, if you have already
 downloaded Borg, ``docs/installation.rst`` to get started with Borg.
 
-.. _installation manual: http://borgbackup.github.io/borgbackup/installation.html
+.. _installation manual: https://borgbackup.readthedocs.org/installation.html
 
 Main features
 ~~~~~~~~~~~~~
@@ -130,7 +130,7 @@ Notes
 
 Borg is a fork of `Attic`_ and maintained by "`The Borg collective`_".
 
-.. _The Borg collective: http://borgbackup.github.io/borgbackup/authors.html
+.. _The Borg collective: https://borgbackup.readthedocs.org/authors.html
 
 Read `issue #1 <https://github.com/borgbackup/borg/issues/1>`_ about the initial
 considerations regarding project goals and policy of the Borg project.

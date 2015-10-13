@@ -1,5 +1,5 @@
 What is BorgBackup?
--------------------
+===================
 BorgBackup (short: Borg) is a deduplicating backup program.
 Optionally, it supports compression and authenticated encryption.
 
@@ -15,7 +15,7 @@ downloaded Borg, ``docs/installation.rst`` to get started with Borg.
 .. _installation manual: https://borgbackup.readthedocs.org/installation.html
 
 Main features
-~~~~~~~~~~~~~
+-------------
 **Space efficient storage**
   Deduplication based on content-defined chunking is used to reduce the number
   of bytes stored: each file is split into a number of variable length chunks
@@ -82,7 +82,7 @@ Main features
 
 
 Easy to use
-~~~~~~~~~~~
+-----------
 Initialize a new backup repository and create a backup archive::
 
     $ borg init /mnt/backup
@@ -106,7 +106,7 @@ For a graphical frontend refer to our complementary project
 `BorgWeb <https://github.com/borgbackup/borgweb>`_.
 
 Links
------
+=====
 
  * `Main Web Site <https://borgbackup.readthedocs.org/>`_
  * `Releases <https://github.com/borgbackup/borg/releases>`_

@@ -91,7 +91,7 @@ Check https://github.com/borgbackup/borg/releases for available binaries.
 Debian Jessie / Ubuntu 14.04 preparations (git/pypi)
 ----------------------------------------------------
 
-.. parsed-literal::
+::
 
     # Python 3.x (>= 3.2) + Headers, Py Package Installer, VirtualEnv
     apt-get install python3 python3-dev python3-pip python-virtualenv
@@ -121,7 +121,7 @@ Debian Jessie / Ubuntu 14.04 preparations (git/pypi)
 Korora / Fedora 21 preparations (git/pypi)
 ------------------------------------------
 
-.. parsed-literal::
+::
 
     # Python 3.x (>= 3.2) + Headers, Py Package Installer, VirtualEnv
     sudo dnf install python3 python3-devel python3-pip python3-virtualenv
@@ -178,9 +178,7 @@ In case that creation of the virtual env fails, try deleting this file:
 Installation (pypi)
 -------------------
 
-This uses the latest (source package) release from PyPi.
-
-.. parsed-literal::
+This uses the latest (source package) release from PyPi. ::
 
     virtualenv --python=python3 borg-env
     source borg-env/bin/activate   # always before using!
@@ -190,19 +188,17 @@ This uses the latest (source package) release from PyPi.
                                # 0.41 and 0.41.1 have unicode issues at install time
     pip install borgbackup
 
-Note: we install into a virtual environment here, but this is not a requirement.
+.. note:: We install into a virtual environment here, but this is not a requirement.
 
 
 Installation (git)
 ------------------
 
 This uses latest, unreleased development code from git.
-While we try not to break master, there are no guarantees on anything.
+While we try not to break master, there are no guarantees on anything. ::
 
-.. parsed-literal::
-
-    # get |project_name| from github, install it
-    git clone |git_url|
+    # get borg from github
+    git clone https://github.com/borgbackup/borg.git
 
     virtualenv --python=python3 borg-env
     source borg-env/bin/activate   # always before using!
@@ -218,4 +214,4 @@ While we try not to break master, there are no guarantees on anything.
     # optional: run all the tests, on all supported Python versions
     fakeroot -u tox
 
-Note: as a developer or power user, you always want to use a virtual environment.
+.. note:: As a developer or power user, you always want to use a virtual environment.

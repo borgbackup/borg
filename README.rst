@@ -105,12 +105,30 @@ Now doing another backup, just to show off the great deduplication::
 For a graphical frontend refer to our complementary project
 `BorgWeb <https://github.com/borgbackup/borgweb>`_.
 
+Links
+-----
+
+ * `Main Web Site <https://borgbackup.readthedocs.org/>`_
+ * `Releases <https://github.com/borgbackup/borg/releases>`_
+ * `PyPI packages <https://pypi.python.org/pypi/borgbackup>`_
+ * `ChangeLog <https://github.com/borgbackup/borg/blob/master/CHANGES.rst>`_
+ * `GitHub <https://github.com/borgbackup/borg>`_
+ * `Issue Tracker <https://github.com/borgbackup/borg/issues>`_
+ * `Bounties & Fundraisers <https://www.bountysource.com/teams/borgbackup>`_
+ * `Mailing List <http://librelist.com/browser/borgbackup/>`_
+ * `License <https://borgbackup.github.io/borgbackup/authors.html#license>`_
+
+Related Projects
+----------------
+
+ * `BorgWeb <https://borgbackup.github.io/borgweb/>`_
+ * `Atticmatic <https://github.com/witten/atticmatic/>`_
+ * `Attic <https://github.com/jborg/attic>`_
 
 Notes
 -----
 
-Borg is a fork of `Attic <https://github.com/jborg/attic>`_ and maintained by
-"`The Borg collective`_".
+Borg is a fork of `Attic`_ and maintained by "`The Borg collective`_".
 
 .. _The Borg collective: http://borgbackup.github.io/borgbackup/authors.html
 
@@ -120,19 +138,15 @@ considerations regarding project goals and policy of the Borg project.
 BORG IS NOT COMPATIBLE WITH ORIGINAL ATTIC.
 EXPECT THAT WE WILL BREAK COMPATIBILITY REPEATEDLY WHEN MAJOR RELEASE NUMBER
 CHANGES (like when going from 0.x.y to 1.0.0). Please read the
-`changelog`_ (or ``CHANGES.rst`` in the source distribution) for more
+`ChangeLog`_ (or ``CHANGES.rst`` in the source distribution) for more
 information.
-
-.. _changelog: https://borgbackup.github.io/borgbackup/changes.html
 
 NOT RELEASED DEVELOPMENT VERSIONS HAVE UNKNOWN COMPATIBILITY PROPERTIES.
 
 THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
 
-Borg is distributed under a 3-clause BSD license, see `the license`_
+Borg is distributed under a 3-clause BSD license, see `License`_
 for the complete license.
-
-.. _the license: https://borgbackup.github.io/borgbackup/authors.html#license
 
 |build| |coverage|
 

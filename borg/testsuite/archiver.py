@@ -71,10 +71,15 @@ class environment_variable:
                 os.environ[k] = v
 
 
-def exec_cmd(*args, archiver=None, fork=False, **kw):
+def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
     if fork:
         try:
-            borg = (sys.executable, '-m', 'borg.archiver')
+            if exe is None:
+                borg = (sys.executable, '-m', 'borg.archiver')
+            elif isinstance(exe, str):
+                borg = (exe, )
+            elif not isinstance(exe, tuple):
+                raise ValueError('exe must be None, a tuple or a str')
             output = subprocess.check_output(borg + args)
             ret = 0
         except subprocess.CalledProcessError as e:

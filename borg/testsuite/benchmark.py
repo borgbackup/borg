@@ -13,10 +13,17 @@ import pytest
 from .archiver import changedir, exec_cmd
 
 
-# TODO: use fixture params to test python code and binary
-@pytest.fixture
-def cmd():
-    return exec_cmd
+@pytest.fixture(params=['python', 'binary'])
+def cmd(request):
+    if request.param == 'python':
+        exe = None
+    elif request.param == 'binary':
+        exe = 'borg.exe'
+    else:
+        raise ValueError("param must be 'python' or 'binary'")
+    def exec_fn(*args, **kw):
+        return exec_cmd(*args, exe=exe, fork=True, **kw)
+    return exec_fn
 
 
 @pytest.yield_fixture

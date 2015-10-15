@@ -16,9 +16,6 @@ from ..helpers import get_keys_dir
 from ..key import KeyfileKey
 from ..repository import Repository, MAGIC
 
-pytestmark = pytest.mark.skipif(attic is None,
-                                reason='cannot find an attic install')
-
 
 def repo_valid(path):
     """
@@ -67,6 +64,7 @@ def attic_repo(tmpdir):
 def inplace(request):
     return request.param
 
+@pytest.mark.skipif(attic is None, reason='cannot find an attic install')
 def test_convert_segments(tmpdir, attic_repo, inplace):
     """test segment conversion
 
@@ -126,6 +124,7 @@ def attic_key_file(attic_repo, tmpdir):
                                        MockArgs(keys_dir))
 
 
+@pytest.mark.skipif(attic is None, reason='cannot find an attic install')
 def test_keys(tmpdir, attic_repo, attic_key_file):
     """test key conversion
 
@@ -144,6 +143,7 @@ def test_keys(tmpdir, attic_repo, attic_key_file):
     assert key_valid(attic_key_file.path)
 
 
+@pytest.mark.skipif(attic is None, reason='cannot find an attic install')
 def test_convert_all(tmpdir, attic_repo, attic_key_file, inplace):
     """test all conversion steps
 

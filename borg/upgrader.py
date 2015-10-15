@@ -1,4 +1,5 @@
 from binascii import hexlify
+import datetime
 import logging
 logger = logging.getLogger(__name__)
 import os
@@ -15,7 +16,7 @@ ATTIC_MAGIC = b'ATTICSEG'
 
 
 class AtticRepositoryUpgrader(Repository):
-    def upgrade(self, dryrun=True):
+    def upgrade(self, dryrun=True, inplace=False):
         """convert an attic repository to a borg repository
 
         those are the files that need to be upgraded here, from most
@@ -26,6 +27,12 @@ class AtticRepositoryUpgrader(Repository):
         we nevertheless do the order in reverse, as we prefer to do
         the fast stuff first, to improve interactivity.
         """
+        backup = None
+        if not inplace:
+            backup = '{}.upgrade-{:%Y-%m-%d-%H:%M:%S}'.format(self.path, datetime.datetime.now())
+            logger.info('making a hardlink copy in %s', backup)
+            if not dryrun:
+                shutil.copytree(self.path, backup, copy_function=lambda src, dst: os.link(src, dst))
         logger.info("opening attic repository with borg and converting")
         # we need to open the repo to load configuration, keyfiles and segments
         self.open(self.path, exclusive=False)
@@ -42,13 +49,14 @@ class AtticRepositoryUpgrader(Repository):
                                    exclusive=True).acquire()
         try:
             self.convert_cache(dryrun)
-            self.convert_segments(segments, dryrun)
+            self.convert_segments(segments, dryrun=dryrun, inplace=inplace)
         finally:
             self.lock.release()
             self.lock = None
+        return backup
 
     @staticmethod
-    def convert_segments(segments, dryrun):
+    def convert_segments(segments, dryrun=True, inplace=False):
         """convert repository segments from attic to borg
 
         replacement pattern is `s/ATTICSEG/BORG_SEG/` in files in
@@ -60,23 +68,33 @@ class AtticRepositoryUpgrader(Repository):
         i = 0
         for filename in segments:
             i += 1
-            print("\rconverting segment %d/%d in place, %.2f%% done (%s)"
+            print("\rconverting segment %d/%d, %.2f%% done (%s)"
                   % (i, len(segments), 100*float(i)/len(segments), filename),
                   end='', file=sys.stderr)
             if dryrun:
                 time.sleep(0.001)
             else:
-                AtticRepositoryUpgrader.header_replace(filename, ATTIC_MAGIC, MAGIC)
+                AtticRepositoryUpgrader.header_replace(filename, ATTIC_MAGIC, MAGIC, inplace=inplace)
         print(file=sys.stderr)
 
     @staticmethod
-    def header_replace(filename, old_magic, new_magic):
+    def header_replace(filename, old_magic, new_magic, inplace=True):
         with open(filename, 'r+b') as segment:
             segment.seek(0)
             # only write if necessary
             if segment.read(len(old_magic)) == old_magic:
-                segment.seek(0)
-                segment.write(new_magic)
+                if inplace:
+                    segment.seek(0)
+                    segment.write(new_magic)
+                else:
+                    # remove the hardlink and rewrite the file. this
+                    # works because our old file handle is still open
+                    # so even though the file is removed, we can still
+                    # read it until the file is closed.
+                    os.unlink(filename)
+                    with open(filename, 'wb') as new_segment:
+                        new_segment.write(new_magic)
+                        new_segment.write(segment.read())
 
     def find_attic_keyfile(self):
         """find the attic keyfiles

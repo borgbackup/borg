@@ -472,7 +472,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         # XXX: should auto-detect if it is an attic repository here
         repo = AtticRepositoryUpgrader(args.repository.path, create=False)
         try:
-            repo.upgrade(args.dry_run)
+            repo.upgrade(args.dry_run, inplace=args.inplace)
         except NotImplementedError as e:
             print("warning: %s" % e)
         return self.exit_code
@@ -894,7 +894,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='repository to prune')
 
         upgrade_epilog = textwrap.dedent("""
-        upgrade an existing Borg repository in place. this currently
+        upgrade an existing Borg repository. this currently
         only support converting an Attic repository, but may
         eventually be extended to cover major Borg upgrades as well.
 
@@ -909,13 +909,6 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         the first backup after the conversion takes longer than expected
         due to the cache resync.
 
-        it is recommended you run this on a copy of the Attic
-        repository, in case something goes wrong, for example:
-
-            cp -a attic borg
-            borg upgrade -n borg
-            borg upgrade borg
-
         upgrade should be able to resume if interrupted, although it
         will still iterate over all segments. if you want to start
         from scratch, use `borg delete` over the copied repository to
@@ -923,11 +916,19 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
             borg delete borg
 
-        the conversion can PERMANENTLY DAMAGE YOUR REPOSITORY! Attic
-        will also NOT BE ABLE TO READ THE BORG REPOSITORY ANYMORE, as
-        the magic strings will have changed.
+        unless ``--inplace`` is specified, the upgrade process first
+        creates a backup copy of the repository, in
+        REPOSITORY.upgrade-DATETIME, using hardlinks. this takes
+        longer than in place upgrades, but is much safer and gives
+        progress information (as opposed to ``cp -al``). once you are
+        satisfied with the conversion, you can safely destroy the
+        backup copy.
 
-        you have been warned.""")
+        WARNING: running the upgrade in place will make the current
+        copy unuseable with older version, with no way of going back
+        to previous versions. this can PERMANENTLY DAMAGE YOUR
+        REPOSITORY!  Attic CAN NOT READ BORG REPOSITORIES, as the
+        magic strings have changed. you have been warned.""")
         subparser = subparsers.add_parser('upgrade', parents=[common_parser],
                                           description=self.do_upgrade.__doc__,
                                           epilog=upgrade_epilog,
@@ -936,6 +937,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
                                help='do not change repository')
+        subparser.add_argument('-i', '--inplace', dest='inplace',
+                               default=False, action='store_true',
+                               help="""rewrite repository in-place, with no chance of going back to older
+                               versions of the repository.""")
         subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')

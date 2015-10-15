@@ -139,12 +139,14 @@ class AtticRepositoryUpgrader(Repository):
           `Cache.open()`, edit in place and then `Cache.close()` to
           make sure we have locking right
         """
-        caches = []
         transaction_id = self.get_index_transaction_id()
         if transaction_id is None:
             logger.warning('no index file found for repository %s' % self.path)
         else:
-            caches += [os.path.join(self.path, 'index.%d' % transaction_id).encode('utf-8')]
+            cache = os.path.join(self.path, 'index.%d' % transaction_id).encode('utf-8')
+            logger.info("converting index cache %s" % cache)
+            if not dryrun:
+                AtticRepositoryUpgrader.header_replace(cache, b'ATTICIDX', b'BORG_IDX')
 
         # copy of attic's get_cache_dir()
         attic_cache_dir = os.environ.get('ATTIC_CACHE_DIR',

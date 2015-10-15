@@ -32,7 +32,7 @@ class AtticRepositoryUpgrader(Repository):
             backup = '{}.upgrade-{:%Y-%m-%d-%H:%M:%S}'.format(self.path, datetime.datetime.now())
             logger.info('making a hardlink copy in %s', backup)
             if not dryrun:
-                shutil.copytree(self.path, backup, copy_function=lambda src, dst: os.link(src, dst))
+                shutil.copytree(self.path, backup, copy_function=os.link)
         logger.info("opening attic repository with borg and converting")
         # we need to open the repo to load configuration, keyfiles and segments
         self.open(self.path, exclusive=False)

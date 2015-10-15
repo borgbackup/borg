@@ -691,7 +691,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                type=int, default=300, metavar='SECONDS',
                                help='write checkpoint every SECONDS seconds (Default: 300)')
-        subparser.add_argument('--do-not-cross-mountpoints', dest='dontcross',
+        subparser.add_argument('-x', '--do-not-cross-mountpoints', dest='dontcross',
                                action='store_true', default=False,
                                help='do not cross mount points')
         subparser.add_argument('--numeric-owner', dest='numeric_owner',

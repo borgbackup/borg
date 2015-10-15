@@ -90,7 +90,7 @@ Initialize a new backup repository and create a backup archive::
 
 Now doing another backup, just to show off the great deduplication::
 
-    $ borg create --stats /mnt/backup::Tuesday ~/Documents
+    $ borg create --stats -C zlib,6 /mnt/backup::Tuesday ~/Documents
 
     Archive name: Tuesday
     Archive fingerprint: 387a5e3f9b0e792e91c...

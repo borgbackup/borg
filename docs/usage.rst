@@ -201,8 +201,9 @@ Examples
         --exclude '*.pyc'
 
     # Backup the root filesystem into an archive named "root-YYYY-MM-DD"
+    # use zlib compression (good, but slow) - default is no compression
     NAME="root-`date +%Y-%m-%d`"
-    $ borg create /mnt/backup::$NAME / --do-not-cross-mountpoints
+    $ borg create -C zlib,6 /mnt/backup::$NAME / --do-not-cross-mountpoints
 
     # Backup huge files with little chunk management overhead
     $ borg create --chunker-params 19,23,21,4095 /mnt/backup::VMs /srv/VMs
@@ -315,7 +316,7 @@ Examples
     Hostname: myhostname
     Username: root
     Time: Fri Aug  2 15:18:17 2013
-    Command line: /usr/bin/borg create --stats /mnt/backup::root-2013-08-02 / --do-not-cross-mountpoints
+    Command line: /usr/bin/borg create --stats -C zlib,6 /mnt/backup::root-2013-08-02 / --do-not-cross-mountpoints
     Number of files: 147429
     Original size: 5344169493 (4.98 GB)
     Compressed size: 1748189642 (1.63 GB)

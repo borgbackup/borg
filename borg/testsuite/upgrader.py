@@ -14,6 +14,7 @@ except ImportError:
 from ..upgrader import AtticRepositoryUpgrader, AtticKeyfileKey
 from ..helpers import get_keys_dir
 from ..key import KeyfileKey
+from ..remote import RemoteRepository
 from ..repository import Repository, MAGIC
 
 
@@ -158,10 +159,14 @@ def test_convert_all(tmpdir, attic_repo, attic_key_file, inplace):
     """
     # check should fail because of magic number
     assert not repo_valid(tmpdir)
+    def stat_segment(path):
+        return os.stat(os.path.join(path, 'data', '0', '0'))
     def first_inode(path):
-        return os.stat(os.path.join(path, 'data', '0', '0')).st_ino
+        return stat_segment(path).st_ino
     orig_inode = first_inode(attic_repo.path)
     repo = AtticRepositoryUpgrader(str(tmpdir), create=False)
+    # replicate command dispatch, partly
+    os.umask(attic_repo.umask)
     backup = repo.upgrade(dryrun=False, inplace=inplace)
     if inplace:
         assert backup is None
@@ -169,6 +174,9 @@ def test_convert_all(tmpdir, attic_repo, attic_key_file, inplace):
     else:
         assert backup
         assert first_inode(repo.path) != first_inode(backup)
+        # i have seen cases where the copied tree has world-readable
+        # permissions, which is wrong
+        assert stat_segment(backup).st_mode & 0o007== 0
 
     assert key_valid(attic_key_file.path)
     assert repo_valid(tmpdir)

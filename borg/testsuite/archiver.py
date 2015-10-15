@@ -1,5 +1,6 @@
 from binascii import hexlify
 from configparser import RawConfigParser
+import errno
 import os
 from io import StringIO
 import stat
@@ -70,20 +71,6 @@ class environment_variable:
             else:
                 os.environ[k] = v
 
-
-@pytest.fixture(params=['python', 'binary'])
-def cmd(request):
-    if request.param == 'python':
-        exe = None
-    elif request.param == 'binary':
-        exe = 'borg.exe'
-    else:
-        raise ValueError("param must be 'python' or 'binary'")
-    def exec_fn(*args, **kw):
-        return exec_cmd(*args, exe=exe, fork=True, **kw)
-    return exec_fn
-
-
 def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
     if fork:
         try:
@@ -110,6 +97,29 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
             return ret, output.getvalue()
         finally:
             sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
+
+
+# check if the binary "borg.exe" is available
+try:
+    exec_cmd('help', exe='borg.exe', fork=True)
+    BORG_EXES = ['python', 'binary', ]
+except IOError as err:
+    if err.errno != errno.ENOENT:
+        raise
+    BORG_EXES = ['python', ]
+
+
+@pytest.fixture(params=BORG_EXES)
+def cmd(request):
+    if request.param == 'python':
+        exe = None
+    elif request.param == 'binary':
+        exe = 'borg.exe'
+    else:
+        raise ValueError("param must be 'python' or 'binary'")
+    def exec_fn(*args, **kw):
+        return exec_cmd(*args, exe=exe, fork=True, **kw)
+    return exec_fn
 
 
 class ArchiverTestCaseBase(BaseTestCase):

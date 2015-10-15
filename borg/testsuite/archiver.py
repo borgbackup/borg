@@ -71,6 +71,19 @@ class environment_variable:
                 os.environ[k] = v
 
 
+@pytest.fixture(params=['python', 'binary'])
+def cmd(request):
+    if request.param == 'python':
+        exe = None
+    elif request.param == 'binary':
+        exe = 'borg.exe'
+    else:
+        raise ValueError("param must be 'python' or 'binary'")
+    def exec_fn(*args, **kw):
+        return exec_cmd(*args, exe=exe, fork=True, **kw)
+    return exec_fn
+
+
 def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
     if fork:
         try:

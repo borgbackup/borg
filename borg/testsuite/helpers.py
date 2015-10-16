@@ -442,3 +442,5 @@ This archive:                   10 B                 10 B                 10 B
 """
     s = "{0.osize_fmt}".format(stats)
     assert s == "10 B"
+    # kind of redundant, but id is variable so we can't match reliably
+    assert stats.__repr__() == '<Statistics object at {:#x} (10, 10, 10)>'.format(id(stats))

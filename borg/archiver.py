@@ -284,7 +284,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
                 archive.extract_item(dirs.pop(-1))
         for pattern in (patterns or []):
             if isinstance(pattern, IncludePattern) and  pattern.match_count == 0:
-                self.print_error(_('Warning: Include pattern "%s" never matched.', pattern)
+                self.print_error(_('Warning: Include pattern "%s" never matched.'), pattern)
         return self.exit_code
 
     def do_rename(self, args):

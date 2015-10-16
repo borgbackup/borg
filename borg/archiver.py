@@ -167,7 +167,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 archive.end = datetime.now()
                 print('-' * 78)
                 print(str(archive))
-                print(archive.stats.print_('This archive:', cache))
+                print(str(archive.stats))
+                print(str(cache))
                 print('-' * 78)
         return self.exit_code
 
@@ -313,7 +314,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             repository.commit()
             cache.commit()
             if args.stats:
-                logger.info(stats.print_('Deleted data:', cache))
+                logger.info(stats.summary.format(label='Deleted data:', stats=stats))
+                logger.info(str(cache))
         else:
             if not args.cache_only:
                 print("You requested to completely DELETE the repository *including* all archives it contains:", file=sys.stderr)
@@ -414,7 +416,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         print('Time: %s' % to_localtime(archive.ts).strftime('%c'))
         print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
         print('Number of files: %d' % stats.nfiles)
-        print(stats.print_('This archive:', cache))
+        print(str(stats))
+        print(str(cache))
         return self.exit_code
 
     def do_prune(self, args):
@@ -459,7 +462,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             repository.commit()
             cache.commit()
         if args.stats:
-            logger.info(stats.print_('Deleted data:', cache))
+            logger.info(stats.summary.format(label='Deleted data:', stats=stats))
+            logger.info(str(cache))
         return self.exit_code
 
     def do_upgrade(self, args):

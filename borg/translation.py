@@ -17,11 +17,11 @@ try:
         locale.bindtextdomain(prog, pkg_resources.resource_filename(prog, "po"))
     if hasattr(locale, "textdomain"):
         locale.textdomain(prog)
-    gettext.install(prog, pkg_resources.resource_filename(prog, "po"), unicode=True, names='ngettext')
+    gettext.install(prog, pkg_resources.resource_filename(prog, "po"), names='ngettext')
 except Exception as e:
-    print "Unable to initialize translations: %s" % e
-    import __builtin__
-    __builtin__.__dict__["_"] = lambda x: x
+    print("Unable to initialize translations: %s" % e, file=sys.stderr)
+    import builtins
+    builtins.__dict__['_'] = lambda x: x
 
 # stolen from deluge-1.3.3 (GPL3)
 class build_trans(Command):

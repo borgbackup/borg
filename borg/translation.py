@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
+from distutils.core import Command
+import gettext
+import locale
+import pkg_resources
 import os
 import sys
-import msgfmt
-from distutils.core import Command
-import locale
-import gettext
-import pkg_resources
+
+from borg.support import msgfmt
 
 prog = 'borg'
 

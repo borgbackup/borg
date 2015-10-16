@@ -163,8 +163,7 @@ class Statistics:
 
     summary = """\
                        Original size      Compressed size    Deduplicated size
-{label:15} {stats.osize_fmt:>20s} {stats.csize_fmt:>20s} {stats.usize_fmt:>20s}
-"""
+{label:15} {stats.osize_fmt:>20s} {stats.csize_fmt:>20s} {stats.usize_fmt:>20s}"""
     def __str__(self):
         return self.summary.format(stats=self, label='This archive:')
 

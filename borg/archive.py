@@ -201,14 +201,12 @@ class Archive:
         return format_timedelta(self.end-self.start)
 
     def __str__(self):
-        buf = '''Archive name: {0.name}
+        return '''Archive name: {0.name}
 Archive fingerprint: {0.fpr}
 Start time: {0.start:%c}
 End time: {0.end:%c}
 Duration: {0.duration}
-Number of files: {0.stats.nfiles}
-{0.cache}'''.format(self)
-        return buf
+Number of files: {0.stats.nfiles}'''.format(self)
 
     def __repr__(self):
         return 'Archive(%r)' % self.name

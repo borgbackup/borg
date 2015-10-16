@@ -28,6 +28,7 @@ import os
 import sys
 import ast
 import getopt
+import gettext
 import struct
 import array
 from email.parser import HeaderParser
@@ -83,7 +84,7 @@ def generate():
         voffsets += [l2, o2+valuestart]
     offsets = koffsets + voffsets
     output = struct.pack("Iiiiiii",
-                         0x950412de,       # Magic
+                         gettext.GNUTranslations.LE_MAGIC,
                          0,                 # Version
                          len(keys),         # # of entries
                          7*4,               # start of key index

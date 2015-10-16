@@ -196,7 +196,7 @@ class Statistics:
             msg += "{0:<{space}}".format(path, space=space)
         else:
             msg = ' ' * columns
-        print(msg, file=stream or sys.stderr, end=final and "\n" or "\r")
+        print(msg, file=stream or sys.stderr, end="\r")
 
 
 def get_keys_dir():

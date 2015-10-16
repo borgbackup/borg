@@ -183,7 +183,7 @@ class Statistics:
     def show_progress(self, item=None, final=False):
         (columns, lines) = get_terminal_size((80, 24))
         if not final:
-            msg = format(self, '{0.osize:9.9s} O {0.csize:9.9s} C {0.usize:9.9s} D {0.nfiles} N ')
+            msg = format(self, '{0.osize} O {0.csize} C {0.usize} D {0.nfiles} N ')
             path = remove_surrogates(item[b'path']) if item else ''
             space = columns - len(msg)
             if space < len('...') + len(path):

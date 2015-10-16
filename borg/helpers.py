@@ -181,7 +181,7 @@ class Statistics:
                 format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize), self.nfiles, path)
         else:
             msg = ' ' * 79
-        print(msg, file=sys.stderr, end='\r')
+        print(msg, file=sys.stderr, end=final and "\n" or "\r")
         sys.stderr.flush()
 
 

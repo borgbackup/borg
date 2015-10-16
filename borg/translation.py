@@ -19,7 +19,7 @@ try:
         locale.textdomain(prog)
     gettext.install(prog, pkg_resources.resource_filename(prog, "po"), unicode=True, names='ngettext')
 except Exception as e:
-    print "Unable to initialize translations: %s" % e
+    print("Unable to initialize translations: %s" % e, file=sys.stderr)
     import __builtin__
     __builtin__.__dict__["_"] = lambda x: x
 

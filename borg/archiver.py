@@ -677,11 +677,11 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the created archive')
-        subparser.add_argument('-p', '--progress', dest='progress',
-                               action='store_true', default=False,
-                               help="""print progress while creating the archive, showing Original,
+        subparser.add_argument('-p', '--progress', dest='progress', const=not sys.stdin.isatty(),
+                               action='store_const', default=sys.stdin.isatty(),
+                               help="""toggle progress display while creating the archive, showing Original,
                                Compressed and Deduplicated sizes, followed by the Number of files seen
-                               and the path being processd""")
+                               and the path being processd, default: %(default)s""")
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')

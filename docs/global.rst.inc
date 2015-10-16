@@ -16,12 +16,12 @@
 .. _libattr: http://savannah.nongnu.org/projects/attr/
 .. _liblz4: https://github.com/Cyan4973/lz4
 .. _OpenSSL: https://www.openssl.org/
-.. _Python: http://www.python.org/
+.. _`Python 3`: http://www.python.org/
 .. _Buzhash: https://en.wikipedia.org/wiki/Buzhash
 .. _msgpack: http://msgpack.org/
 .. _`msgpack-python`: https://pypi.python.org/pypi/msgpack-python/
 .. _llfuse: https://pypi.python.org/pypi/llfuse/
-.. _homebrew: http://mxcl.github.io/homebrew/
+.. _homebrew: http://brew.sh/
 .. _userspace filesystems: https://en.wikipedia.org/wiki/Filesystem_in_Userspace
 .. _librelist: http://librelist.com/
 .. _Cython: http://cython.org/

@@ -9,6 +9,7 @@ from hashlib import sha256
 from .helpers import IntegrityError, get_keys_dir, Error, have_cython
 from .logger import create_logger
 logger = create_logger()
+import borg.translation
 
 if have_cython():
     from .crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
@@ -18,6 +19,7 @@ if have_cython():
 PREFIX = b'\0' * 8
 
 
+# XXX: how to translate those?
 class UnsupportedPayloadError(Error):
     """Unsupported payload type {}. A newer version is required to access this repository.
     """
@@ -92,7 +94,7 @@ class PlaintextKey(KeyBase):
 
     @classmethod
     def create(cls, repository, args):
-        logger.info('Encryption NOT enabled.\nUse the "--encryption=repokey|keyfile|passphrase" to enable encryption.')
+        logger.info(_('Encryption NOT enabled.\nUse the "--encryption=repokey|keyfile|passphrase" to enable encryption.'))
         return cls(repository)
 
     @classmethod
@@ -107,10 +109,10 @@ class PlaintextKey(KeyBase):
 
     def decrypt(self, id, data):
         if data[0] != self.TYPE:
-            raise IntegrityError('Invalid encryption envelope')
+            raise IntegrityError(_('Invalid encryption envelope'))
         data = self.compressor.decompress(memoryview(data)[1:])
         if id and sha256(data).digest() != id:
-            raise IntegrityError('Chunk id verification failed')
+            raise IntegrityError(_('Chunk id verification failed'))
         return data
 
 
@@ -143,19 +145,19 @@ class AESKeyBase(KeyBase):
 
     def decrypt(self, id, data):
         if data[0] != self.TYPE:
-            raise IntegrityError('Invalid encryption envelope')
+            raise IntegrityError(_('Invalid encryption envelope'))
         hmac = memoryview(data)[1:33]
         if memoryview(HMAC(self.enc_hmac_key, memoryview(data)[33:], sha256).digest()) != hmac:
-            raise IntegrityError('Encryption envelope checksum mismatch')
+            raise IntegrityError(_('Encryption envelope checksum mismatch'))
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
         data = self.compressor.decompress(self.dec_cipher.decrypt(data[41:]))
         if id and HMAC(self.id_key, data, sha256).digest() != id:
-            raise IntegrityError('Chunk id verification failed')
+            raise IntegrityError(_('Chunk id verification failed'))
         return data
 
     def extract_nonce(self, payload):
         if payload[0] != self.TYPE:
-            raise IntegrityError('Invalid encryption envelope')
+            raise IntegrityError(_('Invalid encryption envelope'))
         nonce = bytes_to_long(payload[33:41])
         return nonce
 
@@ -190,16 +192,16 @@ class Passphrase(str):
         if passphrase is not None:
             return passphrase
         while True:
-            passphrase = cls.getpass('Enter new passphrase: ')
+            passphrase = cls.getpass(_('Enter new passphrase: '))
             if allow_empty or passphrase:
-                passphrase2 = cls.getpass('Enter same passphrase again: ')
+                passphrase2 = cls.getpass(_('Enter same passphrase again: '))
                 if passphrase == passphrase2:
-                    logger.info('Remember your passphrase. Your data will be inaccessible without it.')
+                    logger.info(_('Remember your passphrase. Your data will be inaccessible without it.'))
                     return passphrase
                 else:
-                    print('Passphrases do not match', file=sys.stderr)
+                    print(_('Passphrases do not match'), file=sys.stderr)
             else:
-                print('Passphrase must not be blank', file=sys.stderr)
+                print(_('Passphrase must not be blank'), file=sys.stderr)
 
     def __repr__(self):
         return '<Passphrase "***hidden***">'
@@ -219,15 +221,15 @@ class PassphraseKey(AESKeyBase):
     @classmethod
     def create(cls, repository, args):
         key = cls(repository)
-        logger.warning('WARNING: "passphrase" mode is deprecated and will be removed in 1.0.')
-        logger.warning('If you want something similar (but with less issues), use "repokey" mode.')
+        logger.warning(_('WARNING: "passphrase" mode is deprecated and will be removed in 1.0.'))
+        logger.warning(_('If you want something similar (but with less issues), use "repokey" mode.'))
         passphrase = Passphrase.new(allow_empty=False)
         key.init(repository, passphrase)
         return key
 
     @classmethod
     def detect(cls, repository, manifest_data):
-        prompt = 'Enter passphrase for %s: ' % repository._location.orig
+        prompt = _('Enter passphrase for %s: ') % repository._location.orig
         key = cls(repository)
         passphrase = Passphrase.env_passphrase()
         if passphrase is None:
@@ -243,6 +245,7 @@ class PassphraseKey(AESKeyBase):
                 passphrase = Passphrase.getpass(prompt)
 
     def change_passphrase(self):
+        # XXX: how to translate this?
         class ImmutablePassphraseError(Error):
             """The passphrase for this encryption key type can't be changed."""
 
@@ -258,7 +261,7 @@ class KeyfileKeyBase(AESKeyBase):
     def detect(cls, repository, manifest_data):
         key = cls(repository)
         target = key.find_key()
-        prompt = 'Enter passphrase for key %s: ' % target
+        prompt = _('Enter passphrase for key %s: ') % target
         passphrase = Passphrase.env_passphrase(default='')
         while not key.load(target, passphrase):
             passphrase = Passphrase.getpass(prompt)
@@ -278,7 +281,7 @@ class KeyfileKeyBase(AESKeyBase):
         if data:
             key = msgpack.unpackb(data)
             if key[b'version'] != 1:
-                raise IntegrityError('Invalid key file header')
+                raise IntegrityError(_('Invalid key file header'))
             self.repository_id = key[b'repository_id']
             self.enc_key = key[b'enc_key']
             self.enc_hmac_key = key[b'enc_hmac_key']
@@ -328,7 +331,7 @@ class KeyfileKeyBase(AESKeyBase):
     def change_passphrase(self):
         passphrase = Passphrase.new(allow_empty=True)
         self.save(self.target, passphrase)
-        logger.info('Key updated')
+        logger.info(_('Key updated'))
 
     @classmethod
     def create(cls, repository, args):
@@ -339,8 +342,8 @@ class KeyfileKeyBase(AESKeyBase):
         key.init_ciphers()
         target = key.get_new_target(args)
         key.save(target, passphrase)
-        logger.info('Key in "%s" created.' % target)
-        logger.info('Keep this key safe. Your data will be inaccessible without it.')
+        logger.info(_('Key in "%s" created.') % target)
+        logger.info(_('Keep this key safe. Your data will be inaccessible without it.'))
         return key
 
     def save(self, target, passphrase):

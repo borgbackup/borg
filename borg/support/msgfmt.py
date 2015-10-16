@@ -26,11 +26,11 @@ Options:
         Display version information and exit.
 """
 
-import sys
-import os
-import getopt
-import struct
 import array
+import getopt
+import os
+import struct
+import sys
 
 __version__ = "1.1"
 

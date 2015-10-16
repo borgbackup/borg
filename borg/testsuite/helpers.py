@@ -438,6 +438,7 @@ def tests_stats_progress(stats, columns = 80):
 def test_stats_format(stats):
     assert str(stats) == """\
                        Original size      Compressed size    Deduplicated size
-%-15s                 10 B                 10 B                 10 B"""
+This archive:                   10 B                 10 B                 10 B
+"""
     s = "{0.osize_fmt}".format(stats)
     assert s == "10 B"

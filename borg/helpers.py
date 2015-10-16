@@ -161,16 +161,12 @@ class Statistics:
         if unique:
             self.usize += csize
 
-    def print_(self, label, cache):
-        buf = str(self) % label
-        buf += "\n"
-        buf += str(cache)
-        return buf
-
-    def __str__(self):
-        return """\
+    summary = """\
                        Original size      Compressed size    Deduplicated size
-%-15s {0.osize_fmt:>20s} {0.csize_fmt:>20s} {0.usize_fmt:>20s}""".format(self)
+{label:15} {stats.osize_fmt:>20s} {stats.csize_fmt:>20s} {stats.usize_fmt:>20s}
+"""
+    def __str__(self):
+        return self.summary.format(stats=self, label='This archive:')
 
     @property
     def osize_fmt(self):

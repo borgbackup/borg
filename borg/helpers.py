@@ -192,7 +192,6 @@ class Statistics:
         else:
             msg = ' ' * columns
         print(msg, file=sys.stderr, end=final and "\n" or "\r")
-        sys.stderr.flush()
 
 
 def get_keys_dir():

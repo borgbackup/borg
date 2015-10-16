@@ -3,4 +3,4 @@
 	msgattrib --no-obsolete $< | msgmerge -U $@ -
 
 messages.pot: ../borg/*.py
-	xgettext -k_ -kN_ --from-code utf-8 -s -o $@ $^
+	xgettext -k_ -kN_ -k__ -kN__ --from-code utf-8 -s -o $@ $^

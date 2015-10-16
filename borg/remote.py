@@ -74,7 +74,7 @@ class RepositoryServer:  # pragma: no cover
                 unpacker.feed(data)
                 for unpacked in unpacker:
                     if not (isinstance(unpacked, tuple) and len(unpacked) == 4):
-                        raise Exception(_("Unexpected RPC data format."))
+                        raise Exception(__("Unexpected RPC data format."))
                     type, msgid, method, args = unpacked
                     method = method.decode('ascii')
                     try:
@@ -86,7 +86,7 @@ class RepositoryServer:  # pragma: no cover
                             f = getattr(self.repository, method)
                         res = f(*args)
                     except BaseException as e:
-                        exc = _("Remote Traceback by Borg %s%s%s") % (__version__, os.linesep, traceback.format_exc())
+                        exc = __("Remote Traceback by Borg %s%s%s") % (__version__, os.linesep, traceback.format_exc())
                         os.write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc)))
                     else:
                         os.write(stdout_fd, msgpack.packb((1, msgid, None, res)))
@@ -150,9 +150,9 @@ class RemoteRepository:
         try:
             version = self.call('negotiate', 1)
         except ConnectionClosed:
-            raise Exception(_('Server immediately closed connection - is Borg installed and working on the server?'))
+            raise Exception(__('Server immediately closed connection - is Borg installed and working on the server?'))
         if version != 1:
-            raise Exception(_('Server insisted on using unsupported protocol version %d') % version)
+            raise Exception(__('Server insisted on using unsupported protocol version %d') % version)
         self.id = self.call('open', location.path, create)
 
     def __del__(self):
@@ -223,7 +223,7 @@ class RemoteRepository:
                     break
             r, w, x = select.select(self.r_fds, w_fds, self.x_fds, 1)
             if x:
-                raise Exception(_('FD exception occurred'))
+                raise Exception(__('FD exception occurred'))
             if r:
                 data = os.read(self.stdout_fd, BUFSIZE)
                 if not data:
@@ -231,7 +231,7 @@ class RemoteRepository:
                 self.unpacker.feed(data)
                 for unpacked in self.unpacker:
                     if not (isinstance(unpacked, tuple) and len(unpacked) == 4):
-                        raise Exception(_("Unexpected RPC data format."))
+                        raise Exception(__("Unexpected RPC data format."))
                     type, msgid, error, res = unpacked
                     if msgid in self.ignore_responses:
                         self.ignore_responses.remove(msgid)

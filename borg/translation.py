@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import builtins
 from distutils.core import Command
 import gettext
 import locale
@@ -21,8 +22,9 @@ try:
     gettext.install(prog, pkg_resources.resource_filename(prog, "po"), names='ngettext')
 except Exception as e:
     print("Unable to initialize translations: %s" % e, file=sys.stderr)
-    import builtins
     builtins.__dict__['_'] = lambda x: x
+# also add '__' alias for functions that use the foo, _ = () construct
+builtins.__dict__['__'] = builtins.__dict__['_']
 
 # stolen from deluge-1.3.3 (GPL3)
 class build_trans(Command):

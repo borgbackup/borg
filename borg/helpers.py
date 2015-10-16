@@ -8,6 +8,11 @@ import grp
 import os
 import pwd
 import re
+try:
+    from shutil import get_terminal_size
+except ImportError:
+    def get_terminal_size(fallback):
+        return (os.environ.get('COLUMNS', fallback[0]), os.environ.get('LINES', fallback[1]))
 import sys
 import time
 import unicodedata
@@ -168,19 +173,24 @@ class Statistics:
 %-15s {0.osize:>20s} {0.csize:>20s} {0.usize:>20s}""")
 
     def __format__(self, format_spec):
-        fields = ['osize', 'csize', 'usize']
-        FormattedStats = namedtuple('FormattedStats', fields)
-        return format_spec.format(FormattedStats(*map(format_file_size, [ getattr(self, x) for x in fields ])))
+        sizes = ['osize', 'csize', 'usize']
+        others = ['nfiles']
+        fields = list(map(format_file_size, [ getattr(self, x) for x in sizes ]))
+        fields += [ getattr(self, x) for x in others ]
+        FormattedStats = namedtuple('FormattedStats', sizes + others)
+        return format_spec.format(FormattedStats(*fields))
 
     def show_progress(self, item=None, final=False):
+        (columns, lines) = get_terminal_size((80, 24))
         if not final:
+            msg = format(self, '{0.osize:9.9s} O {0.csize:9.9s} C {0.usize:9.9s} D {0.nfiles} N ')
             path = remove_surrogates(item[b'path']) if item else ''
-            if len(path) > 43:
-                path = '%s...%s' % (path[:20], path[-20:])
-            msg = '%9s O %9s C %9s D %d N %-43s' % (
-                format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize), self.nfiles, path)
+            space = columns - len(msg)
+            if space < len('...') + len(path):
+                path = '%s...%s' % (path[:(space//2)-len('...')], path[-space//2:])
+            msg += "{0:<{space}}".format(path, space=space)
         else:
-            msg = ' ' * 79
+            msg = ' ' * columns
         print(msg, file=sys.stderr, end=final and "\n" or "\r")
         sys.stderr.flush()
 

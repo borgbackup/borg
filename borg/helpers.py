@@ -168,6 +168,12 @@ class Statistics:
     def __str__(self):
         return self.summary.format(stats=self, label='This archive:')
 
+    def __repr__(self):
+        fmt = "<{cls} object at {hash:#x} ({self.osize}, {self.csize}, {self.usize})>"
+        return fmt.format(cls=type(self).__name__,
+                          hash=id(self),
+                          self=self)
+
     @property
     def osize_fmt(self):
         return format_file_size(self.osize)

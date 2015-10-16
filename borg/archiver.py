@@ -65,7 +65,7 @@ class Archiver:
 
     def do_init(self, args):
         """Initialize an empty repository"""
-        logger.info(_('Initializing repository at "%s"') % args.repository.orig)
+        logger.info(__('Initializing repository at "%s"') % args.repository.orig)
         repository = self.open_repository(args.repository, create=True, exclusive=True)
         key = key_creator(repository, args)
         manifest = Manifest(key, repository)
@@ -80,16 +80,16 @@ class Archiver:
         repository = self.open_repository(args.repository, exclusive=args.repair)
         if args.repair:
             while not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
-                self.print_error(_("""Warning: 'check --repair' is an experimental feature that might result
+                self.print_error(__("""Warning: 'check --repair' is an experimental feature that might result
 in data loss.
 
 Type "Yes I am sure" if you understand this and want to continue.\n"""))
-                if input(_('Do you want to continue? ')) == _('Yes I am sure'):
+                if input(__('Do you want to continue? ')) == __('Yes I am sure'):
                     break
         if not args.archives_only:
-            logger.warning(_('Starting repository check...'))
+            logger.warning(__('Starting repository check...'))
             if repository.check(repair=args.repair):
-                logger.info(_('Repository check complete, no problems found.'))
+                logger.info(__('Repository check complete, no problems found.'))
             else:
                 return 1
         if not args.repo_only and not ArchiveChecker().check(
@@ -166,7 +166,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
                 archive.end = datetime.now()
                 print('-' * 78)
                 print(str(archive))
-                print(archive.stats.print_(_('This archive:'), cache))
+                print(archive.stats.print_(__('This archive:'), cache))
                 print('-' * 78)
         return self.exit_code
 
@@ -223,7 +223,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
             # Ignore unix sockets
             return
         else:
-            self.print_error(_('Unknown file type: %s'), path)
+            self.print_error(__('Unknown file type: %s'), path)
             return
         # Status output
         # A lowercase character means a file type other than a regular file,
@@ -246,7 +246,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         """Extract archive contents"""
         # be restrictive when restoring files, restore permissions later
         if sys.getfilesystemencoding() == 'ascii':
-            logger.warning(_('Warning: File system encoding is "ascii", extracting non-ascii filenames will not be supported.'))
+            logger.warning(__('Warning: File system encoding is "ascii", extracting non-ascii filenames will not be supported.'))
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
         archive = Archive(repository, key, manifest, args.archive.archive,
@@ -284,7 +284,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
                 archive.extract_item(dirs.pop(-1))
         for pattern in (patterns or []):
             if isinstance(pattern, IncludePattern) and  pattern.match_count == 0:
-                self.print_error(_('Warning: Include pattern "%s" never matched.'), pattern)
+                self.print_error(__('Warning: Include pattern "%s" never matched.'), pattern)
         return self.exit_code
 
     def do_rename(self, args):
@@ -312,22 +312,22 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
             repository.commit()
             cache.commit()
             if args.stats:
-                logger.info(stats.print_(_('Deleted data:'), cache))
+                logger.info(stats.print_(__('Deleted data:'), cache))
         else:
             if not args.cache_only:
-                print(_("You requested to completely DELETE the repository *including* all archives it contains:"), file=sys.stderr)
+                print(__("You requested to completely DELETE the repository *including* all archives it contains:"), file=sys.stderr)
                 for archive_info in manifest.list_archive_infos(sort_by='ts'):
                     print(format_archive(archive_info), file=sys.stderr)
                 if not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
-                    print(_("""Type "YES" if you understand this and want to continue.\n"""), file=sys.stderr)
+                    print(__("""Type "YES" if you understand this and want to continue.\n"""), file=sys.stderr)
                     # XXX: prompt may end up on stdout, but we'll assume that input() does the right thing
-                    if input(_('Do you want to continue? ')) != _('YES'):
+                    if input(__('Do you want to continue? ')) != __('YES'):
                         self.exit_code = 1
                         return self.exit_code
                 repository.destroy()
-                logger.info(_('Repository deleted.'))
+                logger.info(__('Repository deleted.'))
             cache.destroy()
-            logger.info(_('Cache deleted.'))
+            logger.info(__('Cache deleted.'))
         return self.exit_code
 
     def do_mount(self, args):
@@ -335,11 +335,11 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         try:
             from .fuse import FuseOperations
         except ImportError as e:
-            self.print_error(_('loading fuse support failed [ImportError: %s]') % str(e))
+            self.print_error(__('loading fuse support failed [ImportError: %s]') % str(e))
             return self.exit_code
 
         if not os.path.isdir(args.mountpoint) or not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
-            self.print_error(_('%s: Mountpoint must be a writable directory') % args.mountpoint)
+            self.print_error(__('%s: Mountpoint must be a writable directory') % args.mountpoint)
             return self.exit_code
 
         repository = self.open_repository(args.src)
@@ -349,7 +349,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         else:
             archive = None
         operations = FuseOperations(key, repository, manifest, archive)
-        self.print_verbose(_('Mounting filesystem'))
+        self.print_verbose(__('Mounting filesystem'))
         try:
             operations.mount(args.mountpoint, args.options, args.foreground)
         except RuntimeError:
@@ -406,14 +406,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         cache = Cache(repository, key, manifest, do_files=args.cache_files)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
         stats = archive.calc_stats(cache)
-        print(_('Name:'), archive.name)
-        print(_('Fingerprint: %s') % hexlify(archive.id).decode('ascii'))
-        print(_('Hostname:'), archive.metadata[b'hostname'])
-        print(_('Username:'), archive.metadata[b'username'])
-        print(_('Time: %s') % to_localtime(archive.ts).strftime('%c'))
-        print(_('Command line:'), remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
-        print(_('Number of files: %d') % stats.nfiles)
-        print(stats.print_(_('This archive:'), cache))
+        print(__('Name:'), archive.name)
+        print(__('Fingerprint: %s') % hexlify(archive.id).decode('ascii'))
+        print(__('Hostname:'), archive.metadata[b'hostname'])
+        print(__('Username:'), archive.metadata[b'username'])
+        print(__('Time: %s') % to_localtime(archive.ts).strftime('%c'))
+        print(__('Command line:'), remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
+        print(__('Number of files: %d') % stats.nfiles)
+        print(stats.print_(__('This archive:'), cache))
         return self.exit_code
 
     def do_prune(self, args):
@@ -423,7 +423,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         cache = Cache(repository, key, manifest, do_files=args.cache_files)
         archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
         if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0 and args.within is None:
-            self.print_error(_('At least one of the "within", "keep-hourly", "keep-daily", "keep-weekly", '
+            self.print_error(__('At least one of the "within", "keep-hourly", "keep-daily", "keep-weekly", '
                                '"keep-monthly" or "keep-yearly" settings must be specified'))
             return 1
         if args.prefix:
@@ -446,19 +446,19 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         to_delete = [a for a in archives if a not in keep]
         stats = Statistics()
         for archive in keep:
-            self.print_verbose(_('Keeping archive: %s') % format_archive(archive))
+            self.print_verbose(__('Keeping archive: %s') % format_archive(archive))
         for archive in to_delete:
             if args.dry_run:
-                self.print_verbose(_('Would prune:     %s') % format_archive(archive))
+                self.print_verbose(__('Would prune:     %s') % format_archive(archive))
             else:
-                self.print_verbose(_('Pruning archive: %s') % format_archive(archive))
+                self.print_verbose(__('Pruning archive: %s') % format_archive(archive))
                 Archive(repository, key, manifest, archive.name, cache).delete(stats)
         if to_delete and not args.dry_run:
             manifest.write()
             repository.commit()
             cache.commit()
         if args.stats:
-            logger.info(stats.print_(_('Deleted data:'), cache))
+            logger.info(stats.print_(__('Deleted data:'), cache))
         return self.exit_code
 
     def do_upgrade(self, args):
@@ -476,11 +476,11 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         try:
             repo.upgrade(args.dry_run)
         except NotImplementedError as e:
-            print(_("warning: %s") % e)
+            print(__("warning: %s") % e)
         return self.exit_code
 
     helptext = {}
-    helptext['patterns'] = _('''
+    helptext['patterns'] = __('''
         Exclude patterns use a variant of shell pattern syntax, with '*' matching any
         number of characters, '?' matching any single character, '[...]' matching any
         single character specified, including ranges, and '[!...]' matching any
@@ -523,19 +523,19 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
             else:
                 commands[args.topic].print_help()
         else:
-            parser.error(_('No help available on %s') % (args.topic,))
+            parser.error(__('No help available on %s') % (args.topic,))
         return self.exit_code
 
     def preprocess_args(self, args):
         deprecations = [
-            ('--hourly', '--keep-hourly', _('Warning: "--hourly" has been deprecated. Use "--keep-hourly" instead.')),
-            ('--daily', '--keep-daily', _('Warning: "--daily" has been deprecated. Use "--keep-daily" instead.')),
-            ('--weekly', '--keep-weekly', _('Warning: "--weekly" has been deprecated. Use "--keep-weekly" instead.')),
-            ('--monthly', '--keep-monthly', _('Warning: "--monthly" has been deprecated. Use "--keep-monthly" instead.')),
-            ('--yearly', '--keep-yearly', _('Warning: "--yearly" has been deprecated. Use "--keep-yearly" instead.'))
+            ('--hourly', '--keep-hourly', __('Warning: "--hourly" has been deprecated. Use "--keep-hourly" instead.')),
+            ('--daily', '--keep-daily', __('Warning: "--daily" has been deprecated. Use "--keep-daily" instead.')),
+            ('--weekly', '--keep-weekly', __('Warning: "--weekly" has been deprecated. Use "--keep-weekly" instead.')),
+            ('--monthly', '--keep-monthly', __('Warning: "--monthly" has been deprecated. Use "--keep-monthly" instead.')),
+            ('--yearly', '--keep-yearly', __('Warning: "--yearly" has been deprecated. Use "--keep-yearly" instead.'))
         ]
         if args and args[0] == 'verify':
-            print(_('Warning: "borg verify" has been deprecated. Use "borg extract --dry-run" instead.'))
+            print(__('Warning: "borg verify" has been deprecated. Use "borg extract --dry-run" instead.'))
             args = ['extract', '--dry-run'] + args[1:]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
@@ -547,18 +547,18 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
     def build_parser(self, args=None, prog=None):
         common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
         common_parser.add_argument('-v', '--verbose', dest='verbose', action='count',
-                                   help=_('verbose output, defaults to warnings only'))
+                                   help=__('verbose output, defaults to warnings only'))
         common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
-                                   help=_('do not load/update the file metadata cache used to detect unchanged files'))
+                                   help=__('do not load/update the file metadata cache used to detect unchanged files'))
         common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=RemoteRepository.umask, metavar='M',
-                                   help=_('set umask to M (local and remote, default: %(default)s)'))
+                                   help=__('set umask to M (local and remote, default: %(default)s)'))
         common_parser.add_argument('--remote-path', dest='remote_path', default=RemoteRepository.remote_path, metavar='PATH',
-                                   help=_('set remote path to executable (default: "%(default)s")'))
+                                   help=__('set remote path to executable (default: "%(default)s")'))
 
-        parser = argparse.ArgumentParser(prog=prog, description=_('Borg %s - Deduplicated Backups') % __version__)
-        subparsers = parser.add_subparsers(title=_('Available commands'))
+        parser = argparse.ArgumentParser(prog=prog, description=__('Borg %s - Deduplicated Backups') % __version__)
+        subparsers = parser.add_subparsers(title=__('Available commands'))
 
-        serve_epilog = textwrap.dedent(_("""
+        serve_epilog = textwrap.dedent(__("""
         This command starts a repository server process. This command is usually not used manually.
         """))
         subparser = subparsers.add_parser('serve', parents=[common_parser],
@@ -566,8 +566,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_serve)
         subparser.add_argument('--restrict-to-path', dest='restrict_to_paths', action='append',
-                               metavar='PATH', help=_('restrict repository access to PATH'))
-        init_epilog = textwrap.dedent(_("""
+                               metavar='PATH', help=__('restrict repository access to PATH'))
+        init_epilog = textwrap.dedent(__("""
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
         Encryption can be enabled at repository init time.
@@ -580,12 +580,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         subparser.set_defaults(func=self.do_init)
         subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
-                               help=_('repository to create'))
+                               help=__('repository to create'))
         subparser.add_argument('-e', '--encryption', dest='encryption',
                                choices=('none', 'keyfile', 'repokey', 'passphrase'), default='none',
-                               help=_('select encryption key mode'))
+                               help=__('select encryption key mode'))
 
-        check_epilog = textwrap.dedent(_("""
+        check_epilog = textwrap.dedent(__("""
         The check command verifies the consistency of a repository and the corresponding archives.
 
         First, the underlying repository data files are checked:
@@ -628,21 +628,21 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         subparser.set_defaults(func=self.do_check)
         subparser.add_argument('repository', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
-                               help=_('repository or archive to check consistency of'))
+                               help=__('repository or archive to check consistency of'))
         subparser.add_argument('--repository-only', dest='repo_only', action='store_true',
                                default=False,
-                               help=_('only perform repository checks'))
+                               help=__('only perform repository checks'))
         subparser.add_argument('--archives-only', dest='archives_only', action='store_true',
                                default=False,
-                               help=_('only perform archives checks'))
+                               help=__('only perform archives checks'))
         subparser.add_argument('--repair', dest='repair', action='store_true',
                                default=False,
-                               help=_('attempt to repair any inconsistencies found'))
+                               help=__('attempt to repair any inconsistencies found'))
         subparser.add_argument('--last', dest='last',
                                type=int, default=None, metavar='N',
-                               help=_('only check last N archives (Default: all)'))
+                               help=__('only check last N archives (Default: all)'))
 
-        change_passphrase_epilog = textwrap.dedent(_("""
+        change_passphrase_epilog = textwrap.dedent(__("""
         The key files used for repository encryption are optionally passphrase
         protected. This command can be used to change this passphrase.
         """))
@@ -669,40 +669,40 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         subparser.set_defaults(func=self.do_create)
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
-                               help=_('print statistics for the created archive'))
+                               help=__('print statistics for the created archive'))
         subparser.add_argument('-p', '--progress', dest='progress',
                                action='store_true', default=False,
-                               help=_('print progress while creating the archive'))
+                               help=__('print progress while creating the archive'))
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
-                               metavar="PATTERN", help=_('exclude paths matching PATTERN'))
+                               metavar="PATTERN", help=__('exclude paths matching PATTERN'))
         subparser.add_argument('--exclude-from', dest='exclude_files',
                                type=argparse.FileType('r'), action='append',
-                               metavar='EXCLUDEFILE', help=_('read exclude patterns from EXCLUDEFILE, one per line'))
+                               metavar='EXCLUDEFILE', help=__('read exclude patterns from EXCLUDEFILE, one per line'))
         subparser.add_argument('--exclude-caches', dest='exclude_caches',
                                action='store_true', default=False,
-                               help=_('exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)'))
+                               help=__('exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)'))
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                type=int, default=300, metavar='SECONDS',
-                               help=_('write checkpoint every SECONDS seconds (Default: 300)'))
+                               help=__('write checkpoint every SECONDS seconds (Default: 300)'))
         subparser.add_argument('--do-not-cross-mountpoints', dest='dontcross',
                                action='store_true', default=False,
-                               help=_('do not cross mount points'))
+                               help=__('do not cross mount points'))
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,
-                               help=_('only store numeric user and group identifiers'))
+                               help=__('only store numeric user and group identifiers'))
         subparser.add_argument('--timestamp', dest='timestamp',
                                type=timestamp, default=None,
                                metavar='yyyy-mm-ddThh:mm:ss',
-                               help=_('manually specify the archive creation date/time (UTC). '
+                               help=__('manually specify the archive creation date/time (UTC). '
                                       'alternatively, give a reference file/directory.'))
         subparser.add_argument('--chunker-params', dest='chunker_params',
                                type=ChunkerParams, default=CHUNKER_PARAMS,
                                metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
-                               help=_('specify the chunker parameters. default: %d,%d,%d,%d') % CHUNKER_PARAMS)
+                               help=__('specify the chunker parameters. default: %d,%d,%d,%d') % CHUNKER_PARAMS)
         subparser.add_argument('-C', '--compression', dest='compression',
                                type=CompressionSpec, default=dict(name='none'), metavar='COMPRESSION',
-                               help=_('select compression algorithm (and level): '
+                               help=__('select compression algorithm (and level): '
                                     'none == no compression (default), '
                                     'lz4 == lz4, '
                                     'zlib == zlib (default level 6), '
@@ -711,15 +711,15 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
                                     'lzma,0 .. lzma,9 == lzma (with level 0..9).'))
         subparser.add_argument('--read-special', dest='read_special',
                                action='store_true', default=False,
-                               help=_('open and read special files as if they were regular files'))
+                               help=__('open and read special files as if they were regular files'))
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                action='store_true', default=False,
-                               help=_('do not create a backup archive'))
+                               help=__('do not create a backup archive'))
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
-                               help=_('name of archive to create (must be also a valid directory name)'))
+                               help=__('name of archive to create (must be also a valid directory name)'))
         subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
-                               help=_('paths to archive'))
+                               help=__('paths to archive'))
 
         extract_epilog = textwrap.dedent("""
         This command extracts the contents of an archive. By default the entire
@@ -736,32 +736,32 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         subparser.set_defaults(func=self.do_extract)
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
-                               help=_('do not actually change any files'))
+                               help=__('do not actually change any files'))
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
-                               metavar="PATTERN", help=_('exclude paths matching PATTERN'))
+                               metavar="PATTERN", help=__('exclude paths matching PATTERN'))
         subparser.add_argument('--exclude-from', dest='exclude_files',
                                type=argparse.FileType('r'), action='append',
-                               metavar='EXCLUDEFILE', help=_('read exclude patterns from EXCLUDEFILE, one per line'))
+                               metavar='EXCLUDEFILE', help=__('read exclude patterns from EXCLUDEFILE, one per line'))
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,
-                               help=_('only obey numeric user and group identifiers'))
+                               help=__('only obey numeric user and group identifiers'))
         subparser.add_argument('--strip-components', dest='strip_components',
                                type=int, default=0, metavar='NUMBER',
-                               help=_('Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.'))
+                               help=__('Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.'))
         subparser.add_argument('--stdout', dest='stdout',
                                action='store_true', default=False,
-                               help=_('write all extracted data to stdout'))
+                               help=__('write all extracted data to stdout'))
         subparser.add_argument('--sparse', dest='sparse',
                                action='store_true', default=False,
-                               help=_('create holes in output sparse file from all-zero chunks'))
+                               help=__('create holes in output sparse file from all-zero chunks'))
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
-                               help=_('archive to extract'))
+                               help=__('archive to extract'))
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help=_('paths to extract'))
+                               help=__('paths to extract'))
 
-        rename_epilog = textwrap.dedent(_("""
+        rename_epilog = textwrap.dedent(__("""
         This command renames an archive in the repository.
         """))
         subparser = subparsers.add_parser('rename', parents=[common_parser],
@@ -771,11 +771,11 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         subparser.set_defaults(func=self.do_rename)
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
-                               help=_('archive to rename'))
+                               help=__('archive to rename'))
         subparser.add_argument('name', metavar='NEWNAME', type=str,
-                               help=_('the new archive name to use'))
+                               help=__('the new archive name to use'))
 
-        delete_epilog = textwrap.dedent(_("""
+        delete_epilog = textwrap.dedent(__("""
         This command deletes an archive from the repository or the complete repository.
         Disk space is reclaimed accordingly. If you delete the complete repository, the
         local cache for it (if any) is also deleted.
@@ -787,15 +787,15 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         subparser.set_defaults(func=self.do_delete)
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
-                               help=_('print statistics for the deleted archive'))
+                               help=__('print statistics for the deleted archive'))
         subparser.add_argument('-c', '--cache-only', dest='cache_only',
                                action='store_true', default=False,
-                               help=_('delete only the local cache for the given repository'))
+                               help=__('delete only the local cache for the given repository'))
         subparser.add_argument('target', metavar='TARGET', nargs='?', default='',
                                type=location_validator(),
-                               help=_('archive or repository to delete'))
+                               help=__('archive or repository to delete'))
 
-        list_epilog = textwrap.dedent(_("""
+        list_epilog = textwrap.dedent(__("""
         This command lists the contents of a repository or an archive.
         """))
         subparser = subparsers.add_parser('list', parents=[common_parser],
@@ -805,11 +805,11 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         subparser.set_defaults(func=self.do_list)
         subparser.add_argument('--short', dest='short',
                                action='store_true', default=False,
-                               help=_('only print file/directory names, nothing else'))
+                               help=__('only print file/directory names, nothing else'))
         subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
-                               help=_('repository/archive to list contents of'))
-        mount_epilog = textwrap.dedent(_("""
+                               help=__('repository/archive to list contents of'))
+        mount_epilog = textwrap.dedent(__("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
         browsing an archive or restoring individual files. Unless the ``--foreground``
         option is given the command will run in the background until the filesystem
@@ -821,16 +821,16 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_mount)
         subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
-                               help=_('repository/archive to mount'))
+                               help=__('repository/archive to mount'))
         subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
-                               help=_('where to mount filesystem'))
+                               help=__('where to mount filesystem'))
         subparser.add_argument('-f', '--foreground', dest='foreground',
                                action='store_true', default=False,
-                               help=_('stay in foreground, do not daemonize'))
+                               help=__('stay in foreground, do not daemonize'))
         subparser.add_argument('-o', dest='options', type=str,
-                               help=_('Extra mount options'))
+                               help=__('Extra mount options'))
 
-        info_epilog = textwrap.dedent(_("""
+        info_epilog = textwrap.dedent(__("""
         This command displays some detailed information about the specified archive.
         """))
         subparser = subparsers.add_parser('info', parents=[common_parser],
@@ -840,9 +840,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         subparser.set_defaults(func=self.do_info)
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
-                               help=_('archive to display information about'))
+                               help=__('archive to display information about'))
 
-        prune_epilog = textwrap.dedent(_("""
+        prune_epilog = textwrap.dedent(__("""
         The prune command prunes a repository by deleting archives not matching
         any of the specified retention options. This command is normally used by
         automated backup scripts wanting to keep a certain number of historic backups.
@@ -873,29 +873,29 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         subparser.set_defaults(func=self.do_prune)
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
-                               help=_('do not change repository'))
+                               help=__('do not change repository'))
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
-                               help=_('print statistics for the deleted archive'))
+                               help=__('print statistics for the deleted archive'))
         subparser.add_argument('--keep-within', dest='within', type=str, metavar='WITHIN',
-                               help=_('keep all archives within this time interval'))
+                               help=__('keep all archives within this time interval'))
         subparser.add_argument('-H', '--keep-hourly', dest='hourly', type=int, default=0,
-                               help=_('number of hourly archives to keep'))
+                               help=__('number of hourly archives to keep'))
         subparser.add_argument('-d', '--keep-daily', dest='daily', type=int, default=0,
-                               help=_('number of daily archives to keep'))
+                               help=__('number of daily archives to keep'))
         subparser.add_argument('-w', '--keep-weekly', dest='weekly', type=int, default=0,
-                               help=_('number of weekly archives to keep'))
+                               help=__('number of weekly archives to keep'))
         subparser.add_argument('-m', '--keep-monthly', dest='monthly', type=int, default=0,
-                               help=_('number of monthly archives to keep'))
+                               help=__('number of monthly archives to keep'))
         subparser.add_argument('-y', '--keep-yearly', dest='yearly', type=int, default=0,
-                               help=_('number of yearly archives to keep'))
+                               help=__('number of yearly archives to keep'))
         subparser.add_argument('-p', '--prefix', dest='prefix', type=str,
-                               help=_('only consider archive names starting with this prefix'))
+                               help=__('only consider archive names starting with this prefix'))
         subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
-                               help=_('repository to prune'))
+                               help=__('repository to prune'))
 
-        upgrade_epilog = textwrap.dedent(_("""
+        upgrade_epilog = textwrap.dedent(__("""
         upgrade an existing Borg repository in place. this currently
         only support converting an Attic repository, but may
         eventually be extended to cover major Borg upgrades as well.
@@ -937,10 +937,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         subparser.set_defaults(func=self.do_upgrade)
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
-                               help=_('do not change repository'))
+                               help=__('do not change repository'))
         subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
-                               help=_('path to the repository to be upgraded'))
+                               help=__('path to the repository to be upgraded'))
 
         subparser = subparsers.add_parser('help', parents=[common_parser],
                                           description='Extra help')
@@ -950,7 +950,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
                                action='store_true', default=False)
         subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
         subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
-                               help=_('additional help on TOPIC'))
+                               help=__('additional help on TOPIC'))
         return parser
 
     def run(self, args=None):
@@ -1032,16 +1032,16 @@ def main():  # pragma: no cover
         archiver.print_error(e.get_message() + "\n%s" % traceback.format_exc())
         exit_code = e.exit_code
     except RemoteRepository.RPCError as e:
-        archiver.print_error(_('Error: Remote Exception.\n%s') % str(e))
+        archiver.print_error(__('Error: Remote Exception.\n%s') % str(e))
         exit_code = 1
     except Exception:
-        archiver.print_error(_('Error: Local Exception.\n%s') % traceback.format_exc())
+        archiver.print_error(__('Error: Local Exception.\n%s') % traceback.format_exc())
         exit_code = 1
     except KeyboardInterrupt:
-        archiver.print_error(_('Error: Keyboard interrupt.\n%s') % traceback.format_exc())
+        archiver.print_error(__('Error: Keyboard interrupt.\n%s') % traceback.format_exc())
         exit_code = 1
     if exit_code:
-        archiver.print_error(_('Exiting with failure status due to previous errors'))
+        archiver.print_error(__('Exiting with failure status due to previous errors'))
     sys.exit(exit_code)
 
 if __name__ == '__main__':

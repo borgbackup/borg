@@ -35,7 +35,7 @@ class TimeoutTimer:
                       or None (autocompute: use 10% of timeout, or 1s for no timeout)
         """
         if timeout is not None and timeout < 0:
-            raise ValueError(_("timeout must be >= 0"))
+            raise ValueError(__("timeout must be >= 0"))
         self.timeout_interval = timeout
         if sleep is None:
             if timeout is None:
@@ -202,7 +202,7 @@ class LockRoster:
         elif op == REMOVE:
             elements.remove(self.id)
         else:
-            raise ValueError(_('Unknown LockRoster op %r') % op)
+            raise ValueError(__('Unknown LockRoster op %r') % op)
         roster[key] = list(list(e) for e in elements)
         self.save(roster)
 

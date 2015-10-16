@@ -7,6 +7,7 @@ from operator import attrgetter
 import functools
 import inspect
 import io
+import locale
 import os
 import signal
 import stat
@@ -1022,6 +1023,7 @@ def main():  # pragma: no cover
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=True)
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, sys.stderr.encoding, 'replace', line_buffering=True)
     setup_signal_handlers()
+    locale.setlocale(locale.LC_ALL, '')
     archiver = Archiver()
     try:
         exit_code = archiver.run(sys.argv[1:])

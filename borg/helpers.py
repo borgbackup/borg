@@ -177,8 +177,8 @@ class Statistics:
             path = remove_surrogates(item[b'path']) if item else ''
             if len(path) > 43:
                 path = '%s...%s' % (path[:20], path[-20:])
-            msg = '%9s O %9s C %9s D %-43s' % (
-                format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize), path)
+            msg = '%9s O %9s C %9s D %d N %-43s' % (
+                format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize), self.nfiles, path)
         else:
             msg = ' ' * 79
         print(msg, file=sys.stderr, end='\r')

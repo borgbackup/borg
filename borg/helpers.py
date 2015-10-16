@@ -168,22 +168,26 @@ class Statistics:
         return buf
 
     def __str__(self):
-        return format(self, """\
+        return """\
                        Original size      Compressed size    Deduplicated size
-%-15s {0.osize:>20s} {0.csize:>20s} {0.usize:>20s}""")
+%-15s {0.osize_fmt:>20s} {0.csize_fmt:>20s} {0.usize_fmt:>20s}""".format(self)
 
-    def __format__(self, format_spec):
-        sizes = ['osize', 'csize', 'usize']
-        others = ['nfiles']
-        fields = list(map(format_file_size, [ getattr(self, x) for x in sizes ]))
-        fields += [ getattr(self, x) for x in others ]
-        FormattedStats = namedtuple('FormattedStats', sizes + others)
-        return format_spec.format(FormattedStats(*fields))
+    @property
+    def osize_fmt(self):
+        return format_file_size(self.osize)
 
-    def show_progress(self, item=None, final=False):
+    @property
+    def usize_fmt(self):
+        return format_file_size(self.usize)
+
+    @property
+    def csize_fmt(self):
+        return format_file_size(self.csize)
+
+    def show_progress(self, item=None, final=False, stream=None):
         (columns, lines) = get_terminal_size((80, 24))
         if not final:
-            msg = format(self, '{0.osize} O {0.csize} C {0.usize} D {0.nfiles} N ')
+            msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
             path = remove_surrogates(item[b'path']) if item else ''
             space = columns - len(msg)
             if space < len('...') + len(path):
@@ -191,7 +195,7 @@ class Statistics:
             msg += "{0:<{space}}".format(path, space=space)
         else:
             msg = ' ' * columns
-        print(msg, file=sys.stderr, end=final and "\n" or "\r")
+        print(msg, file=stream or sys.stderr, end=final and "\n" or "\r")
 
 
 def get_keys_dir():

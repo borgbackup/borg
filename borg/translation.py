@@ -18,7 +18,7 @@ try:
         locale.bindtextdomain(prog, pkg_resources.resource_filename(prog, "po"))
     if hasattr(locale, "textdomain"):
         locale.textdomain(prog)
-    gettext.install(prog, pkg_resources.resource_filename(prog, "po"), unicode=True, names='ngettext')
+    gettext.install(prog, pkg_resources.resource_filename(prog, "po"), names='ngettext')
 except Exception as e:
     print("Unable to initialize translations: %s" % e, file=sys.stderr)
     import builtins

@@ -1,6 +1,9 @@
+import pdb
+
 import hashlib
 from time import mktime, strptime
 from datetime import datetime, timezone, timedelta
+from io import StringIO
 import os
 
 import pytest
@@ -8,7 +11,7 @@ import sys
 import msgpack
 
 from ..helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
-    prune_within, prune_split, get_cache_dir, \
+    prune_within, prune_split, get_cache_dir, Statistics, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams
 from . import BaseTestCase
 
@@ -399,3 +402,42 @@ def test_get_cache_dir():
     # reset old env
     if old_env is not None:
         os.environ['BORG_CACHE_DIR'] = old_env
+
+@pytest.fixture()
+def stats():
+    stats = Statistics()
+    stats.update(10, 10, unique=True)
+    return stats
+
+def test_stats_basic(stats):
+    assert stats.osize == stats.csize == stats.usize == 10
+    stats.update(10, 10, unique=False)
+    assert stats.osize == stats.csize == 20
+    assert stats.usize == 10
+
+def tests_stats_progress(stats, columns = 80):
+    os.environ['COLUMNS'] = str(columns)
+    io = StringIO()
+    stats.show_progress(stream=io)
+    s = '10 B O 10 B C 10 B D 0 N '
+    buf = ' ' * (columns - len(s))
+    assert io.getvalue() == s + buf + "\r"
+
+    io = StringIO()
+    stats.update(10**3, 0, unique=False)
+    stats.show_progress(item={b'path': 'foo'}, final=False, stream=io)
+    s = '1.01 kB O 10 B C 10 B D 0 N foo'
+    buf = ' ' * (columns - len(s))
+    assert io.getvalue() == s + buf + "\r"
+    io = StringIO()
+    stats.show_progress(item={b'path': 'foo'*40}, final=False, stream=io)
+    s = '1.01 kB O 10 B C 10 B D 0 N foofoofoofoofoofoofoofo...oofoofoofoofoofoofoofoofoo'
+    buf = ' ' * (columns - len(s))
+    assert io.getvalue() == s + buf + "\r"
+
+def test_stats_format(stats):
+    assert str(stats) == """\
+                       Original size      Compressed size    Deduplicated size
+%-15s                 10 B                 10 B                 10 B"""
+    s = "{0.osize_fmt}".format(stats)
+    assert s == "10 B"

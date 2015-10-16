@@ -670,7 +670,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='print statistics for the created archive')
         subparser.add_argument('-p', '--progress', dest='progress',
                                action='store_true', default=False,
-                               help='print progress while creating the archive')
+                               help="""print progress while creating
+                               the archive, showing Original,
+                               Compressed and Deduplicated sizes,
+                               followed by the path being processd""")
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')

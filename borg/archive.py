@@ -503,7 +503,10 @@ Number of files: {0.stats.nfiles}
             else:
                 self.hard_links[st.st_ino, st.st_dev] = safe_path
         path_hash = self.key.id_hash(os.path.join(self.cwd, path).encode('utf-8', 'surrogateescape'))
+        first_run = not cache.files
         ids = cache.file_known_and_unchanged(path_hash, st)
+        if first_run:
+            logger.info('processing files')
         chunks = None
         if ids is not None:
             # Make sure all ids are available

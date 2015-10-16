@@ -10,6 +10,7 @@ from .helpers import get_keys_dir, get_cache_dir
 from .locking import UpgradableLock
 from .repository import Repository, MAGIC
 from .key import KeyfileKey, KeyfileNotFoundError
+import borg.translation
 
 ATTIC_MAGIC = b'ATTICSEG'
 
@@ -26,14 +27,14 @@ class AtticRepositoryUpgrader(Repository):
         we nevertheless do the order in reverse, as we prefer to do
         the fast stuff first, to improve interactivity.
         """
-        logger.info("opening attic repository with borg and converting")
+        logger.info(_("opening attic repository with borg and converting"))
         # we need to open the repo to load configuration, keyfiles and segments
         self.open(self.path, exclusive=False)
         segments = [filename for i, filename in self.io.segment_iterator()]
         try:
             keyfile = self.find_attic_keyfile()
         except KeyfileNotFoundError:
-            logger.warning("no key file found for repository")
+            logger.warning(_("no key file found for repository"))
         else:
             self.convert_keyfiles(keyfile, dryrun)
         self.close()
@@ -56,11 +57,11 @@ class AtticRepositoryUpgrader(Repository):
 
         luckily the magic string length didn't change so we can just
         replace the 8 first bytes of all regular files in there."""
-        logger.info("converting %d segments..." % len(segments))
+        logger.info(_("converting %d segments...") % len(segments))
         i = 0
         for filename in segments:
             i += 1
-            print("\rconverting segment %d/%d in place, %.2f%% done (%s)"
+            print(_("\rconverting segment %d/%d in place, %.2f%% done (%s)")
                   % (i, len(segments), 100*float(i)/len(segments), filename),
                   end='', file=sys.stderr)
             if dryrun:
@@ -111,12 +112,12 @@ class AtticRepositoryUpgrader(Repository):
         key file because magic string length changed, but that's not a
         problem because the keyfiles are small (compared to, say,
         all the segments)."""
-        logger.info("converting keyfile %s" % keyfile)
+        logger.info(_("converting keyfile %s") % keyfile)
         with open(keyfile, 'r') as f:
             data = f.read()
         data = data.replace(AtticKeyfileKey.FILE_ID, KeyfileKey.FILE_ID, 1)
         keyfile = os.path.join(get_keys_dir(), os.path.basename(keyfile))
-        logger.info("writing borg keyfile to %s" % keyfile)
+        logger.info(_("writing borg keyfile to %s") % keyfile)
         if not dryrun:
             with open(keyfile, 'w') as f:
                 f.write(data)
@@ -142,7 +143,7 @@ class AtticRepositoryUpgrader(Repository):
         caches = []
         transaction_id = self.get_index_transaction_id()
         if transaction_id is None:
-            logger.warning('no index file found for repository %s' % self.path)
+            logger.warning(_('no index file found for repository %s') % self.path)
         else:
             caches += [os.path.join(self.path, 'index.%d' % transaction_id).encode('utf-8')]
 
@@ -172,14 +173,14 @@ class AtticRepositoryUpgrader(Repository):
             if os.path.exists(attic_file):
                 borg_file = os.path.join(borg_cache_dir, path)
                 if os.path.exists(borg_file):
-                    logger.warning("borg cache file already exists in %s, skipping conversion of %s" % (borg_file, attic_file))
+                    logger.warning(_("borg cache file already exists in %s, skipping conversion of %s") % (borg_file, attic_file))
                 else:
-                    logger.info("copying attic cache file from %s to %s" % (attic_file, borg_file))
+                    logger.info(_("copying attic cache file from %s to %s") % (attic_file, borg_file))
                     if not dryrun:
                         shutil.copyfile(attic_file, borg_file)
                     return borg_file
             else:
-                logger.warning("no %s cache file found in %s" % (path, attic_file))
+                logger.warning(_("no %s cache file found in %s") % (path, attic_file))
             return None
 
         # XXX: untested, because generating cache files is a PITA, see
@@ -196,7 +197,7 @@ class AtticRepositoryUpgrader(Repository):
             for cache in ['chunks']:
                 copied = copy_cache_file(cache)
                 if copied:
-                    logger.info("converting cache %s" % cache)
+                    logger.info(_("converting cache %s") % cache)
                     if not dryrun:
                         AtticRepositoryUpgrader.header_replace(cache, b'ATTICIDX', b'BORG_IDX')
 

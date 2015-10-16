@@ -17,6 +17,7 @@ from .helpers import Error, get_cache_dir, decode_dict, st_mtime_ns, unhexlify, 
     bigint_to_int, format_file_size, have_cython
 from .locking import UpgradableLock
 from .hashindex import ChunkIndex
+import borg.translation
 
 if have_cython():
     import msgpack
@@ -25,6 +26,8 @@ if have_cython():
 class Cache:
     """Client Side cache
     """
+
+    # XXX: how to translate those?
     class RepositoryReplay(Error):
         """Cache is newer than repository, refusing to continue"""
 
@@ -51,14 +54,14 @@ class Cache:
         # Warn user before sending data to a never seen before unencrypted repository
         if not os.path.exists(self.path):
             if warn_if_unencrypted and isinstance(key, PlaintextKey):
-                if not self._confirm('Warning: Attempting to access a previously unknown unencrypted repository',
+                if not self._confirm(_('Warning: Attempting to access a previously unknown unencrypted repository'),
                                      'BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'):
                     raise self.CacheInitAbortedError()
             self.create()
         self.open()
         # Warn user before sending data to a relocated repository
         if self.previous_location and self.previous_location != repository._location.canonical_path():
-            msg = 'Warning: The repository at location {} was previously located at {}'.format(repository._location.canonical_path(), self.previous_location)
+            msg = _('Warning: The repository at location {} was previously located at {}').format(repository._location.canonical_path(), self.previous_location)
             if not self._confirm(msg, 'BORG_RELOCATED_REPO_ACCESS_IS_OK'):
                 raise self.RepositoryAccessAborted()
 
@@ -76,11 +79,11 @@ class Cache:
         self.close()
 
     def __str__(self):
-        return format(self, """\
+        return format(self, _("""\
 All archives:   {0.total_size:>20s} {0.total_csize:>20s} {0.unique_csize:>20s}
 
                        Unique chunks         Total chunks
-Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
+Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""))
 
     def __format__(self, format_spec):
         # XXX: this should really be moved down to `hashindex.pyx`
@@ -94,15 +97,15 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
     def _confirm(self, message, env_var_override=None):
         print(message, file=sys.stderr)
         if env_var_override and os.environ.get(env_var_override):
-            print("Yes (From {})".format(env_var_override), file=sys.stderr)
+            print(_("Yes (From {})").format(env_var_override), file=sys.stderr)
             return True
         if not sys.stdin.isatty():
             return False
         try:
-            answer = input('Do you want to continue? [yN] ')
+            answer = input(_('Do you want to continue? [yN] '))
         except EOFError:
             return False
-        return answer and answer in 'Yy'
+        return answer and answer in _('Yy')
 
     def create(self):
         """Create a new empty cache at `self.path`
@@ -137,10 +140,10 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
             cache_version = self.config.getint('cache', 'version')
             wanted_version = 1
             if  cache_version != wanted_version:
-                raise Exception('%s has unexpected cache version %d (wanted: %d).' % (
+                raise Exception(_('%s has unexpected cache version %d (wanted: %d).') % (
                     config_path, cache_version, wanted_version))
         except configparser.NoSectionError as e:
-            raise Exception('%s does not look like a Borg cache.' % config_path)
+            raise Exception(_('%s does not look like a Borg cache.') % config_path)
         self.id = self.config.get('cache', 'repository')
         self.manifest_id = unhexlify(self.config.get('cache', 'manifest'))
         self.timestamp = self.config.get('cache', 'timestamp', fallback=None)
@@ -151,7 +154,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
 
     def open(self):
         if not os.path.isdir(self.path):
-            raise Exception('%s Does not look like a Borg cache' % self.path)
+            raise Exception(_('%s Does not look like a Borg cache') % self.path)
         self.lock = UpgradableLock(os.path.join(self.path, 'lock'), exclusive=True).acquire()
         self.rollback()
 
@@ -275,7 +278,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
             add(chunk_idx, archive_id, len(data), len(cdata))
             archive = msgpack.unpackb(data)
             if archive[b'version'] != 1:
-                raise Exception('Unknown archive metadata version')
+                raise Exception(_('Unknown archive metadata version'))
             decode_dict(archive, (b'name',))
             unpacker = msgpack.Unpacker()
             for item_id, chunk in zip(archive[b'items'], repository.get_many(archive[b'items'])):
@@ -284,7 +287,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
                 unpacker.feed(data)
                 for item in unpacker:
                     if not isinstance(item, dict):
-                        logger.error('Error: Did not get expected metadata dict - archive corrupted!')
+                        logger.error(_('Error: Did not get expected metadata dict - archive corrupted!'))
                         continue
                     if b'chunks' in item:
                         for chunk_id, size, csize in item[b'chunks']:
@@ -306,10 +309,10 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
                     return name
 
         def create_master_idx(chunk_idx):
-            logger.info('Synchronizing chunks cache...')
+            logger.info(_('Synchronizing chunks cache...'))
             cached_ids = cached_archives()
             archive_ids = repo_archives()
-            logger.info('Archives: %d, w/ cached Idx: %d, w/ outdated Idx: %d, w/o cached Idx: %d.' % (
+            logger.info(_('Archives: %d, w/ cached Idx: %d, w/ outdated Idx: %d, w/o cached Idx: %d.') % (
                 len(archive_ids), len(cached_ids),
                 len(cached_ids - archive_ids), len(archive_ids - cached_ids), ))
             # deallocates old hashindex, creates empty hashindex:
@@ -321,12 +324,12 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
                     archive_name = lookup_name(archive_id)
                     if archive_id in cached_ids:
                         archive_chunk_idx_path = mkpath(archive_id)
-                        logger.info("Reading cached archive chunk index for %s ..." % archive_name)
+                        logger.info(_("Reading cached archive chunk index for %s ...") % archive_name)
                         archive_chunk_idx = ChunkIndex.read(archive_chunk_idx_path)
                     else:
-                        logger.info('Fetching and building archive index for %s ...' % archive_name)
+                        logger.info(_('Fetching and building archive index for %s ...') % archive_name)
                         archive_chunk_idx = fetch_and_build_idx(archive_id, repository, self.key)
-                    logger.info("Merging into master chunks index ...")
+                    logger.info(_("Merging into master chunks index ..."))
                     if chunk_idx is None:
                         # we just use the first archive's idx as starting point,
                         # to avoid growing the hash table from 0 size and also
@@ -334,7 +337,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
                         chunk_idx = archive_chunk_idx
                     else:
                         chunk_idx.merge(archive_chunk_idx)
-            logger.info('Done.')
+            logger.info(_('Done.'))
             return chunk_idx
 
         def legacy_cleanup():
@@ -378,7 +381,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
         if size is not None and stored_size is not None and size != stored_size:
             # we already have a chunk with that id, but different size.
             # this is either a hash collision (unlikely) or corruption or a bug.
-            raise Exception("chunk has same id [%r], but different size (stored: %d new: %d)!" % (
+            raise Exception(_("chunk has same id [%r], but different size (stored: %d new: %d)!") % (
                             id, stored_size, size))
         return refcount
 

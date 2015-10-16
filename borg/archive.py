@@ -9,6 +9,7 @@ from .logger import create_logger
 logger = create_logger()
 from .key import key_factory
 from .remote import cache_if_remote
+import borg.translation
 
 import os
 import socket
@@ -126,6 +127,7 @@ class CacheChunkBuffer(ChunkBuffer):
 
 class Archive:
 
+    # XXX: how to translate those?
     class DoesNotExist(Error):
         """Archive {} does not exist"""
 
@@ -177,7 +179,7 @@ class Archive:
         data = self.key.decrypt(id, self.repository.get(id))
         metadata = msgpack.unpackb(data)
         if metadata[b'version'] != 1:
-            raise Exception('Unknown archive metadata version')
+            raise Exception(_('Unknown archive metadata version'))
         return metadata
 
     def load(self, id):
@@ -201,13 +203,13 @@ class Archive:
         return format_timedelta(self.end-self.start)
 
     def __str__(self):
-        buf = '''Archive name: {0.name}
+        buf = _('''Archive name: {0.name}
 Archive fingerprint: {0.fpr}
 Start time: {0.start:%c}
 End time: {0.end:%c}
 Duration: {0.duration}
 Number of files: {0.stats.nfiles}
-{0.cache}'''.format(self)
+{0.cache}''').format(self)
         return buf
 
     def __repr__(self):
@@ -293,7 +295,7 @@ Number of files: {0.stats.nfiles}
 
         dest = self.cwd
         if item[b'path'].startswith('/') or item[b'path'].startswith('..'):
-            raise Exception('Path should be relative and local')
+            raise Exception(_('Path should be relative and local'))
         path = os.path.join(dest, item[b'path'])
         # Attempt to remove existing files, ignore errors on failure
         try:
@@ -351,7 +353,7 @@ Number of files: {0.stats.nfiles}
             os.mknod(path, item[b'mode'], item[b'rdev'])
             self.restore_attrs(path, item)
         else:
-            raise Exception('Unknown archive item type %r' % item[b'mode'])
+            raise Exception(_('Unknown archive item type %r') % item[b'mode'])
 
     def restore_attrs(self, path, item, symlink=False, fd=None):
         xattrs = item.get(b'xattrs', {})
@@ -645,7 +647,7 @@ class ArchiveChecker:
         self.possibly_superseded = set()
 
     def check(self, repository, repair=False, archive=None, last=None):
-        self.report_progress('Starting archive consistency check...')
+        self.report_progress(_('Starting archive consistency check...'))
         self.check_all = archive is None and last is None
         self.repair = repair
         self.repository = repository
@@ -659,7 +661,7 @@ class ArchiveChecker:
         self.orphan_chunks_check()
         self.finish()
         if not self.error_found:
-            logger.info('Archive consistency check complete, no problems found.')
+            logger.info(_('Archive consistency check complete, no problems found.'))
         return self.repair or not self.error_found
 
     def init_chunks(self):
@@ -692,7 +694,7 @@ class ArchiveChecker:
 
         Iterates through all objects in the repository looking for archive metadata blocks.
         """
-        self.report_progress('Rebuilding missing manifest, this might take some time...', error=True)
+        self.report_progress(_('Rebuilding missing manifest, this might take some time...'), error=True)
         manifest = Manifest(self.key, self.repository)
         for chunk_id, _ in self.chunks.iteritems():
             cdata = self.repository.get(chunk_id)
@@ -709,9 +711,9 @@ class ArchiveChecker:
             except (TypeError, ValueError, StopIteration):
                 continue
             if isinstance(archive, dict) and b'items' in archive and b'cmdline' in archive:
-                self.report_progress('Found archive ' + archive[b'name'].decode('utf-8'), error=True)
+                self.report_progress(_('Found archive %s') % archive[b'name'].decode('utf-8'), error=True)
                 manifest.archives[archive[b'name'].decode('utf-8')] = {b'id': chunk_id, b'time': archive[b'time']}
-        self.report_progress('Manifest rebuild complete', error=True)
+        self.report_progress(_('Manifest rebuild complete'), error=True)
         return manifest
 
     def rebuild_refcounts(self, archive=None, last=None):
@@ -753,7 +755,7 @@ class ArchiveChecker:
             for chunk_id, size, csize in item[b'chunks']:
                 if chunk_id not in self.chunks:
                     # If a file chunk is missing, create an all empty replacement chunk
-                    self.report_progress('{}: Missing file chunk detected (Byte {}-{})'.format(item[b'path'].decode('utf-8', 'surrogateescape'), offset, offset + size), error=True)
+                    self.report_progress(_('{}: Missing file chunk detected (Byte {}-{})').format(item[b'path'].decode('utf-8', 'surrogateescape'), offset, offset + size), error=True)
                     data = bytes(size)
                     chunk_id = self.key.id_hash(data)
                     cdata = self.key.encrypt(data)
@@ -782,7 +784,7 @@ class ArchiveChecker:
             for state, items in groupby(archive[b'items'], missing_chunk_detector):
                 items = list(items)
                 if state % 2:
-                    self.report_progress('Archive metadata damage detected', error=True)
+                    self.report_progress(_('Archive metadata damage detected'), error=True)
                     continue
                 if state > 0:
                     unpacker.resync()
@@ -790,7 +792,7 @@ class ArchiveChecker:
                     unpacker.feed(self.key.decrypt(chunk_id, cdata))
                     for item in unpacker:
                         if not isinstance(item, dict):
-                            self.report_progress('Did not get expected metadata dict - archive corrupted!',
+                            self.report_progress(_('Did not get expected metadata dict - archive corrupted!'),
                                                  error=True)
                             continue
                         yield item
@@ -808,10 +810,10 @@ class ArchiveChecker:
             num_archives = 1
             end = 1
         for i, (name, info) in enumerate(archive_items[:end]):
-            logger.info('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
+            logger.info(_('Analyzing archive {} ({}/{})').format(name, num_archives - i, num_archives))
             archive_id = info[b'id']
             if archive_id not in self.chunks:
-                self.report_progress('Archive metadata block is missing', error=True)
+                self.report_progress(_('Archive metadata block is missing'), error=True)
                 del self.manifest.archives[name]
                 continue
             mark_as_possibly_superseded(archive_id)
@@ -819,7 +821,7 @@ class ArchiveChecker:
             data = self.key.decrypt(archive_id, cdata)
             archive = StableDict(msgpack.unpackb(data))
             if archive[b'version'] != 1:
-                raise Exception('Unknown archive metadata version')
+                raise Exception(_('Unknown archive metadata version'))
             decode_dict(archive, (b'name', b'hostname', b'username', b'time'))  # fixme: argv
             items_buffer = ChunkBuffer(self.key)
             items_buffer.write_chunk = add_callback
@@ -845,12 +847,12 @@ class ArchiveChecker:
                     unused.add(id_)
             orphaned = unused - self.possibly_superseded
             if orphaned:
-                self.report_progress('{} orphaned objects found'.format(len(orphaned)), error=True)
+                self.report_progress(_('{} orphaned objects found').format(len(orphaned)), error=True)
             if self.repair:
                 for id_ in unused:
                     self.repository.delete(id_)
         else:
-            self.report_progress('Orphaned objects check skipped (needs all archives checked)')
+            self.report_progress(_('Orphaned objects check skipped (needs all archives checked)'))
 
     def finish(self):
         if self.repair:

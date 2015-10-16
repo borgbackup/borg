@@ -16,6 +16,7 @@ if have_cython():
     from .hashindex import NSIndex
 from .locking import UpgradableLock
 from .lrucache import LRUCache
+import borg.translation
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
 MAGIC = b'BORG_SEG'
@@ -38,6 +39,7 @@ class Repository:
     DEFAULT_MAX_SEGMENT_SIZE = 5 * 1024 * 1024
     DEFAULT_SEGMENTS_PER_DIR = 10000
 
+    # XXX: how to translate those?
     class DoesNotExist(Error):
         """Repository {} does not exist."""
 
@@ -186,7 +188,7 @@ class Repository:
                 self.io.cleanup(transaction_id)
             hints = read_msgpack(os.path.join(self.path, 'hints.%d' % transaction_id))
             if hints[b'version'] != 1:
-                raise ValueError('Unknown hints file version: %d' % hints['version'])
+                raise ValueError(_('Unknown hints file version: %d') % hints['version'])
             self.segments = hints[b'segments']
             self.compact = set(hints[b'compact'])
 
@@ -332,19 +334,19 @@ class Repository:
                 elif tag == TAG_COMMIT:
                     continue
                 else:
-                    report_error('Unexpected tag {} in segment {}'.format(tag, segment))
+                    report_error(_('Unexpected tag {} in segment {}').format(tag, segment))
         # We might need to add a commit tag if no committed segment is found
         if repair and segments_transaction_id is None:
-            report_error('Adding commit tag to segment {}'.format(transaction_id))
+            report_error(_('Adding commit tag to segment {}').format(transaction_id))
             self.io.segment = transaction_id + 1
             self.io.write_commit()
         if current_index and not repair:
             if len(current_index) != len(self.index):
-                report_error('Index object count mismatch. {} != {}'.format(len(current_index), len(self.index)))
+                report_error(_('Index object count mismatch. {} != {}').format(len(current_index), len(self.index)))
             elif current_index:
                 for key, value in self.index.iteritems():
                     if current_index.get(key, (-1, -1)) != value:
-                        report_error('Index mismatch for key {}. {} != {}'.format(key, value, current_index.get(key, (-1, -1))))
+                        report_error(_('Index mismatch for key {}. {} != {}').format(key, value, current_index.get(key, (-1, -1))))
         if repair:
             self.compact_segments()
             self.write_index()
@@ -534,7 +536,7 @@ class LoggedIO:
         fd = self.get_fd(segment)
         fd.seek(0)
         if fd.read(MAGIC_LEN) != MAGIC:
-            raise IntegrityError('Invalid segment magic [segment {}, offset {}]'.format(segment, 0))
+            raise IntegrityError(_('Invalid segment magic [segment {}, offset {}]').format(segment, 0))
         offset = MAGIC_LEN
         header = fd.read(self.header_fmt.size)
         while header:
@@ -554,7 +556,7 @@ class LoggedIO:
         with open(filename, 'rb') as fd:
             data = memoryview(fd.read())
         os.rename(filename, filename + '.beforerecover')
-        logger.info('attempting to recover ' + filename)
+        logger.info(_('attempting to recover ') + filename)
         with open(filename, 'wb') as fd:
             fd.write(MAGIC)
             while len(data) >= self.header_fmt.size:
@@ -576,7 +578,7 @@ class LoggedIO:
         header = fd.read(self.put_header_fmt.size)
         size, tag, key, data = self._read(fd, self.put_header_fmt, header, segment, offset, (TAG_PUT, ))
         if id != key:
-            raise IntegrityError('Invalid segment entry header, is not for wanted id [segment {}, offset {}]'.format(
+            raise IntegrityError(_('Invalid segment entry header, is not for wanted id [segment {}, offset {}]').format(
                 segment, offset))
         return data
 
@@ -585,7 +587,7 @@ class LoggedIO:
         try:
             hdr_tuple = fmt.unpack(header)
         except struct.error as err:
-            raise IntegrityError('Invalid segment entry header [segment {}, offset {}]: {}'.format(
+            raise IntegrityError(_('Invalid segment entry header [segment {}, offset {}]: {}').format(
                 segment, offset, err))
         if fmt is self.put_header_fmt:
             crc, size, tag, key = hdr_tuple
@@ -593,20 +595,20 @@ class LoggedIO:
             crc, size, tag = hdr_tuple
             key = None
         else:
-            raise TypeError("_read called with unsupported format")
+            raise TypeError(_("_read called with unsupported format"))
         if size > MAX_OBJECT_SIZE or size < fmt.size:
-            raise IntegrityError('Invalid segment entry size [segment {}, offset {}]'.format(
+            raise IntegrityError(_('Invalid segment entry size [segment {}, offset {}]').format(
                 segment, offset))
         length = size - fmt.size
         data = fd.read(length)
         if len(data) != length:
-            raise IntegrityError('Segment entry data short read [segment {}, offset {}]: expected {}, got {} bytes'.format(
+            raise IntegrityError(_('Segment entry data short read [segment {}, offset {}]: expected {}, got {} bytes').format(
                 segment, offset, length, len(data)))
         if crc32(data, crc32(memoryview(header)[4:])) & 0xffffffff != crc:
-            raise IntegrityError('Segment entry checksum mismatch [segment {}, offset {}]'.format(
+            raise IntegrityError(_('Segment entry checksum mismatch [segment {}, offset {}]').format(
                 segment, offset))
         if tag not in acceptable_tags:
-            raise IntegrityError('Invalid segment entry header, did not get acceptable tag [segment {}, offset {}]'.format(
+            raise IntegrityError(_('Invalid segment entry header, did not get acceptable tag [segment {}, offset {}]').format(
                 segment, offset))
         if key is None and tag in (TAG_PUT, TAG_DELETE):
             key, data = data[:32], data[32:]

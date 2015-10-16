@@ -16,6 +16,8 @@ from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from operator import attrgetter
 
+import borg.translation
+
 def have_cython():
     """allow for a way to disable Cython includes
 
@@ -44,9 +46,10 @@ class Error(Exception):
     exit_code = 1
 
     def get_message(self):
-        return 'Error: ' + type(self).__doc__.format(*self.args)
+        return _('Error: ') + type(self).__doc__.format(*self.args)
 
 
+# XXX: how to translate this?
 class ExtensionModuleError(Error):
     """The Borg binary extension modules do not seem to be properly installed"""
 
@@ -84,7 +87,7 @@ class Manifest:
         manifest.id = key.id_hash(data)
         m = msgpack.unpackb(data)
         if not m.get(b'version') == 1:
-            raise ValueError('Invalid manifest version')
+            raise ValueError(_('Invalid manifest version'))
         manifest.archives = dict((k.decode('utf-8'), v) for k, v in m[b'archives'].items())
         manifest.timestamp = m.get(b'timestamp')
         if manifest.timestamp:
@@ -122,9 +125,9 @@ def prune_within(archives, within):
         hours = int(within[:-1]) * multiplier[within[-1]]
     except (KeyError, ValueError):
         # I don't like how this displays the original exception too:
-        raise argparse.ArgumentTypeError('Unable to parse --within option: "%s"' % within)
+        raise argparse.ArgumentTypeError(_('Unable to parse --within option: "%s"') % within)
     if hours <= 0:
-        raise argparse.ArgumentTypeError('Number specified using --within option must be positive')
+        raise argparse.ArgumentTypeError(_('Number specified using --within option must be positive'))
     target = datetime.now(timezone.utc) - timedelta(seconds=hours*60*60)
     return [a for a in archives if a.ts > target]
 
@@ -163,9 +166,9 @@ class Statistics:
         return buf
 
     def __str__(self):
-        return format(self, """\
+        return format(self, _("""\
                        Original size      Compressed size    Deduplicated size
-%-15s {0.osize:>20s} {0.csize:>20s} {0.usize:>20s}""")
+%-15s {0.osize:>20s} {0.csize:>20s} {0.usize:>20s}"""))
 
     def __format__(self, format_spec):
         fields = ['osize', 'csize', 'usize']
@@ -177,7 +180,7 @@ class Statistics:
             path = remove_surrogates(item[b'path']) if item else ''
             if len(path) > 43:
                 path = '%s...%s' % (path[:20], path[-20:])
-            msg = '%9s O %9s C %9s D %-43s' % (
+            msg = _('%9s O %9s C %9s D %-43s') % (
                 format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize), path)
         else:
             msg = ' ' * 79
@@ -352,7 +355,7 @@ def ChunkerParams(s):
     if int(chunk_max) > 23:
         # do not go beyond 2**23 (8MB) chunk size now,
         # COMPR_BUFFER can only cope with up to this size
-        raise ValueError('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)')
+        raise ValueError(_('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)'))
     return int(chunk_min), int(chunk_max), int(chunk_mask), int(window_size)
 
 
@@ -425,13 +428,13 @@ def format_timedelta(td):
     s = ts % 60
     m = int(ts / 60) % 60
     h = int(ts / 3600) % 24
-    txt = '%.2f seconds' % s
+    txt = _('%.2f seconds') % s
     if m:
-        txt = '%d minutes %s' % (m, txt)
+        txt = _('%d minutes %s') % (m, txt)
     if h:
-        txt = '%d hours %s' % (h, txt)
+        txt = _('%d hours %s') % (h, txt)
     if td.days:
-        txt = '%d days %s' % (td.days, txt)
+        txt = _('%d days %s') % (td.days, txt)
     return txt
 
 
@@ -463,6 +466,7 @@ def format_archive(archive):
     return '%-36s %s' % (archive.name, to_localtime(archive.ts).strftime('%c'))
 
 
+# XXX: how to translate this?
 class IntegrityError(Error):
     """Data integrity error"""
 
@@ -632,11 +636,11 @@ def location_validator(archive=None):
         try:
             loc = Location(text)
         except ValueError:
-            raise argparse.ArgumentTypeError('Invalid location format: "%s"' % text)
+            raise argparse.ArgumentTypeError(_('Invalid location format: "%s"') % text)
         if archive is True and not loc.archive:
-            raise argparse.ArgumentTypeError('"%s": No archive specified' % text)
+            raise argparse.ArgumentTypeError(_('"%s": No archive specified') % text)
         elif archive is False and loc.archive:
-            raise argparse.ArgumentTypeError('"%s" No archive can be specified' % text)
+            raise argparse.ArgumentTypeError(_('"%s" No archive can be specified') % text)
         return loc
     return validator
 

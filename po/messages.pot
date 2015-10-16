@@ -1,0 +1,1193 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2015-10-16 02:54-0400\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: ../borg/archiver.py:483
+msgid ""
+"\n"
+"        Exclude patterns use a variant of shell pattern syntax, with '*' "
+"matching any\n"
+"        number of characters, '?' matching any single character, '[...]' "
+"matching any\n"
+"        single character specified, including ranges, and '[!...]' matching "
+"any\n"
+"        character not specified.  For the purpose of these patterns, the "
+"path\n"
+"        separator ('\\' for Windows and '/' on other systems) is not "
+"treated\n"
+"        specially.  For a path to match a pattern, it must completely match "
+"from\n"
+"        start to end, or must match from the start to just before a path "
+"separator.\n"
+"        Except for the root path, paths will never end in the path separator "
+"when\n"
+"        matching is attempted.  Thus, if a given pattern ends in a path "
+"separator, a\n"
+"        '*' is appended before matching is attempted.  Patterns with "
+"wildcards should\n"
+"        be quoted to protect them from shell expansion.\n"
+"\n"
+"        Examples:\n"
+"\n"
+"        # Exclude '/home/user/file.o' but not '/home/user/file.odt':\n"
+"        $ borg create -e '*.o' backup /\n"
+"\n"
+"        # Exclude '/home/user/junk' and '/home/user/subdir/junk' but\n"
+"        # not '/home/user/importantjunk' or '/etc/junk':\n"
+"        $ borg create -e '/home/*/junk' backup /\n"
+"\n"
+"        # Exclude the contents of '/home/user/cache' but not the directory "
+"itself:\n"
+"        $ borg create -e /home/user/cache/ backup /\n"
+"\n"
+"        # The file '/home/user/cache/important' is *not* backed up:\n"
+"        $ borg create -e /home/user/cache/ backup / /home/user/cache/"
+"important\n"
+"        "
+msgstr ""
+
+#: ../borg/archiver.py:588
+msgid ""
+"\n"
+"        The check command verifies the consistency of a repository and the "
+"corresponding archives.\n"
+"\n"
+"        First, the underlying repository data files are checked:\n"
+"\n"
+"        - For all segments the segment magic (header) is checked\n"
+"        - For all objects stored in the segments, all metadata (e.g. crc and "
+"size) and\n"
+"          all data is read. The read data is checked by size and CRC. Bit "
+"rot and other\n"
+"          types of accidental damage can be detected this way.\n"
+"        - If we are in repair mode and a integrity error is detected for a "
+"segment,\n"
+"          we try to recover as many objects from the segment as possible.\n"
+"        - In repair mode, it makes sure that the index is consistent with "
+"the data\n"
+"          stored in the segments.\n"
+"        - If you use a remote repo server via ssh:, the repo check is "
+"executed on the\n"
+"          repo server without causing significant network traffic.\n"
+"        - The repository check can be skipped using the --archives-only "
+"option.\n"
+"\n"
+"        Second, the consistency and correctness of the archive metadata is "
+"verified:\n"
+"\n"
+"        - Is the repo manifest present? If not, it is rebuilt from archive "
+"metadata\n"
+"          chunks (this requires reading and decrypting of all metadata and "
+"data).\n"
+"        - Check if archive metadata chunk is present. if not, remove archive "
+"from\n"
+"          manifest.\n"
+"        - For all files (items) in the archive, for all chunks referenced by "
+"these\n"
+"          files, check if chunk is present (if not and we are in repair "
+"mode, replace\n"
+"          it with a same-size chunk of zeros). This requires reading of "
+"archive and\n"
+"          file metadata, but not data.\n"
+"        - If we are in repair mode and we checked all the archives: delete "
+"orphaned\n"
+"          chunks from the repo.\n"
+"        - if you use a remote repo server via ssh:, the archive check is "
+"executed on\n"
+"          the client machine (because if encryption is enabled, the checks "
+"will require\n"
+"          decryption and this is always done client-side, because key access "
+"will be\n"
+"          required).\n"
+"        - The archive checks can be time consuming, they can be skipped "
+"using the\n"
+"          --repository-only option.\n"
+"        "
+msgstr ""
+
+#: ../borg/archiver.py:645
+msgid ""
+"\n"
+"        The key files used for repository encryption are optionally "
+"passphrase\n"
+"        protected. This command can be used to change this passphrase.\n"
+"        "
+msgstr ""
+
+#: ../borg/archiver.py:845
+msgid ""
+"\n"
+"        The prune command prunes a repository by deleting archives not "
+"matching\n"
+"        any of the specified retention options. This command is normally "
+"used by\n"
+"        automated backup scripts wanting to keep a certain number of "
+"historic backups.\n"
+"\n"
+"        As an example, \"-d 7\" means to keep the latest backup on each day "
+"for 7 days.\n"
+"        Days without backups do not count towards the total.\n"
+"        The rules are applied from hourly to yearly, and backups selected by "
+"previous\n"
+"        rules do not count towards those of later rules. The time that each "
+"backup\n"
+"        completes is used for pruning purposes. Dates and times are "
+"interpreted in\n"
+"        the local timezone, and weeks go from Monday to Sunday. Specifying "
+"a\n"
+"        negative number of archives to keep means that there is no limit.\n"
+"\n"
+"        The \"--keep-within\" option takes an argument of the form "
+"\"<int><char>\",\n"
+"        where char is \"H\", \"d\", \"w\", \"m\", \"y\". For example, \"--"
+"keep-within 2d\" means\n"
+"        to keep all archives that were created within the past 48 hours.\n"
+"        \"1m\" is taken to mean \"31d\". The archives kept with this option "
+"do not\n"
+"        count towards the totals specified by any other options.\n"
+"\n"
+"        If a prefix is set with -p, then only archives that start with the "
+"prefix are\n"
+"        considered for deletion and only those archives count towards the "
+"totals\n"
+"        specified by the rules.\n"
+"        Otherwise, *all* archives in the repository are candidates for "
+"deletion!\n"
+"        "
+msgstr ""
+
+#: ../borg/archiver.py:778
+msgid ""
+"\n"
+"        This command deletes an archive from the repository or the complete "
+"repository.\n"
+"        Disk space is reclaimed accordingly. If you delete the complete "
+"repository, the\n"
+"        local cache for it (if any) is also deleted.\n"
+"        "
+msgstr ""
+
+#: ../borg/archiver.py:833
+msgid ""
+"\n"
+"        This command displays some detailed information about the specified "
+"archive.\n"
+"        "
+msgstr ""
+
+#: ../borg/archiver.py:570
+msgid ""
+"\n"
+"        This command initializes an empty repository. A repository is a "
+"filesystem\n"
+"        directory containing the deduplicated data from zero or more "
+"archives.\n"
+"        Encryption can be enabled at repository init time.\n"
+"        Please note that the 'passphrase' encryption mode is DEPRECATED "
+"(instead of it,\n"
+"        consider using 'repokey').\n"
+"        "
+msgstr ""
+
+#: ../borg/archiver.py:798
+msgid ""
+"\n"
+"        This command lists the contents of a repository or an archive.\n"
+"        "
+msgstr ""
+
+#: ../borg/archiver.py:812
+msgid ""
+"\n"
+"        This command mounts an archive as a FUSE filesystem. This can be "
+"useful for\n"
+"        browsing an archive or restoring individual files. Unless the ``--"
+"foreground``\n"
+"        option is given the command will run in the background until the "
+"filesystem\n"
+"        is ``umounted``.\n"
+"        "
+msgstr ""
+
+#: ../borg/archiver.py:764
+msgid ""
+"\n"
+"        This command renames an archive in the repository.\n"
+"        "
+msgstr ""
+
+#: ../borg/archiver.py:561
+msgid ""
+"\n"
+"        This command starts a repository server process. This command is "
+"usually not used manually.\n"
+"        "
+msgstr ""
+
+#: ../borg/archiver.py:898
+msgid ""
+"\n"
+"        upgrade an existing Borg repository in place. this currently\n"
+"        only support converting an Attic repository, but may\n"
+"        eventually be extended to cover major Borg upgrades as well.\n"
+"\n"
+"        it will change the magic strings in the repository's segments\n"
+"        to match the new Borg magic strings. the keyfiles found in\n"
+"        $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and\n"
+"        copied to $BORG_KEYS_DIR or ~/.borg/keys.\n"
+"\n"
+"        the cache files are converted, from $ATTIC_CACHE_DIR or\n"
+"        ~/.cache/attic to $BORG_CACHE_DIR or ~/.cache/borg, but the\n"
+"        cache layout between Borg and Attic changed, so it is possible\n"
+"        the first backup after the conversion takes longer than expected\n"
+"        due to the cache resync.\n"
+"\n"
+"        it is recommended you run this on a copy of the Attic\n"
+"        repository, in case something goes wrong, for example:\n"
+"\n"
+"            cp -a attic borg\n"
+"            borg upgrade -n borg\n"
+"            borg upgrade borg\n"
+"\n"
+"        upgrade should be able to resume if interrupted, although it\n"
+"        will still iterate over all segments. if you want to start\n"
+"        from scratch, use `borg delete` over the copied repository to\n"
+"        make sure the cache files are also removed:\n"
+"\n"
+"            borg delete borg\n"
+"\n"
+"        the conversion can PERMANENTLY DAMAGE YOUR REPOSITORY! Attic\n"
+"        will also NOT BE ABLE TO READ THE BORG REPOSITORY ANYMORE, as\n"
+"        the magic strings will have changed.\n"
+"\n"
+"        you have been warned."
+msgstr ""
+
+#: ../borg/upgrader.py:64
+#, python-format
+msgid "\rconverting segment %d/%d in place, %.2f%% done (%s)"
+msgstr ""
+
+#: ../borg/helpers.py:169
+#, python-format
+msgid ""
+"                       Original size      Compressed size    Deduplicated "
+"size\n"
+"%-15s {0.osize:>20s} {0.csize:>20s} {0.usize:>20s}"
+msgstr ""
+
+#: ../borg/helpers.py:643
+#, python-format
+msgid "\"%s\" No archive can be specified"
+msgstr ""
+
+#: ../borg/helpers.py:641
+#, python-format
+msgid "\"%s\": No archive specified"
+msgstr ""
+
+#: ../borg/helpers.py:431
+#, python-format
+msgid "%.2f seconds"
+msgstr ""
+
+#: ../borg/helpers.py:183
+#, python-format
+msgid "%9s O %9s C %9s D %-43s"
+msgstr ""
+
+#: ../borg/helpers.py:437
+#, python-format
+msgid "%d days %s"
+msgstr ""
+
+#: ../borg/helpers.py:435
+#, python-format
+msgid "%d hours %s"
+msgstr ""
+
+#: ../borg/helpers.py:433
+#, python-format
+msgid "%d minutes %s"
+msgstr ""
+
+#: ../borg/cache.py:157
+#, python-format
+msgid "%s Does not look like a Borg cache"
+msgstr ""
+
+#: ../borg/cache.py:146
+#, python-format
+msgid "%s does not look like a Borg cache."
+msgstr ""
+
+#: ../borg/cache.py:143
+#, python-format
+msgid "%s has unexpected cache version %d (wanted: %d)."
+msgstr ""
+
+#: ../borg/archiver.py:342
+#, python-format
+msgid "%s: Mountpoint must be a writable directory"
+msgstr ""
+
+#: ../borg/repository.py:340
+msgid "Adding commit tag to segment {}"
+msgstr ""
+
+#: ../borg/cache.py:82
+msgid ""
+"All archives:   {0.total_size:>20s} {0.total_csize:>20s} {0.unique_csize:"
+">20s}\n"
+"\n"
+"                       Unique chunks         Total chunks\n"
+"Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"
+msgstr ""
+
+#: ../borg/archive.py:813
+msgid "Analyzing archive {} ({}/{})"
+msgstr ""
+
+#: ../borg/archive.py:664
+msgid "Archive consistency check complete, no problems found."
+msgstr ""
+
+#: ../borg/archive.py:816
+msgid "Archive metadata block is missing"
+msgstr ""
+
+#: ../borg/archive.py:787
+msgid "Archive metadata damage detected"
+msgstr ""
+
+#: ../borg/archive.py:206
+#, python-format
+msgid ""
+"Archive name: {0.name}\n"
+"Archive fingerprint: {0.fpr}\n"
+"Start time: {0.start:%c}\n"
+"End time: {0.end:%c}\n"
+"Duration: {0.duration}\n"
+"Number of files: {0.stats.nfiles}\n"
+"{0.cache}"
+msgstr ""
+
+#: ../borg/cache.py:315
+#, python-format
+msgid ""
+"Archives: %d, w/ cached Idx: %d, w/ outdated Idx: %d, w/o cached Idx: %d."
+msgstr ""
+
+#: ../borg/archiver.py:426
+msgid ""
+"At least one of the \"within\", \"keep-hourly\", \"keep-daily\", \"keep-"
+"weekly\", \"keep-monthly\" or \"keep-yearly\" settings must be specified"
+msgstr ""
+
+#: ../borg/archiver.py:559
+msgid "Available commands"
+msgstr ""
+
+#: ../borg/archiver.py:558
+#, python-format
+msgid "Borg %s - Deduplicated Backups"
+msgstr ""
+
+#: ../borg/archiver.py:330
+msgid "Cache deleted."
+msgstr ""
+
+#: ../borg/key.py:115 ../borg/key.py:155
+msgid "Chunk id verification failed"
+msgstr ""
+
+#: ../borg/archiver.py:414
+msgid "Command line:"
+msgstr ""
+
+#: ../borg/archiver.py:315 ../borg/archiver.py:461
+msgid "Deleted data:"
+msgstr ""
+
+#: ../borg/archive.py:795
+msgid "Did not get expected metadata dict - archive corrupted!"
+msgstr ""
+
+#: ../borg/archiver.py:87 ../borg/archiver.py:324
+msgid "Do you want to continue? "
+msgstr ""
+
+#: ../borg/cache.py:105
+msgid "Do you want to continue? [yN] "
+msgstr ""
+
+#: ../borg/cache.py:340
+msgid "Done."
+msgstr ""
+
+#: ../borg/key.py:97
+msgid ""
+"Encryption NOT enabled.\n"
+"Use the \"--encryption=repokey|keyfile|passphrase\" to enable encryption."
+msgstr ""
+
+#: ../borg/key.py:151
+msgid "Encryption envelope checksum mismatch"
+msgstr ""
+
+#: ../borg/key.py:195
+msgid "Enter new passphrase: "
+msgstr ""
+
+#: ../borg/key.py:232
+#, python-format
+msgid "Enter passphrase for %s: "
+msgstr ""
+
+#: ../borg/key.py:264
+#, python-format
+msgid "Enter passphrase for key %s: "
+msgstr ""
+
+#: ../borg/key.py:197
+msgid "Enter same passphrase again: "
+msgstr ""
+
+#: ../borg/helpers.py:49
+msgid "Error: "
+msgstr ""
+
+#: ../borg/cache.py:290
+msgid "Error: Did not get expected metadata dict - archive corrupted!"
+msgstr ""
+
+#: ../borg/archiver.py:1041
+#, python-format
+msgid ""
+"Error: Keyboard interrupt.\n"
+"%s"
+msgstr ""
+
+#: ../borg/archiver.py:1038
+#, python-format
+msgid ""
+"Error: Local Exception.\n"
+"%s"
+msgstr ""
+
+#: ../borg/archiver.py:1035
+#, python-format
+msgid ""
+"Error: Remote Exception.\n"
+"%s"
+msgstr ""
+
+#: ../borg/archiver.py:1044
+msgid "Exiting with failure status due to previous errors"
+msgstr ""
+
+#: ../borg/archiver.py:831
+msgid "Extra mount options"
+msgstr ""
+
+#: ../borg/remote.py:226
+msgid "FD exception occurred"
+msgstr ""
+
+#: ../borg/cache.py:330
+#, python-format
+msgid "Fetching and building archive index for %s ..."
+msgstr ""
+
+#: ../borg/archiver.py:410
+#, python-format
+msgid "Fingerprint: %s"
+msgstr ""
+
+#: ../borg/archive.py:714
+#, python-format
+msgid "Found archive %s"
+msgstr ""
+
+#: ../borg/archiver.py:411
+msgid "Hostname:"
+msgstr ""
+
+#: ../borg/key.py:225
+msgid ""
+"If you want something similar (but with less issues), use \"repokey\" mode."
+msgstr ""
+
+#: ../borg/repository.py:349
+msgid "Index mismatch for key {}. {} != {}"
+msgstr ""
+
+#: ../borg/repository.py:345
+msgid "Index object count mismatch. {} != {}"
+msgstr ""
+
+#: ../borg/archiver.py:68
+#, python-format
+msgid "Initializing repository at \"%s\""
+msgstr ""
+
+#: ../borg/key.py:112 ../borg/key.py:148 ../borg/key.py:160
+msgid "Invalid encryption envelope"
+msgstr ""
+
+#: ../borg/key.py:284
+msgid "Invalid key file header"
+msgstr ""
+
+#: ../borg/helpers.py:639
+#, python-format
+msgid "Invalid location format: \"%s\""
+msgstr ""
+
+#: ../borg/helpers.py:90
+msgid "Invalid manifest version"
+msgstr ""
+
+#: ../borg/repository.py:590
+msgid "Invalid segment entry header [segment {}, offset {}]: {}"
+msgstr ""
+
+#: ../borg/repository.py:611
+msgid ""
+"Invalid segment entry header, did not get acceptable tag [segment {}, offset "
+"{}]"
+msgstr ""
+
+#: ../borg/repository.py:581
+msgid ""
+"Invalid segment entry header, is not for wanted id [segment {}, offset {}]"
+msgstr ""
+
+#: ../borg/repository.py:600
+msgid "Invalid segment entry size [segment {}, offset {}]"
+msgstr ""
+
+#: ../borg/repository.py:539
+msgid "Invalid segment magic [segment {}, offset {}]"
+msgstr ""
+
+#: ../borg/key.py:346
+msgid "Keep this key safe. Your data will be inaccessible without it."
+msgstr ""
+
+#: ../borg/archiver.py:449
+#, python-format
+msgid "Keeping archive: %s"
+msgstr ""
+
+#: ../borg/key.py:345
+#, python-format
+msgid "Key in \"%s\" created."
+msgstr ""
+
+#: ../borg/key.py:334
+msgid "Key updated"
+msgstr ""
+
+#: ../borg/archive.py:716
+msgid "Manifest rebuild complete"
+msgstr ""
+
+#: ../borg/cache.py:332
+msgid "Merging into master chunks index ..."
+msgstr ""
+
+#: ../borg/archiver.py:352
+msgid "Mounting filesystem"
+msgstr ""
+
+#: ../borg/archiver.py:409
+msgid "Name:"
+msgstr ""
+
+#: ../borg/archiver.py:526
+#, python-format
+msgid "No help available on %s"
+msgstr ""
+
+#: ../borg/archiver.py:415
+#, python-format
+msgid "Number of files: %d"
+msgstr ""
+
+#: ../borg/helpers.py:130
+msgid "Number specified using --within option must be positive"
+msgstr ""
+
+#: ../borg/archive.py:855
+msgid "Orphaned objects check skipped (needs all archives checked)"
+msgstr ""
+
+#: ../borg/key.py:204
+msgid "Passphrase must not be blank"
+msgstr ""
+
+#: ../borg/key.py:202
+msgid "Passphrases do not match"
+msgstr ""
+
+#: ../borg/archive.py:298
+msgid "Path should be relative and local"
+msgstr ""
+
+#: ../borg/archiver.py:454
+#, python-format
+msgid "Pruning archive: %s"
+msgstr ""
+
+#: ../borg/cache.py:327
+#, python-format
+msgid "Reading cached archive chunk index for %s ..."
+msgstr ""
+
+#: ../borg/archive.py:697
+msgid "Rebuilding missing manifest, this might take some time..."
+msgstr ""
+
+#: ../borg/key.py:199
+msgid "Remember your passphrase. Your data will be inaccessible without it."
+msgstr ""
+
+#: ../borg/remote.py:89
+#, python-format
+msgid "Remote Traceback by Borg %s%s%s"
+msgstr ""
+
+#: ../borg/archiver.py:751
+msgid ""
+"Remove the specified number of leading path elements. Pathnames with fewer "
+"elements will be silently skipped."
+msgstr ""
+
+#: ../borg/archiver.py:92
+msgid "Repository check complete, no problems found."
+msgstr ""
+
+#: ../borg/archiver.py:328
+msgid "Repository deleted."
+msgstr ""
+
+#: ../borg/repository.py:608
+msgid "Segment entry checksum mismatch [segment {}, offset {}]"
+msgstr ""
+
+#: ../borg/repository.py:605
+msgid ""
+"Segment entry data short read [segment {}, offset {}]: expected {}, got {} "
+"bytes"
+msgstr ""
+
+#: ../borg/remote.py:153
+msgid ""
+"Server immediately closed connection - is Borg installed and working on the "
+"server?"
+msgstr ""
+
+#: ../borg/remote.py:155
+#, python-format
+msgid "Server insisted on using unsupported protocol version %d"
+msgstr ""
+
+#: ../borg/archive.py:650
+msgid "Starting archive consistency check..."
+msgstr ""
+
+#: ../borg/archiver.py:90
+msgid "Starting repository check..."
+msgstr ""
+
+#: ../borg/cache.py:312
+msgid "Synchronizing chunks cache..."
+msgstr ""
+
+#: ../borg/archiver.py:169 ../borg/archiver.py:416
+msgid "This archive:"
+msgstr ""
+
+#: ../borg/archiver.py:413
+#, python-format
+msgid "Time: %s"
+msgstr ""
+
+#: ../borg/archiver.py:322
+msgid "Type \"YES\" if you understand this and want to continue.\n"
+msgstr ""
+
+#: ../borg/helpers.py:128
+#, python-format
+msgid "Unable to parse --within option: \"%s\""
+msgstr ""
+
+#: ../borg/remote.py:77 ../borg/remote.py:234
+msgid "Unexpected RPC data format."
+msgstr ""
+
+#: ../borg/repository.py:337
+msgid "Unexpected tag {} in segment {}"
+msgstr ""
+
+#: ../borg/locking.py:205
+#, python-format
+msgid "Unknown LockRoster op %r"
+msgstr ""
+
+#: ../borg/archive.py:356
+#, python-format
+msgid "Unknown archive item type %r"
+msgstr ""
+
+#: ../borg/cache.py:281 ../borg/archive.py:182 ../borg/archive.py:824
+msgid "Unknown archive metadata version"
+msgstr ""
+
+#: ../borg/archiver.py:226
+#, python-format
+msgid "Unknown file type: %s"
+msgstr ""
+
+#: ../borg/repository.py:191
+#, python-format
+msgid "Unknown hints file version: %d"
+msgstr ""
+
+#: ../borg/archiver.py:412
+msgid "Username:"
+msgstr ""
+
+#: ../borg/key.py:224
+msgid "WARNING: \"passphrase\" mode is deprecated and will be removed in 1.0."
+msgstr ""
+
+#: ../borg/archiver.py:532
+msgid "Warning: \"--daily\" has been deprecated. Use \"--keep-daily\" instead."
+msgstr ""
+
+#: ../borg/archiver.py:531
+msgid ""
+"Warning: \"--hourly\" has been deprecated. Use \"--keep-hourly\" instead."
+msgstr ""
+
+#: ../borg/archiver.py:534
+msgid ""
+"Warning: \"--monthly\" has been deprecated. Use \"--keep-monthly\" instead."
+msgstr ""
+
+#: ../borg/archiver.py:533
+msgid ""
+"Warning: \"--weekly\" has been deprecated. Use \"--keep-weekly\" instead."
+msgstr ""
+
+#: ../borg/archiver.py:535
+msgid ""
+"Warning: \"--yearly\" has been deprecated. Use \"--keep-yearly\" instead."
+msgstr ""
+
+#: ../borg/archiver.py:538
+msgid ""
+"Warning: \"borg verify\" has been deprecated. Use \"borg extract --dry-run\" "
+"instead."
+msgstr ""
+
+#: ../borg/archiver.py:83
+msgid ""
+"Warning: 'check --repair' is an experimental feature that might result\n"
+"in data loss.\n"
+"\n"
+"Type \"Yes I am sure\" if you understand this and want to continue.\n"
+msgstr ""
+
+#: ../borg/cache.py:57
+msgid ""
+"Warning: Attempting to access a previously unknown unencrypted repository"
+msgstr ""
+
+#: ../borg/archiver.py:249
+msgid ""
+"Warning: File system encoding is \"ascii\", extracting non-ascii filenames "
+"will not be supported."
+msgstr ""
+
+#: ../borg/archiver.py:287
+#, python-format
+msgid "Warning: Include pattern \"%s\" never matched."
+msgstr ""
+
+#: ../borg/cache.py:64
+msgid "Warning: The repository at location {} was previously located at {}"
+msgstr ""
+
+#: ../borg/archiver.py:452
+#, python-format
+msgid "Would prune:     %s"
+msgstr ""
+
+#: ../borg/archiver.py:324
+msgid "YES"
+msgstr ""
+
+#: ../borg/cache.py:100
+msgid "Yes (From {})"
+msgstr ""
+
+#: ../borg/archiver.py:87
+msgid "Yes I am sure"
+msgstr ""
+
+#: ../borg/archiver.py:318
+msgid ""
+"You requested to completely DELETE the repository *including* all archives "
+"it contains:"
+msgstr ""
+
+#: ../borg/cache.py:108
+msgid "Yy"
+msgstr ""
+
+#: ../borg/repository.py:598
+msgid "_read called with unsupported format"
+msgstr ""
+
+#: ../borg/archiver.py:953
+msgid "additional help on TOPIC"
+msgstr ""
+
+#: ../borg/archiver.py:796
+msgid "archive or repository to delete"
+msgstr ""
+
+#: ../borg/archiver.py:843
+msgid "archive to display information about"
+msgstr ""
+
+#: ../borg/archiver.py:760
+msgid "archive to extract"
+msgstr ""
+
+#: ../borg/archiver.py:774
+msgid "archive to rename"
+msgstr ""
+
+#: ../borg/archiver.py:640
+msgid "attempt to repair any inconsistencies found"
+msgstr ""
+
+#: ../borg/repository.py:559
+msgid "attempting to recover "
+msgstr ""
+
+#: ../borg/upgrader.py:176
+#, python-format
+msgid "borg cache file already exists in %s, skipping conversion of %s"
+msgstr ""
+
+#: ../borg/cache.py:384
+#, python-format
+msgid "chunk has same id [%r], but different size (stored: %d new: %d)!"
+msgstr ""
+
+#: ../borg/upgrader.py:60
+#, python-format
+msgid "converting %d segments..."
+msgstr ""
+
+#: ../borg/upgrader.py:200
+#, python-format
+msgid "converting cache %s"
+msgstr ""
+
+#: ../borg/upgrader.py:115
+#, python-format
+msgid "converting keyfile %s"
+msgstr ""
+
+#: ../borg/upgrader.py:178
+#, python-format
+msgid "copying attic cache file from %s to %s"
+msgstr ""
+
+#: ../borg/archiver.py:757
+msgid "create holes in output sparse file from all-zero chunks"
+msgstr ""
+
+#: ../borg/archiver.py:793
+msgid "delete only the local cache for the given repository"
+msgstr ""
+
+#: ../borg/archiver.py:739
+msgid "do not actually change any files"
+msgstr ""
+
+#: ../borg/archiver.py:876 ../borg/archiver.py:940
+msgid "do not change repository"
+msgstr ""
+
+#: ../borg/archiver.py:717
+msgid "do not create a backup archive"
+msgstr ""
+
+#: ../borg/archiver.py:690
+msgid "do not cross mount points"
+msgstr ""
+
+#: ../borg/archiver.py:552
+msgid ""
+"do not load/update the file metadata cache used to detect unchanged files"
+msgstr ""
+
+#: ../borg/archiver.py:684
+msgid ""
+"exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus."
+"com/cachedir/spec.html)"
+msgstr ""
+
+#: ../borg/archiver.py:678 ../borg/archiver.py:742
+msgid "exclude paths matching PATTERN"
+msgstr ""
+
+#: ../borg/xattr.py:87 ../borg/xattr.py:153 ../borg/xattr.py:234
+msgid "getxattr failed"
+msgstr ""
+
+#: ../borg/archiver.py:881
+msgid "keep all archives within this time interval"
+msgstr ""
+
+#: ../borg/xattr.py:68 ../borg/xattr.py:134 ../borg/xattr.py:206
+msgid "listxattr failed"
+msgstr ""
+
+#: ../borg/archiver.py:338
+#, python-format
+msgid "loading fuse support failed [ImportError: %s]"
+msgstr ""
+
+#: ../borg/archiver.py:697
+msgid ""
+"manually specify the archive creation date/time (UTC). alternatively, give a "
+"reference file/directory."
+msgstr ""
+
+#: ../borg/helpers.py:358
+msgid ""
+"max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk "
+"size)"
+msgstr ""
+
+#: ../borg/archiver.py:720
+msgid "name of archive to create (must be also a valid directory name)"
+msgstr ""
+
+#: ../borg/upgrader.py:183
+#, python-format
+msgid "no %s cache file found in %s"
+msgstr ""
+
+#: ../borg/upgrader.py:146
+#, python-format
+msgid "no index file found for repository %s"
+msgstr ""
+
+#: ../borg/upgrader.py:37
+msgid "no key file found for repository"
+msgstr ""
+
+#: ../borg/archiver.py:885
+msgid "number of daily archives to keep"
+msgstr ""
+
+#: ../borg/archiver.py:883
+msgid "number of hourly archives to keep"
+msgstr ""
+
+#: ../borg/archiver.py:889
+msgid "number of monthly archives to keep"
+msgstr ""
+
+#: ../borg/archiver.py:887
+msgid "number of weekly archives to keep"
+msgstr ""
+
+#: ../borg/archiver.py:891
+msgid "number of yearly archives to keep"
+msgstr ""
+
+#: ../borg/archiver.py:643
+msgid "only check last N archives (Default: all)"
+msgstr ""
+
+#: ../borg/archiver.py:893
+msgid "only consider archive names starting with this prefix"
+msgstr ""
+
+#: ../borg/archiver.py:748
+msgid "only obey numeric user and group identifiers"
+msgstr ""
+
+#: ../borg/archiver.py:637
+msgid "only perform archives checks"
+msgstr ""
+
+#: ../borg/archiver.py:634
+msgid "only perform repository checks"
+msgstr ""
+
+#: ../borg/archiver.py:808
+msgid "only print file/directory names, nothing else"
+msgstr ""
+
+#: ../borg/archiver.py:693
+msgid "only store numeric user and group identifiers"
+msgstr ""
+
+#: ../borg/archiver.py:714
+msgid "open and read special files as if they were regular files"
+msgstr ""
+
+#: ../borg/upgrader.py:30
+msgid "opening attic repository with borg and converting"
+msgstr ""
+
+#: ../borg/archiver.py:943
+msgid "path to the repository to be upgraded"
+msgstr ""
+
+#: ../borg/archiver.py:722
+msgid "paths to archive"
+msgstr ""
+
+#: ../borg/archiver.py:762
+msgid "paths to extract"
+msgstr ""
+
+#: ../borg/archiver.py:675
+msgid "print progress while creating the archive"
+msgstr ""
+
+#: ../borg/archiver.py:672
+msgid "print statistics for the created archive"
+msgstr ""
+
+#: ../borg/archiver.py:790 ../borg/archiver.py:879
+msgid "print statistics for the deleted archive"
+msgstr ""
+
+#: ../borg/archiver.py:681 ../borg/archiver.py:745
+msgid "read exclude patterns from EXCLUDEFILE, one per line"
+msgstr ""
+
+#: ../borg/archiver.py:631
+msgid "repository or archive to check consistency of"
+msgstr ""
+
+#: ../borg/archiver.py:583
+msgid "repository to create"
+msgstr ""
+
+#: ../borg/archiver.py:896
+msgid "repository to prune"
+msgstr ""
+
+#: ../borg/archiver.py:811
+msgid "repository/archive to list contents of"
+msgstr ""
+
+#: ../borg/archiver.py:824
+msgid "repository/archive to mount"
+msgstr ""
+
+#: ../borg/archiver.py:569
+msgid "restrict repository access to PATH"
+msgstr ""
+
+#: ../borg/archiver.py:705
+msgid ""
+"select compression algorithm (and level): none == no compression (default), "
+"lz4 == lz4, zlib == zlib (default level 6), zlib,0 .. zlib,9 == zlib (with "
+"level 0..9), lzma == lzma (default level 6), lzma,0 .. lzma,9 == lzma (with "
+"level 0..9)."
+msgstr ""
+
+#: ../borg/archiver.py:586
+msgid "select encryption key mode"
+msgstr ""
+
+#: ../borg/archiver.py:556
+#, python-format
+msgid "set remote path to executable (default: \"%(default)s\")"
+msgstr ""
+
+#: ../borg/archiver.py:554
+#, python-format
+msgid "set umask to M (local and remote, default: %(default)s)"
+msgstr ""
+
+#: ../borg/archiver.py:702
+#, python-format
+msgid "specify the chunker parameters. default: %d,%d,%d,%d"
+msgstr ""
+
+#: ../borg/archiver.py:829
+msgid "stay in foreground, do not daemonize"
+msgstr ""
+
+#: ../borg/archiver.py:776
+msgid "the new archive name to use"
+msgstr ""
+
+#: ../borg/locking.py:38
+msgid "timeout must be >= 0"
+msgstr ""
+
+#: ../borg/archiver.py:550
+msgid "verbose output, defaults to warnings only"
+msgstr ""
+
+#: ../borg/archiver.py:479
+#, python-format
+msgid "warning: %s"
+msgstr ""
+
+#: ../borg/archiver.py:826
+msgid "where to mount filesystem"
+msgstr ""
+
+#: ../borg/archiver.py:754
+msgid "write all extracted data to stdout"
+msgstr ""
+
+#: ../borg/archiver.py:687
+msgid "write checkpoint every SECONDS seconds (Default: 300)"
+msgstr ""
+
+#: ../borg/upgrader.py:120
+#, python-format
+msgid "writing borg keyfile to %s"
+msgstr ""
+
+#: ../borg/archive.py:850
+msgid "{} orphaned objects found"
+msgstr ""
+
+#: ../borg/archive.py:758
+msgid "{}: Missing file chunk detected (Byte {}-{})"
+msgstr ""

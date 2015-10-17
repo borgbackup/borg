@@ -6,6 +6,7 @@ import threading
 import time
 
 from borg.helpers import Error
+import borg.translation
 
 ADD, REMOVE = 'add', 'remove'
 SHARED, EXCLUSIVE = 'shared', 'exclusive'
@@ -34,7 +35,7 @@ class TimeoutTimer:
                       or None (autocompute: use 10% of timeout, or 1s for no timeout)
         """
         if timeout is not None and timeout < 0:
-            raise ValueError("timeout must be >= 0")
+            raise ValueError(__("timeout must be >= 0"))
         self.timeout_interval = timeout
         if sleep is None:
             if timeout is None:
@@ -73,6 +74,7 @@ class TimeoutTimer:
 
 class ExclusiveLock:
     """An exclusive Lock based on mkdir fs operation being atomic"""
+    # XXX: how to translate those?
     class LockError(Error):
         """Failed to acquire the lock {}."""
 
@@ -200,7 +202,7 @@ class LockRoster:
         elif op == REMOVE:
             elements.remove(self.id)
         else:
-            raise ValueError('Unknown LockRoster op %r' % op)
+            raise ValueError(__('Unknown LockRoster op %r') % op)
         roster[key] = list(list(e) for e in elements)
         self.save(roster)
 
@@ -212,6 +214,8 @@ class UpgradableLock:
     noone is allowed reading) and read access to a resource needs a shared
     lock (multiple readers are allowed).
     """
+
+    # XXX: how to translate those?
     class SharedLockFailed(Error):
         """Failed to acquire shared lock [{}]"""
 

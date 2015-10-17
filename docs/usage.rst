@@ -371,6 +371,12 @@ Examples
     command="borg serve --restrict-to-path /mnt/backup" ssh-rsa AAAAB3[...]
 
 
+Miscellaneous Help
+------------------
+
+.. include:: usage/help.rst.inc
+
+
 Additional Notes
 ----------------
 

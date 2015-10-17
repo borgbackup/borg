@@ -143,10 +143,10 @@ class AtticRepositoryUpgrader(Repository):
         if transaction_id is None:
             logger.warning('no index file found for repository %s' % self.path)
         else:
-            cache = os.path.join(self.path, 'index.%d' % transaction_id).encode('utf-8')
-            logger.info("converting index cache %s" % cache)
+            index = os.path.join(self.path, 'index.%d' % transaction_id).encode('utf-8')
+            logger.info("converting index index %s" % index)
             if not dryrun:
-                AtticRepositoryUpgrader.header_replace(cache, b'ATTICIDX', b'BORG_IDX')
+                AtticRepositoryUpgrader.header_replace(index, b'ATTICIDX', b'BORG_IDX')
 
         # copy of attic's get_cache_dir()
         attic_cache_dir = os.environ.get('ATTIC_CACHE_DIR',

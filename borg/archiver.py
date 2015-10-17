@@ -308,7 +308,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             archive.delete(stats)
             manifest.write()
             repository.commit()
-            cache.commit()
+            cache.commit(removed=[archive.id])
             if args.stats:
                 logger.info(stats.print_('Deleted data:', cache))
         else:
@@ -454,7 +454,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         if to_delete and not args.dry_run:
             manifest.write()
             repository.commit()
-            cache.commit()
+            cache.commit(removed=[archive.id for archive in to_delete])
         if args.stats:
             logger.info(stats.print_('Deleted data:', cache))
         return self.exit_code

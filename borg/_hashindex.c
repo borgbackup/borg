@@ -391,7 +391,7 @@ hashindex_summarize(HashIndex *index, long long *total_size, long long *total_cs
     *total_chunks = chunks;
 }
 
-static void
+static int
 hashindex_merge(HashIndex *index, HashIndex *other)
 {
     int32_t key_size = index->key_size;
@@ -403,9 +403,11 @@ hashindex_merge(HashIndex *index, HashIndex *other)
         other_values = key + key_size;
         my_values = (int32_t *)hashindex_get(index, key);
         if(my_values == NULL) {
-            hashindex_set(index, key, other_values);
+            if(!hashindex_set(index, key, other_values))
+                return 0;
         } else {
             *my_values += *other_values;
         }
     }
+    return 1;
 }

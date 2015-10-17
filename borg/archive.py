@@ -253,7 +253,7 @@ Number of files: {0.stats.nfiles}
         self.manifest.archives[name] = {'id': self.id, 'time': metadata['time']}
         self.manifest.write()
         self.repository.commit()
-        self.cache.commit()
+        self.cache.commit(added=[self.id])
 
     def calc_stats(self, cache):
         def add(id):

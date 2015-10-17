@@ -556,7 +556,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
     def build_parser(self, args=None, prog=None):
         version_argument = { 'action': 'version',
                              'version': '%(prog)s ' + __version__,
-                             'help': __('show version number and exit') }
+                             'help': 'show version number and exit' }
 
         common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
         common_parser.add_argument('-V', '--version', **version_argument)

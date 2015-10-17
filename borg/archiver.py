@@ -14,6 +14,13 @@ import sys
 import textwrap
 import traceback
 
+try:
+    from setproctitle import setproctitle
+    # don't overwrite /proc/<pid>/environ when changing the proctitle
+    os.environ['SPT_NOENV'] = '1'
+except ImportError:
+    setproctitle = lambda x: None
+
 from . import __version__
 from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
@@ -1022,6 +1029,7 @@ def main():  # pragma: no cover
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=True)
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, sys.stderr.encoding, 'replace', line_buffering=True)
     setup_signal_handlers()
+    setproctitle('borg')
     archiver = Archiver()
     try:
         exit_code = archiver.run(sys.argv[1:])

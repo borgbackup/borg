@@ -201,14 +201,12 @@ class Archive:
         return format_timedelta(self.end-self.start)
 
     def __str__(self):
-        buf = '''Archive name: {0.name}
+        return '''Archive name: {0.name}
 Archive fingerprint: {0.fpr}
 Start time: {0.start:%c}
 End time: {0.end:%c}
 Duration: {0.duration}
-Number of files: {0.stats.nfiles}
-{0.cache}'''.format(self)
-        return buf
+Number of files: {0.stats.nfiles}'''.format(self)
 
     def __repr__(self):
         return 'Archive(%r)' % self.name
@@ -503,7 +501,10 @@ Number of files: {0.stats.nfiles}
             else:
                 self.hard_links[st.st_ino, st.st_dev] = safe_path
         path_hash = self.key.id_hash(os.path.join(self.cwd, path).encode('utf-8', 'surrogateescape'))
+        first_run = not cache.files
         ids = cache.file_known_and_unchanged(path_hash, st)
+        if first_run:
+            logger.info('processing files')
         chunks = None
         if ids is not None:
             # Make sure all ids are available

@@ -48,6 +48,7 @@ class Cache:
         self.manifest = manifest
         self.path = path or os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
         self.do_files = do_files
+        logger.info('initializing cache')
         # Warn user before sending data to a never seen before unencrypted repository
         if not os.path.exists(self.path):
             if warn_if_unencrypted and isinstance(key, PlaintextKey):
@@ -69,6 +70,7 @@ class Cache:
             # Make sure an encrypted repository has not been swapped for an unencrypted repository
             if self.key_type is not None and self.key_type != str(key.TYPE):
                 raise self.EncryptionMethodMismatch()
+            logger.info('synchronizing cache')
             self.sync()
             self.commit()
 
@@ -76,20 +78,20 @@ class Cache:
         self.close()
 
     def __str__(self):
-        return format(self, """\
+        fmt = """\
 All archives:   {0.total_size:>20s} {0.total_csize:>20s} {0.unique_csize:>20s}
 
                        Unique chunks         Total chunks
-Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
+Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
+        return fmt.format(self.format_tuple())
 
-    def __format__(self, format_spec):
+    def format_tuple(self):
         # XXX: this should really be moved down to `hashindex.pyx`
         Summary = namedtuple('Summary', ['total_size', 'total_csize', 'unique_size', 'unique_csize', 'total_unique_chunks', 'total_chunks'])
         stats = Summary(*self.chunks.summarize())._asdict()
         for field in ['total_size', 'total_csize', 'unique_csize']:
             stats[field] = format_file_size(stats[field])
-        stats = Summary(**stats)
-        return format_spec.format(stats)
+        return Summary(**stats)
 
     def _confirm(self, message, env_var_override=None):
         print(message, file=sys.stderr)
@@ -163,6 +165,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}""")
     def _read_files(self):
         self.files = {}
         self._newest_mtime = 0
+        logger.info('reading files cache')
         with open(os.path.join(self.path, 'files'), 'rb') as fd:
             u = msgpack.Unpacker(use_list=True)
             while True:

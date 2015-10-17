@@ -132,14 +132,32 @@ Borg is a fork of `Attic`_ and maintained by "`The Borg collective`_".
 
 .. _The Borg collective: https://borgbackup.readthedocs.org/authors.html
 
-Read `issue #1 <https://github.com/borgbackup/borg/issues/1>`_ about the initial
-considerations regarding project goals and policy of the Borg project.
+Differences between Attic and Borg
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-BORG IS NOT COMPATIBLE WITH ORIGINAL ATTIC.
-EXPECT THAT WE WILL BREAK COMPATIBILITY REPEATEDLY WHEN MAJOR RELEASE NUMBER
-CHANGES (like when going from 0.x.y to 1.0.0). Please read the
-`ChangeLog`_ (or ``CHANGES.rst`` in the source distribution) for more
+Here's a (incomplete) list of some major changes:
+
+ * more open, faster paced development (see `issue #1 <https://github.com/borgbackup/borg/issues/1>`_)
+ * lots of attic issues fixed (see `issue #5 <https://github.com/borgbackup/borg/issues/5>`_)
+ * less chunk management overhead via --chunker-params option (less memory and disk usage)
+ * faster remote cache resync (useful when backing up multiple machines into same repo)
+ * compression: no, lz4, zlib or lzma compression, adjustable compression levels
+ * repokey replaces problematic passphrase mode (you can't change the passphrase nor the pbkdf2 iteration count in "passphrase" mode)
+ * simple sparse file support, great for virtual machine disk files
+ * can read special files (e.g. block devices) or from stdin, write to stdout
+ * mkdir-based locking is more compatible than attic's posix locking
+ * uses fadvise to not spoil / blow up the fs cache
+ * better error messages / exception handling
+ * better output for verbose mode, progress indication
+ * tested on misc. Linux systems, 32 and 64bit, FreeBSD, OpenBSD, NetBSD, Mac OS X
+
+Please read the `ChangeLog`_ (or ``CHANGES.rst`` in the source distribution) for more
 information.
+
+BORG IS NOT COMPATIBLE WITH ORIGINAL ATTIC (but there is a one-way conversion).
+
+EXPECT THAT WE WILL BREAK COMPATIBILITY REPEATEDLY WHEN MAJOR RELEASE NUMBER
+CHANGES (like when going from 0.x.y to 1.0.0).
 
 NOT RELEASED DEVELOPMENT VERSIONS HAVE UNKNOWN COMPATIBILITY PROPERTIES.
 

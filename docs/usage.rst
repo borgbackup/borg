@@ -246,6 +246,8 @@ Note: currently, extract always writes into the current working directory ("."),
 
 .. include:: usage/check.rst.inc
 
+.. include:: usage/rename.rst.inc
+
 .. include:: usage/delete.rst.inc
 
 .. include:: usage/list.rst.inc

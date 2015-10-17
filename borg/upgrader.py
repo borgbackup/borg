@@ -174,7 +174,7 @@ class AtticRepositoryUpgrader(Repository):
             if os.path.exists(attic_file):
                 borg_file = os.path.join(borg_cache_dir, path)
                 if os.path.exists(borg_file):
-                    logger.warning("borg cache file already exists in %s, not copying from Attic" % (borg_file))
+                    logger.warning("borg cache file already exists in %s, not copying from Attic", borg_file)
                 else:
                     logger.info("copying attic cache file from %s to %s" % (attic_file, borg_file))
                     if not dryrun:

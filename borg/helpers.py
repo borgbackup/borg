@@ -157,14 +157,20 @@ class Statistics:
             self.usize += csize
 
     def print_(self, label, cache):
-        total_size, total_csize, unique_size, unique_csize, total_unique_chunks, total_chunks = cache.chunks.summarize()
-        print()
-        print('                       Original size      Compressed size    Deduplicated size')
-        print('%-15s %20s %20s %20s' % (label, format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize)))
-        print('All archives:   %20s %20s %20s' % (format_file_size(total_size), format_file_size(total_csize), format_file_size(unique_csize)))
-        print()
-        print('                       Unique chunks         Total chunks')
-        print('Chunk index:    %20d %20d' % (total_unique_chunks, total_chunks))
+        buf = str(self) % label
+        buf += "\n"
+        buf += str(cache)
+        return buf
+
+    def __str__(self):
+        return format(self, """\
+                       Original size      Compressed size    Deduplicated size
+%-15s {0.osize:>20s} {0.csize:>20s} {0.usize:>20s}""")
+
+    def __format__(self, format_spec):
+        fields = ['osize', 'csize', 'usize']
+        FormattedStats = namedtuple('FormattedStats', fields)
+        return format_spec.format(FormattedStats(*map(format_file_size, [ getattr(self, x) for x in fields ])))
 
     def show_progress(self, item=None, final=False):
         if not final:
@@ -175,8 +181,8 @@ class Statistics:
                 format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize), path)
         else:
             msg = ' ' * 79
-        print(msg, end='\r')
-        sys.stdout.flush()
+        print(msg, file=sys.stderr, end='\r')
+        sys.stderr.flush()
 
 
 def get_keys_dir():

@@ -8,11 +8,6 @@ import grp
 import os
 import pwd
 import re
-try:
-    from shutil import get_terminal_size
-except ImportError:
-    def get_terminal_size(fallback):
-        return (os.environ.get('COLUMNS', fallback[0]), os.environ.get('LINES', fallback[1]))
 import sys
 import time
 import unicodedata
@@ -20,8 +15,6 @@ import unicodedata
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from operator import attrgetter
-
-import borg.translation
 
 def have_cython():
     """allow for a way to disable Cython includes
@@ -51,10 +44,9 @@ class Error(Exception):
     exit_code = 1
 
     def get_message(self):
-        return __('Error: ') + type(self).__doc__.format(*self.args)
+        return 'Error: ' + type(self).__doc__.format(*self.args)
 
 
-# XXX: how to translate this?
 class ExtensionModuleError(Error):
     """The Borg binary extension modules do not seem to be properly installed"""
 
@@ -92,7 +84,7 @@ class Manifest:
         manifest.id = key.id_hash(data)
         m = msgpack.unpackb(data)
         if not m.get(b'version') == 1:
-            raise ValueError(__('Invalid manifest version'))
+            raise ValueError('Invalid manifest version')
         manifest.archives = dict((k.decode('utf-8'), v) for k, v in m[b'archives'].items())
         manifest.timestamp = m.get(b'timestamp')
         if manifest.timestamp:
@@ -130,9 +122,9 @@ def prune_within(archives, within):
         hours = int(within[:-1]) * multiplier[within[-1]]
     except (KeyError, ValueError):
         # I don't like how this displays the original exception too:
-        raise argparse.ArgumentTypeError(__('Unable to parse --within option: "%s"') % within)
+        raise argparse.ArgumentTypeError('Unable to parse --within option: "%s"' % within)
     if hours <= 0:
-        raise argparse.ArgumentTypeError(__('Number specified using --within option must be positive'))
+        raise argparse.ArgumentTypeError('Number specified using --within option must be positive')
     target = datetime.now(timezone.utc) - timedelta(seconds=hours*60*60)
     return [a for a in archives if a.ts > target]
 
@@ -164,43 +156,33 @@ class Statistics:
         if unique:
             self.usize += csize
 
-    summary = __("""\
-                       Original size      Compressed size    Deduplicated size
-{label:15} {stats.osize_fmt:>20s} {stats.csize_fmt:>20s} {stats.usize_fmt:>20s}""")
+    def print_(self, label, cache):
+        buf = str(self) % label
+        buf += "\n"
+        buf += str(cache)
+        return buf
+
     def __str__(self):
-        return self.summary.format(stats=self, label='This archive:')
+        return format(self, """\
+                       Original size      Compressed size    Deduplicated size
+%-15s {0.osize:>20s} {0.csize:>20s} {0.usize:>20s}""")
 
-    def __repr__(self):
-        fmt = "<{cls} object at {hash:#x} ({self.osize}, {self.csize}, {self.usize})>"
-        return fmt.format(cls=type(self).__name__,
-                          hash=id(self),
-                          self=self)
+    def __format__(self, format_spec):
+        fields = ['osize', 'csize', 'usize']
+        FormattedStats = namedtuple('FormattedStats', fields)
+        return format_spec.format(FormattedStats(*map(format_file_size, [ getattr(self, x) for x in fields ])))
 
-    @property
-    def osize_fmt(self):
-        return format_file_size(self.osize)
-
-    @property
-    def usize_fmt(self):
-        return format_file_size(self.usize)
-
-    @property
-    def csize_fmt(self):
-        return format_file_size(self.csize)
-
-    def show_progress(self, item=None, final=False, stream=None):
-        (columns, lines) = get_terminal_size((80, 24))
+    def show_progress(self, item=None, final=False):
         if not final:
-            msg = __('{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N ').format(self)
             path = remove_surrogates(item[b'path']) if item else ''
-            space = columns - len(msg)
-            if space < len('...') + len(path):
-                path = '%s...%s' % (path[:(space//2)-len('...')], path[-space//2:])
-            msg += "{0:<{space}}".format(path, space=space)
+            if len(path) > 43:
+                path = '%s...%s' % (path[:20], path[-20:])
+            msg = '%9s O %9s C %9s D %-43s' % (
+                format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize), path)
         else:
-            msg = ' ' * columns
-        print(msg, file=stream or sys.stderr, end="\r")
-        (stream or sys.stderr).flush()
+            msg = ' ' * 79
+        print(msg, file=sys.stderr, end='\r')
+        sys.stderr.flush()
 
 
 def get_keys_dir():
@@ -370,7 +352,7 @@ def ChunkerParams(s):
     if int(chunk_max) > 23:
         # do not go beyond 2**23 (8MB) chunk size now,
         # COMPR_BUFFER can only cope with up to this size
-        raise ValueError(__('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)'))
+        raise ValueError('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)')
     return int(chunk_min), int(chunk_max), int(chunk_mask), int(window_size)
 
 
@@ -443,13 +425,13 @@ def format_timedelta(td):
     s = ts % 60
     m = int(ts / 60) % 60
     h = int(ts / 3600) % 24
-    txt = __('%.2f seconds') % s
+    txt = '%.2f seconds' % s
     if m:
-        txt = __('%d minutes %s') % (m, txt)
+        txt = '%d minutes %s' % (m, txt)
     if h:
-        txt = __('%d hours %s') % (h, txt)
+        txt = '%d hours %s' % (h, txt)
     if td.days:
-        txt = __('%d days %s') % (td.days, txt)
+        txt = '%d days %s' % (td.days, txt)
     return txt
 
 
@@ -481,7 +463,6 @@ def format_archive(archive):
     return '%-36s %s' % (archive.name, to_localtime(archive.ts).strftime('%c'))
 
 
-# XXX: how to translate this?
 class IntegrityError(Error):
     """Data integrity error"""
 
@@ -651,11 +632,11 @@ def location_validator(archive=None):
         try:
             loc = Location(text)
         except ValueError:
-            raise argparse.ArgumentTypeError(__('Invalid location format: "%s"') % text)
+            raise argparse.ArgumentTypeError('Invalid location format: "%s"' % text)
         if archive is True and not loc.archive:
-            raise argparse.ArgumentTypeError(__('"%s": No archive specified') % text)
+            raise argparse.ArgumentTypeError('"%s": No archive specified' % text)
         elif archive is False and loc.archive:
-            raise argparse.ArgumentTypeError(__('"%s" No archive can be specified') % text)
+            raise argparse.ArgumentTypeError('"%s" No archive can be specified' % text)
         return loc
     return validator
 

@@ -7,8 +7,6 @@ import tempfile
 from ctypes import CDLL, create_string_buffer, c_ssize_t, c_size_t, c_char_p, c_int, c_uint32, get_errno
 from ctypes.util import find_library
 
-import borg.translation
-
 
 def is_enabled(path=None):
     """Determine if xattr is enabled on the filesystem
@@ -67,7 +65,7 @@ if sys.platform.startswith('linux'):
         namebuf = create_string_buffer(n)
         n2 = _check(func(path, namebuf, n), path)
         if n2 != n:
-            raise Exception(__('listxattr failed'))
+            raise Exception('listxattr failed')
         return [os.fsdecode(name) for name in namebuf.raw.split(b'\0')[:-1] if not name.startswith(b'system.posix_acl_')]
 
     def getxattr(path, name, *, follow_symlinks=True):
@@ -86,7 +84,7 @@ if sys.platform.startswith('linux'):
         valuebuf = create_string_buffer(n)
         n2 = _check(func(path, name, valuebuf, n), path)
         if n2 != n:
-            raise Exception(__('getxattr failed'))
+            raise Exception('getxattr failed')
         return valuebuf.raw
 
     def setxattr(path, name, value, *, follow_symlinks=True):
@@ -133,7 +131,7 @@ elif sys.platform == 'darwin':
         namebuf = create_string_buffer(n)
         n2 = _check(func(path, namebuf, n, flags), path)
         if n2 != n:
-            raise Exception(__('listxattr failed'))
+            raise Exception('listxattr failed')
         return [os.fsdecode(name) for name in namebuf.raw.split(b'\0')[:-1]]
 
     def getxattr(path, name, *, follow_symlinks=True):
@@ -152,7 +150,7 @@ elif sys.platform == 'darwin':
         valuebuf = create_string_buffer(n)
         n2 = _check(func(path, name, valuebuf, n, 0, flags), path)
         if n2 != n:
-            raise Exception(__('getxattr failed'))
+            raise Exception('getxattr failed')
         return valuebuf.raw
 
     def setxattr(path, name, value, *, follow_symlinks=True):
@@ -205,7 +203,7 @@ elif sys.platform.startswith('freebsd'):
         namebuf = create_string_buffer(n)
         n2 = _check(func(path, ns, namebuf, n), path)
         if n2 != n:
-            raise Exception(__('listxattr failed'))
+            raise Exception('listxattr failed')
         names = []
         mv = memoryview(namebuf.raw)
         while mv:
@@ -233,7 +231,7 @@ elif sys.platform.startswith('freebsd'):
         valuebuf = create_string_buffer(n)
         n2 = _check(func(path, EXTATTR_NAMESPACE_USER, name, valuebuf, n), path)
         if n2 != n:
-            raise Exception(__('getxattr failed'))
+            raise Exception('getxattr failed')
         return valuebuf.raw
 
     def setxattr(path, name, value, *, follow_symlinks=True):

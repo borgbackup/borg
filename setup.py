@@ -24,7 +24,6 @@ on_rtd = os.environ.get('READTHEDOCS')
 # Also, we might use some rather recent API features.
 install_requires=['msgpack-python>=0.4.6', ]
 
-from borg.translation import build_trans
 
 from setuptools import setup, Extension
 from setuptools.command.sdist import sdist
@@ -202,7 +201,6 @@ API Documentation
 # seems like this doesn't work on RTD, see below for build_py hack.
 build.sub_commands.append(('build_api', None))
 build.sub_commands.append(('build_usage', None))
-build.sub_commands.append(('build_trans', None))
 
 
 class build_py_custom(build_py):
@@ -232,7 +230,6 @@ cmdclass = {
     'build_ext': build_ext,
     'build_api': build_api,
     'build_usage': build_usage,
-    'build_usage': build_trans,
     'build_py': build_py_custom,
     'sdist': Sdist
 }

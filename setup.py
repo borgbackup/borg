@@ -231,7 +231,7 @@ cmdclass = {
     'build_ext': build_ext,
     'build_api': build_api,
     'build_usage': build_usage,
-    'build_usage': build_trans,
+    'build_trans': build_trans,
     'build_py': build_py_custom,
     'sdist': Sdist
 }

@@ -50,6 +50,17 @@ Which file types, attributes, etc. are *not* preserved?
       Archive extraction has optional support to extract all-zero chunks as
       holes in a sparse file.
 
+Why is my backup bigger than with attic?
+Why doesn't |project_name| do compression by default?
+    * attic was rather unflexible when it comes to compression, it always
+      compressed using zlib level 6 (no way to switch compression off or
+      adjust the level or algorithm)
+    * |project_name| offers a lot of different compression algorithms and
+      levels. Which of them is the best for you pretty much depends on your use
+      case, your data, your hardware - so you need to do an informed decision
+      about whether you want to use compression, which algorithm and which
+      level you want to use. This is why compression defaults to none.
+
 How can I specify the encryption passphrase programmatically?
     The encryption passphrase can be specified programmatically using the
     `BORG_PASSPHRASE` environment variable. This is convenient when setting up

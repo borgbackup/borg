@@ -128,14 +128,3 @@ doctest:
 	$(SPHINXBUILD) -b doctest $(ALLSPHINXOPTS) $(BUILDDIR)/doctest
 	@echo "Testing of doctests in the sources finished, look at the " \
 	      "results in $(BUILDDIR)/doctest/output.txt."
-
-gh-io: html
-	GH_IO_CLONE="`mktemp -d`" && \
-    git clone git@github.com:borgbackup/borgbackup.github.io.git $$GH_IO_CLONE && \
-	(cd $$GH_IO_CLONE && git rm -r *) && \
-	cp -r _build/html/* $$GH_IO_CLONE && \
-	(cd $$GH_IO_CLONE && git add -A && git commit -m 'Updated borgbackup.github.io' && git push) && \
-	rm -rf $$GH_IO_CLONE
-
-inotify: html
-	while inotifywait -r . --exclude usage.rst --exclude '_build/*' ; do make html ; done

@@ -545,7 +545,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         return args
 
     def build_parser(self, args=None, prog=None):
+        version_argument = { 'action': 'version',
+                             'version': '%(prog)s ' + __version__,
+                             'help': __('show version number and exit') }
+
         common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
+        common_parser.add_argument('-V', '--version', **version_argument)
         common_parser.add_argument('-v', '--verbose', dest='verbose', action='count',
                                    help=__('verbose output, defaults to warnings only'))
         common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
@@ -555,7 +560,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n"""))
         common_parser.add_argument('--remote-path', dest='remote_path', default=RemoteRepository.remote_path, metavar='PATH',
                                    help=__('set remote path to executable (default: "%(default)s")'))
 
-        parser = argparse.ArgumentParser(prog=prog, description=__('Borg %s - Deduplicated Backups') % __version__)
+        parser = argparse.ArgumentParser(prog=prog, description=__('Borg %s - Deduplicated Backups'))
+        parser.add_argument('-V', '--version', **version_argument)
         subparsers = parser.add_subparsers(title=__('Available commands'))
 
         serve_epilog = textwrap.dedent(__("""

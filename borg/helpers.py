@@ -516,14 +516,14 @@ def posix_acl_use_stored_uid_gid(acl):
     """Replace the user/group field with the stored uid/gid
     """
     entries = []
-    for entry in acl.decode('ascii').split('\n'):
+    for entry in acl.decode('utf-8', 'surrogateescape').split('\n'):
         if entry:
             fields = entry.split(':')
             if len(fields) == 4:
                 entries.append(':'.join([fields[0], fields[3], fields[2]]))
             else:
                 entries.append(entry)
-    return ('\n'.join(entries)).encode('ascii')
+    return '\n'.join(entries).encode('utf-8', 'surrogateescape')
 
 
 class Location:

@@ -150,19 +150,25 @@ class build_usage(Command):
         if not os.path.exists('docs/usage'):
             os.mkdir('docs/usage')
         for command, parser in choices.items():
-            if command is 'help':
-                continue
+            print('generating help for %s' % command)
             with open('docs/usage/%s.rst.inc' % command, 'w') as doc:
-                print('generating help for %s' % command)
-                params = {"command": command,
-                          "underline": '-' * len('borg ' + command)}
-                doc.write(".. _borg_{command}:\n\n".format(**params))
-                doc.write("borg {command}\n{underline}\n::\n\n".format(**params))
-                epilog = parser.epilog
-                parser.epilog = None
-                doc.write(re.sub("^", "    ", parser.format_help(), flags=re.M))
-                doc.write("\nDescription\n~~~~~~~~~~~\n")
-                doc.write(epilog)
+                if command == 'help':
+                    for topic in Archiver.helptext:
+                        params = {"topic": topic,
+                                  "underline": '~' * len('borg help ' + topic)}
+                        doc.write(".. _borg_{topic}:\n\n".format(**params))
+                        doc.write("borg help {topic}\n{underline}\n::\n\n".format(**params))
+                        doc.write(Archiver.helptext[topic])
+                else:
+                    params = {"command": command,
+                              "underline": '-' * len('borg ' + command)}
+                    doc.write(".. _borg_{command}:\n\n".format(**params))
+                    doc.write("borg {command}\n{underline}\n::\n\n".format(**params))
+                    epilog = parser.epilog
+                    parser.epilog = None
+                    doc.write(re.sub("^", "    ", parser.format_help(), flags=re.M))
+                    doc.write("\nDescription\n~~~~~~~~~~~\n")
+                    doc.write(epilog)
         # return to regular Cython configuration, if we changed it
         if os.environ.get('BORG_CYTHON_DISABLE') == self.__class__.__name__:
             del os.environ['BORG_CYTHON_DISABLE']

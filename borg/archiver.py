@@ -925,7 +925,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         backup copy.
 
         WARNING: running the upgrade in place will make the current
-        copy unuseable with older version, with no way of going back
+        copy unusable with older version, with no way of going back
         to previous versions. this can PERMANENTLY DAMAGE YOUR
         REPOSITORY!  Attic CAN NOT READ BORG REPOSITORIES, as the
         magic strings have changed. you have been warned.""")
@@ -939,7 +939,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='do not change repository')
         subparser.add_argument('-i', '--inplace', dest='inplace',
                                default=False, action='store_true',
-                               help="""rewrite repository in-place, with no chance of going back to older
+                               help="""rewrite repository in place, with no chance of going back to older
                                versions of the repository.""")
         subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),

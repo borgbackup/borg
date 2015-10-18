@@ -185,8 +185,8 @@ def test_hardlink(tmpdir, inplace):
     """test that we handle hard links properly
 
     that is, if we are in "inplace" mode, hardlinks should *not*
-    change (ie. we write the file directly, so not the whole file, and
-    not re-create the file).
+    change (ie. we write to the file directly, so we do not rewrite the
+    whole file, and we do not re-create the file).
 
     if we are *not* in inplace mode, then the inode should change, as
     we are supposed to leave the original inode alone."""

@@ -86,8 +86,9 @@ class PlatformLinuxTestCase(BaseTestCase):
         acl = b'\n'.join([nothing_special, user_entry, group_entry])
         self.set_acl(file.name, access=acl, numeric_owner=False)
         acl_access = self.get_acl(file.name)[b'acl_access']
-        self.assert_in(user_entry, acl_access)
-        self.assert_in(group_entry, acl_access)
+        # set_acl did not find the local user/group here, so it fell back to the uid/gid:
+        self.assert_in(user_entry_numeric, acl_access)
+        self.assert_in(group_entry_numeric, acl_access)
         acl_access_numeric = self.get_acl(file.name, numeric_owner=True)[b'acl_access']
         self.assert_in(user_entry_numeric, acl_access_numeric)
         self.assert_in(group_entry_numeric, acl_access_numeric)

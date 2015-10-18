@@ -31,7 +31,7 @@ def acl_use_local_uid_gid(acl):
     """Replace the user/group field with the local uid/gid if possible
     """
     entries = []
-    for entry in acl.decode('ascii').split('\n'):
+    for entry in acl.decode('utf-8', 'surrogateescape').split('\n'):
         if entry:
             fields = entry.split(':')
             if fields[0] == 'user' and fields[1]:
@@ -39,7 +39,7 @@ def acl_use_local_uid_gid(acl):
             elif fields[0] == 'group' and fields[1]:
                 fields[1] = str(group2gid(fields[1], int(fields[3])))
             entries.append(':'.join(fields[:3]))
-    return ('\n'.join(entries)).encode('ascii')
+    return '\n'.join(entries).encode('utf-8', 'surrogatescape')
 
 
 cdef acl_append_numeric_ids(acl):

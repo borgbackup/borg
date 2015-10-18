@@ -91,10 +91,14 @@ class AtticRepositoryUpgrader(Repository):
                     # works because our old file handle is still open
                     # so even though the file is removed, we can still
                     # read it until the file is closed.
-                    os.unlink(filename)
+                    os.rename(filename, filename + '.tmp')
                     with open(filename, 'wb') as new_segment:
                         new_segment.write(new_magic)
                         new_segment.write(segment.read())
+                    # the little dance with the .tmp file is necessary
+                    # because Windows won't allow overwriting an open
+                    # file.
+                    os.unlink(filename + '.tmp')
 
     def find_attic_keyfile(self):
         """find the attic keyfiles

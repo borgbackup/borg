@@ -35,9 +35,9 @@ def acl_use_local_uid_gid(acl):
         if entry:
             fields = entry.split(':')
             if fields[0] == 'user' and fields[1]:
-                fields[1] = str(user2uid(fields[1], int(fields[3])))
+                fields[1] = str(user2uid(fields[1], fields[3]))
             elif fields[0] == 'group' and fields[1]:
-                fields[1] = str(group2gid(fields[1], int(fields[3])))
+                fields[1] = str(group2gid(fields[1], fields[3]))
             entries.append(':'.join(fields[:3]))
     return '\n'.join(entries).encode('utf-8', 'surrogatescape')
 

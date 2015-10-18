@@ -139,12 +139,14 @@ class AtticRepositoryUpgrader(Repository):
           `Cache.open()`, edit in place and then `Cache.close()` to
           make sure we have locking right
         """
-        caches = []
         transaction_id = self.get_index_transaction_id()
         if transaction_id is None:
             logger.warning('no index file found for repository %s' % self.path)
         else:
-            caches += [os.path.join(self.path, 'index.%d' % transaction_id).encode('utf-8')]
+            index = os.path.join(self.path, 'index.%d' % transaction_id).encode('utf-8')
+            logger.info("converting index index %s" % index)
+            if not dryrun:
+                AtticRepositoryUpgrader.header_replace(index, b'ATTICIDX', b'BORG_IDX')
 
         # copy of attic's get_cache_dir()
         attic_cache_dir = os.environ.get('ATTIC_CACHE_DIR',
@@ -164,23 +166,23 @@ class AtticRepositoryUpgrader(Repository):
             :params path: the basename of the cache file to copy
             (example: "files" or "chunks") as a string
 
-            :returns: the borg file that was created or None if non
-            was created.
+            :returns: the borg file that was created or None if no
+            Attic cache file was found.
 
             """
             attic_file = os.path.join(attic_cache_dir, path)
             if os.path.exists(attic_file):
                 borg_file = os.path.join(borg_cache_dir, path)
                 if os.path.exists(borg_file):
-                    logger.warning("borg cache file already exists in %s, skipping conversion of %s" % (borg_file, attic_file))
+                    logger.warning("borg cache file already exists in %s, not copying from Attic", borg_file)
                 else:
                     logger.info("copying attic cache file from %s to %s" % (attic_file, borg_file))
                     if not dryrun:
                         shutil.copyfile(attic_file, borg_file)
-                    return borg_file
+                return borg_file
             else:
                 logger.warning("no %s cache file found in %s" % (path, attic_file))
-            return None
+                return None
 
         # XXX: untested, because generating cache files is a PITA, see
         # Archiver.do_create() for proof
@@ -194,11 +196,10 @@ class AtticRepositoryUpgrader(Repository):
 
             # we need to convert the headers of those files, copy first
             for cache in ['chunks']:
-                copied = copy_cache_file(cache)
-                if copied:
-                    logger.info("converting cache %s" % cache)
-                    if not dryrun:
-                        AtticRepositoryUpgrader.header_replace(cache, b'ATTICIDX', b'BORG_IDX')
+                cache = copy_cache_file(cache)
+                logger.info("converting cache %s" % cache)
+                if not dryrun:
+                    AtticRepositoryUpgrader.header_replace(cache, b'ATTICIDX', b'BORG_IDX')
 
 
 class AtticKeyfileKey(KeyfileKey):

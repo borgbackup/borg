@@ -516,14 +516,24 @@ def posix_acl_use_stored_uid_gid(acl):
     """Replace the user/group field with the stored uid/gid
     """
     entries = []
-    for entry in acl.decode('utf-8', 'surrogateescape').split('\n'):
+    for entry in safe_decode(acl).split('\n'):
         if entry:
             fields = entry.split(':')
             if len(fields) == 4:
                 entries.append(':'.join([fields[0], fields[3], fields[2]]))
             else:
                 entries.append(entry)
-    return '\n'.join(entries).encode('utf-8', 'surrogateescape')
+    return safe_encode('\n'.join(entries))
+
+
+def safe_decode(s, coding='utf-8', errors='surrogateescape'):
+    """decode bytes to str, with round-tripping "invalid" bytes"""
+    return s.decode(coding, errors)
+
+
+def safe_encode(s, coding='utf-8', errors='surrogateescape'):
+    """encode str to bytes, with round-tripping "invalid" bytes"""
+    return s.encode(coding, errors)
 
 
 class Location:

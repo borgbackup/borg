@@ -1,7 +1,7 @@
 import os
 import re
 from stat import S_ISLNK
-from .helpers import posix_acl_use_stored_uid_gid, user2uid, group2gid
+from .helpers import posix_acl_use_stored_uid_gid, user2uid, group2gid, safe_decode, safe_encode
 
 API_VERSION = 2
 
@@ -31,7 +31,7 @@ def acl_use_local_uid_gid(acl):
     """Replace the user/group field with the local uid/gid if possible
     """
     entries = []
-    for entry in acl.decode('utf-8', 'surrogateescape').split('\n'):
+    for entry in safe_decode(acl).split('\n'):
         if entry:
             fields = entry.split(':')
             if fields[0] == 'user' and fields[1]:
@@ -39,14 +39,14 @@ def acl_use_local_uid_gid(acl):
             elif fields[0] == 'group' and fields[1]:
                 fields[1] = str(group2gid(fields[1], fields[3]))
             entries.append(':'.join(fields[:3]))
-    return '\n'.join(entries).encode('utf-8', 'surrogatescape')
+    return safe_encode('\n'.join(entries))
 
 
 cdef acl_append_numeric_ids(acl):
     """Extend the "POSIX 1003.1e draft standard 17" format with an additional uid/gid field
     """
     entries = []
-    for entry in _comment_re.sub('', acl.decode('utf-8', 'surrogateescape')).split('\n'):
+    for entry in _comment_re.sub('', safe_decode(acl)).split('\n'):
         if entry:
             type, name, permission = entry.split(':')
             if name and type == 'user':
@@ -55,14 +55,14 @@ cdef acl_append_numeric_ids(acl):
                 entries.append(':'.join([type, name, permission, str(group2gid(name, name))]))
             else:
                 entries.append(entry)
-    return '\n'.join(entries).encode('utf-8', 'surrogateescape')
+    return safe_encode('\n'.join(entries))
 
 
 cdef acl_numeric_ids(acl):
     """Replace the "POSIX 1003.1e draft standard 17" user/group field with uid/gid
     """
     entries = []
-    for entry in _comment_re.sub('', acl.decode('utf-8', 'surrogateescape')).split('\n'):
+    for entry in _comment_re.sub('', safe_decode(acl)).split('\n'):
         if entry:
             type, name, permission = entry.split(':')
             if name and type == 'user':
@@ -73,7 +73,7 @@ cdef acl_numeric_ids(acl):
                 entries.append(':'.join([type, gid, permission, gid]))
             else:
                 entries.append(entry)
-    return '\n'.join(entries).encode('utf-8', 'surrogateescape')
+    return safe_encode('\n'.join(entries))
 
 
 def acl_get(path, item, st, numeric_owner=False):

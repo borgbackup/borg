@@ -146,7 +146,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 self.print_verbose("%1s %s", status, path)
                 continue
             path = os.path.normpath(path)
-            if args.dontcross:
+            if args.one_file_system:
                 try:
                     restrict_dev = os.lstat(path).st_dev
                 except OSError as e:
@@ -530,7 +530,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             ('--daily', '--keep-daily', 'Warning: "--daily" has been deprecated. Use "--keep-daily" instead.'),
             ('--weekly', '--keep-weekly', 'Warning: "--weekly" has been deprecated. Use "--keep-weekly" instead.'),
             ('--monthly', '--keep-monthly', 'Warning: "--monthly" has been deprecated. Use "--keep-monthly" instead.'),
-            ('--yearly', '--keep-yearly', 'Warning: "--yearly" has been deprecated. Use "--keep-yearly" instead.')
+            ('--yearly', '--keep-yearly', 'Warning: "--yearly" has been deprecated. Use "--keep-yearly" instead.'),
+            ('--do-not-cross-mountpoints', '--one-file-system',
+             'Warning:  "--do-no-cross-mountpoints" has been deprecated. Use "--one-file-system" instead.'),
         ]
         if args and args[0] == 'verify':
             print('Warning: "borg verify" has been deprecated. Use "borg extract --dry-run" instead.')
@@ -683,9 +685,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                type=int, default=300, metavar='SECONDS',
                                help='write checkpoint every SECONDS seconds (Default: 300)')
-        subparser.add_argument('-x', '--do-not-cross-mountpoints', dest='dontcross',
+        subparser.add_argument('-x', '--one-file-system', dest='one_file_system',
                                action='store_true', default=False,
-                               help='do not cross mount points')
+                               help='stay in same file system, do not cross mount points')
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,
                                help='only store numeric user and group identifiers')

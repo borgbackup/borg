@@ -166,7 +166,7 @@ def test_convert_all(tmpdir, attic_repo, attic_key_file, inplace):
     orig_inode = first_inode(attic_repo.path)
     repo = AtticRepositoryUpgrader(str(tmpdir), create=False)
     # replicate command dispatch, partly
-    os.umask(attic_repo.umask)
+    os.umask(RemoteRepository.umask)
     backup = repo.upgrade(dryrun=False, inplace=inplace)
     if inplace:
         assert backup is None

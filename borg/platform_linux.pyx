@@ -46,7 +46,7 @@ cdef acl_append_numeric_ids(acl):
     """Extend the "POSIX 1003.1e draft standard 17" format with an additional uid/gid field
     """
     entries = []
-    for entry in _comment_re.sub('', acl.decode('ascii')).split('\n'):
+    for entry in _comment_re.sub('', acl.decode('utf-8', 'surrogateescape')).split('\n'):
         if entry:
             type, name, permission = entry.split(':')
             if name and type == 'user':
@@ -55,14 +55,14 @@ cdef acl_append_numeric_ids(acl):
                 entries.append(':'.join([type, name, permission, str(group2gid(name, name))]))
             else:
                 entries.append(entry)
-    return ('\n'.join(entries)).encode('ascii')
+    return '\n'.join(entries).encode('utf-8', 'surrogateescape')
 
 
 cdef acl_numeric_ids(acl):
     """Replace the "POSIX 1003.1e draft standard 17" user/group field with uid/gid
     """
     entries = []
-    for entry in _comment_re.sub('', acl.decode('ascii')).split('\n'):
+    for entry in _comment_re.sub('', acl.decode('utf-8', 'surrogateescape')).split('\n'):
         if entry:
             type, name, permission = entry.split(':')
             if name and type == 'user':
@@ -73,7 +73,7 @@ cdef acl_numeric_ids(acl):
                 entries.append(':'.join([type, gid, permission, gid]))
             else:
                 entries.append(entry)
-    return ('\n'.join(entries)).encode('ascii')
+    return '\n'.join(entries).encode('utf-8', 'surrogateescape')
 
 
 def acl_get(path, item, st, numeric_owner=False):

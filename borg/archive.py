@@ -820,7 +820,8 @@ class ArchiveChecker:
             archive = StableDict(msgpack.unpackb(data))
             if archive[b'version'] != 1:
                 raise Exception('Unknown archive metadata version')
-            decode_dict(archive, (b'name', b'hostname', b'username', b'time'))  # fixme: argv
+            decode_dict(archive, (b'name', b'hostname', b'username', b'time'))
+            archive[b'cmdline'] = [arg.decode('utf-8', 'surrogateescape') for arg in archive[b'cmdline']]
             items_buffer = ChunkBuffer(self.key)
             items_buffer.write_chunk = add_callback
             for item in robust_iterator(archive):

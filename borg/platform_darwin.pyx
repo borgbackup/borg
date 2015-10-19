@@ -1,5 +1,5 @@
 import os
-from .helpers import user2uid, group2gid
+from .helpers import user2uid, group2gid, safe_decode, safe_encode
 
 API_VERSION = 2
 
@@ -20,7 +20,7 @@ def _remove_numeric_id_if_possible(acl):
     """Replace the user/group field with the local uid/gid if possible
     """
     entries = []
-    for entry in acl.decode('ascii').split('\n'):
+    for entry in safe_decode(acl).split('\n'):
         if entry:
             fields = entry.split(':')
             if fields[0] == 'user':
@@ -30,22 +30,22 @@ def _remove_numeric_id_if_possible(acl):
                 if group2gid(fields[2]) is not None:
                     fields[1] = fields[3] = ''
             entries.append(':'.join(fields))
-    return ('\n'.join(entries)).encode('ascii')
+    return safe_encode('\n'.join(entries))
 
 
 def _remove_non_numeric_identifier(acl):
     """Remove user and group names from the acl
     """
     entries = []
-    for entry in acl.split(b'\n'):
+    for entry in safe_decode(acl).split('\n'):
         if entry:
-            fields = entry.split(b':')
-            if fields[0] in (b'user', b'group'):
-                fields[2] = b''
-                entries.append(b':'.join(fields))
+            fields = entry.split(':')
+            if fields[0] in ('user', 'group'):
+                fields[2] = ''
+                entries.append(':'.join(fields))
             else:
                 entries.append(entry)
-    return b'\n'.join(entries)
+    return safe_encode('\n'.join(entries))
 
 
 def acl_get(path, item, st, numeric_owner=False):

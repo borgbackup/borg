@@ -677,7 +677,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the created archive')
-        subparser.add_argument('-p', '--progress', dest='progress', const=not sys.stdin.isatty(),
+        subparser.add_argument('-p', '--progress', dest='progress', const=not sys.stderr.isatty(),
                                action='store_const', default=sys.stdin.isatty(),
                                help="""toggle progress display while creating the archive, showing Original,
                                Compressed and Deduplicated sizes, followed by the Number of files seen

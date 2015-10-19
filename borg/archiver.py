@@ -56,6 +56,9 @@ class Archiver:
         msg = args and msg % args or msg
         logger.info(msg)
 
+    def print_status(self, status, path):
+        logger.info("%1s %s", status, remove_surrogates(path))
+
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
         """
@@ -143,7 +146,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                         self.print_error('%s: %s', path, e)
                 else:
                     status = '-'
-                self.print_verbose("%1s %s", status, path)
+                self.print_status(status, path)
                 continue
             path = os.path.normpath(path)
             if args.one_file_system:
@@ -164,7 +167,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 archive.end = datetime.now()
                 print('-' * 78)
                 print(str(archive))
-                print(archive.stats.print_('This archive:', cache))
+                print()
+                print(str(archive.stats))
+                print(str(cache))
                 print('-' * 78)
         return self.exit_code
 
@@ -238,7 +243,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 status = '-'  # dry run, item was not backed up
         # output ALL the stuff - it can be easily filtered using grep.
         # even stuff considered unchanged might be interesting.
-        self.print_verbose("%1s %s", status, remove_surrogates(path))
+        self.print_status(status, path)
 
     def do_extract(self, args):
         """Extract archive contents"""
@@ -310,7 +315,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             repository.commit()
             cache.commit()
             if args.stats:
-                logger.info(stats.print_('Deleted data:', cache))
+                logger.info(stats.summary.format(label='Deleted data:', stats=stats))
+                logger.info(str(cache))
         else:
             if not args.cache_only:
                 print("You requested to completely DELETE the repository *including* all archives it contains:", file=sys.stderr)
@@ -411,7 +417,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         print('Time: %s' % to_localtime(archive.ts).strftime('%c'))
         print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
         print('Number of files: %d' % stats.nfiles)
-        print(stats.print_('This archive:', cache))
+        print()
+        print(str(stats))
+        print(str(cache))
         return self.exit_code
 
     def do_prune(self, args):
@@ -456,7 +464,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             repository.commit()
             cache.commit()
         if args.stats:
-            logger.info(stats.print_('Deleted data:', cache))
+            logger.info(stats.summary.format(label='Deleted data:', stats=stats))
+            logger.info(str(cache))
         return self.exit_code
 
     def do_upgrade(self, args):
@@ -670,9 +679,11 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the created archive')
-        subparser.add_argument('-p', '--progress', dest='progress',
-                               action='store_true', default=False,
-                               help='print progress while creating the archive')
+        subparser.add_argument('-p', '--progress', dest='progress', const=not sys.stderr.isatty(),
+                               action='store_const', default=sys.stdin.isatty(),
+                               help="""toggle progress display while creating the archive, showing Original,
+                               Compressed and Deduplicated sizes, followed by the Number of files seen
+                               and the path being processed, default: %(default)s""")
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')

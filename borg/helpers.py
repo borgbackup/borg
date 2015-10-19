@@ -8,6 +8,12 @@ import grp
 import os
 import pwd
 import re
+try:
+    from shutil import get_terminal_size
+except ImportError:
+    def get_terminal_size(fallback=(80, 24)):
+        TerminalSize = namedtuple('TerminalSize', ['columns', 'lines'])
+        return TerminalSize(int(os.environ.get('COLUMNS', fallback[0])), int(os.environ.get('LINES', fallback[1])))
 import sys
 import time
 import unicodedata
@@ -156,33 +162,40 @@ class Statistics:
         if unique:
             self.usize += csize
 
-    def print_(self, label, cache):
-        buf = str(self) % label
-        buf += "\n"
-        buf += str(cache)
-        return buf
-
-    def __str__(self):
-        return format(self, """\
+    summary = """\
                        Original size      Compressed size    Deduplicated size
-%-15s {0.osize:>20s} {0.csize:>20s} {0.usize:>20s}""")
+{label:15} {stats.osize_fmt:>20s} {stats.csize_fmt:>20s} {stats.usize_fmt:>20s}"""
+    def __str__(self):
+        return self.summary.format(stats=self, label='This archive:')
 
-    def __format__(self, format_spec):
-        fields = ['osize', 'csize', 'usize']
-        FormattedStats = namedtuple('FormattedStats', fields)
-        return format_spec.format(FormattedStats(*map(format_file_size, [ getattr(self, x) for x in fields ])))
+    def __repr__(self):
+        return "<{cls} object at {hash:#x} ({self.osize}, {self.csize}, {self.usize})>".format(cls=type(self).__name__, hash=id(self), self=self)
 
-    def show_progress(self, item=None, final=False):
+    @property
+    def osize_fmt(self):
+        return format_file_size(self.osize)
+
+    @property
+    def usize_fmt(self):
+        return format_file_size(self.usize)
+
+    @property
+    def csize_fmt(self):
+        return format_file_size(self.csize)
+
+    def show_progress(self, item=None, final=False, stream=None):
+        columns, lines = get_terminal_size()
         if not final:
+            msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
             path = remove_surrogates(item[b'path']) if item else ''
-            if len(path) > 43:
-                path = '%s...%s' % (path[:20], path[-20:])
-            msg = '%9s O %9s C %9s D %-43s' % (
-                format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize), path)
+            space = columns - len(msg)
+            if space < len('...') + len(path):
+                path = '%s...%s' % (path[:(space//2)-len('...')], path[-space//2:])
+            msg += "{0:<{space}}".format(path, space=space)
         else:
-            msg = ' ' * 79
-        print(msg, file=sys.stderr, end='\r')
-        sys.stderr.flush()
+            msg = ' ' * columns
+        print(msg, file=stream or sys.stderr, end="\r")
+        (stream or sys.stderr).flush()
 
 
 def get_keys_dir():

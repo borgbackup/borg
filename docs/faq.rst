@@ -81,6 +81,11 @@ automated encrypted backups. Another option is to use
 key file based encryption with a blank passphrase. See
 :ref:`encrypted_repos` for more details.
 
+.. caution:: When passing the passphrase through the environment, the
+             passphrase can be read by any user on the same system, so
+             the use of this technique is strongly discouraged on
+             multi-user systems.
+
 When backing up to remote encrypted repos, is encryption done locally?
 ----------------------------------------------------------------------
      

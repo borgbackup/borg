@@ -150,7 +150,12 @@ by providing the correct passphrase.
 For automated backups the passphrase can be specified using the
 `BORG_PASSPHRASE` environment variable.
 
-**The repository data is totally inaccessible without the key:**
+.. caution:: When passing the passphrase through the environment, the
+             passphrase can be read by any user on the same system, so
+             the use of this technique is strongly discouraged on
+             multi-user systems.
+
+.. important:: The repository data is totally inaccessible without the key:**
     Make a backup copy of the key file (``keyfile`` mode) or repo config
     file (``repokey`` mode) and keep it at a safe place, so you still have
     the key in case it gets corrupted or lost.

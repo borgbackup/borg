@@ -681,7 +681,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                action='store_const', default=sys.stdin.isatty(),
                                help="""toggle progress display while creating the archive, showing Original,
                                Compressed and Deduplicated sizes, followed by the Number of files seen
-                               and the path being processd, default: %(default)s""")
+                               and the path being processed, default: %(default)s""")
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')

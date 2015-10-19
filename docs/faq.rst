@@ -5,7 +5,7 @@ Frequently asked questions
 ==========================
 
 Can I backup VM disk images?
-    Yes, the :ref:`deduplication <deduplication_def>` technique used by
+    Yes, the `deduplication`_ technique used by
     |project_name| makes sure only the modified parts of the file are stored.
     Also, we have optional simple sparse file support for extract.
 
@@ -52,6 +52,7 @@ Which file types, attributes, etc. are *not* preserved?
 
 Why is my backup bigger than with attic?
 Why doesn't |project_name| do compression by default?
+
     * attic was rather unflexible when it comes to compression, it always
       compressed using zlib level 6 (no way to switch compression off or
       adjust the level or algorithm)

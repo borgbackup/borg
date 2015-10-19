@@ -102,8 +102,7 @@ Now doing another backup, just to show off the great deduplication::
     This archive:          57.16 MB           46.78 MB            151.67 kB  <--- !
     All archives:         114.02 MB           93.46 MB             44.81 MB
 
-For a graphical frontend refer to our complementary project
-`BorgWeb <https://github.com/borgbackup/borgweb>`_.
+For a graphical frontend refer to our complementary project `BorgWeb`_.
 
 Links
 =====

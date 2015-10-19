@@ -550,7 +550,6 @@ class LoggedIO:
     def recover_segment(self, segment, filename):
         if segment in self.fds:
             del self.fds[segment]
-        # FIXME: save a copy of the original file
         with open(filename, 'rb') as fd:
             data = memoryview(fd.read())
         os.rename(filename, filename + '.beforerecover')

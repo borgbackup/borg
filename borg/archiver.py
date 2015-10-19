@@ -57,7 +57,7 @@ class Archiver:
         logger.info(msg)
 
     def print_status(self, status, path):
-        logger.debug("%1s %s", status, remove_surrogates(path))
+        logger.info("%1s %s", status, remove_surrogates(path))
 
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.

@@ -11,8 +11,9 @@ import re
 try:
     from shutil import get_terminal_size
 except ImportError:
-    def get_terminal_size(fallback):
-        return (os.environ.get('COLUMNS', fallback[0]), os.environ.get('LINES', fallback[1]))
+    def get_terminal_size(fallback=(80, 24)):
+        TerminalSize = namedtuple(TerminalSize, ['columns', 'lines'])
+        return TerminalSize(os.environ.get('COLUMNS', int(fallback[0])), os.environ.get('LINES', int(fallback[1])))
 import sys
 import time
 import unicodedata
@@ -186,7 +187,7 @@ class Statistics:
         return format_file_size(self.csize)
 
     def show_progress(self, item=None, final=False, stream=None):
-        (columns, lines) = get_terminal_size((80, 24))
+        columns, lines = get_terminal_size()
         if not final:
             msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
             path = remove_surrogates(item[b'path']) if item else ''

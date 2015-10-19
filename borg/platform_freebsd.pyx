@@ -1,5 +1,5 @@
 import os
-from .helpers import posix_acl_use_stored_uid_gid
+from .helpers import posix_acl_use_stored_uid_gid, safe_encode, safe_decode
 
 API_VERSION = 2
 
@@ -78,14 +78,14 @@ cdef _nfs4_use_stored_uid_gid(acl):
     """Replace the user/group field with the stored uid/gid
     """
     entries = []
-    for entry in acl.decode('ascii').split('\n'):
+    for entry in safe_decode(acl).split('\n'):
         if entry:
             if entry.startswith('user:') or entry.startswith('group:'):
                 fields = entry.split(':')
                 entries.append(':'.join(fields[0], fields[5], *fields[2:-1]))
             else:
                 entries.append(entry)
-    return ('\n'.join(entries)).encode('ascii')
+    return safe_encode('\n'.join(entries))
 
 
 def acl_set(path, item, numeric_owner=False):

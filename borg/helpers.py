@@ -12,7 +12,7 @@ try:
     from shutil import get_terminal_size
 except ImportError:
     def get_terminal_size(fallback=(80, 24)):
-        TerminalSize = namedtuple(TerminalSize, ['columns', 'lines'])
+        TerminalSize = namedtuple('TerminalSize', ['columns', 'lines'])
         return TerminalSize(os.environ.get('COLUMNS', int(fallback[0])), os.environ.get('LINES', int(fallback[1])))
 import sys
 import time

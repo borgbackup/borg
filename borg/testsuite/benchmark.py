@@ -10,13 +10,7 @@ import os
 
 import pytest
 
-from .archiver import changedir, exec_cmd
-
-
-# TODO: use fixture params to test python code and binary
-@pytest.fixture
-def cmd():
-    return exec_cmd
+from .archiver import changedir, cmd
 
 
 @pytest.yield_fixture

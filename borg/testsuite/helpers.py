@@ -413,25 +413,25 @@ def test_stats_basic(stats):
     assert stats.osize == stats.csize == 20
     assert stats.usize == 10
 
-def tests_stats_progress(stats, columns = 80):
+def tests_stats_progress(stats, columns=80):
     os.environ['COLUMNS'] = str(columns)
-    io = StringIO()
-    stats.show_progress(stream=io)
+    out = StringIO()
+    stats.show_progress(stream=out)
     s = '10 B O 10 B C 10 B D 0 N '
     buf = ' ' * (columns - len(s))
-    assert io.getvalue() == s + buf + "\r"
+    assert out.getvalue() == s + buf + "\r"
 
-    io = StringIO()
+    out = StringIO()
     stats.update(10**3, 0, unique=False)
-    stats.show_progress(item={b'path': 'foo'}, final=False, stream=io)
+    stats.show_progress(item={b'path': 'foo'}, final=False, stream=out)
     s = '1.01 kB O 10 B C 10 B D 0 N foo'
     buf = ' ' * (columns - len(s))
-    assert io.getvalue() == s + buf + "\r"
-    io = StringIO()
-    stats.show_progress(item={b'path': 'foo'*40}, final=False, stream=io)
+    assert out.getvalue() == s + buf + "\r"
+    out = StringIO()
+    stats.show_progress(item={b'path': 'foo'*40}, final=False, stream=out)
     s = '1.01 kB O 10 B C 10 B D 0 N foofoofoofoofoofoofoofo...oofoofoofoofoofoofoofoofoo'
     buf = ' ' * (columns - len(s))
-    assert io.getvalue() == s + buf + "\r"
+    assert out.getvalue() == s + buf + "\r"
 
 def test_stats_format(stats):
     assert str(stats) == """\

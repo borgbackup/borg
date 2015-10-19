@@ -150,10 +150,9 @@ by providing the correct passphrase.
 For automated backups the passphrase can be specified using the
 `BORG_PASSPHRASE` environment variable.
 
-.. caution:: When passing the passphrase through the environment, the
-             passphrase can be read by any user on the same system, so
-             the use of this technique is strongly discouraged on
-             multi-user systems.
+.. note:: Be careful about how you set that environment, see
+          :ref:`this note about password environments <password_env>`
+          for more information.
 
 .. important:: The repository data is totally inaccessible without the key:**
     Make a backup copy of the key file (``keyfile`` mode) or repo config

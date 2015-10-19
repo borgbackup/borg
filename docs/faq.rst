@@ -81,10 +81,15 @@ automated encrypted backups. Another option is to use
 key file based encryption with a blank passphrase. See
 :ref:`encrypted_repos` for more details.
 
-.. caution:: When passing the passphrase through the environment, the
-             passphrase can be read by any user on the same system, so
-             the use of this technique is strongly discouraged on
-             multi-user systems.
+.. _password_env:
+.. note:: Be careful how you set the environment; using the ``env``
+          command, a ``system()`` call or using inline shell scripts
+          might expose the credentials in the process list directly
+          and they will be readable to all users on a system. Using
+          ``export`` in a shell script file should be safe, however, as
+          the environment of a process is `accessible only to that
+          user
+          <http://security.stackexchange.com/questions/14000/environment-variable-accessibility-in-linux/14009#14009>`_.
 
 When backing up to remote encrypted repos, is encryption done locally?
 ----------------------------------------------------------------------

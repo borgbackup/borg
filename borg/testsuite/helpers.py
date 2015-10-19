@@ -404,40 +404,42 @@ def test_get_cache_dir():
 @pytest.fixture()
 def stats():
     stats = Statistics()
-    stats.update(10, 10, unique=True)
+    stats.update(20, 10, unique=True)
     return stats
 
 def test_stats_basic(stats):
-    assert stats.osize == stats.csize == stats.usize == 10
-    stats.update(10, 10, unique=False)
-    assert stats.osize == stats.csize == 20
+    assert stats.osize == 20
+    assert stats.csize == stats.usize == 10
+    stats.update(20, 10, unique=False)
+    assert stats.osize == 40
+    assert stats.csize == 20
     assert stats.usize == 10
 
 def tests_stats_progress(stats, columns=80):
     os.environ['COLUMNS'] = str(columns)
     out = StringIO()
     stats.show_progress(stream=out)
-    s = '10 B O 10 B C 10 B D 0 N '
+    s = '20 B O 10 B C 10 B D 0 N '
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
 
     out = StringIO()
     stats.update(10**3, 0, unique=False)
     stats.show_progress(item={b'path': 'foo'}, final=False, stream=out)
-    s = '1.01 kB O 10 B C 10 B D 0 N foo'
+    s = '1.02 kB O 10 B C 10 B D 0 N foo'
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
     out = StringIO()
     stats.show_progress(item={b'path': 'foo'*40}, final=False, stream=out)
-    s = '1.01 kB O 10 B C 10 B D 0 N foofoofoofoofoofoofoofo...oofoofoofoofoofoofoofoofoo'
+    s = '1.02 kB O 10 B C 10 B D 0 N foofoofoofoofoofoofoofo...oofoofoofoofoofoofoofoofoo'
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
 
 def test_stats_format(stats):
     assert str(stats) == """\
                        Original size      Compressed size    Deduplicated size
-This archive:                   10 B                 10 B                 10 B"""
+This archive:                   20 B                 10 B                 10 B"""
     s = "{0.osize_fmt}".format(stats)
-    assert s == "10 B"
+    assert s == "20 B"
     # kind of redundant, but id is variable so we can't match reliably
-    assert repr(stats) == '<Statistics object at {:#x} (10, 10, 10)>'.format(id(stats))
+    assert repr(stats) == '<Statistics object at {:#x} (20, 10, 10)>'.format(id(stats))

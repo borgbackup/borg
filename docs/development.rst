@@ -136,11 +136,11 @@ Checklist:
     python setup.py register sdist upload --identity="Thomas Waldmann" --sign
 
 - close release milestone on Github
-- announce on::
+- announce on:
 
  - `mailing list <mailto:borgbackup@librelist.org>`_
  - Twitter (follow @ThomasJWaldmann for these tweets)
- - `IRC channel <irc://irc.freenode.net/borgbackup>`_ (change ``/topic``
+ - `IRC channel <irc://irc.freenode.net/borgbackup>`_ (change ``/topic``)
 
 - create a Github release, include:
   * standalone binaries (see above for how to create them)

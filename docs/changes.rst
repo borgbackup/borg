@@ -1,5 +1,5 @@
-Borg Changelog
-==============
+Changelog
+=========
 
 Version 0.27.0
 --------------
@@ -345,20 +345,20 @@ Other changes:
 
 
 Attic Changelog
-===============
+---------------
 
 Here you can see the full list of changes between each Attic release until Borg
 forked from Attic:
 
 Version 0.17
-------------
+~~~~~~~~~~~~
 
 (bugfix release, released on X)
 - Fix hashindex ARM memory alignment issue (#309)
 - Improve hashindex error messages (#298)
 
 Version 0.16
-------------
+~~~~~~~~~~~~
 
 (bugfix release, released on May 16, 2015)
 - Fix typo preventing the security confirmation prompt from working (#303)
@@ -368,7 +368,7 @@ Version 0.16
 - Fix parsing of iso 8601 timestamps with zero microseconds (#282)
 
 Version 0.15
-------------
+~~~~~~~~~~~~
 
 (bugfix release, released on Apr 15, 2015)
 - xattr: Be less strict about unknown/unsupported platforms (#239)
@@ -382,7 +382,7 @@ Version 0.15
 - Include missing pyx files in dist files (#168)
 
 Version 0.14
-------------
+~~~~~~~~~~~~
 
 (feature release, released on Dec 17, 2014)
 
@@ -396,7 +396,7 @@ Version 0.14
 - Fix issue with empty xattr values (#106)
 
 Version 0.13
-------------
+~~~~~~~~~~~~
 
 (feature release, released on Jun 29, 2014)
 
@@ -412,7 +412,7 @@ Version 0.13
 - Fix Python 3.2 specific lockf issue (EDEADLK)
 
 Version 0.12
-------------
+~~~~~~~~~~~~
 
 (feature release, released on April 7, 2014)
 
@@ -429,7 +429,7 @@ Version 0.12
 - Switch to SI units (Power of 1000 instead 1024) when printing file sizes
 
 Version 0.11
-------------
+~~~~~~~~~~~~
 
 (feature release, released on March 7, 2014)
 
@@ -444,7 +444,7 @@ Version 0.11
 - Ignore xattr errors during "extract" if not supported by the filesystem. (#46)
 
 Version 0.10
-------------
+~~~~~~~~~~~~
 
 (bugfix release, released on Jan 30, 2014)
 
@@ -454,7 +454,7 @@ Version 0.10
 - Make source code endianness agnostic (#1)
 
 Version 0.9
------------
+~~~~~~~~~~~
 
 (feature release, released on Jan 23, 2014)
 
@@ -467,14 +467,14 @@ Version 0.9
 - Improved libcrypto path detection (#23).
 
 Version 0.8.1
--------------
+~~~~~~~~~~~~~
 
 (bugfix release, released on Oct 4, 2013)
 
 - Fix segmentation fault issue.
 
 Version 0.8
------------
+~~~~~~~~~~~
 
 (feature release, released on Oct 3, 2013)
 
@@ -487,7 +487,7 @@ Version 0.8
 
 
 Version 0.7
------------
+~~~~~~~~~~~
 
 (feature release, released on Aug 5, 2013)
 
@@ -498,7 +498,7 @@ Version 0.7
 
 
 Version 0.6.1
--------------
+~~~~~~~~~~~~~
 
 (bugfix release, released on July 19, 2013)
 
@@ -506,6 +506,6 @@ Version 0.6.1
 
 
 Version 0.6
------------
+~~~~~~~~~~~
 
 First public release on July 9, 2013

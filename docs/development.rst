@@ -9,6 +9,15 @@ This chapter will get you started with |project_name|' development.
 |project_name| is written in Python (with a little bit of Cython and C for
 the performance critical parts).
 
+Style guide
+-----------
+
+We generally follow `pep8
+<https://www.python.org/dev/peps/pep-0008/>`_, with 120 columns
+instead of 79. We do *not* use form-feed (``^L``) characters to
+separate sections either. The `flake8
+<https://flake8.readthedocs.org/>`_ commandline tool should be used to
+check for style errors before sending pull requests.
 
 Building a development environment
 ----------------------------------

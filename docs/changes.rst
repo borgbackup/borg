@@ -1,6 +1,44 @@
 Changelog
 =========
 
+Version 0.28.0
+--------------
+
+Bug fixes:
+
+- setup.py: fix bug related to BORG_LZ4_PREFIX processing
+- non-ascii ACL fixes for Linux, FreeBSD and OS X, #277
+- fix acl_use_local_uid_gid() and add a test for it, attic #359
+- borg upgrade: do not upgrade repositories in place by default
+- fix cascading failure with the index conversion code, #269
+- borg check: implement 'cmdline' archive metadata value decoding
+
+Other changes:
+
+- do binary releases via "github releases", closes #214
+- create: use -x and --one-file-system instead of --do-not-cross-mountpoints
+- a lot of changes related to using "logging" module and screen output
+- show progress display if on a tty, output more progress information
+- factor out status output so it is consistent, fix surrogates removal
+- benchmarks: test create, extract, list, delete, info, check, help, fixes #146
+- benchmarks: test with both the binary and the python code
+- archiver tests: test with both the binary and the python code, fixes #215
+- travis: use tox -r so it rebuilds the tox environments
+- vagrant: llfuse install on darwin needs pkgconfig installed
+- docs:
+
+  - moved docs to borgbackup.readthedocs.org
+  - a lot of fixes and improvements, use mobile-friendly RTD standard theme
+  - use zlib,6 compression in some examples, fixes #275
+  - add missing rename usage to docs, closes #279
+  - include the help offered by borg help <topic> in the usage docs, fixes #293
+  - include a list of major changes compared to attic into README, fixes #224
+  - add OS X install instructions, #197
+  - more details about the release process
+  - fix linux glibc requirement (binaries built on debian7 now)
+  - build: move usage and API generation to setup.py
+    
+
 Version 0.27.0
 --------------
 

@@ -444,7 +444,7 @@ This archive:                   20 B                 10 B                 10 B""
     # kind of redundant, but id is variable so we can't match reliably
     assert repr(stats) == '<Statistics object at {:#x} (20, 10, 10)>'.format(id(stats))
 
-def test_size():
+def test_file_size():
     """test the size formatting routines"""
     si_size_map = { 0: '0 B',
                     1: '1 B',
@@ -468,3 +468,7 @@ def test_size():
                 }
     for size, fmt in si_size_map.items():
         assert format_file_size(size) == fmt
+
+def test_file_size_precision():
+    assert format_file_size(1254, precision=1) == '1.3 kB'
+    assert format_file_size(999990000, precision=1) == '1.0 GB' # and not 999.9 MB or 1000.0 MB

@@ -457,23 +457,26 @@ def format_file_mode(mod):
     return '%s%s%s' % (x(mod // 64), x(mod // 8), x(mod))
 
 
-def format_file_size(v):
+def format_file_size(v, precision=2):
     """Format file size into a human friendly format
     """
-    return sizeof_fmt_decimal(v, suffix='B', sep=' ')
+    return sizeof_fmt_decimal(v, suffix='B', sep=' ', precision=precision)
 
-def sizeof_fmt(num, suffix='B', units=None, power=None, sep=''):
+def sizeof_fmt(num, suffix='B', units=None, power=None, sep='', precision=2):
     for unit in units[:-1]:
-        if abs(round(num, 2)) < power:
-            return "%3.2f%s%s%s" % (num, sep, unit, suffix)
+        if abs(round(num, precision)) < power:
+            if type(num) is int:
+                return "{}{}{}{}".format(num, sep, unit, suffix)
+            else:
+                return "{:3.{}f}{}{}{}".format(num, precision, sep, unit, suffix)
         num /= float(power)
-    return "%.2f%s%s%s" % (num, sep, units[-1], suffix)
+    return "{:.{}f}{}{}{}".format(num, precision, sep, units[-1], suffix)
 
-def sizeof_fmt_iec(num, suffix='B', sep=''):
-   return sizeof_fmt(num, suffix=suffix, sep=sep, units=['','Ki','Mi','Gi','Ti','Pi','Ei','Zi', 'Yi'], power=1024)
+def sizeof_fmt_iec(num, suffix='B', sep='', precision=2):
+   return sizeof_fmt(num, suffix=suffix, sep=sep, precision=precision, units=['','Ki','Mi','Gi','Ti','Pi','Ei','Zi', 'Yi'], power=1024)
 
-def sizeof_fmt_decimal(num, suffix='B', sep=''):
-   return sizeof_fmt(num, suffix=suffix, sep=sep, units=['','k','M','G','T','P','E','Z', 'Y'], power=1000)
+def sizeof_fmt_decimal(num, suffix='B', sep='', precision=2):
+   return sizeof_fmt(num, suffix=suffix, sep=sep, precision=precision, units=['','k','M','G','T','P','E','Z', 'Y'], power=1000)
 
 
 def format_archive(archive):

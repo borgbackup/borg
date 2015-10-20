@@ -8,7 +8,7 @@ import pytest
 import sys
 import msgpack
 
-from ..helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
+from ..helpers import adjust_patterns, exclude_path, Location, format_file_size, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
     prune_within, prune_split, get_cache_dir, Statistics, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams
 from . import BaseTestCase
@@ -443,3 +443,28 @@ This archive:                   20 B                 10 B                 10 B""
     assert s == "20 B"
     # kind of redundant, but id is variable so we can't match reliably
     assert repr(stats) == '<Statistics object at {:#x} (20, 10, 10)>'.format(id(stats))
+
+def test_size():
+    """test the size formatting routines"""
+    si_size_map = { 0: '0 B',
+                    1: '1 B',
+                    142: '142 B',
+                    999: '999 B',
+                    1000: '1000 B', # XXX: fail
+                    1001: '1.00 kB',
+                    1234: '1.23 kB',
+                    10**6: '1.00 MB',
+                    10**6 + 10*10**3: '1.01 MB',
+                    10**9: '1.00 GB',
+                    10**9+1: '1.00 GB',
+                    10**9-1: '1.00 GB',
+                    10**9-10*10**3: '999.99 MB',
+                    10**9-10*10**3+1: '1.00 GB',
+                    10**12+1: '1.00 TB',
+                    10**15+1: '1.00 PB',
+                    10**18+1: '1.00 EB',
+                    10**21+1: '1.00 ZB',
+                    10**24+1: '1.00 YB',
+                }
+    for size, fmt in si_size_map.items():
+        assert format_file_size(size) == fmt

@@ -460,16 +460,20 @@ def format_file_mode(mod):
 def format_file_size(v):
     """Format file size into a human friendly format
     """
-    if abs(v) > 10**12:
-        return '%.2f TB' % (v / 10**12)
-    elif abs(v) > 10**9:
-        return '%.2f GB' % (v / 10**9)
-    elif abs(v) > 10**6:
-        return '%.2f MB' % (v / 10**6)
-    elif abs(v) > 10**3:
-        return '%.2f kB' % (v / 10**3)
-    else:
-        return '%d B' % v
+    return sizeof_fmt_decimal(v, suffix='B', sep=' ')
+
+def sizeof_fmt(num, suffix='B', units=None, power=None, sep=''):
+    for unit in units[:-1]:
+        if abs(round(num, 2)) < power:
+            return "%3.2f%s%s%s" % (num, sep, unit, suffix)
+        num /= float(power)
+    return "%.2f%s%s%s" % (num, sep, units[-1], suffix)
+
+def sizeof_fmt_iec(num, suffix='B', sep=''):
+   return sizeof_fmt(num, suffix=suffix, sep=sep, units=['','Ki','Mi','Gi','Ti','Pi','Ei','Zi', 'Yi'], power=1024)
+
+def sizeof_fmt_decimal(num, suffix='B', sep=''):
+   return sizeof_fmt(num, suffix=suffix, sep=sep, units=['','k','M','G','T','P','E','Z', 'Y'], power=1000)
 
 
 def format_archive(archive):

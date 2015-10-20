@@ -248,8 +248,10 @@ def run_tests(boxname)
     fi
     # otherwise: just use the system python
     if which fakeroot > /dev/null; then
+      echo "Running tox WITH fakeroot -u"
       fakeroot -u tox --skip-missing-interpreters
     else
+      echo "Running tox WITHOUT fakeroot -u"
       tox --skip-missing-interpreters
     fi
   EOF

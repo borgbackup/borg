@@ -44,13 +44,27 @@ if have_cython():
     import msgpack
 
 
+# return codes returned by borg command
+# when borg is killed by signal N, rc = 128 + N
+EXIT_SUCCESS = 0  # everything done, no problems
+EXIT_WARNING = 1  # reached normal end of operation, but there were issues
+EXIT_ERROR = 2  # terminated abruptly, did not reach end of operation
+
+
 class Error(Exception):
     """Error base class"""
 
-    exit_code = 1
+    # if we raise such an Error and it is only catched by the uppermost
+    # exception handler (that exits short after with the given exit_code),
+    # it is always a (fatal and abrupt) EXIT_ERROR, never just a warning.
+    exit_code = EXIT_ERROR
 
     def get_message(self):
-        return 'Error: ' + type(self).__doc__.format(*self.args)
+        return type(self).__doc__.format(*self.args)
+
+
+class IntegrityError(Error):
+    """Data integrity error"""
 
 
 class ExtensionModuleError(Error):
@@ -485,10 +499,6 @@ def sizeof_fmt_decimal(num, suffix='B', sep='', precision=2):
 
 def format_archive(archive):
     return '%-36s %s' % (archive.name, to_localtime(archive.ts).strftime('%c'))
-
-
-class IntegrityError(Error):
-    """Data integrity error"""
 
 
 def memoize(function):

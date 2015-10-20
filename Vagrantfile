@@ -22,6 +22,7 @@ def packages_debianoid
     apt-get update
     # for building borgbackup and dependencies:
     apt-get install -y libssl-dev libacl1-dev liblz4-dev libfuse-dev fuse pkg-config
+    usermod -a -G fuse vagrant
     apt-get install -y fakeroot build-essential git
     apt-get install -y python3-dev python3-setuptools
     # for building python:

@@ -1,5 +1,4 @@
-from .support import argparse  # see support/__init__.py docstring
-                               # DEPRECATED - remove after requiring py 3.4
+from .support import argparse  # see support/__init__.py docstring, DEPRECATED - remove after requiring py 3.4
 
 import binascii
 from collections import namedtuple
@@ -21,6 +20,7 @@ import unicodedata
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from operator import attrgetter
+
 
 def have_cython():
     """allow for a way to disable Cython includes
@@ -165,6 +165,7 @@ class Statistics:
     summary = """\
                        Original size      Compressed size    Deduplicated size
 {label:15} {stats.osize_fmt:>20s} {stats.csize_fmt:>20s} {stats.usize_fmt:>20s}"""
+
     def __str__(self):
         return self.summary.format(stats=self, label='This archive:')
 
@@ -261,7 +262,7 @@ def exclude_path(path, patterns):
 
 def normalized(func):
     """ Decorator for the Pattern match methods, returning a wrapper that
-    normalizes OSX paths to match the normalized pattern on OSX, and 
+    normalizes OSX paths to match the normalized pattern on OSX, and
     returning the original method on other platforms"""
     @wraps(func)
     def normalize_wrapper(self, path):
@@ -462,21 +463,24 @@ def format_file_size(v, precision=2):
     """
     return sizeof_fmt_decimal(v, suffix='B', sep=' ', precision=precision)
 
+
 def sizeof_fmt(num, suffix='B', units=None, power=None, sep='', precision=2):
     for unit in units[:-1]:
         if abs(round(num, precision)) < power:
-            if type(num) is int:
+            if isinstance(num, int):
                 return "{}{}{}{}".format(num, sep, unit, suffix)
             else:
                 return "{:3.{}f}{}{}{}".format(num, precision, sep, unit, suffix)
         num /= float(power)
     return "{:.{}f}{}{}{}".format(num, precision, sep, units[-1], suffix)
 
+
 def sizeof_fmt_iec(num, suffix='B', sep='', precision=2):
-   return sizeof_fmt(num, suffix=suffix, sep=sep, precision=precision, units=['','Ki','Mi','Gi','Ti','Pi','Ei','Zi', 'Yi'], power=1024)
+    return sizeof_fmt(num, suffix=suffix, sep=sep, precision=precision, units=['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi', 'Yi'], power=1024)
+
 
 def sizeof_fmt_decimal(num, suffix='B', sep='', precision=2):
-   return sizeof_fmt(num, suffix=suffix, sep=sep, precision=precision, units=['','k','M','G','T','P','E','Z', 'Y'], power=1000)
+    return sizeof_fmt(num, suffix=suffix, sep=sep, precision=precision, units=['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'], power=1000)
 
 
 def format_archive(archive):

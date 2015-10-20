@@ -1042,22 +1042,31 @@ def main():  # pragma: no cover
     setup_signal_handlers()
     archiver = Archiver()
     try:
+        msg = None
         exit_code = archiver.run(sys.argv[1:])
     except Error as e:
-        archiver.print_error(e.get_message() + "\n%s" % traceback.format_exc())
+        msg = e.get_message() + "\n%s" % traceback.format_exc()
         exit_code = e.exit_code
     except RemoteRepository.RPCError as e:
-        archiver.print_error('Error: Remote Exception.\n%s' % str(e))
+        msg = 'Remote Exception.\n%s' % str(e)
         exit_code = 1
     except Exception:
-        archiver.print_error('Error: Local Exception.\n%s' % traceback.format_exc())
+        msg = 'Local Exception.\n%s' % traceback.format_exc()
         exit_code = 1
     except KeyboardInterrupt:
-        archiver.print_error('Error: Keyboard interrupt.\n%s' % traceback.format_exc())
+        msg = 'Keyboard interrupt.\n%s' % traceback.format_exc()
         exit_code = 1
-    if exit_code:
-        archiver.print_error('Exiting with failure status due to previous errors')
+    if msg:
+        logger.error(msg)
+    if exit_code == 0:
+        logger.info('terminating with success status, rc %d' % exit_code)
+    else:
+        # TODO:
+        # this should differentiate between normal termination (there were warnings, but
+        # code reached the end of backup) and abrupt termination due to an error or exception.
+        logger.error('terminating with failure status due to previous errors, rc %d' % exit_code)
     sys.exit(exit_code)
+
 
 if __name__ == '__main__':
     main()

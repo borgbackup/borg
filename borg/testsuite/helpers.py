@@ -446,29 +446,30 @@ This archive:                   20 B                 10 B                 10 B""
 
 def test_file_size():
     """test the size formatting routines"""
-    si_size_map = { 0: '0 B',
+    si_size_map = { 0: '0 B',  # no rounding necessary for those
                     1: '1 B',
                     142: '142 B',
                     999: '999 B',
-                    1000: '1.00 kB',
-                    1001: '1.00 kB',
-                    1234: '1.23 kB',
-                    10**6: '1.00 MB',
-                    10**6 + 10*10**3: '1.01 MB',
-                    10**9: '1.00 GB',
-                    10**9+1: '1.00 GB',
-                    10**9-1: '1.00 GB',
-                    10**9-10*10**3: '999.99 MB',
-                    10**9-10*10**3+5*10**3: '1.00 GB',
-                    10**12+1: '1.00 TB',
-                    10**15+1: '1.00 PB',
-                    10**18+1: '1.00 EB',
-                    10**21+1: '1.00 ZB',
-                    10**24+1: '1.00 YB',
+                    1000: '1.00 kB', # rounding starts here
+                    1001: '1.00 kB', # should be rounded away
+                    1234: '1.23 kB', # should be rounded down
+                    1235: '1.24 kB', # should be rounded up
+                    1010: '1.01 kB', # rounded down as well
+                    999990000: '999.99 MB', # rounded down
+                    999990001: '999.99 MB', # rounded down
+                    999995000: '1.00 GB', # rounded up to next unit
+                    10**6: '1.00 MB', # and all the remaining units, megabytes
+                    10**9: '1.00 GB', # gigabytes
+                    10**12: '1.00 TB', # terabytes
+                    10**15: '1.00 PB', # petabytes
+                    10**18: '1.00 EB', # exabytes
+                    10**21: '1.00 ZB', # zottabytes
+                    10**24: '1.00 YB', # yottabytes
                 }
     for size, fmt in si_size_map.items():
         assert format_file_size(size) == fmt
 
 def test_file_size_precision():
-    assert format_file_size(1254, precision=1) == '1.3 kB'
+    assert format_file_size(1234, precision=1) == '1.2 kB' # rounded down
+    assert format_file_size(1254, precision=1) == '1.3 kB' # rounded up
     assert format_file_size(999990000, precision=1) == '1.0 GB' # and not 999.9 MB or 1000.0 MB

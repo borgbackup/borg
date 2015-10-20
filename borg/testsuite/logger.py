@@ -1,6 +1,5 @@
 import logging
 from io import StringIO
-import sys
 
 from mock import Mock
 import pytest

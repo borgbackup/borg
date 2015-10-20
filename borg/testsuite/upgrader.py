@@ -13,6 +13,7 @@ from ..upgrader import AtticRepositoryUpgrader, AtticKeyfileKey
 from ..helpers import get_keys_dir
 from ..key import KeyfileKey
 from ..remote import RemoteRepository
+from ..repository import Repository
 
 
 def repo_valid(path):

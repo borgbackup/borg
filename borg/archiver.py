@@ -19,7 +19,8 @@ from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    is_cachedir, bigint_to_int, ChunkerParams, CompressionSpec, have_cython
+    is_cachedir, bigint_to_int, ChunkerParams, CompressionSpec, have_cython, \
+    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .logger import create_logger, setup_logging
 logger = create_logger()
 if have_cython():
@@ -37,7 +38,7 @@ has_lchflags = hasattr(os, 'lchflags')
 class Archiver:
 
     def __init__(self):
-        self.exit_code = 0
+        self.exit_code = EXIT_SUCCESS
 
     def open_repository(self, location, create=False, exclusive=False):
         if location.proto == 'ssh':
@@ -49,7 +50,7 @@ class Archiver:
 
     def print_error(self, msg, *args):
         msg = args and msg % args or msg
-        self.exit_code = 1
+        self.exit_code = EXIT_WARNING  # we do not terminate here, so it is a warning
         logger.error('borg: ' + msg)
 
     def print_verbose(self, msg, *args, **kw):
@@ -92,18 +93,18 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             if repository.check(repair=args.repair):
                 logger.info('Repository check complete, no problems found.')
             else:
-                return 1
+                return EXIT_WARNING
         if not args.repo_only and not ArchiveChecker().check(
                 repository, repair=args.repair, archive=args.repository.archive, last=args.last):
-            return 1
-        return 0
+            return EXIT_WARNING
+        return EXIT_SUCCESS
 
     def do_change_passphrase(self, args):
         """Change repository key file passphrase"""
         repository = self.open_repository(args.repository)
         manifest, key = Manifest.load(repository)
         key.change_passphrase()
-        return 0
+        return EXIT_SUCCESS
 
     def do_create(self, args):
         """Create new archive"""
@@ -326,7 +327,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     print("""Type "YES" if you understand this and want to continue.\n""", file=sys.stderr)
                     # XXX: prompt may end up on stdout, but we'll assume that input() does the right thing
                     if input('Do you want to continue? ') != 'YES':
-                        self.exit_code = 1
+                        self.exit_code = EXIT_ERROR
                         return self.exit_code
                 repository.destroy()
                 logger.info("Repository deleted.")
@@ -358,7 +359,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             operations.mount(args.mountpoint, args.options, args.foreground)
         except RuntimeError:
             # Relevant error message already printed to stderr by fuse
-            self.exit_code = 1
+            self.exit_code = EXIT_ERROR
         return self.exit_code
 
     def do_list(self, args):
@@ -431,7 +432,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0 and args.within is None:
             self.print_error('At least one of the "within", "keep-hourly", "keep-daily", "keep-weekly", '
                              '"keep-monthly" or "keep-yearly" settings must be specified')
-            return 1
+            return EXIT_ERROR
         if args.prefix:
             archives = [archive for archive in archives if archive.name.startswith(args.prefix)]
         keep = []
@@ -1044,22 +1045,33 @@ def main():  # pragma: no cover
     setup_signal_handlers()
     archiver = Archiver()
     try:
+        msg = None
         exit_code = archiver.run(sys.argv[1:])
     except Error as e:
-        archiver.print_error(e.get_message() + "\n%s" % traceback.format_exc())
+        msg = e.get_message() + "\n%s" % traceback.format_exc()
         exit_code = e.exit_code
     except RemoteRepository.RPCError as e:
-        archiver.print_error('Error: Remote Exception.\n%s' % str(e))
-        exit_code = 1
+        msg = 'Remote Exception.\n%s' % str(e)
+        exit_code = EXIT_ERROR
     except Exception:
-        archiver.print_error('Error: Local Exception.\n%s' % traceback.format_exc())
-        exit_code = 1
+        msg = 'Local Exception.\n%s' % traceback.format_exc()
+        exit_code = EXIT_ERROR
     except KeyboardInterrupt:
-        archiver.print_error('Error: Keyboard interrupt.\n%s' % traceback.format_exc())
-        exit_code = 1
-    if exit_code:
-        archiver.print_error('Exiting with failure status due to previous errors')
+        msg = 'Keyboard interrupt.\n%s' % traceback.format_exc()
+        exit_code = EXIT_ERROR
+    if msg:
+        logger.error(msg)
+    exit_msg = 'terminating with %s status, rc %d'
+    if exit_code == EXIT_SUCCESS:
+        logger.info(exit_msg % ('success', exit_code))
+    elif exit_code == EXIT_WARNING:
+        logger.warning(exit_msg % ('warning', exit_code))
+    elif exit_code == EXIT_ERROR:
+        logger.error(exit_msg % ('error', exit_code))
+    else:
+        logger.error(exit_msg % ('abnormal', exit_code))
     sys.exit(exit_code)
+
 
 if __name__ == '__main__':
     main()

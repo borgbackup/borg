@@ -22,19 +22,15 @@ Return codes
 
 ::
 
-    0      no error, normal termination
-    1      some error occurred (this can be a complete or a partial failure)
-    128+N  killed by signal N (e.g. 137 == kill -9)
+    0 = success (logged as INFO)
+    1 = warning (operation reached its normal end, but there were warnings -
+        you should check the log, logged as WARNING)
+    2 = error (like a fatal error, a local or remote exception, the operation
+        did not reach its normal end, logged as ERROR)
+    128+N = killed by signal N (e.g. 137 == kill -9)
 
+The return code is also logged at the indicated level as the last log entry.
 
-Note: we are aware that more distinct return codes might be useful, but it is
-not clear yet which return codes should be used for which precise conditions.
-
-See issue #61 for a discussion about that. Depending on the outcome of the
-discussion there, return codes may change in future (the only thing rather sure
-is that 0 will always mean some sort of success and "not 0" will always mean
-some sort of warning / error / failure - but the definition of success might
-change).
 
 Environment Variables
 ---------------------

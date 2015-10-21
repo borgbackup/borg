@@ -20,7 +20,7 @@ from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP
 from ..archiver import Archiver
 from ..cache import Cache
 from ..crypto import bytes_to_long, num_aes_blocks
-from ..helpers import Manifest
+from ..helpers import Manifest, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import BaseTestCase
@@ -120,6 +120,24 @@ def cmd(request):
     def exec_fn(*args, **kw):
         return exec_cmd(*args, exe=exe, fork=True, **kw)
     return exec_fn
+
+
+def test_return_codes(cmd, tmpdir):
+    repo = tmpdir.mkdir('repo')
+    input = tmpdir.mkdir('input')
+    output = tmpdir.mkdir('output')
+    input.join('test_file').write('content')
+    rc, out = cmd('init', '%s' % str(repo))
+    assert rc == EXIT_SUCCESS
+    rc, out = cmd('create', '%s::archive' % repo, str(input))
+    assert rc == EXIT_SUCCESS
+    with changedir(str(output)):
+        rc, out = cmd('extract', '%s::archive' % repo)
+        assert rc == EXIT_SUCCESS
+    rc, out = cmd('extract', '%s::archive' % repo, 'does/not/match')
+    assert rc == EXIT_WARNING  # pattern did not match
+    rc, out = cmd('create', '%s::archive' % repo, str(input))
+    assert rc == EXIT_ERROR  # duplicate archive name
 
 
 class ArchiverTestCaseBase(BaseTestCase):

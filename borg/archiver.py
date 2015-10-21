@@ -564,7 +564,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         common_parser.add_argument('--remote-path', dest='remote_path', default=RemoteRepository.remote_path, metavar='PATH',
                                    help='set remote path to executable (default: "%(default)s")')
 
-        parser = argparse.ArgumentParser(prog=prog, description='Borg %s - Deduplicated Backups' % __version__)
+        parser = argparse.ArgumentParser(prog=prog, description='Borg - Deduplicated Backups')
+        parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,
+                                   help='show version number and exit')
         subparsers = parser.add_subparsers(title='Available commands')
 
         serve_epilog = textwrap.dedent("""

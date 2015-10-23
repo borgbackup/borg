@@ -11,10 +11,7 @@ logger = create_logger()
 @pytest.fixture()
 def io_logger():
     io = StringIO()
-    args = Mock()
-    args.verbose = 2
-    assert args.verbose == 2
-    handler, = setup_logging(args, io)
+    handler = setup_logging(io)
     handler.setFormatter(logging.Formatter('%(name)s: %(message)s'))
     logger.setLevel(logging.DEBUG)
     return io

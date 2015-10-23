@@ -37,8 +37,9 @@ has_lchflags = hasattr(os, 'lchflags')
 
 class Archiver:
 
-    def __init__(self):
+    def __init__(self, verbose=False):
         self.exit_code = EXIT_SUCCESS
+        self.verbose = verbose
 
     def open_repository(self, location, create=False, exclusive=False):
         if location.proto == 'ssh':
@@ -53,12 +54,14 @@ class Archiver:
         self.exit_code = EXIT_WARNING  # we do not terminate here, so it is a warning
         logger.error('borg: ' + msg)
 
-    def print_verbose(self, msg, *args, **kw):
-        msg = args and msg % args or msg
-        logger.info(msg)
+    def print_verbose(self, msg, *args):
+        if self.verbose:
+            msg = args and msg % args or msg
+            logger.info(msg)
 
     def print_status(self, status, path):
-        logger.info("%1s %s", status, remove_surrogates(path))
+        if self.verbose:
+            logger.info("%1s %s", status, remove_surrogates(path))
 
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
@@ -89,7 +92,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 if input('Do you want to continue? ') == 'Yes I am sure':
                     break
         if not args.archives_only:
-            logger.warning('Starting repository check...')
+            logger.info('Starting repository check...')
             if repository.check(repair=args.repair):
                 logger.info('Repository check complete, no problems found.')
             else:
@@ -556,8 +559,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
     def build_parser(self, args=None, prog=None):
         common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
-        common_parser.add_argument('-v', '--verbose', dest='verbose', action='count',
-                                   help='verbose output, defaults to warnings only')
+        common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False,
+                                   help='verbose output')
         common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
                                    help='do not load/update the file metadata cache used to detect unchanged files')
         common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=RemoteRepository.umask, metavar='M',
@@ -996,7 +999,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         parser = self.build_parser(args)
 
         args = parser.parse_args(args or ['-h'])
-        setup_logging(args)
+        self.verbose = args.verbose
+        setup_logging()
         os.umask(args.umask)
         RemoteRepository.remote_path = args.remote_path
         RemoteRepository.umask = args.umask
@@ -1015,7 +1019,7 @@ def sig_info_handler(signum, stack):  # pragma: no cover
                 total = loc['st'].st_size
             except Exception:
                 pos, total = 0, 0
-            logger.warning("{0} {1}/{2}".format(path, format_file_size(pos), format_file_size(total)))
+            logger.info("{0} {1}/{2}".format(path, format_file_size(pos), format_file_size(total)))
             break
         if func in ('extract_item', ):  # extract op
             path = loc['item'][b'path']
@@ -1023,7 +1027,7 @@ def sig_info_handler(signum, stack):  # pragma: no cover
                 pos = loc['fd'].tell()
             except Exception:
                 pos = 0
-            logger.warning("{0} {1}/???".format(path, format_file_size(pos)))
+            logger.info("{0} {1}/???".format(path, format_file_size(pos)))
             break
 
 
@@ -1069,7 +1073,8 @@ def main():  # pragma: no cover
     elif exit_code == EXIT_ERROR:
         logger.error(exit_msg % ('error', exit_code))
     else:
-        logger.error(exit_msg % ('abnormal', exit_code))
+        # if you see 666 in output, it usually means exit_code was None
+        logger.error(exit_msg % ('abnormal', exit_code or 666))
     sys.exit(exit_code)
 
 

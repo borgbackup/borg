@@ -282,9 +282,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         shutil.rmtree(self.cache_path)
         with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='1'):
             info_output2 = self.cmd('info', self.repository_location + '::test')
-        # info_output2 starts with some "initializing cache" text but should
-        # end the same way as info_output
-        assert info_output2.endswith(info_output)
+
+        def filter(output):
+            # filter for interesting "info" output, ignore cache rebuilding related stuff
+            prefixes = ['Name:', 'Fingerprint:', 'Number of files:', 'This archive:',
+                        'All archives:', 'Chunk index:', ]
+            result = []
+            for line in output.splitlines():
+                for prefix in prefixes:
+                    if line.startswith(prefix):
+                        result.append(line)
+            return '\n'.join(result)
+
+        # the interesting parts of info_output2 and info_output should be same
+        self.assert_equal(filter(info_output), filter(info_output2))
 
     def _extract_repository_id(self, path):
         return Repository(self.repository_path).id

@@ -1,3 +1,10 @@
+|screencast|
+
+.. |screencast| image:: https://asciinema.org/a/28691.png
+        :alt: BorgBackup Installation and Basic Usage
+        :target: https://asciinema.org/a/28691?autoplay=1&speed=2
+
+
 What is BorgBackup?
 ===================
 BorgBackup (short: Borg) is a deduplicating backup program.

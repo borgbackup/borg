@@ -151,6 +151,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     try:
                         status = archive.process_stdin(path, cache)
                     except IOError as e:
+                        status = 'E'
                         self.print_warning('%s: %s', path, e)
                 else:
                     status = '-'
@@ -205,6 +206,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 try:
                     status = archive.process_file(path, st, cache)
                 except IOError as e:
+                    status = 'E'
                     self.print_warning('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
             if exclude_caches and is_cachedir(path):
@@ -214,6 +216,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             try:
                 entries = os.listdir(path)
             except OSError as e:
+                status = 'E'
                 self.print_warning('%s: %s', path, e)
             else:
                 for filename in sorted(entries):

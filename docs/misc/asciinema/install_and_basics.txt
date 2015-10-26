@@ -1,0 +1,51 @@
+# borgbackup - installation and basic usage
+
+# I have already downloaded the binary release from github:
+ls -l
+# binary file + GPG signature
+
+# verifying whether the binary is valid:
+gpg --verify borg-linux64.asc borg-linux64
+
+# install it as "borg":
+cp borg-linux64 ~/bin/borg
+
+# making it executable:
+chmod +x ~/bin/borg
+
+# yay, installation done! let's make backups!
+
+# creating a repository:
+borg init repo
+
+# creating our first backup with stuff from "data" directory:
+borg create --stats --progress --compression lz4 repo::backup1 data
+
+# changing the data slightly:
+echo "some more data" > data/one_file_more
+
+# creating another backup:
+borg create --stats --progress repo::backup2 data
+
+# that was much faster! it recognized/deduplicated unchanged files.
+# see the "Deduplicated size" column for "This archive"! :)
+
+# extracting a backup archive:
+mv data data.orig
+borg extract repo::backup2
+
+# checking if restored data differs from original data:
+diff -r data.orig data
+
+# no, it doesn't! :)
+
+# listing the repo contents:
+borg list repo
+
+# listing the backup2 archive contents (shortened):
+borg list repo::backup2 | tail
+
+# easy, isn't it?
+
+# if you like #borgbackup, spread the word!
+

@@ -288,14 +288,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_atime(self):
         have_root = self.create_test_files()
+        atime, mtime = 123456780, 234567890
+        os.utime('input/file1', (atime, mtime))
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
         sti = os.stat('input/file1')
         sto = os.stat('output/input/file1')
-        assert st_mtime_ns(sti) == st_mtime_ns(sto)
-        assert st_atime_ns(sti) == st_atime_ns(sto)
+        assert st_mtime_ns(sti) == st_mtime_ns(sto) == mtime * 1e9
+        assert st_atime_ns(sti) == st_atime_ns(sto) == atime * 1e9
 
     def _extract_repository_id(self, path):
         return Repository(self.repository_path).id

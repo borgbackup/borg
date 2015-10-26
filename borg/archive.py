@@ -540,7 +540,7 @@ Number of files: {0.stats.nfiles}'''.format(self)
     @staticmethod
     def _open_rb(path, st):
         flags_normal = os.O_RDONLY | getattr(os, 'O_BINARY', 0)
-        flags_noatime = flags_normal | getattr(os, 'NO_ATIME', 0)
+        flags_noatime = flags_normal | getattr(os, 'O_NOATIME', 0)
         euid = None
 
         def open_simple(p, s):

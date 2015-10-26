@@ -18,7 +18,8 @@ import time
 from io import BytesIO
 from . import xattr
 from .helpers import parse_timestamp, Error, uid2user, user2uid, gid2group, group2gid, format_timedelta, \
-    Manifest, Statistics, decode_dict, st_mtime_ns, make_path_safe, StableDict, int_to_bigint, bigint_to_int, have_cython
+    Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, have_cython, \
+    st_atime_ns, st_ctime_ns, st_mtime_ns
 if have_cython():
     from .platform import acl_get, acl_set
     from .chunker import Chunker
@@ -384,12 +385,17 @@ Number of files: {0.stats.nfiles}'''.format(self)
         elif has_lchmod:  # Not available on Linux
             os.lchmod(path, item[b'mode'])
         mtime = bigint_to_int(item[b'mtime'])
+        if b'atime' in item:
+            atime = bigint_to_int(item[b'atime'])
+        else:
+            # old archives only had mtime in item metadata
+            atime = mtime
         if fd and utime_supports_fd:  # Python >= 3.3
-            os.utime(fd, None, ns=(mtime, mtime))
+            os.utime(fd, None, ns=(atime, mtime))
         elif utime_supports_follow_symlinks:  # Python >= 3.3
-            os.utime(path, None, ns=(mtime, mtime), follow_symlinks=False)
+            os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
         elif not symlink:
-            os.utime(path, (mtime / 1e9, mtime / 1e9))
+            os.utime(path, (atime / 1e9, mtime / 1e9))
         acl_set(path, item, self.numeric_owner)
         # Only available on OS X and FreeBSD
         if has_lchflags and b'bsdflags' in item:
@@ -428,7 +434,9 @@ Number of files: {0.stats.nfiles}'''.format(self)
             b'mode': st.st_mode,
             b'uid': st.st_uid, b'user': uid2user(st.st_uid),
             b'gid': st.st_gid, b'group': gid2group(st.st_gid),
-            b'mtime': int_to_bigint(st_mtime_ns(st))
+            b'atime': int_to_bigint(st_atime_ns(st)),
+            b'ctime': int_to_bigint(st_ctime_ns(st)),
+            b'mtime': int_to_bigint(st_mtime_ns(st)),
         }
         if self.numeric_owner:
             item[b'user'] = item[b'group'] = None

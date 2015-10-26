@@ -297,10 +297,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         sti = os.stat('input/file1')
         sto = os.stat('output/input/file1')
         assert st_mtime_ns(sti) == st_mtime_ns(sto) == mtime * 1e9
-        # to support testing on platforms without O_NOATIME open mode, we just
-        # compare the restored file with the original atime (not with the
-        # atime it has now).
-        assert st_atime_ns(sto) == atime * 1e9
+        if hasattr(os, 'O_NOATIME'):
+            assert st_atime_ns(sti) == st_atime_ns(sto) == atime * 1e9
+        else:
+            # it touched the input file's atime while backing it up
+            assert st_atime_ns(sto) == atime * 1e9
 
     def _extract_repository_id(self, path):
         return Repository(self.repository_path).id

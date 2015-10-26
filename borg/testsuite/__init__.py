@@ -85,8 +85,9 @@ class BaseTestCase(unittest.TestCase):
                 if fuse and not have_fuse_mtime_ns:
                     d1.append(round(st_mtime_ns(s1), -4))
                     d2.append(round(st_mtime_ns(s2), -4))
-                d1.append(round(st_mtime_ns(s1), st_mtime_ns_round))
-                d2.append(round(st_mtime_ns(s2), st_mtime_ns_round))
+                else:
+                    d1.append(round(st_mtime_ns(s1), st_mtime_ns_round))
+                    d2.append(round(st_mtime_ns(s2), st_mtime_ns_round))
             d1.append(get_all(path1, follow_symlinks=False))
             d2.append(get_all(path2, follow_symlinks=False))
             self.assert_equal(d1, d2)

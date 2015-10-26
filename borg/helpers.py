@@ -747,7 +747,13 @@ class StableDict(dict):
 
 
 if sys.version < '3.3':
-    # st_mtime_ns attribute only available in 3.3+
+    # st_xtime_ns attributes only available in 3.3+
+    def st_atime_ns(st):
+        return int(st.st_atime * 1e9)
+
+    def st_ctime_ns(st):
+        return int(st.st_ctime * 1e9)
+
     def st_mtime_ns(st):
         return int(st.st_mtime * 1e9)
 
@@ -757,6 +763,12 @@ if sys.version < '3.3':
             data = data.encode('ascii')
         return binascii.unhexlify(data)
 else:
+    def st_atime_ns(st):
+        return st.st_atime_ns
+
+    def st_ctime_ns(st):
+        return st.st_ctime_ns
+
     def st_mtime_ns(st):
         return st.st_mtime_ns
 

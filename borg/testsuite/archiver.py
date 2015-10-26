@@ -20,7 +20,7 @@ from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP
 from ..archiver import Archiver
 from ..cache import Cache
 from ..crypto import bytes_to_long, num_aes_blocks
-from ..helpers import Manifest, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
+from ..helpers import Manifest, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, st_atime_ns, st_mtime_ns
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import BaseTestCase
@@ -285,6 +285,17 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # info_output2 starts with some "initializing cache" text but should
         # end the same way as info_output
         assert info_output2.endswith(info_output)
+
+    def test_atime(self):
+        have_root = self.create_test_files()
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        sti = os.stat('input/file1')
+        sto = os.stat('output/input/file1')
+        assert st_mtime_ns(sti) == st_mtime_ns(sto)
+        assert st_atime_ns(sti) == st_atime_ns(sto)
 
     def _extract_repository_id(self, path):
         return Repository(self.repository_path).id

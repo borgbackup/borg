@@ -18,4 +18,3 @@ Borg Documentation
    internals
    development
    authors
-   api

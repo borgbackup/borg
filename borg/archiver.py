@@ -348,18 +348,21 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             return self.exit_code
 
         repository = self.open_repository(args.src)
-        manifest, key = Manifest.load(repository)
-        if args.src.archive:
-            archive = Archive(repository, key, manifest, args.src.archive)
-        else:
-            archive = None
-        operations = FuseOperations(key, repository, manifest, archive)
-        self.print_verbose("Mounting filesystem")
         try:
-            operations.mount(args.mountpoint, args.options, args.foreground)
-        except RuntimeError:
-            # Relevant error message already printed to stderr by fuse
-            self.exit_code = EXIT_ERROR
+            manifest, key = Manifest.load(repository)
+            if args.src.archive:
+                archive = Archive(repository, key, manifest, args.src.archive)
+            else:
+                archive = None
+            operations = FuseOperations(key, repository, manifest, archive)
+            self.print_verbose("Mounting filesystem")
+            try:
+                operations.mount(args.mountpoint, args.options, args.foreground)
+            except RuntimeError:
+                # Relevant error message already printed to stderr by fuse
+                self.exit_code = EXIT_ERROR
+        finally:
+            repository.close()
         return self.exit_code
 
     def do_list(self, args):

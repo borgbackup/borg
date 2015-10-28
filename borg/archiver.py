@@ -37,8 +37,9 @@ has_lchflags = hasattr(os, 'lchflags')
 
 class Archiver:
 
-    def __init__(self):
+    def __init__(self, verbose=False):
         self.exit_code = EXIT_SUCCESS
+        self.verbose = verbose
 
     def open_repository(self, location, create=False, exclusive=False):
         if location.proto == 'ssh':
@@ -50,15 +51,21 @@ class Archiver:
 
     def print_error(self, msg, *args):
         msg = args and msg % args or msg
-        self.exit_code = EXIT_WARNING  # we do not terminate here, so it is a warning
-        logger.error('borg: ' + msg)
+        self.exit_code = EXIT_ERROR
+        logger.error(msg)
 
-    def print_verbose(self, msg, *args, **kw):
+    def print_warning(self, msg, *args):
         msg = args and msg % args or msg
-        logger.info(msg)
+        self.exit_code = EXIT_WARNING  # we do not terminate here, so it is a warning
+        logger.warning(msg)
+
+    def print_info(self, msg, *args):
+        if self.verbose:
+            msg = args and msg % args or msg
+            logger.info(msg)
 
     def print_status(self, status, path):
-        logger.info("%1s %s", status, remove_surrogates(path))
+        self.print_info("%1s %s", status, remove_surrogates(path))
 
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
@@ -82,14 +89,14 @@ class Archiver:
         repository = self.open_repository(args.repository, exclusive=args.repair)
         if args.repair:
             while not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
-                self.print_error("""Warning: 'check --repair' is an experimental feature that might result
+                self.print_warning("""'check --repair' is an experimental feature that might result
 in data loss.
 
 Type "Yes I am sure" if you understand this and want to continue.\n""")
                 if input('Do you want to continue? ') == 'Yes I am sure':
                     break
         if not args.archives_only:
-            logger.warning('Starting repository check...')
+            logger.info('Starting repository check...')
             if repository.check(repair=args.repair):
                 logger.info('Repository check complete, no problems found.')
             else:
@@ -144,7 +151,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     try:
                         status = archive.process_stdin(path, cache)
                     except IOError as e:
-                        self.print_error('%s: %s', path, e)
+                        status = 'E'
+                        self.print_warning('%s: %s', path, e)
                 else:
                     status = '-'
                 self.print_status(status, path)
@@ -154,7 +162,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 try:
                     restrict_dev = os.lstat(path).st_dev
                 except OSError as e:
-                    self.print_error('%s: %s', path, e)
+                    self.print_warning('%s: %s', path, e)
                     continue
             else:
                 restrict_dev = None
@@ -181,7 +189,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         try:
             st = os.lstat(path)
         except OSError as e:
-            self.print_error('%s: %s', path, e)
+            self.print_warning('%s: %s', path, e)
             return
         if (st.st_ino, st.st_dev) in skip_inodes:
             return
@@ -198,7 +206,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 try:
                     status = archive.process_file(path, st, cache)
                 except IOError as e:
-                    self.print_error('%s: %s', path, e)
+                    status = 'E'
+                    self.print_warning('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
             if exclude_caches and is_cachedir(path):
                 return
@@ -207,7 +216,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             try:
                 entries = os.listdir(path)
             except OSError as e:
-                self.print_error('%s: %s', path, e)
+                status = 'E'
+                self.print_warning('%s: %s', path, e)
             else:
                 for filename in sorted(entries):
                     entry_path = os.path.normpath(os.path.join(path, filename))
@@ -227,7 +237,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             # Ignore unix sockets
             return
         else:
-            self.print_error('Unknown file type: %s', path)
+            self.print_warning('Unknown file type: %s', path)
             return
         # Status output
         # A lowercase character means a file type other than a regular file,
@@ -270,7 +280,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             if not args.dry_run:
                 while dirs and not item[b'path'].startswith(dirs[-1][b'path']):
                     archive.extract_item(dirs.pop(-1), stdout=stdout)
-            self.print_verbose(remove_surrogates(orig_path))
+            self.print_info(remove_surrogates(orig_path))
             try:
                 if dry_run:
                     archive.extract_item(item, dry_run=True)
@@ -281,14 +291,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     else:
                         archive.extract_item(item, stdout=stdout, sparse=sparse)
             except IOError as e:
-                self.print_error('%s: %s', remove_surrogates(orig_path), e)
+                self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 
         if not args.dry_run:
             while dirs:
                 archive.extract_item(dirs.pop(-1))
         for pattern in (patterns or []):
             if isinstance(pattern, IncludePattern) and  pattern.match_count == 0:
-                self.print_error("Warning: Include pattern '%s' never matched.", pattern)
+                self.print_warning("Include pattern '%s' never matched.", pattern)
         return self.exit_code
 
     def do_rename(self, args):
@@ -340,7 +350,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         try:
             from .fuse import FuseOperations
         except ImportError as e:
-            self.print_error('loading fuse support failed [ImportError: %s]' % str(e))
+            self.print_error('Loading fuse support failed [ImportError: %s]' % str(e))
             return self.exit_code
 
         if not os.path.isdir(args.mountpoint) or not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
@@ -355,7 +365,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             else:
                 archive = None
             operations = FuseOperations(key, repository, manifest, archive)
-            self.print_verbose("Mounting filesystem")
+            self.print_info("Mounting filesystem")
             try:
                 operations.mount(args.mountpoint, args.options, args.foreground)
             except RuntimeError:
@@ -435,7 +445,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0 and args.within is None:
             self.print_error('At least one of the "within", "keep-hourly", "keep-daily", "keep-weekly", '
                              '"keep-monthly" or "keep-yearly" settings must be specified')
-            return EXIT_ERROR
+            return self.exit_code
         if args.prefix:
             archives = [archive for archive in archives if archive.name.startswith(args.prefix)]
         keep = []
@@ -456,12 +466,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         to_delete = [a for a in archives if a not in keep]
         stats = Statistics()
         for archive in keep:
-            self.print_verbose('Keeping archive: %s' % format_archive(archive))
+            self.print_info('Keeping archive: %s' % format_archive(archive))
         for archive in to_delete:
             if args.dry_run:
-                self.print_verbose('Would prune:     %s' % format_archive(archive))
+                self.print_info('Would prune:     %s' % format_archive(archive))
             else:
-                self.print_verbose('Pruning archive: %s' % format_archive(archive))
+                self.print_info('Pruning archive: %s' % format_archive(archive))
                 Archive(repository, key, manifest, archive.name, cache).delete(stats)
         if to_delete and not args.dry_run:
             manifest.write()
@@ -559,8 +569,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
     def build_parser(self, args=None, prog=None):
         common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
-        common_parser.add_argument('-v', '--verbose', dest='verbose', action='count',
-                                   help='verbose output, defaults to warnings only')
+        common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False,
+                                   help='verbose output')
         common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
                                    help='do not load/update the file metadata cache used to detect unchanged files')
         common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=RemoteRepository.umask, metavar='M',
@@ -999,7 +1009,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         parser = self.build_parser(args)
 
         args = parser.parse_args(args or ['-h'])
-        setup_logging(args)
+        self.verbose = args.verbose
+        setup_logging()
         os.umask(args.umask)
         RemoteRepository.remote_path = args.remote_path
         RemoteRepository.umask = args.umask
@@ -1018,7 +1029,7 @@ def sig_info_handler(signum, stack):  # pragma: no cover
                 total = loc['st'].st_size
             except Exception:
                 pos, total = 0, 0
-            logger.warning("{0} {1}/{2}".format(path, format_file_size(pos), format_file_size(total)))
+            logger.info("{0} {1}/{2}".format(path, format_file_size(pos), format_file_size(total)))
             break
         if func in ('extract_item', ):  # extract op
             path = loc['item'][b'path']
@@ -1026,7 +1037,7 @@ def sig_info_handler(signum, stack):  # pragma: no cover
                 pos = loc['fd'].tell()
             except Exception:
                 pos = 0
-            logger.warning("{0} {1}/???".format(path, format_file_size(pos)))
+            logger.info("{0} {1}/???".format(path, format_file_size(pos)))
             break
 
 
@@ -1072,7 +1083,8 @@ def main():  # pragma: no cover
     elif exit_code == EXIT_ERROR:
         logger.error(exit_msg % ('error', exit_code))
     else:
-        logger.error(exit_msg % ('abnormal', exit_code))
+        # if you see 666 in output, it usually means exit_code was None
+        logger.error(exit_msg % ('abnormal', exit_code or 666))
     sys.exit(exit_code)
 
 

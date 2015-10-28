@@ -10,9 +10,9 @@ The way to use this is as follows:
 * then each module uses logger.info/warning/debug/etc according to the
   level it believes is appropriate:
 
-    logger.debug('some intricate details you usually do not care about')
-    logger.info('verbose progress information')
-    logger.warning('some non-error condition that must always be reported')
+    logger.debug('debugging info for developers or power users')
+    logger.info('normal, informational output')
+    logger.warning('warn about a non-fatal error or sth else')
     logger.error('a fatal error')
 
   ... and so on. see the `logging documentation
@@ -26,9 +26,8 @@ The way to use this is as follows:
   stream it is using, unfortunately. we assume that it won't clutter
   stdout, because interaction would be broken then anyways
 
-* advanced verbosity filters, based on what i described in
-  https://github.com/borgbackup/borg/pull/233#issuecomment-145100222
-  may eventually be implemented
+* what is output on INFO level is additionally controlled by commandline
+  flags
 """
 
 import inspect
@@ -36,11 +35,11 @@ import logging
 import sys
 
 
-def setup_logging(args, stream=None):
+def setup_logging(stream=None):
     """setup logging module according to the arguments provided
 
     this sets up a stream handler logger on stderr (by default, if no
-    stream is provided) and verbosity levels.
+    stream is provided).
     """
     logging.raiseExceptions = False
     l = logging.getLogger('')
@@ -50,13 +49,8 @@ def setup_logging(args, stream=None):
     # example:
     # sh.setFormatter(logging.Formatter('%(name)s: %(message)s'))
     l.addHandler(sh)
-    levels = {None: logging.WARNING,
-              0: logging.WARNING,
-              1: logging.INFO,
-              2: logging.DEBUG}
-    # default to WARNING, -v goes to INFO and -vv to DEBUG
-    l.setLevel(levels[args.verbose])
-    return sh,
+    l.setLevel(logging.INFO)
+    return sh
 
 
 def find_parent_module():

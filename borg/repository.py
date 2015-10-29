@@ -1,4 +1,4 @@
-from configparser import RawConfigParser
+from configparser import ConfigParser
 from binascii import hexlify
 from itertools import islice
 import errno
@@ -79,11 +79,11 @@ class Repository:
         with open(os.path.join(path, 'README'), 'w') as fd:
             fd.write('This is a Borg repository\n')
         os.mkdir(os.path.join(path, 'data'))
-        config = RawConfigParser()
+        config = ConfigParser(interpolation=None)
         config.add_section('repository')
         config.set('repository', 'version', '1')
-        config.set('repository', 'segments_per_dir', self.DEFAULT_SEGMENTS_PER_DIR)
-        config.set('repository', 'max_segment_size', self.DEFAULT_MAX_SEGMENT_SIZE)
+        config.set('repository', 'segments_per_dir', str(self.DEFAULT_SEGMENTS_PER_DIR))
+        config.set('repository', 'max_segment_size', str(self.DEFAULT_MAX_SEGMENT_SIZE))
         config.set('repository', 'id', hexlify(os.urandom(32)).decode('ascii'))
         self.save_config(path, config)
 
@@ -136,7 +136,7 @@ class Repository:
         if not os.path.isdir(path):
             raise self.DoesNotExist(path)
         self.lock = UpgradableLock(os.path.join(path, 'lock'), exclusive).acquire()
-        self.config = RawConfigParser()
+        self.config = ConfigParser(interpolation=None)
         self.config.read(os.path.join(self.path, 'config'))
         if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:
             raise self.InvalidRepository(path)

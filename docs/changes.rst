@@ -4,9 +4,20 @@ Changelog
 Version 0.28.0
 --------------
 
+New features:
+
+- refactor return codes (exit codes), fixes #61
+- give a final status into the log output, including exit code, fixes #58
+- borg create backups atime and ctime additionally to mtime, fixes #317
+  - extract: support atime additionally to mtime
+  - FUSE: support ctime and atime additionally to mtime
+- support borg --version
+
 Bug fixes:
 
 - setup.py: fix bug related to BORG_LZ4_PREFIX processing
+- borg mount: fix unlocking of repository at umount time, fixes #331
+- fix reading files without touching their atime, #334
 - non-ascii ACL fixes for Linux, FreeBSD and OS X, #277
 - fix acl_use_local_uid_gid() and add a test for it, attic #359
 - borg upgrade: do not upgrade repositories in place by default, #299
@@ -15,6 +26,11 @@ Bug fixes:
 
 Other changes:
 
+- improve file size displays
+- convert to more flexible size formatters
+- explicitely commit to the units standard, #289
+- archiver: add E status (means that an error occured when processing this
+  (single) item
 - do binary releases via "github releases", closes #214
 - create: use -x and --one-file-system (was: --do-not-cross-mountpoints), #296
 - a lot of changes related to using "logging" module and screen output, #233
@@ -23,9 +39,15 @@ Other changes:
   maybe fixes #309
 - benchmarks: test create, extract, list, delete, info, check, help, fixes #146
 - benchmarks: test with both the binary and the python code
-- archiver tests: test with both the binary and the python code, fixes #215
-- travis: use tox -r so it rebuilds the tox environments
-- vagrant: llfuse install on darwin needs pkgconfig installed
+- tests:
+
+  - travis: also run tests on Python 3.5
+  - travis: use tox -r so it rebuilds the tox environments
+  - test the generated pyinstaller-based binary by archiver unit tests, #215
+  - vagrant: tests: announce whether fakeroot is used or not
+  - vagrant: add vagrant user to fuse group for debianoid systems also
+  - vagrant: llfuse install on darwin needs pkgconfig installed
+  - archiver tests: test with both the binary and the python code, fixes #215
 - docs:
 
   - moved docs to borgbackup.readthedocs.org, #155
@@ -38,6 +60,10 @@ Other changes:
   - more details about the release process, #260
   - fix linux glibc requirement (binaries built on debian7 now)
   - build: move usage and API generation to setup.py
+  - update docs about return codes, #61
+  - remove api docs (too much breakage on rtd)
+  - borgbackup install + basics presentation (asciinema)
+  - describe the current style guide in documentation
     
 
 Version 0.27.0

@@ -571,6 +571,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
         common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False,
                                    help='verbose output')
+        common_parser.add_argument('--show-rc', dest='show_rc', action='store_true', default=False,
+                                   help='show/log the return code (rc)')
         common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
                                    help='do not load/update the file metadata cache used to detect unchanged files')
         common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=RemoteRepository.umask, metavar='M',
@@ -1061,9 +1063,9 @@ def main():  # pragma: no cover
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, sys.stderr.encoding, 'replace', line_buffering=True)
     setup_signal_handlers()
     archiver = Archiver()
+    msg = None
+    args = archiver.parse_args(sys.argv[1:])
     try:
-        msg = None
-        args = archiver.parse_args(sys.argv[1:])
         exit_code = archiver.run(args)
     except Error as e:
         msg = e.get_message()
@@ -1081,16 +1083,17 @@ def main():  # pragma: no cover
         exit_code = EXIT_ERROR
     if msg:
         logger.error(msg)
-    exit_msg = 'terminating with %s status, rc %d'
-    if exit_code == EXIT_SUCCESS:
-        logger.info(exit_msg % ('success', exit_code))
-    elif exit_code == EXIT_WARNING:
-        logger.warning(exit_msg % ('warning', exit_code))
-    elif exit_code == EXIT_ERROR:
-        logger.error(exit_msg % ('error', exit_code))
-    else:
-        # if you see 666 in output, it usually means exit_code was None
-        logger.error(exit_msg % ('abnormal', exit_code or 666))
+    if args.show_rc:
+        exit_msg = 'terminating with %s status, rc %d'
+        if exit_code == EXIT_SUCCESS:
+            logger.info(exit_msg % ('success', exit_code))
+        elif exit_code == EXIT_WARNING:
+            logger.warning(exit_msg % ('warning', exit_code))
+        elif exit_code == EXIT_ERROR:
+            logger.error(exit_msg % ('error', exit_code))
+        else:
+            # if you see 666 in output, it usually means exit_code was None
+            logger.error(exit_msg % ('abnormal', exit_code or 666))
     sys.exit(exit_code)
 
 

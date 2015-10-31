@@ -19,18 +19,15 @@ PREFIX = b'\0' * 8
 
 
 class UnsupportedPayloadError(Error):
-    """Unsupported payload type {}. A newer version is required to access this repository.
-    """
+    """Unsupported payload type {}. A newer version is required to access this repository."""
 
 
 class KeyfileNotFoundError(Error):
-    """No key file for repository {} found in {}.
-    """
+    """No key file for repository {} found in {}."""
 
 
 class RepoKeyNotFoundError(Error):
-    """No key entry found in the config of repository {}.
-    """
+    """No key entry found in the config of repository {}."""
 
 
 class HMAC(hmac.HMAC):

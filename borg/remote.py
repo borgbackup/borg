@@ -28,7 +28,7 @@ class PathNotAllowed(Error):
 
 
 class InvalidRPCMethod(Error):
-    """RPC method is not valid"""
+    """RPC method {} is not valid"""
 
 
 class RepositoryServer:  # pragma: no cover

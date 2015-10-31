@@ -35,8 +35,7 @@ class Cache:
         """Repository access aborted"""
 
     class EncryptionMethodMismatch(Error):
-        """Repository encryption method changed since last acccess, refusing to continue
-        """
+        """Repository encryption method changed since last access, refusing to continue"""
 
     def __init__(self, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True):
         self.lock = None

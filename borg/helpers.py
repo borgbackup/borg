@@ -43,6 +43,8 @@ if have_cython():
     from . import crypto
     import msgpack
 
+import msgpack.fallback
+
 
 # return codes returned by borg command
 # when borg is killed by signal N, rc = 128 + N
@@ -791,3 +793,7 @@ def int_to_bigint(value):
     if value.bit_length() > 63:
         return value.to_bytes((value.bit_length() + 9) // 8, 'little', signed=True)
     return value
+
+
+def is_slow_msgpack():
+    return msgpack.Packer is msgpack.fallback.Packer

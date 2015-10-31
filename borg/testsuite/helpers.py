@@ -7,9 +7,10 @@ import os
 import pytest
 import sys
 import msgpack
+import msgpack.fallback
 
 from ..helpers import adjust_patterns, exclude_path, Location, format_file_size, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
-    prune_within, prune_split, get_cache_dir, Statistics, \
+    prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams
 from . import BaseTestCase
 
@@ -480,3 +481,14 @@ def test_file_size_precision():
     assert format_file_size(1234, precision=1) == '1.2 kB'  # rounded down
     assert format_file_size(1254, precision=1) == '1.3 kB'  # rounded up
     assert format_file_size(999990000, precision=1) == '1.0 GB'  # and not 999.9 MB or 1000.0 MB
+
+
+def test_is_slow_msgpack():
+    saved_packer = msgpack.Packer
+    try:
+        msgpack.Packer = msgpack.fallback.Packer
+        assert is_slow_msgpack()
+    finally:
+        msgpack.Packer = saved_packer
+    # this assumes that we have fast msgpack on test platform:
+    assert not is_slow_msgpack()

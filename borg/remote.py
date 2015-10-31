@@ -23,6 +23,10 @@ class ConnectionClosed(Error):
     """Connection closed by remote host"""
 
 
+class ConnectionClosedWithHint(ConnectionClosed):
+    """Connection closed by remote host. {}"""
+
+
 class PathNotAllowed(Error):
     """Repository path not allowed"""
 
@@ -148,7 +152,7 @@ class RemoteRepository:
         try:
             version = self.call('negotiate', 1)
         except ConnectionClosed:
-            raise Exception('Server immediately closed connection - is Borg installed and working on the server?')
+            raise ConnectionClosedWithHint('Is borg working on the server?')
         if version != 1:
             raise Exception('Server insisted on using unsupported protocol version %d' % version)
         self.id = self.call('open', location.path, create)

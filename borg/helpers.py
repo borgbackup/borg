@@ -58,12 +58,19 @@ class Error(Exception):
     # exception handler (that exits short after with the given exit_code),
     # it is always a (fatal and abrupt) EXIT_ERROR, never just a warning.
     exit_code = EXIT_ERROR
+    # show a traceback?
+    traceback = False
 
     def get_message(self):
         return type(self).__doc__.format(*self.args)
 
 
-class IntegrityError(Error):
+class ErrorWithTraceback(Error):
+    """like Error, but show a traceback also"""
+    traceback = True
+
+
+class IntegrityError(ErrorWithTraceback):
     """Data integrity error"""
 
 

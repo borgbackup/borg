@@ -4,7 +4,7 @@ import os
 import socket
 import time
 
-from borg.helpers import Error
+from borg.helpers import Error, ErrorWithTraceback
 
 ADD, REMOVE = 'add', 'remove'
 SHARED, EXCLUSIVE = 'shared', 'exclusive'
@@ -76,7 +76,7 @@ class TimeoutTimer:
 
 class ExclusiveLock:
     """An exclusive Lock based on mkdir fs operation being atomic"""
-    class LockError(Error):
+    class LockError(ErrorWithTraceback):
         """Failed to acquire the lock {}."""
 
     class LockTimeout(LockError):
@@ -85,7 +85,7 @@ class ExclusiveLock:
     class LockFailed(LockError):
         """Failed to create/acquire the lock {} ({})."""
 
-    class UnlockError(Error):
+    class UnlockError(ErrorWithTraceback):
         """Failed to release the lock {}."""
 
     class NotLocked(UnlockError):
@@ -215,10 +215,10 @@ class UpgradableLock:
     noone is allowed reading) and read access to a resource needs a shared
     lock (multiple readers are allowed).
     """
-    class SharedLockFailed(Error):
+    class SharedLockFailed(ErrorWithTraceback):
         """Failed to acquire shared lock [{}]"""
 
-    class ExclusiveLockFailed(Error):
+    class ExclusiveLockFailed(ErrorWithTraceback):
         """Failed to acquire write lock [{}]"""
 
     def __init__(self, path, exclusive=False, sleep=None, id=None):

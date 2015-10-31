@@ -1062,7 +1062,9 @@ def main():  # pragma: no cover
         msg = None
         exit_code = archiver.run(sys.argv[1:])
     except Error as e:
-        msg = e.get_message() + "\n%s" % traceback.format_exc()
+        msg = e.get_message()
+        if e.traceback:
+            msg += "\n%s" % traceback.format_exc()
         exit_code = e.exit_code
     except RemoteRepository.RPCError as e:
         msg = 'Remote Exception.\n%s' % str(e)

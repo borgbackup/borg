@@ -100,17 +100,17 @@ Backup compression
 Default is no compression, but we support different methods with high speed
 or high compression:
 
-If you have a quick repo storage and you want a little compression:
+If you have a quick repo storage and you want a little compression: ::
 
     $ borg create --compression lz4 /mnt/backup::repo ~
 
 If you have a medium fast repo storage and you want a bit more compression (N=0..9,
-0 means no compression, 9 means high compression):
+0 means no compression, 9 means high compression): ::
 
     $ borg create --compression zlib,N /mnt/backup::repo ~
 
 If you have a very slow repo storage and you want high compression (N=0..9, 0 means
-low compression, 9 means high compression):
+low compression, 9 means high compression): ::
 
     $ borg create --compression lzma,N /mnt/backup::repo ~
 
@@ -150,7 +150,11 @@ by providing the correct passphrase.
 For automated backups the passphrase can be specified using the
 `BORG_PASSPHRASE` environment variable.
 
-**The repository data is totally inaccessible without the key:**
+.. note:: Be careful about how you set that environment, see
+          :ref:`this note about password environments <password_env>`
+          for more information.
+
+.. important:: The repository data is totally inaccessible without the key:**
     Make a backup copy of the key file (``keyfile`` mode) or repo config
     file (``repokey`` mode) and keep it at a safe place, so you still have
     the key in case it gets corrupted or lost.

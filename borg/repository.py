@@ -2,14 +2,18 @@ from configparser import RawConfigParser
 from binascii import hexlify
 from itertools import islice
 import errno
+import logging
+logger = logging.getLogger(__name__)
+
 import os
 import shutil
 import struct
 import sys
 from zlib import crc32
 
-from .hashindex import NSIndex
-from .helpers import Error, IntegrityError, read_msgpack, write_msgpack, unhexlify
+from .helpers import Error, IntegrityError, read_msgpack, write_msgpack, unhexlify, have_cython
+if have_cython():
+    from .hashindex import NSIndex
 from .locking import UpgradableLock
 from .lrucache import LRUCache
 
@@ -278,7 +282,7 @@ class Repository:
         def report_error(msg):
             nonlocal error_found
             error_found = True
-            print(msg, file=sys.stderr)
+            logger.error(msg)
 
         assert not self._active_txn
         try:
@@ -546,11 +550,10 @@ class LoggedIO:
     def recover_segment(self, segment, filename):
         if segment in self.fds:
             del self.fds[segment]
-        # FIXME: save a copy of the original file
         with open(filename, 'rb') as fd:
             data = memoryview(fd.read())
         os.rename(filename, filename + '.beforerecover')
-        print('attempting to recover ' + filename, file=sys.stderr)
+        logger.info('attempting to recover ' + filename)
         with open(filename, 'wb') as fd:
             fd.write(MAGIC)
             while len(data) >= self.header_fmt.size:

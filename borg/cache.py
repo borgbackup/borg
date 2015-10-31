@@ -1,7 +1,7 @@
 import configparser
 from .remote import cache_if_remote
+from collections import namedtuple
 import errno
-import msgpack
 import os
 import stat
 import sys
@@ -12,10 +12,15 @@ import tarfile
 import tempfile
 
 from .key import PlaintextKey
+from .logger import create_logger
+logger = create_logger()
 from .helpers import Error, get_cache_dir, decode_dict, st_mtime_ns, unhexlify, int_to_bigint, \
-    bigint_to_int
+    bigint_to_int, format_file_size, have_cython
 from .locking import UpgradableLock
 from .hashindex import ChunkIndex
+
+if have_cython():
+    import msgpack
 
 
 class Cache:
@@ -47,6 +52,7 @@ class Cache:
         self.manifest = manifest
         self.path = path or os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
         self.do_files = do_files
+        logger.info('initializing cache')
         # Warn user before sending data to a never seen before unencrypted repository
         if not os.path.exists(self.path):
             if warn_if_unencrypted and isinstance(key, PlaintextKey):
@@ -68,16 +74,33 @@ class Cache:
             # Make sure an encrypted repository has not been swapped for an unencrypted repository
             if self.key_type is not None and self.key_type != str(key.TYPE):
                 raise self.EncryptionMethodMismatch()
+            logger.info('synchronizing cache')
             self.sync()
             self.commit()
 
     def __del__(self):
         self.close()
 
+    def __str__(self):
+        fmt = """\
+All archives:   {0.total_size:>20s} {0.total_csize:>20s} {0.unique_csize:>20s}
+
+                       Unique chunks         Total chunks
+Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
+        return fmt.format(self.format_tuple())
+
+    def format_tuple(self):
+        # XXX: this should really be moved down to `hashindex.pyx`
+        Summary = namedtuple('Summary', ['total_size', 'total_csize', 'unique_size', 'unique_csize', 'total_unique_chunks', 'total_chunks'])
+        stats = Summary(*self.chunks.summarize())._asdict()
+        for field in ['total_size', 'total_csize', 'unique_csize']:
+            stats[field] = format_file_size(stats[field])
+        return Summary(**stats)
+
     def _confirm(self, message, env_var_override=None):
         print(message, file=sys.stderr)
         if env_var_override and os.environ.get(env_var_override):
-            print("Yes (From {})".format(env_var_override))
+            print("Yes (From {})".format(env_var_override), file=sys.stderr)
             return True
         if not sys.stdin.isatty():
             return False
@@ -146,6 +169,7 @@ class Cache:
     def _read_files(self):
         self.files = {}
         self._newest_mtime = 0
+        logger.info('reading files cache')
         with open(os.path.join(self.path, 'files'), 'rb') as fd:
             u = msgpack.Unpacker(use_list=True)
             while True:
@@ -267,7 +291,7 @@ class Cache:
                 unpacker.feed(data)
                 for item in unpacker:
                     if not isinstance(item, dict):
-                        print('Error: Did not get expected metadata dict - archive corrupted!')
+                        logger.error('Error: Did not get expected metadata dict - archive corrupted!')
                         continue
                     if b'chunks' in item:
                         for chunk_id, size, csize in item[b'chunks']:
@@ -289,10 +313,10 @@ class Cache:
                     return name
 
         def create_master_idx(chunk_idx):
-            print('Synchronizing chunks cache...')
+            logger.info('Synchronizing chunks cache...')
             cached_ids = cached_archives()
             archive_ids = repo_archives()
-            print('Archives: %d, w/ cached Idx: %d, w/ outdated Idx: %d, w/o cached Idx: %d.' % (
+            logger.info('Archives: %d, w/ cached Idx: %d, w/ outdated Idx: %d, w/o cached Idx: %d.' % (
                 len(archive_ids), len(cached_ids),
                 len(cached_ids - archive_ids), len(archive_ids - cached_ids), ))
             # deallocates old hashindex, creates empty hashindex:
@@ -304,12 +328,12 @@ class Cache:
                     archive_name = lookup_name(archive_id)
                     if archive_id in cached_ids:
                         archive_chunk_idx_path = mkpath(archive_id)
-                        print("Reading cached archive chunk index for %s ..." % archive_name)
+                        logger.info("Reading cached archive chunk index for %s ..." % archive_name)
                         archive_chunk_idx = ChunkIndex.read(archive_chunk_idx_path)
                     else:
-                        print('Fetching and building archive index for %s ...' % archive_name)
+                        logger.info('Fetching and building archive index for %s ...' % archive_name)
                         archive_chunk_idx = fetch_and_build_idx(archive_id, repository, self.key)
-                    print("Merging into master chunks index ...")
+                    logger.info("Merging into master chunks index ...")
                     if chunk_idx is None:
                         # we just use the first archive's idx as starting point,
                         # to avoid growing the hash table from 0 size and also
@@ -317,7 +341,7 @@ class Cache:
                         chunk_idx = archive_chunk_idx
                     else:
                         chunk_idx.merge(archive_chunk_idx)
-            print('Done.')
+            logger.info('Done.')
             return chunk_idx
 
         def legacy_cleanup():

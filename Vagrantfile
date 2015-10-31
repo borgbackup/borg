@@ -22,6 +22,7 @@ def packages_debianoid
     apt-get update
     # for building borgbackup and dependencies:
     apt-get install -y libssl-dev libacl1-dev liblz4-dev libfuse-dev fuse pkg-config
+    usermod -a -G fuse vagrant
     apt-get install -y fakeroot build-essential git
     apt-get install -y python3-dev python3-setuptools
     # for building python:
@@ -137,7 +138,7 @@ end
 def install_pyenv(boxname)
   return <<-EOF
     curl -s -L https://raw.githubusercontent.com/yyuu/pyenv-installer/master/bin/pyenv-installer | bash
-    echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> ~/.bash_profile
+    echo 'export PATH="$HOME/.pyenv/bin:/vagrant/borg:$PATH"' >> ~/.bash_profile
     echo 'eval "$(pyenv init -)"' >> ~/.bash_profile
     echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bash_profile
     echo 'export PYTHON_CONFIGURE_OPTS="--enable-shared"' >> ~/.bash_profile
@@ -232,7 +233,7 @@ def build_binary_with_pyinstaller(boxname)
     cd /vagrant/borg
     . borg-env/bin/activate
     cd borg
-    pyinstaller -F -n borg --hidden-import=logging.config borg/__main__.py
+    pyinstaller -F -n borg.exe --distpath=/vagrant/borg --clean --hidden-import=logging.config borg/__main__.py
   EOF
 end
 
@@ -247,8 +248,10 @@ def run_tests(boxname)
     fi
     # otherwise: just use the system python
     if which fakeroot > /dev/null; then
+      echo "Running tox WITH fakeroot -u"
       fakeroot -u tox --skip-missing-interpreters
     else
+      echo "Running tox WITHOUT fakeroot -u"
       tox --skip-missing-interpreters
     fi
   EOF

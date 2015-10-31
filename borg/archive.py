@@ -1,11 +1,16 @@
+from binascii import hexlify
 from datetime import datetime
 from getpass import getuser
 from itertools import groupby
 import errno
 import threading
+import logging
+
+from .logger import create_logger
+logger = create_logger()
+
 from .key import key_factory
 from .remote import cache_if_remote
-import msgpack
 from multiprocessing import cpu_count
 import os
 import socket
@@ -14,12 +19,17 @@ import sys
 import time
 from io import BytesIO
 from . import xattr
-from .platform import acl_get, acl_set
-from .chunker import Chunker
-from .hashindex import ChunkIndex
-from .helpers import parse_timestamp, Error, uid2user, user2uid, gid2group, group2gid, \
-    Manifest, Statistics, decode_dict, st_mtime_ns, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
-    make_queue, TerminatedQueue
+from .helpers import parse_timestamp, Error, uid2user, user2uid, gid2group, group2gid, format_timedelta, \
+    Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, have_cython, \
+    st_atime_ns, st_ctime_ns, st_mtime_ns, make_queue, TerminatedQueue
+if have_cython():
+    from .platform import acl_get, acl_set
+    from .chunker import Chunker
+    from .hashindex import ChunkIndex
+    import msgpack
+else:
+    import mock
+    msgpack = mock.Mock()
 
 ITEMS_BUFFER = 1024 * 1024
 
@@ -317,7 +327,8 @@ class Archive:
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False, progress=False,
-                 chunker_params=CHUNKER_PARAMS):
+                 chunker_params=CHUNKER_PARAMS,
+                 start=datetime.now(), end=datetime.now()):
         self.cwd = os.getcwd()
         self.key = key
         self.repository = repository
@@ -330,6 +341,8 @@ class Archive:
         self.name = name
         self.checkpoint_interval = checkpoint_interval
         self.numeric_owner = numeric_owner
+        self.start = start
+        self.end = end
         self.pipeline = DownloadPipeline(self.repository, self.key)
         if create:
             self.pp = ParallelProcessor(self)
@@ -374,6 +387,22 @@ class Archive:
     def ts(self):
         """Timestamp of archive creation in UTC"""
         return parse_timestamp(self.metadata[b'time'])
+
+    @property
+    def fpr(self):
+        return hexlify(self.id).decode('ascii')
+
+    @property
+    def duration(self):
+        return format_timedelta(self.end-self.start)
+
+    def __str__(self):
+        return '''Archive name: {0.name}
+Archive fingerprint: {0.fpr}
+Start time: {0.start:%c}
+End time: {0.end:%c}
+Duration: {0.duration}
+Number of files: {0.stats.nfiles}'''.format(self)
 
     def __repr__(self):
         return 'Archive(%r)' % self.name
@@ -565,12 +594,17 @@ class Archive:
         elif has_lchmod:  # Not available on Linux
             os.lchmod(path, item[b'mode'])
         mtime = bigint_to_int(item[b'mtime'])
+        if b'atime' in item:
+            atime = bigint_to_int(item[b'atime'])
+        else:
+            # old archives only had mtime in item metadata
+            atime = mtime
         if fd and utime_supports_fd:  # Python >= 3.3
-            os.utime(fd, None, ns=(mtime, mtime))
+            os.utime(fd, None, ns=(atime, mtime))
         elif utime_supports_follow_symlinks:  # Python >= 3.3
-            os.utime(path, None, ns=(mtime, mtime), follow_symlinks=False)
+            os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
         elif not symlink:
-            os.utime(path, (mtime / 1e9, mtime / 1e9))
+            os.utime(path, (atime / 1e9, mtime / 1e9))
         acl_set(path, item, self.numeric_owner)
         # Only available on OS X and FreeBSD
         if has_lchflags and b'bsdflags' in item:
@@ -609,7 +643,9 @@ class Archive:
             b'mode': st.st_mode,
             b'uid': st.st_uid, b'user': uid2user(st.st_uid),
             b'gid': st.st_gid, b'group': gid2group(st.st_gid),
-            b'mtime': int_to_bigint(st_mtime_ns(st))
+            b'atime': int_to_bigint(st_atime_ns(st)),
+            b'ctime': int_to_bigint(st_ctime_ns(st)),
+            b'mtime': int_to_bigint(st_mtime_ns(st)),
         }
         if self.numeric_owner:
             item[b'user'] = item[b'group'] = None
@@ -677,7 +713,10 @@ class Archive:
             else:
                 self.hard_links[st.st_ino, st.st_dev] = safe_path
         path_hash = self.key.id_hash(os.path.join(self.cwd, path).encode('utf-8', 'surrogateescape'))
+        first_run = not cache.files
         ids = cache.file_known_and_unchanged(path_hash, st)
+        if first_run:
+            logger.info('processing files')
         chunks = None
         if ids is not None:
             # Make sure all ids are available
@@ -713,7 +752,7 @@ class Archive:
     @staticmethod
     def _open_rb(path, st):
         flags_normal = os.O_RDONLY | getattr(os, 'O_BINARY', 0)
-        flags_noatime = flags_normal | getattr(os, 'NO_ATIME', 0)
+        flags_noatime = flags_normal | getattr(os, 'O_NOATIME', 0)
         euid = None
 
         def open_simple(p, s):
@@ -833,7 +872,7 @@ class ArchiveChecker:
         self.orphan_chunks_check()
         self.finish()
         if not self.error_found:
-            self.report_progress('Archive consistency check complete, no problems found.')
+            logger.info('Archive consistency check complete, no problems found.')
         return self.repair or not self.error_found
 
     def init_chunks(self):
@@ -855,7 +894,7 @@ class ArchiveChecker:
     def report_progress(self, msg, error=False):
         if error:
             self.error_found = True
-        print(msg, file=sys.stderr if error else sys.stdout)
+        logger.log(logging.ERROR if error else logging.WARNING, msg)
 
     def identify_key(self, repository):
         cdata = repository.get(next(self.chunks.iteritems())[0])
@@ -982,7 +1021,7 @@ class ArchiveChecker:
             num_archives = 1
             end = 1
         for i, (name, info) in enumerate(archive_items[:end]):
-            self.report_progress('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
+            logger.info('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
             archive_id = info[b'id']
             if archive_id not in self.chunks:
                 self.report_progress('Archive metadata block is missing', error=True)
@@ -994,7 +1033,8 @@ class ArchiveChecker:
             archive = StableDict(msgpack.unpackb(data))
             if archive[b'version'] != 1:
                 raise Exception('Unknown archive metadata version')
-            decode_dict(archive, (b'name', b'hostname', b'username', b'time'))  # fixme: argv
+            decode_dict(archive, (b'name', b'hostname', b'username', b'time'))
+            archive[b'cmdline'] = [arg.decode('utf-8', 'surrogateescape') for arg in archive[b'cmdline']]
             items_buffer = ChunkBuffer(self.key)
             items_buffer.write_chunk = add_callback
             for item in robust_iterator(archive):

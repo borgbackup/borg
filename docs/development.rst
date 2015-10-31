@@ -9,6 +9,15 @@ This chapter will get you started with |project_name|' development.
 |project_name| is written in Python (with a little bit of Cython and C for
 the performance critical parts).
 
+Style guide
+-----------
+
+We generally follow `pep8
+<https://www.python.org/dev/peps/pep-0008/>`_, with 120 columns
+instead of 79. We do *not* use form-feed (``^L``) characters to
+separate sections either. The `flake8
+<https://flake8.readthedocs.org/>`_ commandline tool should be used to
+check for style errors before sending pull requests.
 
 Building a development environment
 ----------------------------------
@@ -68,6 +77,9 @@ Now run::
 
 Then point a web browser at docs/_build/html/index.html.
 
+The website is updated automatically through Github web hooks on the
+main repository.
+
 Using Vagrant
 -------------
 
@@ -91,49 +103,54 @@ Usage::
      vagrant scp OS:/vagrant/borg/borg/dist/borg .
 
 
-Creating a new release
-----------------------
-
-Checklist::
-
-- all issues for this milestone closed?
-- any low hanging fruit left on the issue tracker?
-- run tox on all supported platforms via vagrant, check for test fails.
-- is Travis CI happy also?
-- update CHANGES.rst (compare to git log). check version number of upcoming release.
-- check MANIFEST.in and setup.py - are they complete?
-- tag the release::
-
-  git tag -s -m "tagged release" 0.26.0
-
-- cd docs ; make html  # to update the usage include files
-- update website with the html
-- create a release on PyPi::
-
-    python setup.py register sdist upload --identity="Thomas Waldmann" --sign
-
-- close release milestone.
-- announce on::
-
-  - mailing list
-  - Twitter
-  - IRC channel (topic)
-
-- create standalone binaries and link them from issue tracker: https://github.com/borgbackup/borg/issues/214
-
-
 Creating standalone binaries
 ----------------------------
 
 Make sure you have everything built and installed (including llfuse and fuse).
+When using the Vagrant VMs, pyinstaller will already be installed.
 
 With virtual env activated::
 
   pip install pyinstaller>=3.0  # or git checkout master
   pyinstaller -F -n borg-PLATFORM --hidden-import=logging.config borg/__main__.py
-  ls -l dist/*
+  for file in dist/borg-*; do gpg --armor --detach-sign $file; done
 
 If you encounter issues, see also our `Vagrantfile` for details.
 
-Note: Standalone binaries built with pyinstaller are supposed to work on same OS,
-      same architecture (x86 32bit, amd64 64bit) without external dependencies.
+.. note:: Standalone binaries built with pyinstaller are supposed to
+          work on same OS, same architecture (x86 32bit, amd64 64bit)
+          without external dependencies.
+
+
+Creating a new release
+----------------------
+
+Checklist:
+
+- make sure all issues for this milestone are closed or moved to the
+  next milestone
+- find and fix any low hanging fruit left on the issue tracker
+- run tox on all supported platforms via vagrant, check for test failures
+- check that Travis CI is also happy
+- update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``
+- check version number of upcoming release in ``CHANGES.rst``
+- verify that ``MANIFEST.in`` and ``setup.py`` are complete
+- tag the release::
+
+    git tag -s -m "tagged/signed release X.Y.Z" X.Y.Z
+
+- build fresh docs and update the web site with them
+- create a release on PyPi::
+
+    python setup.py register sdist upload --identity="Thomas Waldmann" --sign
+
+- close release milestone on Github
+- announce on:
+
+ - `mailing list <mailto:borgbackup@librelist.org>`_
+ - Twitter (follow @ThomasJWaldmann for these tweets)
+ - `IRC channel <irc://irc.freenode.net/borgbackup>`_ (change ``/topic``)
+
+- create a Github release, include:
+  * standalone binaries (see above for how to create them)
+  * a link to ``CHANGES.rst``

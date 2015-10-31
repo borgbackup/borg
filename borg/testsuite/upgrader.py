@@ -1,6 +1,4 @@
 import os
-import shutil
-import tempfile
 
 import pytest
 
@@ -14,10 +12,8 @@ except ImportError:
 from ..upgrader import AtticRepositoryUpgrader, AtticKeyfileKey
 from ..helpers import get_keys_dir
 from ..key import KeyfileKey
-from ..repository import Repository, MAGIC
-
-pytestmark = pytest.mark.skipif(attic is None,
-                                reason='cannot find an attic install')
+from ..remote import RemoteRepository
+from ..repository import Repository
 
 
 def repo_valid(path):
@@ -64,7 +60,13 @@ def attic_repo(tmpdir):
     return attic_repo
 
 
-def test_convert_segments(tmpdir, attic_repo):
+@pytest.fixture(params=[True, False])
+def inplace(request):
+    return request.param
+
+
+@pytest.mark.skipif(attic is None, reason='cannot find an attic install')
+def test_convert_segments(tmpdir, attic_repo, inplace):
     """test segment conversion
 
     this will load the given attic repository, list all the segments
@@ -77,11 +79,10 @@ def test_convert_segments(tmpdir, attic_repo):
     """
     # check should fail because of magic number
     assert not repo_valid(tmpdir)
-    print("opening attic repository with borg and converting")
     repo = AtticRepositoryUpgrader(str(tmpdir), create=False)
     segments = [filename for i, filename in repo.io.segment_iterator()]
     repo.close()
-    repo.convert_segments(segments, dryrun=False)
+    repo.convert_segments(segments, dryrun=False, inplace=inplace)
     repo.convert_cache(dryrun=False)
     assert repo_valid(tmpdir)
 
@@ -124,6 +125,7 @@ def attic_key_file(attic_repo, tmpdir):
                                        MockArgs(keys_dir))
 
 
+@pytest.mark.skipif(attic is None, reason='cannot find an attic install')
 def test_keys(tmpdir, attic_repo, attic_key_file):
     """test key conversion
 
@@ -142,7 +144,8 @@ def test_keys(tmpdir, attic_repo, attic_key_file):
     assert key_valid(attic_key_file.path)
 
 
-def test_convert_all(tmpdir, attic_repo, attic_key_file):
+@pytest.mark.skipif(attic is None, reason='cannot find an attic install')
+def test_convert_all(tmpdir, attic_repo, attic_key_file, inplace):
     """test all conversion steps
 
     this runs everything. mostly redundant test, since everything is
@@ -156,8 +159,50 @@ def test_convert_all(tmpdir, attic_repo, attic_key_file):
     """
     # check should fail because of magic number
     assert not repo_valid(tmpdir)
-    print("opening attic repository with borg and converting")
+
+    def stat_segment(path):
+        return os.stat(os.path.join(path, 'data', '0', '0'))
+
+    def first_inode(path):
+        return stat_segment(path).st_ino
+
+    orig_inode = first_inode(attic_repo.path)
     repo = AtticRepositoryUpgrader(str(tmpdir), create=False)
-    repo.upgrade(dryrun=False)
+    # replicate command dispatch, partly
+    os.umask(RemoteRepository.umask)
+    backup = repo.upgrade(dryrun=False, inplace=inplace)
+    if inplace:
+        assert backup is None
+        assert first_inode(repo.path) == orig_inode
+    else:
+        assert backup
+        assert first_inode(repo.path) != first_inode(backup)
+        # i have seen cases where the copied tree has world-readable
+        # permissions, which is wrong
+        assert stat_segment(backup).st_mode & 0o007 == 0
+
     assert key_valid(attic_key_file.path)
     assert repo_valid(tmpdir)
+
+
+def test_hardlink(tmpdir, inplace):
+    """test that we handle hard links properly
+
+    that is, if we are in "inplace" mode, hardlinks should *not*
+    change (ie. we write to the file directly, so we do not rewrite the
+    whole file, and we do not re-create the file).
+
+    if we are *not* in inplace mode, then the inode should change, as
+    we are supposed to leave the original inode alone."""
+    a = str(tmpdir.join('a'))
+    with open(a, 'wb') as tmp:
+        tmp.write(b'aXXX')
+    b = str(tmpdir.join('b'))
+    os.link(a, b)
+    AtticRepositoryUpgrader.header_replace(b, b'a', b'b', inplace=inplace)
+    if not inplace:
+        assert os.stat(a).st_ino != os.stat(b).st_ino
+    else:
+        assert os.stat(a).st_ino == os.stat(b).st_ino
+    with open(b, 'rb') as tmp:
+        assert tmp.read() == b'bXXX'

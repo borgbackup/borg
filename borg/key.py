@@ -2,14 +2,18 @@ from binascii import hexlify, a2b_base64, b2a_base64
 import configparser
 import getpass
 import os
-import msgpack
 import textwrap
 import hmac
 from hashlib import sha256
 
-from .crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
-from .compress import Compressor, COMPR_BUFFER
-from .helpers import IntegrityError, get_keys_dir, Error
+from .helpers import IntegrityError, get_keys_dir, Error, have_cython
+from .logger import create_logger
+logger = create_logger()
+
+if have_cython():
+    from .crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
+    from .compress import Compressor, COMPR_BUFFER
+    import msgpack
 
 PREFIX = b'\0' * 8
 
@@ -88,7 +92,7 @@ class PlaintextKey(KeyBase):
 
     @classmethod
     def create(cls, repository, args):
-        print('Encryption NOT enabled.\nUse the "--encryption=repokey|keyfile|passphrase" to enable encryption.')
+        logger.info('Encryption NOT enabled.\nUse the "--encryption=repokey|keyfile|passphrase" to enable encryption.')
         return cls(repository)
 
     @classmethod
@@ -190,12 +194,12 @@ class Passphrase(str):
             if allow_empty or passphrase:
                 passphrase2 = cls.getpass('Enter same passphrase again: ')
                 if passphrase == passphrase2:
-                    print('Remember your passphrase. Your data will be inaccessible without it.')
+                    logger.info('Remember your passphrase. Your data will be inaccessible without it.')
                     return passphrase
                 else:
-                    print('Passphrases do not match')
+                    print('Passphrases do not match', file=sys.stderr)
             else:
-                print('Passphrase must not be blank')
+                print('Passphrase must not be blank', file=sys.stderr)
 
     def __repr__(self):
         return '<Passphrase "***hidden***">'
@@ -215,8 +219,8 @@ class PassphraseKey(AESKeyBase):
     @classmethod
     def create(cls, repository, args):
         key = cls(repository)
-        print('WARNING: "passphrase" mode is deprecated and will be removed in 1.0.')
-        print('If you want something similar (but with less issues), use "repokey" mode.')
+        logger.warning('WARNING: "passphrase" mode is deprecated and will be removed in 1.0.')
+        logger.warning('If you want something similar (but with less issues), use "repokey" mode.')
         passphrase = Passphrase.new(allow_empty=False)
         key.init(repository, passphrase)
         return key
@@ -324,7 +328,7 @@ class KeyfileKeyBase(AESKeyBase):
     def change_passphrase(self):
         passphrase = Passphrase.new(allow_empty=True)
         self.save(self.target, passphrase)
-        print('Key updated')
+        logger.info('Key updated')
 
     @classmethod
     def create(cls, repository, args):
@@ -335,8 +339,8 @@ class KeyfileKeyBase(AESKeyBase):
         key.init_ciphers()
         target = key.get_new_target(args)
         key.save(target, passphrase)
-        print('Key in "%s" created.' % target)
-        print('Keep this key safe. Your data will be inaccessible without it.')
+        logger.info('Key in "%s" created.' % target)
+        logger.info('Keep this key safe. Your data will be inaccessible without it.')
         return key
 
     def save(self, target, passphrase):

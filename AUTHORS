@@ -1,9 +1,13 @@
-Borg Developers / Contributors ("The Borg Collective")
-``````````````````````````````````````````````````````
+Contributors ("The Borg Collective")
+====================================
+
 - Thomas Waldmann <tw@waldmann-edv.de>
-- Antoine Beaupré
+- Antoine Beaupré <anarcat@debian.org>
 - Radek Podgorny <radek@podgorny.cz>
 - Yuri D'Elia
+
+Attic authors
+-------------
 
 Borg is a fork of Attic. Attic is written and maintained
 by Jonas Borgström and various contributors:

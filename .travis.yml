@@ -17,6 +17,9 @@ matrix:
         - python: 3.4
           os: linux
           env: TOXENV=py34
+        - python: 3.5
+          os: linux
+          env: TOXENV=py35
         - language: generic
           os: osx
           osx_image: xcode6.4
@@ -29,6 +32,10 @@ matrix:
           os: osx
           osx_image: xcode6.4
           env: TOXENV=py34
+        - language: generic
+          os: osx
+          osx_image: xcode6.4
+          env: TOXENV=py35
 
 install:
     - ./.travis/install.sh

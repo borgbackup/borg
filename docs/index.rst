@@ -4,10 +4,11 @@
 Borg Documentation
 ==================
 
+.. include:: ../README.rst
+
 .. toctree::
    :maxdepth: 2
 
-   intro
    installation
    quickstart
    usage
@@ -16,4 +17,4 @@ Borg Documentation
    changes
    internals
    development
-   api
+   authors

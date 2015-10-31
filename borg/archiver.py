@@ -15,17 +15,21 @@ import textwrap
 import traceback
 
 from . import __version__
-from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
-from .compress import Compressor, COMPR_BUFFER
-from .upgrader import AtticRepositoryUpgrader
-from .repository import Repository
-from .cache import Cache
-from .key import key_creator
 from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    is_cachedir, bigint_to_int, ChunkerParams, CompressionSpec
+    is_cachedir, bigint_to_int, ChunkerParams, CompressionSpec, have_cython, \
+    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
+from .logger import create_logger, setup_logging
+logger = create_logger()
+if have_cython():
+    from .compress import Compressor, COMPR_BUFFER
+    from .upgrader import AtticRepositoryUpgrader
+    from .repository import Repository
+    from .cache import Cache
+    from .key import key_creator
+from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
 from .remote import RepositoryServer, RemoteRepository
 
 has_lchflags = hasattr(os, 'lchflags')
@@ -33,8 +37,9 @@ has_lchflags = hasattr(os, 'lchflags')
 
 class Archiver:
 
-    def __init__(self):
-        self.exit_code = 0
+    def __init__(self, verbose=False):
+        self.exit_code = EXIT_SUCCESS
+        self.verbose = verbose
 
     def open_repository(self, location, create=False, exclusive=False):
         if location.proto == 'ssh':
@@ -46,16 +51,21 @@ class Archiver:
 
     def print_error(self, msg, *args):
         msg = args and msg % args or msg
-        self.exit_code = 1
-        print('borg: ' + msg, file=sys.stderr)
+        self.exit_code = EXIT_ERROR
+        logger.error(msg)
 
-    def print_verbose(self, msg, *args, **kw):
+    def print_warning(self, msg, *args):
+        msg = args and msg % args or msg
+        self.exit_code = EXIT_WARNING  # we do not terminate here, so it is a warning
+        logger.warning(msg)
+
+    def print_info(self, msg, *args):
         if self.verbose:
             msg = args and msg % args or msg
-            if kw.get('newline', True):
-                print(msg)
-            else:
-                print(msg, end=' ')
+            logger.info(msg)
+
+    def print_status(self, status, path):
+        self.print_info("%1s %s", status, remove_surrogates(path))
 
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
@@ -64,7 +74,7 @@ class Archiver:
 
     def do_init(self, args):
         """Initialize an empty repository"""
-        print('Initializing repository at "%s"' % args.repository.orig)
+        logger.info('Initializing repository at "%s"' % args.repository.orig)
         repository = self.open_repository(args.repository, create=True, exclusive=True)
         key = key_creator(repository, args)
         manifest = Manifest(key, repository)
@@ -79,29 +89,29 @@ class Archiver:
         repository = self.open_repository(args.repository, exclusive=args.repair)
         if args.repair:
             while not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
-                self.print_error("""Warning: 'check --repair' is an experimental feature that might result
+                self.print_warning("""'check --repair' is an experimental feature that might result
 in data loss.
 
 Type "Yes I am sure" if you understand this and want to continue.\n""")
                 if input('Do you want to continue? ') == 'Yes I am sure':
                     break
         if not args.archives_only:
-            print('Starting repository check...')
+            logger.info('Starting repository check...')
             if repository.check(repair=args.repair):
-                print('Repository check complete, no problems found.')
+                logger.info('Repository check complete, no problems found.')
             else:
-                return 1
+                return EXIT_WARNING
         if not args.repo_only and not ArchiveChecker().check(
                 repository, repair=args.repair, archive=args.repository.archive, last=args.last):
-            return 1
-        return 0
+            return EXIT_WARNING
+        return EXIT_SUCCESS
 
     def do_change_passphrase(self, args):
         """Change repository key file passphrase"""
         repository = self.open_repository(args.repository)
         manifest, key = Manifest.load(repository)
         key.change_passphrase()
-        return 0
+        return EXIT_SUCCESS
 
     def do_create(self, args):
         """Create new archive"""
@@ -117,7 +127,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
                               create=True, checkpoint_interval=args.checkpoint_interval,
                               numeric_owner=args.numeric_owner, progress=args.progress,
-                              chunker_params=args.chunker_params)
+                              chunker_params=args.chunker_params, start=t0)
         else:
             archive = cache = None
         try:
@@ -142,17 +152,18 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                         try:
                             status = archive.process_stdin(path, cache)
                         except IOError as e:
-                            self.print_error('%s: %s', path, e)
+                            status = 'E'
+                            self.print_warning('%s: %s', path, e)
                     else:
                         status = '-'
-                    self.print_verbose("%1s %s", status, path)
+                    self.print_status(status, path)
                     continue
                 path = os.path.normpath(path)
-                if args.dontcross:
+                if args.one_file_system:
                     try:
                         restrict_dev = os.lstat(path).st_dev
                     except OSError as e:
-                        self.print_error('%s: %s', path, e)
+                        self.print_warning('%s: %s', path, e)
                         continue
                 else:
                     restrict_dev = None
@@ -163,16 +174,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 if args.stats:
-                    t = datetime.now()
-                    diff = t - t0
+                    archive.end = datetime.now()
                     print('-' * 78)
-                    print('Archive name: %s' % args.archive.archive)
-                    print('Archive fingerprint: %s' % hexlify(archive.id).decode('ascii'))
-                    print('Start time: %s' % t0.strftime('%c'))
-                    print('End time: %s' % t.strftime('%c'))
-                    print('Duration: %s' % format_timedelta(diff))
-                    print('Number of files: %d' % archive.stats.nfiles)
-                    archive.stats.print_('This archive:', cache)
+                    print(str(archive))
+                    print()
+                    print(str(archive.stats))
+                    print(str(cache))
                     print('-' * 78)
         finally:
             if not dry_run:
@@ -186,7 +193,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         try:
             st = os.lstat(path)
         except OSError as e:
-            self.print_error('%s: %s', path, e)
+            self.print_warning('%s: %s', path, e)
             return
         if (st.st_ino, st.st_dev) in skip_inodes:
             return
@@ -203,7 +210,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 try:
                     status = archive.process_file(path, st, cache)
                 except IOError as e:
-                    self.print_error('%s: %s', path, e)
+                    status = 'E'
+                    self.print_warning('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
             if exclude_caches and is_cachedir(path):
                 return
@@ -212,7 +220,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             try:
                 entries = os.listdir(path)
             except OSError as e:
-                self.print_error('%s: %s', path, e)
+                status = 'E'
+                self.print_warning('%s: %s', path, e)
             else:
                 for filename in sorted(entries):
                     entry_path = os.path.normpath(os.path.join(path, filename))
@@ -232,7 +241,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             # Ignore unix sockets
             return
         else:
-            self.print_error('Unknown file type: %s', path)
+            self.print_warning('Unknown file type: %s', path)
             return
         # Status output
         # A lowercase character means a file type other than a regular file,
@@ -249,13 +258,13 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 status = '-'  # dry run, item was not backed up
         # output ALL the stuff - it can be easily filtered using grep.
         # even stuff considered unchanged might be interesting.
-        self.print_verbose("%1s %s", status, remove_surrogates(path))
+        self.print_status(status, path)
 
     def do_extract(self, args):
         """Extract archive contents"""
         # be restrictive when restoring files, restore permissions later
         if sys.getfilesystemencoding() == 'ascii':
-            print('Warning: File system encoding is "ascii", extracting non-ascii filenames will not be supported.')
+            logger.warning('Warning: File system encoding is "ascii", extracting non-ascii filenames will not be supported.')
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
         archive = Archive(repository, key, manifest, args.archive.archive,
@@ -272,7 +281,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 item[b'path'] = os.sep.join(orig_path.split(os.sep)[strip_components:])
                 if not item[b'path']:
                     continue
-            self.print_verbose(remove_surrogates(orig_path))
+            self.print_info(remove_surrogates(orig_path))
             try:
                 if dry_run:
                     archive.extract_item(item, dry_run=True)
@@ -283,7 +292,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     else:
                         archive.extract_item(item, stdout=stdout, sparse=sparse)
             except IOError as e:
-                self.print_error('%s: %s', remove_surrogates(orig_path), e)
+                self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 
         if not args.dry_run:
             # need to set each directory's timestamps AFTER all files in it are
@@ -293,7 +302,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 archive.extract_item(dirs.pop(-1))
         for pattern in (patterns or []):
             if isinstance(pattern, IncludePattern) and  pattern.match_count == 0:
-                self.print_error("Warning: Include pattern '%s' never matched.", pattern)
+                self.print_warning("Include pattern '%s' never matched.", pattern)
         return self.exit_code
 
     def do_rename(self, args):
@@ -321,21 +330,23 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             repository.commit()
             cache.commit()
             if args.stats:
-                stats.print_('Deleted data:', cache)
+                logger.info(stats.summary.format(label='Deleted data:', stats=stats))
+                logger.info(str(cache))
         else:
             if not args.cache_only:
-                print("You requested to completely DELETE the repository *including* all archives it contains:")
+                print("You requested to completely DELETE the repository *including* all archives it contains:", file=sys.stderr)
                 for archive_info in manifest.list_archive_infos(sort_by='ts'):
-                    print(format_archive(archive_info))
+                    print(format_archive(archive_info), file=sys.stderr)
                 if not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
-                    print("""Type "YES" if you understand this and want to continue.\n""")
+                    print("""Type "YES" if you understand this and want to continue.\n""", file=sys.stderr)
+                    # XXX: prompt may end up on stdout, but we'll assume that input() does the right thing
                     if input('Do you want to continue? ') != 'YES':
-                        self.exit_code = 1
+                        self.exit_code = EXIT_ERROR
                         return self.exit_code
                 repository.destroy()
-                print("Repository deleted.")
+                logger.info("Repository deleted.")
             cache.destroy()
-            print("Cache deleted.")
+            logger.info("Cache deleted.")
         return self.exit_code
 
     def do_mount(self, args):
@@ -343,7 +354,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         try:
             from .fuse import FuseOperations
         except ImportError as e:
-            self.print_error('loading fuse support failed [ImportError: %s]' % str(e))
+            self.print_error('Loading fuse support failed [ImportError: %s]' % str(e))
             return self.exit_code
 
         if not os.path.isdir(args.mountpoint) or not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
@@ -351,18 +362,21 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             return self.exit_code
 
         repository = self.open_repository(args.src)
-        manifest, key = Manifest.load(repository)
-        if args.src.archive:
-            archive = Archive(repository, key, manifest, args.src.archive)
-        else:
-            archive = None
-        operations = FuseOperations(key, repository, manifest, archive)
-        self.print_verbose("Mounting filesystem")
         try:
-            operations.mount(args.mountpoint, args.options, args.foreground)
-        except RuntimeError:
-            # Relevant error message already printed to stderr by fuse
-            self.exit_code = 1
+            manifest, key = Manifest.load(repository)
+            if args.src.archive:
+                archive = Archive(repository, key, manifest, args.src.archive)
+            else:
+                archive = None
+            operations = FuseOperations(key, repository, manifest, archive)
+            self.print_info("Mounting filesystem")
+            try:
+                operations.mount(args.mountpoint, args.options, args.foreground)
+            except RuntimeError:
+                # Relevant error message already printed to stderr by fuse
+                self.exit_code = EXIT_ERROR
+        finally:
+            repository.close()
         return self.exit_code
 
     def do_list(self, args):
@@ -421,7 +435,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         print('Time: %s' % to_localtime(archive.ts).strftime('%c'))
         print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
         print('Number of files: %d' % stats.nfiles)
-        stats.print_('This archive:', cache)
+        print()
+        print(str(stats))
+        print(str(cache))
         return self.exit_code
 
     def do_prune(self, args):
@@ -433,7 +449,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0 and args.within is None:
             self.print_error('At least one of the "within", "keep-hourly", "keep-daily", "keep-weekly", '
                              '"keep-monthly" or "keep-yearly" settings must be specified')
-            return 1
+            return self.exit_code
         if args.prefix:
             archives = [archive for archive in archives if archive.name.startswith(args.prefix)]
         keep = []
@@ -454,19 +470,20 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         to_delete = [a for a in archives if a not in keep]
         stats = Statistics()
         for archive in keep:
-            self.print_verbose('Keeping archive: %s' % format_archive(archive))
+            self.print_info('Keeping archive: %s' % format_archive(archive))
         for archive in to_delete:
             if args.dry_run:
-                self.print_verbose('Would prune:     %s' % format_archive(archive))
+                self.print_info('Would prune:     %s' % format_archive(archive))
             else:
-                self.print_verbose('Pruning archive: %s' % format_archive(archive))
+                self.print_info('Pruning archive: %s' % format_archive(archive))
                 Archive(repository, key, manifest, archive.name, cache).delete(stats)
         if to_delete and not args.dry_run:
             manifest.write()
             repository.commit()
             cache.commit()
         if args.stats:
-            stats.print_('Deleted data:', cache)
+            logger.info(stats.summary.format(label='Deleted data:', stats=stats))
+            logger.info(str(cache))
         return self.exit_code
 
     def do_upgrade(self, args):
@@ -482,7 +499,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         # XXX: should auto-detect if it is an attic repository here
         repo = AtticRepositoryUpgrader(args.repository.path, create=False)
         try:
-            repo.upgrade(args.dry_run)
+            repo.upgrade(args.dry_run, inplace=args.inplace)
         except NotImplementedError as e:
             print("warning: %s" % e)
         return self.exit_code
@@ -540,7 +557,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             ('--daily', '--keep-daily', 'Warning: "--daily" has been deprecated. Use "--keep-daily" instead.'),
             ('--weekly', '--keep-weekly', 'Warning: "--weekly" has been deprecated. Use "--keep-weekly" instead.'),
             ('--monthly', '--keep-monthly', 'Warning: "--monthly" has been deprecated. Use "--keep-monthly" instead.'),
-            ('--yearly', '--keep-yearly', 'Warning: "--yearly" has been deprecated. Use "--keep-yearly" instead.')
+            ('--yearly', '--keep-yearly', 'Warning: "--yearly" has been deprecated. Use "--keep-yearly" instead.'),
+            ('--do-not-cross-mountpoints', '--one-file-system',
+             'Warning:  "--do-no-cross-mountpoints" has been deprecated. Use "--one-file-system" instead.'),
         ]
         if args and args[0] == 'verify':
             print('Warning: "borg verify" has been deprecated. Use "borg extract --dry-run" instead.')
@@ -552,26 +571,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     print(warning)
         return args
 
-    def run(self, args=None):
-        check_extension_modules()
-        keys_dir = get_keys_dir()
-        if not os.path.exists(keys_dir):
-            os.makedirs(keys_dir)
-            os.chmod(keys_dir, stat.S_IRWXU)
-        cache_dir = get_cache_dir()
-        if not os.path.exists(cache_dir):
-            os.makedirs(cache_dir)
-            os.chmod(cache_dir, stat.S_IRWXU)
-            with open(os.path.join(cache_dir, 'CACHEDIR.TAG'), 'w') as fd:
-                fd.write(textwrap.dedent("""
-                    Signature: 8a477f597d28d172789f06886806bc55
-                    # This file is a cache directory tag created by Borg.
-                    # For information about cache directory tags, see:
-                    #       http://www.brynosaurus.com/cachedir/
-                    """).lstrip())
-        common_parser = argparse.ArgumentParser(add_help=False)
-        common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
-                                   default=False,
+    def build_parser(self, args=None, prog=None):
+        common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
+        common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False,
                                    help='verbose output')
         common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
                                    help='do not load/update the file metadata cache used to detect unchanged files')
@@ -580,11 +582,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         common_parser.add_argument('--remote-path', dest='remote_path', default=RemoteRepository.remote_path, metavar='PATH',
                                    help='set remote path to executable (default: "%(default)s")')
 
-        # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
-        if args:
-            args = self.preprocess_args(args)
-
-        parser = argparse.ArgumentParser(description='Borg %s - Deduplicated Backups' % __version__)
+        parser = argparse.ArgumentParser(prog=prog, description='Borg - Deduplicated Backups')
+        parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,
+                                   help='show version number and exit')
         subparsers = parser.add_subparsers(title='Available commands')
 
         serve_epilog = textwrap.dedent("""
@@ -699,9 +699,11 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the created archive')
-        subparser.add_argument('-p', '--progress', dest='progress',
-                               action='store_true', default=False,
-                               help='print progress while creating the archive')
+        subparser.add_argument('-p', '--progress', dest='progress', const=not sys.stderr.isatty(),
+                               action='store_const', default=sys.stdin.isatty(),
+                               help="""toggle progress display while creating the archive, showing Original,
+                               Compressed and Deduplicated sizes, followed by the Number of files seen
+                               and the path being processed, default: %(default)s""")
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
@@ -714,9 +716,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                type=int, default=300, metavar='SECONDS',
                                help='write checkpoint every SECONDS seconds (Default: 300)')
-        subparser.add_argument('--do-not-cross-mountpoints', dest='dontcross',
+        subparser.add_argument('-x', '--one-file-system', dest='one_file_system',
                                action='store_true', default=False,
-                               help='do not cross mount points')
+                               help='stay in same file system, do not cross mount points')
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,
                                help='only store numeric user and group identifiers')
@@ -925,7 +927,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='repository to prune')
 
         upgrade_epilog = textwrap.dedent("""
-        upgrade an existing Borg repository in place. this currently
+        upgrade an existing Borg repository. this currently
         only support converting an Attic repository, but may
         eventually be extended to cover major Borg upgrades as well.
 
@@ -940,13 +942,6 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         the first backup after the conversion takes longer than expected
         due to the cache resync.
 
-        it is recommended you run this on a copy of the Attic
-        repository, in case something goes wrong, for example:
-
-            cp -a attic borg
-            borg upgrade -n borg
-            borg upgrade borg
-
         upgrade should be able to resume if interrupted, although it
         will still iterate over all segments. if you want to start
         from scratch, use `borg delete` over the copied repository to
@@ -954,11 +949,19 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
             borg delete borg
 
-        the conversion can PERMANENTLY DAMAGE YOUR REPOSITORY! Attic
-        will also NOT BE ABLE TO READ THE BORG REPOSITORY ANYMORE, as
-        the magic strings will have changed.
+        unless ``--inplace`` is specified, the upgrade process first
+        creates a backup copy of the repository, in
+        REPOSITORY.upgrade-DATETIME, using hardlinks. this takes
+        longer than in place upgrades, but is much safer and gives
+        progress information (as opposed to ``cp -al``). once you are
+        satisfied with the conversion, you can safely destroy the
+        backup copy.
 
-        you have been warned.""")
+        WARNING: running the upgrade in place will make the current
+        copy unusable with older version, with no way of going back
+        to previous versions. this can PERMANENTLY DAMAGE YOUR
+        REPOSITORY!  Attic CAN NOT READ BORG REPOSITORIES, as the
+        magic strings have changed. you have been warned.""")
         subparser = subparsers.add_parser('upgrade', parents=[common_parser],
                                           description=self.do_upgrade.__doc__,
                                           epilog=upgrade_epilog,
@@ -967,6 +970,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
                                help='do not change repository')
+        subparser.add_argument('-i', '--inplace', dest='inplace',
+                               default=False, action='store_true',
+                               help="""rewrite repository in place, with no chance of going back to older
+                               versions of the repository.""")
         subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')
@@ -980,9 +987,34 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
         subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
                                help='additional help on TOPIC')
+        return parser
+
+    def run(self, args=None):
+        check_extension_modules()
+        keys_dir = get_keys_dir()
+        if not os.path.exists(keys_dir):
+            os.makedirs(keys_dir)
+            os.chmod(keys_dir, stat.S_IRWXU)
+        cache_dir = get_cache_dir()
+        if not os.path.exists(cache_dir):
+            os.makedirs(cache_dir)
+            os.chmod(cache_dir, stat.S_IRWXU)
+            with open(os.path.join(cache_dir, 'CACHEDIR.TAG'), 'w') as fd:
+                fd.write(textwrap.dedent("""
+                    Signature: 8a477f597d28d172789f06886806bc55
+                    # This file is a cache directory tag created by Borg.
+                    # For information about cache directory tags, see:
+                    #       http://www.brynosaurus.com/cachedir/
+                    """).lstrip())
+
+        # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
+        if args:
+            args = self.preprocess_args(args)
+        parser = self.build_parser(args)
 
         args = parser.parse_args(args or ['-h'])
         self.verbose = args.verbose
+        setup_logging()
         os.umask(args.umask)
         RemoteRepository.remote_path = args.remote_path
         RemoteRepository.umask = args.umask
@@ -1001,7 +1033,7 @@ def sig_info_handler(signum, stack):  # pragma: no cover
                 total = loc['st'].st_size
             except Exception:
                 pos, total = 0, 0
-            print("{0} {1}/{2}".format(path, format_file_size(pos), format_file_size(total)))
+            logger.info("{0} {1}/{2}".format(path, format_file_size(pos), format_file_size(total)))
             break
         if func in ('extract_item', ):  # extract op
             path = loc['item'][b'path']
@@ -1009,7 +1041,7 @@ def sig_info_handler(signum, stack):  # pragma: no cover
                 pos = loc['fd'].tell()
             except Exception:
                 pos = 0
-            print("{0} {1}/???".format(path, format_file_size(pos)))
+            logger.info("{0} {1}/???".format(path, format_file_size(pos)))
             break
 
 
@@ -1031,22 +1063,34 @@ def main():  # pragma: no cover
     setup_signal_handlers()
     archiver = Archiver()
     try:
+        msg = None
         exit_code = archiver.run(sys.argv[1:])
     except Error as e:
-        archiver.print_error(e.get_message() + "\n%s" % traceback.format_exc())
+        msg = e.get_message() + "\n%s" % traceback.format_exc()
         exit_code = e.exit_code
     except RemoteRepository.RPCError as e:
-        archiver.print_error('Error: Remote Exception.\n%s' % str(e))
-        exit_code = 1
+        msg = 'Remote Exception.\n%s' % str(e)
+        exit_code = EXIT_ERROR
     except Exception:
-        archiver.print_error('Error: Local Exception.\n%s' % traceback.format_exc())
-        exit_code = 1
+        msg = 'Local Exception.\n%s' % traceback.format_exc()
+        exit_code = EXIT_ERROR
     except KeyboardInterrupt:
-        archiver.print_error('Error: Keyboard interrupt.\n%s' % traceback.format_exc())
-        exit_code = 1
-    if exit_code:
-        archiver.print_error('Exiting with failure status due to previous errors')
+        msg = 'Keyboard interrupt.\n%s' % traceback.format_exc()
+        exit_code = EXIT_ERROR
+    if msg:
+        logger.error(msg)
+    exit_msg = 'terminating with %s status, rc %d'
+    if exit_code == EXIT_SUCCESS:
+        logger.info(exit_msg % ('success', exit_code))
+    elif exit_code == EXIT_WARNING:
+        logger.warning(exit_msg % ('warning', exit_code))
+    elif exit_code == EXIT_ERROR:
+        logger.error(exit_msg % ('error', exit_code))
+    else:
+        # if you see 666 in output, it usually means exit_code was None
+        logger.error(exit_msg % ('abnormal', exit_code or 666))
     sys.exit(exit_code)
+
 
 if __name__ == '__main__':
     main()

@@ -2,17 +2,19 @@ from collections import defaultdict
 import errno
 import io
 import llfuse
-import msgpack
 import os
 import stat
 import tempfile
 import time
 from .archive import Archive
-from .helpers import daemonize
+from .helpers import daemonize, have_cython
 from .remote import cache_if_remote
 
+if have_cython():
+    import msgpack
+
 # Does this version of llfuse support ns precision?
-have_fuse_mtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
+have_fuse_xtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
 
 
 class ItemCache:
@@ -153,14 +155,15 @@ class FuseOperations(llfuse.Operations):
         entry.st_size = size
         entry.st_blksize = 512
         entry.st_blocks = dsize / 512
-        if have_fuse_mtime_ns:
-            entry.st_atime_ns = item[b'mtime']
+        # note: older archives only have mtime (not atime nor ctime)
+        if have_fuse_xtime_ns:
+            entry.st_atime_ns = item.get(b'atime') or item[b'mtime']
             entry.st_mtime_ns = item[b'mtime']
-            entry.st_ctime_ns = item[b'mtime']
+            entry.st_ctime_ns = item.get(b'ctime') or item[b'mtime']
         else:
-            entry.st_atime = item[b'mtime'] / 1e9
+            entry.st_atime = (item.get(b'atime') or item[b'mtime']) / 1e9
             entry.st_mtime = item[b'mtime'] / 1e9
-            entry.st_ctime = item[b'mtime'] / 1e9
+            entry.st_ctime = (item.get(b'ctime') or item[b'mtime']) / 1e9
         return entry
 
     def listxattr(self, inode):

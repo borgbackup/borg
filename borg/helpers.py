@@ -1,5 +1,4 @@
-from .support import argparse  # see support/__init__.py docstring
-                               # DEPRECATED - remove after requiring py 3.4
+from .support import argparse  # see support/__init__.py docstring, DEPRECATED - remove after requiring py 3.4
 
 import binascii
 from collections import namedtuple
@@ -9,6 +8,12 @@ import os
 import pwd
 import queue
 import re
+try:
+    from shutil import get_terminal_size
+except ImportError:
+    def get_terminal_size(fallback=(80, 24)):
+        TerminalSize = namedtuple('TerminalSize', ['columns', 'lines'])
+        return TerminalSize(int(os.environ.get('COLUMNS', fallback[0])), int(os.environ.get('LINES', fallback[1])))
 import sys
 import time
 import unicodedata
@@ -17,11 +22,34 @@ from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from operator import attrgetter
 
-import msgpack
 
-from . import hashindex
-from . import chunker
-from . import crypto
+def have_cython():
+    """allow for a way to disable Cython includes
+
+    this is used during usage docs build, in setup.py. It is to avoid
+    loading the Cython libraries which are built, but sometimes not in
+    the search path (namely, during Tox runs).
+
+    we simply check an environment variable (``BORG_CYTHON_DISABLE``)
+    which, when set (to anything) will disable includes of Cython
+    libraries in key places to enable usage docs to be built.
+
+    :returns: True if Cython is available, False otherwise.
+    """
+    return not os.environ.get('BORG_CYTHON_DISABLE')
+
+if have_cython():
+    from . import hashindex
+    from . import chunker
+    from . import crypto
+    import msgpack
+
+
+# return codes returned by borg command
+# when borg is killed by signal N, rc = 128 + N
+EXIT_SUCCESS = 0  # everything done, no problems
+EXIT_WARNING = 1  # reached normal end of operation, but there were issues
+EXIT_ERROR = 2  # terminated abruptly, did not reach end of operation
 
 QUEUE_DEBUG = False
 
@@ -29,10 +57,17 @@ QUEUE_DEBUG = False
 class Error(Exception):
     """Error base class"""
 
-    exit_code = 1
+    # if we raise such an Error and it is only catched by the uppermost
+    # exception handler (that exits short after with the given exit_code),
+    # it is always a (fatal and abrupt) EXIT_ERROR, never just a warning.
+    exit_code = EXIT_ERROR
 
     def get_message(self):
-        return 'Error: ' + type(self).__doc__.format(*self.args)
+        return type(self).__doc__.format(*self.args)
+
+
+class IntegrityError(Error):
+    """Data integrity error"""
 
 
 class ExtensionModuleError(Error):
@@ -144,27 +179,41 @@ class Statistics:
         if unique:
             self.usize += csize
 
-    def print_(self, label, cache):
-        total_size, total_csize, unique_size, unique_csize, total_unique_chunks, total_chunks = cache.chunks.summarize()
-        print()
-        print('                       Original size      Compressed size    Deduplicated size')
-        print('%-15s %20s %20s %20s' % (label, format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize)))
-        print('All archives:   %20s %20s %20s' % (format_file_size(total_size), format_file_size(total_csize), format_file_size(unique_csize)))
-        print()
-        print('                       Unique chunks         Total chunks')
-        print('Chunk index:    %20d %20d' % (total_unique_chunks, total_chunks))
+    summary = """\
+                       Original size      Compressed size    Deduplicated size
+{label:15} {stats.osize_fmt:>20s} {stats.csize_fmt:>20s} {stats.usize_fmt:>20s}"""
 
-    def show_progress(self, item=None, final=False):
+    def __str__(self):
+        return self.summary.format(stats=self, label='This archive:')
+
+    def __repr__(self):
+        return "<{cls} object at {hash:#x} ({self.osize}, {self.csize}, {self.usize})>".format(cls=type(self).__name__, hash=id(self), self=self)
+
+    @property
+    def osize_fmt(self):
+        return format_file_size(self.osize)
+
+    @property
+    def usize_fmt(self):
+        return format_file_size(self.usize)
+
+    @property
+    def csize_fmt(self):
+        return format_file_size(self.csize)
+
+    def show_progress(self, item=None, final=False, stream=None):
+        columns, lines = get_terminal_size()
         if not final:
+            msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
             path = remove_surrogates(item[b'path']) if item else ''
-            if len(path) > 43:
-                path = '%s...%s' % (path[:20], path[-20:])
-            msg = '%9s O %9s C %9s D %-43s' % (
-                format_file_size(self.osize), format_file_size(self.csize), format_file_size(self.usize), path)
+            space = columns - len(msg)
+            if space < len('...') + len(path):
+                path = '%s...%s' % (path[:(space//2)-len('...')], path[-space//2:])
+            msg += "{0:<{space}}".format(path, space=space)
         else:
-            msg = ' ' * 79
-        print(msg, end='\r')
-        sys.stdout.flush()
+            msg = ' ' * columns
+        print(msg, file=stream or sys.stderr, end="\r")
+        (stream or sys.stderr).flush()
 
 
 def get_keys_dir():
@@ -230,7 +279,7 @@ def exclude_path(path, patterns):
 
 def normalized(func):
     """ Decorator for the Pattern match methods, returning a wrapper that
-    normalizes OSX paths to match the normalized pattern on OSX, and 
+    normalizes OSX paths to match the normalized pattern on OSX, and
     returning the original method on other platforms"""
     @wraps(func)
     def normalize_wrapper(self, path):
@@ -426,27 +475,33 @@ def format_file_mode(mod):
     return '%s%s%s' % (x(mod // 64), x(mod // 8), x(mod))
 
 
-def format_file_size(v):
+def format_file_size(v, precision=2):
     """Format file size into a human friendly format
     """
-    if abs(v) > 10**12:
-        return '%.2f TB' % (v / 10**12)
-    elif abs(v) > 10**9:
-        return '%.2f GB' % (v / 10**9)
-    elif abs(v) > 10**6:
-        return '%.2f MB' % (v / 10**6)
-    elif abs(v) > 10**3:
-        return '%.2f kB' % (v / 10**3)
-    else:
-        return '%d B' % v
+    return sizeof_fmt_decimal(v, suffix='B', sep=' ', precision=precision)
+
+
+def sizeof_fmt(num, suffix='B', units=None, power=None, sep='', precision=2):
+    for unit in units[:-1]:
+        if abs(round(num, precision)) < power:
+            if isinstance(num, int):
+                return "{}{}{}{}".format(num, sep, unit, suffix)
+            else:
+                return "{:3.{}f}{}{}{}".format(num, precision, sep, unit, suffix)
+        num /= float(power)
+    return "{:.{}f}{}{}{}".format(num, precision, sep, units[-1], suffix)
+
+
+def sizeof_fmt_iec(num, suffix='B', sep='', precision=2):
+    return sizeof_fmt(num, suffix=suffix, sep=sep, precision=precision, units=['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi', 'Yi'], power=1024)
+
+
+def sizeof_fmt_decimal(num, suffix='B', sep='', precision=2):
+    return sizeof_fmt(num, suffix=suffix, sep=sep, precision=precision, units=['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'], power=1000)
 
 
 def format_archive(archive):
     return '%-36s %s' % (archive.name, to_localtime(archive.ts).strftime('%c'))
-
-
-class IntegrityError(Error):
-    """Data integrity error"""
 
 
 def memoize(function):
@@ -498,14 +553,24 @@ def posix_acl_use_stored_uid_gid(acl):
     """Replace the user/group field with the stored uid/gid
     """
     entries = []
-    for entry in acl.decode('ascii').split('\n'):
+    for entry in safe_decode(acl).split('\n'):
         if entry:
             fields = entry.split(':')
             if len(fields) == 4:
                 entries.append(':'.join([fields[0], fields[3], fields[2]]))
             else:
                 entries.append(entry)
-    return ('\n'.join(entries)).encode('ascii')
+    return safe_encode('\n'.join(entries))
+
+
+def safe_decode(s, coding='utf-8', errors='surrogateescape'):
+    """decode bytes to str, with round-tripping "invalid" bytes"""
+    return s.decode(coding, errors)
+
+
+def safe_encode(s, coding='utf-8', errors='surrogateescape'):
+    """encode str to bytes, with round-tripping "invalid" bytes"""
+    return s.encode(coding, errors)
 
 
 class Location:
@@ -685,7 +750,13 @@ class StableDict(dict):
 
 
 if sys.version < '3.3':
-    # st_mtime_ns attribute only available in 3.3+
+    # st_xtime_ns attributes only available in 3.3+
+    def st_atime_ns(st):
+        return int(st.st_atime * 1e9)
+
+    def st_ctime_ns(st):
+        return int(st.st_ctime * 1e9)
+
     def st_mtime_ns(st):
         return int(st.st_mtime * 1e9)
 
@@ -695,6 +766,12 @@ if sys.version < '3.3':
             data = data.encode('ascii')
         return binascii.unhexlify(data)
 else:
+    def st_atime_ns(st):
+        return st.st_atime_ns
+
+    def st_ctime_ns(st):
+        return st.st_ctime_ns
+
     def st_mtime_ns(st):
         return st.st_mtime_ns
 

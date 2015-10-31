@@ -1,14 +1,15 @@
 import hashlib
 from time import mktime, strptime
 from datetime import datetime, timezone, timedelta
+from io import StringIO
 import os
 
 import pytest
 import sys
 import msgpack
 
-from ..helpers import adjust_patterns, exclude_path, Location, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
-    prune_within, prune_split, get_cache_dir, \
+from ..helpers import adjust_patterns, exclude_path, Location, format_file_size, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
+    prune_within, prune_split, get_cache_dir, Statistics, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams
 from . import BaseTestCase
 
@@ -29,44 +30,44 @@ class TestLocationWithoutEnv:
     def test_ssh(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
         assert repr(Location('ssh://user@host:1234/some/path::archive')) == \
-               "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive='archive')"
+            "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive='archive')"
         assert repr(Location('ssh://user@host:1234/some/path')) == \
-               "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive=None)"
+            "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive=None)"
 
     def test_file(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
         assert repr(Location('file:///some/path::archive')) == \
-               "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')"
+            "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')"
         assert repr(Location('file:///some/path')) == \
-               "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive=None)"
+            "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive=None)"
 
     def test_scp(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
         assert repr(Location('user@host:/some/path::archive')) == \
-               "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='archive')"
+            "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='archive')"
         assert repr(Location('user@host:/some/path')) == \
-               "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
+            "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
 
     def test_folder(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
         assert repr(Location('path::archive')) == \
-               "Location(proto='file', user=None, host=None, port=None, path='path', archive='archive')"
+            "Location(proto='file', user=None, host=None, port=None, path='path', archive='archive')"
         assert repr(Location('path')) == \
-               "Location(proto='file', user=None, host=None, port=None, path='path', archive=None)"
+            "Location(proto='file', user=None, host=None, port=None, path='path', archive=None)"
 
     def test_abspath(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
         assert repr(Location('/some/absolute/path::archive')) == \
-               "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive='archive')"
+            "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive='archive')"
         assert repr(Location('/some/absolute/path')) == \
-               "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive=None)"
+            "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive=None)"
 
     def test_relpath(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
         assert repr(Location('some/relative/path::archive')) == \
-               "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='archive')"
+            "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='archive')"
         assert repr(Location('some/relative/path')) == \
-               "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive=None)"
+            "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive=None)"
 
     def test_underspecified(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
@@ -94,51 +95,51 @@ class TestLocationWithoutEnv:
                      'ssh://user@host:1234/some/path::archive']
         for location in locations:
             assert Location(location).canonical_path() == \
-                   Location(Location(location).canonical_path()).canonical_path()
+                Location(Location(location).canonical_path()).canonical_path()
 
 
 class TestLocationWithEnv:
     def test_ssh(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'ssh://user@host:1234/some/path')
         assert repr(Location('::archive')) == \
-               "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive='archive')"
+            "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive='archive')"
         assert repr(Location()) == \
-               "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive=None)"
+            "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive=None)"
 
     def test_file(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'file:///some/path')
         assert repr(Location('::archive')) == \
-               "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')"
+            "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')"
         assert repr(Location()) == \
-               "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive=None)"
+            "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive=None)"
 
     def test_scp(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'user@host:/some/path')
         assert repr(Location('::archive')) == \
-               "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='archive')"
+            "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='archive')"
         assert repr(Location()) == \
-               "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
+            "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
 
     def test_folder(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'path')
         assert repr(Location('::archive')) == \
-               "Location(proto='file', user=None, host=None, port=None, path='path', archive='archive')"
+            "Location(proto='file', user=None, host=None, port=None, path='path', archive='archive')"
         assert repr(Location()) == \
-               "Location(proto='file', user=None, host=None, port=None, path='path', archive=None)"
+            "Location(proto='file', user=None, host=None, port=None, path='path', archive=None)"
 
     def test_abspath(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', '/some/absolute/path')
         assert repr(Location('::archive')) == \
-               "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive='archive')"
+            "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive='archive')"
         assert repr(Location()) == \
-               "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive=None)"
+            "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive=None)"
 
     def test_relpath(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'some/relative/path')
         assert repr(Location('::archive')) == \
-               "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='archive')"
+            "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='archive')"
         assert repr(Location()) == \
-               "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive=None)"
+            "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive=None)"
 
     def test_no_slashes(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', '/some/absolute/path')
@@ -211,7 +212,7 @@ class PatternNonAsciiTestCase(BaseTestCase):
         assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
         assert not e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
         assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-    
+
     def testInvalidUnicode(self):
         pattern = str(b'ba\x80', 'latin1')
         i = IncludePattern(pattern)
@@ -234,7 +235,7 @@ class OSXPatternNormalizationTestCase(BaseTestCase):
         assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
         assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
         assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-    
+
     def testDecomposedUnicode(self):
         pattern = 'ba\N{COMBINING ACUTE ACCENT}'
         i = IncludePattern(pattern)
@@ -244,7 +245,7 @@ class OSXPatternNormalizationTestCase(BaseTestCase):
         assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
         assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
         assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-    
+
     def testInvalidUnicode(self):
         pattern = str(b'ba\x80', 'latin1')
         i = IncludePattern(pattern)
@@ -399,3 +400,83 @@ def test_get_cache_dir():
     # reset old env
     if old_env is not None:
         os.environ['BORG_CACHE_DIR'] = old_env
+
+
+@pytest.fixture()
+def stats():
+    stats = Statistics()
+    stats.update(20, 10, unique=True)
+    return stats
+
+
+def test_stats_basic(stats):
+    assert stats.osize == 20
+    assert stats.csize == stats.usize == 10
+    stats.update(20, 10, unique=False)
+    assert stats.osize == 40
+    assert stats.csize == 20
+    assert stats.usize == 10
+
+
+def tests_stats_progress(stats, columns=80):
+    os.environ['COLUMNS'] = str(columns)
+    out = StringIO()
+    stats.show_progress(stream=out)
+    s = '20 B O 10 B C 10 B D 0 N '
+    buf = ' ' * (columns - len(s))
+    assert out.getvalue() == s + buf + "\r"
+
+    out = StringIO()
+    stats.update(10**3, 0, unique=False)
+    stats.show_progress(item={b'path': 'foo'}, final=False, stream=out)
+    s = '1.02 kB O 10 B C 10 B D 0 N foo'
+    buf = ' ' * (columns - len(s))
+    assert out.getvalue() == s + buf + "\r"
+    out = StringIO()
+    stats.show_progress(item={b'path': 'foo'*40}, final=False, stream=out)
+    s = '1.02 kB O 10 B C 10 B D 0 N foofoofoofoofoofoofoofo...oofoofoofoofoofoofoofoofoo'
+    buf = ' ' * (columns - len(s))
+    assert out.getvalue() == s + buf + "\r"
+
+
+def test_stats_format(stats):
+    assert str(stats) == """\
+                       Original size      Compressed size    Deduplicated size
+This archive:                   20 B                 10 B                 10 B"""
+    s = "{0.osize_fmt}".format(stats)
+    assert s == "20 B"
+    # kind of redundant, but id is variable so we can't match reliably
+    assert repr(stats) == '<Statistics object at {:#x} (20, 10, 10)>'.format(id(stats))
+
+
+def test_file_size():
+    """test the size formatting routines"""
+    si_size_map = {
+        0: '0 B',  # no rounding necessary for those
+        1: '1 B',
+        142: '142 B',
+        999: '999 B',
+        1000: '1.00 kB',  # rounding starts here
+        1001: '1.00 kB',  # should be rounded away
+        1234: '1.23 kB',  # should be rounded down
+        1235: '1.24 kB',  # should be rounded up
+        1010: '1.01 kB',  # rounded down as well
+        999990000: '999.99 MB',  # rounded down
+        999990001: '999.99 MB',  # rounded down
+        999995000: '1.00 GB',  # rounded up to next unit
+        10**6: '1.00 MB',  # and all the remaining units, megabytes
+        10**9: '1.00 GB',  # gigabytes
+        10**12: '1.00 TB',  # terabytes
+        10**15: '1.00 PB',  # petabytes
+        10**18: '1.00 EB',  # exabytes
+        10**21: '1.00 ZB',  # zottabytes
+        10**24: '1.00 YB',  # yottabytes
+    }
+    for size, fmt in si_size_map.items():
+        assert format_file_size(size) == fmt
+
+
+def test_file_size_precision():
+    assert format_file_size(1234, precision=1) == '1.2 kB'  # rounded down
+    assert format_file_size(1254, precision=1) == '1.3 kB'  # rounded up
+    assert format_file_size(999990000, precision=1) == '1.0 GB'  # and not 999.9 MB or 1000.0 MB

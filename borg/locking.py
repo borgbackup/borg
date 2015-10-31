@@ -2,7 +2,6 @@ import errno
 import json
 import os
 import socket
-import threading
 import time
 
 from borg.helpers import Error
@@ -10,13 +9,17 @@ from borg.helpers import Error
 ADD, REMOVE = 'add', 'remove'
 SHARED, EXCLUSIVE = 'shared', 'exclusive'
 
+# only determine the PID and hostname once.
+# for FUSE mounts, we fork a child process that needs to release
+# the lock made by the parent, so it needs to use the same PID for that.
+_pid = os.getpid()
+_hostname = socket.gethostname()
+
 
 def get_id():
     """Get identification tuple for 'us'"""
-    hostname = socket.gethostname()
-    pid = os.getpid()
-    tid = threading.current_thread().ident & 0xffffffff
-    return hostname, pid, tid
+    thread_id = 0
+    return _hostname, _pid, thread_id
 
 
 class TimeoutTimer:

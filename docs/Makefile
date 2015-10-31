@@ -36,7 +36,7 @@ help:
 clean:
 	-rm -rf $(BUILDDIR)/*
 
-html: usage api.rst
+html:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
@@ -128,43 +128,3 @@ doctest:
 	$(SPHINXBUILD) -b doctest $(ALLSPHINXOPTS) $(BUILDDIR)/doctest
 	@echo "Testing of doctests in the sources finished, look at the " \
 	      "results in $(BUILDDIR)/doctest/output.txt."
-
-gh-io: html
-	GH_IO_CLONE="`mktemp -d`" && \
-    git clone git@github.com:borgbackup/borgbackup.github.io.git $$GH_IO_CLONE && \
-	(cd $$GH_IO_CLONE && git rm -r *) && \
-	cp -r _build/html/* $$GH_IO_CLONE && \
-	(cd $$GH_IO_CLONE && git add -A && git commit -m 'Updated borgbackup.github.io' && git push) && \
-	rm -rf $$GH_IO_CLONE
-
-inotify: html
-	while inotifywait -r . --exclude usage.rst --exclude '_build/*' ; do make html ; done
-
-# generate list of targets
-usage: $(shell borg help | grep -A1 "Available commands:" | tail -1 | sed 's/[{} ]//g;s/,\|^/.rst.inc usage\//g;s/^.rst.inc//;s/usage\/help//')
-
-# generate help file based on usage
-usage/%.rst.inc: ../borg/archiver.py
-	@echo generating usage for $*
-	@printf ".. _borg_$*:\n\n" > $@
-	@printf "borg $*\n" >> $@
-	@echo -n borg $* | tr 'a-z- ' '-' >> $@
-	@printf "\n::\n\n" >> $@
-	@borg help $* --usage-only | sed -e 's/^/    /' >> $@
-	@printf "\nDescription\n~~~~~~~~~~~\n" >> $@
-	@borg help $* --epilog-only >> $@
-
-api.rst: Makefile
-	@echo "auto-generating API documentation"
-	@echo "Borg Backup API documentation" > $@
-	@echo "=============================" >> $@
-	@echo "" >> $@
-	@for mod in ../borg/*.pyx ../borg/*.py; do \
-		if echo "$$mod" | grep -q "/_"; then \
-			continue ; \
-		fi ; \
-		printf ".. automodule:: "; \
-		echo "$$mod" | sed "s!\.\./!!;s/\.pyx\?//;s!/!.!"; \
-		echo "    :members:"; \
-		echo "    :undoc-members:"; \
-	done >> $@

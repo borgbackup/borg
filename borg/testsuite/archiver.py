@@ -384,7 +384,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self._set_repository_id(self.repository_path, repository_id)
         self.assert_equal(repository_id, self._extract_repository_id(self.repository_path))
         if self.FORK_DEFAULT:
-            self.cmd('create', self.repository_location + '::test.2', 'input', exit_code=1)  # fails
+            self.cmd('create', self.repository_location + '::test.2', 'input', exit_code=EXIT_ERROR)
         else:
             self.assert_raises(Cache.EncryptionMethodMismatch, lambda: self.cmd('create', self.repository_location + '::test.2', 'input'))
 
@@ -397,7 +397,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         shutil.rmtree(self.repository_path + '_encrypted')
         os.rename(self.repository_path + '_unencrypted', self.repository_path + '_encrypted')
         if self.FORK_DEFAULT:
-            self.cmd('create', self.repository_location + '_encrypted::test.2', 'input', exit_code=1)  # fails
+            self.cmd('create', self.repository_location + '_encrypted::test.2', 'input', exit_code=EXIT_ERROR)
         else:
             self.assert_raises(Cache.RepositoryAccessAborted, lambda: self.cmd('create', self.repository_location + '_encrypted::test.2', 'input'))
 

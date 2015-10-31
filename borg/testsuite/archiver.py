@@ -1,5 +1,5 @@
 from binascii import hexlify
-from configparser import RawConfigParser
+from configparser import ConfigParser
 import errno
 import os
 from io import StringIO
@@ -318,7 +318,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         return Repository(self.repository_path).id
 
     def _set_repository_id(self, path, id):
-        config = RawConfigParser()
+        config = ConfigParser(interpolation=None)
         config.read(os.path.join(path, 'config'))
         config.set('repository', 'id', hexlify(id).decode('ascii'))
         with open(os.path.join(path, 'config'), 'w') as fd:

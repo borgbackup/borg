@@ -112,7 +112,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         os.makedirs(self.path)
         with open(os.path.join(self.path, 'README'), 'w') as fd:
             fd.write('This is a Borg cache')
-        config = configparser.RawConfigParser()
+        config = configparser.ConfigParser(interpolation=None)
         config.add_section('cache')
         config.set('cache', 'version', '1')
         config.set('cache', 'repository', hexlify(self.repository.id).decode('ascii'))
@@ -132,7 +132,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         shutil.rmtree(self.path)
 
     def _do_open(self):
-        self.config = configparser.RawConfigParser()
+        self.config = configparser.ConfigParser(interpolation=None)
         config_path = os.path.join(self.path, 'config')
         self.config.read(config_path)
         try:

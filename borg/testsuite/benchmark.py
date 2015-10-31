@@ -70,6 +70,7 @@ def test_create_lz4(benchmark, cmd, repo, testdata):
 def test_extract(benchmark, cmd, archive, tmpdir):
     with changedir(str(tmpdir)):
         result, out = benchmark.pedantic(cmd, ('extract', archive))
+    print(out)
     assert result == 0
 
 

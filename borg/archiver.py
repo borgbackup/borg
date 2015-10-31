@@ -985,7 +985,21 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='additional help on TOPIC')
         return parser
 
-    def run(self, args=None):
+    def parse_args(self, args=None):
+        # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
+        if args:
+            args = self.preprocess_args(args)
+        parser = self.build_parser(args)
+        args = parser.parse_args(args or ['-h'])
+        update_excludes(args)
+        return args
+
+    def run(self, args):
+        os.umask(args.umask)  # early, before opening files
+        self.verbose = args.verbose
+        RemoteRepository.remote_path = args.remote_path
+        RemoteRepository.umask = args.umask
+        setup_logging()
         check_extension_modules()
         keys_dir = get_keys_dir()
         if not os.path.exists(keys_dir):
@@ -1002,19 +1016,6 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     # For information about cache directory tags, see:
                     #       http://www.brynosaurus.com/cachedir/
                     """).lstrip())
-
-        # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
-        if args:
-            args = self.preprocess_args(args)
-        parser = self.build_parser(args)
-
-        args = parser.parse_args(args or ['-h'])
-        self.verbose = args.verbose
-        setup_logging()
-        os.umask(args.umask)
-        RemoteRepository.remote_path = args.remote_path
-        RemoteRepository.umask = args.umask
-        update_excludes(args)
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
         return args.func(args)
@@ -1062,7 +1063,8 @@ def main():  # pragma: no cover
     archiver = Archiver()
     try:
         msg = None
-        exit_code = archiver.run(sys.argv[1:])
+        args = archiver.parse_args(sys.argv[1:])
+        exit_code = archiver.run(args)
     except Error as e:
         msg = e.get_message()
         if e.traceback:

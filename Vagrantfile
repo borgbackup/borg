@@ -42,6 +42,8 @@ def packages_redhatted
     yum install -y openssl-devel openssl libacl-devel libacl lz4-devel fuse-devel fuse pkgconfig
     usermod -a -G fuse vagrant
     yum install -y fakeroot gcc git patch
+    # needed to compile msgpack-python (otherwise it will use slow fallback code):
+    yum install -y gcc-c++
     # for building python:
     yum install -y zlib-devel bzip2-devel ncurses-devel readline-devel xz-devel sqlite-devel
     #yum install -y python-pip

@@ -405,6 +405,10 @@ def CompressionSpec(s):
             raise ValueError
         # DEPRECATED: it is just --compression N
         if 0 <= compression <= 9:
+            print('Warning: --compression %d is deprecated, please use --compression zlib,%d.' % (compression, compression))
+            if compression == 0:
+                print('Hint: instead of --compression zlib,0 you could also use --compression none for better performance.')
+                print('Hint: archives generated using --compression none are not compatible with borg < 0.25.0.')
             return dict(name='zlib', level=compression)
         raise ValueError
     except ValueError:

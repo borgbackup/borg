@@ -10,9 +10,9 @@ import msgpack
 import msgpack.fallback
 
 from ..helpers import adjust_patterns, exclude_path, Location, format_file_size, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
-    prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, \
+    prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, yes, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams
-from . import BaseTestCase
+from . import BaseTestCase, environment_variable, FakeInputs
 
 
 class BigIntTestCase(BaseTestCase):
@@ -492,3 +492,77 @@ def test_is_slow_msgpack():
         msgpack.Packer = saved_packer
     # this assumes that we have fast msgpack on test platform:
     assert not is_slow_msgpack()
+
+
+def test_yes_simple():
+    input = FakeInputs(['y', 'Y', 'yes', 'Yes', ])
+    assert yes(input=input)
+    assert yes(input=input)
+    assert yes(input=input)
+    assert yes(input=input)
+    input = FakeInputs(['n', 'N', 'no', 'No', ])
+    assert not yes(input=input)
+    assert not yes(input=input)
+    assert not yes(input=input)
+    assert not yes(input=input)
+
+
+def test_yes_custom():
+    input = FakeInputs(['YES', 'SURE', 'NOPE', ])
+    assert yes(truish=('YES', ), input=input)
+    assert yes(truish=('SURE', ), input=input)
+    assert not yes(falsish=('NOPE', ), input=input)
+
+
+def test_yes_env():
+    input = FakeInputs(['n', 'n'])
+    with environment_variable(OVERRIDE_THIS='nonempty'):
+        assert yes(env_var_override='OVERRIDE_THIS', input=input)
+    with environment_variable(OVERRIDE_THIS=None):  # env not set
+        assert not yes(env_var_override='OVERRIDE_THIS', input=input)
+
+
+def test_yes_defaults():
+    input = FakeInputs(['invalid', '', ' '])
+    assert not yes(input=input)  # default=False
+    assert not yes(input=input)
+    assert not yes(input=input)
+    input = FakeInputs(['invalid', '', ' '])
+    assert yes(default=True, input=input)
+    assert yes(default=True, input=input)
+    assert yes(default=True, input=input)
+    ifile = StringIO()
+    assert yes(default_notty=True, ifile=ifile)
+    assert not yes(default_notty=False, ifile=ifile)
+    input = FakeInputs([])
+    assert yes(default_eof=True, input=input)
+    assert not yes(default_eof=False, input=input)
+    with pytest.raises(ValueError):
+        yes(default=None)
+    with pytest.raises(ValueError):
+        yes(default_notty='invalid')
+    with pytest.raises(ValueError):
+        yes(default_eof='invalid')
+
+
+def test_yes_retry():
+    input = FakeInputs(['foo', 'bar', 'y', ])
+    assert yes(retry_msg='Retry: ', input=input)
+    input = FakeInputs(['foo', 'bar', 'N', ])
+    assert not yes(retry_msg='Retry: ', input=input)
+
+
+def test_yes_output(capfd):
+    input = FakeInputs(['invalid', 'y', 'n'])
+    assert yes(msg='intro-msg', false_msg='false-msg', true_msg='true-msg', retry_msg='retry-msg', input=input)
+    out, err = capfd.readouterr()
+    assert out == ''
+    assert 'intro-msg' in err
+    assert 'retry-msg' in err
+    assert 'true-msg' in err
+    assert not yes(msg='intro-msg', false_msg='false-msg', true_msg='true-msg', retry_msg='retry-msg', input=input)
+    out, err = capfd.readouterr()
+    assert out == ''
+    assert 'intro-msg' in err
+    assert 'retry-msg' not in err
+    assert 'false-msg' in err

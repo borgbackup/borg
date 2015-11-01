@@ -804,3 +804,84 @@ def int_to_bigint(value):
 
 def is_slow_msgpack():
     return msgpack.Packer is msgpack.fallback.Packer
+
+
+def yes(msg=None, retry_msg=None, false_msg=None, true_msg=None,
+        default=False, default_notty=None, default_eof=None,
+        falsish=('No', 'no', 'N', 'n'), truish=('Yes', 'yes', 'Y', 'y'),
+        env_var_override=None, ifile=None, ofile=None, input=input):
+    """
+    Output <msg> (usually a question) and let user input an answer.
+    Qualifies the answer according to falsish and truish as True or False.
+    If it didn't qualify and retry_msg is None (no retries wanted),
+    return the default [which defaults to False]. Otherwise let user retry
+    answering until answer is qualified.
+
+    If env_var_override is given and it is non-empty, counts as truish answer
+    and won't ask user for an answer.
+    If we don't have a tty as input and default_notty is not None, return its value.
+    Otherwise read input from non-tty and proceed as normal.
+    If EOF is received instead an input, return default_eof [or default, if not given].
+
+    :param msg: introducing message to output on ofile, no \n is added [None]
+    :param retry_msg: retry message to output on ofile, no \n is added [None]
+           (also enforces retries instead of returning default)
+    :param false_msg: message to output before returning False [None]
+    :param true_msg: message to output before returning True [None]
+    :param default: default return value (empty answer is given) [False]
+    :param default_notty: if not None, return its value if no tty is connected [None]
+    :param default_eof: return value if EOF was read as answer [same as default]
+    :param falsish: sequence of answers qualifying as False
+    :param truish: sequence of answers qualifying as True
+    :param env_var_override: environment variable name [None]
+    :param ifile: input stream [sys.stdin] (only for testing!)
+    :param ofile: output stream [sys.stderr]
+    :param input: input function [input from builtins]
+    :return: boolean answer value, True or False
+    """
+    # note: we do not assign sys.stdin/stderr as defaults above, so they are
+    # really evaluated NOW,  not at function definition time.
+    if ifile is None:
+        ifile = sys.stdin
+    if ofile is None:
+        ofile = sys.stderr
+    if default not in (True, False):
+        raise ValueError("invalid default value, must be True or False")
+    if default_notty not in (None, True, False):
+        raise ValueError("invalid default_notty value, must be None, True or False")
+    if default_eof not in (None, True, False):
+        raise ValueError("invalid default_eof value, must be None, True or False")
+    if msg:
+        print(msg, file=ofile, end='')
+        ofile.flush()
+    if env_var_override:
+        value = os.environ.get(env_var_override)
+        # currently, any non-empty value counts as truish
+        # TODO: change this so one can give y/n there?
+        if value:
+            value = bool(value)
+            value_str = truish[0] if value else falsish[0]
+            print("{} (from {})".format(value_str, env_var_override), file=ofile)
+            return value
+    if default_notty is not None and not ifile.isatty():
+        # looks like ifile is not a terminal (but e.g. a pipe)
+        return default_notty
+    while True:
+        try:
+            answer = input()  # XXX how can we use ifile?
+        except EOFError:
+            return default_eof if default_eof is not None else default
+        if answer in truish:
+            if true_msg:
+                print(true_msg, file=ofile)
+            return True
+        if answer in falsish:
+            if false_msg:
+                print(false_msg, file=ofile)
+            return False
+        if retry_msg is None:
+            # no retries wanted, we just return the default
+            return default
+        if retry_msg:
+            print(retry_msg, file=ofile, end='')
+            ofile.flush()

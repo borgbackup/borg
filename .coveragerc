@@ -6,6 +6,7 @@ omit =
     */borg/__main__.py
     */borg/_version.py
     */borg/support/*
+    */borg/testsuite/*
 
 [report]
 exclude_lines =

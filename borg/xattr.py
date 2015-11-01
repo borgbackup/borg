@@ -36,7 +36,7 @@ def _check(rv, path=None):
         raise OSError(get_errno(), path)
     return rv
 
-if sys.platform.startswith('linux'):
+if sys.platform.startswith('linux'):  # pragma: linux only
     libc.llistxattr.argtypes = (c_char_p, c_char_p, c_size_t)
     libc.llistxattr.restype = c_ssize_t
     libc.flistxattr.argtypes = (c_int, c_char_p, c_size_t)
@@ -100,7 +100,7 @@ if sys.platform.startswith('linux'):
             func = libc.lsetxattr
         _check(func(path, name, value, len(value) if value else 0, 0), path)
 
-elif sys.platform == 'darwin':
+elif sys.platform == 'darwin':  # pragma: darwin only
     libc.listxattr.argtypes = (c_char_p, c_char_p, c_size_t, c_int)
     libc.listxattr.restype = c_ssize_t
     libc.flistxattr.argtypes = (c_int, c_char_p, c_size_t)
@@ -166,7 +166,7 @@ elif sys.platform == 'darwin':
             flags = XATTR_NOFOLLOW
         _check(func(path, name, value, len(value) if value else 0, 0, flags), path)
 
-elif sys.platform.startswith('freebsd'):
+elif sys.platform.startswith('freebsd'):  # pragma: freebsd only
     EXTATTR_NAMESPACE_USER = 0x0001
     libc.extattr_list_fd.argtypes = (c_int, c_int, c_char_p, c_size_t)
     libc.extattr_list_fd.restype = c_ssize_t
@@ -247,7 +247,7 @@ elif sys.platform.startswith('freebsd'):
             func = libc.extattr_set_link
         _check(func(path, EXTATTR_NAMESPACE_USER, name, value, len(value) if value else 0), path)
 
-else:
+else:  # pragma: unknown platform only
     def listxattr(path, *, follow_symlinks=True):
         return []
 

@@ -1,12 +1,12 @@
 import sys
 
-if sys.platform.startswith('linux'):
+if sys.platform.startswith('linux'):  # pragma: linux only
     from .platform_linux import acl_get, acl_set, API_VERSION
-elif sys.platform.startswith('freebsd'):
+elif sys.platform.startswith('freebsd'):  # pragma: freebsd only
     from .platform_freebsd import acl_get, acl_set, API_VERSION
-elif sys.platform == 'darwin':
+elif sys.platform == 'darwin':  # pragma: darwin only
     from .platform_darwin import acl_get, acl_set, API_VERSION
-else:
+else:  # pragma: unknown platform only
     API_VERSION = 2
 
     def acl_get(path, item, st, numeric_owner=False):

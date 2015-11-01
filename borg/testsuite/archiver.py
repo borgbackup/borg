@@ -93,7 +93,8 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
             sys.stdout = sys.stderr = output = StringIO()
             if archiver is None:
                 archiver = Archiver()
-            ret = archiver.run(list(args))
+            args = archiver.parse_args(list(args))
+            ret = archiver.run(args)
             return ret, output.getvalue()
         finally:
             sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr

@@ -103,3 +103,50 @@ class BaseTestCase(unittest.TestCase):
                 return
             time.sleep(.1)
         raise Exception('wait_for_mount(%s) timeout' % path)
+
+
+class changedir:
+    def __init__(self, dir):
+        self.dir = dir
+
+    def __enter__(self):
+        self.old = os.getcwd()
+        os.chdir(self.dir)
+
+    def __exit__(self, *args, **kw):
+        os.chdir(self.old)
+
+
+class environment_variable:
+    def __init__(self, **values):
+        self.values = values
+        self.old_values = {}
+
+    def __enter__(self):
+        for k, v in self.values.items():
+            self.old_values[k] = os.environ.get(k)
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    def __exit__(self, *args, **kw):
+        for k, v in self.old_values.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
+class FakeInputs:
+    """Simulate multiple user inputs, can be used as input() replacement"""
+    def __init__(self, inputs):
+        self.inputs = inputs
+
+    def __call__(self, prompt=None):
+        if prompt is not None:
+            print(prompt, end='')
+        try:
+            return self.inputs.pop(0)
+        except IndexError:
+            raise EOFError

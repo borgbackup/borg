@@ -14,7 +14,7 @@ from .key import PlaintextKey
 from .logger import create_logger
 logger = create_logger()
 from .helpers import Error, get_cache_dir, decode_dict, st_mtime_ns, unhexlify, int_to_bigint, \
-    bigint_to_int, format_file_size, have_cython
+    bigint_to_int, format_file_size, have_cython, yes
 from .locking import UpgradableLock
 from .hashindex import ChunkIndex
 
@@ -51,15 +51,21 @@ class Cache:
         # Warn user before sending data to a never seen before unencrypted repository
         if not os.path.exists(self.path):
             if warn_if_unencrypted and isinstance(key, PlaintextKey):
-                if not self._confirm('Warning: Attempting to access a previously unknown unencrypted repository',
-                                     'BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'):
+                msg = ("Warning: Attempting to access a previously unknown unencrypted repository!" +
+                       "\n" +
+                       "Do you want to continue? [yN] ")
+                if not yes(msg, false_msg="Aborting.",
+                           env_var_override='BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'):
                     raise self.CacheInitAbortedError()
             self.create()
         self.open()
         # Warn user before sending data to a relocated repository
         if self.previous_location and self.previous_location != repository._location.canonical_path():
-            msg = 'Warning: The repository at location {} was previously located at {}'.format(repository._location.canonical_path(), self.previous_location)
-            if not self._confirm(msg, 'BORG_RELOCATED_REPO_ACCESS_IS_OK'):
+            msg = ("Warning: The repository at location {} was previously located at {}".format(repository._location.canonical_path(), self.previous_location) +
+                   "\n" +
+                   "Do you want to continue? [yN] ")
+            if not yes(msg, false_msg="Aborting.",
+                       env_var_override='BORG_RELOCATED_REPO_ACCESS_IS_OK'):
                 raise self.RepositoryAccessAborted()
 
         if sync and self.manifest.id != self.manifest_id:
@@ -91,19 +97,6 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         for field in ['total_size', 'total_csize', 'unique_csize']:
             stats[field] = format_file_size(stats[field])
         return Summary(**stats)
-
-    def _confirm(self, message, env_var_override=None):
-        print(message, file=sys.stderr)
-        if env_var_override and os.environ.get(env_var_override):
-            print("Yes (From {})".format(env_var_override), file=sys.stderr)
-            return True
-        if not sys.stdin.isatty():
-            return False
-        try:
-            answer = input('Do you want to continue? [yN] ')
-        except EOFError:
-            return False
-        return answer and answer in 'Yy'
 
     def create(self):
         """Create a new empty cache at `self.path`

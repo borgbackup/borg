@@ -19,7 +19,7 @@ from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    is_cachedir, bigint_to_int, ChunkerParams, CompressionSpec, have_cython, is_slow_msgpack, \
+    is_cachedir, bigint_to_int, ChunkerParams, CompressionSpec, have_cython, is_slow_msgpack, yes, \
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .logger import create_logger, setup_logging
 logger = create_logger()
@@ -88,13 +88,12 @@ class Archiver:
         """Check repository consistency"""
         repository = self.open_repository(args.repository, exclusive=args.repair)
         if args.repair:
-            while not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
-                self.print_warning("""'check --repair' is an experimental feature that might result
-in data loss.
-
-Type "Yes I am sure" if you understand this and want to continue.\n""")
-                if input('Do you want to continue? ') == 'Yes I am sure':
-                    break
+            msg = ("'check --repair' is an experimental feature that might result in data loss." +
+                   "\n" +
+                   "Type 'YES' if you understand this and want to continue: ")
+            if not yes(msg, false_msg="Aborting.",
+                       env_var_override='BORG_CHECK_I_KNOW_WHAT_I_AM_DOING', truish=('YES', )):
+                return EXIT_ERROR
         if not args.archives_only:
             logger.info('Starting repository check...')
             if repository.check(repair=args.repair):
@@ -330,15 +329,16 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 logger.info(str(cache))
         else:
             if not args.cache_only:
-                print("You requested to completely DELETE the repository *including* all archives it contains:", file=sys.stderr)
+                msg = []
+                msg.append("You requested to completely DELETE the repository *including* all archives it contains:")
                 for archive_info in manifest.list_archive_infos(sort_by='ts'):
-                    print(format_archive(archive_info), file=sys.stderr)
-                if not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
-                    print("""Type "YES" if you understand this and want to continue.\n""", file=sys.stderr)
-                    # XXX: prompt may end up on stdout, but we'll assume that input() does the right thing
-                    if input('Do you want to continue? ') != 'YES':
-                        self.exit_code = EXIT_ERROR
-                        return self.exit_code
+                    msg.append(format_archive(archive_info))
+                msg.append("Type 'YES' if you understand this and want to continue: ")
+                msg = '\n'.join(msg)
+                if not yes(msg, false_msg="Aborting.",
+                           env_var_override='BORG_CHECK_I_KNOW_WHAT_I_AM_DOING', truish=('YES', )):
+                    self.exit_code = EXIT_ERROR
+                    return self.exit_code
                 repository.destroy()
                 logger.info("Repository deleted.")
             cache.destroy()

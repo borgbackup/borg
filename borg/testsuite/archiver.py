@@ -23,7 +23,7 @@ from ..crypto import bytes_to_long, num_aes_blocks
 from ..helpers import Manifest, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, st_atime_ns, st_mtime_ns
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
-from . import BaseTestCase
+from . import BaseTestCase, changedir, environment_variable
 
 try:
     import llfuse
@@ -41,35 +41,6 @@ try:
 except NameError:
     PermissionError = OSError
 
-
-class changedir:
-    def __init__(self, dir):
-        self.dir = dir
-
-    def __enter__(self):
-        self.old = os.getcwd()
-        os.chdir(self.dir)
-
-    def __exit__(self, *args, **kw):
-        os.chdir(self.old)
-
-
-class environment_variable:
-    def __init__(self, **values):
-        self.values = values
-        self.old_values = {}
-
-    def __enter__(self):
-        for k, v in self.values.items():
-            self.old_values[k] = os.environ.get(k)
-            os.environ[k] = v
-
-    def __exit__(self, *args, **kw):
-        for k, v in self.old_values.items():
-            if v is None:
-                del os.environ[k]
-            else:
-                os.environ[k] = v
 
 def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
     if fork:

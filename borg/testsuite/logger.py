@@ -1,7 +1,6 @@
 import logging
 from io import StringIO
 
-from mock import Mock
 import pytest
 
 from ..logger import find_parent_module, create_logger, setup_logging

@@ -8,7 +8,6 @@ logger = logging.getLogger(__name__)
 import os
 import shutil
 import struct
-import sys
 from zlib import crc32
 
 from .helpers import Error, ErrorWithTraceback, IntegrityError, read_msgpack, write_msgpack, unhexlify, have_cython

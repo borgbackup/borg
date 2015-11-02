@@ -32,7 +32,6 @@ The way to use this is as follows:
 
 import inspect
 import logging
-import sys
 
 
 def setup_logging(stream=None):

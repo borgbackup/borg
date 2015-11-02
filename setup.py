@@ -6,7 +6,6 @@ from glob import glob
 
 from distutils.command.build import build
 from distutils.core import Command
-from distutils.errors import DistutilsOptionError
 from distutils import log
 from setuptools.command.build_py import build_py
 

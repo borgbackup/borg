@@ -1,14 +1,10 @@
 import configparser
 from .remote import cache_if_remote
 from collections import namedtuple
-import errno
 import os
 import stat
-import sys
 from binascii import hexlify
 import shutil
-import tarfile
-import tempfile
 
 from .key import PlaintextKey
 from .logger import create_logger

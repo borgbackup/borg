@@ -257,6 +257,19 @@ Note: currently, extract always writes into the current working directory ("."),
 
 .. include:: usage/rename.rst.inc
 
+Examples
+~~~~~~~~
+::
+
+    $ borg create /mnt/backup::archivename ~
+    $ borg list /mnt/backup
+    archivename                          Mon Nov  2 20:40:06 2015
+
+    $ borg rename /mnt/backup::archivename newname
+    $ borg list /mnt/backup
+    newname                              Mon Nov  2 20:40:06 2015
+
+
 .. include:: usage/delete.rst.inc
 
 .. include:: usage/list.rst.inc

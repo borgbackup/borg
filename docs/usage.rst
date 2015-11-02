@@ -391,6 +391,48 @@ Additional Notes
 
 Here are misc. notes about topics that are maybe not covered in enough detail in the usage section.
 
+--chunker-params
+~~~~~~~~~~~~~~~~
+The chunker params influence how input files are cut into pieces (chunks)
+which are then considered for deduplication. They also have a big impact on
+resource usage (RAM and disk space) as the amount of resources needed is
+(also) determined by the total amount of chunks in the repository (see
+`Indexes / Caches memory usage` for details).
+
+`--chunker-params=10,23,16,4095 (default)` results in a fine-grained deduplication
+and creates a big amount of chunks and thus uses a lot of resources to manage them.
+This is good for relatively small data volumes and if the machine has a good
+amount of free RAM and disk space.
+
+`--chunker-params=19,23,21,4095` results in a coarse-grained deduplication and
+creates a much smaller amount of chunks and thus uses less resources.
+This is good for relatively big data volumes and if the machine has a relatively
+low amount of free RAM and disk space.
+
+If you already have made some archives in a repository and you then change
+chunker params, this of course impacts deduplication as the chunks will be
+cut differently.
+
+In the worst case (all files are big and were touched in between backups), this
+will store all content into the repository again.
+
+Usually, it is not that bad though:
+- usually most files are not touched, so it will just re-use the old chunks
+it already has in the repo
+- files smaller than the (both old and new) minimum chunksize result in only
+one chunk anyway, so the resulting chunks are same and deduplication will apply
+
+If you switch chunker params to save resources for an existing repo that
+already has some backup archives, you will see an increasing effect over time,
+when more and more files have been touched and stored again using the bigger
+chunksize **and** all references to the smaller older chunks have been removed
+(by deleting / pruning archives).
+
+If you want to see an immediate big effect on resource usage, you better start
+a new repository when changing chunker params.
+
+For more details, see :ref:`chunker_details`.
+
 --read-special
 ~~~~~~~~~~~~~~
 

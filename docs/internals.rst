@@ -196,6 +196,7 @@ to the archive metadata.
 
 A chunk is stored as an object as well, of course.
 
+.. _chunker_details:
 
 Chunks
 ------
@@ -212,15 +213,12 @@ can be used to tune the chunker parameters, the default is:
 - HASH_MASK_BITS = 16 (statistical medium chunk size ~= 2^16 B = 64 kiB)
 - HASH_WINDOW_SIZE = 4095 [B] (`0xFFF`)
 
-The default parameters are OK for relatively small backup data volumes and
-repository sizes and a lot of available memory (RAM) and disk space for the
-chunk index. If that does not apply, you are advised to tune these parameters
-to keep the chunk count lower than with the defaults.
-
 The buzhash table is altered by XORing it with a seed randomly generated once
 for the archive, and stored encrypted in the keyfile. This is to prevent chunk
 size based fingerprinting attacks on your encrypted repo contents (to guess
 what files you have based on a specific set of chunk sizes).
+
+For some more general usage hints see also `--chunker-params`.
 
 
 Indexes / Caches

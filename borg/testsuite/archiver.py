@@ -3,6 +3,7 @@ from configparser import ConfigParser
 import errno
 import os
 from io import StringIO
+import random
 import stat
 import subprocess
 import sys
@@ -110,6 +111,75 @@ def test_return_codes(cmd, tmpdir):
     assert rc == EXIT_WARNING  # pattern did not match
     rc, out = cmd('create', '%s::archive' % repo, str(input))
     assert rc == EXIT_ERROR  # duplicate archive name
+
+
+"""
+test_disk_full is very slow and not recommended to be included in daily testing.
+for this test, an empty, writable 16MB filesystem mounted on DF_MOUNT is required.
+for speed and other reasons, it is recommended that the underlying block device is
+in RAM, not a magnetic or flash disk.
+
+assuming /tmp is a tmpfs (in memory filesystem), one can use this:
+dd if=/dev/zero of=/tmp/borg-disk bs=16M count=1
+mkfs.ext4 /tmp/borg-disk
+mkdir /tmp/borg-mount
+sudo mount /tmp/borg-disk /tmp/borg-mount
+
+if the directory does not exist, the test will be skipped.
+"""
+DF_MOUNT = '/tmp/borg-mount'
+
+@pytest.mark.skipif(not os.path.exists(DF_MOUNT), reason="needs a 16MB fs mounted on %s" % DF_MOUNT)
+def test_disk_full(cmd):
+    def make_files(dir, count, size, rnd=True):
+        shutil.rmtree(dir, ignore_errors=True)
+        os.mkdir(dir)
+        if rnd:
+            count = random.randint(1, count)
+            size = random.randint(1, size)
+        for i in range(count):
+            fn = os.path.join(dir, "file%03d" % i)
+            with open(fn, 'wb') as f:
+                data = os.urandom(size)
+                f.write(data)
+
+    with environment_variable(BORG_CHECK_I_KNOW_WHAT_I_AM_DOING='1'):
+        mount = DF_MOUNT
+        assert os.path.exists(mount)
+        repo = os.path.join(mount, 'repo')
+        input = os.path.join(mount, 'input')
+        reserve = os.path.join(mount, 'reserve')
+        for j in range(100):
+            shutil.rmtree(repo, ignore_errors=True)
+            rc, out = cmd('init', repo)
+            print('init', rc, out)
+            assert rc == EXIT_SUCCESS
+            # keep some space in reserve that we can free up later:
+            make_files(reserve, 1, 8000000, rnd=False)
+            try:
+                success, i = True, 0
+                while success:
+                    i += 1
+                    make_files(input, 20, 200000)  # random, ~1MB
+                    try:
+                        rc, out = cmd('create', '%s::test%03d' % (repo, i), input)
+                        success = rc == EXIT_SUCCESS
+                        if not success:
+                            print('create', rc, out)
+                    finally:
+                        # make sure repo is not locked
+                        shutil.rmtree(os.path.join(repo, 'lock.exclusive'), ignore_errors=True)
+                        os.remove(os.path.join(repo, 'lock.roster'))
+            finally:
+                # now some error happened, likely we are out of disk space.
+                # free some space so we can expect borg to be able to work normally:
+                shutil.rmtree(reserve, ignore_errors=True)
+            rc, out = cmd('list', repo)
+            print('list', rc, out)
+            assert rc == EXIT_SUCCESS
+            rc, out = cmd('check', '--repair', repo)
+            print('check', rc, out)
+            assert rc == EXIT_SUCCESS
 
 
 class ArchiverTestCaseBase(BaseTestCase):

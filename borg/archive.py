@@ -483,13 +483,14 @@ Number of files: {0.stats.nfiles}'''.format(self)
         for chunk in self.chunker.chunkify(fd):
             chunks.append(cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats))
         self.stats.nfiles += 1
+        t = int_to_bigint(int(time.time()) * 1000000000)
         item = {
             b'path': path,
             b'chunks': chunks,
             b'mode': 0o100660,  # regular file, ug=rw
             b'uid': uid, b'user': uid2user(uid),
             b'gid': gid, b'group': gid2group(gid),
-            b'mtime': int_to_bigint(int(time.time()) * 1000000000)
+            b'mtime': t, b'atime': t, b'ctime': t,
         }
         self.add_item(item)
         return 'i'  # stdin

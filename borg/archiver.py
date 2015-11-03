@@ -500,6 +500,20 @@ class Archiver:
             print("warning: %s" % e)
         return self.exit_code
 
+    def do_debug_dump_archive_items(self, args):
+        """dump (decrypted, decompressed) archive items metadata (not: data)"""
+        repository = self.open_repository(args.archive)
+        manifest, key = Manifest.load(repository)
+        archive = Archive(repository, key, manifest, args.archive.archive)
+        for i, item_id in enumerate(archive.metadata[b'items']):
+            data = key.decrypt(item_id, repository.get(item_id))
+            filename = '%06d_%s.items' %(i, hexlify(item_id).decode('ascii'))
+            print('Dumping', filename)
+            with open(filename, 'wb') as fd:
+                fd.write(data)
+        print('Done.')
+        return EXIT_SUCCESS
+
     helptext = {}
     helptext['patterns'] = '''
         Exclude patterns use a variant of shell pattern syntax, with '*' matching any
@@ -985,6 +999,18 @@ class Archiver:
         subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
         subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
                                help='additional help on TOPIC')
+
+        debug_dump_archive_items_epilog = textwrap.dedent("""
+        This command dumps raw (but decrypted and decompressed) archive items (only metadata) to files.
+        """)
+        subparser = subparsers.add_parser('debug-dump-archive-items', parents=[common_parser],
+                                          description=self.do_debug_dump_archive_items.__doc__,
+                                          epilog=debug_dump_archive_items_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.set_defaults(func=self.do_debug_dump_archive_items)
+        subparser.add_argument('archive', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='archive to dump')
         return parser
 
     def parse_args(self, args=None):

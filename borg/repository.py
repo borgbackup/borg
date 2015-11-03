@@ -178,8 +178,8 @@ class Repository:
         if not self.index or transaction_id is None:
             self.index = self.open_index(transaction_id)
         if transaction_id is None:
-            self.segments = {}
-            self.compact = set()
+            self.segments = {}  # XXX bad name: usage_count_of_segment_x = self.segments[x]
+            self.compact = set()  # XXX bad name: segments_needing_compaction = self.compact
         else:
             if do_cleanup:
                 self.io.cleanup(transaction_id)
@@ -335,12 +335,15 @@ class Repository:
                     continue
                 else:
                     report_error('Unexpected tag {} in segment {}'.format(tag, segment))
+        # self.index, self.segments, self.compact now reflect the state of the segment files up to <transaction_id>
         # We might need to add a commit tag if no committed segment is found
         if repair and segments_transaction_id is None:
             report_error('Adding commit tag to segment {}'.format(transaction_id))
             self.io.segment = transaction_id + 1
             self.io.write_commit()
         if current_index and not repair:
+            # current_index = "as found on disk"
+            # self.index = "as rebuilt in-memory from segments"
             if len(current_index) != len(self.index):
                 report_error('Index object count mismatch. {} != {}'.format(len(current_index), len(self.index)))
             elif current_index:

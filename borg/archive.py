@@ -217,6 +217,9 @@ Number of files: {0.stats.nfiles}'''.format(self)
             yield item
 
     def add_item(self, item):
+        unknown_keys = set(item) - ITEM_KEYS
+        assert not unknown_keys, ('unknown item metadata keys detected, please update ITEM_KEYS: %s',
+                                  ','.join(k.decode('ascii') for k in unknown_keys))
         if self.show_progress and time.time() - self.last_progress > 0.2:
             self.stats.show_progress(item=item)
             self.last_progress = time.time()
@@ -589,10 +592,17 @@ Number of files: {0.stats.nfiles}'''.format(self)
         return Archive._open_rb(path, st)
 
 
+# this set must be kept complete, otherwise the RobustUnpacker might malfunction:
+ITEM_KEYS = set([b'path', b'source', b'rdev', b'chunks',
+                 b'mode', b'user', b'group', b'uid', b'gid', b'mtime', b'atime', b'ctime',
+                 b'xattrs', b'bsdflags',
+            ])
+
+
 class RobustUnpacker:
     """A restartable/robust version of the streaming msgpack unpacker
     """
-    item_keys = [msgpack.packb(name) for name in ('path', 'mode', 'source', 'chunks', 'rdev', 'xattrs', 'user', 'group', 'uid', 'gid', 'mtime')]
+    item_keys = [msgpack.packb(name) for name in ITEM_KEYS]
 
     def __init__(self, validator):
         super().__init__()

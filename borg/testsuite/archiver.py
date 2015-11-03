@@ -136,7 +136,8 @@ def test_disk_full(cmd):
         os.mkdir(dir)
         if rnd:
             count = random.randint(1, count)
-            size = random.randint(1, size)
+            if size > 1:
+                size = random.randint(1, size)
         for i in range(count):
             fn = os.path.join(dir, "file%03d" % i)
             with open(fn, 'wb') as f:
@@ -151,16 +152,24 @@ def test_disk_full(cmd):
         reserve = os.path.join(mount, 'reserve')
         for j in range(100):
             shutil.rmtree(repo, ignore_errors=True)
+            shutil.rmtree(input, ignore_errors=True)
+            # keep some space and some inodes in reserve that we can free up later:
+            make_files(reserve, 80, 100000, rnd=False)
             rc, out = cmd('init', repo)
-            print('init', rc, out)
+            if rc != EXIT_SUCCESS:
+                print('init', rc, out)
             assert rc == EXIT_SUCCESS
-            # keep some space in reserve that we can free up later:
-            make_files(reserve, 1, 8000000, rnd=False)
             try:
                 success, i = True, 0
                 while success:
                     i += 1
-                    make_files(input, 20, 200000)  # random, ~1MB
+                    try:
+                        make_files(input, 20, 200000)
+                    except OSError as err:
+                        if err.errno == errno.ENOSPC:
+                            # already out of space
+                            break
+                        raise
                     try:
                         rc, out = cmd('create', '%s::test%03d' % (repo, i), input)
                         success = rc == EXIT_SUCCESS
@@ -175,10 +184,11 @@ def test_disk_full(cmd):
                 # free some space so we can expect borg to be able to work normally:
                 shutil.rmtree(reserve, ignore_errors=True)
             rc, out = cmd('list', repo)
-            print('list', rc, out)
-            assert rc == EXIT_SUCCESS
+            if rc != EXIT_SUCCESS:
+               print('list', rc, out)
             rc, out = cmd('check', '--repair', repo)
-            print('check', rc, out)
+            if rc != EXIT_SUCCESS:
+                print('check', rc, out)
             assert rc == EXIT_SUCCESS
 
 

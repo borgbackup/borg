@@ -17,7 +17,7 @@ import traceback
 from . import __version__
 from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
-    get_cache_dir, get_keys_dir, prune_within, prune_split, \
+    get_cache_dir, get_keys_dir, prune_within, prune_split, unhexlify, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     is_cachedir, bigint_to_int, ChunkerParams, CompressionSpec, have_cython, is_slow_msgpack, yes, \
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
@@ -511,6 +511,28 @@ class Archiver:
             print('Dumping', filename)
             with open(filename, 'wb') as fd:
                 fd.write(data)
+        print('Done.')
+        return EXIT_SUCCESS
+
+    def do_debug_delete_obj(self, args):
+        """delete the objects with the given IDs from the repo"""
+        repository = self.open_repository(args.repository)
+        manifest, key = Manifest.load(repository)
+        modified = False
+        for hex_id in args.ids:
+            try:
+                id = unhexlify(hex_id)
+            except ValueError:
+                print("object id %s is invalid." % hex_id)
+            else:
+                try:
+                    repository.delete(id)
+                    modified = True
+                    print("object %s deleted." % hex_id)
+                except repository.ObjectNotFound:
+                    print("object %s not found." % hex_id)
+        if modified:
+            repository.commit()
         print('Done.')
         return EXIT_SUCCESS
 
@@ -1011,6 +1033,20 @@ class Archiver:
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to dump')
+
+        debug_delete_obj_epilog = textwrap.dedent("""
+        This command deletes objects from the repository.
+        """)
+        subparser = subparsers.add_parser('debug-delete-obj', parents=[common_parser],
+                                          description=self.do_debug_delete_obj.__doc__,
+                                          epilog=debug_delete_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.set_defaults(func=self.do_debug_delete_obj)
+        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
+                               help='hex object ID(s) to delete from the repo')
         return parser
 
     def parse_args(self, args=None):

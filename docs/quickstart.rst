@@ -8,6 +8,29 @@ This chapter will get you started with |project_name|. The first section
 presents a simple step by step example that uses |project_name| to backup data.
 The next section continues by showing how backups can be automated.
 
+Important note about free space
+-------------------------------
+
+Before you start creating backups, please make sure that there is **always**
+a good amount of free space on the filesystem that has your backup repository
+(and also on ~/.cache). It is hard to tell how much, maybe 1-5%.
+
+If you run out of disk space, it can be hard or impossible to free space,
+because |project_name| needs free space to operate - even to delete backup
+archives.
+
+You can use some monitoring process or just include the free space information
+in your backup log files (you check them regularly anyway, right?).
+
+Also helpful:
+
+- create a big file as a "space reserve", that you can delete to free space
+- if you use LVM: use a LV + a filesystem that you can resize later and have
+  some unallocated PEs you can add to the LV.
+- consider using quotas
+- use `prune` regularly
+
+
 A step by step example
 ----------------------
 

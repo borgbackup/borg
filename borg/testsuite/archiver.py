@@ -767,6 +767,31 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_aes_counter_uniqueness_passphrase(self):
         self.verify_aes_counter_uniqueness('passphrase')
 
+    def test_debug_dump_archive_items(self):
+        self.create_test_files()
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            output = self.cmd('debug-dump-archive-items', self.repository_location + '::test')
+        output_dir = sorted(os.listdir('output'))
+        assert len(output_dir) > 0 and output_dir[0].startswith('000000_')
+        assert 'Done.' in output
+
+    def test_debug_delete_obj(self):
+        self.cmd('init', self.repository_location)
+        repository = Repository(self.repository_location)
+        data = b'some data'
+        h = sha256(data)
+        key, hexkey = h.digest(), h.hexdigest()
+        repository.put(key, data)
+        repository.commit()
+        output = self.cmd('debug-delete-obj', self.repository_location, 'invalid')
+        assert "is invalid" in output
+        output = self.cmd('debug-delete-obj', self.repository_location, hexkey)
+        assert "deleted" in output
+        output = self.cmd('debug-delete-obj', self.repository_location, hexkey)
+        assert "not found" in output
+
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
 class ArchiverTestCaseBinary(ArchiverTestCase):
@@ -874,4 +899,8 @@ class RemoteArchiverTestCase(ArchiverTestCase):
 
     @unittest.skip('deadlock issues')
     def test_fuse_mount_archive(self):
+        pass
+
+    @unittest.skip('only works locally')
+    def test_debug_delete_obj(self):
         pass

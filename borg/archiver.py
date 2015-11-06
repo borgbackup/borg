@@ -515,6 +515,26 @@ class Archiver:
         print('Done.')
         return EXIT_SUCCESS
 
+    def do_debug_get_obj(self, args):
+        """get object contents from the repository and write it into file"""
+        repository = self.open_repository(args.repository)
+        manifest, key = Manifest.load(repository)
+        hex_id = args.id
+        try:
+            id = unhexlify(hex_id)
+        except ValueError:
+            print("object id %s is invalid." % hex_id)
+        else:
+            try:
+                data =repository.get(id)
+            except repository.ObjectNotFound:
+                print("object %s not found." % hex_id)
+            else:
+                with open(args.path, "wb") as f:
+                    f.write(data)
+                print("object %s fetched." % hex_id)
+        return EXIT_SUCCESS
+
     def do_debug_put_obj(self, args):
         """put file(s) contents into the repository"""
         repository = self.open_repository(args.repository)
@@ -1047,6 +1067,22 @@ class Archiver:
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to dump')
+
+        debug_get_obj_epilog = textwrap.dedent("""
+        This command gets an object from the repository.
+        """)
+        subparser = subparsers.add_parser('debug-get-obj', parents=[common_parser],
+                                          description=self.do_debug_get_obj.__doc__,
+                                          epilog=debug_get_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.set_defaults(func=self.do_debug_get_obj)
+        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('id', metavar='ID', type=str,
+                               help='hex object ID to get from the repo')
+        subparser.add_argument('path', metavar='PATH', type=str,
+                               help='file to write object data into')
 
         debug_put_obj_epilog = textwrap.dedent("""
         This command puts objects into the repository.

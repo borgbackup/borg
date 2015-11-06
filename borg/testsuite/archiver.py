@@ -777,13 +777,18 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert len(output_dir) > 0 and output_dir[0].startswith('000000_')
         assert 'Done.' in output
 
-    def test_debug_put_delete_obj(self):
+    def test_debug_put_get_delete_obj(self):
         self.cmd('init', self.repository_location)
         data = b'some data'
         hexkey = sha256(data).hexdigest()
         self.create_regular_file('file', contents=data)
         output = self.cmd('debug-put-obj', self.repository_location, 'input/file')
         assert hexkey in output
+        output = self.cmd('debug-get-obj', self.repository_location, hexkey, 'output/file')
+        assert hexkey in output
+        with open('output/file', 'rb') as f:
+            data_read = f.read()
+        assert data == data_read
         output = self.cmd('debug-delete-obj', self.repository_location, hexkey)
         assert "deleted" in output
         output = self.cmd('debug-delete-obj', self.repository_location, hexkey)
@@ -901,5 +906,5 @@ class RemoteArchiverTestCase(ArchiverTestCase):
         pass
 
     @unittest.skip('only works locally')
-    def test_debug_put_delete_obj(self):
+    def test_debug_put_get_delete_obj(self):
         pass

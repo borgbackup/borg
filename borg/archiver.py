@@ -414,6 +414,8 @@ class Archiver:
                         remove_surrogates(item[b'path']), extra))
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
+                if args.prefix and not archive_info.name.startswith(args.prefix):
+                    continue
                 print(format_archive(archive_info))
         return self.exit_code
 
@@ -835,9 +837,12 @@ class Archiver:
         subparser.add_argument('--short', dest='short',
                                action='store_true', default=False,
                                help='only print file/directory names, nothing else')
+        subparser.add_argument('-p', '--prefix', dest='prefix', type=str,
+                               help='only consider archive names starting with this prefix')
         subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='repository/archive to list contents of')
+
         mount_epilog = textwrap.dedent("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
         browsing an archive or restoring individual files. Unless the ``--foreground``

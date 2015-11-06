@@ -675,6 +675,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('bar-2015-08-12-10:00', output)
         self.assert_in('bar-2015-08-12-20:00', output)
 
+    def test_list_prefix(self):
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test-1', src_dir)
+        self.cmd('create', self.repository_location + '::something-else-than-test-1', src_dir)
+        self.cmd('create', self.repository_location + '::test-2', src_dir)
+        output = self.cmd('list', '--prefix=test-', self.repository_location)
+        self.assert_in('test-1', output)
+        self.assert_in('test-2', output)
+        self.assert_not_in('something-else', output)
+
     def test_usage(self):
         if self.FORK_DEFAULT:
             self.cmd(exit_code=0)

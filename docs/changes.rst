@@ -4,10 +4,14 @@ Changelog
 Version 0.28.0
 --------------
 
+Compatibility notes:
+- changed return codes (exit codes), see docs. in short:
+  old: 0 = ok, 1 = error. now: 0 = ok, 1 = warning, 2 = error
+
 New features:
 
 - refactor return codes (exit codes), fixes #61
-- give a final status into the log output, including exit code, fixes #58
+- add --show-rc option enable "terminating with X status, rc N" output, fixes 58, #351
 - borg create backups atime and ctime additionally to mtime, fixes #317
   - extract: support atime additionally to mtime
   - FUSE: support ctime and atime additionally to mtime
@@ -16,14 +20,12 @@ New features:
 - borg list --prefix=thishostname- REPO, fixes #205
 - Debug commands (do not use except if you know what you do: debug-get-obj,
   debug-put-obj, debug-delete-obj, debug-dump-archive-items.
-- add --show-rc option enable "terminating with X status, rc N" output, fixes #351
 
 Bug fixes:
 
 - setup.py: fix bug related to BORG_LZ4_PREFIX processing
-- borg mount: fix unlocking of repository at umount time, fixes #331
-- add a test to find disk-full issues, #327
 - fix "check" for repos that have incomplete chunks, fixes #364
+- borg mount: fix unlocking of repository at umount time, fixes #331
 - fix reading files without touching their atime, #334
 - non-ascii ACL fixes for Linux, FreeBSD and OS X, #277
 - fix acl_use_local_uid_gid() and add a test for it, attic #359
@@ -38,9 +40,8 @@ Bug fixes:
 
 Other changes:
 
-- improve file size displays
-- convert to more flexible size formatters
-- explicitely commit to the units standard, #289
+- improve file size displays, more flexible size formatters
+- explicitly commit to the units standard, #289
 - archiver: add E status (means that an error occured when processing this
   (single) item
 - do binary releases via "github releases", closes #214
@@ -49,18 +50,17 @@ Other changes:
 - show progress display if on a tty, output more progress information, #303
 - factor out status output so it is consistent, fix surrogates removal,
   maybe fixes #309
-- benchmarks: test create, extract, list, delete, info, check, help, fixes #146
-- benchmarks: test with both the binary and the python code
 - move away from RawConfigParser to ConfigParser
 - archive checker: better error logging, give chunk_id and sequence numbers
   (can be used together with borg debug-dump-archive-items).
 - do not mention the deprecated passphrase mode
 - emit a deprecation warning for --compression N (giving a just a number)
-- misc .coverragerc fixes (and coverage measurment improvements), fixes #319
+- misc .coverragerc fixes (and coverage measurement improvements), fixes #319
 - refactor confirmation code, reduce code duplication, add tests
 - prettier error messages, fixes #307, #57
 - tests:
 
+  - add a test to find disk-full issues, #327
   - travis: also run tests on Python 3.5
   - travis: use tox -r so it rebuilds the tox environments
   - test the generated pyinstaller-based binary by archiver unit tests, #215
@@ -68,6 +68,8 @@ Other changes:
   - vagrant: add vagrant user to fuse group for debianoid systems also
   - vagrant: llfuse install on darwin needs pkgconfig installed
   - vagrant: use pyinstaller from develop branch, fixes #336
+  - benchmarks: test create, extract, list, delete, info, check, help, fixes #146
+  - benchmarks: test with both the binary and the python code
   - archiver tests: test with both the binary and the python code, fixes #215
 - docs:
 

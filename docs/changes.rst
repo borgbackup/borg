@@ -12,17 +12,29 @@ New features:
   - extract: support atime additionally to mtime
   - FUSE: support ctime and atime additionally to mtime
 - support borg --version
+- emit a warning if we have a slow msgpack installed
+- borg list --prefix=thishostname- REPO, fixes #205
+- Debug commands (do not use except if you know what you do: debug-get-obj,
+  debug-put-obj, debug-delete-obj, debug-dump-archive-items.
+- add --show-rc option enable "terminating with X status, rc N" output, fixes #351
 
 Bug fixes:
 
 - setup.py: fix bug related to BORG_LZ4_PREFIX processing
 - borg mount: fix unlocking of repository at umount time, fixes #331
+- add a test to find disk-full issues, #327
+- fix "check" for repos that have incomplete chunks, fixes #364
 - fix reading files without touching their atime, #334
 - non-ascii ACL fixes for Linux, FreeBSD and OS X, #277
 - fix acl_use_local_uid_gid() and add a test for it, attic #359
 - borg upgrade: do not upgrade repositories in place by default, #299
 - fix cascading failure with the index conversion code, #269
 - borg check: implement 'cmdline' archive metadata value decoding, #311
+- fix RobustUnpacker, it missed some metadata keys (new atime and ctime keys
+  were missing, but also bsdflags). add check for unknown metadata keys.
+- create from stdin: also save atime, ctime (cosmetic)
+- use default_notty=False for confirmations, fixes #345
+- vagrant: fix msgpack installation on centos, fixes #342
 
 Other changes:
 
@@ -39,6 +51,14 @@ Other changes:
   maybe fixes #309
 - benchmarks: test create, extract, list, delete, info, check, help, fixes #146
 - benchmarks: test with both the binary and the python code
+- move away from RawConfigParser to ConfigParser
+- archive checker: better error logging, give chunk_id and sequence numbers
+  (can be used together with borg debug-dump-archive-items).
+- do not mention the deprecated passphrase mode
+- emit a deprecation warning for --compression N (giving a just a number)
+- misc .coverragerc fixes (and coverage measurment improvements), fixes #319
+- refactor confirmation code, reduce code duplication, add tests
+- prettier error messages, fixes #307, #57
 - tests:
 
   - travis: also run tests on Python 3.5
@@ -47,6 +67,7 @@ Other changes:
   - vagrant: tests: announce whether fakeroot is used or not
   - vagrant: add vagrant user to fuse group for debianoid systems also
   - vagrant: llfuse install on darwin needs pkgconfig installed
+  - vagrant: use pyinstaller from develop branch, fixes #336
   - archiver tests: test with both the binary and the python code, fixes #215
 - docs:
 
@@ -64,7 +85,11 @@ Other changes:
   - remove api docs (too much breakage on rtd)
   - borgbackup install + basics presentation (asciinema)
   - describe the current style guide in documentation
-    
+  - add section about debug commands
+  - warn about not running out of space
+  - add example for rename
+  - improve chunker params docs, fixes #362
+
 
 Version 0.27.0
 --------------

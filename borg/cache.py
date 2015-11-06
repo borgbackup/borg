@@ -43,7 +43,6 @@ class Cache:
         self.manifest = manifest
         self.path = path or os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
         self.do_files = do_files
-        logger.info('initializing cache')
         # Warn user before sending data to a never seen before unencrypted repository
         if not os.path.exists(self.path):
             if warn_if_unencrypted and isinstance(key, PlaintextKey):
@@ -71,7 +70,6 @@ class Cache:
             # Make sure an encrypted repository has not been swapped for an unencrypted repository
             if self.key_type is not None and self.key_type != str(key.TYPE):
                 raise self.EncryptionMethodMismatch()
-            logger.info('synchronizing cache')
             self.sync()
             self.commit()
 

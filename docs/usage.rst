@@ -8,15 +8,18 @@ Usage
 a number of arguments and options. The following sections will describe each
 command in detail.
 
+General
+-------
+
 Quiet by default
-----------------
+~~~~~~~~~~~~~~~~
 
 Like most UNIX commands |project_name| is quiet by default but the ``-v`` or
 ``--verbose`` option can be used to get the program to output more status
 messages as it is processing.
 
 Return codes
-------------
+~~~~~~~~~~~~
 
 |project_name| can exit with the following return codes (rc):
 
@@ -33,7 +36,7 @@ The return code is also logged at the indicated level as the last log entry.
 
 
 Environment Variables
----------------------
+~~~~~~~~~~~~~~~~~~~~~
 
 |project_name| uses some environment variables for automation:
 
@@ -85,7 +88,7 @@ Please note:
 
 
 Resource Usage
---------------
+~~~~~~~~~~~~~~
 
 |project_name| might use a lot of resources depending on the size of the data set it is dealing with.
 
@@ -131,7 +134,7 @@ In case you are interested in more details, please read the internals documentat
 
 
 Units
------
+~~~~~
 
 To display quantities, |project_name| takes care of respecting the
 usual conventions of scale. Disk sizes are displayed in `decimal
@@ -476,7 +479,7 @@ maybe directly into an existing device file of your choice or indirectly via
 ``dd``).
 
 Example
-~~~~~~~
++++++++
 
 Imagine you have made some snapshots of logical volumes (LVs) you want to backup.
 

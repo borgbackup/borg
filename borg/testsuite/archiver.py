@@ -777,20 +777,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert len(output_dir) > 0 and output_dir[0].startswith('000000_')
         assert 'Done.' in output
 
-    def test_debug_delete_obj(self):
+    def test_debug_put_delete_obj(self):
         self.cmd('init', self.repository_location)
-        repository = Repository(self.repository_location)
         data = b'some data'
-        h = sha256(data)
-        key, hexkey = h.digest(), h.hexdigest()
-        repository.put(key, data)
-        repository.commit()
-        output = self.cmd('debug-delete-obj', self.repository_location, 'invalid')
-        assert "is invalid" in output
+        hexkey = sha256(data).hexdigest()
+        self.create_regular_file('file', contents=data)
+        output = self.cmd('debug-put-obj', self.repository_location, 'input/file')
+        assert hexkey in output
         output = self.cmd('debug-delete-obj', self.repository_location, hexkey)
         assert "deleted" in output
         output = self.cmd('debug-delete-obj', self.repository_location, hexkey)
         assert "not found" in output
+        output = self.cmd('debug-delete-obj', self.repository_location, 'invalid')
+        assert "is invalid" in output
 
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
@@ -902,5 +901,5 @@ class RemoteArchiverTestCase(ArchiverTestCase):
         pass
 
     @unittest.skip('only works locally')
-    def test_debug_delete_obj(self):
+    def test_debug_put_delete_obj(self):
         pass

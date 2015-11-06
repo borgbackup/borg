@@ -3,6 +3,7 @@ from .support import argparse  # see support/__init__.py docstring
 
 from binascii import hexlify
 from datetime import datetime
+from hashlib import sha256
 from operator import attrgetter
 import functools
 import inspect
@@ -512,6 +513,19 @@ class Archiver:
             with open(filename, 'wb') as fd:
                 fd.write(data)
         print('Done.')
+        return EXIT_SUCCESS
+
+    def do_debug_put_obj(self, args):
+        """put file(s) contents into the repository"""
+        repository = self.open_repository(args.repository)
+        manifest, key = Manifest.load(repository)
+        for path in args.paths:
+            with open(path, "rb") as f:
+                data = f.read()
+            h = sha256(data)  # XXX hardcoded
+            repository.put(h.digest(), data)
+            print("object %s put." % h.hexdigest())
+        repository.commit()
         return EXIT_SUCCESS
 
     def do_debug_delete_obj(self, args):
@@ -1033,6 +1047,20 @@ class Archiver:
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to dump')
+
+        debug_put_obj_epilog = textwrap.dedent("""
+        This command puts objects into the repository.
+        """)
+        subparser = subparsers.add_parser('debug-put-obj', parents=[common_parser],
+                                          description=self.do_debug_put_obj.__doc__,
+                                          epilog=debug_put_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.set_defaults(func=self.do_debug_put_obj)
+        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
+                               help='file(s) to read and create object(s) from')
 
         debug_delete_obj_epilog = textwrap.dedent("""
         This command deletes objects from the repository.

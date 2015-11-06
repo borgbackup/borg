@@ -304,7 +304,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', '--stats', self.repository_location + '::test.2', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
-        self.assert_equal(len(self.cmd('list', self.repository_location).splitlines()), 2)
+        list_output = self.cmd('list', self.repository_location)
+        self.assert_in('test ', list_output)
+        self.assert_in('test.2 ', list_output)
         expected =  [
             'input',
             'input/bdev',

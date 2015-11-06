@@ -136,7 +136,7 @@ Notes
 
 Borg is a fork of `Attic`_ and maintained by "`The Borg collective`_".
 
-.. _The Borg collective: https://borgbackup.readthedocs.org/authors.html
+.. _The Borg collective: https://borgbackup.readthedocs.org/en/latest/authors.html
 
 Differences between Attic and Borg
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

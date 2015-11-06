@@ -243,35 +243,43 @@ class Repository:
                     continue
                 if segment > segments_transaction_id:
                     break
-                # code duplication below?? vvv (see similar code in check())
-                self.segments[segment] = 0
-                for tag, key, offset in self.io.iter_objects(segment):
-                    if tag == TAG_PUT:
-                        try:
-                            s, _ = self.index[key]
-                            self.compact.add(s)
-                            self.segments[s] -= 1
-                        except KeyError:
-                            pass
-                        self.index[key] = segment, offset
-                        self.segments[segment] += 1
-                    elif tag == TAG_DELETE:
-                        try:
-                            s, _ = self.index.pop(key)
-                            self.segments[s] -= 1
-                            self.compact.add(s)
-                        except KeyError:
-                            pass
-                        self.compact.add(segment)
-                    elif tag == TAG_COMMIT:
-                        continue
-                    else:
-                        raise self.CheckNeeded(self.path)
-                if self.segments[segment] == 0:
-                    self.compact.add(segment)
+                objects = self.io.iter_objects(segment)
+                self._update_index(segment, objects)
             self.write_index()
         finally:
             self.rollback()
+
+    def _update_index(self, segment, objects, report=None):
+        """some code shared between replay_segments and check"""
+        self.segments[segment] = 0
+        for tag, key, offset in objects:
+            if tag == TAG_PUT:
+                try:
+                    s, _ = self.index[key]
+                    self.compact.add(s)
+                    self.segments[s] -= 1
+                except KeyError:
+                    pass
+                self.index[key] = segment, offset
+                self.segments[segment] += 1
+            elif tag == TAG_DELETE:
+                try:
+                    s, _ = self.index.pop(key)
+                    self.segments[s] -= 1
+                    self.compact.add(s)
+                except KeyError:
+                    pass
+                self.compact.add(segment)
+            elif tag == TAG_COMMIT:
+                continue
+            else:
+                msg = 'Unexpected tag {} in segment {}'.format(tag, segment)
+                if report is None:
+                    raise self.CheckNeeded(msg)
+                else:
+                    report(msg)
+        if self.segments[segment] == 0:
+            self.compact.add(segment)
 
     def check(self, repair=False):
         """Check repository consistency
@@ -312,29 +320,7 @@ class Repository:
                 if repair:
                     self.io.recover_segment(segment, filename)
                     objects = list(self.io.iter_objects(segment))
-            self.segments[segment] = 0
-            for tag, key, offset in objects:
-                if tag == TAG_PUT:
-                    try:
-                        s, _ = self.index[key]
-                        self.compact.add(s)
-                        self.segments[s] -= 1
-                    except KeyError:
-                        pass
-                    self.index[key] = segment, offset
-                    self.segments[segment] += 1
-                elif tag == TAG_DELETE:
-                    try:
-                        s, _ = self.index.pop(key)
-                        self.segments[s] -= 1
-                        self.compact.add(s)
-                    except KeyError:
-                        pass
-                    self.compact.add(segment)
-                elif tag == TAG_COMMIT:
-                    continue
-                else:
-                    report_error('Unexpected tag {} in segment {}'.format(tag, segment))
+            self._update_index(segment, objects, report_error)
         # self.index, self.segments, self.compact now reflect the state of the segment files up to <transaction_id>
         # We might need to add a commit tag if no committed segment is found
         if repair and segments_transaction_id is None:

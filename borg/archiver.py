@@ -3,6 +3,7 @@ from .support import argparse  # see support/__init__.py docstring
 
 from binascii import hexlify
 from datetime import datetime
+from hashlib import sha256
 from operator import attrgetter
 import functools
 import inspect
@@ -17,7 +18,7 @@ import traceback
 from . import __version__
 from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
-    get_cache_dir, get_keys_dir, prune_within, prune_split, \
+    get_cache_dir, get_keys_dir, prune_within, prune_split, unhexlify, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     is_cachedir, bigint_to_int, ChunkerParams, CompressionSpec, have_cython, is_slow_msgpack, yes, \
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
@@ -501,6 +502,75 @@ class Archiver:
         except NotImplementedError as e:
             print("warning: %s" % e)
         return self.exit_code
+
+    def do_debug_dump_archive_items(self, args):
+        """dump (decrypted, decompressed) archive items metadata (not: data)"""
+        repository = self.open_repository(args.archive)
+        manifest, key = Manifest.load(repository)
+        archive = Archive(repository, key, manifest, args.archive.archive)
+        for i, item_id in enumerate(archive.metadata[b'items']):
+            data = key.decrypt(item_id, repository.get(item_id))
+            filename = '%06d_%s.items' %(i, hexlify(item_id).decode('ascii'))
+            print('Dumping', filename)
+            with open(filename, 'wb') as fd:
+                fd.write(data)
+        print('Done.')
+        return EXIT_SUCCESS
+
+    def do_debug_get_obj(self, args):
+        """get object contents from the repository and write it into file"""
+        repository = self.open_repository(args.repository)
+        manifest, key = Manifest.load(repository)
+        hex_id = args.id
+        try:
+            id = unhexlify(hex_id)
+        except ValueError:
+            print("object id %s is invalid." % hex_id)
+        else:
+            try:
+                data =repository.get(id)
+            except repository.ObjectNotFound:
+                print("object %s not found." % hex_id)
+            else:
+                with open(args.path, "wb") as f:
+                    f.write(data)
+                print("object %s fetched." % hex_id)
+        return EXIT_SUCCESS
+
+    def do_debug_put_obj(self, args):
+        """put file(s) contents into the repository"""
+        repository = self.open_repository(args.repository)
+        manifest, key = Manifest.load(repository)
+        for path in args.paths:
+            with open(path, "rb") as f:
+                data = f.read()
+            h = sha256(data)  # XXX hardcoded
+            repository.put(h.digest(), data)
+            print("object %s put." % h.hexdigest())
+        repository.commit()
+        return EXIT_SUCCESS
+
+    def do_debug_delete_obj(self, args):
+        """delete the objects with the given IDs from the repo"""
+        repository = self.open_repository(args.repository)
+        manifest, key = Manifest.load(repository)
+        modified = False
+        for hex_id in args.ids:
+            try:
+                id = unhexlify(hex_id)
+            except ValueError:
+                print("object id %s is invalid." % hex_id)
+            else:
+                try:
+                    repository.delete(id)
+                    modified = True
+                    print("object %s deleted." % hex_id)
+                except repository.ObjectNotFound:
+                    print("object %s not found." % hex_id)
+        if modified:
+            repository.commit()
+        print('Done.')
+        return EXIT_SUCCESS
 
     helptext = {}
     helptext['patterns'] = '''
@@ -990,6 +1060,62 @@ class Archiver:
         subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
         subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
                                help='additional help on TOPIC')
+
+        debug_dump_archive_items_epilog = textwrap.dedent("""
+        This command dumps raw (but decrypted and decompressed) archive items (only metadata) to files.
+        """)
+        subparser = subparsers.add_parser('debug-dump-archive-items', parents=[common_parser],
+                                          description=self.do_debug_dump_archive_items.__doc__,
+                                          epilog=debug_dump_archive_items_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.set_defaults(func=self.do_debug_dump_archive_items)
+        subparser.add_argument('archive', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='archive to dump')
+
+        debug_get_obj_epilog = textwrap.dedent("""
+        This command gets an object from the repository.
+        """)
+        subparser = subparsers.add_parser('debug-get-obj', parents=[common_parser],
+                                          description=self.do_debug_get_obj.__doc__,
+                                          epilog=debug_get_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.set_defaults(func=self.do_debug_get_obj)
+        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('id', metavar='ID', type=str,
+                               help='hex object ID to get from the repo')
+        subparser.add_argument('path', metavar='PATH', type=str,
+                               help='file to write object data into')
+
+        debug_put_obj_epilog = textwrap.dedent("""
+        This command puts objects into the repository.
+        """)
+        subparser = subparsers.add_parser('debug-put-obj', parents=[common_parser],
+                                          description=self.do_debug_put_obj.__doc__,
+                                          epilog=debug_put_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.set_defaults(func=self.do_debug_put_obj)
+        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
+                               help='file(s) to read and create object(s) from')
+
+        debug_delete_obj_epilog = textwrap.dedent("""
+        This command deletes objects from the repository.
+        """)
+        subparser = subparsers.add_parser('debug-delete-obj', parents=[common_parser],
+                                          description=self.do_debug_delete_obj.__doc__,
+                                          epilog=debug_delete_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.set_defaults(func=self.do_debug_delete_obj)
+        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
+                               help='hex object ID(s) to delete from the repo')
         return parser
 
     def parse_args(self, args=None):

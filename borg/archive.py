@@ -799,21 +799,33 @@ class ArchiveChecker:
                     _state += 1
                 return _state
 
+            def report(msg, chunk_id, chunk_no):
+                cid = hexlify(chunk_id).decode('ascii')
+                msg += ' [chunk: %06d_%s]' % (chunk_no, cid)  # see debug-dump-archive-items
+                self.report_progress(msg, error=True)
+
+            i = 0
             for state, items in groupby(archive[b'items'], missing_chunk_detector):
                 items = list(items)
                 if state % 2:
-                    self.report_progress('Archive metadata damage detected', error=True)
+                    for chunk_id in items:
+                        report('item metadata chunk missing', chunk_id, i)
+                        i += 1
                     continue
                 if state > 0:
                     unpacker.resync()
                 for chunk_id, cdata in zip(items, repository.get_many(items)):
                     unpacker.feed(self.key.decrypt(chunk_id, cdata))
-                    for item in unpacker:
-                        if not isinstance(item, dict):
-                            self.report_progress('Did not get expected metadata dict - archive corrupted!',
-                                                 error=True)
-                            continue
-                        yield item
+                    try:
+                        for item in unpacker:
+                            if isinstance(item, dict):
+                                yield item
+                            else:
+                                report('Did not get expected metadata dict when unpacking item metadata', chunk_id, i)
+                    except Exception:
+                        report('Exception while unpacking item metadata', chunk_id, i)
+                        raise
+                    i += 1
 
         repository = cache_if_remote(self.repository)
         if archive is None:

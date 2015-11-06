@@ -304,9 +304,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', '--stats', self.repository_location + '::test.2', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
-        list_output = self.cmd('list', self.repository_location)
-        self.assert_in('test ', list_output)
-        self.assert_in('test.2 ', list_output)
+        list_output = self.cmd('list', '--short', self.repository_location)
+        self.assert_in('test', list_output)
+        self.assert_in('test.2', list_output)
         expected =  [
             'input',
             'input/bdev',
@@ -328,7 +328,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # remove the file we did not backup, so input and output become equal
             expected.remove('input/flagfile') # this file is UF_NODUMP
             os.remove(os.path.join('input', 'flagfile'))
-        self.assert_equal(self.cmd('list', '--short', self.repository_location + '::test').splitlines(), expected)
+        list_output = self.cmd('list', '--short', self.repository_location + '::test')
+        for name in expected:
+            self.assert_in(name, list_output)
         self.assert_dirs_equal('input', 'output/input')
         info_output = self.cmd('info', self.repository_location + '::test')
         item_count = 3 if has_lchflags else 4  # one file is UF_NODUMP

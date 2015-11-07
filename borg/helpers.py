@@ -650,13 +650,14 @@ class Location:
         return False
 
     def __str__(self):
-        items = []
-        items.append('proto=%r' % self.proto)
-        items.append('user=%r' % self.user)
-        items.append('host=%r' % self.host)
-        items.append('port=%r' % self.port)
-        items.append('path=%r' % self.path)
-        items.append('archive=%r' % self.archive)
+        items = [
+            'proto=%r' % self.proto,
+            'user=%r' % self.user,
+            'host=%r' % self.host,
+            'port=%r' % self.port,
+            'path=%r' % self.path,
+            'archive=%r' % self.archive,
+        ]
         return ', '.join(items)
 
     def to_key_filename(self):

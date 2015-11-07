@@ -261,6 +261,8 @@ class Archiver:
         # be restrictive when restoring files, restore permissions later
         if sys.getfilesystemencoding() == 'ascii':
             logger.warning('Warning: File system encoding is "ascii", extracting non-ascii filenames will not be supported.')
+            if sys.platform.startswith(('linux', 'freebsd', 'netbsd', 'openbsd', 'darwin', )):
+                logger.warning('Hint: You likely need to fix your locale setup. E.g. install locales and use: LANG=en_US.UTF-8')
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
         archive = Archive(repository, key, manifest, args.archive.archive,

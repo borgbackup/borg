@@ -83,7 +83,7 @@ main repository.
 Using Vagrant
 -------------
 
-We use Vagrant for the automated creation of testing environment and borgbackup
+We use Vagrant for the automated creation of testing environments and borgbackup
 standalone binaries for various platforms.
 
 For better security, there is no automatic sync in the VM to host direction.
@@ -100,7 +100,7 @@ Usage::
    To shut down and destroy the VM:
      vagrant destroy OS
    To copy files from the VM (in this case, the generated binary):
-     vagrant scp OS:/vagrant/borg/borg/dist/borg .
+     vagrant scp OS:/vagrant/borg/borg.exe .
 
 
 Creating standalone binaries

@@ -605,10 +605,9 @@ ITEM_KEYS = set([b'path', b'source', b'rdev', b'chunks',
 class RobustUnpacker:
     """A restartable/robust version of the streaming msgpack unpacker
     """
-    item_keys = [msgpack.packb(name) for name in ITEM_KEYS]
-
     def __init__(self, validator):
         super().__init__()
+        self.item_keys = [msgpack.packb(name) for name in ITEM_KEYS]
         self.validator = validator
         self._buffered_data = []
         self._resync = False

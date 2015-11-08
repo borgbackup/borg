@@ -342,7 +342,10 @@ Number of files: {0.stats.nfiles}'''.format(self)
             source = item[b'source']
             if os.path.exists(path):
                 os.unlink(path)
-            os.symlink(source, path)
+            try:
+                os.symlink(source, path)
+            except UnicodeEncodeError:
+                raise self.IncompatibleFilesystemEncodingError(source, sys.getfilesystemencoding())
             self.restore_attrs(path, item, symlink=True)
         elif stat.S_ISFIFO(mode):
             if not os.path.exists(os.path.dirname(path)):

@@ -37,6 +37,9 @@ Bug fixes:
 - create from stdin: also save atime, ctime (cosmetic)
 - use default_notty=False for confirmations, fixes #345
 - vagrant: fix msgpack installation on centos, fixes #342
+- deal with unicode errors for symlinks in same way as for regular files and
+  have a helpful warning message about how to fix wrong locale setup, fixes #382
+- add ACL keys the RobustUnpacker must know about
 
 Other changes:
 
@@ -71,6 +74,7 @@ Other changes:
   - benchmarks: test create, extract, list, delete, info, check, help, fixes #146
   - benchmarks: test with both the binary and the python code
   - archiver tests: test with both the binary and the python code, fixes #215
+  - make basic test more robust
 - docs:
 
   - moved docs to borgbackup.readthedocs.org, #155
@@ -91,6 +95,7 @@ Other changes:
   - warn about not running out of space
   - add example for rename
   - improve chunker params docs, fixes #362
+  - minor development docs update
 
 
 Version 0.27.0

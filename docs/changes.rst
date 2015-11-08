@@ -5,6 +5,7 @@ Version 0.28.0
 --------------
 
 Compatibility notes:
+
 - changed return codes (exit codes), see docs. in short:
   old: 0 = ok, 1 = error. now: 0 = ok, 1 = warning, 2 = error
 

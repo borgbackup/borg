@@ -1,6 +1,21 @@
 Changelog
 =========
 
+Version 0.28.1
+--------------
+
+Bug fixes:
+
+- do not try to build api / usage docs for production install,
+  fixes unexpected "mock" build dependency, #384
+
+Other changes:
+
+- avoid using msgpack.packb at import time
+- fix formatting issue in changes.rst
+- fix build on readthedocs
+
+
 Version 0.28.0
 --------------
 

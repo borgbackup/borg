@@ -42,8 +42,7 @@ if have_cython():
     from . import chunker
     from . import crypto
     import msgpack
-
-import msgpack.fallback
+    import msgpack.fallback
 
 
 # return codes returned by borg command

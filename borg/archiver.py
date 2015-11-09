@@ -20,7 +20,7 @@ from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, prune_within, prune_split, unhexlify, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    is_cachedir, bigint_to_int, ChunkerParams, CompressionSpec, have_cython, is_slow_msgpack, yes, \
+    dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, have_cython, is_slow_msgpack, yes, \
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .logger import create_logger, setup_logging
 logger = create_logger()
@@ -166,7 +166,8 @@ class Archiver:
                     continue
             else:
                 restrict_dev = None
-            self._process(archive, cache, args.excludes, args.exclude_caches, skip_inodes, path, restrict_dev,
+            self._process(archive, cache, args.excludes, args.exclude_caches, args.exclude_if_present,
+                          args.keep_tag_files, skip_inodes, path, restrict_dev,
                           read_special=args.read_special, dry_run=dry_run)
         if not dry_run:
             archive.save(timestamp=args.timestamp)
@@ -182,7 +183,8 @@ class Archiver:
                 print('-' * 78)
         return self.exit_code
 
-    def _process(self, archive, cache, excludes, exclude_caches, skip_inodes, path, restrict_dev,
+    def _process(self, archive, cache, excludes, exclude_caches, exclude_if_present,
+                 keep_tag_files, skip_inodes, path, restrict_dev,
                  read_special=False, dry_run=False):
         if exclude_path(path, excludes):
             return
@@ -209,7 +211,11 @@ class Archiver:
                     status = 'E'
                     self.print_warning('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
-            if exclude_caches and is_cachedir(path):
+            tag_path = dir_is_tagged(path, exclude_caches, exclude_if_present)
+            if tag_path:
+                if keep_tag_files:
+                    archive.process_dir(path, st)
+                    archive.process_file(tag_path, st, cache)
                 return
             if not dry_run:
                 status = archive.process_dir(path, st)
@@ -221,9 +227,9 @@ class Archiver:
             else:
                 for filename in sorted(entries):
                     entry_path = os.path.normpath(os.path.join(path, filename))
-                    self._process(archive, cache, excludes, exclude_caches, skip_inodes,
-                                  entry_path, restrict_dev, read_special=read_special,
-                                  dry_run=dry_run)
+                    self._process(archive, cache, excludes, exclude_caches, exclude_if_present,
+                                  keep_tag_files, skip_inodes, entry_path, restrict_dev,
+                                  read_special=read_special, dry_run=dry_run)
         elif stat.S_ISLNK(st.st_mode):
             if not dry_run:
                 status = archive.process_symlink(path, st)
@@ -785,6 +791,12 @@ class Archiver:
         subparser.add_argument('--exclude-caches', dest='exclude_caches',
                                action='store_true', default=False,
                                help='exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)')
+        subparser.add_argument('--exclude-if-present', dest='exclude_if_present',
+                               metavar='FILENAME', action='append', type=str,
+                               help='exclude directories that contain the specified file')
+        subparser.add_argument('--keep-tag-files', dest='keep_tag_files',
+                               action='store_true', default=False,
+                               help='keep tag files of excluded caches/directories')
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                type=int, default=300, metavar='SECONDS',
                                help='write checkpoint every SECONDS seconds (Default: 300)')

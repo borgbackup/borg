@@ -428,7 +428,7 @@ def CompressionSpec(s):
         raise ValueError
 
 
-def is_cachedir(path):
+def dir_is_cachedir(path):
     """Determines whether the specified path is a cache directory (and
     therefore should potentially be excluded from the backup) according to
     the CACHEDIR.TAG protocol
@@ -445,6 +445,20 @@ def is_cachedir(path):
                     return True
     except OSError:
         pass
+    return False
+
+
+def dir_is_tagged(path, exclude_caches, exclude_if_present):
+    """Determines whether the specified path is excluded by being a cache
+    directory or containing the user-specified tag file.
+    """
+    if exclude_caches and dir_is_cachedir(path):
+        return True
+    if exclude_if_present is not None:
+        for tag in exclude_if_present:
+            tag_path = os.path.join(path, tag)
+            if os.path.isfile(tag_path):
+                return True
     return False
 
 

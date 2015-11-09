@@ -510,6 +510,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'tagged3'])
 
+    def test_exclude_keep_tagged(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('file1', size=1024 * 80)
+        self.create_regular_file('tagged1/.NOBACKUP')
+        self.create_regular_file('tagged1/file2', size=1024 * 80)
+        self.create_regular_file('tagged2/CACHEDIR.TAG', contents = b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
+        self.create_regular_file('tagged2/file3', size=1024 * 80)
+        self.cmd('create', '--exclude-if-present', '.NOBACKUP', '--exclude-caches', '--keep-tag-files', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'tagged1', 'tagged2'])
+        self.assert_equal(sorted(os.listdir('output/input/tagged1')), ['.NOBACKUP'])
+        self.assert_equal(sorted(os.listdir('output/input/tagged2')), ['CACHEDIR.TAG'])
+
     def test_path_normalization(self):
         self.cmd('init', self.repository_location)
         self.create_regular_file('dir1/dir2/file', size=1024 * 80)

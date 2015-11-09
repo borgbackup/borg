@@ -167,7 +167,8 @@ class Archiver:
             else:
                 restrict_dev = None
             self._process(archive, cache, args.excludes, args.exclude_caches, args.exclude_if_present,
-                          skip_inodes, path, restrict_dev, read_special=args.read_special, dry_run=dry_run)
+                          args.keep_tag_files, skip_inodes, path, restrict_dev,
+                          read_special=args.read_special, dry_run=dry_run)
         if not dry_run:
             archive.save(timestamp=args.timestamp)
             if args.progress:
@@ -183,7 +184,8 @@ class Archiver:
         return self.exit_code
 
     def _process(self, archive, cache, excludes, exclude_caches, exclude_if_present,
-                 skip_inodes, path, restrict_dev, read_special=False, dry_run=False):
+                 keep_tag_files, skip_inodes, path, restrict_dev,
+                 read_special=False, dry_run=False):
         if exclude_path(path, excludes):
             return
         try:
@@ -209,7 +211,11 @@ class Archiver:
                     status = 'E'
                     self.print_warning('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
-            if dir_is_tagged(path, exclude_caches, exclude_if_present):
+            tag_path = dir_is_tagged(path, exclude_caches, exclude_if_present)
+            if tag_path:
+                if keep_tag_files:
+                    archive.process_dir(path, st)
+                    archive.process_file(tag_path, st, cache)
                 return
             if not dry_run:
                 status = archive.process_dir(path, st)
@@ -222,8 +228,8 @@ class Archiver:
                 for filename in sorted(entries):
                     entry_path = os.path.normpath(os.path.join(path, filename))
                     self._process(archive, cache, excludes, exclude_caches, exclude_if_present,
-                                  skip_inodes, entry_path, restrict_dev, read_special=read_special,
-                                  dry_run=dry_run)
+                                  keep_tag_files, skip_inodes, entry_path, restrict_dev,
+                                  read_special=read_special, dry_run=dry_run)
         elif stat.S_ISLNK(st.st_mode):
             if not dry_run:
                 status = archive.process_symlink(path, st)
@@ -788,6 +794,9 @@ class Archiver:
         subparser.add_argument('--exclude-if-present', dest='exclude_if_present',
                                metavar='FILENAME', action='append', type=str,
                                help='exclude directories that contain the specified file')
+        subparser.add_argument('--keep-tag-files', dest='keep_tag_files',
+                               action='store_true', default=False,
+                               help='keep tag files of excluded caches/directories')
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                type=int, default=300, metavar='SECONDS',
                                help='write checkpoint every SECONDS seconds (Default: 300)')

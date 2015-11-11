@@ -26,7 +26,10 @@ if have_cython():
     from .hashindex import ChunkIndex
     import msgpack
 else:
-    import mock
+    try:
+        from unittest import mock
+    except ImportError:
+        import mock
     msgpack = mock.Mock()
 
 ITEMS_BUFFER = 1024 * 1024

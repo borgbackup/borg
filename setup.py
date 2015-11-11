@@ -202,6 +202,11 @@ API Documentation
     :undoc-members:
 """ % mod)
 
+# (function, predicate), see http://docs.python.org/2/distutils/apiref.html#distutils.cmd.Command.sub_commands
+# seems like this doesn't work on RTD, see below for build_py hack.
+build.sub_commands.append(('build_api', None))
+build.sub_commands.append(('build_usage', None))
+
 
 class build_py_custom(build_py):
     """override build_py to also build our stuff
@@ -222,13 +227,8 @@ class build_py_custom(build_py):
         super().run()
         self.announce('calling custom build steps', level=log.INFO)
         self.run_command('build_ext')
-        if on_rtd:
-            # only build these files if running on readthedocs, but not
-            # for a normal production install. It requires "mock" and we
-            # do not have that as a build dependency. Also, for really
-            # building the docs, it would also require sphinx, etc.
-            self.run_command('build_api')
-            self.run_command('build_usage')
+        self.run_command('build_api')
+        self.run_command('build_usage')
 
 
 cmdclass = {

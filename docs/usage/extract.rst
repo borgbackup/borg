@@ -47,3 +47,22 @@ by passing a list of ``PATHs`` as arguments. The file selection can further
 be restricted by using the ``--exclude`` option.
 
 See the output of the "borg help patterns" command for more help on exclude patterns.
+
+Examples
+~~~~~~~~
+::
+
+    # Extract entire archive
+    $ borg extract /mnt/backup::my-files
+
+    # Extract entire archive and list files while processing
+    $ borg extract -v /mnt/backup::my-files
+
+    # Extract the "src" directory
+    $ borg extract /mnt/backup::my-files home/USERNAME/src
+
+    # Extract the "src" directory but exclude object files
+    $ borg extract /mnt/backup::my-files home/USERNAME/src --exclude '*.o'
+
+Note: currently, extract always writes into the current working directory ("."),
+      so make sure you ``cd`` to the right place before calling ``borg extract``.

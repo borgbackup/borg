@@ -27,3 +27,15 @@ Description
 ~~~~~~~~~~~
 
 This command renames an archive in the repository.
+
+Examples
+~~~~~~~~
+::
+
+    $ borg create /mnt/backup::archivename ~
+    $ borg list /mnt/backup
+    archivename                          Mon Nov  2 20:40:06 2015
+
+    $ borg rename /mnt/backup::archivename newname
+    $ borg list /mnt/backup
+    newname                              Mon Nov  2 20:40:06 2015

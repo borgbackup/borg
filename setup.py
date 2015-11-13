@@ -146,7 +146,7 @@ class build_usage(Command):
             os.mkdir('docs/usage')
         for command, parser in choices.items():
             print('generating help for %s' % command)
-            with open('docs/usage/%s.rst.inc' % command, 'w') as doc:
+            with open('docs/usage/%s.rst' % command, 'w') as doc:
                 if command == 'help':
                     for topic in Archiver.helptext:
                         params = {"topic": topic,

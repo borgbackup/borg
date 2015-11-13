@@ -27,3 +27,22 @@ Description
 
 The key files used for repository encryption are optionally passphrase
 protected. This command can be used to change this passphrase.
+
+Examples
+~~~~~~~~
+::
+
+    # Create a key file protected repository
+    $ borg init --encryption=keyfile /mnt/backup
+    Initializing repository at "/mnt/backup"
+    Enter passphrase (empty for no passphrase):
+    Enter same passphrase again: 
+    Key file "/home/USER/.borg/keys/mnt_backup" created.
+    Keep this file safe. Your data will be inaccessible without it.
+
+    # Change key file passphrase
+    $ borg change-passphrase /mnt/backup
+    Enter passphrase for key file /home/USER/.borg/keys/mnt_backup:
+    New passphrase: 
+    Enter same passphrase again: 
+    Key file "/home/USER/.borg/keys/mnt_backup" updated

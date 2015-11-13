@@ -219,10 +219,49 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-#man_pages = [
-#    ('man', 'borg', 'Borg',
-#     ['see "AUTHORS" file'], 1)
-#]
+man_pages = [
+    ('usage/create', 'borg create', 'Create a new archive',
+     copyright, 1),
+    ('usage/change-passphrase', 'borg change-passphrase', '',
+     copyright, 1),
+    ('usage/check', 'borg check', '',
+     copyright, 1),
+    ('usage/create', 'borg create', '',
+     copyright, 1),
+    ('usage/debug-delete-obj', 'borg debug-delete-obj', '',
+     copyright, 1),
+    ('usage/debug-dump-archive-items', 'borg debug-dump-archive-items', '',
+     copyright, 1),
+    ('usage/debug-get-obj', 'borg debug-get-obj', '',
+     copyright, 1),
+    ('usage/debug-put-obj', 'borg debug-put-obj', '',
+     copyright, 1),
+    ('usage/delete', 'borg delete', '',
+     copyright, 1),
+    ('usage/extract', 'borg extract', '',
+     copyright, 1),
+    ('usage/help', 'borg help', '',
+     copyright, 1),
+    ('usage/info', 'borg info', '',
+     copyright, 1),
+    ('usage/init', 'borg init', '',
+     copyright, 1),
+    ('usage/list', 'borg list', '',
+     copyright, 1),
+    ('usage/mount', 'borg mount', '',
+     copyright, 1),
+    ('usage/prune', 'borg prune', '',
+     copyright, 1),
+    ('usage/rename', 'borg rename', '',
+     copyright, 1),
+    ('usage/serve', 'borg serve', '',
+     copyright, 1),
+    ('usage/upgrade', 'borg upgrade', '',
+     copyright, 1),
+]
+
+# If true, show URL addresses after external links.
+man_show_urls = True
 
 extensions = ['sphinx.ext.extlinks', 'sphinx.ext.autodoc', 'sphinx.ext.todo', 'sphinx.ext.coverage', 'sphinx.ext.viewcode']
 

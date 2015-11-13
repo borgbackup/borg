@@ -33,3 +33,12 @@ This command mounts an archive as a FUSE filesystem. This can be useful for
 browsing an archive or restoring individual files. Unless the ``--foreground``
 option is given the command will run in the background until the filesystem
 is ``umounted``.
+
+Examples
+~~~~~~~~
+::
+
+    $ borg mount /mnt/backup::root-2013-08-02 /tmp/mymountpoint
+    $ ls /tmp/mymountpoint
+    bin  boot  etc  lib  lib64  mnt  opt  root  sbin  srv  usr  var
+    $ fusermount -u /tmp/mymountpoint

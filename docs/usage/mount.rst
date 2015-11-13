@@ -2,20 +2,28 @@
 
 borg mount
 ----------
+
+Mount archive or an entire repository as a FUSE fileystem
+
+Synopsis
+--------
+
 ::
 
-    usage: borg mount [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
+    borg mount [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
                       [--remote-path PATH] [-f] [-o OPTIONS]
                       REPOSITORY_OR_ARCHIVE MOUNTPOINT
     
-    Mount archive or an entire repository as a FUSE fileystem
-    
-    positional arguments:
+positional arguments
+~~~~~~~~~~~~~~~~~~~~
+::
       REPOSITORY_OR_ARCHIVE
                             repository/archive to mount
       MOUNTPOINT            where to mount filesystem
     
-    optional arguments:
+optional arguments
+~~~~~~~~~~~~~~~~~~
+::
       -h, --help            show this help message and exit
       -v, --verbose         verbose output
       --show-rc             show/log the return code (rc)

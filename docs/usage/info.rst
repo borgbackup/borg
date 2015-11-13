@@ -2,18 +2,26 @@
 
 borg info
 ---------
+
+Show archive details such as disk space used
+
+Synopsis
+--------
+
 ::
 
-    usage: borg info [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
+    borg info [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
                      [--remote-path PATH]
                      ARCHIVE
     
-    Show archive details such as disk space used
-    
-    positional arguments:
+positional arguments
+~~~~~~~~~~~~~~~~~~~~
+::
       ARCHIVE             archive to display information about
     
-    optional arguments:
+optional arguments
+~~~~~~~~~~~~~~~~~~
+::
       -h, --help          show this help message and exit
       -v, --verbose       verbose output
       --show-rc           show/log the return code (rc)

@@ -2,18 +2,26 @@
 
 borg upgrade
 ------------
+
+upgrade a repository from a previous version
+
+Synopsis
+--------
+
 ::
 
-    usage: borg upgrade [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
+    borg upgrade [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
                         [--remote-path PATH] [-n] [-i]
                         [REPOSITORY]
     
-    upgrade a repository from a previous version
-    
-    positional arguments:
+positional arguments
+~~~~~~~~~~~~~~~~~~~~
+::
       REPOSITORY          path to the repository to be upgraded
     
-    optional arguments:
+optional arguments
+~~~~~~~~~~~~~~~~~~
+::
       -h, --help          show this help message and exit
       -v, --verbose       verbose output
       --show-rc           show/log the return code (rc)

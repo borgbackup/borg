@@ -156,14 +156,22 @@ class build_usage(Command):
                         doc.write(Archiver.helptext[topic])
                 else:
                     params = {"command": command,
-                              "underline": '-' * len('borg ' + command)}
+                              "underline": '-' * len('borg ' + command),
+                              "description": parser.description,
+                    }
                     doc.write(".. _borg_{command}:\n\n".format(**params))
-                    doc.write("borg {command}\n{underline}\n::\n\n".format(**params))
-                    epilog = parser.epilog
-                    parser.epilog = None
-                    doc.write(re.sub("^", "    ", parser.format_help(), flags=re.M))
+                    doc.write("borg {command}\n{underline}\n\n{description}\n\nSynopsis\n--------\n\n::\n\n".format(**params))
+                    doc.write(re.sub("^", "    ", parser.format_usage().replace('usage: ', '', 1), flags=re.M))
+                    formatter = parser._get_formatter()
+                    # positionals, optionals and user-defined groups
+                    for action_group in parser._action_groups:
+                        formatter.start_section("XXX%s\nXXX%s\nXXX:" % (action_group.title, '~' * len(action_group.title)))
+                        formatter.add_text(action_group.description)
+                        formatter.add_arguments(action_group._group_actions)
+                        formatter.end_section()
+                    doc.write("\n" + re.sub("^(?!XXX)", "    ", formatter.format_help(), flags=re.M).replace('XXX', ''))
                     doc.write("\nDescription\n~~~~~~~~~~~\n")
-                    doc.write(epilog)
+                    doc.write(parser.epilog)
 
 
 class build_api(Command):

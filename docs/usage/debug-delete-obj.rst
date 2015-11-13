@@ -2,19 +2,27 @@
 
 borg debug-delete-obj
 ---------------------
+
+delete the objects with the given IDs from the repo
+
+Synopsis
+--------
+
 ::
 
-    usage: borg debug-delete-obj [-h] [-v] [--show-rc] [--no-files-cache]
+    borg debug-delete-obj [-h] [-v] [--show-rc] [--no-files-cache]
                                  [--umask M] [--remote-path PATH]
                                  [REPOSITORY] IDs [IDs ...]
     
-    delete the objects with the given IDs from the repo
-    
-    positional arguments:
+positional arguments
+~~~~~~~~~~~~~~~~~~~~
+::
       REPOSITORY          repository to use
       IDs                 hex object ID(s) to delete from the repo
     
-    optional arguments:
+optional arguments
+~~~~~~~~~~~~~~~~~~
+::
       -h, --help          show this help message and exit
       -v, --verbose       verbose output
       --show-rc           show/log the return code (rc)

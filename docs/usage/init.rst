@@ -2,18 +2,26 @@
 
 borg init
 ---------
+
+Initialize an empty repository
+
+Synopsis
+--------
+
 ::
 
-    usage: borg init [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
+    borg init [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
                      [--remote-path PATH] [-e {none,keyfile,repokey,passphrase}]
                      [REPOSITORY]
     
-    Initialize an empty repository
-    
-    positional arguments:
+positional arguments
+~~~~~~~~~~~~~~~~~~~~
+::
       REPOSITORY            repository to create
     
-    optional arguments:
+optional arguments
+~~~~~~~~~~~~~~~~~~
+::
       -h, --help            show this help message and exit
       -v, --verbose         verbose output
       --show-rc             show/log the return code (rc)

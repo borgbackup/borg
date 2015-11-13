@@ -2,21 +2,29 @@
 
 borg extract
 ------------
+
+Extract archive contents
+
+Synopsis
+--------
+
 ::
 
-    usage: borg extract [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
+    borg extract [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
                         [--remote-path PATH] [-n] [-e PATTERN]
                         [--exclude-from EXCLUDEFILE] [--numeric-owner]
                         [--strip-components NUMBER] [--stdout] [--sparse]
                         ARCHIVE [PATH [PATH ...]]
     
-    Extract archive contents
-    
-    positional arguments:
+positional arguments
+~~~~~~~~~~~~~~~~~~~~
+::
       ARCHIVE               archive to extract
       PATH                  paths to extract
     
-    optional arguments:
+optional arguments
+~~~~~~~~~~~~~~~~~~
+::
       -h, --help            show this help message and exit
       -v, --verbose         verbose output
       --show-rc             show/log the return code (rc)

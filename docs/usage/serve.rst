@@ -2,15 +2,21 @@
 
 borg serve
 ----------
+
+Start in server mode. This command is usually not used manually.
+        
+
+Synopsis
+--------
+
 ::
 
-    usage: borg serve [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
+    borg serve [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
                       [--remote-path PATH] [--restrict-to-path PATH]
     
-    Start in server mode. This command is usually not used manually.
-            
-    
-    optional arguments:
+optional arguments
+~~~~~~~~~~~~~~~~~~
+::
       -h, --help            show this help message and exit
       -v, --verbose         verbose output
       --show-rc             show/log the return code (rc)

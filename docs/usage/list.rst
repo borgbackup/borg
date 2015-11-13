@@ -2,19 +2,27 @@
 
 borg list
 ---------
+
+List archive or repository contents
+
+Synopsis
+--------
+
 ::
 
-    usage: borg list [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
+    borg list [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
                      [--remote-path PATH] [--short] [-p PREFIX]
                      [REPOSITORY_OR_ARCHIVE]
     
-    List archive or repository contents
-    
-    positional arguments:
+positional arguments
+~~~~~~~~~~~~~~~~~~~~
+::
       REPOSITORY_OR_ARCHIVE
                             repository/archive to list contents of
     
-    optional arguments:
+optional arguments
+~~~~~~~~~~~~~~~~~~
+::
       -h, --help            show this help message and exit
       -v, --verbose         verbose output
       --show-rc             show/log the return code (rc)

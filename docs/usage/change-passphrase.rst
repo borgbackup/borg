@@ -2,18 +2,26 @@
 
 borg change-passphrase
 ----------------------
+
+Change repository key file passphrase
+
+Synopsis
+--------
+
 ::
 
-    usage: borg change-passphrase [-h] [-v] [--show-rc] [--no-files-cache]
+    borg change-passphrase [-h] [-v] [--show-rc] [--no-files-cache]
                                   [--umask M] [--remote-path PATH]
                                   [REPOSITORY]
     
-    Change repository key file passphrase
-    
-    positional arguments:
+positional arguments
+~~~~~~~~~~~~~~~~~~~~
+::
       REPOSITORY
     
-    optional arguments:
+optional arguments
+~~~~~~~~~~~~~~~~~~
+::
       -h, --help          show this help message and exit
       -v, --verbose       verbose output
       --show-rc           show/log the return code (rc)

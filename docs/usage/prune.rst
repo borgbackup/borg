@@ -2,20 +2,28 @@
 
 borg prune
 ----------
+
+Prune repository archives according to specified rules
+
+Synopsis
+--------
+
 ::
 
-    usage: borg prune [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
+    borg prune [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
                       [--remote-path PATH] [-n] [-s] [--keep-within WITHIN]
                       [-H HOURLY] [-d DAILY] [-w WEEKLY] [-m MONTHLY] [-y YEARLY]
                       [-p PREFIX]
                       [REPOSITORY]
     
-    Prune repository archives according to specified rules
-    
-    positional arguments:
+positional arguments
+~~~~~~~~~~~~~~~~~~~~
+::
       REPOSITORY            repository to prune
     
-    optional arguments:
+optional arguments
+~~~~~~~~~~~~~~~~~~
+::
       -h, --help            show this help message and exit
       -v, --verbose         verbose output
       --show-rc             show/log the return code (rc)

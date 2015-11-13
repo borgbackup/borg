@@ -2,9 +2,15 @@
 
 borg create
 -----------
+
+Create new archive
+
+Synopsis
+--------
+
 ::
 
-    usage: borg create [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
+    borg create [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
                        [--remote-path PATH] [-s] [-p] [-e PATTERN]
                        [--exclude-from EXCLUDEFILE] [--exclude-caches]
                        [--exclude-if-present FILENAME] [--keep-tag-files]
@@ -14,14 +20,16 @@ borg create
                        [-C COMPRESSION] [--read-special] [-n]
                        ARCHIVE PATH [PATH ...]
     
-    Create new archive
-    
-    positional arguments:
+positional arguments
+~~~~~~~~~~~~~~~~~~~~
+::
       ARCHIVE               name of archive to create (must be also a valid
                             directory name)
       PATH                  paths to archive
     
-    optional arguments:
+optional arguments
+~~~~~~~~~~~~~~~~~~
+::
       -h, --help            show this help message and exit
       -v, --verbose         verbose output
       --show-rc             show/log the return code (rc)

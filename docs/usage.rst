@@ -158,56 +158,6 @@ indicated using the `IEC binary prefixes
 using powers of two (so ``KiB`` means 1024 bytes).
 
 
-.. include:: usage/init.rst.inc
-
-Examples
-~~~~~~~~
-::
-
-    # Local repository
-    $ borg init /mnt/backup
-
-    # Remote repository (accesses a remote borg via ssh)
-    $ borg init user@hostname:backup
-
-    # Encrypted remote repository, store the key in the repo
-    $ borg init --encryption=repokey user@hostname:backup
-
-    # Encrypted remote repository, store the key your home dir
-    $ borg init --encryption=keyfile user@hostname:backup
-
-Important notes about encryption:
-
-Use encryption! Repository encryption protects you e.g. against the case that
-an attacker has access to your backup repository.
-
-But be careful with the key / the passphrase:
-
-``--encryption=passphrase`` is DEPRECATED and will be removed in next major release.
-This mode has very fundamental, unfixable problems (like you can never change
-your passphrase or the pbkdf2 iteration count for an existing repository, because
-the encryption / decryption key is directly derived from the passphrase).
-
-If you want "passphrase-only" security, just use the ``repokey`` mode. The key will
-be stored inside the repository (in its "config" file). In above mentioned
-attack scenario, the attacker will have the key (but not the passphrase).
-
-If you want "passphrase and having-the-key" security, use the ``keyfile`` mode.
-The key will be stored in your home directory (in ``.borg/keys``). In the attack
-scenario, the attacker who has just access to your repo won't have the key (and
-also not the passphrase).
-
-Make a backup copy of the key file (``keyfile`` mode) or repo config file
-(``repokey`` mode) and keep it at a safe place, so you still have the key in
-case it gets corrupted or lost.
-The backup that is encrypted with that key won't help you with that, of course.
-
-Make sure you use a good passphrase. Not too short, not too simple. The real
-encryption / decryption key is encrypted with / locked by your passphrase.
-If an attacker gets your key, he can't unlock and use it without knowing the
-passphrase. In ``repokey`` and ``keyfile`` modes, you can change your passphrase
-for existing repos.
-
 Debug Commands
 --------------
 There are some more commands (all starting with "debug-") wich are are all

@@ -37,6 +37,7 @@ This command displays some detailed information about the specified archive.
 
 Examples
 ~~~~~~~~
+
 ::
 
     $ borg info /mnt/backup::root-2013-08-02

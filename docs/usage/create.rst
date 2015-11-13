@@ -82,6 +82,7 @@ See the output of the "borg help patterns" command for more help on exclude patt
 
 Examples
 ~~~~~~~~
+
 ::
 
     # Backup ~/Documents into an archive named "my-documents"

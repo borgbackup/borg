@@ -670,6 +670,14 @@ class Archiver:
         subparser = subparsers.add_parser('serve', parents=[common_parser],
                                           description=self.do_serve.__doc__, epilog=serve_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.examples = '''
+::
+
+    # Allow an SSH keypair to only run |project_name|, and only have access to /mnt/backup.
+    # This will help to secure an automated remote backup system.
+    $ cat ~/.ssh/authorized_keys
+    command="borg serve --restrict-to-path /mnt/backup" ssh-rsa AAAAB3[...]
+'''
         subparser.set_defaults(func=self.do_serve)
         subparser.add_argument('--restrict-to-path', dest='restrict_to_paths', action='append',
                                metavar='PATH', help='restrict repository access to PATH')
@@ -756,6 +764,24 @@ class Archiver:
                                           description=self.do_change_passphrase.__doc__,
                                           epilog=change_passphrase_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.examples = '''
+::
+
+    # Create a key file protected repository
+    $ borg init --encryption=keyfile /mnt/backup
+    Initializing repository at "/mnt/backup"
+    Enter passphrase (empty for no passphrase):
+    Enter same passphrase again: 
+    Key file "/home/USER/.borg/keys/mnt_backup" created.
+    Keep this file safe. Your data will be inaccessible without it.
+
+    # Change key file passphrase
+    $ borg change-passphrase /mnt/backup
+    Enter passphrase for key file /home/USER/.borg/keys/mnt_backup:
+    New passphrase: 
+    Enter same passphrase again: 
+    Key file "/home/USER/.borg/keys/mnt_backup" updated
+'''
         subparser.set_defaults(func=self.do_change_passphrase)
         subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
@@ -772,6 +798,41 @@ class Archiver:
                                           description=self.do_create.__doc__,
                                           epilog=create_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.examples = '''
+::
+
+    # Backup ~/Documents into an archive named "my-documents"
+    $ borg create /mnt/backup::my-documents ~/Documents
+
+    # Backup ~/Documents and ~/src but exclude pyc files
+    $ borg create /mnt/backup::my-files   \\
+        ~/Documents                       \\
+        ~/src                             \\
+        --exclude '*.pyc'
+
+    # Backup the root filesystem into an archive named "root-YYYY-MM-DD"
+    # use zlib compression (good, but slow) - default is no compression
+    NAME="root-`date +%Y-%m-%d`"
+    $ borg create -C zlib,6 /mnt/backup::$NAME / --do-not-cross-mountpoints
+
+    # Backup huge files with little chunk management overhead
+    $ borg create --chunker-params 19,23,21,4095 /mnt/backup::VMs /srv/VMs
+
+    # Backup a raw device (must not be active/in use/mounted at that time)
+    $ dd if=/dev/sda bs=10M | borg create /mnt/backup::my-sda -
+
+    # No compression (default)
+    $ borg create /mnt/backup::repo ~
+
+    # Super fast, low compression
+    $ borg create --compression lz4 /mnt/backup::repo ~
+
+    # Less fast, higher compression (N = 0..9)
+    $ borg create --compression zlib,N /mnt/backup::repo ~
+
+    # Even slower, even higher compression (N = 0..9)
+    $ borg create --compression lzma,N /mnt/backup::repo ~
+'''
         subparser.set_defaults(func=self.do_create)
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
@@ -847,6 +908,24 @@ class Archiver:
                                           description=self.do_extract.__doc__,
                                           epilog=extract_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.examples = '''
+::
+
+    # Extract entire archive
+    $ borg extract /mnt/backup::my-files
+
+    # Extract entire archive and list files while processing
+    $ borg extract -v /mnt/backup::my-files
+
+    # Extract the "src" directory
+    $ borg extract /mnt/backup::my-files home/USERNAME/src
+
+    # Extract the "src" directory but exclude object files
+    $ borg extract /mnt/backup::my-files home/USERNAME/src --exclude '*.o'
+
+Note: currently, extract always writes into the current working directory ("."),
+      so make sure you ``cd`` to the right place before calling ``borg extract``.
+'''
         subparser.set_defaults(func=self.do_extract)
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
@@ -882,6 +961,17 @@ class Archiver:
                                           description=self.do_rename.__doc__,
                                           epilog=rename_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.examples = '''
+::
+
+    $ borg create /mnt/backup::archivename ~
+    $ borg list /mnt/backup
+    archivename                          Mon Nov  2 20:40:06 2015
+
+    $ borg rename /mnt/backup::archivename newname
+    $ borg list /mnt/backup
+    newname                              Mon Nov  2 20:40:06 2015
+'''
         subparser.set_defaults(func=self.do_rename)
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
@@ -916,6 +1006,24 @@ class Archiver:
                                           description=self.do_list.__doc__,
                                           epilog=list_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.examples = '''
+::
+
+    $ borg list /mnt/backup
+    my-files            Thu Aug  1 23:33:22 2013
+    my-documents        Thu Aug  1 23:35:43 2013
+    root-2013-08-01     Thu Aug  1 23:43:55 2013
+    root-2013-08-02     Fri Aug  2 15:18:17 2013
+    ...
+
+    $ borg list /mnt/backup::root-2013-08-02
+    drwxr-xr-x root   root          0 Jun 05 12:06 .
+    lrwxrwxrwx root   root          0 May 31 20:40 bin -> usr/bin
+    drwxr-xr-x root   root          0 Aug 01 22:08 etc
+    drwxr-xr-x root   root          0 Jul 15 22:07 etc/ImageMagick-6
+    -rw-r--r-- root   root       1383 May 22 22:25 etc/ImageMagick-6/colors.xml
+    ...
+'''
         subparser.set_defaults(func=self.do_list)
         subparser.add_argument('--short', dest='short',
                                action='store_true', default=False,
@@ -936,6 +1044,14 @@ class Archiver:
                                           description=self.do_mount.__doc__,
                                           epilog=mount_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.examples = '''
+::
+
+    $ borg mount /mnt/backup::root-2013-08-02 /tmp/mymountpoint
+    $ ls /tmp/mymountpoint
+    bin  boot  etc  lib  lib64  mnt  opt  root  sbin  srv  usr  var
+    $ fusermount -u /tmp/mymountpoint
+'''
         subparser.set_defaults(func=self.do_mount)
         subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
                                help='repository/archive to mount')
@@ -954,6 +1070,21 @@ class Archiver:
                                           description=self.do_info.__doc__,
                                           epilog=info_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.examples = '''
+::
+
+    $ borg info /mnt/backup::root-2013-08-02
+    Name: root-2013-08-02
+    Fingerprint: bc3902e2c79b6d25f5d769b335c5c49331e6537f324d8d3badcb9a0917536dbb
+    Hostname: myhostname
+    Username: root
+    Time: Fri Aug  2 15:18:17 2013
+    Command line: /usr/bin/borg create --stats -C zlib,6 /mnt/backup::root-2013-08-02 / --do-not-cross-mountpoints
+    Number of files: 147429
+    Original size: 5344169493 (4.98 GB)
+    Compressed size: 1748189642 (1.63 GB)
+    Unique data: 64805454 (61.80 MB)
+'''
         subparser.set_defaults(func=self.do_info)
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
@@ -987,6 +1118,36 @@ class Archiver:
                                           description=self.do_prune.__doc__,
                                           epilog=prune_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.examples = '''
+
+Be careful, prune is potentially dangerous command, it will remove backup
+archives.
+
+The default of prune is to apply to **all archives in the repository** unless
+you restrict its operation to a subset of the archives using `--prefix`.
+When using --prefix, be careful to choose a good prefix - e.g. do not use a
+prefix "foo" if you do not also want to match "foobar".
+
+It is strongly recommended to always run `prune --dry-run ...` first so you
+will see what it would do without it actually doing anything.
+
+::
+
+    # Keep 7 end of day and 4 additional end of week archives.
+    # Do a dry-run without actually deleting anything.
+    $ borg prune /mnt/backup --dry-run --keep-daily=7 --keep-weekly=4
+
+    # Same as above but only apply to archive names starting with "foo":
+    $ borg prune /mnt/backup --keep-daily=7 --keep-weekly=4 --prefix=foo
+
+    # Keep 7 end of day, 4 additional end of week archives,
+    # and an end of month archive for every month:
+    $ borg prune /mnt/backup --keep-daily=7 --keep-weekly=4 --keep-monthly=-1
+
+    # Keep all backups in the last 10 days, 4 additional end of week archives,
+    # and an end of month archive for every month:
+    $ borg prune /mnt/backup --keep-within=10d --keep-weekly=4 --keep-monthly=-1
+'''
         subparser.set_defaults(func=self.do_prune)
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',

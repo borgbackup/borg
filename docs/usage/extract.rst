@@ -58,6 +58,7 @@ See the output of the "borg help patterns" command for more help on exclude patt
 
 Examples
 ~~~~~~~~
+
 ::
 
     # Extract entire archive

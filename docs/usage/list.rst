@@ -41,6 +41,7 @@ This command lists the contents of a repository or an archive.
 
 Examples
 ~~~~~~~~
+
 ::
 
     $ borg list /mnt/backup

@@ -38,6 +38,7 @@ protected. This command can be used to change this passphrase.
 
 Examples
 ~~~~~~~~
+
 ::
 
     # Create a key file protected repository

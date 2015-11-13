@@ -44,6 +44,7 @@ is ``umounted``.
 
 Examples
 ~~~~~~~~
+
 ::
 
     $ borg mount /mnt/backup::root-2013-08-02 /tmp/mymountpoint

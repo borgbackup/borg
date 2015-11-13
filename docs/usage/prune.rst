@@ -76,6 +76,7 @@ Otherwise, *all* archives in the repository are candidates for deletion!
 Examples
 ~~~~~~~~
 
+
 Be careful, prune is potentially dangerous command, it will remove backup
 archives.
 

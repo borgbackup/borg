@@ -38,6 +38,7 @@ This command renames an archive in the repository.
 
 Examples
 ~~~~~~~~
+
 ::
 
     $ borg create /mnt/backup::archivename ~

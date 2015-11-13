@@ -172,6 +172,9 @@ class build_usage(Command):
                     doc.write("\n" + re.sub("^(?!XXX)", "    ", formatter.format_help(), flags=re.M).replace('XXX', ''))
                     doc.write("\nDescription\n~~~~~~~~~~~\n")
                     doc.write(parser.epilog)
+                    if hasattr(parser, 'examples'):
+                        doc.write("\nExamples\n~~~~~~~~\n")
+                        doc.write(parser.examples)
 
 
 class build_api(Command):

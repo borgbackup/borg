@@ -20,16 +20,15 @@ from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, prune_within, prune_split, unhexlify, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, have_cython, is_slow_msgpack, yes, \
+    dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, \
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .logger import create_logger, setup_logging
 logger = create_logger()
-if have_cython():
-    from .compress import Compressor, COMPR_BUFFER
-    from .upgrader import AtticRepositoryUpgrader
-    from .repository import Repository
-    from .cache import Cache
-    from .key import key_creator
+from .compress import Compressor, COMPR_BUFFER
+from .upgrader import AtticRepositoryUpgrader
+from .repository import Repository
+from .cache import Cache
+from .key import key_creator
 from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
 from .remote import RepositoryServer, RemoteRepository
 

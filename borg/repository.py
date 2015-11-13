@@ -10,9 +10,8 @@ import shutil
 import struct
 from zlib import crc32
 
-from .helpers import Error, ErrorWithTraceback, IntegrityError, read_msgpack, write_msgpack, unhexlify, have_cython
-if have_cython():
-    from .hashindex import NSIndex
+from .helpers import Error, ErrorWithTraceback, IntegrityError, read_msgpack, write_msgpack, unhexlify
+from .hashindex import NSIndex
 from .locking import UpgradableLock
 from .lrucache import LRUCache
 

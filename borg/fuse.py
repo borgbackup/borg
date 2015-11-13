@@ -7,11 +7,10 @@ import stat
 import tempfile
 import time
 from .archive import Archive
-from .helpers import daemonize, have_cython
+from .helpers import daemonize
 from .remote import cache_if_remote
 
-if have_cython():
-    import msgpack
+import msgpack
 
 # Does this version of llfuse support ns precision?
 have_fuse_xtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')

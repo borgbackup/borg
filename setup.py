@@ -135,8 +135,6 @@ class build_usage(Command):
     def run(self):
         print('generating usage docs')
         # allows us to build docs without the C modules fully loaded during help generation
-        if 'BORG_CYTHON_DISABLE' not in os.environ:
-            os.environ['BORG_CYTHON_DISABLE'] = self.__class__.__name__
         from borg.archiver import Archiver
         parser = Archiver().build_parser(prog='borg')
         choices = {}
@@ -166,9 +164,6 @@ class build_usage(Command):
                     doc.write(re.sub("^", "    ", parser.format_help(), flags=re.M))
                     doc.write("\nDescription\n~~~~~~~~~~~\n")
                     doc.write(epilog)
-        # return to regular Cython configuration, if we changed it
-        if os.environ.get('BORG_CYTHON_DISABLE') == self.__class__.__name__:
-            del os.environ['BORG_CYTHON_DISABLE']
 
 
 class build_api(Command):

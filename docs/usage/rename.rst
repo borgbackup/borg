@@ -16,13 +16,19 @@ Synopsis
     
 positional arguments
 ~~~~~~~~~~~~~~~~~~~~
+
 ::
+      
+    
       ARCHIVE             archive to rename
       NEWNAME             the new archive name to use
     
 optional arguments
 ~~~~~~~~~~~~~~~~~~
+
 ::
+      
+    
       -h, --help          show this help message and exit
       -v, --verbose       verbose output
       --show-rc           show/log the return code (rc)

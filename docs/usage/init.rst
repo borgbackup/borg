@@ -16,12 +16,18 @@ Synopsis
     
 positional arguments
 ~~~~~~~~~~~~~~~~~~~~
+
 ::
+      
+    
       REPOSITORY            repository to create
     
 optional arguments
 ~~~~~~~~~~~~~~~~~~
+
 ::
+      
+    
       -h, --help            show this help message and exit
       -v, --verbose         verbose output
       --show-rc             show/log the return code (rc)

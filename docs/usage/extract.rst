@@ -18,13 +18,19 @@ Synopsis
     
 positional arguments
 ~~~~~~~~~~~~~~~~~~~~
+
 ::
+      
+    
       ARCHIVE               archive to extract
       PATH                  paths to extract
     
 optional arguments
 ~~~~~~~~~~~~~~~~~~
+
 ::
+      
+    
       -h, --help            show this help message and exit
       -v, --verbose         verbose output
       --show-rc             show/log the return code (rc)

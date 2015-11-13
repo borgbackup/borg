@@ -17,13 +17,19 @@ Synopsis
     
 positional arguments
 ~~~~~~~~~~~~~~~~~~~~
+
 ::
+      
+    
       REPOSITORY_OR_ARCHIVE
                             repository or archive to check consistency of
     
 optional arguments
 ~~~~~~~~~~~~~~~~~~
+
 ::
+      
+    
       -h, --help            show this help message and exit
       -v, --verbose         verbose output
       --show-rc             show/log the return code (rc)

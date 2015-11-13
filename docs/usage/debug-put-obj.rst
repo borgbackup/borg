@@ -16,13 +16,19 @@ Synopsis
     
 positional arguments
 ~~~~~~~~~~~~~~~~~~~~
+
 ::
+      
+    
       REPOSITORY          repository to use
       PATH                file(s) to read and create object(s) from
     
 optional arguments
 ~~~~~~~~~~~~~~~~~~
+
 ::
+      
+    
       -h, --help          show this help message and exit
       -v, --verbose       verbose output
       --show-rc           show/log the return code (rc)

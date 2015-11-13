@@ -165,7 +165,8 @@ class build_usage(Command):
                     formatter = parser._get_formatter()
                     # positionals, optionals and user-defined groups
                     for action_group in parser._action_groups:
-                        formatter.start_section("XXX%s\nXXX%s\nXXX:" % (action_group.title, '~' * len(action_group.title)))
+                        formatter.start_section("XXX%s\nXXX%s\nXXX\nXXX:" % (action_group.title, '~' * len(action_group.title)))
+                        formatter.add_text("\n")
                         formatter.add_text(action_group.description)
                         formatter.add_arguments(action_group._group_actions)
                         formatter.end_section()

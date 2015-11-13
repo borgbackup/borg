@@ -14,9 +14,18 @@ Synopsis
     borg serve [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
                       [--remote-path PATH] [--restrict-to-path PATH]
     
+positional arguments
+~~~~~~~~~~~~~~~~~~~~
+
+::
+      
+    
 optional arguments
 ~~~~~~~~~~~~~~~~~~
+
 ::
+      
+    
       -h, --help            show this help message and exit
       -v, --verbose         verbose output
       --show-rc             show/log the return code (rc)

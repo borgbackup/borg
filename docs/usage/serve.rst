@@ -14,12 +14,6 @@ Synopsis
     borg serve [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
                       [--remote-path PATH] [--restrict-to-path PATH]
     
-positional arguments
-~~~~~~~~~~~~~~~~~~~~
-
-::
-      
-    
 optional arguments
 ~~~~~~~~~~~~~~~~~~
 

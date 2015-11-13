@@ -6,8 +6,6 @@ from glob import glob
 
 from distutils.command.build import build
 from distutils.core import Command
-from distutils import log
-from setuptools.command.build_py import build_py
 
 min_python = (3, 2)
 my_python = sys.version_info
@@ -203,39 +201,10 @@ API Documentation
 """ % mod)
 
 
-class build_py_custom(build_py):
-    """override build_py to also build our stuff
-
-    it is unclear why this is necessary, but in some environments
-    (Readthedocs.org, specifically), the above
-    ``build.sub_commands.append()`` doesn't seem to have an effect:
-    our custom build commands seem to be ignored when running
-    ``setup.py install``.
-
-    This class overrides the ``build_py`` target by forcing it to run
-    our custom steps as well.
-
-    See also the `bug report on RTD
-    <https://github.com/rtfd/readthedocs.org/issues/1740>`_.
-    """
-    def run(self):
-        super().run()
-        self.announce('calling custom build steps', level=log.INFO)
-        self.run_command('build_ext')
-        if on_rtd:
-            # only build these files if running on readthedocs, but not
-            # for a normal production install. It requires "mock" and we
-            # do not have that as a build dependency. Also, for really
-            # building the docs, it would also require sphinx, etc.
-            self.run_command('build_api')
-            self.run_command('build_usage')
-
-
 cmdclass = {
     'build_ext': build_ext,
     'build_api': build_api,
     'build_usage': build_usage,
-    'build_py': build_py_custom,
     'sdist': Sdist
 }
 

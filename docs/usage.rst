@@ -11,6 +11,7 @@ command in detail.
 .. toctree::
    :maxdepth: 1
 
+   usage/init
    usage/create
    usage/extract
    usage/check
@@ -22,6 +23,7 @@ command in detail.
    usage/mount
    usage/change-passphrase
    usage/serve
+   usage/upgrade
    usage/help
 
 General
@@ -326,4 +328,3 @@ Now, let's see how to restore some LVs from such a backup. ::
     $ # we assume that you created an empty root and home LV and overwrite it now:
     $ borg extract --stdout /mnt/backup::repo dev/vg0/root-snapshot > /dev/vg0/root
     $ borg extract --stdout /mnt/backup::repo dev/vg0/home-snapshot > /dev/vg0/home
-

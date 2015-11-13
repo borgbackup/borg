@@ -6,7 +6,7 @@ borg prune
 Prune repository archives according to specified rules
 
 Synopsis
---------
+~~~~~~~~
 
 ::
 

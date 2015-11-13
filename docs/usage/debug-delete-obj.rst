@@ -6,7 +6,7 @@ borg debug-delete-obj
 delete the objects with the given IDs from the repo
 
 Synopsis
---------
+~~~~~~~~
 
 ::
 

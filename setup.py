@@ -160,7 +160,7 @@ class build_usage(Command):
                               "description": parser.description,
                     }
                     doc.write(".. _borg_{command}:\n\n".format(**params))
-                    doc.write("borg {command}\n{underline}\n\n{description}\n\nSynopsis\n--------\n\n::\n\n".format(**params))
+                    doc.write("borg {command}\n{underline}\n\n{description}\n\nSynopsis\n~~~~~~~~\n\n::\n\n".format(**params))
                     doc.write(re.sub("^", "    ", parser.format_usage().replace('usage: ', '', 1), flags=re.M))
                     formatter = parser._get_formatter()
                     # positionals, optionals and user-defined groups

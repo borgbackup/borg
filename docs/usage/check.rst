@@ -6,7 +6,7 @@ borg check
 Check repository consistency
 
 Synopsis
---------
+~~~~~~~~
 
 ::
 

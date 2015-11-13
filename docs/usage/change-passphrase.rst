@@ -6,7 +6,7 @@ borg change-passphrase
 Change repository key file passphrase
 
 Synopsis
---------
+~~~~~~~~
 
 ::
 

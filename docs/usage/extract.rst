@@ -6,7 +6,7 @@ borg extract
 Extract archive contents
 
 Synopsis
---------
+~~~~~~~~
 
 ::
 

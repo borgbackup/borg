@@ -6,7 +6,7 @@ borg list
 List archive or repository contents
 
 Synopsis
---------
+~~~~~~~~
 
 ::
 

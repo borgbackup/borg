@@ -6,7 +6,7 @@ borg info
 Show archive details such as disk space used
 
 Synopsis
---------
+~~~~~~~~
 
 ::
 

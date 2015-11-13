@@ -7,7 +7,7 @@ Start in server mode. This command is usually not used manually.
         
 
 Synopsis
---------
+~~~~~~~~
 
 ::
 

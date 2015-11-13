@@ -6,7 +6,7 @@ borg mount
 Mount archive or an entire repository as a FUSE fileystem
 
 Synopsis
---------
+~~~~~~~~
 
 ::
 

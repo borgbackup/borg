@@ -6,7 +6,7 @@ borg delete
 Delete an existing repository or archive
 
 Synopsis
---------
+~~~~~~~~
 
 ::
 

@@ -6,7 +6,7 @@ borg debug-get-obj
 get object contents from the repository and write it into file
 
 Synopsis
---------
+~~~~~~~~
 
 ::
 

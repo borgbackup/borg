@@ -6,7 +6,7 @@ borg debug-put-obj
 put file(s) contents into the repository
 
 Synopsis
---------
+~~~~~~~~
 
 ::
 

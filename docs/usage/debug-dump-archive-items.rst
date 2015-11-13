@@ -6,7 +6,7 @@ borg debug-dump-archive-items
 dump (decrypted, decompressed) archive items metadata (not: data)
 
 Synopsis
---------
+~~~~~~~~
 
 ::
 

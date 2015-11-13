@@ -6,7 +6,7 @@ borg rename
 Rename an existing archive
 
 Synopsis
---------
+~~~~~~~~
 
 ::
 

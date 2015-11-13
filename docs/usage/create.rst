@@ -6,7 +6,7 @@ borg create
 Create new archive
 
 Synopsis
---------
+~~~~~~~~
 
 ::
 

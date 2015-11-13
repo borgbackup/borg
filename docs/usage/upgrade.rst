@@ -6,7 +6,7 @@ borg upgrade
 upgrade a repository from a previous version
 
 Synopsis
---------
+~~~~~~~~
 
 ::
 

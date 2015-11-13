@@ -6,7 +6,7 @@ borg init
 Initialize an empty repository
 
 Synopsis
---------
+~~~~~~~~
 
 ::
 

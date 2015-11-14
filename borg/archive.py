@@ -18,16 +18,12 @@ import time
 from io import BytesIO
 from . import xattr
 from .helpers import parse_timestamp, Error, uid2user, user2uid, gid2group, group2gid, format_timedelta, \
-    Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, have_cython, \
+    Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
     st_atime_ns, st_ctime_ns, st_mtime_ns
-if have_cython():
-    from .platform import acl_get, acl_set
-    from .chunker import Chunker
-    from .hashindex import ChunkIndex
-    import msgpack
-else:
-    import mock
-    msgpack = mock.Mock()
+from .platform import acl_get, acl_set
+from .chunker import Chunker
+from .hashindex import ChunkIndex
+import msgpack
 
 ITEMS_BUFFER = 1024 * 1024
 

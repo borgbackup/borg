@@ -61,6 +61,23 @@ Important notes:
 - When using -- to give options to py.test, you MUST also give borg.testsuite[.module].
 
 
+Regenerate usage files
+----------------------
+
+Usage and API documentation is currently committed directly to git,
+although those files are generated automatically from the source
+tree.
+
+When a new module is added, the ``docs/api.rst`` file needs to be
+regenerated::
+
+  ./setup.py build_api
+
+When a command is added, a commandline flag changed, added or removed,
+the usage docs need to be rebuilt as well::
+
+  ./setup.py build_usage
+
 Building the docs with Sphinx
 -----------------------------
 

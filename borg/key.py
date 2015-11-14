@@ -7,14 +7,13 @@ import textwrap
 import hmac
 from hashlib import sha256
 
-from .helpers import IntegrityError, get_keys_dir, Error, have_cython
+from .helpers import IntegrityError, get_keys_dir, Error
 from .logger import create_logger
 logger = create_logger()
 
-if have_cython():
-    from .crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
-    from .compress import Compressor, COMPR_BUFFER
-    import msgpack
+from .crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
+from .compress import Compressor, COMPR_BUFFER
+import msgpack
 
 PREFIX = b'\0' * 8
 

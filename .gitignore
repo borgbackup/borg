@@ -15,8 +15,6 @@ platform_linux.c
 *.pyc
 *.pyo
 *.so
-docs/usage/*.inc
-docs/api.rst
 .idea/
 .cache/
 borg/_version.py

@@ -10,11 +10,10 @@ import traceback
 
 from . import __version__
 
-from .helpers import Error, IntegrityError, have_cython
+from .helpers import Error, IntegrityError
 from .repository import Repository
 
-if have_cython():
-    import msgpack
+import msgpack
 
 BUFSIZE = 10 * 1024 * 1024
 

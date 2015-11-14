@@ -1,6 +1,25 @@
 Changelog
 =========
 
+Version 0.28.2
+--------------
+
+New features:
+
+- borg create --exclude-if-present TAGFILE - exclude directories that have the
+  given file from the backup. You can additionally give --keep-tag-files to
+  preserve just the directory roots and the tag-files (but not backup other
+  directory contents), #395, attic #128, attic #142
+
+Other changes:
+
+- do not create docs sources at build time (just have them in the repo),
+  completely remove have_cython() hack, do not use the "mock" library at build
+  time, #384
+- docs: explain how to regenerate usage and API files (build_api or
+  build_usage) and when to commit usage files directly into git, #384
+
+
 Version 0.28.1
 --------------
 

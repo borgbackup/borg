@@ -42,11 +42,11 @@ and compare that to our latest release and review the :doc:`changes`.
 
 .. _pyinstaller-binary:
 
-PyInstaller Binary
-------------------
+Standalone binary
+-----------------
 
-The |project_name| binary is available on the releases_ page for the following
-platforms:
+|project_name| binaries (generated with `pyinstaller`_) are available
+on the releases_ page for the following platforms:
 
 * **Linux**: glibc >= 2.13 (ok for most supported Linux releases)
 * **Mac OS X**: 10.10 (unknown whether it works for older releases)
@@ -57,6 +57,7 @@ them into a directory in your ``PATH`` and then you can run ``borg``. If a new
 version is released, you will have to manually download it and replace the old
 version.
 
+.. _pyinstaller: http://www.pyinstaller.org
 .. _releases: https://github.com/borgbackup/borg/releases
 
 .. _source-install:

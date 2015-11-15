@@ -6,18 +6,23 @@ Installation
 
 There are different ways to install |project_name|:
 
-- **distribution package** - easy and fast if a package is available for your
-  Linux/BSD distribution.
-- **PyInstaller binary** - easy and fast, we provide a ready-to-use binary file
+- :ref:`distribution-package` - easy and fast if a package is
+  available from your operating system.
+- :ref:`pyinstaller-binary` - easy and fast, we provide a ready-to-use binary file
   that comes bundled with all dependencies.
-- **pip** - installing a source package with pip needs more installation steps
-  and requires all dependencies with development headers and a compiler.
-- **git** - for developers and power users who want to have the latest code or
-  use revision control (each release is tagged).
+- :ref:`source-install`, either:
 
+  - :ref:`pip-installation` - installing a source package with pip needs
+    more installation steps and requires all dependencies with
+    development headers and a compiler.
+  - :ref:`git-installation`  - for developers and power users who want to
+    have the latest code or use revision control (each release is
+    tagged).
 
-Installation (Distribution Package)
------------------------------------
+.. _distribution-package:
+
+Distribution Package
+--------------------
 
 Some Linux and BSD distributions might offer a ready-to-use ``borgbackup``
 package which can be installed with the package manager.  As |project_name| is
@@ -32,9 +37,10 @@ and compare that to our latest release and review the :doc:`changes`.
 
 .. _AUR: https://aur.archlinux.org/packages/borgbackup/
 
+.. _pyinstaller-binary:
 
-Installation (PyInstaller Binary)
----------------------------------
+PyInstaller Binary
+------------------
 
 The |project_name| binary is available on the releases_ page for the following
 platforms:
@@ -50,10 +56,15 @@ version.
 
 .. _releases: https://github.com/borgbackup/borg/releases
 
-Installing the Dependencies
----------------------------
+.. _source-install:
 
-To install |project_name| from a source package, you have to install the
+From source
+-----------
+
+Dependencies
+~~~~~~~~~~~~
+
+To install |project_name| from a source package (including pip), you have to install the
 following dependencies first:
 
 * `Python 3`_ >= 3.2.2. Even though Python 3 is not the default Python version on
@@ -75,7 +86,7 @@ After you have installed the dependencies, you can proceed with steps outlined
 under :ref:`pip-installation`.
 
 Debian / Ubuntu
-~~~~~~~~~~~~~~~
++++++++++++++++
 
 Install the dependencies with development headers::
 
@@ -91,7 +102,7 @@ Ubuntu this means your user is not in the ``fuse`` group. Add yourself to that
 group, log out and log in again.
 
 Fedora / Korora
-~~~~~~~~~~~~~~~
++++++++++++++++
 
 Install the dependencies with development headers::
 
@@ -103,7 +114,7 @@ Install the dependencies with development headers::
 
 
 Mac OS X
-~~~~~~~~
+++++++++
 
 Assuming you have installed homebrew_, the following steps will install all the
 dependencies::
@@ -117,7 +128,7 @@ FUSE for OS X, which is available as a pre-release_.
 .. _pre-release: https://github.com/osxfuse/osxfuse/releases
 
 Cygwin
-~~~~~~
+++++++
 
 .. note::
     Running under Cygwin is experimental and has only been tested with Cygwin
@@ -144,8 +155,8 @@ In case the creation of the virtual environment fails, try deleting this file::
 
 .. _pip-installation:
 
-Installation (pip)
-------------------
+From pip
+~~~~~~~~
 
 Virtualenv_ can be used to build and install |project_name| without affecting
 the system Python or requiring root access.  Using a virtual environment is
@@ -172,9 +183,10 @@ activating your virtual environment::
 
     pip install -U borgbackup
 
+.. _git-installation:
 
-Installation (git)
-------------------
+From git
+~~~~~~~~
 
 This uses latest, unreleased development code from git.
 While we try not to break master, there are no guarantees on anything. ::

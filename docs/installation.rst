@@ -7,7 +7,7 @@ Installation
 There are different ways to install |project_name|:
 
 - :ref:`distribution-package` - easy and fast if a package is
-  available from your operating system.
+  available from your distribution / for your operating system.
 - :ref:`pyinstaller-binary` - easy and fast, we provide a ready-to-use binary file
   that comes bundled with all dependencies.
 - :ref:`source-install`, either:
@@ -42,7 +42,7 @@ and compare that to our latest release and review the :doc:`changes`.
 
 .. _pyinstaller-binary:
 
-Standalone binary
+Standalone Binary
 -----------------
 
 |project_name| binaries (generated with `pyinstaller`_) are available
@@ -62,7 +62,7 @@ version.
 
 .. _source-install:
 
-From source
+From Source
 -----------
 
 Dependencies
@@ -159,8 +159,8 @@ In case the creation of the virtual environment fails, try deleting this file::
 
 .. _pip-installation:
 
-From pip
-~~~~~~~~
+From PyPi / using pip
+~~~~~~~~~~~~~~~~~~~~~
 
 Virtualenv_ can be used to build and install |project_name| without affecting
 the system Python or requiring root access.  Using a virtual environment is
@@ -189,8 +189,8 @@ activating your virtual environment::
 
 .. _git-installation:
 
-From git
-~~~~~~~~
+From Github / using git
+~~~~~~~~~~~~~~~~~~~~~~~
 
 This uses latest, unreleased development code from git.
 While we try not to break master, there are no guarantees on anything. ::

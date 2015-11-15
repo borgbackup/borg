@@ -16,8 +16,13 @@ Other changes:
 - do not create docs sources at build time (just have them in the repo),
   completely remove have_cython() hack, do not use the "mock" library at build
   time, #384
-- docs: explain how to regenerate usage and API files (build_api or
-  build_usage) and when to commit usage files directly into git, #384
+- avoid hidden import, make it easier for PyInstaller, easier fix for #218
+- docs:
+
+  - add description of item flags / status output, fixes #402
+  - explain how to regenerate usage and API files (build_api or
+    build_usage) and when to commit usage files directly into git, #384
+  - minor install docs improvements
 
 
 Version 0.28.1

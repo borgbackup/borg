@@ -245,13 +245,6 @@ class Archiver:
             self.print_warning('Unknown file type: %s', path)
             return
         # Status output
-        # A lowercase character means a file type other than a regular file,
-        # borg usually just stores them. E.g. (d)irectory.
-        # Hardlinks to already seen content are indicated by (h).
-        # A uppercase character means a regular file that was (A)dded,
-        # (M)odified or was (U)nchanged.
-        # Note: A/M/U is relative to the "files" cache, not to the repo.
-        # This would be an issue if the files cache is not used.
         if status is None:
             if not dry_run:
                 status = '?'  # need to add a status code somewhere

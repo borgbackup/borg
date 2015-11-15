@@ -33,6 +33,10 @@ The way to use this is as follows:
 import inspect
 import logging
 
+# make it easy for PyInstaller (it does not discover the dependency on this
+# module automatically, because it is lazy-loaded by logging, see #218):
+import logging.config
+
 
 def setup_logging(stream=None):
     """setup logging module according to the arguments provided

@@ -27,15 +27,18 @@ Distribution Package
 Some Linux and BSD distributions might offer a ready-to-use ``borgbackup``
 package which can be installed with the package manager.  As |project_name| is
 still a young project, such a package might be not available for your system
-yet. Please ask package maintainers to build a package or, if you can package /
-submit it yourself, please help us with that!
+yet.
 
 * On **Arch Linux**, there is a package available in the AUR_.
 
+.. _AUR: https://aur.archlinux.org/packages/borgbackup/
+
+Please ask package maintainers to build a package or, if you can package /
+submit it yourself, please help us with that! See :issue:`105` on
+github to followup on packaging efforts.
+
 If a package is available, it might be interesting to check its version
 and compare that to our latest release and review the :doc:`changes`.
-
-.. _AUR: https://aur.archlinux.org/packages/borgbackup/
 
 .. _pyinstaller-binary:
 

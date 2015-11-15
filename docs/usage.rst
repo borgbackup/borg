@@ -47,6 +47,8 @@ General:
         can either leave it away or abbreviate as `::`, if a positional parameter is required.
     BORG_PASSPHRASE
         When set, use the value to answer the passphrase question for encrypted repositories.
+    BORG_LOGGING_CONF
+        When set, use the given filename as INI_-style logging configuration.
     BORG_RSH
         When set, use this command instead of ``ssh``.
     TMPDIR
@@ -80,6 +82,8 @@ Please note:
 - also be very careful when putting your passphrase into a script, make sure it has appropriate file permissions
   (e.g. mode 600, root:root).
 
+
+.. _INI: https://docs.python.org/3.2/library/logging.config.html#configuration-file-format
 
 Resource Usage
 ~~~~~~~~~~~~~~

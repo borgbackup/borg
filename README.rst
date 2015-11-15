@@ -19,7 +19,7 @@ fully trusted targets.
 See the `installation manual`_ or, if you have already
 downloaded Borg, ``docs/installation.rst`` to get started with Borg.
 
-.. _installation manual: https://borgbackup.readthedocs.org/installation.html
+.. _installation manual: https://borgbackup.readthedocs.org/en/stable/installation.html
 
 Main features
 -------------

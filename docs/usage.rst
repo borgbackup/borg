@@ -411,6 +411,39 @@ Additional Notes
 
 Here are misc. notes about topics that are maybe not covered in enough detail in the usage section.
 
+Item flags
+~~~~~~~~~~
+
+`borg create -v` outputs a verbose list of all files, directories and other
+file system items it considered. For each item, it prefixes a single-letter
+flag that indicates type and/or status of the item.
+
+A uppercase character represents the status of a regular file relative to the
+"files" cache (not relative to the repo - this is an issue if the files cache
+is not used). Metadata is stored in any case and for 'A' and 'M' also new data
+chunks are stored. For 'U' all data chunks refer to already existing chunks.
+
+- 'A' = regular file, added
+- 'M' = regular file, modified
+- 'U' = regular file, unchanged
+
+A lowercase character means a file type other than a regular file,
+borg usually just stores their metadata:
+
+- 'd' = directory
+- 'b' = block device
+- 'c' = char device
+- 'h' = regular file, hardlink (to already seen inodes)
+- 's' = symlink
+- 'f' = fifo
+
+Other flags used include:
+
+- 'i' = backup data was read from standard input (stdin)
+- '-' = dry run, item was *not* backed up
+- '?' = missing status code (if you see this, please file a bug report!)
+
+
 --chunker-params
 ~~~~~~~~~~~~~~~~
 The chunker params influence how input files are cut into pieces (chunks)

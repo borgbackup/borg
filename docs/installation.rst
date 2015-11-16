@@ -29,9 +29,19 @@ package which can be installed with the package manager.  As |project_name| is
 still a young project, such a package might be not available for your system
 yet.
 
-* On **Arch Linux**, there is a package available in the AUR_.
+================ ===================== =======
+Operating system Source                Command
+================ ===================== =======
+Arch Linux       AUR_
+Debian           `unstable/sid`_       ``apt install borgbackup``
+Ubuntu           `Xenial Xerus 15.04`_ ``apt install borgbackup``
+OS X             `Brew cask`_          ``brew cask install borgbackup``
+================ ===================== =======
 
 .. _AUR: https://aur.archlinux.org/packages/borgbackup/
+.. _unstable/sid: https://packages.debian.org/sid/borgbackup
+.. _Xenial Xerus 15.04: https://launchpad.net/ubuntu/xenial/+source/borgbackup
+.. _Brew cask: http://caskroom.io/
 
 Please ask package maintainers to build a package or, if you can package /
 submit it yourself, please help us with that! See :issue:`105` on

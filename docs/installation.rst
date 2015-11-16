@@ -159,8 +159,8 @@ In case the creation of the virtual environment fails, try deleting this file::
 
 .. _pip-installation:
 
-From PyPi / using pip
-~~~~~~~~~~~~~~~~~~~~~
+Using pip
+~~~~~~~~~
 
 Virtualenv_ can be used to build and install |project_name| without affecting
 the system Python or requiring root access.  Using a virtual environment is
@@ -189,8 +189,8 @@ activating your virtual environment::
 
 .. _git-installation:
 
-From Github / using git
-~~~~~~~~~~~~~~~~~~~~~~~
+Using git
+~~~~~~~~~
 
 This uses latest, unreleased development code from git.
 While we try not to break master, there are no guarantees on anything. ::

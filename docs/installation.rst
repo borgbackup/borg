@@ -34,7 +34,7 @@ Distribution Source                Command
 ============ ===================== =======
 Arch Linux   AUR_
 Debian       `unstable/sid`_       ``apt install borgbackup``
-Ubuntu       `Xenial Xerus 15.04`_ ``apt install borgbackup``
+Ubuntu       `Xenial Xerus 16.04`_ ``apt install borgbackup``
 OS X         `Brew cask`_          ``brew cask install borgbackup``
 ============ ===================== =======
 

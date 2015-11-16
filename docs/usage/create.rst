@@ -2,9 +2,15 @@
 
 borg create
 -----------
+
+Create new archive
+
+Synopsis
+~~~~~~~~
+
 ::
 
-    usage: borg create [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
+    borg create [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
                        [--remote-path PATH] [-s] [-p] [-e PATTERN]
                        [--exclude-from EXCLUDEFILE] [--exclude-caches]
                        [--exclude-if-present FILENAME] [--keep-tag-files]
@@ -14,14 +20,22 @@ borg create
                        [-C COMPRESSION] [--read-special] [-n]
                        ARCHIVE PATH [PATH ...]
     
-    Create new archive
+positional arguments
+~~~~~~~~~~~~~~~~~~~~
+
+::
+      
     
-    positional arguments:
       ARCHIVE               name of archive to create (must be also a valid
                             directory name)
       PATH                  paths to archive
     
-    optional arguments:
+optional arguments
+~~~~~~~~~~~~~~~~~~
+
+::
+      
+    
       -h, --help            show this help message and exit
       -v, --verbose         verbose output
       --show-rc             show/log the return code (rc)
@@ -71,3 +85,40 @@ traversing all paths specified. The archive will consume almost no disk space fo
 files or parts of files that have already been stored in other archives.
 
 See the output of the "borg help patterns" command for more help on exclude patterns.
+
+Examples
+~~~~~~~~
+
+::
+
+    # Backup ~/Documents into an archive named "my-documents"
+    $ borg create /mnt/backup::my-documents ~/Documents
+
+    # Backup ~/Documents and ~/src but exclude pyc files
+    $ borg create /mnt/backup::my-files   \
+        ~/Documents                       \
+        ~/src                             \
+        --exclude '*.pyc'
+
+    # Backup the root filesystem into an archive named "root-YYYY-MM-DD"
+    # use zlib compression (good, but slow) - default is no compression
+    NAME="root-`date +%Y-%m-%d`"
+    $ borg create -C zlib,6 /mnt/backup::$NAME / --do-not-cross-mountpoints
+
+    # Backup huge files with little chunk management overhead
+    $ borg create --chunker-params 19,23,21,4095 /mnt/backup::VMs /srv/VMs
+
+    # Backup a raw device (must not be active/in use/mounted at that time)
+    $ dd if=/dev/sda bs=10M | borg create /mnt/backup::my-sda -
+
+    # No compression (default)
+    $ borg create /mnt/backup::repo ~
+
+    # Super fast, low compression
+    $ borg create --compression lz4 /mnt/backup::repo ~
+
+    # Less fast, higher compression (N = 0..9)
+    $ borg create --compression zlib,N /mnt/backup::repo ~
+
+    # Even slower, even higher compression (N = 0..9)
+    $ borg create --compression lzma,N /mnt/backup::repo ~

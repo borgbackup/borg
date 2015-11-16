@@ -2,20 +2,34 @@
 
 borg mount
 ----------
+
+Mount archive or an entire repository as a FUSE fileystem
+
+Synopsis
+~~~~~~~~
+
 ::
 
-    usage: borg mount [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
+    borg mount [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
                       [--remote-path PATH] [-f] [-o OPTIONS]
                       REPOSITORY_OR_ARCHIVE MOUNTPOINT
     
-    Mount archive or an entire repository as a FUSE fileystem
+positional arguments
+~~~~~~~~~~~~~~~~~~~~
+
+::
+      
     
-    positional arguments:
       REPOSITORY_OR_ARCHIVE
                             repository/archive to mount
       MOUNTPOINT            where to mount filesystem
     
-    optional arguments:
+optional arguments
+~~~~~~~~~~~~~~~~~~
+
+::
+      
+    
       -h, --help            show this help message and exit
       -v, --verbose         verbose output
       --show-rc             show/log the return code (rc)
@@ -33,3 +47,13 @@ This command mounts an archive as a FUSE filesystem. This can be useful for
 browsing an archive or restoring individual files. Unless the ``--foreground``
 option is given the command will run in the background until the filesystem
 is ``umounted``.
+
+Examples
+~~~~~~~~
+
+::
+
+    $ borg mount /mnt/backup::root-2013-08-02 /tmp/mymountpoint
+    $ ls /tmp/mymountpoint
+    bin  boot  etc  lib  lib64  mnt  opt  root  sbin  srv  usr  var
+    $ fusermount -u /tmp/mymountpoint

@@ -2,18 +2,32 @@
 
 borg delete
 -----------
+
+Delete an existing repository or archive
+
+Synopsis
+~~~~~~~~
+
 ::
 
-    usage: borg delete [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
+    borg delete [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
                        [--remote-path PATH] [-s] [-c]
                        [TARGET]
     
-    Delete an existing repository or archive
+positional arguments
+~~~~~~~~~~~~~~~~~~~~
+
+::
+      
     
-    positional arguments:
       TARGET              archive or repository to delete
     
-    optional arguments:
+optional arguments
+~~~~~~~~~~~~~~~~~~
+
+::
+      
+    
       -h, --help          show this help message and exit
       -v, --verbose       verbose output
       --show-rc           show/log the return code (rc)

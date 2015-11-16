@@ -2,20 +2,34 @@
 
 borg check
 ----------
+
+Check repository consistency
+
+Synopsis
+~~~~~~~~
+
 ::
 
-    usage: borg check [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
+    borg check [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
                       [--remote-path PATH] [--repository-only] [--archives-only]
                       [--repair] [--last N]
                       [REPOSITORY_OR_ARCHIVE]
     
-    Check repository consistency
+positional arguments
+~~~~~~~~~~~~~~~~~~~~
+
+::
+      
     
-    positional arguments:
       REPOSITORY_OR_ARCHIVE
                             repository or archive to check consistency of
     
-    optional arguments:
+optional arguments
+~~~~~~~~~~~~~~~~~~
+
+::
+      
+    
       -h, --help            show this help message and exit
       -v, --verbose         verbose output
       --show-rc             show/log the return code (rc)

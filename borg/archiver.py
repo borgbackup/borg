@@ -431,7 +431,7 @@ class Archiver:
         print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
         print('Hostname:', archive.metadata[b'hostname'])
         print('Username:', archive.metadata[b'username'])
-        print('Time: %s' % to_localtime(archive.ts).strftime('%c'))
+        print('Time: %s' % format_time(to_localtime(archive.ts)))
         print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
         print('Number of files: %d' % stats.nfiles)
         print()

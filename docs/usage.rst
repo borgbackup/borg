@@ -140,6 +140,14 @@ indicated using the `IEC binary prefixes
 using powers of two (so ``KiB`` means 1024 bytes).
 
 
+Date and Time
+~~~~~~~~~~~~~
+
+We format date and time conforming to ISO-8601, that is: YYYY-MM-DD and HH:MM:SS
+
+For more information, see: https://xkcd.com/1179/
+
+
 .. include:: usage/init.rst.inc
 
 Examples

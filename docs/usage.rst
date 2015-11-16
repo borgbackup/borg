@@ -426,6 +426,7 @@ chunks are stored. For 'U' all data chunks refer to already existing chunks.
 - 'A' = regular file, added
 - 'M' = regular file, modified
 - 'U' = regular file, unchanged
+- 'E' = regular file, an error happened while accessing/reading *this* file
 
 A lowercase character means a file type other than a regular file,
 borg usually just stores their metadata:

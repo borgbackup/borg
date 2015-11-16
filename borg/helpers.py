@@ -449,12 +449,9 @@ def dir_is_tagged(path, exclude_caches, exclude_if_present):
 
 
 def format_time(t):
-    """Format datetime suitable for fixed length list output
+    """use ISO-8601 date and time format
     """
-    if abs((datetime.now() - t).days) < 365:
-        return t.strftime('%b %d %H:%M')
-    else:
-        return t.strftime('%b %d  %Y')
+    return t.strftime('%Y-%m-%d %H:%M:%S')
 
 
 def format_timedelta(td):
@@ -510,7 +507,7 @@ def sizeof_fmt_decimal(num, suffix='B', sep='', precision=2):
 
 
 def format_archive(archive):
-    return '%-36s %s' % (archive.name, to_localtime(archive.ts).strftime('%c'))
+    return '%-36s %s' % (archive.name, format_time(to_localtime(archive.ts)))
 
 
 def memoize(function):

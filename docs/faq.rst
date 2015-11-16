@@ -165,6 +165,32 @@ Yes, if you want to detect accidental data damage (like bit rot), use the
 If you want to be able to detect malicious tampering also, use a encrypted
 repo. It will then be able to check using CRCs and HMACs.
 
+I am seeing 'A' (added) status for a unchanged file!?
+-----------------------------------------------------
+
+The files cache (which is used to determine whether |project_name| already
+"knows" / has backed up a file and if so, to skip the file from chunking)
+does intentionally *not* contain files that:
+
+- have >= 10 as "entry age" (|project_name| has not seen this file for a while)
+- have a modification time (mtime) same as the newest mtime in the created
+  archive
+
+So, if you see an 'A' status for unchanged file(s), they are likely the files
+with the most recent mtime in that archive.
+
+This is expected: it is to avoid data loss with files that are backed up from
+a snapshot and that are immediately changed after the snapshot (but within
+mtime granularity time, so the mtime would not change). Without the code that
+removes these files from the files cache, the change that happened right after
+the snapshot would not be contained in the next backup as |project_name| would
+think the file is unchanged.
+
+This does not affect deduplication, the file will be chunked, but as the chunks
+will often be the same and already stored in the repo (except in the above
+mentioned rare condition), it will just re-use them as usual and not store new
+data chunks.
+
 Why was Borg forked from Attic?
 -------------------------------
 

@@ -7,7 +7,7 @@ Installation
 There are different ways to install |project_name|:
 
 - :ref:`distribution-package` - easy and fast if a package is
-  available from your distribution / for your operating system.
+  available from your distribution.
 - :ref:`pyinstaller-binary` - easy and fast, we provide a ready-to-use binary file
   that comes bundled with all dependencies.
 - :ref:`source-install`, either:
@@ -24,14 +24,24 @@ There are different ways to install |project_name|:
 Distribution Package
 --------------------
 
-Some Linux and BSD distributions might offer a ready-to-use ``borgbackup``
+Some distributions might offer a ready-to-use ``borgbackup``
 package which can be installed with the package manager.  As |project_name| is
 still a young project, such a package might be not available for your system
 yet.
 
-* On **Arch Linux**, there is a package available in the AUR_.
+============ ===================== =======
+Distribution Source                Command
+============ ===================== =======
+Arch Linux   AUR_
+Debian       `unstable/sid`_       ``apt install borgbackup``
+Ubuntu       `Xenial Xerus 16.04`_ ``apt install borgbackup``
+OS X         `Brew cask`_          ``brew cask install borgbackup``
+============ ===================== =======
 
 .. _AUR: https://aur.archlinux.org/packages/borgbackup/
+.. _unstable/sid: https://packages.debian.org/sid/borgbackup
+.. _Xenial Xerus 15.04: https://launchpad.net/ubuntu/xenial/+source/borgbackup
+.. _Brew cask: http://caskroom.io/
 
 Please ask package maintainers to build a package or, if you can package /
 submit it yourself, please help us with that! See :issue:`105` on
@@ -159,8 +169,8 @@ In case the creation of the virtual environment fails, try deleting this file::
 
 .. _pip-installation:
 
-From PyPi / using pip
-~~~~~~~~~~~~~~~~~~~~~
+Using pip
+~~~~~~~~~
 
 Virtualenv_ can be used to build and install |project_name| without affecting
 the system Python or requiring root access.  Using a virtual environment is
@@ -189,8 +199,8 @@ activating your virtual environment::
 
 .. _git-installation:
 
-From Github / using git
-~~~~~~~~~~~~~~~~~~~~~~~
+Using git
+~~~~~~~~~
 
 This uses latest, unreleased development code from git.
 While we try not to break master, there are no guarantees on anything. ::

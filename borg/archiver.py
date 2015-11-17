@@ -993,7 +993,7 @@ class Archiver:
                                help='print statistics for the deleted archive')
         subparser.add_argument('--save-space', dest='save_space',
                                action='store_true', default=False,
-                               help='prune in a slower, but space-saving way')
+                               help='prune in a slower, but space efficient way')
         subparser.add_argument('--keep-within', dest='within', type=str, metavar='WITHIN',
                                help='keep all archives within this time interval')
         subparser.add_argument('-H', '--keep-hourly', dest='hourly', type=int, default=0,

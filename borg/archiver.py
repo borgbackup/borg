@@ -476,7 +476,11 @@ class Archiver:
             else:
                 self.print_info('Pruning archive: %s' % format_archive(archive))
                 Archive(repository, key, manifest, archive.name, cache).delete(stats)
-        if to_delete and not args.dry_run:
+                if args.save_space:
+                    manifest.write()
+                    repository.commit()
+                    cache.commit()
+        if to_delete and not args.dry_run and not args.save_space:
             manifest.write()
             repository.commit()
             cache.commit()
@@ -987,6 +991,9 @@ class Archiver:
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the deleted archive')
+        subparser.add_argument('--save-space', dest='save_space',
+                               action='store_true', default=False,
+                               help='prune in a slower, but space-saving way')
         subparser.add_argument('--keep-within', dest='within', type=str, metavar='WITHIN',
                                help='keep all archives within this time interval')
         subparser.add_argument('-H', '--keep-hourly', dest='hourly', type=int, default=0,

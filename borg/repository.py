@@ -210,6 +210,12 @@ class Repository:
     def compact_segments(self):
         """Compact sparse segments by copying data into new segments
         """
+        # note: this first copies (potentially lots of) segments to new segments,
+        # needing (potentially lots of) additional space (which might be problematic
+        # in low space conditions). then it commits, then deletes the old segments
+        # (finally freeing up space).
+        # when trying to optimize this for low space conditions, make sure not to
+        # create lots of segment files significantly smaller than the target size.
         if not self.compact:
             return
         index_transaction_id = self.get_index_transaction_id()

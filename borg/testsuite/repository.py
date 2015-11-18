@@ -311,7 +311,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         # Simulate a crash before compact
         with patch.object(Repository, 'compact_segments') as compact:
             self.repository.commit()
-            compact.assert_called_once_with()
+            compact.assert_called_once_with(save_space=False)
         self.reopen()
         self.check(repair=True)
         self.assert_equal(self.repository.get(bytes(32)), b'data2')

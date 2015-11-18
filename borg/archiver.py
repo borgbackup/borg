@@ -105,10 +105,11 @@ class Archiver:
                        env_var_override='BORG_CHECK_I_KNOW_WHAT_I_AM_DOING', truish=('YES', )):
                 return EXIT_ERROR
         if not args.archives_only:
-            if not repository.check(repair=args.repair):
+            if not repository.check(repair=args.repair, save_space=args.save_space):
                 return EXIT_WARNING
         if not args.repo_only and not ArchiveChecker().check(
-                repository, repair=args.repair, archive=args.repository.archive, last=args.last):
+                repository, repair=args.repair, archive=args.repository.archive,
+                last=args.last, save_space=args.save_space):
             return EXIT_WARNING
         return EXIT_SUCCESS
 
@@ -332,7 +333,7 @@ class Archiver:
             stats = Statistics()
             archive.delete(stats)
             manifest.write()
-            repository.commit()
+            repository.commit(save_space=args.save_space)
             cache.commit()
             if args.stats:
                 logger.info(stats.summary.format(label='Deleted data:', stats=stats))
@@ -487,7 +488,7 @@ class Archiver:
                 Archive(repository, key, manifest, archive.name, cache).delete(stats)
         if to_delete and not args.dry_run:
             manifest.write()
-            repository.commit()
+            repository.commit(save_space=args.save_space)
             cache.commit()
         if args.stats:
             logger.info(stats.summary.format(label='Deleted data:', stats=stats))
@@ -762,6 +763,9 @@ class Archiver:
         subparser.add_argument('--repair', dest='repair', action='store_true',
                                default=False,
                                help='attempt to repair any inconsistencies found')
+        subparser.add_argument('--save-space', dest='save_space', action='store_true',
+                               default=False,
+                               help='work slower, but using less space')
         subparser.add_argument('--last', dest='last',
                                type=int, default=None, metavar='N',
                                help='only check last N archives (Default: all)')
@@ -926,6 +930,9 @@ class Archiver:
         subparser.add_argument('-c', '--cache-only', dest='cache_only',
                                action='store_true', default=False,
                                help='delete only the local cache for the given repository')
+        subparser.add_argument('--save-space', dest='save_space', action='store_true',
+                               default=False,
+                               help='work slower, but using less space')
         subparser.add_argument('target', metavar='TARGET', nargs='?', default='',
                                type=location_validator(),
                                help='archive or repository to delete')
@@ -1043,6 +1050,9 @@ class Archiver:
                                help='number of yearly archives to keep')
         subparser.add_argument('-p', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')
+        subparser.add_argument('--save-space', dest='save_space', action='store_true',
+                               default=False,
+                               help='work slower, but using less space')
         subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to prune')

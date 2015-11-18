@@ -26,15 +26,16 @@ Stay connected.
 Mailing list
 ------------
 
-There is a mailing list for Borg on librelist_ that you can use for feature
-requests and general discussions about Borg. A mailing list archive is
-available `here <http://librelist.com/browser/borgbackup/>`_.
+New Mailing List:
 
-To subscribe to the list, send an email to borgbackup@librelist.com and reply
-to the confirmation mail.
+`borgbackup@python.org <https://mail.python.org/mailman/listinfo/borgbackup>`_
 
-To unsubscribe, send an email to borgbackup-unsubscribe@librelist.com and reply
-to the confirmation mail.
+Just read that page to find out about the mailing list, its topic, how to subscribe,
+how to unsubscribe and where you can find the archives of the list.
+
+We used a different mailing list before, you can still read its archives there:
+
+`Old Mailing List's Archives <http://librelist.com/browser/borgbackup/>`_
 
 Bounties and Fundraisers
 ------------------------

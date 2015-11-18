@@ -164,9 +164,9 @@ Checklist:
 - close release milestone on Github
 - announce on:
 
- - `mailing list <mailto:borgbackup@librelist.org>`_
+ - Mailing list
  - Twitter (follow @ThomasJWaldmann for these tweets)
- - `IRC channel <irc://irc.freenode.net/borgbackup>`_ (change ``/topic``)
+ - IRC channel (change ``/topic``)
 
 - create a Github release, include:
   * standalone binaries (see above for how to create them)

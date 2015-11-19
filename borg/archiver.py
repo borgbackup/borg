@@ -210,11 +210,14 @@ class Archiver:
                     status = 'E'
                     self.print_warning('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
-            tag_path = dir_is_tagged(path, exclude_caches, exclude_if_present)
-            if tag_path:
+            tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)
+            if tag_paths:
                 if keep_tag_files:
                     archive.process_dir(path, st)
-                    archive.process_file(tag_path, st, cache)
+                    for tag_path in tag_paths:
+                        self._process(archive, cache, excludes, exclude_caches, exclude_if_present,
+                                      keep_tag_files, skip_inodes, tag_path, restrict_dev,
+                                      read_special=read_special, dry_run=dry_run)
                 return
             if not dry_run:
                 status = archive.process_dir(path, st)

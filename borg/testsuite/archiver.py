@@ -512,17 +512,27 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_exclude_keep_tagged(self):
         self.cmd('init', self.repository_location)
-        self.create_regular_file('file1', size=1024 * 80)
-        self.create_regular_file('tagged1/.NOBACKUP')
-        self.create_regular_file('tagged1/file2', size=1024 * 80)
-        self.create_regular_file('tagged2/CACHEDIR.TAG', contents = b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
-        self.create_regular_file('tagged2/file3', size=1024 * 80)
-        self.cmd('create', '--exclude-if-present', '.NOBACKUP', '--exclude-caches', '--keep-tag-files', self.repository_location + '::test', 'input')
+        self.create_regular_file('file0', size=1024)
+        self.create_regular_file('tagged1/.NOBACKUP1')
+        self.create_regular_file('tagged1/file1', size=1024)
+        self.create_regular_file('tagged2/.NOBACKUP2')
+        self.create_regular_file('tagged2/file2', size=1024)
+        self.create_regular_file('tagged3/CACHEDIR.TAG', contents = b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
+        self.create_regular_file('tagged3/file3', size=1024)
+        self.create_regular_file('taggedall/.NOBACKUP1')
+        self.create_regular_file('taggedall/.NOBACKUP2')
+        self.create_regular_file('taggedall/CACHEDIR.TAG', contents = b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
+        self.create_regular_file('taggedall/file4', size=1024)
+        self.cmd('create', '--exclude-if-present', '.NOBACKUP1', '--exclude-if-present', '.NOBACKUP2',
+                 '--exclude-caches', '--keep-tag-files', self.repository_location + '::test', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
-        self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'tagged1', 'tagged2'])
-        self.assert_equal(sorted(os.listdir('output/input/tagged1')), ['.NOBACKUP'])
-        self.assert_equal(sorted(os.listdir('output/input/tagged2')), ['CACHEDIR.TAG'])
+        self.assert_equal(sorted(os.listdir('output/input')), ['file0', 'tagged1', 'tagged2', 'tagged3', 'taggedall'])
+        self.assert_equal(os.listdir('output/input/tagged1'), ['.NOBACKUP1'])
+        self.assert_equal(os.listdir('output/input/tagged2'), ['.NOBACKUP2'])
+        self.assert_equal(os.listdir('output/input/tagged3'), ['CACHEDIR.TAG'])
+        self.assert_equal(sorted(os.listdir('output/input/taggedall')),
+                          ['.NOBACKUP1', '.NOBACKUP2', 'CACHEDIR.TAG', ])
 
     def test_path_normalization(self):
         self.cmd('init', self.repository_location)

@@ -434,18 +434,19 @@ def dir_is_cachedir(path):
 
 def dir_is_tagged(path, exclude_caches, exclude_if_present):
     """Determines whether the specified path is excluded by being a cache
-    directory or containing the user-specified tag file. Returns the
-    path of the tag file (either CACHEDIR.TAG or the matching
-    user-specified file)
+    directory or containing user-specified tag files. Returns a list of the
+    paths of the tag files (either CACHEDIR.TAG or the matching
+    user-specified files).
     """
+    tag_paths = []
     if exclude_caches and dir_is_cachedir(path):
-        return os.path.join(path, 'CACHEDIR.TAG')
+        tag_paths.append(os.path.join(path, 'CACHEDIR.TAG'))
     if exclude_if_present is not None:
         for tag in exclude_if_present:
             tag_path = os.path.join(path, tag)
             if os.path.isfile(tag_path):
-                return tag_path
-    return None
+                tag_paths.append(tag_path)
+    return tag_paths
 
 
 def format_time(t):

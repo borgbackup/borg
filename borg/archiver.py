@@ -35,6 +35,20 @@ from .remote import RepositoryServer, RemoteRepository
 has_lchflags = hasattr(os, 'lchflags')
 
 
+class ToggleAction(argparse.Action):
+    """argparse action to handle "toggle" flags easily
+
+    toggle flags are in the form of ``--foo``, ``--no-foo``.
+
+    the ``--no-foo`` argument still needs to be passed to the
+    ``add_argument()`` call, but it simplifies the ``--no``
+    detection.
+    """
+    def __call__(self, parser, ns, values, option):
+        """set the given flag to true unless ``--no`` is passed"""
+        setattr(ns, self.dest, not option.startswith('--no-'))
+
+
 class Archiver:
 
     def __init__(self, verbose=False):
@@ -763,19 +777,6 @@ class Archiver:
 
         See the output of the "borg help patterns" command for more help on exclude patterns.
         """)
-
-        class ToggleAction(argparse.Action):
-            """argparse action to handle "toggle" flags easily
-
-            toggle flags are in the form of ``--foo``, ``--no-foo``.
-
-            the ``--no-foo`` argument still needs to be passed to the
-            ``add_argument()`` call, but it simplifies the ``--no``
-            detection.
-            """
-            def __call__(self, parser, ns, values, option):
-                """set the given flag to true unless ``--no`` is passed"""
-                setattr(ns, self.dest, not option.startswith('--no-'))
 
         subparser = subparsers.add_parser('create', parents=[common_parser],
                                           description=self.do_create.__doc__,

@@ -170,4 +170,7 @@ Checklist:
 
 - create a Github release, include:
   * standalone binaries (see above for how to create them)
+    + for OS X, document the OS X Fuse version in the README of the binaries.
+      OS X FUSE uses a kernel extension that needs to be compatible with the
+      code contained in the binary.
   * a link to ``CHANGES.rst``

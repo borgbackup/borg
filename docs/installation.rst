@@ -62,10 +62,15 @@ on the releases_ page for the following platforms:
 * **Mac OS X**: 10.10 (unknown whether it works for older releases)
 * **FreeBSD**: 10.2 (unknown whether it works for older releases)
 
-These binaries work without requiring specific installation steps. Just drop
-them into a directory in your ``PATH`` and then you can run ``borg``. If a new
-version is released, you will have to manually download it and replace the old
-version.
+To install such a binary, just drop it into a directory in your ``PATH``,
+make borg readable and executable for its users and then you can run ``borg``::
+
+    sudo cp borg-linux64 /usr/local/bin/borg
+    sudo chown root:root /usr/local/bin/borg
+    sudo chmod 755 /usr/local/bin/borg
+
+If a new version is released, you will have to manually download it and replace
+the old version using the same steps as shown above.
 
 .. _pyinstaller: http://www.pyinstaller.org
 .. _releases: https://github.com/borgbackup/borg/releases

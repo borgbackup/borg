@@ -764,6 +764,19 @@ class Archiver:
         See the output of the "borg help patterns" command for more help on exclude patterns.
         """)
 
+        class ToggleAction(argparse.Action):
+            """argparse action to handle "toggle" flags easily
+
+            toggle flags are in the form of ``--foo``, ``--no-foo``.
+
+            the ``--no-foo`` argument still needs to be passed to the
+            ``add_argument()`` call, but it simplifies the ``--no``
+            detection.
+            """
+            def __call__(self, parser, ns, values, option):
+                """set the given flag to true unless ``--no`` is passed"""
+                setattr(ns, self.dest, option.startswith('--no-'))
+
         subparser = subparsers.add_parser('create', parents=[common_parser],
                                           description=self.do_create.__doc__,
                                           epilog=create_epilog,
@@ -772,8 +785,9 @@ class Archiver:
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the created archive')
-        subparser.add_argument('-p', '--progress', dest='progress', const=not sys.stderr.isatty(),
-                               action='store_const', default=sys.stdin.isatty(),
+        subparser.add_argument('-p', '--progress', '--no-progress',
+                               dest='progress', default=sys.stdin.isatty(),
+                               action=ToggleAction, nargs=0,
                                help="""toggle progress display while creating the archive, showing Original,
                                Compressed and Deduplicated sizes, followed by the Number of files seen
                                and the path being processed, default: %(default)s""")

@@ -775,7 +775,7 @@ class Archiver:
             """
             def __call__(self, parser, ns, values, option):
                 """set the given flag to true unless ``--no`` is passed"""
-                setattr(ns, self.dest, option.startswith('--no-'))
+                setattr(ns, self.dest, not option.startswith('--no-'))
 
         subparser = subparsers.add_parser('create', parents=[common_parser],
                                           description=self.do_create.__doc__,

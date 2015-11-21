@@ -1155,7 +1155,7 @@ class Archiver:
         self.verbose = args.verbose
         RemoteRepository.remote_path = args.remote_path
         RemoteRepository.umask = args.umask
-        setup_logging()
+        setup_logging()  # do not use loggers before this!
         check_extension_modules()
         keys_dir = get_keys_dir()
         if not os.path.exists(keys_dir):

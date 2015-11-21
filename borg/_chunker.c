@@ -76,19 +76,18 @@ buzhash_update(uint32_t sum, unsigned char remove, unsigned char add, size_t len
 }
 
 typedef struct {
-    int window_size, chunk_mask, min_size;
-    size_t buf_size;
+    uint32_t chunk_mask;
     uint32_t *table;
     uint8_t *data;
     PyObject *fd;
     int fh;
     int done, eof;
-    size_t remaining, position, last;
+    size_t min_size, buf_size, window_size, remaining, position, last;
     off_t bytes_read, bytes_yielded;
 } Chunker;
 
 static Chunker *
-chunker_init(int window_size, int chunk_mask, int min_size, int max_size, uint32_t seed)
+chunker_init(size_t window_size, uint32_t chunk_mask, size_t min_size, size_t max_size, uint32_t seed)
 {
     Chunker *c = calloc(sizeof(Chunker), 1);
     c->window_size = window_size;
@@ -203,9 +202,8 @@ PyBuffer_FromMemory(void *data, Py_ssize_t len)
 static PyObject *
 chunker_process(Chunker *c)
 {
-    uint32_t sum, chunk_mask = c->chunk_mask, min_size = c->min_size, window_size = c->window_size;
-    int n = 0;
-    int old_last;
+    uint32_t sum, chunk_mask = c->chunk_mask;
+    size_t n = 0, old_last, min_size = c->min_size, window_size = c->window_size;
 
     if(c->done) {
         if(c->bytes_read == c->bytes_yielded)

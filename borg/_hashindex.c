@@ -171,7 +171,7 @@ hashindex_read(const char *path)
         goto fail;
     }
     buckets_length = (off_t)_le32toh(header.num_buckets) * (header.key_size + header.value_size);
-    if(length != sizeof(HashHeader) + buckets_length) {
+    if((size_t) length != sizeof(HashHeader) + buckets_length) {
         EPRINTF_MSG_PATH(path, "Incorrect file length (expected %ju, got %ju)",
                          (uintmax_t) sizeof(HashHeader) + buckets_length, (uintmax_t) length);
         goto fail;
@@ -275,7 +275,7 @@ hashindex_write(HashIndex *index, const char *path)
         EPRINTF_PATH(path, "fwrite header failed");
         ret = 0;
     }
-    if(fwrite(index->buckets, 1, buckets_length, fd) != buckets_length) {
+    if(fwrite(index->buckets, 1, buckets_length, fd) != (size_t) buckets_length) {
         EPRINTF_PATH(path, "fwrite buckets failed");
         ret = 0;
     }

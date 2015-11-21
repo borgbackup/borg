@@ -20,7 +20,7 @@ from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, prune_within, prune_split, unhexlify, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, \
+    dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .logger import create_logger, setup_logging
 logger = create_logger()
@@ -1224,16 +1224,16 @@ def main():  # pragma: no cover
     except Error as e:
         msg = e.get_message()
         if e.traceback:
-            msg += "\n%s" % traceback.format_exc()
+            msg += "\n%s\n%s" % (traceback.format_exc(), sysinfo())
         exit_code = e.exit_code
     except RemoteRepository.RPCError as e:
-        msg = 'Remote Exception.\n%s' % str(e)
+        msg = 'Remote Exception.\n%s\n%s' % (str(e), sysinfo())
         exit_code = EXIT_ERROR
     except Exception:
-        msg = 'Local Exception.\n%s' % traceback.format_exc()
+        msg = 'Local Exception.\n%s\n%s' % (traceback.format_exc(), sysinfo())
         exit_code = EXIT_ERROR
     except KeyboardInterrupt:
-        msg = 'Keyboard interrupt.\n%s' % traceback.format_exc()
+        msg = 'Keyboard interrupt.\n%s\n%s' % (traceback.format_exc(), sysinfo())
         exit_code = EXIT_ERROR
     if msg:
         logger.error(msg)

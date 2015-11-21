@@ -59,7 +59,7 @@ class Archiver:
         self.exit_code = EXIT_WARNING  # we do not terminate here, so it is a warning
         logger.warning(msg)
 
-    def print_info(self, msg, *args):
+    def print_verbose(self, msg, *args):
         if self.verbose:
             msg = args and msg % args or msg
             logger.info(msg)
@@ -151,7 +151,7 @@ class Archiver:
                         self.print_warning('%s: %s', path, e)
                 else:
                     status = '-'
-                self.print_info("%1s %s", status, remove_surrogates(path))
+                self.print_verbose("%1s %s", status, remove_surrogates(path))
                 continue
             path = os.path.normpath(path)
             if args.one_file_system:
@@ -252,7 +252,7 @@ class Archiver:
                 status = '-'  # dry run, item was not backed up
         # output ALL the stuff - it can be easily filtered using grep.
         # even stuff considered unchanged might be interesting.
-        self.print_info("%1s %s", status, remove_surrogates(path))
+        self.print_verbose("%1s %s", status, remove_surrogates(path))
 
     def do_extract(self, args):
         """Extract archive contents"""
@@ -280,7 +280,7 @@ class Archiver:
             if not args.dry_run:
                 while dirs and not item[b'path'].startswith(dirs[-1][b'path']):
                     archive.extract_item(dirs.pop(-1), stdout=stdout)
-            self.print_info(remove_surrogates(orig_path))
+            self.print_verbose(remove_surrogates(orig_path))
             try:
                 if dry_run:
                     archive.extract_item(item, dry_run=True)
@@ -366,7 +366,7 @@ class Archiver:
             else:
                 archive = None
             operations = FuseOperations(key, repository, manifest, archive)
-            self.print_info("Mounting filesystem")
+            self.print_verbose("Mounting filesystem")
             try:
                 operations.mount(args.mountpoint, args.options, args.foreground)
             except RuntimeError:
@@ -469,12 +469,12 @@ class Archiver:
         to_delete = [a for a in archives if a not in keep]
         stats = Statistics()
         for archive in keep:
-            self.print_info('Keeping archive: %s' % format_archive(archive))
+            self.print_verbose('Keeping archive: %s' % format_archive(archive))
         for archive in to_delete:
             if args.dry_run:
-                self.print_info('Would prune:     %s' % format_archive(archive))
+                self.print_verbose('Would prune:     %s' % format_archive(archive))
             else:
-                self.print_info('Pruning archive: %s' % format_archive(archive))
+                self.print_verbose('Pruning archive: %s' % format_archive(archive))
                 Archive(repository, key, manifest, archive.name, cache).delete(stats)
         if to_delete and not args.dry_run:
             manifest.write()

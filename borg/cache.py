@@ -32,7 +32,8 @@ class Cache:
     class EncryptionMethodMismatch(Error):
         """Repository encryption method changed since last access, refusing to continue"""
 
-    def __init__(self, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True):
+    def __init__(self, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True,
+                 lock_wait=None):
         self.lock = None
         self.timestamp = None
         self.lock = None
@@ -52,7 +53,7 @@ class Cache:
                            env_var_override='BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'):
                     raise self.CacheInitAbortedError()
             self.create()
-        self.open()
+        self.open(lock_wait=lock_wait)
         # Warn user before sending data to a relocated repository
         if self.previous_location and self.previous_location != repository._location.canonical_path():
             msg = ("Warning: The repository at location {} was previously located at {}".format(repository._location.canonical_path(), self.previous_location) +
@@ -136,10 +137,10 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         self.chunks = ChunkIndex.read(os.path.join(self.path, 'chunks').encode('utf-8'))
         self.files = None
 
-    def open(self):
+    def open(self, lock_wait=None):
         if not os.path.isdir(self.path):
             raise Exception('%s Does not look like a Borg cache' % self.path)
-        self.lock = UpgradableLock(os.path.join(self.path, 'lock'), exclusive=True).acquire()
+        self.lock = UpgradableLock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait).acquire()
         self.rollback()
 
     def close(self):

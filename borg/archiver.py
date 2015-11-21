@@ -37,15 +37,16 @@ has_lchflags = hasattr(os, 'lchflags')
 
 class Archiver:
 
-    def __init__(self, verbose=False):
+    def __init__(self, verbose=False, lock_wait=None):
         self.exit_code = EXIT_SUCCESS
         self.verbose = verbose
+        self.lock_wait = lock_wait
 
     def open_repository(self, location, create=False, exclusive=False):
         if location.proto == 'ssh':
-            repository = RemoteRepository(location, create=create)
+            repository = RemoteRepository(location, create=create, lock_wait=self.lock_wait)
         else:
-            repository = Repository(location.path, create=create, exclusive=exclusive)
+            repository = Repository(location.path, create=create, exclusive=exclusive, lock_wait=self.lock_wait)
         repository._location = location
         return repository
 
@@ -119,7 +120,7 @@ class Archiver:
             compr_args = dict(buffer=COMPR_BUFFER)
             compr_args.update(args.compression)
             key.compressor = Compressor(**compr_args)
-            cache = Cache(repository, key, manifest, do_files=args.cache_files)
+            cache = Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait)
             archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
                               create=True, checkpoint_interval=args.checkpoint_interval,
                               numeric_owner=args.numeric_owner, progress=args.progress,
@@ -305,7 +306,7 @@ class Archiver:
         """Rename an existing archive"""
         repository = self.open_repository(args.archive, exclusive=True)
         manifest, key = Manifest.load(repository)
-        cache = Cache(repository, key, manifest)
+        cache = Cache(repository, key, manifest, lock_wait=self.lock_wait)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
         archive.rename(args.name)
         manifest.write()
@@ -317,7 +318,7 @@ class Archiver:
         """Delete an existing repository or archive"""
         repository = self.open_repository(args.target, exclusive=True)
         manifest, key = Manifest.load(repository)
-        cache = Cache(repository, key, manifest, do_files=args.cache_files)
+        cache = Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait)
         if args.target.archive:
             archive = Archive(repository, key, manifest, args.target.archive, cache=cache)
             stats = Statistics()
@@ -424,7 +425,7 @@ class Archiver:
         """Show archive details such as disk space used"""
         repository = self.open_repository(args.archive)
         manifest, key = Manifest.load(repository)
-        cache = Cache(repository, key, manifest, do_files=args.cache_files)
+        cache = Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait)
         archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
         stats = archive.calc_stats(cache)
         print('Name:', archive.name)
@@ -443,7 +444,7 @@ class Archiver:
         """Prune repository archives according to specified rules"""
         repository = self.open_repository(args.repository, exclusive=True)
         manifest, key = Manifest.load(repository)
-        cache = Cache(repository, key, manifest, do_files=args.cache_files)
+        cache = Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait)
         archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
         if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0 and args.within is None:
             self.print_error('At least one of the "within", "keep-hourly", "keep-daily", "keep-weekly", '
@@ -646,6 +647,8 @@ class Archiver:
         common_parser.add_argument('--log-level', dest='log_level', default='info', metavar='LEVEL',
                                    choices=('debug', 'info', 'warning', 'error', 'critical'),
                                    help='set the log level to LEVEL, default: %(default)s)')
+        common_parser.add_argument('--lock-wait', dest='lock_wait', type=int, metavar='N', default=1,
+                                   help='wait for the lock, but max. N seconds (default: %(default)d).')
         common_parser.add_argument('--show-rc', dest='show_rc', action='store_true', default=False,
                                    help='show/log the return code (rc)')
         common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
@@ -1153,6 +1156,7 @@ class Archiver:
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
         self.verbose = args.verbose
+        self.lock_wait = args.lock_wait
         RemoteRepository.remote_path = args.remote_path
         RemoteRepository.umask = args.umask
         setup_logging(level=args.log_level)  # do not use loggers before this!

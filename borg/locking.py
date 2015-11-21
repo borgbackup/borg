@@ -99,7 +99,14 @@ class NotMyLock(LockErrorT):
 
 
 class ExclusiveLock:
-    """An exclusive Lock based on mkdir fs operation being atomic"""
+    """An exclusive Lock based on mkdir fs operation being atomic.
+
+    If possible, try to use the contextmanager here like:
+    with ExclusiveLock(...) as lock:
+        ...
+    This makes sure the lock is released again if the block is left, no
+    matter how (e.g. if an exception occurred).
+    """
     def __init__(self, path, timeout=None, sleep=None, id=None):
         self.timeout = timeout
         self.sleep = sleep
@@ -220,6 +227,12 @@ class UpgradableLock:
     Typically, write access to a resource needs an exclusive lock (1 writer,
     noone is allowed reading) and read access to a resource needs a shared
     lock (multiple readers are allowed).
+
+    If possible, try to use the contextmanager here like:
+    with UpgradableLock(...) as lock:
+        ...
+    This makes sure the lock is released again if the block is left, no
+    matter how (e.g. if an exception occurred).
     """
     def __init__(self, path, exclusive=False, sleep=None, timeout=None, id=None):
         self.path = path
@@ -262,12 +275,18 @@ class UpgradableLock:
         timer = TimeoutTimer(self.timeout, sleep).start()
         while True:
             self._lock.acquire()
-            if remove is not None:
-                self._roster.modify(remove, REMOVE)
-                remove = None
-            if len(self._roster.get(SHARED)) == 0:
-                return  # we are the only one and we keep the lock!
-            self._lock.release()
+            try:
+                if remove is not None:
+                    self._roster.modify(remove, REMOVE)
+                    remove = None
+                if len(self._roster.get(SHARED)) == 0:
+                    return  # we are the only one and we keep the lock!
+            except:
+                # avoid orphan lock when an exception happens here, e.g. Ctrl-C!
+                self._lock.release()
+                raise
+            else:
+                self._lock.release()
             if timer.timed_out_or_sleep():
                 raise LockTimeout(self.path)
 

@@ -51,7 +51,7 @@ class Repository:
     class ObjectNotFound(ErrorWithTraceback):
         """Object with key {} not found in repository {}."""
 
-    def __init__(self, path, create=False, exclusive=False, lock_wait=None):
+    def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True):
         self.path = os.path.abspath(path)
         self.io = None
         self.lock = None
@@ -59,7 +59,7 @@ class Repository:
         self._active_txn = False
         if create:
             self.create(self.path)
-        self.open(self.path, exclusive, lock_wait=lock_wait)
+        self.open(self.path, exclusive, lock_wait=lock_wait, lock=lock)
 
     def __del__(self):
         self.close()
@@ -129,11 +129,17 @@ class Repository:
             self.replay_segments(replay_from, segments_transaction_id)
         return self.get_index_transaction_id()
 
-    def open(self, path, exclusive, lock_wait=None):
+    def break_lock(self):
+        UpgradableLock(os.path.join(self.path, 'lock')).break_lock()
+
+    def open(self, path, exclusive, lock_wait=None, lock=True):
         self.path = path
         if not os.path.isdir(path):
             raise self.DoesNotExist(path)
-        self.lock = UpgradableLock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait).acquire()
+        if lock:
+            self.lock = UpgradableLock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait).acquire()
+        else:
+            self.lock = None
         self.config = ConfigParser(interpolation=None)
         self.config.read(os.path.join(self.path, 'config'))
         if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:

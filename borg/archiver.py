@@ -646,6 +646,9 @@ class Archiver:
         common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
         common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False,
                                    help='verbose output')
+        common_parser.add_argument('--log-level', dest='log_level', default='info', metavar='LEVEL',
+                                   choices=('debug', 'info', 'warning', 'error', 'critical'),
+                                   help='set the log level to LEVEL, default: %(default)s)')
         common_parser.add_argument('--show-rc', dest='show_rc', action='store_true', default=False,
                                    help='show/log the return code (rc)')
         common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
@@ -1155,7 +1158,7 @@ class Archiver:
         self.verbose = args.verbose
         RemoteRepository.remote_path = args.remote_path
         RemoteRepository.umask = args.umask
-        setup_logging()  # do not use loggers before this!
+        setup_logging(level=args.log_level)  # do not use loggers before this!
         check_extension_modules()
         keys_dir = get_keys_dir()
         if not os.path.exists(keys_dir):

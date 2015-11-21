@@ -11,12 +11,21 @@ command in detail.
 General
 -------
 
-Quiet by default
-~~~~~~~~~~~~~~~~
+Type of log output
+~~~~~~~~~~~~~~~~~~
 
-Like most UNIX commands |project_name| is quiet by default but the ``-v`` or
-``--verbose`` option can be used to get the program to output more status
-messages as it is processing.
+You can set the log level of the builtin logging configuration using the
+--log-level option.
+
+Supported levels: ``debug``, ``info``, ``warning``, ``error``, ``critical``.
+
+All log messages created with at least the given level will be output.
+
+Amount of informational output
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For some subcommands, using the ``-v`` or ``--verbose`` option will give you
+more informational output (at ``info`` level).
 
 Return codes
 ~~~~~~~~~~~~

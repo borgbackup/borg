@@ -52,7 +52,7 @@ def _log_warning(message, category, filename, lineno, file=None, line=None):
     logger.warning(msg)
 
 
-def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF'):
+def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', level='info'):
     """setup logging module according to the arguments provided
 
     if conf_fname is given (or the config file name can be determined via
@@ -88,7 +88,7 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF'):
     # example:
     # handler.setFormatter(logging.Formatter('%(name)s: %(message)s'))
     logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(level.upper())
     configured = True
     logger = logging.getLogger(__name__)
     if err_msg:

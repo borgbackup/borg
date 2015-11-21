@@ -64,9 +64,6 @@ class Archiver:
             msg = args and msg % args or msg
             logger.info(msg)
 
-    def print_status(self, status, path):
-        self.print_info("%1s %s", status, remove_surrogates(path))
-
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
         """
@@ -154,7 +151,7 @@ class Archiver:
                         self.print_warning('%s: %s', path, e)
                 else:
                     status = '-'
-                self.print_status(status, path)
+                self.print_info("%1s %s", status, remove_surrogates(path))
                 continue
             path = os.path.normpath(path)
             if args.one_file_system:
@@ -255,7 +252,7 @@ class Archiver:
                 status = '-'  # dry run, item was not backed up
         # output ALL the stuff - it can be easily filtered using grep.
         # even stuff considered unchanged might be interesting.
-        self.print_status(status, path)
+        self.print_info("%1s %s", status, remove_surrogates(path))
 
     def do_extract(self, args):
         """Extract archive contents"""

@@ -14,6 +14,7 @@ except ImportError:
         TerminalSize = namedtuple('TerminalSize', ['columns', 'lines'])
         return TerminalSize(int(os.environ.get('COLUMNS', fallback[0])), int(os.environ.get('LINES', fallback[1])))
 import sys
+import platform
 import time
 import unicodedata
 
@@ -887,3 +888,13 @@ def yes(msg=None, retry_msg=None, false_msg=None, true_msg=None,
         if retry_msg:
             print(retry_msg, file=ofile, end='')
             ofile.flush()
+
+
+def sysinfo():
+    info = []
+    info.append('Platform: %s' % (' '.join(platform.uname()), ))
+    if sys.platform.startswith('linux'):
+        info.append('Linux: %s %s %s  LibC: %s %s' % (platform.linux_distribution() + platform.libc_ver()))
+    info.append('Python: %s %s' % (platform.python_implementation(), platform.python_version()))
+    info.append('')
+    return '\n'.join(info)

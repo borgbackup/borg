@@ -724,6 +724,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('test-2', output)
         self.assert_not_in('something-else', output)
 
+    def test_break_lock(self):
+        self.cmd('init', self.repository_location)
+        self.cmd('break-lock', self.repository_location)
+
     def test_usage(self):
         if self.FORK_DEFAULT:
             self.cmd(exit_code=0)

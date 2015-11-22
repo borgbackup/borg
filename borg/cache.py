@@ -32,6 +32,11 @@ class Cache:
     class EncryptionMethodMismatch(Error):
         """Repository encryption method changed since last access, refusing to continue"""
 
+    @staticmethod
+    def break_lock(repository, path=None):
+        path = path or os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
+        UpgradableLock(os.path.join(path, 'lock'), exclusive=True).break_lock()
+
     def __init__(self, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True,
                  lock_wait=None):
         self.lock = None

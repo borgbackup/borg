@@ -42,11 +42,11 @@ class Archiver:
         self.verbose = verbose
         self.lock_wait = lock_wait
 
-    def open_repository(self, location, create=False, exclusive=False):
+    def open_repository(self, location, create=False, exclusive=False, lock=True):
         if location.proto == 'ssh':
-            repository = RemoteRepository(location, create=create, lock_wait=self.lock_wait)
+            repository = RemoteRepository(location, create=create, lock_wait=self.lock_wait, lock=lock)
         else:
-            repository = Repository(location.path, create=create, exclusive=exclusive, lock_wait=self.lock_wait)
+            repository = Repository(location.path, create=create, exclusive=exclusive, lock_wait=self.lock_wait, lock=lock)
         repository._location = location
         return repository
 
@@ -573,6 +573,16 @@ class Archiver:
         print('Done.')
         return EXIT_SUCCESS
 
+    def do_break_lock(self, args):
+        """Break the repository lock (e.g. in case it was left by a dead borg."""
+        repository = self.open_repository(args.repository, lock=False)
+        try:
+            repository.break_lock()
+            Cache.break_lock(repository)
+        finally:
+            repository.close()
+        return self.exit_code
+
     helptext = {}
     helptext['patterns'] = '''
         Exclude patterns use a variant of shell pattern syntax, with '*' matching any
@@ -971,6 +981,20 @@ class Archiver:
         subparser.add_argument('archive', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to display information about')
+
+        break_lock_epilog = textwrap.dedent("""
+        This command breaks the repository and cache locks.
+        Please use carefully and only while no borg process (on any machine) is
+        trying to access the Cache or the Repository.
+        """)
+        subparser = subparsers.add_parser('break-lock', parents=[common_parser],
+                                          description=self.do_break_lock.__doc__,
+                                          epilog=break_lock_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.set_defaults(func=self.do_break_lock)
+        subparser.add_argument('repository', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repository for which to break the locks')
 
         prune_epilog = textwrap.dedent("""
         The prune command prunes a repository by deleting archives not matching

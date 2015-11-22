@@ -2,7 +2,8 @@ import time
 
 import pytest
 
-from ..locking import get_id, TimeoutTimer, ExclusiveLock , UpgradableLock, LockRoster, ADD, REMOVE, SHARED, EXCLUSIVE
+from ..locking import get_id, TimeoutTimer, ExclusiveLock, UpgradableLock, LockRoster, \
+                      ADD, REMOVE, SHARED, EXCLUSIVE, LockTimeout
 
 
 ID1 = "foo", 1, 1
@@ -52,7 +53,7 @@ class TestExclusiveLock:
 
     def test_timeout(self, lockpath):
         with ExclusiveLock(lockpath, id=ID1):
-            with pytest.raises(ExclusiveLock.LockTimeout):
+            with pytest.raises(LockTimeout):
                 ExclusiveLock(lockpath, id=ID2, timeout=0.1).acquire()
 
 
@@ -91,6 +92,17 @@ class TestUpgradableLock:
         assert len(lock._roster.get(EXCLUSIVE)) == 0
         with UpgradableLock(lockpath, exclusive=True, id=ID2):
             pass
+
+    def test_timeout(self, lockpath):
+        with UpgradableLock(lockpath, exclusive=False, id=ID1):
+            with pytest.raises(LockTimeout):
+                UpgradableLock(lockpath, exclusive=True, id=ID2, timeout=0.1).acquire()
+        with UpgradableLock(lockpath, exclusive=True, id=ID1):
+            with pytest.raises(LockTimeout):
+                UpgradableLock(lockpath, exclusive=False, id=ID2, timeout=0.1).acquire()
+        with UpgradableLock(lockpath, exclusive=True, id=ID1):
+            with pytest.raises(LockTimeout):
+                UpgradableLock(lockpath, exclusive=True, id=ID2, timeout=0.1).acquire()
 
 
 @pytest.fixture()

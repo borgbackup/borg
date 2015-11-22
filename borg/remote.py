@@ -97,7 +97,7 @@ class RepositoryServer:  # pragma: no cover
     def negotiate(self, versions):
         return 1
 
-    def open(self, path, create=False):
+    def open(self, path, create=False, lock_wait=None):
         path = os.fsdecode(path)
         if path.startswith('/~'):
             path = path[1:]
@@ -108,7 +108,7 @@ class RepositoryServer:  # pragma: no cover
                     break
             else:
                 raise PathNotAllowed(path)
-        self.repository = Repository(path, create)
+        self.repository = Repository(path, create, lock_wait=lock_wait)
         return self.repository.id
 
 
@@ -122,7 +122,7 @@ class RemoteRepository:
         def __init__(self, name):
             self.name = name
 
-    def __init__(self, location, create=False):
+    def __init__(self, location, create=False, lock_wait=None):
         self.location = location
         self.preload_ids = []
         self.msgid = 0
@@ -154,7 +154,7 @@ class RemoteRepository:
             raise ConnectionClosedWithHint('Is borg working on the server?')
         if version != 1:
             raise Exception('Server insisted on using unsupported protocol version %d' % version)
-        self.id = self.call('open', location.path, create)
+        self.id = self.call('open', location.path, create, lock_wait)
 
     def __del__(self):
         self.close()

@@ -74,26 +74,32 @@ class TimeoutTimer:
             return False
 
 
+class LockError(Error):
+    """Failed to acquire the lock {}."""
+
+
+class LockErrorT(ErrorWithTraceback):
+    """Failed to acquire the lock {}."""
+
+
+class LockTimeout(LockError):
+    """Failed to create/acquire the lock {} (timeout)."""
+
+
+class LockFailed(LockErrorT):
+    """Failed to create/acquire the lock {} ({})."""
+
+
+class NotLocked(LockErrorT):
+    """Failed to release the lock {} (was not locked)."""
+
+
+class NotMyLock(LockErrorT):
+    """Failed to release the lock {} (was/is locked, but not by me)."""
+
+
 class ExclusiveLock:
     """An exclusive Lock based on mkdir fs operation being atomic"""
-    class LockError(ErrorWithTraceback):
-        """Failed to acquire the lock {}."""
-
-    class LockTimeout(LockError):
-        """Failed to create/acquire the lock {} (timeout)."""
-
-    class LockFailed(LockError):
-        """Failed to create/acquire the lock {} ({})."""
-
-    class UnlockError(ErrorWithTraceback):
-        """Failed to release the lock {}."""
-
-    class NotLocked(UnlockError):
-        """Failed to release the lock {} (was not locked)."""
-
-    class NotMyLock(UnlockError):
-        """Failed to release the lock {} (was/is locked, but not by me)."""
-
     def __init__(self, path, timeout=None, sleep=None, id=None):
         self.timeout = timeout
         self.sleep = sleep
@@ -124,9 +130,9 @@ class ExclusiveLock:
                     if self.by_me():
                         return self
                     if timer.timed_out_or_sleep():
-                        raise self.LockTimeout(self.path)
+                        raise LockTimeout(self.path)
                 else:
-                    raise self.LockFailed(self.path, str(err))
+                    raise LockFailed(self.path, str(err))
             else:
                 with open(self.unique_name, "wb"):
                     pass
@@ -134,9 +140,9 @@ class ExclusiveLock:
 
     def release(self):
         if not self.is_locked():
-            raise self.NotLocked(self.path)
+            raise NotLocked(self.path)
         if not self.by_me():
-            raise self.NotMyLock(self.path)
+            raise NotMyLock(self.path)
         os.unlink(self.unique_name)
         os.rmdir(self.path)
 
@@ -215,23 +221,18 @@ class UpgradableLock:
     noone is allowed reading) and read access to a resource needs a shared
     lock (multiple readers are allowed).
     """
-    class SharedLockFailed(ErrorWithTraceback):
-        """Failed to acquire shared lock [{}]"""
-
-    class ExclusiveLockFailed(ErrorWithTraceback):
-        """Failed to acquire write lock [{}]"""
-
-    def __init__(self, path, exclusive=False, sleep=None, id=None):
+    def __init__(self, path, exclusive=False, sleep=None, timeout=None, id=None):
         self.path = path
         self.is_exclusive = exclusive
         self.sleep = sleep
+        self.timeout = timeout
         self.id = id or get_id()
         # globally keeping track of shared and exclusive lockers:
         self._roster = LockRoster(path + '.roster', id=id)
         # an exclusive lock, used for:
         # - holding while doing roster queries / updates
         # - holding while the UpgradableLock itself is exclusive
-        self._lock = ExclusiveLock(path + '.exclusive', id=id)
+        self._lock = ExclusiveLock(path + '.exclusive', id=id, timeout=timeout)
 
     def __enter__(self):
         return self.acquire()
@@ -246,25 +247,19 @@ class UpgradableLock:
         if exclusive is None:
             exclusive = self.is_exclusive
         sleep = sleep or self.sleep or 0.2
-        try:
-            if exclusive:
-                self._wait_for_readers_finishing(remove, sleep)
-                self._roster.modify(EXCLUSIVE, ADD)
-            else:
-                with self._lock:
-                    if remove is not None:
-                        self._roster.modify(remove, REMOVE)
-                    self._roster.modify(SHARED, ADD)
-            self.is_exclusive = exclusive
-            return self
-        except ExclusiveLock.LockError as err:
-            msg = str(err)
-            if exclusive:
-                raise self.ExclusiveLockFailed(msg)
-            else:
-                raise self.SharedLockFailed(msg)
+        if exclusive:
+            self._wait_for_readers_finishing(remove, sleep)
+            self._roster.modify(EXCLUSIVE, ADD)
+        else:
+            with self._lock:
+                if remove is not None:
+                    self._roster.modify(remove, REMOVE)
+                self._roster.modify(SHARED, ADD)
+        self.is_exclusive = exclusive
+        return self
 
     def _wait_for_readers_finishing(self, remove, sleep):
+        timer = TimeoutTimer(self.timeout, sleep).start()
         while True:
             self._lock.acquire()
             if remove is not None:
@@ -273,7 +268,8 @@ class UpgradableLock:
             if len(self._roster.get(SHARED)) == 0:
                 return  # we are the only one and we keep the lock!
             self._lock.release()
-            time.sleep(sleep)
+            if timer.timed_out_or_sleep():
+                raise LockTimeout(self.path)
 
     def release(self):
         if self.is_exclusive:

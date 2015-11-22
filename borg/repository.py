@@ -12,7 +12,7 @@ from zlib import crc32
 
 from .helpers import Error, ErrorWithTraceback, IntegrityError, read_msgpack, write_msgpack, unhexlify
 from .hashindex import NSIndex
-from .locking import UpgradableLock
+from .locking import UpgradableLock, LockError, LockErrorT
 from .lrucache import LRUCache
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
@@ -51,7 +51,7 @@ class Repository:
     class ObjectNotFound(ErrorWithTraceback):
         """Object with key {} not found in repository {}."""
 
-    def __init__(self, path, create=False, exclusive=False):
+    def __init__(self, path, create=False, exclusive=False, lock_wait=None):
         self.path = os.path.abspath(path)
         self.io = None
         self.lock = None
@@ -59,7 +59,7 @@ class Repository:
         self._active_txn = False
         if create:
             self.create(self.path)
-        self.open(self.path, exclusive)
+        self.open(self.path, exclusive, lock_wait=lock_wait)
 
     def __del__(self):
         self.close()
@@ -129,11 +129,11 @@ class Repository:
             self.replay_segments(replay_from, segments_transaction_id)
         return self.get_index_transaction_id()
 
-    def open(self, path, exclusive):
+    def open(self, path, exclusive, lock_wait=None):
         self.path = path
         if not os.path.isdir(path):
             raise self.DoesNotExist(path)
-        self.lock = UpgradableLock(os.path.join(path, 'lock'), exclusive).acquire()
+        self.lock = UpgradableLock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait).acquire()
         self.config = ConfigParser(interpolation=None)
         self.config.read(os.path.join(self.path, 'config'))
         if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:
@@ -168,7 +168,7 @@ class Repository:
         self._active_txn = True
         try:
             self.lock.upgrade()
-        except UpgradableLock.ExclusiveLockFailed:
+        except (LockError, LockErrorT):
             # if upgrading the lock to exclusive fails, we do not have an
             # active transaction. this is important for "serve" mode, where
             # the repository instance lives on - even if exceptions happened.

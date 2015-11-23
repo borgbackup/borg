@@ -74,7 +74,8 @@ class Archiver:
         logger.warning(msg)
 
     def print_file_status(self, status, path):
-        logger.info("1s %s", status, remove_surrogates(path))
+        if self.args.changed:
+            logger.info("%1s %s" % (status, remove_surrogates(path)))
 
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
@@ -801,6 +802,8 @@ class Archiver:
                                help="""toggle progress display while creating the archive, showing Original,
                                Compressed and Deduplicated sizes, followed by the Number of files seen
                                and the path being processed, default: %(default)s""")
+        subparser.add_argument('--changed', action='store_true', dest='changed', default=False,
+                               help="""display which files were added to the archive""")
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
@@ -1171,6 +1174,7 @@ class Archiver:
             args = self.preprocess_args(args)
         parser = self.build_parser(args)
         args = parser.parse_args(args or ['-h'])
+        self.args = args
         update_excludes(args)
         return args
 

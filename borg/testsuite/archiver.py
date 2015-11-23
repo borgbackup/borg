@@ -723,6 +723,27 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # http://borgbackup.readthedocs.org/en/latest/faq.html#i-am-seeing-a-added-status-for-a-unchanged-file
         self.assert_in("A input/file2", output)
 
+    def test_create_topical(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', self.repository_location)
+        # no listing by default
+        output = self.cmd('create', self.repository_location + '::test', 'input')
+        self.assert_not_in('file1', output)
+        # shouldn't be listed even if unchanged
+        output = self.cmd('create', self.repository_location + '::test0', 'input')
+        self.assert_not_in('file1', output)
+        # should list the file as unchanged
+        #output = self.cmd('create', '--unchanged', self.repository_location + '::test1', 'input')
+        #self.assert_in('file1', output)
+        # should *not* list the file as changed
+        #output = self.cmd('create', '--changed', self.repository_location + '::test2', 'input')
+        #self.assert_not_in('file1', output)
+        # change the file
+        self.create_regular_file('file1', size=1024 * 100)
+        # should list the file as changed
+        output = self.cmd('create', '--changed', self.repository_location + '::test3', 'input')
+        self.assert_in('file1', output)
+
     def test_cmdline_compatibility(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', self.repository_location)

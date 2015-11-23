@@ -21,12 +21,6 @@ Supported levels: ``debug``, ``info``, ``warning``, ``error``, ``critical``.
 
 All log messages created with at least the given level will be output.
 
-Amount of informational output
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-For some subcommands, using the ``-v`` or ``--verbose`` option will give you
-more informational output (at ``info`` level).
-
 Return codes
 ~~~~~~~~~~~~
 
@@ -435,7 +429,7 @@ Here are misc. notes about topics that are maybe not covered in enough detail in
 Item flags
 ~~~~~~~~~~
 
-`borg create -v` outputs a verbose list of all files, directories and other
+`borg create --changed` outputs a verbose list of all files, directories and other
 file system items it considered. For each item, it prefixes a single-letter
 flag that indicates type and/or status of the item.
 

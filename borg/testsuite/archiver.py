@@ -697,10 +697,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # with a terminal, progress forced on
         output = self.cmd('create', '--progress', self.repository_location + '::test4', 'input', fork=True)
         self.assert_in("\r", output)
-        # without a termainl, progress forced off
+        # without a terminal, progress forced off
         output = self.cmd('create', '--no-progress', self.repository_location + '::test5', 'input', fork=False)
         self.assert_not_in("\r", output)
-        # with a termainl, progress forced off
+        # with a terminal, progress forced off
         output = self.cmd('create', '--no-progress', self.repository_location + '::test6', 'input', fork=True)
         self.assert_not_in("\r", output)
 

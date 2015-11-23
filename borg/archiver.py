@@ -75,7 +75,7 @@ class Archiver:
 
     def print_file_status(self, status, path):
         if self.args.changed:
-            logger.info("%1s %s" % (status, remove_surrogates(path)))
+            print("%1s %s" % (status, remove_surrogates(path)), file=sys.stderr)
 
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
@@ -663,9 +663,9 @@ class Archiver:
     def build_parser(self, args=None, prog=None):
         common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
         common_parser.add_argument('-v', '--verbose', dest='log_level',
-                                   action='store_const', const='info', default='info',
+                                   action='store_const', const='info', default='warning',
                                    help='verbose output, same as --log-level=info')
-        common_parser.add_argument('--log-level', dest='log_level', default='info', metavar='LEVEL',
+        common_parser.add_argument('--log-level', dest='log_level', default='warning', metavar='LEVEL',
                                    choices=('debug', 'info', 'warning', 'error', 'critical'),
                                    help='set the log level to LEVEL, default: %(default)s)')
         common_parser.add_argument('--lock-wait', dest='lock_wait', type=int, metavar='N', default=1,

@@ -51,9 +51,8 @@ class ToggleAction(argparse.Action):
 
 class Archiver:
 
-    def __init__(self, verbose=False, lock_wait=None):
+    def __init__(self, lock_wait=None):
         self.exit_code = EXIT_SUCCESS
-        self.verbose = verbose
         self.lock_wait = lock_wait
 
     def open_repository(self, location, create=False, exclusive=False, lock=True):
@@ -74,10 +73,8 @@ class Archiver:
         self.exit_code = EXIT_WARNING  # we do not terminate here, so it is a warning
         logger.warning(msg)
 
-    def print_verbose(self, msg, *args):
-        if self.verbose:
-            msg = args and msg % args or msg
-            logger.info(msg)
+    def print_file_status(self, status, path):
+        logger.info("1s %s", status, remove_surrogates(path))
 
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
@@ -166,7 +163,7 @@ class Archiver:
                         self.print_warning('%s: %s', path, e)
                 else:
                     status = '-'
-                self.print_verbose("%1s %s", status, remove_surrogates(path))
+                self.print_file_status(status, path)
                 continue
             path = os.path.normpath(path)
             if args.one_file_system:
@@ -265,9 +262,7 @@ class Archiver:
                 status = '?'  # need to add a status code somewhere
             else:
                 status = '-'  # dry run, item was not backed up
-        # output ALL the stuff - it can be easily filtered using grep.
-        # even stuff considered unchanged might be interesting.
-        self.print_verbose("%1s %s", status, remove_surrogates(path))
+        self.print_file_status(status, path)
 
     def do_extract(self, args):
         """Extract archive contents"""
@@ -295,7 +290,7 @@ class Archiver:
             if not args.dry_run:
                 while dirs and not item[b'path'].startswith(dirs[-1][b'path']):
                     archive.extract_item(dirs.pop(-1), stdout=stdout)
-            self.print_verbose(remove_surrogates(orig_path))
+            logger.info(remove_surrogates(orig_path))
             try:
                 if dry_run:
                     archive.extract_item(item, dry_run=True)
@@ -381,7 +376,7 @@ class Archiver:
             else:
                 archive = None
             operations = FuseOperations(key, repository, manifest, archive)
-            self.print_verbose("Mounting filesystem")
+            logger.info("Mounting filesystem")
             try:
                 operations.mount(args.mountpoint, args.options, args.foreground)
             except RuntimeError:
@@ -484,12 +479,12 @@ class Archiver:
         to_delete = [a for a in archives if a not in keep]
         stats = Statistics()
         for archive in keep:
-            self.print_verbose('Keeping archive: %s' % format_archive(archive))
+            logger.info('Keeping archive: %s' % format_archive(archive))
         for archive in to_delete:
             if args.dry_run:
-                self.print_verbose('Would prune:     %s' % format_archive(archive))
+                logger.info('Would prune:     %s' % format_archive(archive))
             else:
-                self.print_verbose('Pruning archive: %s' % format_archive(archive))
+                logger.info('Pruning archive: %s' % format_archive(archive))
                 Archive(repository, key, manifest, archive.name, cache).delete(stats)
         if to_delete and not args.dry_run:
             manifest.write()
@@ -666,8 +661,9 @@ class Archiver:
 
     def build_parser(self, args=None, prog=None):
         common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
-        common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False,
-                                   help='verbose output')
+        common_parser.add_argument('-v', '--verbose', dest='log_level',
+                                   action='store_const', const='info', default='info',
+                                   help='verbose output, same as --log-level=info')
         common_parser.add_argument('--log-level', dest='log_level', default='info', metavar='LEVEL',
                                    choices=('debug', 'info', 'warning', 'error', 'critical'),
                                    help='set the log level to LEVEL, default: %(default)s)')
@@ -1180,7 +1176,6 @@ class Archiver:
 
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
-        self.verbose = args.verbose
         self.lock_wait = args.lock_wait
         RemoteRepository.remote_path = args.remote_path
         RemoteRepository.umask = args.umask

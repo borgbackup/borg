@@ -74,7 +74,7 @@ class Archiver:
         logger.warning(msg)
 
     def print_file_status(self, status, path):
-        if self.args.changed:
+        if self.changed:
             print("%1s %s" % (status, remove_surrogates(path)), file=sys.stderr)
 
     def do_serve(self, args):
@@ -1174,13 +1174,14 @@ class Archiver:
             args = self.preprocess_args(args)
         parser = self.build_parser(args)
         args = parser.parse_args(args or ['-h'])
-        self.args = args
         update_excludes(args)
         return args
 
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
+        self.changed = getattr(args, 'changed', False)
+        self.unchanged = getattr(args, 'unchanged', False)
         RemoteRepository.remote_path = args.remote_path
         RemoteRepository.umask = args.umask
         setup_logging(level=args.log_level)  # do not use loggers before this!

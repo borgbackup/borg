@@ -165,6 +165,8 @@ Yes, if you want to detect accidental data damage (like bit rot), use the
 If you want to be able to detect malicious tampering also, use a encrypted
 repo. It will then be able to check using CRCs and HMACs.
 
+.. _a_status_oddity:
+
 I am seeing 'A' (added) status for a unchanged file!?
 -----------------------------------------------------
 

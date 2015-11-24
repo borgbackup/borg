@@ -1,6 +1,49 @@
 Changelog
 =========
 
+Version 0.29.0
+--------------
+
+Compatibility notes:
+
+- when upgrading to 0.29.0 you need to upgrade client as well as server
+  installations due to the locking related changes.
+- the default waiting time for a lock changed from infinity to 1 second for a
+  better interactive user experience. if the repo you want to access is
+  currently locked, borg will now terminate after 1s with an error message.
+  if you have scripts that shall wait for the lock for a longer time, use
+  --lock-wait N (with N being the maximum wait time in seconds).
+
+Bug fixes:
+
+- avoid creation of an orphan lock for one case, see #285
+- --keep-tag-files: fix file mode and multiple tag files in one directory, #432
+
+New features:
+
+- implement --lock-wait, support timeout for UpgradableLock, fixes #210
+- implement borg break-lock command, fixes #157
+- include system info below traceback, fixes #324
+- use ISO-8601 date and time format, fixes #375
+- add --log-level to set the level of the builtin logging configuration, fixes #426
+- configure logging via env var BORG_LOGGING_CONF
+- add a --no-progress flag to forcibly disable progress info
+
+Other changes:
+
+- fix progress tests on travis
+- get rid of C compiler warnings, fixes #391
+- upgrade OS X FUSE to 3.0.9 on the OS X binary build system
+- docs:
+
+  - document new mailing list borgbackup@python.org
+  - readthedocs: color and logo improvements
+  - more precise binary installation steps
+  - update release procedure docs about OS X FUSE
+  - FAQ entry about unexpected 'A' status for unchanged file(s), fixes #403
+  - add docs about 'E' file status
+
+
 Version 0.28.2
 --------------
 

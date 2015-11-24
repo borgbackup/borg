@@ -168,9 +168,9 @@ repo. It will then be able to check using CRCs and HMACs.
 I am seeing 'A' (added) status for a unchanged file!?
 -----------------------------------------------------
 
-The files cache (which is used to determine whether |project_name| already
-"knows" / has backed up a file and if so, to skip the file from chunking)
-does intentionally *not* contain files that:
+The files cache is used to determine whether |project_name| already
+"knows" / has backed up a file and if so, to skip the file from
+chunking. It does intentionally *not* contain files that:
 
 - have >= 10 as "entry age" (|project_name| has not seen this file for a while)
 - have a modification time (mtime) same as the newest mtime in the created
@@ -190,6 +190,10 @@ This does not affect deduplication, the file will be chunked, but as the chunks
 will often be the same and already stored in the repo (except in the above
 mentioned rare condition), it will just re-use them as usual and not store new
 data chunks.
+
+Since only the files cache is used in the display of files status,
+those files are reported as being added when, really, chunks are
+already used.
 
 Why was Borg forked from Attic?
 -------------------------------

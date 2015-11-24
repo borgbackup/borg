@@ -444,7 +444,7 @@ A uppercase character represents the status of a regular file relative to the
 is not used). Metadata is stored in any case and for 'A' and 'M' also new data
 chunks are stored. For 'U' all data chunks refer to already existing chunks.
 
-- 'A' = regular file, added
+- 'A' = regular file, added (see also :ref:`a_status_oddity` in the FAQ)
 - 'M' = regular file, modified
 - 'U' = regular file, unchanged
 - 'E' = regular file, an error happened while accessing/reading *this* file

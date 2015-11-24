@@ -704,6 +704,25 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('create', '--no-progress', self.repository_location + '::test6', 'input', fork=True)
         self.assert_not_in("\r", output)
 
+    def test_file_status(self):
+        """test that various file status show expected results
+
+        clearly incomplete: only tests for the weird "unchanged" status for now"""
+        now = time.time()
+        self.create_regular_file('file1', size=1024 * 80)
+        os.utime('input/file1', (now - 5, now - 5)) # 5 seconds ago
+        self.create_regular_file('file2', size=1024 * 80)
+        self.cmd('init', self.repository_location)
+        output = self.cmd('create', '--verbose', self.repository_location + '::test', 'input')
+        self.assert_in("A input/file1", output)
+        self.assert_in("A input/file2", output)
+        # should find first file as unmodified
+        output = self.cmd('create', '--verbose', self.repository_location + '::test1', 'input')
+        self.assert_in("U input/file1", output)
+        # this is expected, although surprising, for why, see:
+        # http://borgbackup.readthedocs.org/en/latest/faq.html#i-am-seeing-a-added-status-for-a-unchanged-file
+        self.assert_in("A input/file2", output)
+
     def test_cmdline_compatibility(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', self.repository_location)

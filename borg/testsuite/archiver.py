@@ -713,11 +713,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.utime('input/file1', (now - 5, now - 5)) # 5 seconds ago
         self.create_regular_file('file2', size=1024 * 80)
         self.cmd('init', self.repository_location)
-        output = self.cmd('create', '--verbose', self.repository_location + '::test', 'input')
+        output = self.cmd('create', '--changed', '--unchanged', self.repository_location + '::test', 'input')
         self.assert_in("A input/file1", output)
         self.assert_in("A input/file2", output)
         # should find first file as unmodified
-        output = self.cmd('create', '--verbose', self.repository_location + '::test1', 'input')
+        output = self.cmd('create', '--changed', '--unchanged', self.repository_location + '::test1', 'input')
         self.assert_in("U input/file1", output)
         # this is expected, although surprising, for why, see:
         # http://borgbackup.readthedocs.org/en/latest/faq.html#i-am-seeing-a-added-status-for-a-unchanged-file

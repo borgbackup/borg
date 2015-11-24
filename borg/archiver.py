@@ -74,8 +74,12 @@ class Archiver:
         logger.warning(msg)
 
     def print_file_status(self, status, path):
-        if self.changed:
-            print("%1s %s" % (status, remove_surrogates(path)), file=sys.stderr)
+        if status == 'U':
+            if self.unchanged:
+                print("%1s %s" % (status, remove_surrogates(path)), file=sys.stderr)
+        else:
+            if self.changed:
+                print("%1s %s" % (status, remove_surrogates(path)), file=sys.stderr)
 
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
@@ -804,6 +808,8 @@ class Archiver:
                                and the path being processed, default: %(default)s""")
         subparser.add_argument('--changed', action='store_true', dest='changed', default=False,
                                help="""display which files were added to the archive""")
+        subparser.add_argument('--unchanged', action='store_true', dest='unchanged', default=False,
+                               help="""display which files were *not* added to the archive""")
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')

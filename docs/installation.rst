@@ -32,13 +32,13 @@ yet.
 ============ ===================== =======
 Distribution Source                Command
 ============ ===================== =======
-Arch Linux   AUR_
+Arch Linux   `[community]`_        ``pacman -Syu borg``
 Debian       `unstable/sid`_       ``apt install borgbackup``
 Ubuntu       `Xenial Xerus 16.04`_ ``apt install borgbackup``
 OS X         `Brew cask`_          ``brew cask install borgbackup``
 ============ ===================== =======
 
-.. _AUR: https://aur.archlinux.org/packages/borgbackup/
+.. _[community]: https://www.archlinux.org/packages/?name=borg
 .. _unstable/sid: https://packages.debian.org/sid/borgbackup
 .. _Xenial Xerus 15.04: https://launchpad.net/ubuntu/xenial/+source/borgbackup
 .. _Brew cask: http://caskroom.io/

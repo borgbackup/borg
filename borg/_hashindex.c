@@ -44,8 +44,8 @@ typedef struct {
 #define DELETED _htole32(0xfffffffe)
 #define MAX_BUCKET_SIZE 512
 #define BUCKET_LOWER_LIMIT .25
-#define BUCKET_UPPER_LIMIT .90
-#define MIN_BUCKETS 1024
+#define BUCKET_UPPER_LIMIT .75  /* don't go higher than 0.75, otherwise performance severely suffers! */
+#define MIN_BUCKETS 1031  /* must be prime, otherwise performance breaks down! */
 #define MAX(x, y) ((x) > (y) ? (x): (y))
 #define BUCKET_ADDR(index, idx) (index->buckets + (idx * index->bucket_size))
 
@@ -113,12 +113,13 @@ hashindex_resize(HashIndex *index, int capacity)
 {
     HashIndex *new;
     void *key = NULL;
+    int32_t key_size = index->key_size;
 
-    if(!(new = hashindex_init(capacity, index->key_size, index->value_size))) {
+    if(!(new = hashindex_init(capacity, key_size, index->value_size))) {
         return 0;
     }
     while((key = hashindex_next_key(index, key))) {
-        hashindex_set(new, key, hashindex_get(index, key));
+        hashindex_set(new, key, key + key_size);
     }
     free(index->buckets);
     index->buckets = new->buckets;
@@ -218,7 +219,6 @@ fail:
 static HashIndex *
 hashindex_init(int capacity, int key_size, int value_size)
 {
-    off_t buckets_length;
     HashIndex *index;
     int i;
     capacity = MAX(MIN_BUCKETS, capacity);
@@ -227,8 +227,7 @@ hashindex_init(int capacity, int key_size, int value_size)
         EPRINTF("malloc header failed");
         return NULL;
     }
-    buckets_length = (off_t)capacity * (key_size + value_size);
-    if(!(index->buckets = calloc(buckets_length, 1))) {
+    if(!(index->buckets = calloc(capacity, key_size + value_size))) {
         EPRINTF("malloc buckets failed");
         free(index);
         return NULL;

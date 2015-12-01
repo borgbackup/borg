@@ -152,16 +152,17 @@ Repository encryption is enabled at repository creation time::
 When repository encryption is enabled all data is encrypted using 256-bit AES_
 encryption and the integrity and authenticity is verified using `HMAC-SHA256`_.
 
-All data is encrypted before being written to the repository. This means that
-an attacker who manages to compromise the host containing an encrypted
-archive will not be able to access any of the data.
+All data is encrypted on the client before being written to the repository. This
+means that an attacker who manages to compromise the host containing an
+encrypted archive will not be able to access any of the data, even as the backup
+is being made.
 
 |project_name| supports different methods to store the AES and HMAC keys.
 
 ``repokey`` mode
     The key is stored inside the repository (in its "config" file).
     Use this mode if you trust in your good passphrase giving you enough
-    protection.
+    protection. The repository server never sees the plaintext key.
 
 ``keyfile`` mode
     The key is stored on your local disk (in ``~/.borg/keys/``).

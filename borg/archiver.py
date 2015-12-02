@@ -86,7 +86,7 @@ class Archiver:
 
     def do_init(self, args):
         """Initialize an empty repository"""
-        logger.info('Initializing repository at "%s"' % args.repository.orig)
+        logger.info('Initializing repository at "%s"' % args.repository.canonical_path())
         repository = self.open_repository(args.repository, create=True, exclusive=True)
         key = key_creator(repository, args)
         manifest = Manifest(key, repository)

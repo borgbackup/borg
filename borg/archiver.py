@@ -74,12 +74,8 @@ class Archiver:
         logger.warning(msg)
 
     def print_file_status(self, status, path):
-        if status == 'U':
-            if self.unchanged:
-                print("%1s %s" % (status, remove_surrogates(path)), file=sys.stderr)
-        else:
-            if self.changed:
-                print("%1s %s" % (status, remove_surrogates(path)), file=sys.stderr)
+        if self.output_filter is None or status in self.output_filter:
+            logger.info("%1s %s", status, remove_surrogates(path))
 
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
@@ -128,6 +124,7 @@ class Archiver:
 
     def do_create(self, args):
         """Create new archive"""
+        self.output_filter = args.output_filter
         dry_run = args.dry_run
         t0 = datetime.now()
         if not dry_run:
@@ -806,10 +803,8 @@ class Archiver:
                                help="""toggle progress display while creating the archive, showing Original,
                                Compressed and Deduplicated sizes, followed by the Number of files seen
                                and the path being processed, default: %(default)s""")
-        subparser.add_argument('--changed', action='store_true', dest='changed', default=False,
-                               help="""display which files were added to the archive""")
-        subparser.add_argument('--unchanged', action='store_true', dest='unchanged', default=False,
-                               help="""display which files were *not* added to the archive""")
+        subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
+                               help='only display items with the given status characters')
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=ExcludePattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
@@ -1186,8 +1181,6 @@ class Archiver:
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
-        self.changed = getattr(args, 'changed', False)
-        self.unchanged = getattr(args, 'unchanged', False)
         RemoteRepository.remote_path = args.remote_path
         RemoteRepository.umask = args.umask
         setup_logging(level=args.log_level)  # do not use loggers before this!

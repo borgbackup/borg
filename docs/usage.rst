@@ -429,10 +429,14 @@ Here are misc. notes about topics that are maybe not covered in enough detail in
 Item flags
 ~~~~~~~~~~
 
-`borg create --changed` outputs a verbose list of all files, directories and other
-file system items it considered, with the exception of unchanged files
-(for this, also add `--unchanged`). For each item, it prefixes a single-letter
-flag that indicates type and/or status of the item.
+`borg create -v` outputs a verbose list of all files, directories and other
+file system items it considered (no matter whether they had content changes
+or not). For each item, it prefixes a single-letter flag that indicates type
+and/or status of the item.
+
+If you are interested only in a subset of that output, you can give e.g.
+`--filter=AME` and it will only show regular files with A, M or E status (see
+below).
 
 A uppercase character represents the status of a regular file relative to the
 "files" cache (not relative to the repo - this is an issue if the files cache
@@ -441,7 +445,7 @@ chunks are stored. For 'U' all data chunks refer to already existing chunks.
 
 - 'A' = regular file, added (see also :ref:`a_status_oddity` in the FAQ)
 - 'M' = regular file, modified
-- 'U' = regular file, unchanged (only if `--unchanged` is specified)
+- 'U' = regular file, unchanged
 - 'E' = regular file, an error happened while accessing/reading *this* file
 
 A lowercase character means a file type other than a regular file,

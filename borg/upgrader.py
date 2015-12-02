@@ -7,7 +7,7 @@ import shutil
 import sys
 import time
 
-from .helpers import get_keys_dir, get_cache_dir
+from .helpers import get_keys_dir, get_cache_dir, ProgressIndicatorPercent
 from .locking import UpgradableLock
 from .repository import Repository, MAGIC
 from .key import KeyfileKey, KeyfileNotFoundError
@@ -65,17 +65,15 @@ class AtticRepositoryUpgrader(Repository):
         luckily the magic string length didn't change so we can just
         replace the 8 first bytes of all regular files in there."""
         logger.info("converting %d segments..." % len(segments))
-        i = 0
-        for filename in segments:
-            i += 1
-            print("\rconverting segment %d/%d, %.2f%% done (%s)"
-                  % (i, len(segments), 100*float(i)/len(segments), filename),
-                  end='', file=sys.stderr)
+        segment_count = len(segments)
+        pi = ProgressIndicatorPercent(total=segment_count, msg="Converting segments %3.0f%%", same_line=True)
+        for i, filename in enumerate(segments):
+            pi.show(i)
             if dryrun:
                 time.sleep(0.001)
             else:
                 AtticRepositoryUpgrader.header_replace(filename, ATTIC_MAGIC, MAGIC, inplace=inplace)
-        print(file=sys.stderr)
+        pi.finish()
 
     @staticmethod
     def header_replace(filename, old_magic, new_magic, inplace=True):

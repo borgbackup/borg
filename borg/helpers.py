@@ -890,6 +890,82 @@ def yes(msg=None, retry_msg=None, false_msg=None, true_msg=None,
             ofile.flush()
 
 
+class ProgressIndicatorPercent:
+    def __init__(self, total, step=5, start=0, same_line=False, msg="%3.0f%%", file=sys.stderr):
+        """
+        Percentage-based progress indicator
+
+        :param total: total amount of items
+        :param step: step size in percent
+        :param start: at which percent value to start
+        :param same_line: if True, emit output always on same line
+        :param msg: output message, must contain one %f placeholder for the percentage
+        :param file: output file, default: sys.stderr
+        """
+        self.counter = 0  # 0 .. (total-1)
+        self.total = total
+        self.trigger_at = start  # output next percentage value when reaching (at least) this
+        self.step = step
+        self.file = file
+        self.msg = msg
+        self.same_line = same_line
+
+    def progress(self, current=None):
+        if current is not None:
+            self.counter = current
+        pct = self.counter * 100 / self.total
+        self.counter += 1
+        if pct >= self.trigger_at:
+            self.trigger_at += self.step
+            return pct
+
+    def show(self, current=None):
+        pct = self.progress(current)
+        if pct is not None:
+            return self.output(pct)
+
+    def output(self, percent):
+        print(self.msg % percent, file=self.file, end='\r' if self.same_line else '\n')
+
+    def finish(self):
+        if self.same_line:
+            print(" " * len(self.msg % 100.0), file=self.file, end='\r')
+
+
+
+class ProgressIndicatorEndless:
+    def __init__(self, step=10, file=sys.stderr):
+        """
+        Progress indicator (long row of dots)
+
+        :param step: every Nth call, call the func
+        :param file: output file, default: sys.stderr
+        """
+        self.counter = 0  # call counter
+        self.triggered = 0  # increases 1 per trigger event
+        self.step = step  # trigger every <step> calls
+        self.file = file
+
+    def progress(self):
+        self.counter += 1
+        trigger = self.counter % self.step == 0
+        if trigger:
+            self.triggered += 1
+        return trigger
+
+    def show(self):
+        trigger = self.progress()
+        if trigger:
+            return self.output(self.triggered)
+
+    def output(self, triggered):
+        print('.', end='', file=self.file)  # python 3.3 gives us flush=True
+        self.file.flush()
+
+    def finish(self):
+        print(file=self.file)
+
+
 def sysinfo():
     info = []
     info.append('Platform: %s' % (' '.join(platform.uname()), ))

@@ -107,10 +107,7 @@ class Archiver:
                        env_var_override='BORG_CHECK_I_KNOW_WHAT_I_AM_DOING', truish=('YES', )):
                 return EXIT_ERROR
         if not args.archives_only:
-            logger.info('Starting repository check...')
-            if repository.check(repair=args.repair):
-                logger.info('Repository check complete, no problems found.')
-            else:
+            if not repository.check(repair=args.repair):
                 return EXIT_WARNING
         if not args.repo_only and not ArchiveChecker().check(
                 repository, repair=args.repair, archive=args.repository.archive, last=args.last):

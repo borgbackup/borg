@@ -11,7 +11,8 @@ import msgpack.fallback
 
 from ..helpers import adjust_patterns, exclude_path, Location, format_file_size, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
     prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, yes, \
-    StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams
+    StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
+    ProgressIndicatorPercent, ProgressIndicatorEndless
 from . import BaseTestCase, environment_variable, FakeInputs
 
 
@@ -566,3 +567,77 @@ def test_yes_output(capfd):
     assert 'intro-msg' in err
     assert 'retry-msg' not in err
     assert 'false-msg' in err
+
+
+def test_progress_percentage_multiline(capfd):
+    pi = ProgressIndicatorPercent(1000, step=5, start=0, same_line=False, msg="%3.0f%%", file=sys.stderr)
+    pi.show(0)
+    out, err = capfd.readouterr()
+    assert err == '  0%\n'
+    pi.show(420)
+    out, err = capfd.readouterr()
+    assert err == ' 42%\n'
+    pi.show(1000)
+    out, err = capfd.readouterr()
+    assert err == '100%\n'
+    pi.finish()
+    out, err = capfd.readouterr()
+    assert err == ''
+
+
+def test_progress_percentage_sameline(capfd):
+    pi = ProgressIndicatorPercent(1000, step=5, start=0, same_line=True, msg="%3.0f%%", file=sys.stderr)
+    pi.show(0)
+    out, err = capfd.readouterr()
+    assert err == '  0%\r'
+    pi.show(420)
+    out, err = capfd.readouterr()
+    assert err == ' 42%\r'
+    pi.show(1000)
+    out, err = capfd.readouterr()
+    assert err == '100%\r'
+    pi.finish()
+    out, err = capfd.readouterr()
+    assert err == ' ' * 4 + '\r'
+
+
+def test_progress_percentage_step(capfd):
+    pi = ProgressIndicatorPercent(100, step=2, start=0, same_line=False, msg="%3.0f%%", file=sys.stderr)
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == '  0%\n'
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == ''  # no output at 1% as we have step == 2
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == '  2%\n'
+
+
+def test_progress_endless(capfd):
+    pi = ProgressIndicatorEndless(step=1, file=sys.stderr)
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == '.'
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == '.'
+    pi.finish()
+    out, err = capfd.readouterr()
+    assert err == '\n'
+
+
+def test_progress_endless_step(capfd):
+    pi = ProgressIndicatorEndless(step=2, file=sys.stderr)
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == ''  # no output here as we have step == 2
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == '.'
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == ''  # no output here as we have step == 2
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == '.'

@@ -10,7 +10,8 @@ import shutil
 import struct
 from zlib import crc32
 
-from .helpers import Error, ErrorWithTraceback, IntegrityError, read_msgpack, write_msgpack, unhexlify
+from .helpers import Error, ErrorWithTraceback, IntegrityError, read_msgpack, write_msgpack, \
+                     unhexlify, ProgressIndicatorPercent
 from .hashindex import NSIndex
 from .locking import UpgradableLock, LockError, LockErrorT
 from .lrucache import LRUCache
@@ -243,13 +244,17 @@ class Repository:
     def replay_segments(self, index_transaction_id, segments_transaction_id):
         self.prepare_txn(index_transaction_id, do_cleanup=False)
         try:
-            for segment, filename in self.io.segment_iterator():
+            segment_count = sum(1 for _ in self.io.segment_iterator())
+            pi = ProgressIndicatorPercent(total=segment_count, msg="Replaying segments %3.0f%%", same_line=True)
+            for i, (segment, filename) in enumerate(self.io.segment_iterator()):
+                pi.show(i)
                 if index_transaction_id is not None and segment <= index_transaction_id:
                     continue
                 if segment > segments_transaction_id:
                     break
                 objects = self.io.iter_objects(segment)
                 self._update_index(segment, objects)
+            pi.finish()
             self.write_index()
         finally:
             self.rollback()
@@ -299,6 +304,7 @@ class Repository:
             error_found = True
             logger.error(msg)
 
+        logger.info('Starting repository check')
         assert not self._active_txn
         try:
             transaction_id = self.get_transaction_id()
@@ -314,7 +320,10 @@ class Repository:
             self.io.cleanup(transaction_id)
         segments_transaction_id = self.io.get_segments_transaction_id()
         self.prepare_txn(None)  # self.index, self.compact, self.segments all empty now!
-        for segment, filename in self.io.segment_iterator():
+        segment_count = sum(1 for _ in self.io.segment_iterator())
+        pi = ProgressIndicatorPercent(total=segment_count, msg="Checking segments %3.0f%%", same_line=True)
+        for i, (segment, filename) in enumerate(self.io.segment_iterator()):
+            pi.show(i)
             if segment > transaction_id:
                 continue
             try:
@@ -326,6 +335,7 @@ class Repository:
                     self.io.recover_segment(segment, filename)
                     objects = list(self.io.iter_objects(segment))
             self._update_index(segment, objects, report_error)
+        pi.finish()
         # self.index, self.segments, self.compact now reflect the state of the segment files up to <transaction_id>
         # We might need to add a commit tag if no committed segment is found
         if repair and segments_transaction_id is None:
@@ -345,6 +355,13 @@ class Repository:
             self.compact_segments()
             self.write_index()
         self.rollback()
+        if error_found:
+            if repair:
+                logger.info('Completed repository check, errors found and repaired.')
+            else:
+                logger.info('Completed repository check, errors found.')
+        else:
+            logger.info('Completed repository check, no problems found.')
         return not error_found or repair
 
     def rollback(self):

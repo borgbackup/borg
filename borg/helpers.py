@@ -898,6 +898,8 @@ class ProgressIndicatorPercent:
         :param total: total amount of items
         :param step: step size in percent
         :param start: at which percent value to start
+        :param same_line: if True, emit output always on same line
+        :param msg: output message, must contain one %f placeholder for the percentage
         :param file: output file, default: sys.stderr
         """
         self.counter = 0  # 0 .. (total-1)
@@ -909,12 +911,10 @@ class ProgressIndicatorPercent:
         self.same_line = same_line
 
     def progress(self, current=None):
-        if current is None:
-            current = self.counter
-        else:
+        if current is not None:
             self.counter = current
+        pct = self.counter * 100 / self.total
         self.counter += 1
-        pct = current * 100 / self.total
         if pct >= self.trigger_at:
             self.trigger_at += self.step
             return pct

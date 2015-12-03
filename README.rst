@@ -57,7 +57,7 @@ Main features
 
 **Data encryption**
     All data can be protected using 256-bit AES encryption, data integrity and
-    authenticity is verified using HMAC-SHA256.
+    authenticity is verified using HMAC-SHA256. Data is encrypted clientside.
 
 **Compression**
     All data can be compressed by lz4 (super fast, low compression), zlib

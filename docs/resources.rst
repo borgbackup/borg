@@ -29,3 +29,11 @@ Some of them refer to attic, but you can do the same stuff (and more) with borgb
 
 - "Attic Backup: Mount your encrypted backups over ssh", 2014 (video, english):
   `youtube <https://www.youtube.com/watch?v=BVXDFv9YMp8>`_
+
+
+Software
+--------
+
+- `BorgWeb - a very simple web UI for BorgBackup <https://borgbackup.github.io/borgweb/>`_
+- some other stuff found at the `BorgBackup Github organisation <https://github.com/borgbackup/>`_
+- `atticmatic <https://github.com/witten/atticmatic/>`_ (includes borgmatic)

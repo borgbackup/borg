@@ -15,6 +15,8 @@ from .repository import Repository
 
 import msgpack
 
+RPC_PROTOCOL_VERSION = 2
+
 BUFSIZE = 10 * 1024 * 1024
 
 
@@ -96,7 +98,7 @@ class RepositoryServer:  # pragma: no cover
                 return
 
     def negotiate(self, versions):
-        return 1
+        return RPC_PROTOCOL_VERSION
 
     def open(self, path, create=False, lock_wait=None, lock=True):
         path = os.fsdecode(path)
@@ -150,10 +152,10 @@ class RemoteRepository:
         self.x_fds = [self.stdin_fd, self.stdout_fd]
 
         try:
-            version = self.call('negotiate', 1)
+            version = self.call('negotiate', RPC_PROTOCOL_VERSION)
         except ConnectionClosed:
             raise ConnectionClosedWithHint('Is borg working on the server?')
-        if version != 1:
+        if version != RPC_PROTOCOL_VERSION:
             raise Exception('Server insisted on using unsupported protocol version %d' % version)
         self.id = self.call('open', location.path, create, lock_wait, lock)
 

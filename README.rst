@@ -109,7 +109,7 @@ Now doing another backup, just to show off the great deduplication::
     This archive:          57.16 MB           46.78 MB            151.67 kB  <--- !
     All archives:         114.02 MB           93.46 MB             44.81 MB
 
-For a graphical frontend refer to our complementary project `BorgWeb`_.
+For a graphical frontend refer to our complementary project `BorgWeb <https://borgbackup.github.io/borgweb/>`_.
 
 Links
 =====
@@ -125,18 +125,12 @@ Links
  * `(Old Mailing List's Archives <http://librelist.com/browser/borgbackup/>`_)
  * `License <https://borgbackup.github.io/borgbackup/authors.html#license>`_
 
-Related Projects
-----------------
-
- * `BorgWeb <https://borgbackup.github.io/borgweb/>`_
- * `Atticmatic <https://github.com/witten/atticmatic/>`_
- * `Attic <https://github.com/jborg/attic>`_
-
 Notes
 -----
 
 Borg is a fork of `Attic`_ and maintained by "`The Borg collective`_".
 
+.. _Attic: https://github.com/jborg/attic
 .. _The Borg collective: https://borgbackup.readthedocs.org/en/latest/authors.html
 
 Differences between Attic and Borg

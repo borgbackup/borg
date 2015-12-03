@@ -14,6 +14,7 @@ Borg Documentation
    usage
    faq
    support
+   resources
    changes
    internals
    development

@@ -3,7 +3,6 @@ from datetime import datetime
 from getpass import getuser
 from itertools import groupby
 import errno
-import logging
 
 from .logger import create_logger
 logger = create_logger()
@@ -663,20 +662,24 @@ class ArchiveChecker:
         self.possibly_superseded = set()
 
     def check(self, repository, repair=False, archive=None, last=None):
-        self.report_progress('Starting archive consistency check...')
+        logger.info('Starting archive consistency check...')
         self.check_all = archive is None and last is None
         self.repair = repair
         self.repository = repository
         self.init_chunks()
         self.key = self.identify_key(repository)
         if Manifest.MANIFEST_ID not in self.chunks:
+            logger.error("Repository manifest not found!")
+            self.error_found = True
             self.manifest = self.rebuild_manifest()
         else:
             self.manifest, _ = Manifest.load(repository, key=self.key)
         self.rebuild_refcounts(archive=archive, last=last)
         self.orphan_chunks_check()
         self.finish()
-        if not self.error_found:
+        if self.error_found:
+            logger.error('Archive consistency check complete, problems found.')
+        else:
             logger.info('Archive consistency check complete, no problems found.')
         return self.repair or not self.error_found
 
@@ -696,11 +699,6 @@ class ArchiveChecker:
             for id_ in result:
                 self.chunks[id_] = (0, 0, 0)
 
-    def report_progress(self, msg, error=False):
-        if error:
-            self.error_found = True
-        logger.log(logging.ERROR if error else logging.WARNING, msg)
-
     def identify_key(self, repository):
         cdata = repository.get(next(self.chunks.iteritems())[0])
         return key_factory(repository, cdata)
@@ -710,7 +708,7 @@ class ArchiveChecker:
 
         Iterates through all objects in the repository looking for archive metadata blocks.
         """
-        self.report_progress('Rebuilding missing manifest, this might take some time...', error=True)
+        logger.info('Rebuilding missing manifest, this might take some time...')
         manifest = Manifest(self.key, self.repository)
         for chunk_id, _ in self.chunks.iteritems():
             cdata = self.repository.get(chunk_id)
@@ -727,9 +725,9 @@ class ArchiveChecker:
             except (TypeError, ValueError, StopIteration):
                 continue
             if isinstance(archive, dict) and b'items' in archive and b'cmdline' in archive:
-                self.report_progress('Found archive ' + archive[b'name'].decode('utf-8'), error=True)
+                logger.info('Found archive %s', archive[b'name'].decode('utf-8'))
                 manifest.archives[archive[b'name'].decode('utf-8')] = {b'id': chunk_id, b'time': archive[b'time']}
-        self.report_progress('Manifest rebuild complete', error=True)
+        logger.info('Manifest rebuild complete.')
         return manifest
 
     def rebuild_refcounts(self, archive=None, last=None):
@@ -771,7 +769,8 @@ class ArchiveChecker:
             for chunk_id, size, csize in item[b'chunks']:
                 if chunk_id not in self.chunks:
                     # If a file chunk is missing, create an all empty replacement chunk
-                    self.report_progress('{}: Missing file chunk detected (Byte {}-{})'.format(item[b'path'].decode('utf-8', 'surrogateescape'), offset, offset + size), error=True)
+                    logger.error('{}: Missing file chunk detected (Byte {}-{})'.format(item[b'path'].decode('utf-8', 'surrogateescape'), offset, offset + size))
+                    self.error_found = True
                     data = bytes(size)
                     chunk_id = self.key.id_hash(data)
                     cdata = self.key.encrypt(data)
@@ -800,7 +799,8 @@ class ArchiveChecker:
             def report(msg, chunk_id, chunk_no):
                 cid = hexlify(chunk_id).decode('ascii')
                 msg += ' [chunk: %06d_%s]' % (chunk_no, cid)  # see debug-dump-archive-items
-                self.report_progress(msg, error=True)
+                self.error_found = True
+                logger.error(msg)
 
             i = 0
             for state, items in groupby(archive[b'items'], missing_chunk_detector):
@@ -841,7 +841,8 @@ class ArchiveChecker:
             logger.info('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
             archive_id = info[b'id']
             if archive_id not in self.chunks:
-                self.report_progress('Archive metadata block is missing', error=True)
+                logger.error('Archive metadata block is missing!')
+                self.error_found = True
                 del self.manifest.archives[name]
                 continue
             mark_as_possibly_superseded(archive_id)
@@ -876,12 +877,13 @@ class ArchiveChecker:
                     unused.add(id_)
             orphaned = unused - self.possibly_superseded
             if orphaned:
-                self.report_progress('{} orphaned objects found'.format(len(orphaned)), error=True)
+                logger.error('{} orphaned objects found!'.format(len(orphaned)))
+                self.error_found = True
             if self.repair:
                 for id_ in unused:
                     self.repository.delete(id_)
         else:
-            self.report_progress('Orphaned objects check skipped (needs all archives checked)')
+            logger.warning('Orphaned objects check skipped (needs all archives checked).')
 
     def finish(self):
         if self.repair:

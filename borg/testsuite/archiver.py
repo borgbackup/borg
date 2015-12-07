@@ -992,7 +992,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         repository.delete(Manifest.MANIFEST_ID)
         repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
-        output = self.cmd('check', '--repair', self.repository_location, exit_code=0)
+        output = self.cmd('check', '-v', '--repair', self.repository_location, exit_code=0)
         self.assert_in('archive1', output)
         self.assert_in('archive2', output)
         self.cmd('check', self.repository_location, exit_code=0)

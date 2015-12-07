@@ -109,6 +109,7 @@ class Archiver:
             if repository.check(repair=args.repair):
                 logger.info('Repository check complete, no problems found.')
             else:
+                logger.error('Repository check complete, problems found.')
                 return EXIT_WARNING
         if not args.repo_only and not ArchiveChecker().check(
                 repository, repair=args.repair, archive=args.repository.archive, last=args.last):

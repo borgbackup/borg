@@ -108,6 +108,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         config.set('cache', 'version', '1')
         config.set('cache', 'repository', hexlify(self.repository.id).decode('ascii'))
         config.set('cache', 'manifest', '')
+        config.set('cache', 'archives', '')
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             config.write(fd)
         ChunkIndex().write(os.path.join(self.path, 'chunks').encode('utf-8'))
@@ -139,6 +140,9 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         self.timestamp = self.config.get('cache', 'timestamp', fallback=None)
         self.key_type = self.config.get('cache', 'key_type', fallback=None)
         self.previous_location = self.config.get('cache', 'previous_location', fallback=None)
+        self.chunks_index_archives = set(unhexlify(hexid)
+                                         for hexid in self.config.get('cache', 'archives').split(',\n')
+                                         if len(hexid) == 64)
         self.chunks = ChunkIndex.read(os.path.join(self.path, 'chunks').encode('utf-8'))
         self.files = None
 
@@ -180,7 +184,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                   os.path.join(self.path, 'txn.active'))
         self.txn_active = True
 
-    def commit(self):
+    def commit(self, added=None, removed=None):
         """Commit transaction
         """
         if not self.txn_active:
@@ -197,6 +201,10 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         self.config.set('cache', 'timestamp', self.manifest.timestamp)
         self.config.set('cache', 'key_type', str(self.key.TYPE))
         self.config.set('cache', 'previous_location', self.repository._location.canonical_path())
+        self.chunks_index_archives |= set(added or [])
+        self.chunks_index_archives -= set(removed or [])
+        self.config.set('cache', 'archives', ',\n'.join(hexlify(id).decode('ascii')
+                                                        for id in self.chunks_index_archives))
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             self.config.write(fd)
         self.chunks.write(os.path.join(self.path, 'chunks').encode('utf-8'))
@@ -226,12 +234,13 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
     def sync(self):
         """Re-synchronize chunks cache with repository.
 
-        Maintains a directory with known backup archive indexes, so it only
-        needs to fetch infos from repo and build a chunk index once per backup
-        archive.
-        If out of sync, missing archive indexes get added, outdated indexes
-        get removed and a new master chunks index is built by merging all
-        archive indexes.
+        This assumes that the current chunks cache contains a valid index
+        for some known set of archives.
+        To re-synchronize, we check if there were archives deleted from the repo -
+        in that case, we must do a full rebuild merging all the indexes of the
+        remaining archives.
+        If only archives were added, we can just merge the added archives' indexes
+        into our existing master index (== chunks cache).
         """
         archive_path = os.path.join(self.path, 'chunks.archive.d')
 
@@ -299,35 +308,54 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 if info[b'id'] == archive_id:
                     return name
 
-        def create_master_idx(chunk_idx):
+        def fetch(archive_id, archive_name, cached_ids):
+            if archive_id in cached_ids:
+                logger.info("Reading cached archive chunk index for %s ..." % archive_name)
+                archive_chunk_idx = ChunkIndex.read(mkpath(archive_id))
+            else:
+                logger.info('Fetching and building archive index for %s ...' % archive_name)
+                archive_chunk_idx = fetch_and_build_idx(archive_id, repository, self.key)
+            return archive_chunk_idx
+
+        def update_master_idx(chunk_idx):
             logger.info('Synchronizing chunks cache...')
             cached_ids = cached_archives()
-            archive_ids = repo_archives()
-            logger.info('Archives: %d, w/ cached Idx: %d, w/ outdated Idx: %d, w/o cached Idx: %d.' % (
-                len(archive_ids), len(cached_ids),
-                len(cached_ids - archive_ids), len(archive_ids - cached_ids), ))
-            # deallocates old hashindex, creates empty hashindex:
-            chunk_idx.clear()
-            cleanup_outdated(cached_ids - archive_ids)
-            if archive_ids:
-                chunk_idx = None
-                for archive_id in archive_ids:
-                    archive_name = lookup_name(archive_id)
-                    if archive_id in cached_ids:
-                        archive_chunk_idx_path = mkpath(archive_id)
-                        logger.info("Reading cached archive chunk index for %s ..." % archive_name)
-                        archive_chunk_idx = ChunkIndex.read(archive_chunk_idx_path)
-                    else:
-                        logger.info('Fetching and building archive index for %s ...' % archive_name)
-                        archive_chunk_idx = fetch_and_build_idx(archive_id, repository, self.key)
-                    logger.info("Merging into master chunks index ...")
-                    if chunk_idx is None:
-                        # we just use the first archive's idx as starting point,
-                        # to avoid growing the hash table from 0 size and also
-                        # to save 1 merge call.
-                        chunk_idx = archive_chunk_idx
-                    else:
-                        chunk_idx.merge(archive_chunk_idx)
+            repo_ids = repo_archives()
+            index_ids = self.chunks_index_archives
+            logger.info('Archives: %d, in Master Idx: %d, w/ cached Idx: %d, w/ outdated Idx: %d, w/o cached Idx: %d.' % (
+                len(repo_ids), len(index_ids), len(cached_ids),
+                len(cached_ids - repo_ids), len(repo_ids - cached_ids), ))
+            cleanup_outdated(cached_ids - repo_ids)
+            removed_ids = index_ids - repo_ids
+            if not removed_ids:
+                # if only stuff was added, we can quickly update our index
+                added_ids = repo_ids - index_ids
+                if added_ids:
+                    logger.info("Archives were added to repository, will do a quick chunks cache resync.")
+                    for id in added_ids:
+                        archive_name = lookup_name(id)
+                        idx = fetch(id, archive_name, cached_ids)
+                        logger.info("Merging index of %s ..." % archive_name)
+                        if not chunk_idx.merge(idx):
+                            raise Exception("chunk index merge failed")
+            else:
+                # de-allocates old hashindex, creates empty hashindex:
+                chunk_idx.clear()
+                if repo_ids:
+                    logger.info("Archives were deleted from repository, must do a full chunks cache rebuild.")
+                    chunk_idx = None
+                    for id in repo_ids:
+                        archive_name = lookup_name(id)
+                        idx = fetch(id, archive_name, cached_ids)
+                        logger.info("Merging index of %s ..." % archive_name)
+                        if chunk_idx is None:
+                            # we just use the first archive's idx as starting point,
+                            # to avoid growing the hash table from 0 size and also
+                            # to save 1 merge call.
+                            chunk_idx = idx
+                        else:
+                            chunk_idx.merge(idx)
+            self.chunks_index_archives = repo_ids
             logger.info('Done.')
             return chunk_idx
 
@@ -352,7 +380,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         # TEMPORARY HACK: to avoid archive index caching, create a FILE named ~/.cache/borg/REPOID/chunks.archive.d -
         # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local disk)
         self.do_cache = os.path.isdir(archive_path)
-        self.chunks = create_master_idx(self.chunks)
+        self.chunks = update_master_idx(self.chunks)
 
     def add_chunk(self, id, data, stats):
         if not self.txn_active:

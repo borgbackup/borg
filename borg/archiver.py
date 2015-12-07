@@ -336,7 +336,7 @@ class Archiver:
             archive.delete(stats)
             manifest.write()
             repository.commit()
-            cache.commit()
+            cache.commit(removed=[archive.id])
             if args.stats:
                 logger.info(stats.summary.format(label='Deleted data:', stats=stats))
                 logger.info(str(cache))
@@ -491,7 +491,7 @@ class Archiver:
         if to_delete and not args.dry_run:
             manifest.write()
             repository.commit()
-            cache.commit()
+            cache.commit(removed=[archive.id for archive in to_delete])
         if args.stats:
             logger.info(stats.summary.format(label='Deleted data:', stats=stats))
             logger.info(str(cache))

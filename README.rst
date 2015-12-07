@@ -173,6 +173,6 @@ for the complete license.
         :alt: Build Status
         :target: https://travis-ci.org/borgbackup/borg
 
-.. |coverage| image:: http://codecov.io/github/borgbackup/borg/coverage.svg?branch=master
+.. |coverage| image:: https://codecov.io/github/borgbackup/borg/coverage.svg?branch=master
         :alt: Test Coverage
-        :target: http://codecov.io/github/borgbackup/borg?branch=master
+        :target: https://codecov.io/github/borgbackup/borg?branch=master

@@ -697,19 +697,6 @@ def location_validator(archive=None):
     return validator
 
 
-def read_msgpack(filename):
-    with open(filename, 'rb') as fd:
-        return msgpack.unpack(fd)
-
-
-def write_msgpack(filename, d):
-    with open(filename + '.tmp', 'wb') as fd:
-        msgpack.pack(d, fd)
-        fd.flush()
-        os.fsync(fd.fileno())
-    os.rename(filename + '.tmp', filename)
-
-
 def decode_dict(d, keys, encoding='utf-8', errors='surrogateescape'):
     for key in keys:
         if isinstance(d.get(key), bytes):

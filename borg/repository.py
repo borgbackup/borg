@@ -10,8 +10,8 @@ import shutil
 import struct
 from zlib import crc32
 
-from .helpers import Error, ErrorWithTraceback, IntegrityError, read_msgpack, write_msgpack, \
-                     unhexlify, ProgressIndicatorPercent
+import msgpack
+from .helpers import Error, ErrorWithTraceback, IntegrityError, unhexlify, ProgressIndicatorPercent
 from .hashindex import NSIndex
 from .locking import UpgradableLock, LockError, LockErrorT
 from .lrucache import LRUCache
@@ -189,7 +189,8 @@ class Repository:
         else:
             if do_cleanup:
                 self.io.cleanup(transaction_id)
-            hints = read_msgpack(os.path.join(self.path, 'hints.%d' % transaction_id))
+            with open(os.path.join(self.path, 'hints.%d' % transaction_id), 'rb') as fd:
+                hints = msgpack.unpack(fd)
             if hints[b'version'] != 1:
                 raise ValueError('Unknown hints file version: %d' % hints['version'])
             self.segments = hints[b'segments']
@@ -200,7 +201,12 @@ class Repository:
                  b'segments': self.segments,
                  b'compact': list(self.compact)}
         transaction_id = self.io.get_segments_transaction_id()
-        write_msgpack(os.path.join(self.path, 'hints.%d' % transaction_id), hints)
+        hints_file = os.path.join(self.path, 'hints.%d' % transaction_id)
+        with open(hints_file + '.tmp', 'wb') as fd:
+            msgpack.pack(hints, fd)
+            fd.flush()
+            os.fsync(fd.fileno())
+        os.rename(hints_file + '.tmp', hints_file)
         self.index.write(os.path.join(self.path, 'index.tmp'))
         os.rename(os.path.join(self.path, 'index.tmp'),
                   os.path.join(self.path, 'index.%d' % transaction_id))

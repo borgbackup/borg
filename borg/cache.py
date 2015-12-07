@@ -255,18 +255,11 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             for id in ids:
                 os.unlink(mkpath(id))
 
-        def add(chunk_idx, id, size, csize, incr=1):
-            try:
-                count, size, csize = chunk_idx[id]
-                chunk_idx[id] = count + incr, size, csize
-            except KeyError:
-                chunk_idx[id] = incr, size, csize
-
         def fetch_and_build_idx(archive_id, repository, key):
             chunk_idx = ChunkIndex()
             cdata = repository.get(archive_id)
             data = key.decrypt(archive_id, cdata)
-            add(chunk_idx, archive_id, len(data), len(cdata))
+            chunk_idx.add(archive_id, 1, len(data), len(cdata))
             archive = msgpack.unpackb(data)
             if archive[b'version'] != 1:
                 raise Exception('Unknown archive metadata version')
@@ -274,7 +267,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             unpacker = msgpack.Unpacker()
             for item_id, chunk in zip(archive[b'items'], repository.get_many(archive[b'items'])):
                 data = key.decrypt(item_id, chunk)
-                add(chunk_idx, item_id, len(data), len(chunk))
+                chunk_idx.add(item_id, 1, len(data), len(chunk))
                 unpacker.feed(data)
                 for item in unpacker:
                     if not isinstance(item, dict):
@@ -282,7 +275,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                         continue
                     if b'chunks' in item:
                         for chunk_id, size, csize in item[b'chunks']:
-                            add(chunk_idx, chunk_id, size, csize)
+                            chunk_idx.add(chunk_id, 1, size, csize)
             if self.do_cache:
                 fn = mkpath(archive_id)
                 fn_tmp = mkpath(archive_id, suffix='.tmp')

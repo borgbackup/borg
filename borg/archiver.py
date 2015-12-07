@@ -675,7 +675,7 @@ class Archiver:
         common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
                                    help='do not load/update the file metadata cache used to detect unchanged files')
         common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=RemoteRepository.umask, metavar='M',
-                                   help='set umask to M (local and remote, default: %(default)s)')
+                                   help='set umask to M (local and remote, default: %(default)04o)')
         common_parser.add_argument('--remote-path', dest='remote_path', default=RemoteRepository.remote_path, metavar='PATH',
                                    help='set remote path to executable (default: "%(default)s")')
 

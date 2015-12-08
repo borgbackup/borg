@@ -29,7 +29,7 @@ Also helpful:
   some unallocated PEs you can add to the LV.
 - consider using quotas
 - use `prune` regularly
-
+- if you do not have much free disk space, use `borg prune --save-space ...`
 
 A step by step example
 ----------------------

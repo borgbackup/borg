@@ -127,7 +127,8 @@ def packages_netbsd
     ln -s /usr/pkg/lib/liblz4* /usr/local/opt/lz4/lib/
     touch /etc/openssl/openssl.cnf  # avoids a flood of "can't open ..."
     mozilla-rootcerts install
-    # llfuse does not support netbsd
+    # pkg_add fuse pkg-config  # llfuse 0.41.1 supports netbsd, but is still buggy.
+    # https://bitbucket.org/nikratio/python-llfuse/issues/70/perfuse_open-setsockopt-no-buffer-space
     pkg_add python34 py34-setuptools
     ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python
     ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python3
@@ -144,6 +145,7 @@ def install_pyenv(boxname)
     echo 'eval "$(pyenv init -)"' >> ~/.bash_profile
     echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bash_profile
     echo 'export PYTHON_CONFIGURE_OPTS="--enable-shared"' >> ~/.bash_profile
+    echo 'export LANG=en_US.UTF-8' >> ~/.bash_profile
   EOF
 end
 
@@ -195,7 +197,8 @@ def install_borg(boxname)
     rm -f borg/*.so borg/*.cpy*
     rm -f borg/{chunker,crypto,compress,hashindex,platform_linux}.c
     rm -rf borg/__pycache__ borg/support/__pycache__ borg/testsuite/__pycache__
-    pip install 'llfuse<0.41'  # 0.41 does not install due to UnicodeDecodeError
+    pip install 'llfuse<0.41'  # 0.41.1 throws UnicodeDecodeError at install time:
+    # https://bitbucket.org/nikratio/python-llfuse/issues/69/unicode-exception-at-install-time
     pip install -r requirements.d/development.txt
     pip install -e .
   EOF

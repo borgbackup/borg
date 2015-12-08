@@ -664,12 +664,12 @@ class Archiver:
 
     def build_parser(self, args=None, prog=None):
         common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
-        common_parser.add_argument('-v', '--verbose', dest='log_level',
+        common_parser.add_argument('-v', '--verbose', '--info', dest='log_level',
                                    action='store_const', const='info', default='warning',
-                                   help='verbose output, same as --log-level=info')
-        common_parser.add_argument('--log-level', dest='log_level', default='warning', metavar='LEVEL',
-                                   choices=('debug', 'info', 'warning', 'error', 'critical'),
-                                   help='set the log level to LEVEL, default: %(default)s)')
+                                   help='enable informative (verbose) output, work on log level INFO')
+        common_parser.add_argument('--debug', dest='log_level',
+                                   action='store_const', const='debug', default='warning',
+                                   help='enable debug output, work on log level DEBUG')
         common_parser.add_argument('--lock-wait', dest='lock_wait', type=int, metavar='N', default=1,
                                    help='wait for the lock, but max. N seconds (default: %(default)d).')
         common_parser.add_argument('--show-rc', dest='show_rc', action='store_true', default=False,

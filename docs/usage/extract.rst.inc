@@ -4,10 +4,11 @@ borg extract
 ------------
 ::
 
-    usage: borg extract [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
-                        [--remote-path PATH] [-n] [-e PATTERN]
-                        [--exclude-from EXCLUDEFILE] [--numeric-owner]
-                        [--strip-components NUMBER] [--stdout] [--sparse]
+    usage: borg extract [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
+                        [--no-files-cache] [--umask M] [--remote-path PATH] [-n]
+                        [-e PATTERN] [--exclude-from EXCLUDEFILE]
+                        [--numeric-owner] [--strip-components NUMBER] [--stdout]
+                        [--sparse]
                         ARCHIVE [PATH [PATH ...]]
     
     Extract archive contents
@@ -18,11 +19,15 @@ borg extract
     
     optional arguments:
       -h, --help            show this help message and exit
-      -v, --verbose         verbose output
+      -v, --verbose, --info
+                            enable informative (verbose) output, work on log level
+                            INFO
+      --debug               enable debug output, work on log level DEBUG
+      --lock-wait N         wait for the lock, but max. N seconds (default: 1).
       --show-rc             show/log the return code (rc)
       --no-files-cache      do not load/update the file metadata cache used to
                             detect unchanged files
-      --umask M             set umask to M (local and remote, default: 63)
+      --umask M             set umask to M (local and remote, default: 0077)
       --remote-path PATH    set remote path to executable (default: "borg")
       -n, --dry-run         do not actually change any files
       -e PATTERN, --exclude PATTERN

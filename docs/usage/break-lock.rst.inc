@@ -1,15 +1,17 @@
-.. _borg_serve:
+.. _borg_break-lock:
 
-borg serve
-----------
+borg break-lock
+---------------
 ::
 
-    usage: borg serve [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
-                      [--no-files-cache] [--umask M] [--remote-path PATH]
-                      [--restrict-to-path PATH]
+    usage: borg break-lock [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
+                           [--no-files-cache] [--umask M] [--remote-path PATH]
+                           REPOSITORY
     
-    Start in server mode. This command is usually not used manually.
-            
+    Break the repository lock (e.g. in case it was left by a dead borg.
+    
+    positional arguments:
+      REPOSITORY            repository for which to break the locks
     
     optional arguments:
       -h, --help            show this help message and exit
@@ -23,10 +25,10 @@ borg serve
                             detect unchanged files
       --umask M             set umask to M (local and remote, default: 0077)
       --remote-path PATH    set remote path to executable (default: "borg")
-      --restrict-to-path PATH
-                            restrict repository access to PATH
     
 Description
 ~~~~~~~~~~~
 
-This command starts a repository server process. This command is usually not used manually.
+This command breaks the repository and cache locks.
+Please use carefully and only while no borg process (on any machine) is
+trying to access the Cache or the Repository.

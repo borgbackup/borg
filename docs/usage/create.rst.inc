@@ -4,8 +4,9 @@ borg create
 -----------
 ::
 
-    usage: borg create [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
-                       [--remote-path PATH] [-s] [-p] [-e PATTERN]
+    usage: borg create [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
+                       [--no-files-cache] [--umask M] [--remote-path PATH] [-s]
+                       [-p] [--filter STATUSCHARS] [-e PATTERN]
                        [--exclude-from EXCLUDEFILE] [--exclude-caches]
                        [--exclude-if-present FILENAME] [--keep-tag-files]
                        [-c SECONDS] [-x] [--numeric-owner]
@@ -23,17 +24,23 @@ borg create
     
     optional arguments:
       -h, --help            show this help message and exit
-      -v, --verbose         verbose output
+      -v, --verbose, --info
+                            enable informative (verbose) output, work on log level
+                            INFO
+      --debug               enable debug output, work on log level DEBUG
+      --lock-wait N         wait for the lock, but max. N seconds (default: 1).
       --show-rc             show/log the return code (rc)
       --no-files-cache      do not load/update the file metadata cache used to
                             detect unchanged files
-      --umask M             set umask to M (local and remote, default: 63)
+      --umask M             set umask to M (local and remote, default: 0077)
       --remote-path PATH    set remote path to executable (default: "borg")
       -s, --stats           print statistics for the created archive
-      -p, --progress        toggle progress display while creating the archive,
+      -p, --progress, --no-progress
+                            toggle progress display while creating the archive,
                             showing Original, Compressed and Deduplicated sizes,
                             followed by the Number of files seen and the path
                             being processed, default: True
+      --filter STATUSCHARS  only display items with the given status characters
       -e PATTERN, --exclude PATTERN
                             exclude paths matching PATTERN
       --exclude-from EXCLUDEFILE

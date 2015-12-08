@@ -4,26 +4,31 @@ borg upgrade
 ------------
 ::
 
-    usage: borg upgrade [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
-                        [--remote-path PATH] [-n] [-i]
+    usage: borg upgrade [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
+                        [--no-files-cache] [--umask M] [--remote-path PATH] [-n]
+                        [-i]
                         [REPOSITORY]
     
     upgrade a repository from a previous version
     
     positional arguments:
-      REPOSITORY          path to the repository to be upgraded
+      REPOSITORY            path to the repository to be upgraded
     
     optional arguments:
-      -h, --help          show this help message and exit
-      -v, --verbose       verbose output
-      --show-rc           show/log the return code (rc)
-      --no-files-cache    do not load/update the file metadata cache used to
-                          detect unchanged files
-      --umask M           set umask to M (local and remote, default: 63)
-      --remote-path PATH  set remote path to executable (default: "borg")
-      -n, --dry-run       do not change repository
-      -i, --inplace       rewrite repository in place, with no chance of going
-                          back to older versions of the repository.
+      -h, --help            show this help message and exit
+      -v, --verbose, --info
+                            enable informative (verbose) output, work on log level
+                            INFO
+      --debug               enable debug output, work on log level DEBUG
+      --lock-wait N         wait for the lock, but max. N seconds (default: 1).
+      --show-rc             show/log the return code (rc)
+      --no-files-cache      do not load/update the file metadata cache used to
+                            detect unchanged files
+      --umask M             set umask to M (local and remote, default: 0077)
+      --remote-path PATH    set remote path to executable (default: "borg")
+      -n, --dry-run         do not change repository
+      -i, --inplace         rewrite repository in place, with no chance of going
+                            back to older versions of the repository.
     
 Description
 ~~~~~~~~~~~

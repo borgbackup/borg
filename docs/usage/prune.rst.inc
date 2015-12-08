@@ -4,10 +4,10 @@ borg prune
 ----------
 ::
 
-    usage: borg prune [-h] [-v] [--show-rc] [--no-files-cache] [--umask M]
-                      [--remote-path PATH] [-n] [-s] [--keep-within WITHIN]
-                      [-H HOURLY] [-d DAILY] [-w WEEKLY] [-m MONTHLY] [-y YEARLY]
-                      [-p PREFIX]
+    usage: borg prune [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
+                      [--no-files-cache] [--umask M] [--remote-path PATH] [-n]
+                      [-s] [--keep-within WITHIN] [-H HOURLY] [-d DAILY]
+                      [-w WEEKLY] [-m MONTHLY] [-y YEARLY] [-p PREFIX]
                       [REPOSITORY]
     
     Prune repository archives according to specified rules
@@ -17,11 +17,15 @@ borg prune
     
     optional arguments:
       -h, --help            show this help message and exit
-      -v, --verbose         verbose output
+      -v, --verbose, --info
+                            enable informative (verbose) output, work on log level
+                            INFO
+      --debug               enable debug output, work on log level DEBUG
+      --lock-wait N         wait for the lock, but max. N seconds (default: 1).
       --show-rc             show/log the return code (rc)
       --no-files-cache      do not load/update the file metadata cache used to
                             detect unchanged files
-      --umask M             set umask to M (local and remote, default: 63)
+      --umask M             set umask to M (local and remote, default: 0077)
       --remote-path PATH    set remote path to executable (default: "borg")
       -n, --dry-run         do not change repository
       -s, --stats           print statistics for the deleted archive

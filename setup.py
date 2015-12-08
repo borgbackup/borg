@@ -224,7 +224,7 @@ setup(
         'write_to': 'borg/_version.py',
     },
     author='The Borg Collective (see AUTHORS file)',
-    author_email='borgbackup@librelist.com',
+    author_email='borgbackup@python.org',
     url='https://borgbackup.readthedocs.org/',
     description='Deduplicated, encrypted, authenticated and compressed backups',
     long_description=long_description,

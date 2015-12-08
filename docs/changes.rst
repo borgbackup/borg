@@ -1,8 +1,8 @@
 Changelog
 =========
 
-Version 0.29.0
---------------
+Version 0.29.0 (not released yet)
+---------------------------------
 
 Compatibility notes:
 

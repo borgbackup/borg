@@ -19,6 +19,18 @@ separate sections either. The `flake8
 <https://flake8.readthedocs.org/>`_ commandline tool should be used to
 check for style errors before sending pull requests.
 
+Output and Logging
+------------------
+When writing logger calls, always use correct log level (debug only for
+debugging, info for informative messages, warning for warnings, error for
+errors, critical for critical errors/states).
+
+When directly talking to the user (e.g. Y/N questions), do not use logging,
+but directly output to stderr (not: stdout, it could be connected to a pipe).
+
+To control the amount and kinds of messages output to stderr or emitted at
+info level, use flags like --stats.
+
 Building a development environment
 ----------------------------------
 

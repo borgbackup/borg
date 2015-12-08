@@ -32,7 +32,7 @@ yet.
 ============ ===================== =======
 Distribution Source                Command
 ============ ===================== =======
-Arch Linux   `[community]`_        ``pacman -Syu borg``
+Arch Linux   `[community]`_        ``pacman -S borg``
 Debian       `unstable/sid`_       ``apt install borgbackup``
 Ubuntu       `Xenial Xerus 16.04`_ ``apt install borgbackup``
 OS X         `Brew cask`_          ``brew cask install borgbackup``

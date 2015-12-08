@@ -771,6 +771,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_not_in('test1', output)
         self.assert_in('test2', output)
 
+    def test_prune_repository_save_space(self):
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test1', src_dir)
+        self.cmd('create', self.repository_location + '::test2', src_dir)
+        output = self.cmd('prune', '-v', '--dry-run', self.repository_location, '--keep-daily=2')
+        self.assert_in('Keeping archive: test2', output)
+        self.assert_in('Would prune:     test1', output)
+        output = self.cmd('list', self.repository_location)
+        self.assert_in('test1', output)
+        self.assert_in('test2', output)
+        self.cmd('prune', '--save-space', self.repository_location, '--keep-daily=2')
+        output = self.cmd('list', self.repository_location)
+        self.assert_not_in('test1', output)
+        self.assert_in('test2', output)
+
     def test_prune_repository_prefix(self):
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::foo-2015-08-12-10:00', src_dir)

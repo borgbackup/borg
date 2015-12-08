@@ -25,7 +25,9 @@ New features:
 - implement borg break-lock command, fixes #157
 - include system info below traceback, fixes #324
 - use ISO-8601 date and time format, fixes #375
-- add --log-level to set the level of the builtin logging configuration, fixes #426
+- add --debug and --info (same as --verbose) to set the log level of the
+  builtin logging configuration (which otherwise defaults to warning),
+  fixes #426
 - configure logging via env var BORG_LOGGING_CONF
 - add a --no-progress flag to forcibly disable progress info
 

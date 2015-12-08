@@ -273,11 +273,11 @@ class RemoteRepository:
                     w_fds = []
         self.ignore_responses |= set(waiting_for)
 
-    def check(self, repair=False):
-        return self.call('check', repair)
+    def check(self, repair=False, save_space=False):
+        return self.call('check', repair, save_space)
 
-    def commit(self, *args):
-        return self.call('commit')
+    def commit(self, save_space=False):
+        return self.call('commit', save_space)
 
     def rollback(self, *args):
         return self.call('rollback')

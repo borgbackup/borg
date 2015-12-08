@@ -661,7 +661,7 @@ class ArchiveChecker:
         self.error_found = False
         self.possibly_superseded = set()
 
-    def check(self, repository, repair=False, archive=None, last=None):
+    def check(self, repository, repair=False, archive=None, last=None, save_space=False):
         logger.info('Starting archive consistency check...')
         self.check_all = archive is None and last is None
         self.repair = repair
@@ -676,7 +676,7 @@ class ArchiveChecker:
             self.manifest, _ = Manifest.load(repository, key=self.key)
         self.rebuild_refcounts(archive=archive, last=last)
         self.orphan_chunks_check()
-        self.finish()
+        self.finish(save_space=save_space)
         if self.error_found:
             logger.error('Archive consistency check complete, problems found.')
         else:
@@ -885,7 +885,7 @@ class ArchiveChecker:
         else:
             logger.warning('Orphaned objects check skipped (needs all archives checked).')
 
-    def finish(self):
+    def finish(self, save_space=False):
         if self.repair:
             self.manifest.write()
-            self.repository.commit()
+            self.repository.commit(save_space=save_space)

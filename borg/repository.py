@@ -365,7 +365,7 @@ class Repository:
             if repair:
                 logger.info('Completed repository check, errors found and repaired.')
             else:
-                logger.info('Completed repository check, errors found.')
+                logger.error('Completed repository check, errors found.')
         else:
             logger.info('Completed repository check, no problems found.')
         return not error_found or repair

@@ -14,18 +14,20 @@ General
 Type of log output
 ~~~~~~~~~~~~~~~~~~
 
-You can set the log level of the builtin logging configuration using the
---log-level option.
+The log level of the builtin logging configuration defaults to WARNING.
+This is because we want |project_name| to be mostly silent and only output
+warnings (plus errors and critical messages).
 
-Supported levels: ``debug``, ``info``, ``warning``, ``error``, ``critical``.
+Use --verbose or --info to set INFO (you will get informative output then
+additionally to warnings, errors, critical messages).
+Use --debug to set DEBUG to get output made for debugging.
 
-All log messages created with at least the given level will be output.
+All log messages created with at least the set level will be output.
 
-Amount of informational output
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Log levels: DEBUG < INFO < WARNING < ERROR < CRITICAL
 
-For some subcommands, using the ``-v`` or ``--verbose`` option will give you
-more informational output (at ``info`` level).
+While you can set misc. log levels, do not expect that every command will
+give different output on different log levels - it's just a possibility.
 
 Return codes
 ~~~~~~~~~~~~
@@ -436,8 +438,13 @@ Item flags
 ~~~~~~~~~~
 
 `borg create -v` outputs a verbose list of all files, directories and other
-file system items it considered. For each item, it prefixes a single-letter
-flag that indicates type and/or status of the item.
+file system items it considered (no matter whether they had content changes
+or not). For each item, it prefixes a single-letter flag that indicates type
+and/or status of the item.
+
+If you are interested only in a subset of that output, you can give e.g.
+`--filter=AME` and it will only show regular files with A, M or E status (see
+below).
 
 A uppercase character represents the status of a regular file relative to the
 "files" cache (not relative to the repo - this is an issue if the files cache

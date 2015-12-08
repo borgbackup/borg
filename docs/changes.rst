@@ -7,7 +7,8 @@ Version 0.29.0
 Compatibility notes:
 
 - when upgrading to 0.29.0 you need to upgrade client as well as server
-  installations due to the locking related changes.
+  installations due to the locking related changes otherwise you'll get an
+  error msg about a RPC protocol mismatch.
 - the default waiting time for a lock changed from infinity to 1 second for a
   better interactive user experience. if the repo you want to access is
   currently locked, borg will now terminate after 1s with an error message.
@@ -16,8 +17,12 @@ Compatibility notes:
 
 Bug fixes:
 
+- hash table tuning (better chosen hashtable load factor 0.75 and prime initial
+  size of 1031 gave ~1000x speedup in some scenarios)
 - avoid creation of an orphan lock for one case, see #285
 - --keep-tag-files: fix file mode and multiple tag files in one directory, #432
+- fix format of umask in help pages, #463
+- borg init: display proper repo URL
 
 New features:
 
@@ -28,22 +33,34 @@ New features:
 - add --debug and --info (same as --verbose) to set the log level of the
   builtin logging configuration (which otherwise defaults to warning),
   fixes #426
+  note: there are no messages emitted at DEBUG level currently.
 - configure logging via env var BORG_LOGGING_CONF
 - add a --no-progress flag to forcibly disable progress info
+- add a --filter option for status characters: e.g. to show only the added
+  or modified files (and also errors), use "borg create -v --filter=AME ...".
+- more progress indicators, fixes #394
 
 Other changes:
 
-- fix progress tests on travis
+- hashindex_add C implementation (speed up cache resync for new archives)
+- increase rpc protocol version to 2, fixes #458
+- silence borg by default (via log level WARNING)
 - get rid of C compiler warnings, fixes #391
 - upgrade OS X FUSE to 3.0.9 on the OS X binary build system
 - docs:
 
-  - document new mailing list borgbackup@python.org
+  - new mailing list borgbackup@python.org, #468
   - readthedocs: color and logo improvements
+  - load coverage icons over SSL (avoids mixed content)
   - more precise binary installation steps
   - update release procedure docs about OS X FUSE
   - FAQ entry about unexpected 'A' status for unchanged file(s), fixes #403
   - add docs about 'E' file status
+  - add "borg upgrade" docs, fixes #464
+  - add developer docs about output and logging
+  - clarify encryption, add note about clientside encryption
+  - add resources section, with videos, talks, presentations, #149
+  - Borg moved to Arch Linux [community]
 
 
 Version 0.28.2

@@ -413,6 +413,15 @@ Examples
     command="borg serve --restrict-to-path /mnt/backup" ssh-rsa AAAAB3[...]
 
 
+.. include:: usage/upgrade.rst.inc
+
+Examples
+~~~~~~~~
+::
+
+    borg upgrade -v /mnt/backup
+
+
 Miscellaneous Help
 ------------------
 

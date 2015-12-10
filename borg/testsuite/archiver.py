@@ -676,32 +676,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('create', '--progress', self.repository_location + '::test4', 'input')
         self.assert_in("\r", output)
         # progress forced off
-        output = self.cmd('create', '--no-progress', self.repository_location + '::test5', 'input')
-        self.assert_not_in("\r", output)
-
-    @unittest.skipUnless(sys.stdout.isatty(), 'need a tty to test auto-detection')
-    def test_progress_tty(self):
-        """test that the --progress and --no-progress flags work,
-        overriding defaults from the terminal auto-detection"""
-        self.create_regular_file('file1', size=1024 * 80)
-        self.cmd('init', self.repository_location)
-        # without a terminal, no progress expected
-        output = self.cmd('create', self.repository_location + '::test1', 'input', fork=False)
-        self.assert_not_in("\r", output)
-        # with a terminal, progress expected
-        output = self.cmd('create', self.repository_location + '::test2', 'input', fork=True)
-        self.assert_in("\r", output)
-        # without a terminal, progress forced on
-        output = self.cmd('create', '--progress', self.repository_location + '::test3', 'input', fork=False)
-        self.assert_in("\r", output)
-        # with a terminal, progress forced on
-        output = self.cmd('create', '--progress', self.repository_location + '::test4', 'input', fork=True)
-        self.assert_in("\r", output)
-        # without a terminal, progress forced off
-        output = self.cmd('create', '--no-progress', self.repository_location + '::test5', 'input', fork=False)
-        self.assert_not_in("\r", output)
-        # with a terminal, progress forced off
-        output = self.cmd('create', '--no-progress', self.repository_location + '::test6', 'input', fork=True)
+        output = self.cmd('create', self.repository_location + '::test5', 'input')
         self.assert_not_in("\r", output)
 
     def test_file_status(self):

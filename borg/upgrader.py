@@ -37,6 +37,16 @@ class AtticRepositoryUpgrader(Repository):
             logger.info('making a hardlink copy in %s', backup)
             if not dryrun:
                 shutil.copytree(self.path, backup, copy_function=os.link)
+                # we need to create a real copy (not hardlink copy) of index.* and hints.*
+                # otherwise the backup copy will get modified.
+                transaction_id = self.get_index_transaction_id()
+                for name in ['index', 'hints']:
+                    fname = "%s.%d" % (name, transaction_id)
+                    fname_orig = os.path.join(self.path, fname)
+                    fname_backup = os.path.join(backup, fname)
+                    os.remove(fname_backup)
+                    shutil.copy(fname_orig, fname_backup)
+
         logger.info("opening attic repository with borg and converting")
         # now lock the repo, after we have made the copy
         self.lock = UpgradableLock(os.path.join(self.path, 'lock'), exclusive=True, timeout=1.0).acquire()

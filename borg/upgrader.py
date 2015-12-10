@@ -50,10 +50,17 @@ class AtticRepositoryUpgrader(Repository):
         try:
             self.convert_cache(dryrun)
             self.convert_segments(segments, dryrun=dryrun, inplace=inplace)
+            self.borg_readme()
         finally:
             self.lock.release()
             self.lock = None
         return backup
+
+    def borg_readme(self):
+        readme = os.path.join(self.path, 'README')
+        os.remove(readme)
+        with open(readme, 'w') as fd:
+            fd.write('This is a Borg repository\n')
 
     @staticmethod
     def convert_segments(segments, dryrun=True, inplace=False):

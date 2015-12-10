@@ -16,6 +16,10 @@ ATTIC_MAGIC = b'ATTICSEG'
 
 
 class AtticRepositoryUpgrader(Repository):
+    def __init__(self, *args, **kw):
+        kw['lock'] = False  # do not create borg lock files (now) in attic repo
+        super().__init__(*args, **kw)
+
     def upgrade(self, dryrun=True, inplace=False):
         """convert an attic repository to a borg repository
 
@@ -34,8 +38,8 @@ class AtticRepositoryUpgrader(Repository):
             if not dryrun:
                 shutil.copytree(self.path, backup, copy_function=os.link)
         logger.info("opening attic repository with borg and converting")
-        # we need to open the repo to load configuration, keyfiles and segments
-        self.open(self.path, exclusive=False)
+        # now lock the repo, after we have made the copy
+        self.lock = UpgradableLock(os.path.join(self.path, 'lock'), exclusive=True, timeout=1.0).acquire()
         segments = [filename for i, filename in self.io.segment_iterator()]
         try:
             keyfile = self.find_attic_keyfile()

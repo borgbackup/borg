@@ -52,6 +52,7 @@ class AtticRepositoryUpgrader(Repository):
         self.lock = UpgradableLock(os.path.join(self.path, 'lock'),
                                    exclusive=True).acquire()
         try:
+            self.convert_repo_index(dryrun)
             self.convert_cache(dryrun)
             self.convert_segments(segments, dryrun=dryrun, inplace=inplace)
             self.borg_readme()
@@ -150,8 +151,8 @@ class AtticRepositoryUpgrader(Repository):
             with open(keyfile, 'w') as f:
                 f.write(data)
 
-    def convert_cache(self, dryrun):
-        """convert caches from attic to borg
+    def convert_repo_index(self, dryrun):
+        """convert some repo files
 
         those are all hash indexes, so we need to
         `s/ATTICIDX/BORG_IDX/` in a few locations:
@@ -161,6 +162,21 @@ class AtticRepositoryUpgrader(Repository):
           should probably update, with a lock, see
           `Repository.open()`, which i'm not sure we should use
           because it may write data on `Repository.close()`...
+        """
+        transaction_id = self.get_index_transaction_id()
+        if transaction_id is None:
+            logger.warning('no index file found for repository %s' % self.path)
+        else:
+            index = os.path.join(self.path, 'index.%d' % transaction_id).encode('utf-8')
+            logger.info("converting repo index %s" % index)
+            if not dryrun:
+                AtticRepositoryUpgrader.header_replace(index, b'ATTICIDX', b'BORG_IDX')
+
+    def convert_cache(self, dryrun):
+        """convert caches from attic to borg
+
+        those are all hash indexes, so we need to
+        `s/ATTICIDX/BORG_IDX/` in a few locations:
 
         * the `files` and `chunks` cache (in `$ATTIC_CACHE_DIR` or
           `$HOME/.cache/attic/<repoid>/`), which we could just drop,
@@ -168,15 +184,6 @@ class AtticRepositoryUpgrader(Repository):
           `Cache.open()`, edit in place and then `Cache.close()` to
           make sure we have locking right
         """
-        transaction_id = self.get_index_transaction_id()
-        if transaction_id is None:
-            logger.warning('no index file found for repository %s' % self.path)
-        else:
-            index = os.path.join(self.path, 'index.%d' % transaction_id).encode('utf-8')
-            logger.info("converting index index %s" % index)
-            if not dryrun:
-                AtticRepositoryUpgrader.header_replace(index, b'ATTICIDX', b'BORG_IDX')
-
         # copy of attic's get_cache_dir()
         attic_cache_dir = os.environ.get('ATTIC_CACHE_DIR',
                                          os.path.join(os.path.expanduser('~'),

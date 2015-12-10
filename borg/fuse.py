@@ -28,7 +28,7 @@ class ItemCache:
 
     def get(self, inode):
         self.fd.seek(inode - self.offset, io.SEEK_SET)
-        return next(msgpack.Unpacker(self.fd, read_size=512))
+        return next(msgpack.Unpacker(self.fd, read_size=1024))
 
 
 class FuseOperations(llfuse.Operations):

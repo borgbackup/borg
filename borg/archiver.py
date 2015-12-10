@@ -798,10 +798,9 @@ class Archiver:
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the created archive')
-        subparser.add_argument('-p', '--progress', '--no-progress',
-                               dest='progress', default=sys.stdin.isatty(),
-                               action=ToggleAction, nargs=0,
-                               help="""toggle progress display while creating the archive, showing Original,
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help="""show progress display while creating the archive, showing Original,
                                Compressed and Deduplicated sizes, followed by the Number of files seen
                                and the path being processed, default: %(default)s""")
         subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',

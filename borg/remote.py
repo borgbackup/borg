@@ -265,7 +265,7 @@ class RemoteRepository:
                     if not data:
                         raise ConnectionClosed()
                     data = data.decode('utf-8')
-                    for line in data.splitlines(keepends=True):
+                    for line in data.splitlines(True):  # keepends=True for py3.3+
                         if line.startswith('$LOG '):
                             _, level, msg = line.split(' ', 2)
                             level = getattr(logging, level, logging.CRITICAL)  # str -> int

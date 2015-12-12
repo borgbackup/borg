@@ -264,13 +264,13 @@ class RemoteRepository:
                     if not data:
                         raise ConnectionClosed()
                     data = data.decode('utf-8')
-                    for line in data.splitlines():
+                    for line in data.splitlines(keepends=True):
                         if line.startswith('$LOG '):
                             _, level, msg = line.split(' ', 2)
                             level = getattr(logging, level, logging.CRITICAL)  # str -> int
-                            logging.log(level, msg)
+                            logging.log(level, msg.rstrip())
                         else:
-                            print("Remote: " + line, file=sys.stderr)
+                            sys.stderr.write("Remote: " + line)
             if w:
                 while not self.to_send and (calls or self.preload_ids) and len(waiting_for) < 100:
                     if calls:

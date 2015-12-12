@@ -33,10 +33,6 @@ New Mailing List:
 Just read that page to find out about the mailing list, its topic, how to subscribe,
 how to unsubscribe and where you can find the archives of the list.
 
-We used a different mailing list before, you can still read its archives there:
-
-`Old Mailing List's Archives <http://librelist.com/browser/borgbackup/>`_
-
 Bounties and Fundraisers
 ------------------------
 

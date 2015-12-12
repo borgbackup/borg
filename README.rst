@@ -121,8 +121,7 @@ Links
  * `GitHub <https://github.com/borgbackup/borg>`_
  * `Issue Tracker <https://github.com/borgbackup/borg/issues>`_
  * `Bounties & Fundraisers <https://www.bountysource.com/teams/borgbackup>`_
- * `New Mailing List <https://mail.python.org/mailman/listinfo/borgbackup>`_
- * `(Old Mailing List's Archives <http://librelist.com/browser/borgbackup/>`_)
+ * `Mailing List <https://mail.python.org/mailman/listinfo/borgbackup>`_
  * `License <https://borgbackup.github.io/borgbackup/authors.html#license>`_
 
 Notes

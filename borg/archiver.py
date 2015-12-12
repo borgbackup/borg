@@ -109,7 +109,7 @@ class Archiver:
                 return EXIT_WARNING
         if not args.repo_only and not ArchiveChecker().check(
                 repository, repair=args.repair, archive=args.repository.archive,
-                last=args.last, save_space=args.save_space):
+                last=args.last, prefix=args.prefix, save_space=args.save_space):
             return EXIT_WARNING
         return EXIT_SUCCESS
 
@@ -769,6 +769,8 @@ class Archiver:
         subparser.add_argument('--last', dest='last',
                                type=int, default=None, metavar='N',
                                help='only check last N archives (Default: all)')
+        subparser.add_argument('-p', '--prefix', dest='prefix', type=str,
+                               help='only consider archive names starting with this prefix')
 
         change_passphrase_epilog = textwrap.dedent("""
         The key files used for repository encryption are optionally passphrase

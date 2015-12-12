@@ -949,6 +949,8 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         output = self.cmd('check', '-v', '--archives-only', self.repository_location, exit_code=0)
         self.assert_not_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)
+        output = self.cmd('check', '-v', '--archives-only', '--prefix=archive2', self.repository_location, exit_code=0)
+        self.assert_not_in('archive1', output)
 
     def test_missing_file_chunk(self):
         archive, repository = self.open_archive('archive1')

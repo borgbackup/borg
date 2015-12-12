@@ -34,6 +34,9 @@ from .remote import RepositoryServer, RemoteRepository
 
 has_lchflags = hasattr(os, 'lchflags')
 
+# default umask, overriden by --umask, defaults to read/write only for owner
+UMASK_DEFAULT = 0o077
+
 
 class ToggleAction(argparse.Action):
     """argparse action to handle "toggle" flags easily
@@ -58,7 +61,7 @@ class Archiver:
     def open_repository(self, args, create=False, exclusive=False, lock=True):
         location = args.location  # note: 'location' must be always present in args
         if location.proto == 'ssh':
-            repository = RemoteRepository(location, create=create, lock_wait=self.lock_wait, lock=lock)
+            repository = RemoteRepository(location, create=create, lock_wait=self.lock_wait, lock=lock, args=args)
         else:
             repository = Repository(location.path, create=create, exclusive=exclusive, lock_wait=self.lock_wait, lock=lock)
         repository._location = location
@@ -674,9 +677,9 @@ class Archiver:
                                    help='show/log the return code (rc)')
         common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
                                    help='do not load/update the file metadata cache used to detect unchanged files')
-        common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=RemoteRepository.umask, metavar='M',
+        common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=UMASK_DEFAULT, metavar='M',
                                    help='set umask to M (local and remote, default: %(default)04o)')
-        common_parser.add_argument('--remote-path', dest='remote_path', default=RemoteRepository.remote_path, metavar='PATH',
+        common_parser.add_argument('--remote-path', dest='remote_path', default='borg', metavar='PATH',
                                    help='set remote path to executable (default: "%(default)s")')
 
         parser = argparse.ArgumentParser(prog=prog, description='Borg - Deduplicated Backups')
@@ -1188,8 +1191,6 @@ class Archiver:
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
-        RemoteRepository.remote_path = args.remote_path
-        RemoteRepository.umask = args.umask
         setup_logging(level=args.log_level)  # do not use loggers before this!
         check_extension_modules()
         keys_dir = get_keys_dir()

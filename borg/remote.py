@@ -117,15 +117,12 @@ class RepositoryServer:  # pragma: no cover
 
 class RemoteRepository:
     extra_test_args = []
-    remote_path = 'borg'
-    # default umask, overriden by --umask, defaults to read/write only for owner
-    umask = 0o077
 
     class RPCError(Exception):
         def __init__(self, name):
             self.name = name
 
-    def __init__(self, location, create=False, lock_wait=None, lock=True):
+    def __init__(self, location, create=False, lock_wait=None, lock=True, args=None):
         self.location = location
         self.preload_ids = []
         self.msgid = 0
@@ -135,15 +132,11 @@ class RemoteRepository:
         self.responses = {}
         self.unpacker = msgpack.Unpacker(use_list=False)
         self.p = None
-        # XXX: ideally, the testsuite would subclass Repository and
-        # override ssh_cmd() instead of this crude hack, although
-        # __testsuite__ is not a valid domain name so this is pretty
-        # safe.
-        if location.host == '__testsuite__':
-            args = [sys.executable, '-m', 'borg.archiver', 'serve' ] + self.extra_test_args
-        else:  # pragma: no cover
-            args = self.ssh_cmd(location)
-        self.p = Popen(args, bufsize=0, stdin=PIPE, stdout=PIPE)
+        testing = location.host == '__testsuite__'
+        borg_cmd = self.borg_cmd(args, testing)
+        if not testing:
+            borg_cmd = self.ssh_cmd(location) + borg_cmd
+        self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()
         fcntl.fcntl(self.stdin_fd, fcntl.F_SETFL, fcntl.fcntl(self.stdin_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
@@ -165,10 +158,27 @@ class RemoteRepository:
     def __repr__(self):
         return '<%s %s>' % (self.__class__.__name__, self.location.canonical_path())
 
-    def umask_flag(self):
-        return ['--umask', '%03o' % self.umask]
+    def borg_cmd(self, args, testing):
+        """return a borg serve command line"""
+        # give some args/options to "borg serve" process as they were given to us
+        opts = []
+        if args is not None:
+            opts.append('--umask=%03o' % args.umask)
+            if args.log_level == 'debug':
+                opts.append('--debug')
+            elif args.log_level == 'info':
+                opts.append('--info')
+            elif args.log_level == 'warning':
+                pass  # is default
+            else:
+                raise ValueError('log level missing, fix this code')
+        if testing:
+            return [sys.executable, '-m', 'borg.archiver', 'serve' ] + opts + self.extra_test_args
+        else:  # pragma: no cover
+            return [args.remote_path, 'serve'] + opts
 
     def ssh_cmd(self, location):
+        """return a ssh command line that can be prefixed to a borg command line"""
         args = shlex.split(os.environ.get('BORG_RSH', 'ssh'))
         if location.port:
             args += ['-p', str(location.port)]
@@ -176,8 +186,6 @@ class RemoteRepository:
             args.append('%s@%s' % (location.user, location.host))
         else:
             args.append('%s' % location.host)
-        # use local umask also for the remote process
-        args += [self.remote_path, 'serve'] + self.umask_flag()
         return args
 
     def call(self, cmd, *args, **kw):

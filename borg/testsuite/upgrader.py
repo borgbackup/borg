@@ -12,7 +12,7 @@ except ImportError:
 from ..upgrader import AtticRepositoryUpgrader, AtticKeyfileKey
 from ..helpers import get_keys_dir
 from ..key import KeyfileKey
-from ..remote import RemoteRepository
+from ..archiver import UMASK_DEFAULT
 from ..repository import Repository
 
 
@@ -169,7 +169,7 @@ def test_convert_all(tmpdir, attic_repo, attic_key_file, inplace):
     orig_inode = first_inode(attic_repo.path)
     repo = AtticRepositoryUpgrader(str(tmpdir), create=False)
     # replicate command dispatch, partly
-    os.umask(RemoteRepository.umask)
+    os.umask(UMASK_DEFAULT)
     backup = repo.upgrade(dryrun=False, inplace=inplace)
     if inplace:
         assert backup is None
@@ -179,7 +179,7 @@ def test_convert_all(tmpdir, attic_repo, attic_key_file, inplace):
         assert first_inode(repo.path) != first_inode(backup)
         # i have seen cases where the copied tree has world-readable
         # permissions, which is wrong
-        assert stat_segment(backup).st_mode & 0o007 == 0
+        assert stat_segment(backup).st_mode & UMASK_DEFAULT == 0
 
     assert key_valid(attic_key_file.path)
     assert repo_valid(tmpdir)

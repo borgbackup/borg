@@ -1,5 +1,6 @@
 import errno
 import fcntl
+import logging
 import os
 import select
 import shlex
@@ -164,12 +165,13 @@ class RemoteRepository:
         opts = []
         if args is not None:
             opts.append('--umask=%03o' % args.umask)
-            if args.log_level == 'debug':
+            root_logger = logging.getLogger()
+            if root_logger.isEnabledFor(logging.DEBUG):
                 opts.append('--debug')
-            elif args.log_level == 'info':
+            elif root_logger.isEnabledFor(logging.INFO):
                 opts.append('--info')
-            elif args.log_level == 'warning':
-                pass  # is default
+            elif root_logger.isEnabledFor(logging.WARNING):
+                pass  # warning is default
             else:
                 raise ValueError('log level missing, fix this code')
         if testing:

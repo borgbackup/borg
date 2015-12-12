@@ -337,13 +337,11 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
     def test_borg_cmd(self):
         class MockArgs:
             remote_path = 'borg'
-            log_level = 'warning'
             umask = 0o077
 
         assert self.repository.borg_cmd(None, testing=True) == [sys.executable, '-m', 'borg.archiver', 'serve' ]
         args = MockArgs()
-        assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--umask=077']
-        args.log_level = 'info'
+        # note: test logger is on info log level, so --info gets added automagically
         assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--umask=077', '--info']
         args.remote_path = 'borg-0.28.2'
         assert self.repository.borg_cmd(args, testing=False) == ['borg-0.28.2', 'serve', '--umask=077', '--info']

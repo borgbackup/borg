@@ -1263,7 +1263,7 @@ def main():  # pragma: no cover
             msg += "\n%s\n%s" % (traceback.format_exc(), sysinfo())
         exit_code = e.exit_code
     except RemoteRepository.RPCError as e:
-        msg = 'Remote Exception.\n%s\n%s' % (str(e), sysinfo())
+        msg = '%s\n%s' % (str(e), sysinfo())
         exit_code = EXIT_ERROR
     except Exception:
         msg = 'Local Exception.\n%s\n%s' % (traceback.format_exc(), sysinfo())

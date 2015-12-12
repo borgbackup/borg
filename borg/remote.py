@@ -11,7 +11,7 @@ import traceback
 
 from . import __version__
 
-from .helpers import Error, IntegrityError
+from .helpers import Error, IntegrityError, sysinfo
 from .repository import Repository
 
 import msgpack
@@ -95,8 +95,9 @@ class RepositoryServer:  # pragma: no cover
                             f = getattr(self.repository, method)
                         res = f(*args)
                     except BaseException as e:
-                        # XXX rather log exception
-                        exc = "Remote Traceback by Borg %s%s%s" % (__version__, os.linesep, traceback.format_exc())
+                        logging.exception('Borg %s: exception in RPC call:', __version__)
+                        logging.error(sysinfo())
+                        exc = "Remote Exception (see remote log for the traceback)"
                         os.write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc)))
                     else:
                         os.write(stdout_fd, msgpack.packb((1, msgid, None, res)))

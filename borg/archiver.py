@@ -1191,7 +1191,7 @@ class Archiver:
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
-        setup_logging(level=args.log_level)  # do not use loggers before this!
+        setup_logging(level=args.log_level, is_serve=args.func == self.do_serve)  # do not use loggers before this!
         check_extension_modules()
         keys_dir = get_keys_dir()
         if not os.path.exists(keys_dir):

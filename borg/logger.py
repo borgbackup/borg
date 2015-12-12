@@ -52,7 +52,7 @@ def _log_warning(message, category, filename, lineno, file=None, line=None):
     logger.warning(msg)
 
 
-def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', level='info'):
+def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', level='info', is_serve=False):
     """setup logging module according to the arguments provided
 
     if conf_fname is given (or the config file name can be determined via
@@ -60,6 +60,9 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
 
     otherwise, set up a stream handler logger on stderr (by default, if no
     stream is provided).
+
+    if is_serve == True, we configure a special log format as expected by
+    the borg client log message interceptor.
     """
     global configured
     err_msg = None
@@ -84,9 +87,11 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
     # if we did not / not successfully load a logging configuration, fallback to this:
     logger = logging.getLogger('')
     handler = logging.StreamHandler(stream)
-    # other formatters will probably want this, but let's remove clutter on stderr
-    # example:
-    # handler.setFormatter(logging.Formatter('%(name)s: %(message)s'))
+    if is_serve:
+        fmt = '$LOG %(levelname)s Remote: %(message)s'
+    else:
+        fmt = '%(message)s'
+    handler.setFormatter(logging.Formatter(fmt))
     logger.addHandler(handler)
     logger.setLevel(level.upper())
     configured = True

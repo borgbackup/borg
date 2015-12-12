@@ -84,8 +84,8 @@ class Archiver:
 
     def do_init(self, args):
         """Initialize an empty repository"""
-        logger.info('Initializing repository at "%s"' % args.repository.canonical_path())
-        repository = self.open_repository(args.repository, create=True, exclusive=True)
+        logger.info('Initializing repository at "%s"' % args.location.canonical_path())
+        repository = self.open_repository(args.location, create=True, exclusive=True)
         key = key_creator(repository, args)
         manifest = Manifest(key, repository)
         manifest.key = key
@@ -96,7 +96,7 @@ class Archiver:
 
     def do_check(self, args):
         """Check repository consistency"""
-        repository = self.open_repository(args.repository, exclusive=args.repair)
+        repository = self.open_repository(args.location, exclusive=args.repair)
         if args.repair:
             msg = ("'check --repair' is an experimental feature that might result in data loss." +
                    "\n" +
@@ -108,14 +108,14 @@ class Archiver:
             if not repository.check(repair=args.repair, save_space=args.save_space):
                 return EXIT_WARNING
         if not args.repo_only and not ArchiveChecker().check(
-                repository, repair=args.repair, archive=args.repository.archive,
+                repository, repair=args.repair, archive=args.location.archive,
                 last=args.last, save_space=args.save_space):
             return EXIT_WARNING
         return EXIT_SUCCESS
 
     def do_change_passphrase(self, args):
         """Change repository key file passphrase"""
-        repository = self.open_repository(args.repository)
+        repository = self.open_repository(args.location)
         manifest, key = Manifest.load(repository)
         key.change_passphrase()
         return EXIT_SUCCESS
@@ -126,13 +126,13 @@ class Archiver:
         dry_run = args.dry_run
         t0 = datetime.now()
         if not dry_run:
-            repository = self.open_repository(args.archive, exclusive=True)
+            repository = self.open_repository(args.location, exclusive=True)
             manifest, key = Manifest.load(repository)
             compr_args = dict(buffer=COMPR_BUFFER)
             compr_args.update(args.compression)
             key.compressor = Compressor(**compr_args)
             cache = Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait)
-            archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
+            archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                               create=True, checkpoint_interval=args.checkpoint_interval,
                               numeric_owner=args.numeric_owner, progress=args.progress,
                               chunker_params=args.chunker_params, start=t0)
@@ -146,9 +146,9 @@ class Archiver:
         except IOError:
             pass
         # Add local repository dir to inode_skip list
-        if not args.archive.host:
+        if not args.location.host:
             try:
-                st = os.stat(args.archive.path)
+                st = os.stat(args.location.path)
                 skip_inodes.add((st.st_ino, st.st_dev))
             except IOError:
                 pass
@@ -271,9 +271,9 @@ class Archiver:
             logger.warning('Warning: File system encoding is "ascii", extracting non-ascii filenames will not be supported.')
             if sys.platform.startswith(('linux', 'freebsd', 'netbsd', 'openbsd', 'darwin', )):
                 logger.warning('Hint: You likely need to fix your locale setup. E.g. install locales and use: LANG=en_US.UTF-8')
-        repository = self.open_repository(args.archive)
+        repository = self.open_repository(args.location)
         manifest, key = Manifest.load(repository)
-        archive = Archive(repository, key, manifest, args.archive.archive,
+        archive = Archive(repository, key, manifest, args.location.archive,
                           numeric_owner=args.numeric_owner)
         patterns = adjust_patterns(args.paths, args.excludes)
         dry_run = args.dry_run
@@ -313,10 +313,10 @@ class Archiver:
 
     def do_rename(self, args):
         """Rename an existing archive"""
-        repository = self.open_repository(args.archive, exclusive=True)
+        repository = self.open_repository(args.location, exclusive=True)
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest, lock_wait=self.lock_wait)
-        archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
+        archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
         archive.rename(args.name)
         manifest.write()
         repository.commit()
@@ -325,11 +325,11 @@ class Archiver:
 
     def do_delete(self, args):
         """Delete an existing repository or archive"""
-        repository = self.open_repository(args.target, exclusive=True)
+        repository = self.open_repository(args.location, exclusive=True)
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait)
-        if args.target.archive:
-            archive = Archive(repository, key, manifest, args.target.archive, cache=cache)
+        if args.location.archive:
+            archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
             stats = Statistics()
             archive.delete(stats)
             manifest.write()
@@ -368,11 +368,11 @@ class Archiver:
             self.print_error('%s: Mountpoint must be a writable directory' % args.mountpoint)
             return self.exit_code
 
-        repository = self.open_repository(args.src)
+        repository = self.open_repository(args.location)
         try:
             manifest, key = Manifest.load(repository)
-            if args.src.archive:
-                archive = Archive(repository, key, manifest, args.src.archive)
+            if args.location.archive:
+                archive = Archive(repository, key, manifest, args.location.archive)
             else:
                 archive = None
             operations = FuseOperations(key, repository, manifest, archive)
@@ -388,10 +388,10 @@ class Archiver:
 
     def do_list(self, args):
         """List archive or repository contents"""
-        repository = self.open_repository(args.src)
+        repository = self.open_repository(args.location)
         manifest, key = Manifest.load(repository)
-        if args.src.archive:
-            archive = Archive(repository, key, manifest, args.src.archive)
+        if args.location.archive:
+            archive = Archive(repository, key, manifest, args.location.archive)
             if args.short:
                 for item in archive.iter_items():
                     print(remove_surrogates(item[b'path']))
@@ -432,10 +432,10 @@ class Archiver:
 
     def do_info(self, args):
         """Show archive details such as disk space used"""
-        repository = self.open_repository(args.archive)
+        repository = self.open_repository(args.location)
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait)
-        archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
+        archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
         stats = archive.calc_stats(cache)
         print('Name:', archive.name)
         print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
@@ -451,7 +451,7 @@ class Archiver:
 
     def do_prune(self, args):
         """Prune repository archives according to specified rules"""
-        repository = self.open_repository(args.repository, exclusive=True)
+        repository = self.open_repository(args.location, exclusive=True)
         manifest, key = Manifest.load(repository)
         cache = Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait)
         archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
@@ -506,7 +506,7 @@ class Archiver:
         # to be implemented.
 
         # XXX: should auto-detect if it is an attic repository here
-        repo = AtticRepositoryUpgrader(args.repository.path, create=False)
+        repo = AtticRepositoryUpgrader(args.location.path, create=False)
         try:
             repo.upgrade(args.dry_run, inplace=args.inplace)
         except NotImplementedError as e:
@@ -515,9 +515,9 @@ class Archiver:
 
     def do_debug_dump_archive_items(self, args):
         """dump (decrypted, decompressed) archive items metadata (not: data)"""
-        repository = self.open_repository(args.archive)
+        repository = self.open_repository(args.location)
         manifest, key = Manifest.load(repository)
-        archive = Archive(repository, key, manifest, args.archive.archive)
+        archive = Archive(repository, key, manifest, args.location.archive)
         for i, item_id in enumerate(archive.metadata[b'items']):
             data = key.decrypt(item_id, repository.get(item_id))
             filename = '%06d_%s.items' %(i, hexlify(item_id).decode('ascii'))
@@ -529,7 +529,7 @@ class Archiver:
 
     def do_debug_get_obj(self, args):
         """get object contents from the repository and write it into file"""
-        repository = self.open_repository(args.repository)
+        repository = self.open_repository(args.location)
         manifest, key = Manifest.load(repository)
         hex_id = args.id
         try:
@@ -549,7 +549,7 @@ class Archiver:
 
     def do_debug_put_obj(self, args):
         """put file(s) contents into the repository"""
-        repository = self.open_repository(args.repository)
+        repository = self.open_repository(args.location)
         manifest, key = Manifest.load(repository)
         for path in args.paths:
             with open(path, "rb") as f:
@@ -562,7 +562,7 @@ class Archiver:
 
     def do_debug_delete_obj(self, args):
         """delete the objects with the given IDs from the repo"""
-        repository = self.open_repository(args.repository)
+        repository = self.open_repository(args.location)
         manifest, key = Manifest.load(repository)
         modified = False
         for hex_id in args.ids:
@@ -584,7 +584,7 @@ class Archiver:
 
     def do_break_lock(self, args):
         """Break the repository lock (e.g. in case it was left by a dead borg."""
-        repository = self.open_repository(args.repository, lock=False)
+        repository = self.open_repository(args.location, lock=False)
         try:
             repository.break_lock()
             Cache.break_lock(repository)
@@ -703,7 +703,7 @@ class Archiver:
                                           description=self.do_init.__doc__, epilog=init_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_init)
-        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption',
@@ -751,7 +751,7 @@ class Archiver:
                                           epilog=check_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_check)
-        subparser.add_argument('repository', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='repository or archive to check consistency of')
         subparser.add_argument('--repository-only', dest='repo_only', action='store_true',
@@ -779,7 +779,7 @@ class Archiver:
                                           epilog=change_passphrase_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_change_passphrase)
-        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 
         create_epilog = textwrap.dedent("""
@@ -853,7 +853,7 @@ class Archiver:
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                action='store_true', default=False,
                                help='do not create a backup archive')
-        subparser.add_argument('archive', metavar='ARCHIVE',
+        subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='name of archive to create (must be also a valid directory name)')
         subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
@@ -893,7 +893,7 @@ class Archiver:
         subparser.add_argument('--sparse', dest='sparse',
                                action='store_true', default=False,
                                help='create holes in output sparse file from all-zero chunks')
-        subparser.add_argument('archive', metavar='ARCHIVE',
+        subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to extract')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
@@ -907,7 +907,7 @@ class Archiver:
                                           epilog=rename_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_rename)
-        subparser.add_argument('archive', metavar='ARCHIVE',
+        subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to rename')
         subparser.add_argument('name', metavar='NEWNAME', type=str,
@@ -932,7 +932,7 @@ class Archiver:
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
                                help='work slower, but using less space')
-        subparser.add_argument('target', metavar='TARGET', nargs='?', default='',
+        subparser.add_argument('location', metavar='TARGET', nargs='?', default='',
                                type=location_validator(),
                                help='archive or repository to delete')
 
@@ -949,7 +949,7 @@ class Archiver:
                                help='only print file/directory names, nothing else')
         subparser.add_argument('-p', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')
-        subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='repository/archive to list contents of')
 
@@ -964,7 +964,7 @@ class Archiver:
                                           epilog=mount_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_mount)
-        subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
                                help='repository/archive to mount')
         subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
                                help='where to mount filesystem')
@@ -982,7 +982,7 @@ class Archiver:
                                           epilog=info_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_info)
-        subparser.add_argument('archive', metavar='ARCHIVE',
+        subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to display information about')
 
@@ -996,7 +996,7 @@ class Archiver:
                                           epilog=break_lock_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_break_lock)
-        subparser.add_argument('repository', metavar='REPOSITORY',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository for which to break the locks')
 
@@ -1052,7 +1052,7 @@ class Archiver:
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
                                help='work slower, but using less space')
-        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to prune')
 
@@ -1104,7 +1104,7 @@ class Archiver:
                                default=False, action='store_true',
                                help="""rewrite repository in place, with no chance of going back to older
                                versions of the repository.""")
-        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')
 
@@ -1126,7 +1126,7 @@ class Archiver:
                                           epilog=debug_dump_archive_items_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_debug_dump_archive_items)
-        subparser.add_argument('archive', metavar='ARCHIVE',
+        subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to dump')
 
@@ -1138,7 +1138,7 @@ class Archiver:
                                           epilog=debug_get_obj_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_debug_get_obj)
-        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to use')
         subparser.add_argument('id', metavar='ID', type=str,
@@ -1154,7 +1154,7 @@ class Archiver:
                                           epilog=debug_put_obj_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_debug_put_obj)
-        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to use')
         subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
@@ -1168,7 +1168,7 @@ class Archiver:
                                           epilog=debug_delete_obj_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_debug_delete_obj)
-        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to use')
         subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,

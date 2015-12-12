@@ -13,7 +13,7 @@ from . import BaseTestCase
 class KeyTestCase(BaseTestCase):
 
     class MockArgs:
-        repository = Location(tempfile.mkstemp()[1])
+        location = Location(tempfile.mkstemp()[1])
 
     keyfile2_key_file = """
         BORG_KEY 0000000000000000000000000000000000000000000000000000000000000000

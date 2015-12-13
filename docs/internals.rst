@@ -276,10 +276,10 @@ buckets. As a consequence the hash is just a start position for a linear
 search, and if the element is not in the table the index is linearly crossed
 until an empty bucket is found.
 
-When the hash table is almost full at 90%, its size is doubled. When it's
-almost empty at 25%, its size is halved. So operations on it have a variable
+When the hash table is filled to 75%, its size is doubled. When it's
+emptied to 25%, its size is halved. So operations on it have a variable
 complexity between constant and linear with low factor, and memory overhead
-varies between 10% and 300%.
+varies between 33% and 300%.
 
 
 Indexes / Caches memory usage

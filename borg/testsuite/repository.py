@@ -1,5 +1,6 @@
 import os
 import shutil
+import sys
 import tempfile
 
 from mock import patch
@@ -326,13 +327,24 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         self.assert_raises(InvalidRPCMethod, lambda: self.repository.call('__init__', None))
 
     def test_ssh_cmd(self):
-        assert self.repository.umask is not None
-        assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', 'example.com', 'borg', 'serve'] + self.repository.umask_flag()
-        assert self.repository.ssh_cmd(Location('ssh://example.com/foo')) == ['ssh', 'example.com', 'borg', 'serve'] + self.repository.umask_flag()
-        assert self.repository.ssh_cmd(Location('ssh://user@example.com/foo')) == ['ssh', 'user@example.com', 'borg', 'serve'] + self.repository.umask_flag()
-        assert self.repository.ssh_cmd(Location('ssh://user@example.com:1234/foo')) == ['ssh', '-p', '1234', 'user@example.com', 'borg', 'serve'] + self.repository.umask_flag()
+        assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', 'example.com']
+        assert self.repository.ssh_cmd(Location('ssh://example.com/foo')) == ['ssh', 'example.com']
+        assert self.repository.ssh_cmd(Location('ssh://user@example.com/foo')) == ['ssh', 'user@example.com']
+        assert self.repository.ssh_cmd(Location('ssh://user@example.com:1234/foo')) == ['ssh', '-p', '1234', 'user@example.com']
         os.environ['BORG_RSH'] = 'ssh --foo'
-        assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', '--foo', 'example.com', 'borg', 'serve'] + self.repository.umask_flag()
+        assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', '--foo', 'example.com']
+
+    def test_borg_cmd(self):
+        class MockArgs:
+            remote_path = 'borg'
+            umask = 0o077
+
+        assert self.repository.borg_cmd(None, testing=True) == [sys.executable, '-m', 'borg.archiver', 'serve' ]
+        args = MockArgs()
+        # note: test logger is on info log level, so --info gets added automagically
+        assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--umask=077', '--info']
+        args.remote_path = 'borg-0.28.2'
+        assert self.repository.borg_cmd(args, testing=False) == ['borg-0.28.2', 'serve', '--umask=077', '--info']
 
 
 class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):

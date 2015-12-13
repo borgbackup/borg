@@ -1,5 +1,6 @@
 import errno
 import fcntl
+import logging
 import os
 import select
 import shlex
@@ -10,7 +11,7 @@ import traceback
 
 from . import __version__
 
-from .helpers import Error, IntegrityError
+from .helpers import Error, IntegrityError, sysinfo
 from .repository import Repository
 
 import msgpack
@@ -62,12 +63,16 @@ class RepositoryServer:  # pragma: no cover
     def serve(self):
         stdin_fd = sys.stdin.fileno()
         stdout_fd = sys.stdout.fileno()
+        stderr_fd = sys.stdout.fileno()
         # Make stdin non-blocking
         fl = fcntl.fcntl(stdin_fd, fcntl.F_GETFL)
         fcntl.fcntl(stdin_fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
         # Make stdout blocking
         fl = fcntl.fcntl(stdout_fd, fcntl.F_GETFL)
         fcntl.fcntl(stdout_fd, fcntl.F_SETFL, fl & ~os.O_NONBLOCK)
+        # Make stderr blocking
+        fl = fcntl.fcntl(stderr_fd, fcntl.F_GETFL)
+        fcntl.fcntl(stderr_fd, fcntl.F_SETFL, fl & ~os.O_NONBLOCK)
         unpacker = msgpack.Unpacker(use_list=False)
         while True:
             r, w, es = select.select([stdin_fd], [], [], 10)
@@ -90,7 +95,9 @@ class RepositoryServer:  # pragma: no cover
                             f = getattr(self.repository, method)
                         res = f(*args)
                     except BaseException as e:
-                        exc = "Remote Traceback by Borg %s%s%s" % (__version__, os.linesep, traceback.format_exc())
+                        logging.exception('Borg %s: exception in RPC call:', __version__)
+                        logging.error(sysinfo())
+                        exc = "Remote Exception (see remote log for the traceback)"
                         os.write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc)))
                     else:
                         os.write(stdout_fd, msgpack.packb((1, msgid, None, res)))
@@ -117,15 +124,12 @@ class RepositoryServer:  # pragma: no cover
 
 class RemoteRepository:
     extra_test_args = []
-    remote_path = 'borg'
-    # default umask, overriden by --umask, defaults to read/write only for owner
-    umask = 0o077
 
     class RPCError(Exception):
         def __init__(self, name):
             self.name = name
 
-    def __init__(self, location, create=False, lock_wait=None, lock=True):
+    def __init__(self, location, create=False, lock_wait=None, lock=True, args=None):
         self.location = location
         self.preload_ids = []
         self.msgid = 0
@@ -135,21 +139,19 @@ class RemoteRepository:
         self.responses = {}
         self.unpacker = msgpack.Unpacker(use_list=False)
         self.p = None
-        # XXX: ideally, the testsuite would subclass Repository and
-        # override ssh_cmd() instead of this crude hack, although
-        # __testsuite__ is not a valid domain name so this is pretty
-        # safe.
-        if location.host == '__testsuite__':
-            args = [sys.executable, '-m', 'borg.archiver', 'serve' ] + self.extra_test_args
-        else:  # pragma: no cover
-            args = self.ssh_cmd(location)
-        self.p = Popen(args, bufsize=0, stdin=PIPE, stdout=PIPE)
+        testing = location.host == '__testsuite__'
+        borg_cmd = self.borg_cmd(args, testing)
+        if not testing:
+            borg_cmd = self.ssh_cmd(location) + borg_cmd
+        self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()
+        self.stderr_fd = self.p.stderr.fileno()
         fcntl.fcntl(self.stdin_fd, fcntl.F_SETFL, fcntl.fcntl(self.stdin_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
         fcntl.fcntl(self.stdout_fd, fcntl.F_SETFL, fcntl.fcntl(self.stdout_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
-        self.r_fds = [self.stdout_fd]
-        self.x_fds = [self.stdin_fd, self.stdout_fd]
+        fcntl.fcntl(self.stderr_fd, fcntl.F_SETFL, fcntl.fcntl(self.stderr_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
+        self.r_fds = [self.stdout_fd, self.stderr_fd]
+        self.x_fds = [self.stdin_fd, self.stdout_fd, self.stderr_fd]
 
         try:
             version = self.call('negotiate', RPC_PROTOCOL_VERSION)
@@ -165,10 +167,28 @@ class RemoteRepository:
     def __repr__(self):
         return '<%s %s>' % (self.__class__.__name__, self.location.canonical_path())
 
-    def umask_flag(self):
-        return ['--umask', '%03o' % self.umask]
+    def borg_cmd(self, args, testing):
+        """return a borg serve command line"""
+        # give some args/options to "borg serve" process as they were given to us
+        opts = []
+        if args is not None:
+            opts.append('--umask=%03o' % args.umask)
+            root_logger = logging.getLogger()
+            if root_logger.isEnabledFor(logging.DEBUG):
+                opts.append('--debug')
+            elif root_logger.isEnabledFor(logging.INFO):
+                opts.append('--info')
+            elif root_logger.isEnabledFor(logging.WARNING):
+                pass  # warning is default
+            else:
+                raise ValueError('log level missing, fix this code')
+        if testing:
+            return [sys.executable, '-m', 'borg.archiver', 'serve' ] + opts + self.extra_test_args
+        else:  # pragma: no cover
+            return [args.remote_path, 'serve'] + opts
 
     def ssh_cmd(self, location):
+        """return a ssh command line that can be prefixed to a borg command line"""
         args = shlex.split(os.environ.get('BORG_RSH', 'ssh'))
         if location.port:
             args += ['-p', str(location.port)]
@@ -176,8 +196,6 @@ class RemoteRepository:
             args.append('%s@%s' % (location.user, location.host))
         else:
             args.append('%s' % location.host)
-        # use local umask also for the remote process
-        args += [self.remote_path, 'serve'] + self.umask_flag()
         return args
 
     def call(self, cmd, *args, **kw):
@@ -228,19 +246,32 @@ class RemoteRepository:
             r, w, x = select.select(self.r_fds, w_fds, self.x_fds, 1)
             if x:
                 raise Exception('FD exception occurred')
-            if r:
-                data = os.read(self.stdout_fd, BUFSIZE)
-                if not data:
-                    raise ConnectionClosed()
-                self.unpacker.feed(data)
-                for unpacked in self.unpacker:
-                    if not (isinstance(unpacked, tuple) and len(unpacked) == 4):
-                        raise Exception("Unexpected RPC data format.")
-                    type, msgid, error, res = unpacked
-                    if msgid in self.ignore_responses:
-                        self.ignore_responses.remove(msgid)
-                    else:
-                        self.responses[msgid] = error, res
+            for fd in r:
+                if fd is self.stdout_fd:
+                    data = os.read(fd, BUFSIZE)
+                    if not data:
+                        raise ConnectionClosed()
+                    self.unpacker.feed(data)
+                    for unpacked in self.unpacker:
+                        if not (isinstance(unpacked, tuple) and len(unpacked) == 4):
+                            raise Exception("Unexpected RPC data format.")
+                        type, msgid, error, res = unpacked
+                        if msgid in self.ignore_responses:
+                            self.ignore_responses.remove(msgid)
+                        else:
+                            self.responses[msgid] = error, res
+                elif fd is self.stderr_fd:
+                    data = os.read(fd, 32768)
+                    if not data:
+                        raise ConnectionClosed()
+                    data = data.decode('utf-8')
+                    for line in data.splitlines(True):  # keepends=True for py3.3+
+                        if line.startswith('$LOG '):
+                            _, level, msg = line.split(' ', 2)
+                            level = getattr(logging, level, logging.CRITICAL)  # str -> int
+                            logging.log(level, msg.rstrip())
+                        else:
+                            sys.stderr.write("Remote: " + line)
             if w:
                 while not self.to_send and (calls or self.preload_ids) and len(waiting_for) < 100:
                     if calls:

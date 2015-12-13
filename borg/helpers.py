@@ -912,7 +912,8 @@ class ProgressIndicatorPercent:
             return self.output(pct)
 
     def output(self, percent):
-        print(self.msg % percent, file=self.file, end='\r' if self.same_line else '\n')
+        print(self.msg % percent, file=self.file, end='\r' if self.same_line else '\n')  # python 3.3 gives us flush=True
+        self.file.flush()
 
     def finish(self):
         if self.same_line:

@@ -363,7 +363,7 @@ class KeyfileKey(KeyfileKeyBase):
         raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
 
     def get_new_target(self, args):
-        filename = args.repository.to_key_filename()
+        filename = args.location.to_key_filename()
         path = filename
         i = 1
         while os.path.exists(path):

@@ -164,11 +164,11 @@ Checklist:
 - update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``
 - check version number of upcoming release in ``CHANGES.rst``
 - verify that ``MANIFEST.in`` and ``setup.py`` are complete
+- ``python setup.py build_api ; python setup.py build_usage``
 - tag the release::
 
     git tag -s -m "tagged/signed release X.Y.Z" X.Y.Z
 
-- build fresh docs and update the web site with them
 - create a release on PyPi::
 
     python setup.py register sdist upload --identity="Thomas Waldmann" --sign

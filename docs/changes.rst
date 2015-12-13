@@ -1,14 +1,18 @@
 Changelog
 =========
 
-Version 0.29.0 (not released yet)
----------------------------------
+Version 0.29.0
+--------------
 
 Compatibility notes:
 
 - when upgrading to 0.29.0 you need to upgrade client as well as server
-  installations due to the locking related changes otherwise you'll get an
-  error msg about a RPC protocol mismatch.
+  installations due to the locking and commandline interface changes otherwise
+  you'll get an error msg about a RPC protocol mismatch or a wrong commandline
+  option.
+  if you run a server that needs to support both old and new clients, it is
+  suggested that you have a "borg-0.28.2" and a "borg-0.29.0" command.
+  clients then can choose via e.g. "borg --remote-path=borg-0.29.0 ...".
 - the default waiting time for a lock changed from infinity to 1 second for a
   better interactive user experience. if the repo you want to access is
   currently locked, borg will now terminate after 1s with an error message.
@@ -19,34 +23,43 @@ Bug fixes:
 
 - hash table tuning (better chosen hashtable load factor 0.75 and prime initial
   size of 1031 gave ~1000x speedup in some scenarios)
-- avoid creation of an orphan lock for one case, see #285
+- avoid creation of an orphan lock for one case, #285
 - --keep-tag-files: fix file mode and multiple tag files in one directory, #432
-- fix format of umask in help pages, #463
+- fixes for "borg upgrade" (attic repo converter), #466
+- remove --progress isatty magic (and also --no-progress option) again, #476
 - borg init: display proper repo URL
+- fix format of umask in help pages, #463
 
 New features:
 
-- implement --lock-wait, support timeout for UpgradableLock, fixes #210
-- implement borg break-lock command, fixes #157
-- include system info below traceback, fixes #324
-- use ISO-8601 date and time format, fixes #375
+- implement --lock-wait, support timeout for UpgradableLock, #210
+- implement borg break-lock command, #157
+- include system info below traceback, #324
+- sane remote logging, remote stderr, #461:
+
+  - remote log output: intercept it and log it via local logging system,
+    with "Remote: " prefixed to message. log remote tracebacks.
+  - remote stderr: output it to local stderr with "Remote: " prefixed.
 - add --debug and --info (same as --verbose) to set the log level of the
-  builtin logging configuration (which otherwise defaults to warning),
-  fixes #426
-  note: there are no messages emitted at DEBUG level currently.
-- configure logging via env var BORG_LOGGING_CONF
-- add a --no-progress flag to forcibly disable progress info
-- add a --filter option for status characters: e.g. to show only the added
+  builtin logging configuration (which otherwise defaults to warning), #426
+  note: there are few messages emitted at DEBUG level currently.
+- optionally configure logging via env var BORG_LOGGING_CONF
+- add --filter option for status characters: e.g. to show only the added
   or modified files (and also errors), use "borg create -v --filter=AME ...".
-- more progress indicators, fixes #394
+- more progress indicators, #394
+- use ISO-8601 date and time format, #375
+- "borg check --prefix" to restrict archive checking to that name prefix, #206
 
 Other changes:
 
-- hashindex_add C implementation (speed up cache resync for new archives)
-- increase rpc protocol version to 2, fixes #458
-- silence borg by default (via log level WARNING)
-- get rid of C compiler warnings, fixes #391
+- hashindex_add C implementation (speed up cache re-sync for new archives)
+- increase FUSE read_size to 1024 (speed up metadata operations)
+- check/delete/prune --save-space: free unused segments quickly, #239
+- increase rpc protocol version to 2 (see also Compatibility notes), #458
+- silence borg by default (via default log level WARNING)
+- get rid of C compiler warnings, #391
 - upgrade OS X FUSE to 3.0.9 on the OS X binary build system
+- use python 3.5.1 to build binaries
 - docs:
 
   - new mailing list borgbackup@python.org, #468
@@ -54,13 +67,14 @@ Other changes:
   - load coverage icons over SSL (avoids mixed content)
   - more precise binary installation steps
   - update release procedure docs about OS X FUSE
-  - FAQ entry about unexpected 'A' status for unchanged file(s), fixes #403
+  - FAQ entry about unexpected 'A' status for unchanged file(s), #403
   - add docs about 'E' file status
-  - add "borg upgrade" docs, fixes #464
+  - add "borg upgrade" docs, #464
   - add developer docs about output and logging
-  - clarify encryption, add note about clientside encryption
+  - clarify encryption, add note about client-side encryption
   - add resources section, with videos, talks, presentations, #149
   - Borg moved to Arch Linux [community]
+  - fix wrong installation instructions for archlinux
 
 
 Version 0.28.2

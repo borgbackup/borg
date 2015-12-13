@@ -2,23 +2,15 @@
 API Documentation
 =================
 
-.. automodule:: borg.key
+.. automodule:: borg.archiver
     :members:
     :undoc-members:
 
-.. automodule:: borg.cache
+.. automodule:: borg.upgrader
     :members:
     :undoc-members:
 
-.. automodule:: borg.locking
-    :members:
-    :undoc-members:
-
-.. automodule:: borg.platform
-    :members:
-    :undoc-members:
-
-.. automodule:: borg.xattr
+.. automodule:: borg.archive
     :members:
     :undoc-members:
 
@@ -26,19 +18,15 @@ API Documentation
     :members:
     :undoc-members:
 
-.. automodule:: borg.logger
+.. automodule:: borg.platform
+    :members:
+    :undoc-members:
+
+.. automodule:: borg.locking
     :members:
     :undoc-members:
 
 .. automodule:: borg.repository
-    :members:
-    :undoc-members:
-
-.. automodule:: borg.archiver
-    :members:
-    :undoc-members:
-
-.. automodule:: borg.archive
     :members:
     :undoc-members:
 
@@ -50,7 +38,7 @@ API Documentation
     :members:
     :undoc-members:
 
-.. automodule:: borg.upgrader
+.. automodule:: borg.xattr
     :members:
     :undoc-members:
 
@@ -58,15 +46,15 @@ API Documentation
     :members:
     :undoc-members:
 
-.. automodule:: borg.platform_freebsd
+.. automodule:: borg.cache
     :members:
     :undoc-members:
 
-.. automodule:: borg.hashindex
+.. automodule:: borg.key
     :members:
     :undoc-members:
 
-.. automodule:: borg.chunker
+.. automodule:: borg.logger
     :members:
     :undoc-members:
 
@@ -78,10 +66,22 @@ API Documentation
     :members:
     :undoc-members:
 
+.. automodule:: borg.hashindex
+    :members:
+    :undoc-members:
+
 .. automodule:: borg.compress
     :members:
     :undoc-members:
 
+.. automodule:: borg.chunker
+    :members:
+    :undoc-members:
+
 .. automodule:: borg.crypto
+    :members:
+    :undoc-members:
+
+.. automodule:: borg.platform_freebsd
     :members:
     :undoc-members:

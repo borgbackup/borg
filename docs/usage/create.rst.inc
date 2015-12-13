@@ -35,11 +35,10 @@ borg create
       --umask M             set umask to M (local and remote, default: 0077)
       --remote-path PATH    set remote path to executable (default: "borg")
       -s, --stats           print statistics for the created archive
-      -p, --progress, --no-progress
-                            toggle progress display while creating the archive,
+      -p, --progress        show progress display while creating the archive,
                             showing Original, Compressed and Deduplicated sizes,
                             followed by the Number of files seen and the path
-                            being processed, default: True
+                            being processed, default: False
       --filter STATUSCHARS  only display items with the given status characters
       -e PATTERN, --exclude PATTERN
                             exclude paths matching PATTERN

@@ -8,6 +8,7 @@ borg prune
                       [--no-files-cache] [--umask M] [--remote-path PATH] [-n]
                       [-s] [--keep-within WITHIN] [-H HOURLY] [-d DAILY]
                       [-w WEEKLY] [-m MONTHLY] [-y YEARLY] [-p PREFIX]
+                      [--save-space]
                       [REPOSITORY]
     
     Prune repository archives according to specified rules
@@ -42,6 +43,7 @@ borg prune
                             number of yearly archives to keep
       -p PREFIX, --prefix PREFIX
                             only consider archive names starting with this prefix
+      --save-space          work slower, but using less space
     
 Description
 ~~~~~~~~~~~

@@ -661,9 +661,9 @@ class ArchiveChecker:
         self.error_found = False
         self.possibly_superseded = set()
 
-    def check(self, repository, repair=False, archive=None, last=None, save_space=False):
+    def check(self, repository, repair=False, archive=None, last=None, prefix=None, save_space=False):
         logger.info('Starting archive consistency check...')
-        self.check_all = archive is None and last is None
+        self.check_all = archive is None and last is None and prefix is None
         self.repair = repair
         self.repository = repository
         self.init_chunks()
@@ -674,7 +674,7 @@ class ArchiveChecker:
             self.manifest = self.rebuild_manifest()
         else:
             self.manifest, _ = Manifest.load(repository, key=self.key)
-        self.rebuild_refcounts(archive=archive, last=last)
+        self.rebuild_refcounts(archive=archive, last=last, prefix=prefix)
         self.orphan_chunks_check()
         self.finish(save_space=save_space)
         if self.error_found:
@@ -730,7 +730,7 @@ class ArchiveChecker:
         logger.info('Manifest rebuild complete.')
         return manifest
 
-    def rebuild_refcounts(self, archive=None, last=None):
+    def rebuild_refcounts(self, archive=None, last=None, prefix=None):
         """Rebuild object reference counts by walking the metadata
 
         Missing and/or incorrect data is repaired when detected
@@ -830,7 +830,9 @@ class ArchiveChecker:
             # we need last N or all archives
             archive_items = sorted(self.manifest.archives.items(), reverse=True,
                                    key=lambda name_info: name_info[1][b'time'])
-            num_archives = len(self.manifest.archives)
+            if prefix is not None:
+                archive_items = [item for item in archive_items if item[0].startswith(prefix)]
+            num_archives = len(archive_items)
             end = None if last is None else min(num_archives, last)
         else:
             # we only want one specific archive

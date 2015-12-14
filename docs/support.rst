@@ -26,12 +26,10 @@ Stay connected.
 Mailing list
 ------------
 
-New Mailing List:
-
-`borgbackup@python.org <https://mail.python.org/mailman/listinfo/borgbackup>`_
-
-Just read that page to find out about the mailing list, its topic, how to subscribe,
-how to unsubscribe and where you can find the archives of the list.
+To find out about the mailing list, its topic, how to subscribe, how to
+unsubscribe and where you can find the archives of the list, see the
+`mailing list homepage
+<https://mail.python.org/mailman/listinfo/borgbackup>`_.
 
 Bounties and Fundraisers
 ------------------------

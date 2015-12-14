@@ -292,7 +292,7 @@ Number of files: {0.stats.nfiles}'''.format(self)
             else:
                 os.unlink(path)
         except UnicodeEncodeError:
-            raise self.IncompatibleFilesystemEncodingError(path, sys.getfilesystemencoding())
+            raise self.IncompatibleFilesystemEncodingError(path, sys.getfilesystemencoding()) from None
         except OSError:
             pass
         mode = item[b'mode']
@@ -332,7 +332,7 @@ Number of files: {0.stats.nfiles}'''.format(self)
             try:
                 os.symlink(source, path)
             except UnicodeEncodeError:
-                raise self.IncompatibleFilesystemEncodingError(source, sys.getfilesystemencoding())
+                raise self.IncompatibleFilesystemEncodingError(source, sys.getfilesystemencoding()) from None
             self.restore_attrs(path, item, symlink=True)
         elif stat.S_ISFIFO(mode):
             if not os.path.exists(os.path.dirname(path)):

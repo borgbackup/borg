@@ -159,7 +159,7 @@ class RemoteRepository:
         try:
             version = self.call('negotiate', RPC_PROTOCOL_VERSION)
         except ConnectionClosed:
-            raise ConnectionClosedWithHint('Is borg working on the server?')
+            raise ConnectionClosedWithHint('Is borg working on the server?') from None
         if version != RPC_PROTOCOL_VERSION:
             raise Exception('Server insisted on using unsupported protocol version %d' % version)
         self.id = self.call('open', location.path, create, lock_wait, lock)

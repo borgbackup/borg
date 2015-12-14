@@ -144,4 +144,4 @@ class FakeInputs:
         try:
             return self.inputs.pop(0)
         except IndexError:
-            raise EOFError
+            raise EOFError from None

@@ -417,7 +417,7 @@ class Repository:
             segment, offset = self.index[id_]
             return self.io.read(segment, offset, id_)
         except KeyError:
-            raise self.ObjectNotFound(id_, self.path)
+            raise self.ObjectNotFound(id_, self.path) from None
 
     def get_many(self, ids, is_preloaded=False):
         for id_ in ids:
@@ -446,7 +446,7 @@ class Repository:
         try:
             segment, offset = self.index.pop(id)
         except KeyError:
-            raise self.ObjectNotFound(id, self.path)
+            raise self.ObjectNotFound(id, self.path) from None
         self.segments[segment] -= 1
         self.compact.add(segment)
         segment = self.io.write_delete(id)
@@ -628,7 +628,7 @@ class LoggedIO:
             hdr_tuple = fmt.unpack(header)
         except struct.error as err:
             raise IntegrityError('Invalid segment entry header [segment {}, offset {}]: {}'.format(
-                segment, offset, err))
+                segment, offset, err)) from None
         if fmt is self.put_header_fmt:
             crc, size, tag, key = hdr_tuple
         elif fmt is self.header_fmt:

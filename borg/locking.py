@@ -138,7 +138,7 @@ class ExclusiveLock:
                 if timer.timed_out_or_sleep():
                     raise LockTimeout(self.path)
             except OSError as err:
-                raise LockFailed(self.path, str(err))
+                raise LockFailed(self.path, str(err)) from None
             else:
                 with open(self.unique_name, "wb"):
                     pass

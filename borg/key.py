@@ -390,7 +390,7 @@ class RepoKey(KeyfileKeyBase):
             self.repository.load_key()
             return loc
         except configparser.NoOptionError:
-            raise RepoKeyNotFoundError(loc)
+            raise RepoKeyNotFoundError(loc) from None
 
     def get_new_target(self, args):
         return self.repository

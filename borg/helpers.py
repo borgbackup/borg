@@ -777,7 +777,7 @@ def location_validator(archive=None):
         try:
             loc = Location(text)
         except ValueError:
-            raise argparse.ArgumentTypeError('Invalid location format: "%s"' % text)
+            raise argparse.ArgumentTypeError('Invalid location format: "%s"' % text) from None
         if archive is True and not loc.archive:
             raise argparse.ArgumentTypeError('"%s": No archive specified' % text)
         elif archive is False and loc.archive:

@@ -70,9 +70,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
 try:
     exec_cmd('help', exe='borg.exe', fork=True)
     BORG_EXES = ['python', 'binary', ]
-except (IOError, OSError) as err:
-    if err.errno != errno.ENOENT:
-        raise
+except FileNotFoundError:
     BORG_EXES = ['python', ]
 
 

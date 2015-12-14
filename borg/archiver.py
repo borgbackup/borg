@@ -137,14 +137,14 @@ class Archiver:
             try:
                 st = os.stat(get_cache_dir())
                 skip_inodes.add((st.st_ino, st.st_dev))
-            except IOError:
+            except OSError:
                 pass
             # Add local repository dir to inode_skip list
             if not args.location.host:
                 try:
                     st = os.stat(args.location.path)
                     skip_inodes.add((st.st_ino, st.st_dev))
-                except IOError:
+                except OSError:
                     pass
             for path in args.paths:
                 if path == '-':  # stdin
@@ -152,7 +152,7 @@ class Archiver:
                     if not dry_run:
                         try:
                             status = archive.process_stdin(path, cache)
-                        except IOError as e:
+                        except OSError as e:
                             status = 'E'
                             self.print_warning('%s: %s', path, e)
                     else:
@@ -229,7 +229,7 @@ class Archiver:
             if not dry_run:
                 try:
                     status = archive.process_file(path, st, cache)
-                except IOError as e:
+                except OSError as e:
                     status = 'E'
                     self.print_warning('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
@@ -326,7 +326,7 @@ class Archiver:
                         archive.extract_item(item, restore_attrs=False)
                     else:
                         archive.extract_item(item, stdout=stdout, sparse=sparse)
-            except IOError as e:
+            except OSError as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 
         if not args.dry_run:

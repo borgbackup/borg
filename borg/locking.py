@@ -132,14 +132,13 @@ class ExclusiveLock:
         while True:
             try:
                 os.mkdir(self.path)
+            except FileExistsError:  # already locked
+                if self.by_me():
+                    return self
+                if timer.timed_out_or_sleep():
+                    raise LockTimeout(self.path)
             except OSError as err:
-                if err.errno == errno.EEXIST:  # already locked
-                    if self.by_me():
-                        return self
-                    if timer.timed_out_or_sleep():
-                        raise LockTimeout(self.path)
-                else:
-                    raise LockFailed(self.path, str(err))
+                raise LockFailed(self.path, str(err))
             else:
                 with open(self.unique_name, "wb"):
                     pass
@@ -181,12 +180,8 @@ class LockRoster:
         try:
             with open(self.path) as f:
                 data = json.load(f)
-        except IOError as err:
-            if err.errno != errno.ENOENT:
-                raise
-            data = {}
-        except ValueError:
-            # corrupt/empty roster file?
+        except (FileNotFoundError, ValueError):
+            # no or corrupt/empty roster file?
             data = {}
         return data
 
@@ -197,9 +192,8 @@ class LockRoster:
     def remove(self):
         try:
             os.unlink(self.path)
-        except OSError as e:
-            if e.errno != errno.ENOENT:
-                raise
+        except FileNotFoundError:
+            pass
 
     def get(self, key):
         roster = self.load()

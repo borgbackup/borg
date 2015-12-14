@@ -567,7 +567,7 @@ class LoggedIO:
             del self.fds[segment]
         try:
             os.unlink(self.segment_filename(segment))
-        except OSError:
+        except FileNotFoundError:
             pass
 
     def segment_exists(self, segment):

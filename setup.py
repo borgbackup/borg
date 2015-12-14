@@ -7,7 +7,7 @@ from glob import glob
 from distutils.command.build import build
 from distutils.core import Command
 
-min_python = (3, 2)
+min_python = (3, 4)
 my_python = sys.version_info
 
 if my_python < min_python:
@@ -242,8 +242,6 @@ setup(
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.2',
-        'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Topic :: Security :: Cryptography',

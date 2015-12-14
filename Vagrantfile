@@ -161,7 +161,6 @@ end
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
-    pyenv install 3.3.0  # tests
     pyenv install 3.4.0  # tests
     pyenv install 3.5.0  # tests
     pyenv install 3.5.1  # binary build, use latest 3.5.x release
@@ -251,7 +250,7 @@ def run_tests(boxname)
     . ../borg-env/bin/activate
     if which pyenv > /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.3.0 3.4.0 3.5.0
+      pyenv global 3.4.0 3.5.0
     fi
     # otherwise: just use the system python
     if which fakeroot > /dev/null; then

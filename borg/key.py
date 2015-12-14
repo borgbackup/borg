@@ -263,7 +263,7 @@ class KeyfileKeyBase(AESKeyBase):
         raise NotImplementedError
 
     def _load(self, key_data, passphrase):
-        cdata = a2b_base64(key_data.encode('ascii'))  # .encode needed for Python 3.[0-2]
+        cdata = a2b_base64(key_data)
         data = self.decrypt_key_file(cdata, passphrase)
         if data:
             key = msgpack.unpackb(data)

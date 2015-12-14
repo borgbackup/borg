@@ -210,8 +210,7 @@ class Statistics:
                 msg += "{0:<{space}}".format(path, space=space)
             else:
                 msg = ' ' * columns
-            print(msg, file=stream or sys.stderr, end="\r")
-            (stream or sys.stderr).flush()
+            print(msg, file=stream or sys.stderr, end="\r", flush=True)
 
 
 def get_keys_dir():
@@ -934,8 +933,7 @@ def yes(msg=None, retry_msg=None, false_msg=None, true_msg=None,
             # no retries wanted, we just return the default
             return default
         if retry_msg:
-            print(retry_msg, file=ofile, end='')
-            ofile.flush()
+            print(retry_msg, file=ofile, end='', flush=True)
 
 
 class ProgressIndicatorPercent:
@@ -973,8 +971,7 @@ class ProgressIndicatorPercent:
             return self.output(pct)
 
     def output(self, percent):
-        print(self.msg % percent, file=self.file, end='\r' if self.same_line else '\n')  # python 3.3 gives us flush=True
-        self.file.flush()
+        print(self.msg % percent, file=self.file, end='\r' if self.same_line else '\n', flush=True)
 
     def finish(self):
         if self.same_line:
@@ -1008,8 +1005,7 @@ class ProgressIndicatorEndless:
             return self.output(self.triggered)
 
     def output(self, triggered):
-        print('.', end='', file=self.file)  # python 3.3 gives us flush=True
-        self.file.flush()
+        print('.', end='', file=self.file, flush=True)
 
     def finish(self):
         print(file=self.file)

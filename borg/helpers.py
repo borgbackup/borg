@@ -6,12 +6,7 @@ import grp
 import os
 import pwd
 import re
-try:
-    from shutil import get_terminal_size
-except ImportError:
-    def get_terminal_size(fallback=(80, 24)):
-        TerminalSize = namedtuple('TerminalSize', ['columns', 'lines'])
-        return TerminalSize(int(os.environ.get('COLUMNS', fallback[0])), int(os.environ.get('LINES', fallback[1])))
+from shutil import get_terminal_size
 import sys
 import platform
 import time

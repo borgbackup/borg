@@ -231,9 +231,6 @@ elif sys.platform.startswith('freebsd'):  # pragma: freebsd only
         mv = memoryview(namebuf.raw)
         while mv:
             length = mv[0]
-            # Python < 3.3 returns bytes instead of int
-            if isinstance(length, bytes):
-                length = ord(length)
             names.append(os.fsdecode(bytes(mv[1:1+length])))
             mv = mv[1+length:]
         return names

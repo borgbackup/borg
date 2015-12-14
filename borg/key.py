@@ -4,7 +4,7 @@ import getpass
 import os
 import sys
 import textwrap
-import hmac
+from hmac import HMAC
 from hashlib import sha256
 
 from .helpers import IntegrityError, get_keys_dir, Error
@@ -28,13 +28,6 @@ class KeyfileNotFoundError(Error):
 
 class RepoKeyNotFoundError(Error):
     """No key entry found in the config of repository {}."""
-
-
-class HMAC(hmac.HMAC):
-    """Workaround a bug in Python < 3.4 Where HMAC does not accept memoryviews
-    """
-    def update(self, msg):
-        self.inner.update(msg)
 
 
 def key_creator(repository, args):

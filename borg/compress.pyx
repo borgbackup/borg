@@ -110,7 +110,7 @@ cdef class LZ4(CompressorBase):
 
 class LZMA(CompressorBase):
     """
-    lzma compression / decompression (python 3.3+ stdlib)
+    lzma compression / decompression
     """
     ID = b'\x02\x00'
     name = 'lzma'

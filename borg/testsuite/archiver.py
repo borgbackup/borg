@@ -11,9 +11,9 @@ import shutil
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 from hashlib import sha256
 
-from mock import patch
 import pytest
 
 from .. import xattr

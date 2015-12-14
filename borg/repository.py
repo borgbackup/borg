@@ -1,5 +1,5 @@
 from configparser import ConfigParser
-from binascii import hexlify
+from binascii import hexlify, unhexlify
 from itertools import islice
 import errno
 import logging
@@ -11,7 +11,7 @@ import struct
 from zlib import crc32
 
 import msgpack
-from .helpers import Error, ErrorWithTraceback, IntegrityError, unhexlify, ProgressIndicatorPercent
+from .helpers import Error, ErrorWithTraceback, IntegrityError, ProgressIndicatorPercent
 from .hashindex import NSIndex
 from .locking import UpgradableLock, LockError, LockErrorT
 from .lrucache import LRUCache

@@ -18,7 +18,7 @@ from io import BytesIO
 from . import xattr
 from .helpers import parse_timestamp, Error, uid2user, user2uid, gid2group, group2gid, format_timedelta, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
-    st_atime_ns, st_ctime_ns, st_mtime_ns, ProgressIndicatorPercent
+    ProgressIndicatorPercent
 from .platform import acl_get, acl_set
 from .chunker import Chunker
 from .hashindex import ChunkIndex
@@ -39,7 +39,6 @@ ITEMS_CHUNKER_PARAMS = (12, 16, 14, HASH_WINDOW_SIZE)
 
 utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
 utime_supports_follow_symlinks = os.utime in getattr(os, 'supports_follow_symlinks', {})
-has_mtime_ns = sys.version >= '3.3'
 has_lchmod = hasattr(os, 'lchmod')
 has_lchflags = hasattr(os, 'lchflags')
 
@@ -435,9 +434,9 @@ Number of files: {0.stats.nfiles}'''.format(self)
             b'mode': st.st_mode,
             b'uid': st.st_uid, b'user': uid2user(st.st_uid),
             b'gid': st.st_gid, b'group': gid2group(st.st_gid),
-            b'atime': int_to_bigint(st_atime_ns(st)),
-            b'ctime': int_to_bigint(st_ctime_ns(st)),
-            b'mtime': int_to_bigint(st_mtime_ns(st)),
+            b'atime': int_to_bigint(st.st_atime_ns),
+            b'ctime': int_to_bigint(st.st_ctime_ns),
+            b'mtime': int_to_bigint(st.st_mtime_ns),
         }
         if self.numeric_owner:
             item[b'user'] = item[b'group'] = None

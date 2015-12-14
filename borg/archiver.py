@@ -1,4 +1,4 @@
-from binascii import hexlify
+from binascii import hexlify, unhexlify
 from datetime import datetime
 from hashlib import sha256
 from operator import attrgetter
@@ -16,7 +16,7 @@ import traceback
 from . import __version__
 from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
-    get_cache_dir, get_keys_dir, prune_within, prune_split, unhexlify, \
+    get_cache_dir, get_keys_dir, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher

@@ -21,7 +21,7 @@ from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP
 from ..archiver import Archiver
 from ..cache import Cache
 from ..crypto import bytes_to_long, num_aes_blocks
-from ..helpers import Manifest, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, st_atime_ns, st_mtime_ns
+from ..helpers import Manifest, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import BaseTestCase, changedir, environment_variable
@@ -358,12 +358,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
         sti = os.stat('input/file1')
         sto = os.stat('output/input/file1')
-        assert st_mtime_ns(sti) == st_mtime_ns(sto) == mtime * 1e9
+        assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
         if hasattr(os, 'O_NOATIME'):
-            assert st_atime_ns(sti) == st_atime_ns(sto) == atime * 1e9
+            assert sti.st_atime_ns == sto.st_atime_ns == atime * 1e9
         else:
             # it touched the input file's atime while backing it up
-            assert st_atime_ns(sto) == atime * 1e9
+            assert sto.st_atime_ns == atime * 1e9
 
     def _extract_repository_id(self, path):
         return Repository(self.repository_path).id

@@ -835,35 +835,6 @@ class StableDict(dict):
         return sorted(super().items())
 
 
-if sys.version < '3.3':
-    # st_xtime_ns attributes only available in 3.3+
-    def st_atime_ns(st):
-        return int(st.st_atime * 1e9)
-
-    def st_ctime_ns(st):
-        return int(st.st_ctime * 1e9)
-
-    def st_mtime_ns(st):
-        return int(st.st_mtime * 1e9)
-
-    # unhexlify in < 3.3 incorrectly only accepts bytes input
-    def unhexlify(data):
-        if isinstance(data, str):
-            data = data.encode('ascii')
-        return binascii.unhexlify(data)
-else:
-    def st_atime_ns(st):
-        return st.st_atime_ns
-
-    def st_ctime_ns(st):
-        return st.st_ctime_ns
-
-    def st_mtime_ns(st):
-        return st.st_mtime_ns
-
-    unhexlify = binascii.unhexlify
-
-
 def bigint_to_int(mtime):
     """Convert bytearray to int
     """

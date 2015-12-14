@@ -37,8 +37,6 @@ CHUNKER_PARAMS = (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE
 # chunker params for the items metadata stream, finer granularity
 ITEMS_CHUNKER_PARAMS = (12, 16, 14, HASH_WINDOW_SIZE)
 
-utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
-utime_supports_follow_symlinks = os.utime in getattr(os, 'supports_follow_symlinks', {})
 has_lchmod = hasattr(os, 'lchmod')
 has_lchflags = hasattr(os, 'lchflags')
 
@@ -385,12 +383,10 @@ Number of files: {0.stats.nfiles}'''.format(self)
         else:
             # old archives only had mtime in item metadata
             atime = mtime
-        if fd and utime_supports_fd:  # Python >= 3.3
+        if fd:
             os.utime(fd, None, ns=(atime, mtime))
-        elif utime_supports_follow_symlinks:  # Python >= 3.3
+        else:
             os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
-        elif not symlink:
-            os.utime(path, (atime / 1e9, mtime / 1e9))
         acl_set(path, item, self.numeric_owner)
         # Only available on OS X and FreeBSD
         if has_lchflags and b'bsdflags' in item:

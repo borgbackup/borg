@@ -1,10 +1,8 @@
-from .support import argparse  # see support/__init__.py docstring
-                               # DEPRECATED - remove after requiring py 3.4
-
 from binascii import hexlify
 from datetime import datetime
 from hashlib import sha256
 from operator import attrgetter
+import argparse
 import functools
 import inspect
 import io

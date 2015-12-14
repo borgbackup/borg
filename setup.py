@@ -247,7 +247,7 @@ setup(
         'Topic :: Security :: Cryptography',
         'Topic :: System :: Archiving :: Backup',
     ],
-    packages=['borg', 'borg.testsuite', 'borg.support', ],
+    packages=['borg', 'borg.testsuite', ],
     entry_points={
         'console_scripts': [
             'borg = borg.archiver:main',

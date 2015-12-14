@@ -36,12 +36,6 @@ has_lchflags = hasattr(os, 'lchflags')
 
 src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__), '..')
 
-# Python <= 3.2 raises OSError instead of PermissionError (See #164)
-try:
-    PermissionError = PermissionError
-except NameError:
-    PermissionError = OSError
-
 
 def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
     if fork:

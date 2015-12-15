@@ -34,7 +34,7 @@ except ImportError:
 
 has_lchflags = hasattr(os, 'lchflags')
 
-src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__), '..')
+src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 
 def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):

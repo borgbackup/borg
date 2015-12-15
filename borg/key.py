@@ -4,7 +4,7 @@ import getpass
 import os
 import sys
 import textwrap
-from hmac import HMAC
+from hmac import HMAC, compare_digest
 from hashlib import sha256
 
 from .helpers import IntegrityError, get_keys_dir, Error
@@ -134,13 +134,17 @@ class AESKeyBase(KeyBase):
     def decrypt(self, id, data):
         if data[0] != self.TYPE:
             raise IntegrityError('Invalid encryption envelope')
-        hmac = memoryview(data)[1:33]
-        if memoryview(HMAC(self.enc_hmac_key, memoryview(data)[33:], sha256).digest()) != hmac:
+        hmac_given = memoryview(data)[1:33]
+        hmac_computed = memoryview(HMAC(self.enc_hmac_key, memoryview(data)[33:], sha256).digest())
+        if not compare_digest(hmac_computed, hmac_given):
             raise IntegrityError('Encryption envelope checksum mismatch')
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
         data = self.compressor.decompress(self.dec_cipher.decrypt(data[41:]))
-        if id and HMAC(self.id_key, data, sha256).digest() != id:
-            raise IntegrityError('Chunk id verification failed')
+        if id:
+            hmac_given = id
+            hmac_computed = HMAC(self.id_key, data, sha256).digest()
+            if not compare_digest(hmac_computed, hmac_given):
+                raise IntegrityError('Chunk id verification failed')
         return data
 
     def extract_nonce(self, payload):

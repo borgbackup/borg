@@ -489,6 +489,79 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file3'])
 
+    def test_extract_include_exclude_regex(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('file1', size=1024 * 80)
+        self.create_regular_file('file2', size=1024 * 80)
+        self.create_regular_file('file3', size=1024 * 80)
+        self.create_regular_file('file4', size=1024 * 80)
+        self.create_regular_file('file333', size=1024 * 80)
+
+        # Create with regular expression exclusion for file4
+        self.cmd('create', '--exclude=re:input/file4$', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2', 'file3', 'file333'])
+        shutil.rmtree('output/input')
+
+        # Extract with regular expression exclusion
+        with changedir('output'):
+            self.cmd('extract', '--exclude=re:file3+', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2'])
+        shutil.rmtree('output/input')
+
+        # Combine --exclude with fnmatch and regular expression
+        with changedir('output'):
+            self.cmd('extract', '--exclude=input/file2', '--exclude=re:file[01]', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file3', 'file333'])
+        shutil.rmtree('output/input')
+
+        # Combine --exclude-from and regular expression exclusion
+        with changedir('output'):
+            self.cmd('extract', '--exclude-from=' + self.exclude_file_path, '--exclude=re:file1',
+                     '--exclude=re:file(\\d)\\1\\1$', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file3'])
+
+    def test_extract_include_exclude_regex_from_file(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('file1', size=1024 * 80)
+        self.create_regular_file('file2', size=1024 * 80)
+        self.create_regular_file('file3', size=1024 * 80)
+        self.create_regular_file('file4', size=1024 * 80)
+        self.create_regular_file('file333', size=1024 * 80)
+        self.create_regular_file('aa:something', size=1024 * 80)
+
+        # Create while excluding using mixed pattern styles
+        with open(self.exclude_file_path, 'wb') as fd:
+            fd.write(b're:input/file4$\n')
+            fd.write(b'fm:*aa:*thing\n')
+
+        self.cmd('create', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2', 'file3', 'file333'])
+        shutil.rmtree('output/input')
+
+        # Exclude using regular expression
+        with open(self.exclude_file_path, 'wb') as fd:
+            fd.write(b're:file3+\n')
+
+        with changedir('output'):
+            self.cmd('extract', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2'])
+        shutil.rmtree('output/input')
+
+        # Mixed exclude pattern styles
+        with open(self.exclude_file_path, 'wb') as fd:
+            fd.write(b're:file(\\d)\\1\\1$\n')
+            fd.write(b'fm:nothingwillmatchthis\n')
+            fd.write(b'*/file1\n')
+            fd.write(b're:file2$\n')
+
+        with changedir('output'):
+            self.cmd('extract', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file3'])
+
     def test_exclude_caches(self):
         self.cmd('init', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)

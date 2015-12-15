@@ -240,7 +240,7 @@ def load_excludes(fh):
     whitespace is not stripped.
     """
     patterns = (line.rstrip('\r\n') for line in fh if not line.startswith('#'))
-    return [ExcludePattern(pattern) for pattern in patterns if pattern]
+    return [parse_pattern(pattern) for pattern in patterns if pattern]
 
 
 def update_excludes(args):
@@ -266,7 +266,7 @@ def exclude_path(path, patterns):
     """
     for pattern in (patterns or []):
         if pattern.match(path):
-            return isinstance(pattern, ExcludePattern)
+            return isinstance(pattern, (ExcludePattern, ExcludeRegex))
     return False
 
 
@@ -360,6 +360,44 @@ class ExcludePattern(PatternBase):
 
     def _match(self, path):
         return (self.regex.match(path + os.path.sep) is not None)
+
+
+class ExcludeRegex(PatternBase):
+    """Regular expression to exclude.
+    """
+    def _prepare(self, pattern):
+        self.pattern = pattern
+        self.regex = re.compile(pattern)
+
+    def _match(self, path):
+        # Normalize path separators
+        if os.path.sep != '/':
+            path = path.replace(os.path.sep, '/')
+
+        return (self.regex.search(path) is not None)
+
+
+_DEFAULT_PATTERN_STYLE = "fm"
+_PATTERN_STYLES = {
+        "fm": ExcludePattern,
+        "re": ExcludeRegex,
+        }
+
+
+def parse_pattern(pattern):
+    """Read pattern from string and return an instance of the appropriate implementation class.
+    """
+    if len(pattern) > 2 and pattern[2] == ":" and pattern[:2].isalnum():
+        (style, pattern) = (pattern[:2], pattern[3:])
+    else:
+        style = _DEFAULT_PATTERN_STYLE
+
+    cls = _PATTERN_STYLES.get(style, None)
+
+    if cls is None:
+        raise ValueError("Unknown pattern style: {}".format(style))
+
+    return cls(pattern)
 
 
 def timestamp(s):

@@ -438,7 +438,7 @@ class Archiver:
                             pass
                     try:
                         mtime = datetime.fromtimestamp(bigint_to_int(item[b'mtime']) / 1e9)
-                    except ValueError:
+                    except OverflowError:
                         # likely a broken mtime and datetime did not want to go beyond year 9999
                         mtime = datetime(9999, 12, 31, 23, 59, 59)
                     if b'source' in item:

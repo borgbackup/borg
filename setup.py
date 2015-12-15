@@ -211,7 +211,7 @@ if not on_rtd:
     Extension('borg.chunker', [chunker_source]),
     Extension('borg.hashindex', [hashindex_source])
 ]
-    if sys.platform.startswith('linux'):
+    if sys.platform == 'linux':
         ext_modules.append(Extension('borg.platform_linux', [platform_linux_source], libraries=['acl']))
     elif sys.platform.startswith('freebsd'):
         ext_modules.append(Extension('borg.platform_freebsd', [platform_freebsd_source]))

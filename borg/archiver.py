@@ -15,7 +15,7 @@ import traceback
 
 from . import __version__
 from .helpers import Error, location_validator, format_time, format_file_size, \
-    format_file_mode, parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
+    parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
@@ -426,10 +426,9 @@ class Archiver:
                 for item in archive.iter_items():
                     print(remove_surrogates(item[b'path']))
             else:
-                tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 0o10: '-', 0o12: 'l', 0o14: 's'}
                 for item in archive.iter_items():
-                    type = tmap.get(item[b'mode'] // 4096, '?')
-                    mode = format_file_mode(item[b'mode'])
+                    mode = stat.filemode(item[b'mode'])
+                    type = mode[0]
                     size = 0
                     if type == '-':
                         try:
@@ -445,12 +444,12 @@ class Archiver:
                         if type == 'l':
                             extra = ' -> %s' % item[b'source']
                         else:
-                            type = 'h'
+                            mode = 'h' + mode[1:]
                             extra = ' link to %s' % item[b'source']
                     else:
                         extra = ''
-                    print('%s%s %-6s %-6s %8d %s %s%s' % (
-                        type, mode, item[b'user'] or item[b'uid'],
+                    print('%s %-6s %-6s %8d %s %s%s' % (
+                        mode, item[b'user'] or item[b'uid'],
                         item[b'group'] or item[b'gid'], size, format_time(mtime),
                         remove_surrogates(item[b'path']), extra))
         else:

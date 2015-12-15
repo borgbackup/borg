@@ -558,15 +558,6 @@ def format_timedelta(td):
     return txt
 
 
-def format_file_mode(mod):
-    """Format file mode bits for list output
-    """
-    def x(v):
-        return ''.join(v & m and s or '-'
-                       for m, s in ((4, 'r'), (2, 'w'), (1, 'x')))
-    return '%s%s%s' % (x(mod // 64), x(mod // 8), x(mod))
-
-
 def format_file_size(v, precision=2):
     """Format file size into a human friendly format
     """

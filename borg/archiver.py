@@ -18,7 +18,7 @@ import traceback
 from . import __version__
 from .helpers import Error, location_validator, format_time, format_file_size, \
     format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
-    get_cache_dir, get_keys_dir, prune_within, prune_split, unhexlify, \
+    get_cache_dir, get_keys_dir, prune_within, prune_split, unhexlify, ExcludeRegex, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
@@ -817,6 +817,9 @@ class Archiver:
         subparser.add_argument('--exclude-from', dest='exclude_files',
                                type=argparse.FileType('r'), action='append',
                                metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
+        subparser.add_argument('--exclude-regex', dest='excludes',
+                               type=ExcludeRegex, action='append',
+                               metavar="REGEX", help='exclude paths matching regular expression')
         subparser.add_argument('--exclude-caches', dest='exclude_caches',
                                action='store_true', default=False,
                                help='exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)')
@@ -887,6 +890,9 @@ class Archiver:
         subparser.add_argument('--exclude-from', dest='exclude_files',
                                type=argparse.FileType('r'), action='append',
                                metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
+        subparser.add_argument('--exclude-regex', dest='excludes',
+                               type=ExcludeRegex, action='append',
+                               metavar="REGEX", help='exclude paths matching regular expression')
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,
                                help='only obey numeric user and group identifiers')

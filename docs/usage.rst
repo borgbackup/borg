@@ -229,6 +229,10 @@ Examples
         ~/src                             \
         --exclude '*.pyc'
 
+    # Backup home directories excluding directories containing image thumbnails
+    $ borg create /mnt/backup::my-files /home \
+        --exclude-regex '^/home/[^/]/\.thumbnails/'
+
     # Backup the root filesystem into an archive named "root-YYYY-MM-DD"
     # use zlib compression (good, but slow) - default is no compression
     NAME="root-`date +%Y-%m-%d`"

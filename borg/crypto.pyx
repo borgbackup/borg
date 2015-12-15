@@ -1,7 +1,6 @@
 """A thin OpenSSL wrapper
 
-This could be replaced by PyCrypto or something similar when the performance
-of their PBKDF2 implementation is comparable to the OpenSSL version.
+This could be replaced by PyCrypto maybe?
 """
 from libc.stdlib cimport malloc, free
 
@@ -21,7 +20,6 @@ cdef extern from "openssl/evp.h":
         pass
     ctypedef struct ENGINE:
         pass
-    const EVP_MD *EVP_sha256()
     const EVP_CIPHER *EVP_aes_256_ctr()
     void EVP_CIPHER_CTX_init(EVP_CIPHER_CTX *a)
     void EVP_CIPHER_CTX_cleanup(EVP_CIPHER_CTX *a)
@@ -37,10 +35,6 @@ cdef extern from "openssl/evp.h":
     int EVP_EncryptFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
     int EVP_DecryptFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
 
-    int PKCS5_PBKDF2_HMAC(const char *password, int passwordlen,
-                          const unsigned char *salt, int saltlen, int iter,
-                          const EVP_MD *digest,
-                          int keylen, unsigned char *out)
 
 import struct
 
@@ -57,21 +51,6 @@ def num_aes_blocks(int length):
        Note: this is only correct for modes without padding, like AES-CTR.
     """
     return (length + 15) // 16
-
-
-def pbkdf2_sha256(password, salt, iterations, size):
-    """Password based key derivation function 2 (RFC2898)
-    """
-    cdef unsigned char *key = <unsigned char *>malloc(size)
-    if not key:
-        raise MemoryError
-    try:
-        rv = PKCS5_PBKDF2_HMAC(password, len(password), salt, len(salt), iterations, EVP_sha256(), size, key)
-        if not rv:
-            raise Exception('PKCS5_PBKDF2_HMAC failed')
-        return key[:size]
-    finally:
-        free(key)
 
 
 def get_random_bytes(n):

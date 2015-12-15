@@ -5,13 +5,13 @@ import os
 import sys
 import textwrap
 from hmac import HMAC, compare_digest
-from hashlib import sha256
+from hashlib import sha256, pbkdf2_hmac
 
 from .helpers import IntegrityError, get_keys_dir, Error
 from .logger import create_logger
 logger = create_logger()
 
-from .crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
+from .crypto import get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
 from .compress import Compressor, COMPR_BUFFER
 import msgpack
 
@@ -199,7 +199,7 @@ class Passphrase(str):
         return '<Passphrase "***hidden***">'
 
     def kdf(self, salt, iterations, length):
-        return pbkdf2_sha256(self.encode('utf-8'), salt, iterations, length)
+        return pbkdf2_hmac('sha256', self.encode('utf-8'), salt, iterations, length)
 
 
 class PassphraseKey(AESKeyBase):

@@ -488,6 +488,37 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file3'])
 
+    def test_extract_include_exclude_regex(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('file1', size=1024 * 80)
+        self.create_regular_file('file2', size=1024 * 80)
+        self.create_regular_file('file3', size=1024 * 80)
+        self.create_regular_file('file4', size=1024 * 80)
+
+        # Create with --exclude-regex
+        self.cmd('create', '--exclude-regex=input/file4$', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2', 'file3'])
+        shutil.rmtree('output/input')
+
+        # Extract with --exclude-regex
+        with changedir('output'):
+            self.cmd('extract', '--exclude-regex=file3+', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2'])
+        shutil.rmtree('output/input')
+
+        # Combine --exclude and --exclude-regex
+        with changedir('output'):
+            self.cmd('extract', '--exclude=input/file2', '--exclude-regex=file[01]', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file3'])
+        shutil.rmtree('output/input')
+
+        # Combine --exclude-from and --exclude-regex
+        with changedir('output'):
+            self.cmd('extract', '--exclude-from=' + self.exclude_file_path, '--exclude-regex=file1', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file3'])
+
     def test_exclude_caches(self):
         self.cmd('init', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)

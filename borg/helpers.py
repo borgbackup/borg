@@ -257,7 +257,7 @@ def exclude_path(path, patterns):
     """
     for pattern in (patterns or []):
         if pattern.match(path):
-            return isinstance(pattern, ExcludePattern)
+            return isinstance(pattern, (ExcludePattern, ExcludeRegex))
     return False
 
 
@@ -337,6 +337,33 @@ class ExcludePattern(IncludePattern):
     @normalized
     def match(self, path):
         matches = self.regex.match(path+os.path.sep) is not None
+        if matches:
+            self.match_count += 1
+        return matches
+
+    def __repr__(self):
+        return '%s(%s)' % (type(self), self.pattern)
+
+    def __str__(self):
+        return self.pattern_orig
+
+
+class ExcludeRegex(IncludePattern):
+    """Regular expression to exclude.
+    """
+    def __init__(self, pattern):
+        self.pattern_orig = pattern
+        self.match_count = 0
+
+        if sys.platform in ('darwin',):
+            pattern = unicodedata.normalize("NFD", pattern)
+
+        self.pattern = pattern
+        self.regex = re.compile(pattern)
+
+    @normalized
+    def match(self, path):
+        matches = self.regex.search(path) is not None
         if matches:
             self.match_count += 1
         return matches

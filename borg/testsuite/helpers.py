@@ -3,6 +3,7 @@ from time import mktime, strptime
 from datetime import datetime, timezone, timedelta
 from io import StringIO
 import os
+import re
 
 import pytest
 import sys
@@ -10,7 +11,7 @@ import msgpack
 import msgpack.fallback
 
 from ..helpers import adjust_patterns, exclude_path, Location, format_file_size, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
-    prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, yes, \
+    prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, yes, ExcludeRegex, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
     ProgressIndicatorPercent, ProgressIndicatorEndless
 from . import BaseTestCase, environment_variable, FakeInputs
@@ -169,8 +170,8 @@ class PatternTestCase(BaseTestCase):
         '/var/log/messages', '/var/log/dmesg',
     ]
 
-    def evaluate(self, paths, excludes):
-        patterns = adjust_patterns(paths, [ExcludePattern(p) for p in excludes])
+    def evaluate(self, paths, excludes, cls=ExcludePattern):
+        patterns = adjust_patterns(paths, [cls(p) for p in excludes])
         return [path for path in self.files if not exclude_path(path, patterns)]
 
     def test(self):
@@ -192,6 +193,13 @@ class PatternTestCase(BaseTestCase):
         self.assert_equal(self.evaluate(['/etc/', '/var'], ['dmesg']),
                           ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg'])
 
+        # Regular expressions
+        self.assert_equal(self.evaluate(['/'], ['.*'], cls=ExcludeRegex), [])
+        self.assert_equal(self.evaluate(['/'], ['^/'], cls=ExcludeRegex), [])
+        self.assert_equal(self.evaluate(['/'], ['^abc$'], cls=ExcludeRegex), self.files)
+        self.assert_equal(self.evaluate(['/'], ['^(?!/home/)'], cls=ExcludeRegex),
+                          ['/home/user/.profile', '/home/user/.bashrc', '/home/user2/.profile', '/home/user2/public_html/index.html'])
+
 
 @pytest.mark.skipif(sys.platform in ('darwin',), reason='all but OS X test')
 class PatternNonAsciiTestCase(BaseTestCase):
@@ -199,31 +207,40 @@ class PatternNonAsciiTestCase(BaseTestCase):
         pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
         i = IncludePattern(pattern)
         e = ExcludePattern(pattern)
+        er = ExcludeRegex("^{}/foo$".format(re.escape(pattern)))
 
         assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
         assert not i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
         assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
         assert not e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+        assert er.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert not er.match("ba\N{COMBINING ACUTE ACCENT}/foo")
 
     def testDecomposedUnicode(self):
         pattern = 'ba\N{COMBINING ACUTE ACCENT}'
         i = IncludePattern(pattern)
         e = ExcludePattern(pattern)
+        er = ExcludeRegex("^{}/foo$".format(re.escape(pattern)))
 
         assert not i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
         assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
         assert not e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
         assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+        assert not er.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert er.match("ba\N{COMBINING ACUTE ACCENT}/foo")
 
     def testInvalidUnicode(self):
         pattern = str(b'ba\x80', 'latin1')
         i = IncludePattern(pattern)
         e = ExcludePattern(pattern)
+        er = ExcludeRegex("^{}/foo$".format(re.escape(pattern)))
 
         assert not i.match("ba/foo")
         assert i.match(str(b"ba\x80/foo", 'latin1'))
         assert not e.match("ba/foo")
         assert e.match(str(b"ba\x80/foo", 'latin1'))
+        assert not er.match("ba/foo")
+        assert er.match(str(b"ba\x80/foo", 'latin1'))
 
 
 @pytest.mark.skipif(sys.platform not in ('darwin',), reason='OS X test')
@@ -232,31 +249,40 @@ class OSXPatternNormalizationTestCase(BaseTestCase):
         pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
         i = IncludePattern(pattern)
         e = ExcludePattern(pattern)
+        er = ExcludeRegex("^{}/foo$".format(re.escape(pattern)))
 
         assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
         assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
         assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
         assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+        assert er.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert er.match("ba\N{COMBINING ACUTE ACCENT}/foo")
 
     def testDecomposedUnicode(self):
         pattern = 'ba\N{COMBINING ACUTE ACCENT}'
         i = IncludePattern(pattern)
         e = ExcludePattern(pattern)
+        er = ExcludeRegex("^{}/foo$".format(re.escape(pattern)))
 
         assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
         assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
         assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
         assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+        assert er.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+        assert er.match("ba\N{COMBINING ACUTE ACCENT}/foo")
 
     def testInvalidUnicode(self):
         pattern = str(b'ba\x80', 'latin1')
         i = IncludePattern(pattern)
         e = ExcludePattern(pattern)
+        er = ExcludeRegex("^{}/foo$".format(re.escape(pattern)))
 
         assert not i.match("ba/foo")
         assert i.match(str(b"ba\x80/foo", 'latin1'))
         assert not e.match("ba/foo")
         assert e.match(str(b"ba\x80/foo", 'latin1'))
+        assert not er.match("ba/foo")
+        assert er.match(str(b"ba\x80/foo", 'latin1'))
 
 
 def test_compression_specs():

@@ -249,8 +249,10 @@ Examples
     NAME="root-`date +%Y-%m-%d`"
     $ borg create -C zlib,6 /mnt/backup::$NAME / --do-not-cross-mountpoints
 
-    # Backup huge files with little chunk management overhead
-    $ borg create --chunker-params 19,23,21,4095 /mnt/backup::VMs /srv/VMs
+    # Make a big effort in fine granular deduplication (big chunk management
+    # overhead, needs a lot of RAM and disk space, see formula in internals
+    # docs - same parameters as borg < 1.0 or attic):
+    $ borg create --chunker-params 10,23,16,4095 /mnt/backup::small /smallstuff
 
     # Backup a raw device (must not be active/in use/mounted at that time)
     $ dd if=/dev/sda bs=10M | borg create /mnt/backup::my-sda -
@@ -506,15 +508,15 @@ resource usage (RAM and disk space) as the amount of resources needed is
 (also) determined by the total amount of chunks in the repository (see
 `Indexes / Caches memory usage` for details).
 
-``--chunker-params=10,23,16,4095 (default)`` results in a fine-grained deduplication
-and creates a big amount of chunks and thus uses a lot of resources to manage them.
-This is good for relatively small data volumes and if the machine has a good
-amount of free RAM and disk space.
+``--chunker-params=10,23,16,4095`` results in a fine-grained deduplication
+and creates a big amount of chunks and thus uses a lot of resources to manage
+them. This is good for relatively small data volumes and if the machine has a
+good amount of free RAM and disk space.
 
-``--chunker-params=19,23,21,4095`` results in a coarse-grained deduplication and
-creates a much smaller amount of chunks and thus uses less resources.
-This is good for relatively big data volumes and if the machine has a relatively
-low amount of free RAM and disk space.
+``--chunker-params=19,23,21,4095`` (default) results in a coarse-grained
+deduplication and creates a much smaller amount of chunks and thus uses less
+resources. This is good for relatively big data volumes and if the machine has
+a relatively low amount of free RAM and disk space.
 
 If you already have made some archives in a repository and you then change
 chunker params, this of course impacts deduplication as the chunks will be

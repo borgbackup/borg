@@ -210,9 +210,9 @@ producing chunks of 2^HASH_MASK_BITS Bytes on average.
 ``borg create --chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE``
 can be used to tune the chunker parameters, the default is:
 
-- CHUNK_MIN_EXP = 10 (minimum chunk size = 2^10 B = 1 kiB)
+- CHUNK_MIN_EXP = 19 (minimum chunk size = 2^19 B = 512 kiB)
 - CHUNK_MAX_EXP = 23 (maximum chunk size = 2^23 B = 8 MiB)
-- HASH_MASK_BITS = 16 (statistical medium chunk size ~= 2^16 B = 64 kiB)
+- HASH_MASK_BITS = 21 (statistical medium chunk size ~= 2^21 B = 2 MiB)
 - HASH_WINDOW_SIZE = 4095 [B] (`0xFFF`)
 
 The buzhash table is altered by XORing it with a seed randomly generated once
@@ -313,13 +313,13 @@ If a remote repository is used the repo index will be allocated on the remote si
 
 E.g. backing up a total count of 1 Mi (IEC binary prefix e.g. 2^20) files with a total size of 1TiB.
 
-a) with create ``--chunker-params 10,23,16,4095`` (default):
+a) with ``create --chunker-params 10,23,16,4095`` (custom, like borg < 1.0 or attic):
 
   mem_usage  =  2.8GiB
 
-b) with create ``--chunker-params 10,23,20,4095`` (custom):
+b) with ``create --chunker-params 19,23,21,4095`` (default):
 
-  mem_usage  =  0.4GiB
+  mem_usage  =  0.31GiB
 
 .. note:: There is also the ``--no-files-cache`` option to switch off the files cache.
    You'll save some memory, but it will need to read / chunk all the files as

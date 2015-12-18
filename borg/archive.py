@@ -26,10 +26,10 @@ import msgpack
 
 ITEMS_BUFFER = 1024 * 1024
 
-CHUNK_MIN_EXP = 10  # 2**10 == 1kiB
+CHUNK_MIN_EXP = 19  # 2**19 == 512kiB
 CHUNK_MAX_EXP = 23  # 2**23 == 8MiB
 HASH_WINDOW_SIZE = 0xfff  # 4095B
-HASH_MASK_BITS = 16  # results in ~64kiB chunks statistically
+HASH_MASK_BITS = 21  # results in ~2MiB chunks statistically
 
 # defaults, use --chunker-params to override
 CHUNKER_PARAMS = (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)

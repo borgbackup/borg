@@ -11,7 +11,7 @@ from .helpers import IntegrityError, get_keys_dir, Error
 from .logger import create_logger
 logger = create_logger()
 
-from .crypto import get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
+from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
 from .compress import Compressor, COMPR_BUFFER
 import msgpack
 
@@ -291,7 +291,7 @@ class KeyfileKeyBase(AESKeyBase):
             return data
 
     def encrypt_key_file(self, data, passphrase):
-        salt = get_random_bytes(32)
+        salt = os.urandom(32)
         iterations = 100000
         key = passphrase.kdf(salt, iterations, 32)
         hash = HMAC(key, data, sha256).digest()
@@ -329,7 +329,7 @@ class KeyfileKeyBase(AESKeyBase):
         passphrase = Passphrase.new(allow_empty=True)
         key = cls(repository)
         key.repository_id = repository.id
-        key.init_from_random_data(get_random_bytes(100))
+        key.init_from_random_data(os.urandom(100))
         key.init_ciphers()
         target = key.get_new_target(args)
         key.save(target, passphrase)

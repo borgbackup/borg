@@ -1,6 +1,6 @@
 from binascii import hexlify
 
-from ..crypto import AES, bytes_to_long, bytes_to_int, long_to_bytes, get_random_bytes
+from ..crypto import AES, bytes_to_long, bytes_to_int, long_to_bytes
 from . import BaseTestCase
 
 
@@ -12,13 +12,6 @@ class CryptoTestCase(BaseTestCase):
     def test_bytes_to_long(self):
         self.assert_equal(bytes_to_long(b'\0\0\0\0\0\0\0\1'), 1)
         self.assert_equal(long_to_bytes(1), b'\0\0\0\0\0\0\0\1')
-
-    def test_get_random_bytes(self):
-        bytes = get_random_bytes(10)
-        bytes2 = get_random_bytes(10)
-        self.assert_equal(len(bytes), 10)
-        self.assert_equal(len(bytes2), 10)
-        self.assert_not_equal(bytes, bytes2)
 
     def test_aes(self):
         key = b'X' * 32

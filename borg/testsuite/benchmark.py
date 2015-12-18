@@ -40,13 +40,10 @@ def testdata(request, tmpdir_factory):
         # do not use a binary zero (\0) to avoid sparse detection
         data = lambda: b'0' * size
     if data_type == 'random':
-        rnd = open('/dev/urandom', 'rb')
-        data = lambda: rnd.read(size)
+        data = lambda: os.urandom(size)
     for i in range(count):
         with open(str(p.join(str(i))), "wb") as f:
             f.write(data())
-    if data_type == 'random':
-        rnd.close()
     yield str(p)
     p.remove(rec=1)
 

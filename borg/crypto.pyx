@@ -53,20 +53,6 @@ def num_aes_blocks(int length):
     return (length + 15) // 16
 
 
-def get_random_bytes(n):
-    """Return n cryptographically strong pseudo-random bytes
-    """
-    cdef unsigned char *buf = <unsigned char *>malloc(n)
-    if not buf:
-        raise MemoryError
-    try:
-        if RAND_bytes(buf, n) < 1:
-            raise Exception('RAND_bytes failed')
-        return buf[:n]
-    finally:
-        free(buf)
-
-
 cdef class AES:
     """A thin wrapper around the OpenSSL EVP cipher API
     """

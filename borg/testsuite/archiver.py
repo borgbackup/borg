@@ -92,7 +92,7 @@ def test_return_codes(cmd, tmpdir):
     input = tmpdir.mkdir('input')
     output = tmpdir.mkdir('output')
     input.join('test_file').write('content')
-    rc, out = cmd('init', '%s' % str(repo))
+    rc, out = cmd('init', '--encryption=none', '%s' % str(repo))
     assert rc == EXIT_SUCCESS
     rc, out = cmd('create', '%s::archive' % repo, str(input))
     assert rc == EXIT_SUCCESS
@@ -192,6 +192,7 @@ class ArchiverTestCaseBase(BaseTestCase):
     def setUp(self):
         os.environ['BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'] = '1'
         os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = '1'
+        os.environ['BORG_PASSPHRASE'] = 'waytooeasyonlyfortests'
         self.archiver = not self.FORK_DEFAULT and Archiver() or None
         self.tmpdir = tempfile.mkdtemp()
         self.repository_path = os.path.join(self.tmpdir, 'repository')

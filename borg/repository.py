@@ -11,7 +11,7 @@ import struct
 from zlib import crc32
 
 import msgpack
-from .helpers import Error, ErrorWithTraceback, IntegrityError, ProgressIndicatorPercent
+from .helpers import Error, ErrorWithTraceback, IntegrityError, Location, ProgressIndicatorPercent
 from .hashindex import NSIndex
 from .locking import UpgradableLock, LockError, LockErrorT
 from .lrucache import LRUCache
@@ -54,6 +54,7 @@ class Repository:
 
     def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True):
         self.path = os.path.abspath(path)
+        self._location = Location('file://%s' % self.path)
         self.io = None
         self.lock = None
         self.index = None

@@ -129,7 +129,7 @@ class RemoteRepository:
             self.name = name
 
     def __init__(self, location, create=False, lock_wait=None, lock=True, args=None):
-        self.location = location
+        self.location = self._location = location
         self.preload_ids = []
         self.msgid = 0
         self.to_send = b''

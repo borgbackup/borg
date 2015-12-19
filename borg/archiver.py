@@ -64,7 +64,6 @@ class Archiver:
             repository = RemoteRepository(location, create=create, lock_wait=self.lock_wait, lock=lock, args=args)
         else:
             repository = Repository(location.path, create=create, exclusive=exclusive, lock_wait=self.lock_wait, lock=lock)
-        repository._location = location
         return repository
 
     def print_error(self, msg, *args):
@@ -797,8 +796,8 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption',
-                               choices=('none', 'keyfile', 'repokey', 'passphrase'), default='none',
-                               help='select encryption key mode')
+                               choices=('none', 'keyfile', 'repokey', 'passphrase'), default='repokey',
+                               help='select encryption key mode (default: "%(default)s")')
 
         check_epilog = textwrap.dedent("""
         The check command verifies the consistency of a repository and the corresponding archives.

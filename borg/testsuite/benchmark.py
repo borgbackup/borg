@@ -17,6 +17,7 @@ from .archiver import changedir, cmd
 def repo_url(request, tmpdir):
     os.environ['BORG_PASSPHRASE'] = '123456'
     os.environ['BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'] = '1'
+    os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = '1'
     os.environ['BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'] = '1'
     os.environ['BORG_KEYS_DIR'] = str(tmpdir.join('keys'))
     os.environ['BORG_CACHE_DIR'] = str(tmpdir.join('cache'))

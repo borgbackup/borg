@@ -73,9 +73,8 @@ Main features
     backup examination and restores (e.g. by using a regular file manager).
 
 **Easy installation on multiple platforms**
-    We offer single-file binaries
-    that does not require installing anything - you can just run it on
-    the supported platforms:
+    We offer single-file binaries that do not require installing anything -
+    you can just run them on these platforms:
 
     * Linux
     * Mac OS X
@@ -148,7 +147,7 @@ Here's a (incomplete) list of some major changes:
  * mkdir-based locking is more compatible than attic's posix locking
  * uses fadvise to not spoil / blow up the fs cache
  * better error messages / exception handling
- * better output for verbose mode, progress indication
+ * better logging, screen output, progress indication
  * tested on misc. Linux systems, 32 and 64bit, FreeBSD, OpenBSD, NetBSD, Mac OS X
 
 Please read the `ChangeLog`_ (or ``CHANGES.rst`` in the source distribution) for more

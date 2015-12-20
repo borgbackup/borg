@@ -69,15 +69,19 @@ General:
     TMPDIR
         where temporary files are stored (might need a lot of temporary space for some operations)
 
-Some "yes" sayers (if set, they automatically confirm that you really want to do X even if there is that warning):
-    BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK
+Some automatic "answerers" (if set, they automatically answer confirmation questions):
+    BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=no (or =yes)
         For "Warning: Attempting to access a previously unknown unencrypted repository"
-    BORG_RELOCATED_REPO_ACCESS_IS_OK
+    BORG_RELOCATED_REPO_ACCESS_IS_OK=no (or =yes)
         For "Warning: The repository at location ... was previously located at ..."
-    BORG_CHECK_I_KNOW_WHAT_I_AM_DOING
-        For "Warning: '``check --repair``' is an experimental feature that might result in data loss."
-    BORG_DELETE_I_KNOW_WHAT_I_AM_DOING
-        For "You requested to completely DELETE the repository *including* all archives it contains:  "
+    BORG_CHECK_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
+        For "Warning: 'check --repair' is an experimental feature that might result in data loss."
+    BORG_DELETE_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
+        For "You requested to completely DELETE the repository *including* all archives it contains:"
+
+    Note: answers are case sensitive. setting an invalid answer value might either give the default
+    answer or ask you interactively, depending on whether retries are allowed (they by default are
+    allowed). So please test your scripts interactively before making them a non-interactive script.
 
 Directories:
     BORG_KEYS_DIR

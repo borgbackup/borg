@@ -136,7 +136,7 @@ def test_disk_full(cmd):
                 data = os.urandom(size)
                 f.write(data)
 
-    with environment_variable(BORG_CHECK_I_KNOW_WHAT_I_AM_DOING='1'):
+    with environment_variable(BORG_CHECK_I_KNOW_WHAT_I_AM_DOING='YES'):
         mount = DF_MOUNT
         assert os.path.exists(mount)
         repo = os.path.join(mount, 'repo')
@@ -190,8 +190,8 @@ class ArchiverTestCaseBase(BaseTestCase):
     prefix = ''
 
     def setUp(self):
-        os.environ['BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'] = '1'
-        os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = '1'
+        os.environ['BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
+        os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
         os.environ['BORG_PASSPHRASE'] = 'waytooeasyonlyfortests'
         self.archiver = not self.FORK_DEFAULT and Archiver() or None
         self.tmpdir = tempfile.mkdtemp()
@@ -330,7 +330,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         item_count = 3 if has_lchflags else 4  # one file is UF_NODUMP
         self.assert_in('Number of files: %d' % item_count, info_output)
         shutil.rmtree(self.cache_path)
-        with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='1'):
+        with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='yes'):
             info_output2 = self.cmd('info', self.repository_location + '::test')
 
         def filter(output):

@@ -162,6 +162,7 @@ class Statistics:
 
     def __init__(self):
         self.osize = self.csize = self.usize = self.nfiles = 0
+        self.last_progress = 0  # timestamp when last progress was shown
 
     def update(self, size, csize, unique):
         self.osize += size
@@ -191,19 +192,22 @@ class Statistics:
     def csize_fmt(self):
         return format_file_size(self.csize)
 
-    def show_progress(self, item=None, final=False, stream=None):
-        columns, lines = get_terminal_size()
-        if not final:
-            msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
-            path = remove_surrogates(item[b'path']) if item else ''
-            space = columns - len(msg)
-            if space < len('...') + len(path):
-                path = '%s...%s' % (path[:(space//2)-len('...')], path[-space//2:])
-            msg += "{0:<{space}}".format(path, space=space)
-        else:
-            msg = ' ' * columns
-        print(msg, file=stream or sys.stderr, end="\r")
-        (stream or sys.stderr).flush()
+    def show_progress(self, item=None, final=False, stream=None, dt=None):
+        now = time.time()
+        if dt is None or now - self.last_progress > dt:
+            self.last_progress = now
+            columns, lines = get_terminal_size()
+            if not final:
+                msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
+                path = remove_surrogates(item[b'path']) if item else ''
+                space = columns - len(msg)
+                if space < len('...') + len(path):
+                    path = '%s...%s' % (path[:(space//2)-len('...')], path[-space//2:])
+                msg += "{0:<{space}}".format(path, space=space)
+            else:
+                msg = ' ' * columns
+            print(msg, file=stream or sys.stderr, end="\r")
+            (stream or sys.stderr).flush()
 
 
 def get_keys_dir():

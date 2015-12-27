@@ -143,7 +143,6 @@ class Archive:
         self.hard_links = {}
         self.stats = Statistics()
         self.show_progress = progress
-        self.last_progress = time.time()
         self.name = name
         self.checkpoint_interval = checkpoint_interval
         self.numeric_owner = numeric_owner
@@ -215,9 +214,8 @@ Number of files: {0.stats.nfiles}'''.format(self)
         unknown_keys = set(item) - ITEM_KEYS
         assert not unknown_keys, ('unknown item metadata keys detected, please update ITEM_KEYS: %s',
                                   ','.join(k.decode('ascii') for k in unknown_keys))
-        if self.show_progress and time.time() - self.last_progress > 0.2:
-            self.stats.show_progress(item=item)
-            self.last_progress = time.time()
+        if self.show_progress:
+            self.stats.show_progress(item=item, dt=0.2)
         self.items_buffer.add(item)
         if time.time() - self.last_checkpoint > self.checkpoint_interval:
             self.write_checkpoint()
@@ -526,6 +524,7 @@ Number of files: {0.stats.nfiles}'''.format(self)
                 status = 'U'  # regular file, unchanged
         else:
             status = 'A'  # regular file, added
+        item = {b'path': safe_path}
         # Only chunkify the file if needed
         if chunks is None:
             fh = Archive._open_rb(path, st)
@@ -533,9 +532,11 @@ Number of files: {0.stats.nfiles}'''.format(self)
                 chunks = []
                 for chunk in self.chunker.chunkify(fd, fh):
                     chunks.append(cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats))
+                    if self.show_progress:
+                        self.stats.show_progress(item=item, dt=0.2)
             cache.memorize_file(path_hash, st, [c[0] for c in chunks])
             status = status or 'M'  # regular file, modified (if not 'A' already)
-        item = {b'path': safe_path, b'chunks': chunks}
+        item[b'chunks'] = chunks
         item.update(self.stat_attrs(st, path))
         self.stats.nfiles += 1
         self.add_item(item)

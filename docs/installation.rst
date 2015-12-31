@@ -109,11 +109,11 @@ Debian / Ubuntu
 
 Install the dependencies with development headers::
 
-    sudo apt-get install python3 python3-dev python3-pip python-virtualenv
-    sudo apt-get install libssl-dev openssl
-    sudo apt-get install libacl1-dev libacl1
-    sudo apt-get install liblz4-dev liblz4-1
-    sudo apt-get install build-essential
+    sudo apt-get install python3 python3-dev python3-pip python-virtualenv \
+    libssl-dev openssl \
+    libacl1-dev libacl1 \
+    liblz4-dev liblz4-1 \
+    build-essential
     sudo apt-get install libfuse-dev fuse pkg-config    # optional, for FUSE support
 
 In case you get complaints about permission denied on ``/etc/fuse.conf``: on

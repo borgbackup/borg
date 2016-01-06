@@ -69,6 +69,8 @@ make borg readable and executable for its users and then you can run ``borg``::
     sudo chown root:root /usr/local/bin/borg
     sudo chmod 755 /usr/local/bin/borg
 
+Note that pyinstaller uses /tmp for executable dependencies. |project_name| will fail if /tmp has less than 40M of free space or is mounted with the ``noxece`` option. You can change the temporary directory by setting the ``TEMP`` environment variable before running borg.
+
 If a new version is released, you will have to manually download it and replace
 the old version using the same steps as shown above.
 

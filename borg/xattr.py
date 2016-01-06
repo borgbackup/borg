@@ -7,6 +7,9 @@ import tempfile
 from ctypes import CDLL, create_string_buffer, c_ssize_t, c_size_t, c_char_p, c_int, c_uint32, get_errno
 from ctypes.util import find_library
 
+from .logger import create_logger
+logger = create_logger()
+
 
 def is_enabled(path=None):
     """Determine if xattr is enabled on the filesystem
@@ -27,8 +30,28 @@ def get_all(path, follow_symlinks=True):
         if e.errno in (errno.ENOTSUP, errno.EPERM):
             return {}
 
+libc_name = find_library('c')
+if libc_name is None:
+    # find_library didn't work, maybe we are on some minimal system that misses essential
+    # tools used by find_library, like ldconfig, gcc/cc, objdump.
+    # so we can only try some "usual" names for the C library:
+    if sys.platform.startswith('linux'):
+        libc_name = 'libc.so.6'
+    elif sys.platform.startswith(('freebsd', 'netbsd')):
+        libc_name = 'libc.so'
+    elif sys.platform == 'darwin':
+        libc_name = 'libc.dylib'
+    else:
+        msg = "Can't find C library. No fallback known. Try installing ldconfig, gcc/cc or objdump."
+        logger.error(msg)
+        raise Exception(msg)
 
-libc = CDLL(find_library('c'), use_errno=True)
+try:
+    libc = CDLL(libc_name, use_errno=True)
+except OSError as e:
+    msg = "Can't find C library [%s]. Try installing ldconfig, gcc/cc or objdump." % e
+    logger.error(msg)
+    raise Exception(msg)
 
 
 def _check(rv, path=None):

@@ -12,7 +12,7 @@ import msgpack.fallback
 from ..helpers import adjust_patterns, exclude_path, Location, format_file_size, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
     prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, yes, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
-    ProgressIndicatorPercent, ProgressIndicatorEndless
+    ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes
 from . import BaseTestCase, environment_variable, FakeInputs
 
 
@@ -257,6 +257,41 @@ class OSXPatternNormalizationTestCase(BaseTestCase):
         assert i.match(str(b"ba\x80/foo", 'latin1'))
         assert not e.match("ba/foo")
         assert e.match(str(b"ba\x80/foo", 'latin1'))
+
+
+@pytest.mark.parametrize("lines, expected", [
+    # "None" means all files, i.e. none excluded
+    ([], None),
+    (["# Comment only"], None),
+    (["*"], []),
+    (["# Comment",
+      "*/something00.txt",
+      "  whitespace\t",
+      "/whitespace/at/end of filename \t ",
+      # Whitespace before comment
+      " #/ws*",
+      # Empty line
+      "",
+      "# EOF"],
+     ["/more/data", "/home"]),
+    ])
+def test_patterns_from_file(tmpdir, lines, expected):
+    files = [
+        '/data/something00.txt', '/more/data', '/home',
+        ' #/wsfoobar',
+        '/whitespace/at/end of filename \t ',
+    ]
+
+    def evaluate(filename):
+        patterns = load_excludes(open(filename, "rt"))
+        return [path for path in files if not exclude_path(path, patterns)]
+
+    exclfile = tmpdir.join("exclude.txt")
+
+    with exclfile.open("wt") as fh:
+        fh.write("\n".join(lines))
+
+    assert evaluate(str(exclfile)) == (files if expected is None else expected)
 
 
 def test_compression_specs():

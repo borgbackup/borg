@@ -229,7 +229,7 @@ def to_localtime(ts):
 
 def parse_timestamp(timestamp):
     """Parse a ISO 8601 timestamp string"""
-    if '.' in timestamp:  # microseconds might not be pressent
+    if '.' in timestamp:  # microseconds might not be present
         return datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%f').replace(tzinfo=timezone.utc)
     else:
         return datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)

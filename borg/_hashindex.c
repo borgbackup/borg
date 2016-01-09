@@ -40,13 +40,26 @@ typedef struct {
     int upper_limit;
 } HashIndex;
 
+/* prime (or w/ big prime factors) hash table sizes - otherwise performance breaks down! */
+static int hash_sizes[] = {
+    1031, 2053, 4099, 8209, 16411, 32771, 65537, 131101, 262147, 445649,
+    757607, 1287917, 2189459, 3065243, 4291319, 6007867, 8410991,
+    11775359, 16485527, 23079703, 27695653, 33234787, 39881729, 47858071,
+    57429683, 68915617, 82698751, 99238507, 119086189, 144378011, 157223263,
+    173476439, 190253911, 209915011, 230493629, 253169431, 278728861,
+    306647623, 337318939, 370742809, 408229973, 449387209, 493428073,
+    543105119, 596976533, 657794869, 722676499, 795815791, 874066969,
+    962279771, 1057701643, 1164002657, 1280003147, 1407800297, 1548442699,
+    1703765389, 1873768367, 2062383853, /* 32bit int ends about here */
+};
+
 #define EMPTY _htole32(0xffffffff)
 #define DELETED _htole32(0xfffffffe)
 #define MAX_BUCKET_SIZE 512
 #define BUCKET_LOWER_LIMIT .25
 #define BUCKET_UPPER_LIMIT .75  /* don't go higher than 0.75, otherwise performance severely suffers! */
-#define MIN_BUCKETS 1031  /* must be prime, otherwise performance breaks down! */
 #define MAX(x, y) ((x) > (y) ? (x): (y))
+#define NELEMS(x) (sizeof(x) / sizeof((x)[0]))
 #define BUCKET_ADDR(index, idx) (index->buckets + (idx * index->bucket_size))
 
 #define BUCKET_IS_DELETED(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) == DELETED)
@@ -207,8 +220,8 @@ hashindex_read(const char *path)
     index->key_size = header.key_size;
     index->value_size = header.value_size;
     index->bucket_size = index->key_size + index->value_size;
-    index->lower_limit = index->num_buckets > MIN_BUCKETS ? ((int)(index->num_buckets * BUCKET_LOWER_LIMIT)) : 0;
-    index->upper_limit = (int)(index->num_buckets * BUCKET_UPPER_LIMIT);
+    index->lower_limit = get_lower_limit(index->num_buckets);
+    index->upper_limit = get_upper_limit(index->num_buckets);
 fail:
     if(fclose(fd) < 0) {
         EPRINTF_PATH(path, "fclose failed");
@@ -216,12 +229,59 @@ fail:
     return index;
 }
 
+int get_lower_limit(int num_buckets){
+    int min_buckets = hash_sizes[0];
+    if (num_buckets <= min_buckets)
+        return 0;
+    return (int)(num_buckets * BUCKET_LOWER_LIMIT);
+}
+
+int get_upper_limit(int num_buckets){
+    int max_buckets = hash_sizes[NELEMS(hash_sizes) - 1];
+    if (num_buckets >= max_buckets)
+        return max_buckets;
+    return (int)(num_buckets * BUCKET_UPPER_LIMIT);
+}
+
+int size_idx(int size){
+    /* find the hash_sizes index with entry >= size */
+    int elems = NELEMS(hash_sizes);
+    int entry, i=0;
+    do{
+        entry = hash_sizes[i++];
+    }while((entry < size) && (i < elems));
+    if (i >= elems)
+        return elems - 1;
+    i--;
+    return i;
+}
+
+int fit_size(int current){
+    int i = size_idx(current);
+    return hash_sizes[i];
+}
+
+int grow_size(int current){
+    int i = size_idx(current) + 1;
+    int elems = NELEMS(hash_sizes);
+    if (i >= elems)
+        return hash_sizes[elems - 1];
+    return hash_sizes[i];
+}
+
+int shrink_size(int current){
+    int i = size_idx(current) - 1;
+    if (i < 0)
+        return hash_sizes[0];
+    return hash_sizes[i];
+}
+
 static HashIndex *
 hashindex_init(int capacity, int key_size, int value_size)
 {
     HashIndex *index;
     int i;
-    capacity = MAX(MIN_BUCKETS, capacity);
+    capacity = fit_size(capacity);
 
     if(!(index = malloc(sizeof(HashIndex)))) {
         EPRINTF("malloc header failed");
@@ -237,8 +297,8 @@ hashindex_init(int capacity, int key_size, int value_size)
     index->value_size = value_size;
     index->num_buckets = capacity;
     index->bucket_size = index->key_size + index->value_size;
-    index->lower_limit = index->num_buckets > MIN_BUCKETS ? ((int)(index->num_buckets * BUCKET_LOWER_LIMIT)) : 0;
-    index->upper_limit = (int)(index->num_buckets * BUCKET_UPPER_LIMIT);
+    index->lower_limit = get_lower_limit(index->num_buckets);
+    index->upper_limit = get_upper_limit(index->num_buckets);
     for(i = 0; i < capacity; i++) {
         BUCKET_MARK_EMPTY(index, i);
     }
@@ -302,7 +362,7 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
     if(idx < 0)
     {
         if(index->num_entries > index->upper_limit) {
-            if(!hashindex_resize(index, index->num_buckets * 2)) {
+            if(!hashindex_resize(index, grow_size(index->num_buckets))) {
                 return 0;
             }
         }
@@ -332,7 +392,7 @@ hashindex_delete(HashIndex *index, const void *key)
     BUCKET_MARK_DELETED(index, idx);
     index->num_entries -= 1;
     if(index->num_entries < index->lower_limit) {
-        if(!hashindex_resize(index, index->num_buckets / 2)) {
+        if(!hashindex_resize(index, shrink_size(index->num_buckets))) {
             return 0;
         }
     }

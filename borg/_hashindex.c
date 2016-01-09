@@ -145,6 +145,53 @@ hashindex_resize(HashIndex *index, int capacity)
     return 1;
 }
 
+int get_lower_limit(int num_buckets){
+    int min_buckets = hash_sizes[0];
+    if (num_buckets <= min_buckets)
+        return 0;
+    return (int)(num_buckets * HASH_MIN_LOAD);
+}
+
+int get_upper_limit(int num_buckets){
+    int max_buckets = hash_sizes[NELEMS(hash_sizes) - 1];
+    if (num_buckets >= max_buckets)
+        return max_buckets;
+    return (int)(num_buckets * HASH_MAX_LOAD);
+}
+
+int size_idx(int size){
+    /* find the hash_sizes index with entry >= size */
+    int elems = NELEMS(hash_sizes);
+    int entry, i=0;
+    do{
+        entry = hash_sizes[i++];
+    }while((entry < size) && (i < elems));
+    if (i >= elems)
+        return elems - 1;
+    i--;
+    return i;
+}
+
+int fit_size(int current){
+    int i = size_idx(current);
+    return hash_sizes[i];
+}
+
+int grow_size(int current){
+    int i = size_idx(current) + 1;
+    int elems = NELEMS(hash_sizes);
+    if (i >= elems)
+        return hash_sizes[elems - 1];
+    return hash_sizes[i];
+}
+
+int shrink_size(int current){
+    int i = size_idx(current) - 1;
+    if (i < 0)
+        return hash_sizes[0];
+    return hash_sizes[i];
+}
+
 /* Public API */
 static HashIndex *
 hashindex_read(const char *path)
@@ -229,53 +276,6 @@ fail:
         EPRINTF_PATH(path, "fclose failed");
     }
     return index;
-}
-
-int get_lower_limit(int num_buckets){
-    int min_buckets = hash_sizes[0];
-    if (num_buckets <= min_buckets)
-        return 0;
-    return (int)(num_buckets * HASH_MIN_LOAD);
-}
-
-int get_upper_limit(int num_buckets){
-    int max_buckets = hash_sizes[NELEMS(hash_sizes) - 1];
-    if (num_buckets >= max_buckets)
-        return max_buckets;
-    return (int)(num_buckets * HASH_MAX_LOAD);
-}
-
-int size_idx(int size){
-    /* find the hash_sizes index with entry >= size */
-    int elems = NELEMS(hash_sizes);
-    int entry, i=0;
-    do{
-        entry = hash_sizes[i++];
-    }while((entry < size) && (i < elems));
-    if (i >= elems)
-        return elems - 1;
-    i--;
-    return i;
-}
-
-int fit_size(int current){
-    int i = size_idx(current);
-    return hash_sizes[i];
-}
-
-int grow_size(int current){
-    int i = size_idx(current) + 1;
-    int elems = NELEMS(hash_sizes);
-    if (i >= elems)
-        return hash_sizes[elems - 1];
-    return hash_sizes[i];
-}
-
-int shrink_size(int current){
-    int i = size_idx(current) - 1;
-    if (i < 0)
-        return hash_sizes[0];
-    return hash_sizes[i];
 }
 
 static HashIndex *

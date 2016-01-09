@@ -38,8 +38,8 @@ Which file types, attributes, etc. are preserved?
     * Name
     * Contents
     * Time of last modification (nanosecond precision with Python >= 3.3)
-    * User ID of owner
-    * Group ID of owner
+    * IDs of owning user and owning group
+    * Names of owning user and owning group (if the IDs can be resolved)
     * Unix Mode/Permissions (u/g/o permissions, suid, sgid, sticky)
     * Extended Attributes (xattrs) on Linux, OS X and FreeBSD
     * Access Control Lists (ACL_) on Linux, OS X and FreeBSD

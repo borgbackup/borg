@@ -53,19 +53,21 @@ static int hash_sizes[] = {
     1703765389, 1873768367, 2062383853, /* 32bit int ends about here */
 };
 
-#define EMPTY _htole32(0xffffffff)
-#define DELETED _htole32(0xfffffffe)
-#define MAX_BUCKET_SIZE 512
-#define BUCKET_LOWER_LIMIT .25
-#define BUCKET_UPPER_LIMIT .75  /* don't go higher than 0.75, otherwise performance severely suffers! */
+#define HASH_MIN_LOAD .25
+#define HASH_MAX_LOAD .75  /* don't go higher than 0.75, otherwise performance severely suffers! */
+
 #define MAX(x, y) ((x) > (y) ? (x): (y))
 #define NELEMS(x) (sizeof(x) / sizeof((x)[0]))
+
+#define EMPTY _htole32(0xffffffff)
+#define DELETED _htole32(0xfffffffe)
+
 #define BUCKET_ADDR(index, idx) (index->buckets + (idx * index->bucket_size))
+
+#define BUCKET_MATCHES_KEY(index, idx, key) (memcmp(key, BUCKET_ADDR(index, idx), index->key_size) == 0)
 
 #define BUCKET_IS_DELETED(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) == DELETED)
 #define BUCKET_IS_EMPTY(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) == EMPTY)
-
-#define BUCKET_MATCHES_KEY(index, idx, key) (memcmp(key, BUCKET_ADDR(index, idx), index->key_size) == 0)
 
 #define BUCKET_MARK_DELETED(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) = DELETED)
 #define BUCKET_MARK_EMPTY(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) = EMPTY)
@@ -233,14 +235,14 @@ int get_lower_limit(int num_buckets){
     int min_buckets = hash_sizes[0];
     if (num_buckets <= min_buckets)
         return 0;
-    return (int)(num_buckets * BUCKET_LOWER_LIMIT);
+    return (int)(num_buckets * HASH_MIN_LOAD);
 }
 
 int get_upper_limit(int num_buckets){
     int max_buckets = hash_sizes[NELEMS(hash_sizes) - 1];
     if (num_buckets >= max_buckets)
         return max_buckets;
-    return (int)(num_buckets * BUCKET_UPPER_LIMIT);
+    return (int)(num_buckets * HASH_MAX_LOAD);
 }
 
 int size_idx(int size){

@@ -141,9 +141,13 @@ class RemoteRepository:
         self.p = None
         testing = location.host == '__testsuite__'
         borg_cmd = self.borg_cmd(args, testing)
+        env = dict(os.environ)
         if not testing:
             borg_cmd = self.ssh_cmd(location) + borg_cmd
-        self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+            # pyinstaller binary adds LD_LIBRARY_PATH=/tmp/_ME... but we do not want
+            # that the system's ssh binary picks up (non-matching) libraries from there
+            env.pop('LD_LIBRARY_PATH', None)
+        self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()
         self.stderr_fd = self.p.stderr.fileno()

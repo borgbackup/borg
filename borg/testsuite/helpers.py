@@ -160,8 +160,23 @@ class FormatTimedeltaTestCase(BaseTestCase):
         )
 
 
-class PatternTestCase(BaseTestCase):
-
+@pytest.mark.parametrize("paths, excludes, expected", [
+    # "None" means all files, i.e. none excluded
+    ([], [], None),
+    (['/'], [], None),
+    (['/'], ['/h'], None),
+    (['/'], ['/home'], ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg']),
+    (['/'], ['/home/'], ['/etc/passwd', '/etc/hosts', '/home', '/var/log/messages', '/var/log/dmesg']),
+    (['/home/u'], [], []),
+    (['/', '/home', '/etc/hosts'], ['/'], []),
+    (['/home/'], ['/home/user2'], ['/home', '/home/user/.profile', '/home/user/.bashrc']),
+    (['/'], ['*.profile', '/var/log'],
+     ['/etc/passwd', '/etc/hosts', '/home', '/home/user/.bashrc', '/home/user2/public_html/index.html']),
+    (['/'], ['/home/*/public_html', '*.profile', '*/log/*'],
+     ['/etc/passwd', '/etc/hosts', '/home', '/home/user/.bashrc']),
+    (['/etc/', '/var'], ['dmesg'], ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg']),
+    ])
+def test_patterns(paths, excludes, expected):
     files = [
         '/etc/passwd', '/etc/hosts', '/home',
         '/home/user/.profile', '/home/user/.bashrc',
@@ -169,28 +184,10 @@ class PatternTestCase(BaseTestCase):
         '/var/log/messages', '/var/log/dmesg',
     ]
 
-    def evaluate(self, paths, excludes):
-        patterns = adjust_patterns(paths, [ExcludePattern(p) for p in excludes])
-        return [path for path in self.files if not exclude_path(path, patterns)]
+    patterns = adjust_patterns(paths, [ExcludePattern(p) for p in excludes])
+    included = [path for path in files if not exclude_path(path, patterns)]
 
-    def test(self):
-        self.assert_equal(self.evaluate(['/'], []), self.files)
-        self.assert_equal(self.evaluate([], []), self.files)
-        self.assert_equal(self.evaluate(['/'], ['/h']), self.files)
-        self.assert_equal(self.evaluate(['/'], ['/home']),
-                          ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg'])
-        self.assert_equal(self.evaluate(['/'], ['/home/']),
-                          ['/etc/passwd', '/etc/hosts', '/home', '/var/log/messages', '/var/log/dmesg'])
-        self.assert_equal(self.evaluate(['/home/u'], []), [])
-        self.assert_equal(self.evaluate(['/', '/home', '/etc/hosts'], ['/']), [])
-        self.assert_equal(self.evaluate(['/home/'], ['/home/user2']),
-                          ['/home', '/home/user/.profile', '/home/user/.bashrc'])
-        self.assert_equal(self.evaluate(['/'], ['*.profile', '/var/log']),
-                          ['/etc/passwd', '/etc/hosts', '/home', '/home/user/.bashrc', '/home/user2/public_html/index.html'])
-        self.assert_equal(self.evaluate(['/'], ['/home/*/public_html', '*.profile', '*/log/*']),
-                          ['/etc/passwd', '/etc/hosts', '/home', '/home/user/.bashrc'])
-        self.assert_equal(self.evaluate(['/etc/', '/var'], ['dmesg']),
-                          ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg'])
+    assert included == (files if expected is None else expected)
 
 
 @pytest.mark.skipif(sys.platform in ('darwin',), reason='all but OS X test')

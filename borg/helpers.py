@@ -462,7 +462,7 @@ def dir_is_tagged(path, exclude_caches, exclude_if_present):
 def format_time(t):
     """use ISO-8601 date and time format
     """
-    return t.strftime('%Y-%m-%d %H:%M:%S')
+    return t.strftime('%a, %Y-%m-%d %H:%M:%S')
 
 
 def format_timedelta(td):

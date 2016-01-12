@@ -597,7 +597,7 @@ class Archiver:
         return self.exit_code
 
     helptext = {}
-    helptext['patterns'] = '''
+    helptext['patterns'] = textwrap.dedent('''
         Exclude patterns use a variant of shell pattern syntax, with '*' matching any
         number of characters, '?' matching any single character, '[...]' matching any
         single character specified, including ranges, and '[!...]' matching any
@@ -624,7 +624,7 @@ class Archiver:
 
         # The file '/home/user/cache/important' is *not* backed up:
         $ borg create -e /home/user/cache/ backup / /home/user/cache/important
-        '''
+        ''')
 
     def do_help(self, parser, commands, args):
         if not args.topic:

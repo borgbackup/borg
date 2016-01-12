@@ -4,7 +4,7 @@
 Development
 ===========
 
-This chapter will get you started with |project_name|' development.
+This chapter will get you started with |project_name| development.
 
 |project_name| is written in Python (with a little bit of Cython and C for
 the performance critical parts).
@@ -164,7 +164,7 @@ Checklist:
 - update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``
 - check version number of upcoming release in ``CHANGES.rst``
 - verify that ``MANIFEST.in`` and ``setup.py`` are complete
-- ``python setup.py build_api ; python setup.py build_usage``
+- ``python setup.py build_api ; python setup.py build_usage`` and commit
 - tag the release::
 
     git tag -s -m "tagged/signed release X.Y.Z" X.Y.Z
@@ -181,7 +181,9 @@ Checklist:
  - IRC channel (change ``/topic``)
 
 - create a Github release, include:
+
   * standalone binaries (see above for how to create them)
+
     + for OS X, document the OS X Fuse version in the README of the binaries.
       OS X FUSE uses a kernel extension that needs to be compatible with the
       code contained in the binary.

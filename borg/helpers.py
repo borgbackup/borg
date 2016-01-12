@@ -22,7 +22,7 @@ from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from operator import attrgetter
 
-
+from . import __version__ as borg_version
 from . import hashindex
 from . import chunker
 from . import crypto
@@ -968,6 +968,6 @@ def sysinfo():
     info.append('Platform: %s' % (' '.join(platform.uname()), ))
     if sys.platform.startswith('linux'):
         info.append('Linux: %s %s %s  LibC: %s %s' % (platform.linux_distribution() + platform.libc_ver()))
-    info.append('Python: %s %s' % (platform.python_implementation(), platform.python_version()))
+    info.append('Borg: %s Python: %s %s' % (borg_version, platform.python_implementation(), platform.python_version()))
     info.append('')
     return '\n'.join(info)

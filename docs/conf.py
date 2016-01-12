@@ -44,7 +44,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Borg - Deduplicating Archiver'
-copyright = '2010-2014 Jonas Borgström, 2015 The Borg Collective (see AUTHORS file)'
+copyright = '2010-2014 Jonas Borgström, 2015-2016 The Borg Collective (see AUTHORS file)'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

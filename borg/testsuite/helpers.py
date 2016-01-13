@@ -324,17 +324,16 @@ class OSXPatternNormalizationTestCase(BaseTestCase):
     (["*"], []),
     (["# Comment",
       "*/something00.txt",
-      "  whitespace\t",
-      "/whitespace/at/end of filename \t ",
+      "  *whitespace*  ",
       # Whitespace before comment
       " #/ws*",
       # Empty line
       "",
       "# EOF"],
-     ["/more/data", "/home"]),
+     ["/more/data", "/home", " #/wsfoobar"]),
     (["re:.*"], []),
     (["re:\s"], ["/data/something00.txt", "/more/data", "/home"]),
-    ([r"re:(.)(\1)"], ["/more/data", "/home", "/whitespace/at/end of filename \t "]),
+    ([r"re:(.)(\1)"], ["/more/data", "/home", "\tstart/whitespace", "/whitespace/end\t"]),
     (["", "", "",
       "# This is a test with mixed pattern styles",
       # Case-insensitive pattern
@@ -343,12 +342,15 @@ class OSXPatternNormalizationTestCase(BaseTestCase):
       "*whitespace*",
       "fm:*/something00*"],
      ["/more/data"]),
+    ([r"  re:^\s  "], ["/data/something00.txt", "/more/data", "/home", "/whitespace/end\t"]),
+    ([r"  re:\s$  "], ["/data/something00.txt", "/more/data", "/home", " #/wsfoobar", "\tstart/whitespace"]),
     ])
 def test_patterns_from_file(tmpdir, lines, expected):
     files = [
         '/data/something00.txt', '/more/data', '/home',
         ' #/wsfoobar',
-        '/whitespace/at/end of filename \t ',
+        '\tstart/whitespace',
+        '/whitespace/end\t',
     ]
 
     def evaluate(filename):

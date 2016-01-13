@@ -236,10 +236,10 @@ def parse_timestamp(timestamp):
 
 
 def load_excludes(fh):
-    """Load and parse exclude patterns from file object. Empty lines and lines starting with '#' are ignored, but
-    whitespace is not stripped.
+    """Load and parse exclude patterns from file object. Lines empty or starting with '#' after stripping whitespace on
+    both line ends are ignored.
     """
-    patterns = (line.rstrip('\r\n') for line in fh if not line.startswith('#'))
+    patterns = (line for line in (i.strip() for i in fh) if not line.startswith('#'))
     return [parse_pattern(pattern) for pattern in patterns if pattern]
 
 

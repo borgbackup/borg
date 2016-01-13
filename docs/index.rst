@@ -12,6 +12,7 @@ Borg Documentation
    installation
    quickstart
    usage
+   deployment
    faq
    support
    resources

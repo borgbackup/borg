@@ -34,6 +34,7 @@ Distribution Source                Command
 ============ ===================== =======
 Arch Linux   `[community]`_        ``pacman -S borg``
 Debian       `stretch`_, `unstable/sid`_ ``apt install borgbackup``
+NixOS        `.nix file`_
 OS X         `Brew cask`_          ``brew cask install borgbackup``
 Ubuntu       `Xenial 16.04`_, `Wily 15.10 (backport PPA)`_  ``apt install borgbackup``
 ============ ===================== =======
@@ -42,6 +43,7 @@ Ubuntu       `Xenial 16.04`_, `Wily 15.10 (backport PPA)`_  ``apt install borgba
 .. _unstable/sid: https://packages.debian.org/sid/borgbackup
 .. _Xenial 15.04: https://launchpad.net/ubuntu/xenial/+source/borgbackup
 .. _Wily 15.10 (backport PPA): https://launchpad.net/~neoatnhng/+archive/ubuntu/ppa
+.. _.nix file: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/backup/borg/default.nix
 .. _Brew cask: http://caskroom.io/
 
 Please ask package maintainers to build a package or, if you can package /

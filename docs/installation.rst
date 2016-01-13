@@ -33,14 +33,15 @@ yet.
 Distribution Source                Command
 ============ ===================== =======
 Arch Linux   `[community]`_        ``pacman -S borg``
-Debian       `unstable/sid`_       ``apt install borgbackup``
-Ubuntu       `Xenial Xerus 16.04`_ ``apt install borgbackup``
+Debian       `stretch`_, `unstable/sid`_ ``apt install borgbackup``
+Ubuntu       `Xenial 16.04`_, `Wily 15.10 (backport PPA)`_  ``apt install borgbackup``
 OS X         `Brew cask`_          ``brew cask install borgbackup``
 ============ ===================== =======
 
 .. _[community]: https://www.archlinux.org/packages/?name=borg
 .. _unstable/sid: https://packages.debian.org/sid/borgbackup
-.. _Xenial Xerus 15.04: https://launchpad.net/ubuntu/xenial/+source/borgbackup
+.. _Xenial 15.04: https://launchpad.net/ubuntu/xenial/+source/borgbackup
+.. _Wily 15.10 (backport PPA): https://launchpad.net/~neoatnhng/+archive/ubuntu/ppa
 .. _Brew cask: http://caskroom.io/
 
 Please ask package maintainers to build a package or, if you can package /

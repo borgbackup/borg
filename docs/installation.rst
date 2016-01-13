@@ -34,8 +34,8 @@ Distribution Source                Command
 ============ ===================== =======
 Arch Linux   `[community]`_        ``pacman -S borg``
 Debian       `stretch`_, `unstable/sid`_ ``apt install borgbackup``
-Ubuntu       `Xenial 16.04`_, `Wily 15.10 (backport PPA)`_  ``apt install borgbackup``
 OS X         `Brew cask`_          ``brew cask install borgbackup``
+Ubuntu       `Xenial 16.04`_, `Wily 15.10 (backport PPA)`_  ``apt install borgbackup``
 ============ ===================== =======
 
 .. _[community]: https://www.archlinux.org/packages/?name=borg

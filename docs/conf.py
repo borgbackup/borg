@@ -228,10 +228,12 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-#man_pages = [
-#    ('man', 'borg', 'Borg',
-#     ['see "AUTHORS" file'], 1)
-#]
+man_pages = [
+        ('usage', 'borg',
+         'BorgBackup is a deduplicating backup program with optional compression and authenticated encryption.',
+         ['The Borg Collective (see AUTHORS file)'],
+         1),
+]
 
 extensions = ['sphinx.ext.extlinks', 'sphinx.ext.autodoc', 'sphinx.ext.todo', 'sphinx.ext.coverage', 'sphinx.ext.viewcode']
 

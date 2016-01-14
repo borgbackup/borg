@@ -18,6 +18,10 @@ import platform
 import time
 import unicodedata
 
+import logging
+from .logger import create_logger
+logger = create_logger()
+
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from operator import attrgetter
@@ -1014,3 +1018,16 @@ def sysinfo():
     info.append('Borg: %s Python: %s %s' % (borg_version, platform.python_implementation(), platform.python_version()))
     info.append('')
     return '\n'.join(info)
+
+
+def log_multi(*msgs, level=logging.INFO):
+    """
+    log multiple lines of text, each line by a separate logging call for cosmetic reasons
+
+    each positional argument may be a single or multiple lines (separated by \n) of text.
+    """
+    lines = []
+    for msg in msgs:
+        lines.extend(msg.splitlines())
+    for line in lines:
+        logger.log(level, line)

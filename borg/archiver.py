@@ -21,7 +21,7 @@ from .helpers import Error, location_validator, format_time, format_file_size, \
     get_cache_dir, get_keys_dir, prune_within, prune_split, unhexlify, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
-    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
+    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi
 from .logger import create_logger, setup_logging
 logger = create_logger()
 from .compress import Compressor, COMPR_BUFFER
@@ -36,6 +36,8 @@ has_lchflags = hasattr(os, 'lchflags')
 
 # default umask, overriden by --umask, defaults to read/write only for owner
 UMASK_DEFAULT = 0o077
+
+DASHES = '-' * 78
 
 
 class ToggleAction(argparse.Action):
@@ -187,12 +189,12 @@ class Archiver:
                 archive.stats.show_progress(final=True)
             if args.stats:
                 archive.end = datetime.now()
-                print('-' * 78)
-                print(str(archive))
-                print()
-                print(str(archive.stats))
-                print(str(cache))
-                print('-' * 78)
+                log_multi(DASHES,
+                          str(archive),
+                          DASHES,
+                          str(archive.stats),
+                          str(cache),
+                          DASHES)
         return self.exit_code
 
     def _process(self, archive, cache, excludes, exclude_caches, exclude_if_present,
@@ -339,9 +341,12 @@ class Archiver:
             manifest.write()
             repository.commit(save_space=args.save_space)
             cache.commit()
+            logger.info("Archive deleted.")
             if args.stats:
-                logger.info(stats.summary.format(label='Deleted data:', stats=stats))
-                logger.info(str(cache))
+                log_multi(DASHES,
+                          stats.summary.format(label='Deleted data:', stats=stats),
+                          str(cache),
+                          DASHES)
         else:
             if not args.cache_only:
                 msg = []
@@ -495,8 +500,10 @@ class Archiver:
             repository.commit(save_space=args.save_space)
             cache.commit()
         if args.stats:
-            logger.info(stats.summary.format(label='Deleted data:', stats=stats))
-            logger.info(str(cache))
+            log_multi(DASHES,
+                      stats.summary.format(label='Deleted data:', stats=stats),
+                      str(cache),
+                      DASHES)
         return self.exit_code
 
     def do_upgrade(self, args):

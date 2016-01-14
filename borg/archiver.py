@@ -80,7 +80,7 @@ class Archiver:
         logger.warning(msg)
 
     def print_file_status(self, status, path):
-        if self.output_filter is None or status in self.output_filter:
+        if self.output_list and (self.output_filter is None or status in self.output_filter):
             logger.info("%1s %s", status, remove_surrogates(path))
 
     def do_serve(self, args):
@@ -129,6 +129,7 @@ class Archiver:
     def do_create(self, args):
         """Create new archive"""
         self.output_filter = args.output_filter
+        self.output_list = args.output_list
         dry_run = args.dry_run
         t0 = datetime.now()
         if not dry_run:
@@ -858,6 +859,9 @@ class Archiver:
                                help="""show progress display while creating the archive, showing Original,
                                Compressed and Deduplicated sizes, followed by the Number of files seen
                                and the path being processed, default: %(default)s""")
+        subparser.add_argument('--list', dest='output_list',
+                               action='store_true', default=False,
+                               help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
                                help='only display items with the given status characters')
         subparser.add_argument('-e', '--exclude', dest='excludes',

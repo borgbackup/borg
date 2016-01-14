@@ -155,7 +155,7 @@ int get_lower_limit(int num_buckets){
 int get_upper_limit(int num_buckets){
     int max_buckets = hash_sizes[NELEMS(hash_sizes) - 1];
     if (num_buckets >= max_buckets)
-        return max_buckets;
+        return num_buckets;
     return (int)(num_buckets * HASH_MAX_LOAD);
 }
 

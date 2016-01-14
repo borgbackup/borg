@@ -17,7 +17,7 @@ import traceback
 
 from . import __version__
 from .helpers import Error, location_validator, format_time, format_file_size, \
-    format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
+    format_file_mode, parse_pattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, prune_within, prune_split, unhexlify, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
@@ -598,17 +598,45 @@ class Archiver:
 
     helptext = {}
     helptext['patterns'] = textwrap.dedent('''
-        Exclude patterns use a variant of shell pattern syntax, with '*' matching any
-        number of characters, '?' matching any single character, '[...]' matching any
-        single character specified, including ranges, and '[!...]' matching any
-        character not specified.  For the purpose of these patterns, the path
-        separator ('\\' for Windows and '/' on other systems) is not treated
-        specially.  For a path to match a pattern, it must completely match from
-        start to end, or must match from the start to just before a path separator.
-        Except for the root path, paths will never end in the path separator when
-        matching is attempted.  Thus, if a given pattern ends in a path separator, a
-        '*' is appended before matching is attempted.  Patterns with wildcards should
-        be quoted to protect them from shell expansion.
+        Exclusion patterns support two separate styles, fnmatch and regular
+        expressions. If followed by a colon (':') the first two characters of
+        a pattern are used as a style selector. Explicit style selection is necessary
+        when regular expressions are desired or when the desired fnmatch pattern
+        starts with two alphanumeric characters followed by a colon (i.e.
+        `aa:something/*`).
+
+        `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_ patterns use
+        a variant of shell pattern syntax, with '*' matching any number of
+        characters, '?' matching any single character, '[...]' matching any single
+        character specified, including ranges, and '[!...]' matching any character
+        not specified. The style selector is `fm`. For the purpose of these patterns,
+        the path separator ('\\' for Windows and '/' on other systems) is not treated
+        specially. For a path to match a pattern, it must completely match from start
+        to end, or must match from the start to just before a path separator. Except
+        for the root path, paths will never end in the path separator when matching
+        is attempted. Thus, if a given pattern ends in a path separator, a '*' is
+        appended before matching is attempted.
+
+        Regular expressions similar to those found in Perl are supported with the
+        selection prefix `re:`. Unlike shell patterns regular expressions are not
+        required to match the complete path and any substring match is sufficient. It
+        is strongly recommended to anchor patterns to the start ('^'), to the end
+        ('$') or both. Path separators ('\\' for Windows and '/' on other systems) in
+        paths are always normalized to a forward slash ('/') before applying
+        a pattern. The regular expression syntax is described in the `Python
+        documentation for the re module
+        <https://docs.python.org/3/library/re.html>`_.
+
+        Exclusions can be passed via the command line option `--exclude`. When used
+        from within a shell the patterns should be quoted to protect them from
+        expansion.
+
+        The `--exclude-from` option permits loading exclusion patterns from a text
+        file with one pattern per line. Lines empty or starting with the number sign
+        ('#') after removing whitespace on both ends are ignored. The optional style
+        selector prefix is also supported for patterns loaded from a file. Due to
+        whitespace removal paths with whitespace at the beginning or end can only be
+        excluded using regular expressions.
 
         Examples:
 
@@ -624,6 +652,20 @@ class Archiver:
 
         # The file '/home/user/cache/important' is *not* backed up:
         $ borg create -e /home/user/cache/ backup / /home/user/cache/important
+
+        # The contents of directories in '/home' are not backed up when their name
+        # ends in '.tmp'
+        $ borg create --exclude 're:^/home/[^/]+\.tmp/' backup /
+
+        # Load exclusions from file
+        $ cat >exclude.txt <<EOF
+        # Comment line
+        /home/*/junk
+        *.tmp
+        fm:aa:something/*
+        re:^/home/[^/]\.tmp/
+        EOF
+        $ borg create --exclude-from exclude.txt backup /
         ''')
 
     def do_help(self, parser, commands, args):
@@ -812,7 +854,7 @@ class Archiver:
         subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
                                help='only display items with the given status characters')
         subparser.add_argument('-e', '--exclude', dest='excludes',
-                               type=ExcludePattern, action='append',
+                               type=parse_pattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
         subparser.add_argument('--exclude-from', dest='exclude_files',
                                type=argparse.FileType('r'), action='append',
@@ -882,7 +924,7 @@ class Archiver:
                                default=False, action='store_true',
                                help='do not actually change any files')
         subparser.add_argument('-e', '--exclude', dest='excludes',
-                               type=ExcludePattern, action='append',
+                               type=parse_pattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
         subparser.add_argument('--exclude-from', dest='exclude_files',
                                type=argparse.FileType('r'), action='append',

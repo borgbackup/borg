@@ -236,11 +236,11 @@ def parse_timestamp(timestamp):
 
 
 def load_excludes(fh):
-    """Load and parse exclude patterns from file object. Empty lines and lines starting with '#' are ignored, but
-    whitespace is not stripped.
+    """Load and parse exclude patterns from file object. Lines empty or starting with '#' after stripping whitespace on
+    both line ends are ignored.
     """
-    patterns = (line.rstrip('\r\n') for line in fh if not line.startswith('#'))
-    return [ExcludePattern(pattern) for pattern in patterns if pattern]
+    patterns = (line for line in (i.strip() for i in fh) if not line.startswith('#'))
+    return [parse_pattern(pattern) for pattern in patterns if pattern]
 
 
 def update_excludes(args):
@@ -266,15 +266,9 @@ def exclude_path(path, patterns):
     """
     for pattern in (patterns or []):
         if pattern.match(path):
-            return isinstance(pattern, ExcludePattern)
+            return isinstance(pattern, (ExcludePattern, ExcludeRegex))
     return False
 
-
-# For both IncludePattern and ExcludePattern, we require that
-# the pattern either match the whole path or an initial segment
-# of the path up to but not including a path separator.  To
-# unify the two cases, we add a path separator to the end of
-# the path before matching.
 
 def normalized(func):
     """ Decorator for the Pattern match methods, returning a wrapper that
@@ -294,11 +288,8 @@ def normalized(func):
         return func
 
 
-class IncludePattern:
-    """Literal files or directories listed on the command line
-    for some operations (e.g. extract, but not create).
-    If a directory is specified, all paths that start with that
-    path match as well.  A trailing slash makes no difference.
+class PatternBase:
+    """Shared logic for inclusion/exclusion patterns.
     """
     def __init__(self, pattern):
         self.pattern_orig = pattern
@@ -307,13 +298,15 @@ class IncludePattern:
         if sys.platform in ('darwin',):
             pattern = unicodedata.normalize("NFD", pattern)
 
-        self.pattern = os.path.normpath(pattern).rstrip(os.path.sep)+os.path.sep
+        self._prepare(pattern)
 
     @normalized
     def match(self, path):
-        matches = (path+os.path.sep).startswith(self.pattern)
+        matches = self._match(path)
+
         if matches:
             self.match_count += 1
+
         return matches
 
     def __repr__(self):
@@ -322,39 +315,89 @@ class IncludePattern:
     def __str__(self):
         return self.pattern_orig
 
+    def _prepare(self, pattern):
+        raise NotImplementedError
 
-class ExcludePattern(IncludePattern):
+    def _match(self, path):
+        raise NotImplementedError
+
+
+# For both IncludePattern and ExcludePattern, we require that
+# the pattern either match the whole path or an initial segment
+# of the path up to but not including a path separator.  To
+# unify the two cases, we add a path separator to the end of
+# the path before matching.
+
+
+class IncludePattern(PatternBase):
+    """Literal files or directories listed on the command line
+    for some operations (e.g. extract, but not create).
+    If a directory is specified, all paths that start with that
+    path match as well.  A trailing slash makes no difference.
+    """
+    def _prepare(self, pattern):
+        self.pattern = os.path.normpath(pattern).rstrip(os.path.sep) + os.path.sep
+
+    def _match(self, path):
+        return (path + os.path.sep).startswith(self.pattern)
+
+
+class ExcludePattern(PatternBase):
     """Shell glob patterns to exclude.  A trailing slash means to
     exclude the contents of a directory, but not the directory itself.
     """
-    def __init__(self, pattern):
-        self.pattern_orig = pattern
-        self.match_count = 0
-
+    def _prepare(self, pattern):
         if pattern.endswith(os.path.sep):
-            self.pattern = os.path.normpath(pattern).rstrip(os.path.sep)+os.path.sep+'*'+os.path.sep
+            pattern = os.path.normpath(pattern).rstrip(os.path.sep) + os.path.sep + '*' + os.path.sep
         else:
-            self.pattern = os.path.normpath(pattern)+os.path.sep+'*'
+            pattern = os.path.normpath(pattern) + os.path.sep+'*'
 
-        if sys.platform in ('darwin',):
-            self.pattern = unicodedata.normalize("NFD", self.pattern)
+        self.pattern = pattern
 
         # fnmatch and re.match both cache compiled regular expressions.
         # Nevertheless, this is about 10 times faster.
         self.regex = re.compile(translate(self.pattern))
 
-    @normalized
-    def match(self, path):
-        matches = self.regex.match(path+os.path.sep) is not None
-        if matches:
-            self.match_count += 1
-        return matches
+    def _match(self, path):
+        return (self.regex.match(path + os.path.sep) is not None)
 
-    def __repr__(self):
-        return '%s(%s)' % (type(self), self.pattern)
 
-    def __str__(self):
-        return self.pattern_orig
+class ExcludeRegex(PatternBase):
+    """Regular expression to exclude.
+    """
+    def _prepare(self, pattern):
+        self.pattern = pattern
+        self.regex = re.compile(pattern)
+
+    def _match(self, path):
+        # Normalize path separators
+        if os.path.sep != '/':
+            path = path.replace(os.path.sep, '/')
+
+        return (self.regex.search(path) is not None)
+
+
+_DEFAULT_PATTERN_STYLE = "fm"
+_PATTERN_STYLES = {
+        "fm": ExcludePattern,
+        "re": ExcludeRegex,
+        }
+
+
+def parse_pattern(pattern):
+    """Read pattern from string and return an instance of the appropriate implementation class.
+    """
+    if len(pattern) > 2 and pattern[2] == ":" and pattern[:2].isalnum():
+        (style, pattern) = (pattern[:2], pattern[3:])
+    else:
+        style = _DEFAULT_PATTERN_STYLE
+
+    cls = _PATTERN_STYLES.get(style, None)
+
+    if cls is None:
+        raise ValueError("Unknown pattern style: {}".format(style))
+
+    return cls(pattern)
 
 
 def timestamp(s):

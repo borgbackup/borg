@@ -29,6 +29,10 @@ Log levels: DEBUG < INFO < WARNING < ERROR < CRITICAL
 While you can set misc. log levels, do not expect that every command will
 give different output on different log levels - it's just a possibility.
 
+..warning:: While some options (like --stats or --list) will emit more
+informational messages, you have to use INFO (or lower) log level to make
+them show up in log output. Use `-v` or a logging configuration.
+
 Return codes
 ~~~~~~~~~~~~
 
@@ -269,7 +273,7 @@ Examples
     $ borg extract /mnt/backup::my-files
 
     # Extract entire archive and list files while processing
-    $ borg extract -v /mnt/backup::my-files
+    $ borg extract -v --list /mnt/backup::my-files
 
     # Extract the "src" directory
     $ borg extract /mnt/backup::my-files home/USERNAME/src
@@ -453,7 +457,7 @@ Here are misc. notes about topics that are maybe not covered in enough detail in
 Item flags
 ~~~~~~~~~~
 
-`borg create -v` outputs a verbose list of all files, directories and other
+`borg create -v --list` outputs a verbose list of all files, directories and other
 file system items it considered (no matter whether they had content changes
 or not). For each item, it prefixes a single-letter flag that indicates type
 and/or status of the item.

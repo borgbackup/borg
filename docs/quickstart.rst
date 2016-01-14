@@ -46,7 +46,7 @@ A step by step example
 
 3. The next day create a new archive called *Tuesday*::
 
-    $ borg create --stats /mnt/backup::Tuesday ~/src ~/Documents
+    $ borg create -v --stats /mnt/backup::Tuesday ~/src ~/Documents
 
    This backup will be a lot quicker and a lot smaller since only new never
    before seen data is stored. The ``--stats`` option causes |project_name| to
@@ -101,7 +101,7 @@ certain number of old archives::
 
     # Backup all of /home and /var/www except a few
     # excluded directories
-    borg create --stats                             \
+    borg create -v --stats                          \
         $REPOSITORY::`hostname`-`date +%Y-%m-%d`    \
         /home                                       \
         /var/www                                    \

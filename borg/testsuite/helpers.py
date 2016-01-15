@@ -9,8 +9,8 @@ import sys
 import msgpack
 import msgpack.fallback
 
-from ..helpers import adjust_patterns, exclude_path, Location, format_file_size, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
-    prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, yes, ExcludeRegex, \
+from ..helpers import adjust_patterns, exclude_path, Location, format_file_size, format_timedelta, PathPrefixPattern, FnmatchPattern, make_path_safe, \
+    prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, yes, RegexPattern, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
     ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern
 from . import BaseTestCase, environment_variable, FakeInputs
@@ -193,7 +193,7 @@ def test_patterns(paths, excludes, expected):
         '/var/log/messages', '/var/log/dmesg',
     ]
 
-    check_patterns(files, paths, [ExcludePattern(p) for p in excludes], expected)
+    check_patterns(files, paths, [FnmatchPattern(p) for p in excludes], expected)
 
 
 @pytest.mark.parametrize("paths, excludes, expected", [
@@ -218,7 +218,7 @@ def test_patterns_regex(paths, excludes, expected):
     patterns = []
 
     for i in excludes:
-        pat = ExcludeRegex(i)
+        pat = RegexPattern(i)
         assert str(pat) == i
         assert pat.pattern == i
         patterns.append(pat)
@@ -228,9 +228,9 @@ def test_patterns_regex(paths, excludes, expected):
 
 def test_regex_pattern():
     # The forward slash must match the platform-specific path separator
-    assert ExcludeRegex("^/$").match("/")
-    assert ExcludeRegex("^/$").match(os.path.sep)
-    assert not ExcludeRegex(r"^\\$").match("/")
+    assert RegexPattern("^/$").match("/")
+    assert RegexPattern("^/$").match(os.path.sep)
+    assert not RegexPattern(r"^\\$").match("/")
 
 
 def use_normalized_unicode():
@@ -238,9 +238,9 @@ def use_normalized_unicode():
 
 
 def _make_test_patterns(pattern):
-    return [IncludePattern(pattern),
-            ExcludePattern(pattern),
-            ExcludeRegex("^{}/foo$".format(pattern)),
+    return [PathPrefixPattern(pattern),
+            FnmatchPattern(pattern),
+            RegexPattern("^{}/foo$".format(pattern)),
             ]
 
 
@@ -311,23 +311,23 @@ def test_patterns_from_file(tmpdir, lines, expected):
 
 
 @pytest.mark.parametrize("pattern, cls", [
-    ("", ExcludePattern),
+    ("", FnmatchPattern),
 
     # Default style
-    ("*", ExcludePattern),
-    ("/data/*", ExcludePattern),
+    ("*", FnmatchPattern),
+    ("/data/*", FnmatchPattern),
 
     # fnmatch style
-    ("fm:", ExcludePattern),
-    ("fm:*", ExcludePattern),
-    ("fm:/data/*", ExcludePattern),
-    ("fm:fm:/data/*", ExcludePattern),
+    ("fm:", FnmatchPattern),
+    ("fm:*", FnmatchPattern),
+    ("fm:/data/*", FnmatchPattern),
+    ("fm:fm:/data/*", FnmatchPattern),
 
     # Regular expression
-    ("re:", ExcludeRegex),
-    ("re:.*", ExcludeRegex),
-    ("re:^/something/", ExcludeRegex),
-    ("re:re:^/something/", ExcludeRegex),
+    ("re:", RegexPattern),
+    ("re:.*", RegexPattern),
+    ("re:^/something/", RegexPattern),
+    ("re:re:^/something/", RegexPattern),
     ])
 def test_parse_pattern(pattern, cls):
     assert isinstance(parse_pattern(pattern), cls)

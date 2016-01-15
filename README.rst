@@ -1,12 +1,8 @@
 |screencast|
 
-.. |screencast| image:: https://asciinema.org/a/28691.png
-        :alt: BorgBackup Installation and Basic Usage
-        :target: https://asciinema.org/a/28691?autoplay=1&speed=2
-
-
 What is BorgBackup?
 ===================
+
 BorgBackup (short: Borg) is a deduplicating backup program.
 Optionally, it supports compression and authenticated encryption.
 
@@ -165,7 +161,11 @@ THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
 Borg is distributed under a 3-clause BSD license, see `License`_
 for the complete license.
 
-|build| |coverage|
+|doc| |build| |coverage|
+
+.. |doc| image:: https://readthedocs.org/projects/borgbackup/badge/?version=stable
+        :alt: Documentation
+        :target: http://borgbackup.readthedocs.org/en/stable/
 
 .. |build| image:: https://travis-ci.org/borgbackup/borg.svg
         :alt: Build Status
@@ -174,3 +174,7 @@ for the complete license.
 .. |coverage| image:: https://codecov.io/github/borgbackup/borg/coverage.svg?branch=master
         :alt: Test Coverage
         :target: https://codecov.io/github/borgbackup/borg?branch=master
+
+.. |screencast| image:: https://asciinema.org/a/28691.png
+        :alt: BorgBackup Installation and Basic Usage
+        :target: https://asciinema.org/a/28691?autoplay=1&speed=2

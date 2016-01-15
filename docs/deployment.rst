@@ -15,9 +15,10 @@ respective fully qualified domain name (fqdn).
 
 * The backup server: `backup01.srv.local`
 * The clients:
-  * John Doe's desktop: `johndoe.clnt.local`
-  * Webserver 01: `web01.srv.local`
-  * Application server 01: `app01.srv.local`
+
+  - John Doe's desktop: `johndoe.clnt.local`
+  - Webserver 01: `web01.srv.local`
+  - Application server 01: `app01.srv.local`
 
 User and group
 --------------
@@ -40,10 +41,11 @@ The following folder tree layout is suggested on the repository server:
 
 * User home directory, /home/backup
 * Repositories path (storage pool): /home/backup/repos
-* Clients restricted paths: `/home/backup/repos/<client fqdn>`
-  * johndoe.clnt.local: `/home/backup/repos/johndoe.clnt.local`
-  * web01.srv.local: `/home/backup/repos/web01.srv.local`
-  * app01.srv.local: `/home/backup/repos/app01.srv.local`
+* Clients restricted paths (`/home/backup/repos/<client fqdn>`):
+
+  - johndoe.clnt.local: `/home/backup/repos/johndoe.clnt.local`
+  - web01.srv.local: `/home/backup/repos/web01.srv.local`
+  - app01.srv.local: `/home/backup/repos/app01.srv.local`
 
 Restrictions
 ------------
@@ -62,7 +64,7 @@ forced command and restrictions applied as shown below:
            borg serve --restrict-path /home/backup/repos/<client fqdn>",
            no-port-forwarding,no-X11-forwarding,no-pty <keytype> <key> <host>
 
-**NOTE** The text shown above needs to be written on a single line!
+.. note:: The text shown above needs to be written on a single line!
 
 The options which are added to the key will perform the following:
 
@@ -74,23 +76,25 @@ The options which are added to the key will perform the following:
 Due to the cd command we use, the server automatically changes the current working
 directory so the client will not need to append the hostname to the remote URI.
 
-**NOTE** The setup above ignores all client given commandline parameters which are
-normally appended to the `borg serve` command.
+.. note:: The setup above ignores all client given commandline parameters
+          which are normally appended to the `borg serve` command.
 
 Client
 ------
 
 The client needs to initialize the `pictures` repository like this:
 
-`borg init backup@backup01.srv.local:pictures`
+ borg init backup@backup01.srv.local:pictures
 
 Or with the full path (should actually never be used, as only for demonstrational purposes).
 The server should automatically change the current working directory to the `<client fqdn>` folder.
 
-`borg init backup@backup01.srv.local:/home/backup/repos/johndoe.clnt.local/pictures`
+  borg init backup@backup01.srv.local:/home/backup/repos/johndoe.clnt.local/pictures
 
 When `johndoe.clnt.local` tries to access a not restricted path the following error is raised.
-John Doe tries to backup into the Web 01 path: `borg init backup@backup01.srv.local:/home/backup/repos/web01.srv.local/pictures`
+John Doe tries to backup into the Web 01 path:
+
+  borg init backup@backup01.srv.local:/home/backup/repos/web01.srv.local/pictures
 
 ::
 
@@ -108,7 +112,7 @@ satisfied and reproducable.
 
 Automate setting up an repository server with the user, group, folders and
 permissions a Ansible playbook could be used. Keep in mind the playbook
-uses the Arch Linux `pacman<https://www.archlinux.org/pacman/pacman.8.html>`_
+uses the Arch Linux `pacman <https://www.archlinux.org/pacman/pacman.8.html>`_
 package manager to install and keep borg up-to-date.
 
 ::
@@ -156,5 +160,5 @@ and no other interpreter or apllication has to be deployed.
 See also
 --------
 
-* `SSH Daemon manpage<http://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
-* `Ansible<http://docs.ansible.com>`_
+* `SSH Daemon manpage <http://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
+* `Ansible <http://docs.ansible.com>`_

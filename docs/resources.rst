@@ -30,6 +30,8 @@ Some of them refer to attic, but you can do the same stuff (and more) with borgb
 - "Attic Backup: Mount your encrypted backups over ssh", 2014 (video, english):
   `youtube <https://www.youtube.com/watch?v=BVXDFv9YMp8>`_
 
+- "Evolution of Borg", Oct 2015 (gource visualization of attic and borg development):
+  `youtube <https://www.youtube.com/watch?v=K4k_4wDkG6Q>`_
 
 Software
 --------

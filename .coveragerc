@@ -8,6 +8,7 @@ omit =
     */borg/fuse.py
     */borg/support/*
     */borg/testsuite/*
+    */borg/hash_sizes.py
 
 [report]
 exclude_lines =

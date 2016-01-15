@@ -26,7 +26,7 @@ from .compress import Compressor, COMPR_BUFFER
 from .upgrader import AtticRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache
-from .key import key_creator
+from .key import key_creator, RepoKey, PassphraseKey
 from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 
@@ -122,6 +122,23 @@ class Archiver:
         repository = self.open_repository(args)
         manifest, key = Manifest.load(repository)
         key.change_passphrase()
+        return EXIT_SUCCESS
+
+    def do_migrate_to_repokey(self, args):
+        """Migrate passphrase -> repokey"""
+        repository = self.open_repository(args)
+        manifest_data = repository.get(Manifest.MANIFEST_ID)
+        key_old = PassphraseKey.detect(repository, manifest_data)
+        key_new = RepoKey(repository)
+        key_new.target = repository
+        key_new.repository_id = repository.id
+        key_new.enc_key = key_old.enc_key
+        key_new.enc_hmac_key = key_old.enc_hmac_key
+        key_new.id_key = key_old.id_key
+        key_new.chunk_seed = key_old.chunk_seed
+        key_new.change_passphrase()  # option to change key protection passphrase, save
+        return EXIT_SUCCESS
+
         return EXIT_SUCCESS
 
     def do_create(self, args):
@@ -870,6 +887,32 @@ class Archiver:
                                           epilog=change_passphrase_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_change_passphrase)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False))
+
+        migrate_to_repokey_epilog = textwrap.dedent("""
+        This command migrates a repository from passphrase mode (not supported any
+        more) to repokey mode.
+
+        You will be first asked for the repository passphrase (to open it in passphrase
+        mode). This is the same passphrase as you used to use for this repo before 1.0.
+
+        It will then derive the different secrets from this passphrase.
+
+        Then you will be asked for a new passphrase (twice, for safety). This
+        passphrase will be used to protect the repokey (which contains these same
+        secrets in encrypted form). You may use the same passphrase as you used to
+        use, but you may also use a different one.
+
+        After migrating to repokey mode, you can change the passphrase at any time.
+        But please note: the secrets will always stay the same and they could always
+        be derived from your (old) passphrase-mode passphrase.
+        """)
+        subparser = subparsers.add_parser('migrate-to-repokey', parents=[common_parser],
+                                          description=self.do_migrate_to_repokey.__doc__,
+                                          epilog=migrate_to_repokey_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.set_defaults(func=self.do_migrate_to_repokey)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 

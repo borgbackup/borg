@@ -426,7 +426,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_repository_swap_detection(self):
         self.create_test_files()
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
-        self.cmd('init', '--encryption=passphrase', self.repository_location)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
         repository_id = self._extract_repository_id(self.repository_path)
         self.cmd('create', self.repository_location + '::test', 'input')
         shutil.rmtree(self.repository_path)
@@ -442,7 +442,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_test_files()
         self.cmd('init', '--encryption=none', self.repository_location + '_unencrypted')
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
-        self.cmd('init', '--encryption=passphrase', self.repository_location + '_encrypted')
+        self.cmd('init', '--encryption=repokey', self.repository_location + '_encrypted')
         self.cmd('create', self.repository_location + '_encrypted::test', 'input')
         shutil.rmtree(self.repository_path + '_encrypted')
         os.rename(self.repository_path + '_unencrypted', self.repository_path + '_encrypted')
@@ -986,7 +986,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.verify_aes_counter_uniqueness('keyfile')
 
     def test_aes_counter_uniqueness_passphrase(self):
-        self.verify_aes_counter_uniqueness('passphrase')
+        self.verify_aes_counter_uniqueness('repokey')
 
     def test_debug_dump_archive_items(self):
         self.create_test_files()

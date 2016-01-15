@@ -25,7 +25,7 @@ def repo_url(request, tmpdir):
     tmpdir.remove(rec=1)
 
 
-@pytest.fixture(params=["none", "passphrase"])
+@pytest.fixture(params=["none", "repokey"])
 def repo(request, cmd, repo_url):
     cmd('init', '--encryption', request.param, repo_url)
     return repo_url

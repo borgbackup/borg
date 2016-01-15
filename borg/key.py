@@ -47,8 +47,10 @@ def key_factory(repository, manifest_data):
         return KeyfileKey.detect(repository, manifest_data)
     elif key_type == RepoKey.TYPE:
         return RepoKey.detect(repository, manifest_data)
-    elif key_type == PassphraseKey.TYPE:  # deprecated, kill in 1.x
-        return PassphraseKey.detect(repository, manifest_data)
+    elif key_type == PassphraseKey.TYPE:
+        # this mode was killed in borg 1.0, see: https://github.com/borgbackup/borg/issues/97
+        # we just dispatch to repokey mode and assume the passphrase was migrated to a repokey.
+        return RepoKey.detect(repository, manifest_data)
     elif key_type == PlaintextKey.TYPE:
         return PlaintextKey.detect(repository, manifest_data)
     else:
@@ -132,7 +134,8 @@ class AESKeyBase(KeyBase):
         return b''.join((self.TYPE_STR, hmac, data))
 
     def decrypt(self, id, data):
-        if data[0] != self.TYPE:
+        if not (data[0] == self.TYPE or \
+            data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             raise IntegrityError('Invalid encryption envelope')
         hmac_given = memoryview(data)[1:33]
         hmac_computed = memoryview(HMAC(self.enc_hmac_key, memoryview(data)[33:], sha256).digest())
@@ -148,7 +151,8 @@ class AESKeyBase(KeyBase):
         return data
 
     def extract_nonce(self, payload):
-        if payload[0] != self.TYPE:
+        if not (payload[0] == self.TYPE or \
+            payload[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             raise IntegrityError('Invalid encryption envelope')
         nonce = bytes_to_long(payload[33:41])
         return nonce

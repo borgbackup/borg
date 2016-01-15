@@ -161,7 +161,7 @@ Other changes:
 
 - improve file size displays, more flexible size formatters
 - explicitly commit to the units standard, #289
-- archiver: add E status (means that an error occured when processing this
+- archiver: add E status (means that an error occurred when processing this
   (single) item
 - do binary releases via "github releases", closes #214
 - create: use -x and --one-file-system (was: --do-not-cross-mountpoints), #296

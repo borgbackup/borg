@@ -34,6 +34,9 @@ HASH_MASK_BITS = 16  # results in ~64kiB chunks statistically
 # defaults, use --chunker-params to override
 CHUNKER_PARAMS = (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
 
+# chunker params for the items metadata stream, finer granularity
+ITEMS_CHUNKER_PARAMS = (12, 16, 14, HASH_WINDOW_SIZE)
+
 utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
 utime_supports_follow_symlinks = os.utime in getattr(os, 'supports_follow_symlinks', {})
 has_mtime_ns = sys.version >= '3.3'
@@ -75,7 +78,7 @@ class DownloadPipeline:
 class ChunkBuffer:
     BUFFER_SIZE = 1 * 1024 * 1024
 
-    def __init__(self, key, chunker_params=CHUNKER_PARAMS):
+    def __init__(self, key, chunker_params=ITEMS_CHUNKER_PARAMS):
         self.buffer = BytesIO()
         self.packer = msgpack.Packer(unicode_errors='surrogateescape')
         self.chunks = []
@@ -110,7 +113,7 @@ class ChunkBuffer:
 
 class CacheChunkBuffer(ChunkBuffer):
 
-    def __init__(self, cache, key, stats, chunker_params=CHUNKER_PARAMS):
+    def __init__(self, cache, key, stats, chunker_params=ITEMS_CHUNKER_PARAMS):
         super().__init__(key, chunker_params)
         self.cache = cache
         self.stats = stats
@@ -150,7 +153,7 @@ class Archive:
         self.end = end
         self.pipeline = DownloadPipeline(self.repository, self.key)
         if create:
-            self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats, chunker_params)
+            self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
             self.chunker = Chunker(self.key.chunk_seed, *chunker_params)
             if name in manifest.archives:
                 raise self.AlreadyExists(name)

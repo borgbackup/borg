@@ -344,7 +344,12 @@ To reduce payload size, only 8 bytes of the 16 bytes nonce is saved in the
 payload, the first 8 bytes are always zeros. This does not affect security but
 limits the maximum repository capacity to only 295 exabytes (2**64 * 16 bytes).
 
-Encryption keys are either derived from a passphrase or kept in a key file.
+Encryption keys (and other secrets) are kept either in a key file on the client
+('keyfile' mode) or in the repository config on the server ('repokey' mode).
+In both cases, the secrets are generated from random and then encrypted by a
+key derived from your passphrase (this happens on the client before the key
+is stored into the keyfile or as repokey).
+
 The passphrase is passed through the ``BORG_PASSPHRASE`` environment variable
 or prompted for interactive usage.
 

@@ -198,12 +198,7 @@ an attacker has access to your backup repository.
 
 But be careful with the key / the passphrase:
 
-``--encryption=passphrase`` is DEPRECATED and will be removed in next major release.
-This mode has very fundamental, unfixable problems (like you can never change
-your passphrase or the pbkdf2 iteration count for an existing repository, because
-the encryption / decryption key is directly derived from the passphrase).
-
-If you want "passphrase-only" security, just use the ``repokey`` mode. The key will
+If you want "passphrase-only" security, use the ``repokey`` mode. The key will
 be stored inside the repository (in its "config" file). In above mentioned
 attack scenario, the attacker will have the key (but not the passphrase).
 
@@ -220,8 +215,10 @@ The backup that is encrypted with that key won't help you with that, of course.
 Make sure you use a good passphrase. Not too short, not too simple. The real
 encryption / decryption key is encrypted with / locked by your passphrase.
 If an attacker gets your key, he can't unlock and use it without knowing the
-passphrase. In ``repokey`` and ``keyfile`` modes, you can change your passphrase
-for existing repos.
+passphrase.
+
+You can change your passphrase for existing repos at any time, it won't affect
+the encryption/decryption key or other secrets.
 
 
 .. include:: usage/create.rst.inc

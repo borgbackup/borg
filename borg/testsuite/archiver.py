@@ -822,12 +822,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('create', '-v', '--list', '--filter=AM', self.repository_location + '::test3', 'input')
         self.assert_in('file1', output)
 
-    def test_cmdline_compatibility(self):
-        self.create_regular_file('file1', size=1024 * 80)
-        self.cmd('init', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        output = self.cmd('prune', self.repository_location, '--hourly=1')
-        self.assert_in('"--hourly" has been deprecated. Use "--keep-hourly" instead', output)
+    #def test_cmdline_compatibility(self):
+    #    self.create_regular_file('file1', size=1024 * 80)
+    #    self.cmd('init', self.repository_location)
+    #    self.cmd('create', self.repository_location + '::test', 'input')
+    #    output = self.cmd('foo', self.repository_location, '--old')
+    #    self.assert_in('"--old" has been deprecated. Use "--new" instead', output)
 
     def test_prune_repository(self):
         self.cmd('init', self.repository_location)

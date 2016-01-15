@@ -190,9 +190,11 @@ Each item represents a file, directory or other fs item and is stored as an
 it and it is reset every time an inode's metadata is changed.
 
 All items are serialized using msgpack and the resulting byte stream
-is fed into the same chunker used for regular file data and turned
-into deduplicated chunks. The reference to these chunks is then added
-to the archive metadata.
+is fed into the same chunker algorithm as used for regular file data
+and turned into deduplicated chunks. The reference to these chunks is then added
+to the archive metadata. To achieve a finer granularity on this metadata
+stream, we use different chunker params for this chunker, which result in
+smaller chunks.
 
 A chunk is stored as an object as well, of course.
 

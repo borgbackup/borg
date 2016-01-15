@@ -441,7 +441,7 @@ Miscellaneous Help
 
 Debug Commands
 --------------
-There are some more commands (all starting with "debug-") wich are are all
+There are some more commands (all starting with "debug-") which are all
 **not intended for normal use** and **potentially very dangerous** if used incorrectly.
 
 They exist to improve debugging capabilities without direct system access, e.g.

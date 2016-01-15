@@ -755,9 +755,6 @@ class Archiver:
             ('--do-not-cross-mountpoints', '--one-file-system',
              'Warning:  "--do-no-cross-mountpoints" has been deprecated. Use "--one-file-system" instead.'),
         ]
-        if args and args[0] == 'verify':
-            print('Warning: "borg verify" has been deprecated. Use "borg extract --dry-run" instead.')
-            args = ['extract', '--dry-run'] + args[1:]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
                 if arg.startswith(old_name):

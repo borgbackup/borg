@@ -826,8 +826,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
-        output = self.cmd('verify', '-v', self.repository_location + '::test')
-        self.assert_in('"borg verify" has been deprecated', output)
         output = self.cmd('prune', self.repository_location, '--hourly=1')
         self.assert_in('"--hourly" has been deprecated. Use "--keep-hourly" instead', output)
 

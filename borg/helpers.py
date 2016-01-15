@@ -466,35 +466,21 @@ def CompressionSpec(s):
     count = len(values)
     if count < 1:
         raise ValueError
-    compression = values[0]
-    try:
-        compression = int(compression)
-        if count > 1:
-            raise ValueError
-        # DEPRECATED: it is just --compression N
-        if 0 <= compression <= 9:
-            print('Warning: --compression %d is deprecated, please use --compression zlib,%d.' % (compression, compression))
-            if compression == 0:
-                print('Hint: instead of --compression zlib,0 you could also use --compression none for better performance.')
-                print('Hint: archives generated using --compression none are not compatible with borg < 0.25.0.')
-            return dict(name='zlib', level=compression)
-        raise ValueError
-    except ValueError:
-        # --compression algo[,...]
-        name = compression
-        if name in ('none', 'lz4', ):
-            return dict(name=name)
-        if name in ('zlib', 'lzma', ):
-            if count < 2:
-                level = 6  # default compression level in py stdlib
-            elif count == 2:
-                level = int(values[1])
-                if not 0 <= level <= 9:
-                    raise ValueError
-            else:
+    # --compression algo[,level]
+    name = values[0]
+    if name in ('none', 'lz4', ):
+        return dict(name=name)
+    if name in ('zlib', 'lzma', ):
+        if count < 2:
+            level = 6  # default compression level in py stdlib
+        elif count == 2:
+            level = int(values[1])
+            if not 0 <= level <= 9:
                 raise ValueError
-            return dict(name=name, level=level)
-        raise ValueError
+        else:
+            raise ValueError
+        return dict(name=name, level=level)
+    raise ValueError
 
 
 def dir_is_cachedir(path):

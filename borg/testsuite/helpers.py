@@ -458,11 +458,6 @@ def test_pattern_matcher():
 def test_compression_specs():
     with pytest.raises(ValueError):
         CompressionSpec('')
-    assert CompressionSpec('0') == dict(name='zlib', level=0)
-    assert CompressionSpec('1') == dict(name='zlib', level=1)
-    assert CompressionSpec('9') == dict(name='zlib', level=9)
-    with pytest.raises(ValueError):
-        CompressionSpec('10')
     assert CompressionSpec('none') == dict(name='none')
     assert CompressionSpec('lz4') == dict(name='lz4')
     assert CompressionSpec('zlib') == dict(name='zlib', level=6)

@@ -802,8 +802,6 @@ class Archiver:
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
         Encryption can be enabled at repository init time.
-        Please note that the 'passphrase' encryption mode is DEPRECATED (instead of it,
-        consider using 'repokey').
         """)
         subparser = subparsers.add_parser('init', parents=[common_parser],
                                           description=self.do_init.__doc__, epilog=init_epilog,
@@ -813,7 +811,7 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption',
-                               choices=('none', 'keyfile', 'repokey', 'passphrase'), default='repokey',
+                               choices=('none', 'keyfile', 'repokey'), default='repokey',
                                help='select encryption key mode (default: "%(default)s")')
 
         check_epilog = textwrap.dedent("""

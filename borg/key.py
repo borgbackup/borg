@@ -35,8 +35,6 @@ def key_creator(repository, args):
         return KeyfileKey.create(repository, args)
     elif args.encryption == 'repokey':
         return RepoKey.create(repository, args)
-    elif args.encryption == 'passphrase':  # deprecated, kill in 1.x
-        return PassphraseKey.create(repository, args)
     else:
         return PlaintextKey.create(repository, args)
 
@@ -48,8 +46,8 @@ def key_factory(repository, manifest_data):
     elif key_type == RepoKey.TYPE:
         return RepoKey.detect(repository, manifest_data)
     elif key_type == PassphraseKey.TYPE:
-        # this mode was killed in borg 1.0, see: https://github.com/borgbackup/borg/issues/97
         # we just dispatch to repokey mode and assume the passphrase was migrated to a repokey.
+        # see also comment in PassphraseKey class.
         return RepoKey.detect(repository, manifest_data)
     elif key_type == PlaintextKey.TYPE:
         return PlaintextKey.detect(repository, manifest_data)
@@ -207,18 +205,21 @@ class Passphrase(str):
 
 
 class PassphraseKey(AESKeyBase):
-    # This mode is DEPRECATED and will be killed at 1.0 release.
-    # With this mode:
+    # This mode was killed in borg 1.0, see: https://github.com/borgbackup/borg/issues/97
+    # Reasons:
     # - you can never ever change your passphrase for existing repos.
     # - you can never ever use a different iterations count for existing repos.
+    # "Killed" means:
+    # - there is no automatic dispatch to this class via type byte
+    # - --encryption=passphrase is an invalid argument now
+    # This class is kept for a while to support migration from passphrase to repokey mode.
     TYPE = 0x01
     iterations = 100000  # must not be changed ever!
 
     @classmethod
     def create(cls, repository, args):
         key = cls(repository)
-        logger.warning('WARNING: "passphrase" mode is deprecated and will be removed in 1.0.')
-        logger.warning('If you want something similar (but with less issues), use "repokey" mode.')
+        logger.warning('WARNING: "passphrase" mode is unsupported since borg 1.0.')
         passphrase = Passphrase.new(allow_empty=False)
         key.init(repository, passphrase)
         return key

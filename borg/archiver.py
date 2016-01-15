@@ -17,7 +17,7 @@ import traceback
 
 from . import __version__
 from .helpers import Error, location_validator, format_time, format_file_size, \
-    format_file_mode, parse_pattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
+    format_file_mode, parse_pattern, PathPrefixPattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, prune_within, prune_split, unhexlify, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
@@ -314,7 +314,7 @@ class Archiver:
             while dirs:
                 archive.extract_item(dirs.pop(-1))
         for pattern in (patterns or []):
-            if isinstance(pattern, IncludePattern) and  pattern.match_count == 0:
+            if isinstance(pattern, PathPrefixPattern) and pattern.match_count == 0:
                 self.print_warning("Include pattern '%s' never matched.", pattern)
         return self.exit_code
 

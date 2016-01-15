@@ -9,8 +9,8 @@ import sys
 import msgpack
 import msgpack.fallback
 
-from ..helpers import adjust_patterns, exclude_path, Location, format_file_size, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
-    prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, yes, ExcludeRegex, \
+from ..helpers import adjust_patterns, exclude_path, Location, format_file_size, format_timedelta, PathPrefixPattern, FnmatchPattern, make_path_safe, \
+    prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, yes, RegexPattern, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
     ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern
 from . import BaseTestCase, environment_variable, FakeInputs
@@ -193,7 +193,7 @@ def test_patterns(paths, excludes, expected):
         '/var/log/messages', '/var/log/dmesg',
     ]
 
-    check_patterns(files, paths, [ExcludePattern(p) for p in excludes], expected)
+    check_patterns(files, paths, [FnmatchPattern(p) for p in excludes], expected)
 
 
 @pytest.mark.parametrize("paths, excludes, expected", [
@@ -218,7 +218,7 @@ def test_patterns_regex(paths, excludes, expected):
     patterns = []
 
     for i in excludes:
-        pat = ExcludeRegex(i)
+        pat = RegexPattern(i)
         assert str(pat) == i
         assert pat.pattern == i
         patterns.append(pat)
@@ -228,93 +228,38 @@ def test_patterns_regex(paths, excludes, expected):
 
 def test_regex_pattern():
     # The forward slash must match the platform-specific path separator
-    assert ExcludeRegex("^/$").match("/")
-    assert ExcludeRegex("^/$").match(os.path.sep)
-    assert not ExcludeRegex(r"^\\$").match("/")
+    assert RegexPattern("^/$").match("/")
+    assert RegexPattern("^/$").match(os.path.sep)
+    assert not RegexPattern(r"^\\$").match("/")
 
 
-@pytest.mark.skipif(sys.platform in ('darwin',), reason='all but OS X test')
-class PatternNonAsciiTestCase(BaseTestCase):
-    def testComposedUnicode(self):
-        pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
-        er = ExcludeRegex("^{}/foo$".format(pattern))
-
-        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert not i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert not e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert er.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert not er.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-
-    def testDecomposedUnicode(self):
-        pattern = 'ba\N{COMBINING ACUTE ACCENT}'
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
-        er = ExcludeRegex("^{}/foo$".format(pattern))
-
-        assert not i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert not e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert not er.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert er.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-
-    def testInvalidUnicode(self):
-        pattern = str(b'ba\x80', 'latin1')
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
-        er = ExcludeRegex("^{}/foo$".format(pattern))
-
-        assert not i.match("ba/foo")
-        assert i.match(str(b"ba\x80/foo", 'latin1'))
-        assert not e.match("ba/foo")
-        assert e.match(str(b"ba\x80/foo", 'latin1'))
-        assert not er.match("ba/foo")
-        assert er.match(str(b"ba\x80/foo", 'latin1'))
+def use_normalized_unicode():
+    return sys.platform in ("darwin",)
 
 
-@pytest.mark.skipif(sys.platform not in ('darwin',), reason='OS X test')
-class OSXPatternNormalizationTestCase(BaseTestCase):
-    def testComposedUnicode(self):
-        pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
-        er = ExcludeRegex("^{}/foo$".format(pattern))
+def _make_test_patterns(pattern):
+    return [PathPrefixPattern(pattern),
+            FnmatchPattern(pattern),
+            RegexPattern("^{}/foo$".format(pattern)),
+            ]
 
-        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert er.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert er.match("ba\N{COMBINING ACUTE ACCENT}/foo")
 
-    def testDecomposedUnicode(self):
-        pattern = 'ba\N{COMBINING ACUTE ACCENT}'
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
-        er = ExcludeRegex("^{}/foo$".format(pattern))
+@pytest.mark.parametrize("pattern", _make_test_patterns("b\N{LATIN SMALL LETTER A WITH ACUTE}"))
+def test_composed_unicode_pattern(pattern):
+    assert pattern.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+    assert pattern.match("ba\N{COMBINING ACUTE ACCENT}/foo") == use_normalized_unicode()
 
-        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert er.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert er.match("ba\N{COMBINING ACUTE ACCENT}/foo")
 
-    def testInvalidUnicode(self):
-        pattern = str(b'ba\x80', 'latin1')
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
-        er = ExcludeRegex("^{}/foo$".format(pattern))
+@pytest.mark.parametrize("pattern", _make_test_patterns("ba\N{COMBINING ACUTE ACCENT}"))
+def test_decomposed_unicode_pattern(pattern):
+    assert pattern.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo") == use_normalized_unicode()
+    assert pattern.match("ba\N{COMBINING ACUTE ACCENT}/foo")
 
-        assert not i.match("ba/foo")
-        assert i.match(str(b"ba\x80/foo", 'latin1'))
-        assert not e.match("ba/foo")
-        assert e.match(str(b"ba\x80/foo", 'latin1'))
-        assert not er.match("ba/foo")
-        assert er.match(str(b"ba\x80/foo", 'latin1'))
+
+@pytest.mark.parametrize("pattern", _make_test_patterns(str(b"ba\x80", "latin1")))
+def test_invalid_unicode_pattern(pattern):
+    assert not pattern.match("ba/foo")
+    assert pattern.match(str(b"ba\x80/foo", "latin1"))
 
 
 @pytest.mark.parametrize("lines, expected", [
@@ -366,23 +311,23 @@ def test_patterns_from_file(tmpdir, lines, expected):
 
 
 @pytest.mark.parametrize("pattern, cls", [
-    ("", ExcludePattern),
+    ("", FnmatchPattern),
 
     # Default style
-    ("*", ExcludePattern),
-    ("/data/*", ExcludePattern),
+    ("*", FnmatchPattern),
+    ("/data/*", FnmatchPattern),
 
     # fnmatch style
-    ("fm:", ExcludePattern),
-    ("fm:*", ExcludePattern),
-    ("fm:/data/*", ExcludePattern),
-    ("fm:fm:/data/*", ExcludePattern),
+    ("fm:", FnmatchPattern),
+    ("fm:*", FnmatchPattern),
+    ("fm:/data/*", FnmatchPattern),
+    ("fm:fm:/data/*", FnmatchPattern),
 
     # Regular expression
-    ("re:", ExcludeRegex),
-    ("re:.*", ExcludeRegex),
-    ("re:^/something/", ExcludeRegex),
-    ("re:re:^/something/", ExcludeRegex),
+    ("re:", RegexPattern),
+    ("re:.*", RegexPattern),
+    ("re:^/something/", RegexPattern),
+    ("re:re:^/something/", RegexPattern),
     ])
 def test_parse_pattern(pattern, cls):
     assert isinstance(parse_pattern(pattern), cls)

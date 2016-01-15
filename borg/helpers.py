@@ -259,7 +259,7 @@ def update_excludes(args):
 
 def adjust_patterns(paths, excludes):
     if paths:
-        return (excludes or []) + [IncludePattern(path) for path in paths] + [ExcludePattern('*')]
+        return (excludes or []) + [PathPrefixPattern(path) for path in paths] + [FnmatchPattern('*')]
     else:
         return excludes
 
@@ -270,7 +270,7 @@ def exclude_path(path, patterns):
     """
     for pattern in (patterns or []):
         if pattern.match(path):
-            return isinstance(pattern, (ExcludePattern, ExcludeRegex))
+            return isinstance(pattern, (FnmatchPattern, RegexPattern))
     return False
 
 
@@ -326,14 +326,14 @@ class PatternBase:
         raise NotImplementedError
 
 
-# For both IncludePattern and ExcludePattern, we require that
+# For both PathPrefixPattern and FnmatchPattern, we require that
 # the pattern either match the whole path or an initial segment
 # of the path up to but not including a path separator.  To
 # unify the two cases, we add a path separator to the end of
 # the path before matching.
 
 
-class IncludePattern(PatternBase):
+class PathPrefixPattern(PatternBase):
     """Literal files or directories listed on the command line
     for some operations (e.g. extract, but not create).
     If a directory is specified, all paths that start with that
@@ -346,7 +346,7 @@ class IncludePattern(PatternBase):
         return (path + os.path.sep).startswith(self.pattern)
 
 
-class ExcludePattern(PatternBase):
+class FnmatchPattern(PatternBase):
     """Shell glob patterns to exclude.  A trailing slash means to
     exclude the contents of a directory, but not the directory itself.
     """
@@ -366,7 +366,7 @@ class ExcludePattern(PatternBase):
         return (self.regex.match(path + os.path.sep) is not None)
 
 
-class ExcludeRegex(PatternBase):
+class RegexPattern(PatternBase):
     """Regular expression to exclude.
     """
     def _prepare(self, pattern):
@@ -383,8 +383,8 @@ class ExcludeRegex(PatternBase):
 
 _DEFAULT_PATTERN_STYLE = "fm"
 _PATTERN_STYLES = {
-        "fm": ExcludePattern,
-        "re": ExcludeRegex,
+        "fm": FnmatchPattern,
+        "re": RegexPattern,
         }
 
 

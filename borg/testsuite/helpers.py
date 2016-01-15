@@ -233,88 +233,33 @@ def test_regex_pattern():
     assert not ExcludeRegex(r"^\\$").match("/")
 
 
-@pytest.mark.skipif(sys.platform in ('darwin',), reason='all but OS X test')
-class PatternNonAsciiTestCase(BaseTestCase):
-    def testComposedUnicode(self):
-        pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
-        er = ExcludeRegex("^{}/foo$".format(pattern))
-
-        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert not i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert not e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert er.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert not er.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-
-    def testDecomposedUnicode(self):
-        pattern = 'ba\N{COMBINING ACUTE ACCENT}'
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
-        er = ExcludeRegex("^{}/foo$".format(pattern))
-
-        assert not i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert not e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert not er.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert er.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-
-    def testInvalidUnicode(self):
-        pattern = str(b'ba\x80', 'latin1')
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
-        er = ExcludeRegex("^{}/foo$".format(pattern))
-
-        assert not i.match("ba/foo")
-        assert i.match(str(b"ba\x80/foo", 'latin1'))
-        assert not e.match("ba/foo")
-        assert e.match(str(b"ba\x80/foo", 'latin1'))
-        assert not er.match("ba/foo")
-        assert er.match(str(b"ba\x80/foo", 'latin1'))
+def use_normalized_unicode():
+    return sys.platform in ("darwin",)
 
 
-@pytest.mark.skipif(sys.platform not in ('darwin',), reason='OS X test')
-class OSXPatternNormalizationTestCase(BaseTestCase):
-    def testComposedUnicode(self):
-        pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
-        er = ExcludeRegex("^{}/foo$".format(pattern))
+def _make_test_patterns(pattern):
+    return [IncludePattern(pattern),
+            ExcludePattern(pattern),
+            ExcludeRegex("^{}/foo$".format(pattern)),
+            ]
 
-        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert er.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert er.match("ba\N{COMBINING ACUTE ACCENT}/foo")
 
-    def testDecomposedUnicode(self):
-        pattern = 'ba\N{COMBINING ACUTE ACCENT}'
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
-        er = ExcludeRegex("^{}/foo$".format(pattern))
+@pytest.mark.parametrize("pattern", _make_test_patterns("b\N{LATIN SMALL LETTER A WITH ACUTE}"))
+def test_composed_unicode_pattern(pattern):
+    assert pattern.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+    assert pattern.match("ba\N{COMBINING ACUTE ACCENT}/foo") == use_normalized_unicode()
 
-        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert er.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert er.match("ba\N{COMBINING ACUTE ACCENT}/foo")
 
-    def testInvalidUnicode(self):
-        pattern = str(b'ba\x80', 'latin1')
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
-        er = ExcludeRegex("^{}/foo$".format(pattern))
+@pytest.mark.parametrize("pattern", _make_test_patterns("ba\N{COMBINING ACUTE ACCENT}"))
+def test_decomposed_unicode_pattern(pattern):
+    assert pattern.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo") == use_normalized_unicode()
+    assert pattern.match("ba\N{COMBINING ACUTE ACCENT}/foo")
 
-        assert not i.match("ba/foo")
-        assert i.match(str(b"ba\x80/foo", 'latin1'))
-        assert not e.match("ba/foo")
-        assert e.match(str(b"ba\x80/foo", 'latin1'))
-        assert not er.match("ba/foo")
-        assert er.match(str(b"ba\x80/foo", 'latin1'))
+
+@pytest.mark.parametrize("pattern", _make_test_patterns(str(b"ba\x80", "latin1")))
+def test_invalid_unicode_pattern(pattern):
+    assert not pattern.match("ba/foo")
+    assert pattern.match(str(b"ba\x80/foo", "latin1"))
 
 
 @pytest.mark.parametrize("lines, expected", [

@@ -37,13 +37,17 @@ Debian       `stretch`_, `unstable/sid`_                   ``apt install borgbac
 NixOS        `.nix file`_                                  N/A
 OS X         `Brew cask`_                                  ``brew cask install borgbackup``
 Ubuntu       `Xenial 16.04`_, `Wily 15.10 (backport PPA)`_ ``apt install borgbackup``
+Ubuntu       `Vivid 15.04 (backport PPA)`_                 ``apt install borgbackup``
+Ubuntu       `Trusty 14.04 (backport PPA)`_                ``apt install borgbackup``
 ============ ============================================= =======
 
 .. _[community]: https://www.archlinux.org/packages/?name=borg
 .. _stretch: https://packages.debian.org/stretch/borgbackup
 .. _unstable/sid: https://packages.debian.org/sid/borgbackup
 .. _Xenial 16.04: https://launchpad.net/ubuntu/xenial/+source/borgbackup
-.. _Wily 15.10 (backport PPA): https://launchpad.net/~neoatnhng/+archive/ubuntu/ppa
+.. _Wily 15.10 (backport PPA): https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
+.. _Vivid 15.04 (backport PPA): https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
+.. _Trusty 14.04 (backport PPA): https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
 .. _.nix file: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/backup/borg/default.nix
 .. _Brew cask: http://caskroom.io/
 

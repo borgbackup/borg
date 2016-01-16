@@ -278,9 +278,11 @@ class UpgradableLock:
             try:
                 if remove is not None:
                     self._roster.modify(remove, REMOVE)
-                    remove = None
                 if len(self._roster.get(SHARED)) == 0:
                     return  # we are the only one and we keep the lock!
+                # restore the roster state as before (undo the roster change):
+                if remove is not None:
+                    self._roster.modify(remove, ADD)
             except:
                 # avoid orphan lock when an exception happens here, e.g. Ctrl-C!
                 self._lock.release()

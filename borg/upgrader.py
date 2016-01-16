@@ -20,7 +20,7 @@ class AtticRepositoryUpgrader(Repository):
         kw['lock'] = False  # do not create borg lock files (now) in attic repo
         super().__init__(*args, **kw)
 
-    def upgrade(self, dryrun=True, inplace=False):
+    def upgrade(self, dryrun=True, inplace=False, progress=False):
         """convert an attic repository to a borg repository
 
         those are the files that need to be upgraded here, from most
@@ -54,7 +54,7 @@ class AtticRepositoryUpgrader(Repository):
         try:
             self.convert_cache(dryrun)
             self.convert_repo_index(dryrun=dryrun, inplace=inplace)
-            self.convert_segments(segments, dryrun=dryrun, inplace=inplace)
+            self.convert_segments(segments, dryrun=dryrun, inplace=inplace, progress=progress)
             self.borg_readme()
         finally:
             self.lock.release()
@@ -68,7 +68,7 @@ class AtticRepositoryUpgrader(Repository):
             fd.write('This is a Borg repository\n')
 
     @staticmethod
-    def convert_segments(segments, dryrun=True, inplace=False):
+    def convert_segments(segments, dryrun=True, inplace=False, progress=False):
         """convert repository segments from attic to borg
 
         replacement pattern is `s/ATTICSEG/BORG_SEG/` in files in
@@ -80,12 +80,14 @@ class AtticRepositoryUpgrader(Repository):
         segment_count = len(segments)
         pi = ProgressIndicatorPercent(total=segment_count, msg="Converting segments %3.0f%%", same_line=True)
         for i, filename in enumerate(segments):
-            pi.show(i)
+            if progress:
+                pi.show(i)
             if dryrun:
                 time.sleep(0.001)
             else:
                 AtticRepositoryUpgrader.header_replace(filename, ATTIC_MAGIC, MAGIC, inplace=inplace)
-        pi.finish()
+        if progress:
+            pi.finish()
 
     @staticmethod
     def header_replace(filename, old_magic, new_magic, inplace=True):

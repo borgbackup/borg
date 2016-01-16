@@ -338,7 +338,7 @@ class Archiver:
         if args.location.archive:
             archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
             stats = Statistics()
-            archive.delete(stats)
+            archive.delete(stats, progress=args.progress)
             manifest.write()
             repository.commit(save_space=args.save_space)
             cache.commit()
@@ -520,7 +520,7 @@ class Archiver:
         # XXX: should auto-detect if it is an attic repository here
         repo = AtticRepositoryUpgrader(args.location.path, create=False)
         try:
-            repo.upgrade(args.dry_run, inplace=args.inplace)
+            repo.upgrade(args.dry_run, inplace=args.inplace, progress=args.progress)
         except NotImplementedError as e:
             print("warning: %s" % e)
         return self.exit_code
@@ -982,6 +982,9 @@ class Archiver:
                                           epilog=delete_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_delete)
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help="""show progress display while deleting a single archive""")
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the deleted archive')
@@ -1156,6 +1159,9 @@ class Archiver:
                                           epilog=upgrade_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_upgrade)
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help="""show progress display while upgrading the repository""")
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
                                help='do not change repository')

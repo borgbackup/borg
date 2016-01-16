@@ -345,18 +345,18 @@ will see what it would do without it actually doing anything.
 
     # Keep 7 end of day and 4 additional end of week archives.
     # Do a dry-run without actually deleting anything.
-    $ borg prune /mnt/backup --dry-run --keep-daily=7 --keep-weekly=4
+    $ borg prune --dry-run --keep-daily=7 --keep-weekly=4 /mnt/backup
 
     # Same as above but only apply to archive names starting with "foo":
-    $ borg prune /mnt/backup --keep-daily=7 --keep-weekly=4 --prefix=foo
+    $ borg prune --keep-daily=7 --keep-weekly=4 --prefix=foo /mnt/backup
 
     # Keep 7 end of day, 4 additional end of week archives,
     # and an end of month archive for every month:
-    $ borg prune /mnt/backup --keep-daily=7 --keep-weekly=4 --keep-monthly=-1
+    $ borg prune --keep-daily=7 --keep-weekly=4 --keep-monthly=-1 /mnt/backup
 
     # Keep all backups in the last 10 days, 4 additional end of week archives,
     # and an end of month archive for every month:
-    $ borg prune /mnt/backup --keep-within=10d --keep-weekly=4 --keep-monthly=-1
+    $ borg prune --keep-within=10d --keep-weekly=4 --keep-monthly=-1 /mnt/backup
 
 
 .. include:: usage/info.rst.inc

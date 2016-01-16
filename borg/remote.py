@@ -49,7 +49,6 @@ class RepositoryServer:  # pragma: no cover
         'negotiate',
         'open',
         'put',
-        'repair',
         'rollback',
         'save_key',
         'load_key',

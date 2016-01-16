@@ -8,7 +8,6 @@ import tempfile
 import time
 from .archive import Archive
 from .helpers import daemonize
-from .remote import cache_if_remote
 
 import msgpack
 
@@ -34,11 +33,11 @@ class ItemCache:
 class FuseOperations(llfuse.Operations):
     """Export archive as a fuse filesystem
     """
-    def __init__(self, key, repository, manifest, archive):
+    def __init__(self, key, repository, manifest, archive, cached_repo):
         super().__init__()
         self._inode_count = 0
         self.key = key
-        self.repository = cache_if_remote(repository)
+        self.repository = cached_repo
         self.items = {}
         self.parent = {}
         self.contents = defaultdict(dict)
@@ -238,4 +237,3 @@ class FuseOperations(llfuse.Operations):
             llfuse.main(single=True)
         finally:
             llfuse.close()
-            self.repository.close()

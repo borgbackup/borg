@@ -520,7 +520,7 @@ class Archiver:
         # XXX: should auto-detect if it is an attic repository here
         repo = AtticRepositoryUpgrader(args.location.path, create=False)
         try:
-            repo.upgrade(args.dry_run, inplace=args.inplace)
+            repo.upgrade(args.dry_run, inplace=args.inplace, progress=args.progress)
         except NotImplementedError as e:
             print("warning: %s" % e)
         return self.exit_code
@@ -1156,6 +1156,9 @@ class Archiver:
                                           epilog=upgrade_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_upgrade)
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help="""show progress display while upgrading the repository""")
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
                                help='do not change repository')

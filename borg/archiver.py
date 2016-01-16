@@ -338,7 +338,7 @@ class Archiver:
         if args.location.archive:
             archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
             stats = Statistics()
-            archive.delete(stats)
+            archive.delete(stats, progress=args.progress)
             manifest.write()
             repository.commit(save_space=args.save_space)
             cache.commit()
@@ -982,6 +982,9 @@ class Archiver:
                                           epilog=delete_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_delete)
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help="""show progress display while deleting a single archive""")
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the deleted archive')

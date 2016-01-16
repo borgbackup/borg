@@ -18,7 +18,7 @@ from io import BytesIO
 from . import xattr
 from .helpers import parse_timestamp, Error, uid2user, user2uid, gid2group, group2gid, format_timedelta, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
-    st_atime_ns, st_ctime_ns, st_mtime_ns
+    st_atime_ns, st_ctime_ns, st_mtime_ns, ProgressIndicatorPercent
 from .platform import acl_get, acl_set
 from .chunker import Chunker
 from .hashindex import ChunkIndex
@@ -418,16 +418,21 @@ Number of files: {0.stats.nfiles}'''.format(self)
         self.cache.chunk_decref(self.id, self.stats)
         del self.manifest.archives[self.name]
 
-    def delete(self, stats):
+    def delete(self, stats, progress=False):
         unpacker = msgpack.Unpacker(use_list=False)
-        for items_id, data in zip(self.metadata[b'items'], self.repository.get_many(self.metadata[b'items'])):
+        items_ids = self.metadata[b'items']
+        pi = ProgressIndicatorPercent(total=len(items_ids), msg="Decrementing references %3.0f%%", same_line=True)
+        for (i, (items_id, data)) in enumerate(zip(items_ids, self.repository.get_many(items_ids))):
+            if progress:
+                pi.show(i)
             unpacker.feed(self.key.decrypt(items_id, data))
             self.cache.chunk_decref(items_id, stats)
             for item in unpacker:
                 if b'chunks' in item:
                     for chunk_id, size, csize in item[b'chunks']:
                         self.cache.chunk_decref(chunk_id, stats)
-
+        if progress:
+            pi.finish()
         self.cache.chunk_decref(self.id, stats)
         del self.manifest.archives[self.name]
 

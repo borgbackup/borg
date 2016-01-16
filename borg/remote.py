@@ -359,21 +359,45 @@ class RemoteRepository:
         self.preload_ids += ids
 
 
-class RepositoryCache:
+class RepositoryNoCache:
+    """A not caching Repository wrapper, passes through to repository.
+
+    Just to have same API (including the context manager) as RepositoryCache.
+    """
+    def __init__(self, repository):
+        self.repository = repository
+
+    def close(self):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    def get(self, key):
+        return next(self.get_many([key]))
+
+    def get_many(self, keys):
+        for data in self.repository.get_many(keys):
+            yield data
+
+
+class RepositoryCache(RepositoryNoCache):
     """A caching Repository wrapper
 
     Caches Repository GET operations using a local temporary Repository.
     """
     def __init__(self, repository):
-        self.repository = repository
+        super().__init__(repository)
         tmppath = tempfile.mkdtemp(prefix='borg-tmp')
         self.caching_repo = Repository(tmppath, create=True, exclusive=True)
 
-    def __del__(self):
-        self.caching_repo.destroy()
-
-    def get(self, key):
-        return next(self.get_many([key]))
+    def close(self):
+        if self.caching_repo is not None:
+            self.caching_repo.destroy()
+            self.caching_repo = None
 
     def get_many(self, keys):
         unknown_keys = [key for key in keys if key not in self.caching_repo]
@@ -395,4 +419,5 @@ class RepositoryCache:
 def cache_if_remote(repository):
     if isinstance(repository, RemoteRepository):
         return RepositoryCache(repository)
-    return repository
+    else:
+        return RepositoryNoCache(repository)

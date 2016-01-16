@@ -238,3 +238,4 @@ class FuseOperations(llfuse.Operations):
             llfuse.main(single=True)
         finally:
             llfuse.close()
+            self.repository.close()

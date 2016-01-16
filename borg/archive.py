@@ -829,7 +829,6 @@ class ArchiveChecker:
                         raise
                     i += 1
 
-        repository = cache_if_remote(self.repository)
         if archive is None:
             # we need last N or all archives
             archive_items = sorted(self.manifest.archives.items(), reverse=True,
@@ -843,37 +842,39 @@ class ArchiveChecker:
             archive_items = [item for item in self.manifest.archives.items() if item[0] == archive]
             num_archives = 1
             end = 1
-        for i, (name, info) in enumerate(archive_items[:end]):
-            logger.info('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
-            archive_id = info[b'id']
-            if archive_id not in self.chunks:
-                logger.error('Archive metadata block is missing!')
-                self.error_found = True
-                del self.manifest.archives[name]
-                continue
-            mark_as_possibly_superseded(archive_id)
-            cdata = self.repository.get(archive_id)
-            data = self.key.decrypt(archive_id, cdata)
-            archive = StableDict(msgpack.unpackb(data))
-            if archive[b'version'] != 1:
-                raise Exception('Unknown archive metadata version')
-            decode_dict(archive, (b'name', b'hostname', b'username', b'time'))
-            archive[b'cmdline'] = [arg.decode('utf-8', 'surrogateescape') for arg in archive[b'cmdline']]
-            items_buffer = ChunkBuffer(self.key)
-            items_buffer.write_chunk = add_callback
-            for item in robust_iterator(archive):
-                if b'chunks' in item:
-                    verify_file_chunks(item)
-                items_buffer.add(item)
-            items_buffer.flush(flush=True)
-            for previous_item_id in archive[b'items']:
-                mark_as_possibly_superseded(previous_item_id)
-            archive[b'items'] = items_buffer.chunks
-            data = msgpack.packb(archive, unicode_errors='surrogateescape')
-            new_archive_id = self.key.id_hash(data)
-            cdata = self.key.encrypt(data)
-            add_reference(new_archive_id, len(data), len(cdata), cdata)
-            info[b'id'] = new_archive_id
+
+        with cache_if_remote(self.repository) as repository:
+            for i, (name, info) in enumerate(archive_items[:end]):
+                logger.info('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
+                archive_id = info[b'id']
+                if archive_id not in self.chunks:
+                    logger.error('Archive metadata block is missing!')
+                    self.error_found = True
+                    del self.manifest.archives[name]
+                    continue
+                mark_as_possibly_superseded(archive_id)
+                cdata = self.repository.get(archive_id)
+                data = self.key.decrypt(archive_id, cdata)
+                archive = StableDict(msgpack.unpackb(data))
+                if archive[b'version'] != 1:
+                    raise Exception('Unknown archive metadata version')
+                decode_dict(archive, (b'name', b'hostname', b'username', b'time'))
+                archive[b'cmdline'] = [arg.decode('utf-8', 'surrogateescape') for arg in archive[b'cmdline']]
+                items_buffer = ChunkBuffer(self.key)
+                items_buffer.write_chunk = add_callback
+                for item in robust_iterator(archive):
+                    if b'chunks' in item:
+                        verify_file_chunks(item)
+                    items_buffer.add(item)
+                items_buffer.flush(flush=True)
+                for previous_item_id in archive[b'items']:
+                    mark_as_possibly_superseded(previous_item_id)
+                archive[b'items'] = items_buffer.chunks
+                data = msgpack.packb(archive, unicode_errors='surrogateescape')
+                new_archive_id = self.key.id_hash(data)
+                cdata = self.key.encrypt(data)
+                add_reference(new_archive_id, len(data), len(cdata), cdata)
+                info[b'id'] = new_archive_id
 
     def orphan_chunks_check(self):
         if self.check_all:

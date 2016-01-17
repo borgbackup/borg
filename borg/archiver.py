@@ -466,7 +466,7 @@ class Archiver:
         cache = Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait)
         archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
         if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0 and args.within is None:
-            self.print_error('At least one of the "within", "keep-hourly", "keep-daily", "keep-weekly", '
+            self.print_error('At least one of the "keep-within", "keep-hourly", "keep-daily", "keep-weekly", '
                              '"keep-monthly" or "keep-yearly" settings must be specified')
             return self.exit_code
         if args.prefix:

@@ -29,7 +29,7 @@ Log levels: DEBUG < INFO < WARNING < ERROR < CRITICAL
 While you can set misc. log levels, do not expect that every command will
 give different output on different log levels - it's just a possibility.
 
-..warning:: While some options (like ``--stats`` or ``--list``) will emit more
+.. warning:: While some options (like ``--stats`` or ``--list``) will emit more
 informational messages, you have to use INFO (or lower) log level to make
 them show up in log output. Use ``-v`` or a logging configuration.
 

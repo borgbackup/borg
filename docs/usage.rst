@@ -463,11 +463,11 @@ or not). For each item, it prefixes a single-letter flag that indicates type
 and/or status of the item.
 
 If you are interested only in a subset of that output, you can give e.g.
-`--filter=AME` and it will only show regular files with A, M or E status (see
+``--filter=AME`` and it will only show regular files with A, M or E status (see
 below).
 
 A uppercase character represents the status of a regular file relative to the
-"files" cache (not relative to the repo - this is an issue if the files cache
+"files" cache (not relative to the repo -- this is an issue if the files cache
 is not used). Metadata is stored in any case and for 'A' and 'M' also new data
 chunks are stored. For 'U' all data chunks refer to already existing chunks.
 
@@ -519,10 +519,11 @@ In the worst case (all files are big and were touched in between backups), this
 will store all content into the repository again.
 
 Usually, it is not that bad though:
+
 - usually most files are not touched, so it will just re-use the old chunks
-it already has in the repo
+  it already has in the repo
 - files smaller than the (both old and new) minimum chunksize result in only
-one chunk anyway, so the resulting chunks are same and deduplication will apply
+  one chunk anyway, so the resulting chunks are same and deduplication will apply
 
 If you switch chunker params to save resources for an existing repo that
 already has some backup archives, you will see an increasing effect over time,
@@ -556,7 +557,7 @@ You need to be careful with what you give as filename when using ``--read-specia
 e.g. if you give ``/dev/zero``, your backup will never terminate.
 
 The given files' metadata is saved as it would be saved without
-``--read-special`` (e.g. its name, its size [might be 0], its mode, etc.) - but
+``--read-special`` (e.g. its name, its size [might be 0], its mode, etc.) -- but
 additionally, also the content read from it will be saved for it.
 
 Restoring such files' content is currently only supported one at a time via

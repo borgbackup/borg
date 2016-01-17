@@ -78,7 +78,10 @@ class Cache:
             self.sync()
             self.commit()
 
-    def __del__(self):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
     def __str__(self):
@@ -149,7 +152,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         self.rollback()
 
     def close(self):
-        if self.lock:
+        if self.lock is not None:
             self.lock.release()
             self.lock = None
 

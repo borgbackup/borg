@@ -18,9 +18,9 @@ The log level of the builtin logging configuration defaults to WARNING.
 This is because we want |project_name| to be mostly silent and only output
 warnings (plus errors and critical messages).
 
-Use --verbose or --info to set INFO (you will get informative output then
+Use ``--verbose`` or ``--info`` to set INFO (you will get informative output then
 additionally to warnings, errors, critical messages).
-Use --debug to set DEBUG to get output made for debugging.
+Use ``--debug`` to set DEBUG to get output made for debugging.
 
 All log messages created with at least the set level will be output.
 
@@ -29,9 +29,9 @@ Log levels: DEBUG < INFO < WARNING < ERROR < CRITICAL
 While you can set misc. log levels, do not expect that every command will
 give different output on different log levels - it's just a possibility.
 
-..warning:: While some options (like --stats or --list) will emit more
+..warning:: While some options (like ``--stats`` or ``--list``) will emit more
 informational messages, you have to use INFO (or lower) log level to make
-them show up in log output. Use `-v` or a logging configuration.
+them show up in log output. Use ``-v`` or a logging configuration.
 
 Return codes
 ~~~~~~~~~~~~
@@ -75,7 +75,7 @@ Some "yes" sayers (if set, they automatically confirm that you really want to do
     BORG_RELOCATED_REPO_ACCESS_IS_OK
         For "Warning: The repository at location ... was previously located at ..."
     BORG_CHECK_I_KNOW_WHAT_I_AM_DOING
-        For "Warning: 'check --repair' is an experimental feature that might result in data loss."
+        For "Warning: 'check ``--repair``' is an experimental feature that might result in data loss."
     BORG_DELETE_I_KNOW_WHAT_I_AM_DOING
         For "You requested to completely DELETE the repository *including* all archives it contains:  "
 
@@ -334,11 +334,11 @@ Be careful, prune is potentially dangerous command, it will remove backup
 archives.
 
 The default of prune is to apply to **all archives in the repository** unless
-you restrict its operation to a subset of the archives using `--prefix`.
-When using --prefix, be careful to choose a good prefix - e.g. do not use a
+you restrict its operation to a subset of the archives using ``--prefix``.
+When using ``--prefix``, be careful to choose a good prefix - e.g. do not use a
 prefix "foo" if you do not also want to match "foobar".
 
-It is strongly recommended to always run `prune --dry-run ...` first so you
+It is strongly recommended to always run ``prune --dry-run ...`` first so you
 will see what it would do without it actually doing anything.
 
 ::
@@ -457,7 +457,7 @@ Here are misc. notes about topics that are maybe not covered in enough detail in
 Item flags
 ~~~~~~~~~~
 
-`borg create -v --list` outputs a verbose list of all files, directories and other
+``borg create -v --list`` outputs a verbose list of all files, directories and other
 file system items it considered (no matter whether they had content changes
 or not). For each item, it prefixes a single-letter flag that indicates type
 and/or status of the item.
@@ -501,12 +501,12 @@ resource usage (RAM and disk space) as the amount of resources needed is
 (also) determined by the total amount of chunks in the repository (see
 `Indexes / Caches memory usage` for details).
 
-`--chunker-params=10,23,16,4095 (default)` results in a fine-grained deduplication
+``--chunker-params=10,23,16,4095 (default)`` results in a fine-grained deduplication
 and creates a big amount of chunks and thus uses a lot of resources to manage them.
 This is good for relatively small data volumes and if the machine has a good
 amount of free RAM and disk space.
 
-`--chunker-params=19,23,21,4095` results in a coarse-grained deduplication and
+``--chunker-params=19,23,21,4095`` results in a coarse-grained deduplication and
 creates a much smaller amount of chunks and thus uses less resources.
 This is good for relatively big data volumes and if the machine has a relatively
 low amount of free RAM and disk space.

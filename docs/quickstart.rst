@@ -17,7 +17,7 @@ a good amount of free space on the filesystem that has your backup repository
 
 If you run out of disk space, it can be hard or impossible to free space,
 because |project_name| needs free space to operate - even to delete backup
-archives. There is a `--save-space` option for some commands, but even with
+archives. There is a ``--save-space`` option for some commands, but even with
 that |project_name| will need free space to operate.
 
 You can use some monitoring process or just include the free space information

@@ -89,7 +89,7 @@ key file based encryption with a blank passphrase. See
           ``export`` in a shell script file should be safe, however, as
           the environment of a process is `accessible only to that
           user
-          <http://security.stackexchange.com/questions/14000/environment-variable-accessibility-in-linux/14009#14009>`_.
+          <https://security.stackexchange.com/questions/14000/environment-variable-accessibility-in-linux/14009#14009>`_.
 
 When backing up to remote encrypted repos, is encryption done locally?
 ----------------------------------------------------------------------

@@ -161,4 +161,4 @@ See also
 --------
 
 * `SSH Daemon manpage <http://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
-* `Ansible <http://docs.ansible.com>`_
+* `Ansible <https://docs.ansible.com>`_

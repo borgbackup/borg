@@ -340,12 +340,12 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 pass
 
         self.begin_txn()
-        repository = cache_if_remote(self.repository)
-        legacy_cleanup()
-        # TEMPORARY HACK: to avoid archive index caching, create a FILE named ~/.cache/borg/REPOID/chunks.archive.d -
-        # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local disk)
-        self.do_cache = os.path.isdir(archive_path)
-        self.chunks = create_master_idx(self.chunks)
+        with cache_if_remote(self.repository) as repository:
+            legacy_cleanup()
+            # TEMPORARY HACK: to avoid archive index caching, create a FILE named ~/.cache/borg/REPOID/chunks.archive.d -
+            # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local disk)
+            self.do_cache = os.path.isdir(archive_path)
+            self.chunks = create_master_idx(self.chunks)
 
     def add_chunk(self, id, data, stats):
         if not self.txn_active:

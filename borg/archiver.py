@@ -30,7 +30,7 @@ from .repository import Repository
 from .cache import Cache
 from .key import key_creator
 from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
-from .remote import RepositoryServer, RemoteRepository
+from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 
 has_lchflags = hasattr(os, 'lchflags')
 
@@ -380,18 +380,19 @@ class Archiver:
 
         repository = self.open_repository(args)
         try:
-            manifest, key = Manifest.load(repository)
-            if args.location.archive:
-                archive = Archive(repository, key, manifest, args.location.archive)
-            else:
-                archive = None
-            operations = FuseOperations(key, repository, manifest, archive)
-            logger.info("Mounting filesystem")
-            try:
-                operations.mount(args.mountpoint, args.options, args.foreground)
-            except RuntimeError:
-                # Relevant error message already printed to stderr by fuse
-                self.exit_code = EXIT_ERROR
+            with cache_if_remote(repository) as cached_repo:
+                manifest, key = Manifest.load(repository)
+                if args.location.archive:
+                    archive = Archive(repository, key, manifest, args.location.archive)
+                else:
+                    archive = None
+                operations = FuseOperations(key, repository, manifest, archive, cached_repo)
+                logger.info("Mounting filesystem")
+                try:
+                    operations.mount(args.mountpoint, args.options, args.foreground)
+                except RuntimeError:
+                    # Relevant error message already printed to stderr by fuse
+                    self.exit_code = EXIT_ERROR
         finally:
             repository.close()
         return self.exit_code

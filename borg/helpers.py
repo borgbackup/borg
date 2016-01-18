@@ -257,23 +257,6 @@ def update_excludes(args):
             file.close()
 
 
-def adjust_patterns(paths, excludes):
-    if paths:
-        return (excludes or []) + [PathPrefixPattern(path) for path in paths] + [FnmatchPattern('*')]
-    else:
-        return excludes
-
-
-def exclude_path(path, patterns):
-    """Used by create and extract sub-commands to determine
-    whether or not an item should be processed.
-    """
-    for pattern in (patterns or []):
-        if pattern.match(path):
-            return isinstance(pattern, (FnmatchPattern, RegexPattern))
-    return False
-
-
 class PatternMatcher:
     def __init__(self, fallback=None):
         self._items = []

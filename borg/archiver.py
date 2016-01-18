@@ -17,11 +17,11 @@ import traceback
 
 from . import __version__
 from .helpers import Error, location_validator, format_time, format_file_size, \
-    format_file_mode, parse_pattern, PathPrefixPattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
+    format_file_mode, parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, prune_within, prune_split, unhexlify, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
-    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi
+    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher
 from .logger import create_logger, setup_logging
 logger = create_logger()
 from .compress import Compressor, COMPR_BUFFER
@@ -129,6 +129,10 @@ class Archiver:
 
     def do_create(self, args):
         """Create new archive"""
+        matcher = PatternMatcher(fallback=True)
+        if args.excludes:
+            matcher.add(args.excludes, False)
+
         def create_inner(archive, cache):
             # Add cache dir to inode_skip list
             skip_inodes = set()
@@ -166,7 +170,7 @@ class Archiver:
                         continue
                 else:
                     restrict_dev = None
-                self._process(archive, cache, args.excludes, args.exclude_caches, args.exclude_if_present,
+                self._process(archive, cache, matcher, args.exclude_caches, args.exclude_if_present,
                               args.keep_tag_files, skip_inodes, path, restrict_dev,
                               read_special=args.read_special, dry_run=dry_run)
             if not dry_run:
@@ -202,11 +206,12 @@ class Archiver:
             create_inner(None, None)
         return self.exit_code
 
-    def _process(self, archive, cache, excludes, exclude_caches, exclude_if_present,
+    def _process(self, archive, cache, matcher, exclude_caches, exclude_if_present,
                  keep_tag_files, skip_inodes, path, restrict_dev,
                  read_special=False, dry_run=False):
-        if exclude_path(path, excludes):
+        if not matcher.match(path):
             return
+
         try:
             st = os.lstat(path)
         except OSError as e:
@@ -235,7 +240,7 @@ class Archiver:
                 if keep_tag_files and not dry_run:
                     archive.process_dir(path, st)
                     for tag_path in tag_paths:
-                        self._process(archive, cache, excludes, exclude_caches, exclude_if_present,
+                        self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
                                       keep_tag_files, skip_inodes, tag_path, restrict_dev,
                                       read_special=read_special, dry_run=dry_run)
                 return
@@ -249,7 +254,7 @@ class Archiver:
             else:
                 for filename in sorted(entries):
                     entry_path = os.path.normpath(os.path.join(path, filename))
-                    self._process(archive, cache, excludes, exclude_caches, exclude_if_present,
+                    self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
                                   keep_tag_files, skip_inodes, entry_path, restrict_dev,
                                   read_special=read_special, dry_run=dry_run)
         elif stat.S_ISLNK(st.st_mode):

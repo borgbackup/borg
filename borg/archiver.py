@@ -286,13 +286,25 @@ class Archiver:
         manifest, key = Manifest.load(repository)
         archive = Archive(repository, key, manifest, args.location.archive,
                           numeric_owner=args.numeric_owner)
-        patterns = adjust_patterns(args.paths, args.excludes)
+
+        matcher = PatternMatcher()
+        if args.excludes:
+            matcher.add(args.excludes, False)
+
+        include_patterns = []
+
+        if args.paths:
+            include_patterns.extend(parse_pattern(i, PathPrefixPattern) for i in args.paths)
+            matcher.add(include_patterns, True)
+
+        matcher.fallback = not include_patterns
+
         dry_run = args.dry_run
         stdout = args.stdout
         sparse = args.sparse
         strip_components = args.strip_components
         dirs = []
-        for item in archive.iter_items(lambda item: not exclude_path(item[b'path'], patterns), preload=True):
+        for item in archive.iter_items(lambda item: matcher.match(item[b'path']), preload=True):
             orig_path = item[b'path']
             if strip_components:
                 item[b'path'] = os.sep.join(orig_path.split(os.sep)[strip_components:])
@@ -317,8 +329,8 @@ class Archiver:
         if not args.dry_run:
             while dirs:
                 archive.extract_item(dirs.pop(-1))
-        for pattern in (patterns or []):
-            if isinstance(pattern, PathPrefixPattern) and pattern.match_count == 0:
+        for pattern in include_patterns:
+            if pattern.match_count == 0:
                 self.print_warning("Include pattern '%s' never matched.", pattern)
         return self.exit_code
 
@@ -965,7 +977,7 @@ class Archiver:
                                type=location_validator(archive=True),
                                help='archive to extract')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to extract')
+                               help='paths to extract; patterns are supported')
 
         rename_epilog = textwrap.dedent("""
         This command renames an archive in the repository.

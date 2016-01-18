@@ -418,18 +418,18 @@ _PATTERN_STYLES = set([
 _PATTERN_STYLE_BY_PREFIX = dict((i.PREFIX, i) for i in _PATTERN_STYLES)
 
 
-def parse_pattern(pattern):
+def parse_pattern(pattern, fallback=FnmatchPattern):
     """Read pattern from string and return an instance of the appropriate implementation class.
     """
     if len(pattern) > 2 and pattern[2] == ":" and pattern[:2].isalnum():
         (style, pattern) = (pattern[:2], pattern[3:])
+
+        cls = _PATTERN_STYLE_BY_PREFIX.get(style, None)
+
+        if cls is None:
+            raise ValueError("Unknown pattern style: {}".format(style))
     else:
-        style = FnmatchPattern.PREFIX
-
-    cls = _PATTERN_STYLE_BY_PREFIX.get(style, None)
-
-    if cls is None:
-        raise ValueError("Unknown pattern style: {}".format(style))
+        cls = fallback
 
     return cls(pattern)
 

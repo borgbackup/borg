@@ -30,20 +30,15 @@ Main features
 
   Compared to other deduplication approaches, this method does NOT depend on:
 
-  * file/directory names staying the same
+  * file/directory names staying the same: So you can move your stuff around 
+    without killing the deduplication, even between machines sharing a repo.
 
-    So you can move your stuff around without killing the deduplication,
-    even between machines sharing a repo.
+  * complete files or time stamps staying the same: If a big file changes a 
+    little, only a few new chunks need to be stored - this is great for VMs or 
+    raw disks.
 
-  * complete files or time stamps staying the same
-
-    If a big file changes a little, only a few new chunks will be stored -
-    this is great for VMs or raw disks.
-
-  * the absolute position of a data chunk inside a file
-
-    Stuff may get shifted and will still be found by the deduplication
-    algorithm.
+  * The absolute position of a data chunk inside a file: Stuff may get shifted 
+    and will still be found by the deduplication algorithm.
 
 **Speed**
   * performance critical code (chunking, compression, encryption) is
@@ -109,15 +104,15 @@ For a graphical frontend refer to our complementary project `BorgWeb <https://bo
 Links
 =====
 
- * `Main Web Site <https://borgbackup.readthedocs.org/>`_
- * `Releases <https://github.com/borgbackup/borg/releases>`_
- * `PyPI packages <https://pypi.python.org/pypi/borgbackup>`_
- * `ChangeLog <https://github.com/borgbackup/borg/blob/master/CHANGES.rst>`_
- * `GitHub <https://github.com/borgbackup/borg>`_
- * `Issue Tracker <https://github.com/borgbackup/borg/issues>`_
- * `Bounties & Fundraisers <https://www.bountysource.com/teams/borgbackup>`_
- * `Mailing List <https://mail.python.org/mailman/listinfo/borgbackup>`_
- * `License <https://borgbackup.github.io/borgbackup/authors.html#license>`_
+* `Main Web Site <https://borgbackup.readthedocs.org/>`_
+* `Releases <https://github.com/borgbackup/borg/releases>`_
+* `PyPI packages <https://pypi.python.org/pypi/borgbackup>`_
+* `ChangeLog <https://github.com/borgbackup/borg/blob/master/CHANGES.rst>`_
+* `GitHub <https://github.com/borgbackup/borg>`_
+* `Issue Tracker <https://github.com/borgbackup/borg/issues>`_
+* `Bounties & Fundraisers <https://www.bountysource.com/teams/borgbackup>`_
+* `Mailing List <https://mail.python.org/mailman/listinfo/borgbackup>`_
+* `License <https://borgbackup.github.io/borgbackup/authors.html#license>`_
 
 Notes
 -----
@@ -132,19 +127,19 @@ Differences between Attic and Borg
 
 Here's a (incomplete) list of some major changes:
 
- * more open, faster paced development (see `issue #1 <https://github.com/borgbackup/borg/issues/1>`_)
- * lots of attic issues fixed (see `issue #5 <https://github.com/borgbackup/borg/issues/5>`_)
- * less chunk management overhead via --chunker-params option (less memory and disk usage)
- * faster remote cache resync (useful when backing up multiple machines into same repo)
- * compression: no, lz4, zlib or lzma compression, adjustable compression levels
- * repokey replaces problematic passphrase mode (you can't change the passphrase nor the pbkdf2 iteration count in "passphrase" mode)
- * simple sparse file support, great for virtual machine disk files
- * can read special files (e.g. block devices) or from stdin, write to stdout
- * mkdir-based locking is more compatible than attic's posix locking
- * uses fadvise to not spoil / blow up the fs cache
- * better error messages / exception handling
- * better logging, screen output, progress indication
- * tested on misc. Linux systems, 32 and 64bit, FreeBSD, OpenBSD, NetBSD, Mac OS X
+* more open, faster paced development (see `issue #1 <https://github.com/borgbackup/borg/issues/1>`_)
+* lots of attic issues fixed (see `issue #5 <https://github.com/borgbackup/borg/issues/5>`_)
+* less chunk management overhead via --chunker-params option (less memory and disk usage)
+* faster remote cache resync (useful when backing up multiple machines into same repo)
+* compression: no, lz4, zlib or lzma compression, adjustable compression levels
+* repokey replaces problematic passphrase mode (you can't change the passphrase nor the pbkdf2 iteration count in "passphrase" mode)
+* simple sparse file support, great for virtual machine disk files
+* can read special files (e.g. block devices) or from stdin, write to stdout
+* mkdir-based locking is more compatible than attic's posix locking
+* uses fadvise to not spoil / blow up the fs cache
+* better error messages / exception handling
+* better logging, screen output, progress indication
+* tested on misc. Linux systems, 32 and 64bit, FreeBSD, OpenBSD, NetBSD, Mac OS X
 
 Please read the `ChangeLog`_ (or ``CHANGES.rst`` in the source distribution) for more
 information.

@@ -12,7 +12,7 @@ import msgpack.fallback
 from ..helpers import exclude_path, Location, format_file_size, format_timedelta, PathPrefixPattern, FnmatchPattern, make_path_safe, \
     prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, yes, RegexPattern, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
-    ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern
+    ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, PatternMatcher
 from . import BaseTestCase, environment_variable, FakeInputs
 
 
@@ -372,6 +372,29 @@ def test_parse_pattern(pattern, cls):
 def test_parse_pattern_error(pattern):
     with pytest.raises(ValueError):
         parse_pattern(pattern)
+
+
+def test_pattern_matcher():
+    pm = PatternMatcher()
+
+    assert pm.fallback is None
+
+    for i in ["", "foo", "bar"]:
+        assert pm.match(i) is None
+
+    pm.add([RegexPattern("^a")], "A")
+    pm.add([RegexPattern("^b"), RegexPattern("^z")], "B")
+    pm.add([RegexPattern("^$")], "Empty")
+    pm.fallback = "FileNotFound"
+
+    assert pm.match("") == "Empty"
+    assert pm.match("aaa") == "A"
+    assert pm.match("bbb") == "B"
+    assert pm.match("ccc") == "FileNotFound"
+    assert pm.match("xyz") == "FileNotFound"
+    assert pm.match("z") == "B"
+
+    assert PatternMatcher(fallback="hey!").fallback == "hey!"
 
 
 def test_compression_specs():

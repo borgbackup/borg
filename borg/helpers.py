@@ -274,6 +274,27 @@ def exclude_path(path, patterns):
     return False
 
 
+class PatternMatcher:
+    def __init__(self, fallback=None):
+        self._items = []
+
+        # Value to return from match function when none of the patterns match.
+        self.fallback = fallback
+
+    def add(self, patterns, value):
+        """Add list of patterns to internal list. The given value is returned from the match function when one of the
+        given patterns matches.
+        """
+        self._items.extend((i, value) for i in patterns)
+
+    def match(self, path):
+        for (pattern, value) in self._items:
+            if pattern.match(path):
+                return value
+
+        return self.fallback
+
+
 def normalized(func):
     """ Decorator for the Pattern match methods, returning a wrapper that
     normalizes OSX paths to match the normalized pattern on OSX, and

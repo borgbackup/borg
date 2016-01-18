@@ -67,14 +67,14 @@ adjust the level or algorithm).
 
 |project_name| offers a lot of different compression algorithms and
 levels. Which of them is the best for you pretty much depends on your
-use case, your data, your hardware - so you need to do an informed
+use case, your data, your hardware -- so you need to do an informed
 decision about whether you want to use compression, which algorithm
 and which level you want to use. This is why compression defaults to
 none.
 
 How can I specify the encryption passphrase programmatically?
 -------------------------------------------------------------
-      
+
 The encryption passphrase can be specified programmatically using the
 `BORG_PASSPHRASE` environment variable. This is convenient when setting up
 automated encrypted backups. Another option is to use
@@ -89,11 +89,11 @@ key file based encryption with a blank passphrase. See
           ``export`` in a shell script file should be safe, however, as
           the environment of a process is `accessible only to that
           user
-          <http://security.stackexchange.com/questions/14000/environment-variable-accessibility-in-linux/14009#14009>`_.
+          <https://security.stackexchange.com/questions/14000/environment-variable-accessibility-in-linux/14009#14009>`_.
 
 When backing up to remote encrypted repos, is encryption done locally?
 ----------------------------------------------------------------------
-     
+
 Yes, file and directory metadata and data is locally encrypted, before
 leaving the local machine. We do not mean the transport layer encryption
 by that, but the data/metadata itself. Transport layer encryption (e.g.

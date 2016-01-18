@@ -165,7 +165,7 @@ for the complete license.
 
 .. |doc| image:: https://readthedocs.org/projects/borgbackup/badge/?version=stable
         :alt: Documentation
-        :target: http://borgbackup.readthedocs.org/en/stable/
+        :target: https://borgbackup.readthedocs.org/en/stable/
 
 .. |build| image:: https://travis-ci.org/borgbackup/borg.svg
         :alt: Build Status

@@ -207,7 +207,7 @@ The |project_name| chunker uses a rolling hash computed by the Buzhash_ algorith
 It triggers (chunks) when the last HASH_MASK_BITS bits of the hash are zero,
 producing chunks of 2^HASH_MASK_BITS Bytes on average.
 
-create --chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE
+``borg create --chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE``
 can be used to tune the chunker parameters, the default is:
 
 - CHUNK_MIN_EXP = 10 (minimum chunk size = 2^10 B = 1 kiB)
@@ -220,7 +220,7 @@ for the archive, and stored encrypted in the keyfile. This is to prevent chunk
 size based fingerprinting attacks on your encrypted repo contents (to guess
 what files you have based on a specific set of chunk sizes).
 
-For some more general usage hints see also `--chunker-params`.
+For some more general usage hints see also ``--chunker-params``.
 
 
 Indexes / Caches
@@ -311,28 +311,27 @@ more chunks than estimated above, because 1 file is at least 1 chunk).
 
 If a remote repository is used the repo index will be allocated on the remote side.
 
-E.g. backing up a total count of 1Mi files with a total size of 1TiB.
+E.g. backing up a total count of 1 Mi (IEC binary prefix e.g. 2^20) files with a total size of 1TiB.
 
-a) with create --chunker-params 10,23,16,4095 (default):
+a) with create ``--chunker-params 10,23,16,4095`` (default):
 
   mem_usage  =  2.8GiB
 
-b) with create --chunker-params 10,23,20,4095 (custom):
+b) with create ``--chunker-params 10,23,20,4095`` (custom):
 
   mem_usage  =  0.4GiB
 
-Note: there is also the --no-files-cache option to switch off the files cache.
-You'll save some memory, but it will need to read / chunk all the files then as
-it can not skip unmodified files then.
-
+.. note:: There is also the ``--no-files-cache`` option to switch off the files cache.
+   You'll save some memory, but it will need to read / chunk all the files as
+   it can not skip unmodified files then.
 
 Encryption
 ----------
 
-AES_ is used in CTR mode (so no need for padding). A 64bit initialization
+AES_-256 is used in CTR mode (so no need for padding). A 64bit initialization
 vector is used, a `HMAC-SHA256`_ is computed on the encrypted chunk with a
 random 64bit nonce and both are stored in the chunk.
-The header of each chunk is : ``TYPE(1)`` + ``HMAC(32)`` + ``NONCE(8)`` + ``CIPHERTEXT``.
+The header of each chunk is: ``TYPE(1)`` + ``HMAC(32)`` + ``NONCE(8)`` + ``CIPHERTEXT``.
 Encryption and HMAC use two different keys.
 
 In AES CTR mode you can think of the IV as the start value for the counter.

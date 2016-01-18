@@ -73,8 +73,10 @@ The options which are added to the key will perform the following:
 3. Run ``borg serve`` restricted at the client base path
 4. Restrict ssh and do not allow stuff which imposes a security risk
 
-Due to the cd command we use, the server automatically changes the current working
-directory so the client will not need to append the hostname to the remote URI.
+Due to the ``cd`` command we use, the server automatically changes the current
+working directory. Then client doesn't need to have knowledge of the absolute
+or relative remote repository path and can directly access the repositories at
+``<user>@<host>:<repo>``.
 
 .. note:: The setup above ignores all client given commandline parameters
           which are normally appended to the `borg serve` command.
@@ -161,4 +163,4 @@ See also
 --------
 
 * `SSH Daemon manpage <http://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
-* `Ansible <http://docs.ansible.com>`_
+* `Ansible <https://docs.ansible.com>`_

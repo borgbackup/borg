@@ -316,6 +316,8 @@ def normalized(func):
 class PatternBase:
     """Shared logic for inclusion/exclusion patterns.
     """
+    PREFIX = NotImplemented
+
     def __init__(self, pattern):
         self.pattern_orig = pattern
         self.match_count = 0
@@ -360,6 +362,8 @@ class PathPrefixPattern(PatternBase):
     If a directory is specified, all paths that start with that
     path match as well.  A trailing slash makes no difference.
     """
+    PREFIX = "pp"
+
     def _prepare(self, pattern):
         self.pattern = os.path.normpath(pattern).rstrip(os.path.sep) + os.path.sep
 
@@ -371,6 +375,8 @@ class FnmatchPattern(PatternBase):
     """Shell glob patterns to exclude.  A trailing slash means to
     exclude the contents of a directory, but not the directory itself.
     """
+    PREFIX = "fm"
+
     def _prepare(self, pattern):
         if pattern.endswith(os.path.sep):
             pattern = os.path.normpath(pattern).rstrip(os.path.sep) + os.path.sep + '*' + os.path.sep
@@ -390,6 +396,8 @@ class FnmatchPattern(PatternBase):
 class RegexPattern(PatternBase):
     """Regular expression to exclude.
     """
+    PREFIX = "re"
+
     def _prepare(self, pattern):
         self.pattern = pattern
         self.regex = re.compile(pattern)
@@ -402,11 +410,12 @@ class RegexPattern(PatternBase):
         return (self.regex.search(path) is not None)
 
 
-_DEFAULT_PATTERN_STYLE = "fm"
-_PATTERN_STYLES = {
-        "fm": FnmatchPattern,
-        "re": RegexPattern,
-        }
+_PATTERN_STYLES = set([
+    FnmatchPattern,
+    RegexPattern,
+])
+
+_PATTERN_STYLE_BY_PREFIX = dict((i.PREFIX, i) for i in _PATTERN_STYLES)
 
 
 def parse_pattern(pattern):
@@ -415,9 +424,9 @@ def parse_pattern(pattern):
     if len(pattern) > 2 and pattern[2] == ":" and pattern[:2].isalnum():
         (style, pattern) = (pattern[:2], pattern[3:])
     else:
-        style = _DEFAULT_PATTERN_STYLE
+        style = FnmatchPattern.PREFIX
 
-    cls = _PATTERN_STYLES.get(style, None)
+    cls = _PATTERN_STYLE_BY_PREFIX.get(style, None)
 
     if cls is None:
         raise ValueError("Unknown pattern style: {}".format(style))

@@ -76,7 +76,7 @@ def packages_freebsd
     pkg install -y openssl liblz4 fusefs-libs pkgconf
     pkg install -y fakeroot git bash
     # for building python:
-    pkg install sqlite3
+    pkg install -y sqlite3
     # make bash default / work:
     chsh -s bash vagrant
     mount -t fdescfs fdesc /dev/fd
@@ -211,8 +211,7 @@ def install_pyinstaller(boxname)
     . borg-env/bin/activate
     git clone https://github.com/pyinstaller/pyinstaller.git
     cd pyinstaller
-    # use develop branch for now, see borgbackup issue #336
-    git checkout develop
+    git checkout v3.1
     pip install -e .
   EOF
 end
@@ -224,8 +223,7 @@ def install_pyinstaller_bootloader(boxname)
     . borg-env/bin/activate
     git clone https://github.com/pyinstaller/pyinstaller.git
     cd pyinstaller
-    # use develop branch for now, see borgbackup issue #336
-    git checkout develop
+    git checkout v3.1
     # build bootloader, if it is not included
     cd bootloader
     python ./waf all

@@ -228,7 +228,7 @@ class Archiver:
         elif stat.S_ISDIR(st.st_mode):
             tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)
             if tag_paths:
-                if keep_tag_files:
+                if keep_tag_files and not dry_run:
                     archive.process_dir(path, st)
                     for tag_path in tag_paths:
                         self._process(archive, cache, excludes, exclude_caches, exclude_if_present,

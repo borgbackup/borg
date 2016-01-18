@@ -257,21 +257,25 @@ def update_excludes(args):
             file.close()
 
 
-def adjust_patterns(paths, excludes):
-    if paths:
-        return (excludes or []) + [PathPrefixPattern(path) for path in paths] + [FnmatchPattern('*')]
-    else:
-        return excludes
+class PatternMatcher:
+    def __init__(self, fallback=None):
+        self._items = []
 
+        # Value to return from match function when none of the patterns match.
+        self.fallback = fallback
 
-def exclude_path(path, patterns):
-    """Used by create and extract sub-commands to determine
-    whether or not an item should be processed.
-    """
-    for pattern in (patterns or []):
-        if pattern.match(path):
-            return isinstance(pattern, (FnmatchPattern, RegexPattern))
-    return False
+    def add(self, patterns, value):
+        """Add list of patterns to internal list. The given value is returned from the match function when one of the
+        given patterns matches.
+        """
+        self._items.extend((i, value) for i in patterns)
+
+    def match(self, path):
+        for (pattern, value) in self._items:
+            if pattern.match(path):
+                return value
+
+        return self.fallback
 
 
 def normalized(func):
@@ -295,6 +299,8 @@ def normalized(func):
 class PatternBase:
     """Shared logic for inclusion/exclusion patterns.
     """
+    PREFIX = NotImplemented
+
     def __init__(self, pattern):
         self.pattern_orig = pattern
         self.match_count = 0
@@ -339,6 +345,8 @@ class PathPrefixPattern(PatternBase):
     If a directory is specified, all paths that start with that
     path match as well.  A trailing slash makes no difference.
     """
+    PREFIX = "pp"
+
     def _prepare(self, pattern):
         self.pattern = os.path.normpath(pattern).rstrip(os.path.sep) + os.path.sep
 
@@ -350,6 +358,8 @@ class FnmatchPattern(PatternBase):
     """Shell glob patterns to exclude.  A trailing slash means to
     exclude the contents of a directory, but not the directory itself.
     """
+    PREFIX = "fm"
+
     def _prepare(self, pattern):
         if pattern.endswith(os.path.sep):
             pattern = os.path.normpath(pattern).rstrip(os.path.sep) + os.path.sep + '*' + os.path.sep
@@ -369,6 +379,8 @@ class FnmatchPattern(PatternBase):
 class RegexPattern(PatternBase):
     """Regular expression to exclude.
     """
+    PREFIX = "re"
+
     def _prepare(self, pattern):
         self.pattern = pattern
         self.regex = re.compile(pattern)
@@ -381,25 +393,27 @@ class RegexPattern(PatternBase):
         return (self.regex.search(path) is not None)
 
 
-_DEFAULT_PATTERN_STYLE = "fm"
-_PATTERN_STYLES = {
-        "fm": FnmatchPattern,
-        "re": RegexPattern,
-        }
+_PATTERN_STYLES = set([
+    FnmatchPattern,
+    PathPrefixPattern,
+    RegexPattern,
+])
+
+_PATTERN_STYLE_BY_PREFIX = dict((i.PREFIX, i) for i in _PATTERN_STYLES)
 
 
-def parse_pattern(pattern):
+def parse_pattern(pattern, fallback=FnmatchPattern):
     """Read pattern from string and return an instance of the appropriate implementation class.
     """
     if len(pattern) > 2 and pattern[2] == ":" and pattern[:2].isalnum():
         (style, pattern) = (pattern[:2], pattern[3:])
+
+        cls = _PATTERN_STYLE_BY_PREFIX.get(style, None)
+
+        if cls is None:
+            raise ValueError("Unknown pattern style: {}".format(style))
     else:
-        style = _DEFAULT_PATTERN_STYLE
-
-    cls = _PATTERN_STYLES.get(style, None)
-
-    if cls is None:
-        raise ValueError("Unknown pattern style: {}".format(style))
+        cls = fallback
 
     return cls(pattern)
 

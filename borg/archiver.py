@@ -17,11 +17,11 @@ import traceback
 
 from . import __version__
 from .helpers import Error, location_validator, format_time, format_file_size, \
-    format_file_mode, parse_pattern, PathPrefixPattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
+    format_file_mode, parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, prune_within, prune_split, unhexlify, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
-    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi
+    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher
 from .logger import create_logger, setup_logging
 logger = create_logger()
 from .compress import Compressor, COMPR_BUFFER
@@ -129,6 +129,10 @@ class Archiver:
 
     def do_create(self, args):
         """Create new archive"""
+        matcher = PatternMatcher(fallback=True)
+        if args.excludes:
+            matcher.add(args.excludes, False)
+
         def create_inner(archive, cache):
             # Add cache dir to inode_skip list
             skip_inodes = set()
@@ -166,7 +170,7 @@ class Archiver:
                         continue
                 else:
                     restrict_dev = None
-                self._process(archive, cache, args.excludes, args.exclude_caches, args.exclude_if_present,
+                self._process(archive, cache, matcher, args.exclude_caches, args.exclude_if_present,
                               args.keep_tag_files, skip_inodes, path, restrict_dev,
                               read_special=args.read_special, dry_run=dry_run)
             if not dry_run:
@@ -202,11 +206,12 @@ class Archiver:
             create_inner(None, None)
         return self.exit_code
 
-    def _process(self, archive, cache, excludes, exclude_caches, exclude_if_present,
+    def _process(self, archive, cache, matcher, exclude_caches, exclude_if_present,
                  keep_tag_files, skip_inodes, path, restrict_dev,
                  read_special=False, dry_run=False):
-        if exclude_path(path, excludes):
+        if not matcher.match(path):
             return
+
         try:
             st = os.lstat(path)
         except OSError as e:
@@ -235,7 +240,7 @@ class Archiver:
                 if keep_tag_files and not dry_run:
                     archive.process_dir(path, st)
                     for tag_path in tag_paths:
-                        self._process(archive, cache, excludes, exclude_caches, exclude_if_present,
+                        self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
                                       keep_tag_files, skip_inodes, tag_path, restrict_dev,
                                       read_special=read_special, dry_run=dry_run)
                 return
@@ -249,7 +254,7 @@ class Archiver:
             else:
                 for filename in sorted(entries):
                     entry_path = os.path.normpath(os.path.join(path, filename))
-                    self._process(archive, cache, excludes, exclude_caches, exclude_if_present,
+                    self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
                                   keep_tag_files, skip_inodes, entry_path, restrict_dev,
                                   read_special=read_special, dry_run=dry_run)
         elif stat.S_ISLNK(st.st_mode):
@@ -286,13 +291,25 @@ class Archiver:
         manifest, key = Manifest.load(repository)
         archive = Archive(repository, key, manifest, args.location.archive,
                           numeric_owner=args.numeric_owner)
-        patterns = adjust_patterns(args.paths, args.excludes)
+
+        matcher = PatternMatcher()
+        if args.excludes:
+            matcher.add(args.excludes, False)
+
+        include_patterns = []
+
+        if args.paths:
+            include_patterns.extend(parse_pattern(i, PathPrefixPattern) for i in args.paths)
+            matcher.add(include_patterns, True)
+
+        matcher.fallback = not include_patterns
+
         dry_run = args.dry_run
         stdout = args.stdout
         sparse = args.sparse
         strip_components = args.strip_components
         dirs = []
-        for item in archive.iter_items(lambda item: not exclude_path(item[b'path'], patterns), preload=True):
+        for item in archive.iter_items(lambda item: matcher.match(item[b'path']), preload=True):
             orig_path = item[b'path']
             if strip_components:
                 item[b'path'] = os.sep.join(orig_path.split(os.sep)[strip_components:])
@@ -317,8 +334,8 @@ class Archiver:
         if not args.dry_run:
             while dirs:
                 archive.extract_item(dirs.pop(-1))
-        for pattern in (patterns or []):
-            if isinstance(pattern, PathPrefixPattern) and pattern.match_count == 0:
+        for pattern in include_patterns:
+            if pattern.match_count == 0:
                 self.print_warning("Include pattern '%s' never matched.", pattern)
         return self.exit_code
 
@@ -611,12 +628,12 @@ class Archiver:
 
     helptext = {}
     helptext['patterns'] = textwrap.dedent('''
-        Exclusion patterns support two separate styles, fnmatch and regular
-        expressions. If followed by a colon (':') the first two characters of
-        a pattern are used as a style selector. Explicit style selection is necessary
-        when regular expressions are desired or when the desired fnmatch pattern
-        starts with two alphanumeric characters followed by a colon (i.e.
-        `aa:something/*`).
+        Exclusion patterns support three separate styles, fnmatch, regular
+        expressions and path prefixes. If followed by a colon (':') the first two
+        characters of a pattern are used as a style selector. Explicit style
+        selection is necessary when a non-default style is desired or when the
+        desired pattern starts with two alphanumeric characters followed by a colon
+        (i.e. `aa:something/*`).
 
         `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_ patterns use
         a variant of shell pattern syntax, with '*' matching any number of
@@ -639,6 +656,10 @@ class Archiver:
         a pattern. The regular expression syntax is described in the `Python
         documentation for the re module
         <https://docs.python.org/3/library/re.html>`_.
+
+        Prefix path patterns can be selected with the prefix `pp:`. This pattern
+        style is useful to match whole sub-directories. The pattern `pp:/data/bar`
+        matches `/data/bar` and everything therein.
 
         Exclusions can be passed via the command line option `--exclude`. When used
         from within a shell the patterns should be quoted to protect them from
@@ -961,7 +982,7 @@ class Archiver:
                                type=location_validator(archive=True),
                                help='archive to extract')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to extract')
+                               help='paths to extract; patterns are supported')
 
         rename_epilog = textwrap.dedent("""
         This command renames an archive in the repository.

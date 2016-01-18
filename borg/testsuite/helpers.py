@@ -9,10 +9,10 @@ import sys
 import msgpack
 import msgpack.fallback
 
-from ..helpers import adjust_patterns, exclude_path, Location, format_file_size, format_timedelta, PathPrefixPattern, FnmatchPattern, make_path_safe, \
+from ..helpers import Location, format_file_size, format_timedelta, PathPrefixPattern, FnmatchPattern, make_path_safe, \
     prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, yes, RegexPattern, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
-    ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern
+    ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, PatternMatcher
 from . import BaseTestCase, environment_variable, FakeInputs
 
 
@@ -160,70 +160,105 @@ class FormatTimedeltaTestCase(BaseTestCase):
         )
 
 
-def check_patterns(files, paths, excludes, expected):
-    """Utility for testing exclusion patterns.
+def check_patterns(files, pattern, expected):
+    """Utility for testing patterns.
     """
-    patterns = adjust_patterns(paths, excludes)
-    included = [path for path in files if not exclude_path(path, patterns)]
+    assert all([f == os.path.normpath(f) for f in files]), \
+            "Pattern matchers expect normalized input paths"
 
-    assert included == (files if expected is None else expected)
+    matched = [f for f in files if pattern.match(f)]
+
+    assert matched == (files if expected is None else expected)
 
 
-@pytest.mark.parametrize("paths, excludes, expected", [
-    # "None" means all files, i.e. none excluded
-    ([], [], None),
-    (['/'], [], None),
-    (['/'], ['/h'], None),
-    (['/'], ['/home'], ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg']),
-    (['/'], ['/home/'], ['/etc/passwd', '/etc/hosts', '/home', '/var/log/messages', '/var/log/dmesg']),
-    (['/home/u'], [], []),
-    (['/', '/home', '/etc/hosts'], ['/'], []),
-    (['/home/'], ['/home/user2'], ['/home', '/home/user/.profile', '/home/user/.bashrc']),
-    (['/'], ['*.profile', '/var/log'],
-     ['/etc/passwd', '/etc/hosts', '/home', '/home/user/.bashrc', '/home/user2/public_html/index.html']),
-    (['/'], ['/home/*/public_html', '*.profile', '*/log/*'],
-     ['/etc/passwd', '/etc/hosts', '/home', '/home/user/.bashrc']),
-    (['/etc/', '/var'], ['dmesg'], ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg']),
+@pytest.mark.parametrize("pattern, expected", [
+    # "None" means all files, i.e. all match the given pattern
+    ("/", None),
+    ("/./", None),
+    ("", []),
+    ("/home/u", []),
+    ("/home/user", ["/home/user/.profile", "/home/user/.bashrc"]),
+    ("/etc", ["/etc/server/config", "/etc/server/hosts"]),
+    ("///etc//////", ["/etc/server/config", "/etc/server/hosts"]),
+    ("/./home//..//home/user2", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
+    ("/srv", ["/srv/messages", "/srv/dmesg"]),
     ])
-def test_patterns(paths, excludes, expected):
+def test_patterns_prefix(pattern, expected):
     files = [
-        '/etc/passwd', '/etc/hosts', '/home',
-        '/home/user/.profile', '/home/user/.bashrc',
-        '/home/user2/.profile', '/home/user2/public_html/index.html',
-        '/var/log/messages', '/var/log/dmesg',
+        "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
+        "/home/user2/.profile", "/home/user2/public_html/index.html", "/srv/messages", "/srv/dmesg",
     ]
 
-    check_patterns(files, paths, [FnmatchPattern(p) for p in excludes], expected)
+    check_patterns(files, PathPrefixPattern(pattern), expected)
 
 
-@pytest.mark.parametrize("paths, excludes, expected", [
-    # "None" means all files, i.e. none excluded
-    ([], [], None),
-    (['/'], [], None),
-    (['/'], ['.*'], []),
-    (['/'], ['^/'], []),
-    (['/'], ['^abc$'], None),
-    (['/'], ['^(?!/home/)'],
-     ['/home/user/.profile', '/home/user/.bashrc', '/home/user2/.profile',
-      '/home/user2/public_html/index.html']),
+@pytest.mark.parametrize("pattern, expected", [
+    # "None" means all files, i.e. all match the given pattern
+    ("", []),
+    ("foo", []),
+    ("relative", ["relative/path1", "relative/two"]),
+    ("more", ["more/relative"]),
     ])
-def test_patterns_regex(paths, excludes, expected):
+def test_patterns_prefix_relative(pattern, expected):
+    files = ["relative/path1", "relative/two", "more/relative"]
+
+    check_patterns(files, PathPrefixPattern(pattern), expected)
+
+
+@pytest.mark.parametrize("pattern, expected", [
+    # "None" means all files, i.e. all match the given pattern
+    ("/*", None),
+    ("/./*", None),
+    ("*", None),
+    ("*/*", None),
+    ("*///*", None),
+    ("/home/u", []),
+    ("/home/*",
+     ["/home/user/.profile", "/home/user/.bashrc", "/home/user2/.profile", "/home/user2/public_html/index.html",
+      "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails"]),
+    ("/home/user/*", ["/home/user/.profile", "/home/user/.bashrc"]),
+    ("/etc/*", ["/etc/server/config", "/etc/server/hosts"]),
+    ("*/.pr????e", ["/home/user/.profile", "/home/user2/.profile"]),
+    ("///etc//////*", ["/etc/server/config", "/etc/server/hosts"]),
+    ("/./home//..//home/user2/*", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
+    ("/srv*", ["/srv/messages", "/srv/dmesg"]),
+    ("/home/*/.thumbnails", ["/home/foo/.thumbnails", "/home/foo/bar/.thumbnails"]),
+    ])
+def test_patterns_fnmatch(pattern, expected):
+    files = [
+        "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
+        "/home/user2/.profile", "/home/user2/public_html/index.html", "/srv/messages", "/srv/dmesg",
+        "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails",
+    ]
+
+    check_patterns(files, FnmatchPattern(pattern), expected)
+
+
+@pytest.mark.parametrize("pattern, expected", [
+    # "None" means all files, i.e. all match the given pattern
+    ("", None),
+    (".*", None),
+    ("^/", None),
+    ("^abc$", []),
+    ("^[^/]", []),
+    ("^(?!/srv|/foo|/opt)",
+     ["/home", "/home/user/.profile", "/home/user/.bashrc", "/home/user2/.profile",
+      "/home/user2/public_html/index.html", "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails",]),
+    ])
+def test_patterns_regex(pattern, expected):
     files = [
         '/srv/data', '/foo/bar', '/home',
         '/home/user/.profile', '/home/user/.bashrc',
         '/home/user2/.profile', '/home/user2/public_html/index.html',
         '/opt/log/messages.txt', '/opt/log/dmesg.txt',
+        "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails",
     ]
 
-    patterns = []
+    obj = RegexPattern(pattern)
+    assert str(obj) == pattern
+    assert obj.pattern == pattern
 
-    for i in excludes:
-        pat = RegexPattern(i)
-        assert str(pat) == i
-        assert pat.pattern == i
-        patterns.append(pat)
-
-    check_patterns(files, paths, patterns, expected)
+    check_patterns(files, obj, expected)
 
 
 def test_regex_pattern():
@@ -289,6 +324,10 @@ def test_invalid_unicode_pattern(pattern):
      ["/more/data"]),
     ([r"  re:^\s  "], ["/data/something00.txt", "/more/data", "/home", "/whitespace/end\t"]),
     ([r"  re:\s$  "], ["/data/something00.txt", "/more/data", "/home", " #/wsfoobar", "\tstart/whitespace"]),
+    (["pp:./"], None),
+    (["pp:/"], [" #/wsfoobar", "\tstart/whitespace"]),
+    (["pp:aaabbb"], None),
+    (["pp:/data", "pp: #/", "pp:\tstart", "pp:/whitespace"], ["/more/data", "/home"]),
     ])
 def test_patterns_from_file(tmpdir, lines, expected):
     files = [
@@ -299,8 +338,9 @@ def test_patterns_from_file(tmpdir, lines, expected):
     ]
 
     def evaluate(filename):
-        patterns = load_excludes(open(filename, "rt"))
-        return [path for path in files if not exclude_path(path, patterns)]
+        matcher = PatternMatcher(fallback=True)
+        matcher.add(load_excludes(open(filename, "rt")), False)
+        return [path for path in files if matcher.match(path)]
 
     exclfile = tmpdir.join("exclude.txt")
 
@@ -328,6 +368,12 @@ def test_patterns_from_file(tmpdir, lines, expected):
     ("re:.*", RegexPattern),
     ("re:^/something/", RegexPattern),
     ("re:re:^/something/", RegexPattern),
+
+    # Path prefix
+    ("pp:", PathPrefixPattern),
+    ("pp:/", PathPrefixPattern),
+    ("pp:/data/", PathPrefixPattern),
+    ("pp:pp:/data/", PathPrefixPattern),
     ])
 def test_parse_pattern(pattern, cls):
     assert isinstance(parse_pattern(pattern), cls)
@@ -337,6 +383,29 @@ def test_parse_pattern(pattern, cls):
 def test_parse_pattern_error(pattern):
     with pytest.raises(ValueError):
         parse_pattern(pattern)
+
+
+def test_pattern_matcher():
+    pm = PatternMatcher()
+
+    assert pm.fallback is None
+
+    for i in ["", "foo", "bar"]:
+        assert pm.match(i) is None
+
+    pm.add([RegexPattern("^a")], "A")
+    pm.add([RegexPattern("^b"), RegexPattern("^z")], "B")
+    pm.add([RegexPattern("^$")], "Empty")
+    pm.fallback = "FileNotFound"
+
+    assert pm.match("") == "Empty"
+    assert pm.match("aaa") == "A"
+    assert pm.match("bbb") == "B"
+    assert pm.match("ccc") == "FileNotFound"
+    assert pm.match("xyz") == "FileNotFound"
+    assert pm.match("z") == "B"
+
+    assert PatternMatcher(fallback="hey!").fallback == "hey!"
 
 
 def test_compression_specs():

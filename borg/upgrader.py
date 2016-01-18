@@ -267,10 +267,12 @@ class AtticKeyfileKey(KeyfileKey):
         get_keys_dir = cls.get_keys_dir
         id = hexlify(repository.id).decode('ascii')
         keys_dir = get_keys_dir()
+        if not os.path.exists(keys_dir):
+            raise KeyfileNotFoundError(repository.path, keys_dir)
         for name in os.listdir(keys_dir):
             filename = os.path.join(keys_dir, name)
             with open(filename, 'r') as fd:
                 line = fd.readline().strip()
                 if line and line.startswith(cls.FILE_ID) and line[10:] == id:
                     return filename
-        raise KeyfileNotFoundError(repository.path, get_keys_dir())
+        raise KeyfileNotFoundError(repository.path, keys_dir)

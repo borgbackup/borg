@@ -311,7 +311,7 @@ more chunks than estimated above, because 1 file is at least 1 chunk).
 
 If a remote repository is used the repo index will be allocated on the remote side.
 
-E.g. backing up a total count of 1MiB files with a total size of 1TiB.
+E.g. backing up a total count of 1 million files with a total size of 1TiB.
 
 a) with create ``--chunker-params 10,23,16,4095`` (default):
 

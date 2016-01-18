@@ -75,7 +75,7 @@ Some "yes" sayers (if set, they automatically confirm that you really want to do
     BORG_RELOCATED_REPO_ACCESS_IS_OK
         For "Warning: The repository at location ... was previously located at ..."
     BORG_CHECK_I_KNOW_WHAT_I_AM_DOING
-        For "Warning: 'check ``--repair``' is an experimental feature that might result in data loss."
+        For "Warning: '``check --repair``' is an experimental feature that might result in data loss."
     BORG_DELETE_I_KNOW_WHAT_I_AM_DOING
         For "You requested to completely DELETE the repository *including* all archives it contains:  "
 

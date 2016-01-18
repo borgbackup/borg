@@ -9,7 +9,7 @@ import sys
 import msgpack
 import msgpack.fallback
 
-from ..helpers import exclude_path, Location, format_file_size, format_timedelta, PathPrefixPattern, FnmatchPattern, make_path_safe, \
+from ..helpers import Location, format_file_size, format_timedelta, PathPrefixPattern, FnmatchPattern, make_path_safe, \
     prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, yes, RegexPattern, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
     ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, PatternMatcher
@@ -334,8 +334,9 @@ def test_patterns_from_file(tmpdir, lines, expected):
     ]
 
     def evaluate(filename):
-        patterns = load_excludes(open(filename, "rt"))
-        return [path for path in files if not exclude_path(path, patterns)]
+        matcher = PatternMatcher(fallback=True)
+        matcher.add(load_excludes(open(filename, "rt")), False)
+        return [path for path in files if matcher.match(path)]
 
     exclfile = tmpdir.join("exclude.txt")
 

@@ -97,7 +97,8 @@ class Archiver:
         manifest.key = key
         manifest.write()
         repository.commit()
-        Cache(repository, key, manifest, warn_if_unencrypted=False)
+        with Cache(repository, key, manifest, warn_if_unencrypted=False):
+            pass
         return self.exit_code
 
     def do_check(self, args):
@@ -128,6 +129,59 @@ class Archiver:
 
     def do_create(self, args):
         """Create new archive"""
+        def create_inner(archive, cache):
+            # Add cache dir to inode_skip list
+            skip_inodes = set()
+            try:
+                st = os.stat(get_cache_dir())
+                skip_inodes.add((st.st_ino, st.st_dev))
+            except IOError:
+                pass
+            # Add local repository dir to inode_skip list
+            if not args.location.host:
+                try:
+                    st = os.stat(args.location.path)
+                    skip_inodes.add((st.st_ino, st.st_dev))
+                except IOError:
+                    pass
+            for path in args.paths:
+                if path == '-':  # stdin
+                    path = 'stdin'
+                    if not dry_run:
+                        try:
+                            status = archive.process_stdin(path, cache)
+                        except IOError as e:
+                            status = 'E'
+                            self.print_warning('%s: %s', path, e)
+                    else:
+                        status = '-'
+                    self.print_file_status(status, path)
+                    continue
+                path = os.path.normpath(path)
+                if args.one_file_system:
+                    try:
+                        restrict_dev = os.lstat(path).st_dev
+                    except OSError as e:
+                        self.print_warning('%s: %s', path, e)
+                        continue
+                else:
+                    restrict_dev = None
+                self._process(archive, cache, args.excludes, args.exclude_caches, args.exclude_if_present,
+                              args.keep_tag_files, skip_inodes, path, restrict_dev,
+                              read_special=args.read_special, dry_run=dry_run)
+            if not dry_run:
+                archive.save(timestamp=args.timestamp)
+                if args.progress:
+                    archive.stats.show_progress(final=True)
+                if args.stats:
+                    archive.end = datetime.now()
+                    log_multi(DASHES,
+                              str(archive),
+                              DASHES,
+                              str(archive.stats),
+                              str(cache),
+                              DASHES)
+
         self.output_filter = args.output_filter
         self.output_list = args.output_list
         dry_run = args.dry_run
@@ -138,64 +192,14 @@ class Archiver:
             compr_args = dict(buffer=COMPR_BUFFER)
             compr_args.update(args.compression)
             key.compressor = Compressor(**compr_args)
-            cache = Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait)
-            archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
-                              create=True, checkpoint_interval=args.checkpoint_interval,
-                              numeric_owner=args.numeric_owner, progress=args.progress,
-                              chunker_params=args.chunker_params, start=t0)
+            with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
+                archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
+                                  create=True, checkpoint_interval=args.checkpoint_interval,
+                                  numeric_owner=args.numeric_owner, progress=args.progress,
+                                  chunker_params=args.chunker_params, start=t0)
+                create_inner(archive, cache)
         else:
-            archive = cache = None
-        # Add cache dir to inode_skip list
-        skip_inodes = set()
-        try:
-            st = os.stat(get_cache_dir())
-            skip_inodes.add((st.st_ino, st.st_dev))
-        except IOError:
-            pass
-        # Add local repository dir to inode_skip list
-        if not args.location.host:
-            try:
-                st = os.stat(args.location.path)
-                skip_inodes.add((st.st_ino, st.st_dev))
-            except IOError:
-                pass
-        for path in args.paths:
-            if path == '-':  # stdin
-                path = 'stdin'
-                if not dry_run:
-                    try:
-                        status = archive.process_stdin(path, cache)
-                    except IOError as e:
-                        status = 'E'
-                        self.print_warning('%s: %s', path, e)
-                else:
-                    status = '-'
-                self.print_file_status(status, path)
-                continue
-            path = os.path.normpath(path)
-            if args.one_file_system:
-                try:
-                    restrict_dev = os.lstat(path).st_dev
-                except OSError as e:
-                    self.print_warning('%s: %s', path, e)
-                    continue
-            else:
-                restrict_dev = None
-            self._process(archive, cache, args.excludes, args.exclude_caches, args.exclude_if_present,
-                          args.keep_tag_files, skip_inodes, path, restrict_dev,
-                          read_special=args.read_special, dry_run=dry_run)
-        if not dry_run:
-            archive.save(timestamp=args.timestamp)
-            if args.progress:
-                archive.stats.show_progress(final=True)
-            if args.stats:
-                archive.end = datetime.now()
-                log_multi(DASHES,
-                          str(archive),
-                          DASHES,
-                          str(archive.stats),
-                          str(cache),
-                          DASHES)
+            create_inner(None, None)
         return self.exit_code
 
     def _process(self, archive, cache, excludes, exclude_caches, exclude_if_present,
@@ -322,48 +326,48 @@ class Archiver:
         """Rename an existing archive"""
         repository = self.open_repository(args, exclusive=True)
         manifest, key = Manifest.load(repository)
-        cache = Cache(repository, key, manifest, lock_wait=self.lock_wait)
-        archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
-        archive.rename(args.name)
-        manifest.write()
-        repository.commit()
-        cache.commit()
+        with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
+            archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
+            archive.rename(args.name)
+            manifest.write()
+            repository.commit()
+            cache.commit()
         return self.exit_code
 
     def do_delete(self, args):
         """Delete an existing repository or archive"""
         repository = self.open_repository(args, exclusive=True)
         manifest, key = Manifest.load(repository)
-        cache = Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait)
-        if args.location.archive:
-            archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
-            stats = Statistics()
-            archive.delete(stats, progress=args.progress)
-            manifest.write()
-            repository.commit(save_space=args.save_space)
-            cache.commit()
-            logger.info("Archive deleted.")
-            if args.stats:
-                log_multi(DASHES,
-                          stats.summary.format(label='Deleted data:', stats=stats),
-                          str(cache),
-                          DASHES)
-        else:
-            if not args.cache_only:
-                msg = []
-                msg.append("You requested to completely DELETE the repository *including* all archives it contains:")
-                for archive_info in manifest.list_archive_infos(sort_by='ts'):
-                    msg.append(format_archive(archive_info))
-                msg.append("Type 'YES' if you understand this and want to continue: ")
-                msg = '\n'.join(msg)
-                if not yes(msg, false_msg="Aborting.", default_notty=False,
-                           env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING', truish=('YES', )):
-                    self.exit_code = EXIT_ERROR
-                    return self.exit_code
-                repository.destroy()
-                logger.info("Repository deleted.")
-            cache.destroy()
-            logger.info("Cache deleted.")
+        with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
+            if args.location.archive:
+                archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
+                stats = Statistics()
+                archive.delete(stats, progress=args.progress)
+                manifest.write()
+                repository.commit(save_space=args.save_space)
+                cache.commit()
+                logger.info("Archive deleted.")
+                if args.stats:
+                    log_multi(DASHES,
+                              stats.summary.format(label='Deleted data:', stats=stats),
+                              str(cache),
+                              DASHES)
+            else:
+                if not args.cache_only:
+                    msg = []
+                    msg.append("You requested to completely DELETE the repository *including* all archives it contains:")
+                    for archive_info in manifest.list_archive_infos(sort_by='ts'):
+                        msg.append(format_archive(archive_info))
+                    msg.append("Type 'YES' if you understand this and want to continue: ")
+                    msg = '\n'.join(msg)
+                    if not yes(msg, false_msg="Aborting.", default_notty=False,
+                               env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING', truish=('YES', )):
+                        self.exit_code = EXIT_ERROR
+                        return self.exit_code
+                    repository.destroy()
+                    logger.info("Repository deleted.")
+                cache.destroy()
+                logger.info("Cache deleted.")
         return self.exit_code
 
     def do_mount(self, args):
@@ -445,26 +449,25 @@ class Archiver:
         """Show archive details such as disk space used"""
         repository = self.open_repository(args)
         manifest, key = Manifest.load(repository)
-        cache = Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait)
-        archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
-        stats = archive.calc_stats(cache)
-        print('Name:', archive.name)
-        print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
-        print('Hostname:', archive.metadata[b'hostname'])
-        print('Username:', archive.metadata[b'username'])
-        print('Time: %s' % format_time(to_localtime(archive.ts)))
-        print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
-        print('Number of files: %d' % stats.nfiles)
-        print()
-        print(str(stats))
-        print(str(cache))
+        with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
+            archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
+            stats = archive.calc_stats(cache)
+            print('Name:', archive.name)
+            print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
+            print('Hostname:', archive.metadata[b'hostname'])
+            print('Username:', archive.metadata[b'username'])
+            print('Time: %s' % format_time(to_localtime(archive.ts)))
+            print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
+            print('Number of files: %d' % stats.nfiles)
+            print()
+            print(str(stats))
+            print(str(cache))
         return self.exit_code
 
     def do_prune(self, args):
         """Prune repository archives according to specified rules"""
         repository = self.open_repository(args, exclusive=True)
         manifest, key = Manifest.load(repository)
-        cache = Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait)
         archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
         if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0 and args.within is None:
             self.print_error('At least one of the "within", "keep-hourly", "keep-daily", "keep-weekly", '
@@ -489,23 +492,24 @@ class Archiver:
         keep.sort(key=attrgetter('ts'), reverse=True)
         to_delete = [a for a in archives if a not in keep]
         stats = Statistics()
-        for archive in keep:
-            logger.info('Keeping archive: %s' % format_archive(archive))
-        for archive in to_delete:
-            if args.dry_run:
-                logger.info('Would prune:     %s' % format_archive(archive))
-            else:
-                logger.info('Pruning archive: %s' % format_archive(archive))
-                Archive(repository, key, manifest, archive.name, cache).delete(stats)
-        if to_delete and not args.dry_run:
-            manifest.write()
-            repository.commit(save_space=args.save_space)
-            cache.commit()
-        if args.stats:
-            log_multi(DASHES,
-                      stats.summary.format(label='Deleted data:', stats=stats),
-                      str(cache),
-                      DASHES)
+        with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
+            for archive in keep:
+                logger.info('Keeping archive: %s' % format_archive(archive))
+            for archive in to_delete:
+                if args.dry_run:
+                    logger.info('Would prune:     %s' % format_archive(archive))
+                else:
+                    logger.info('Pruning archive: %s' % format_archive(archive))
+                    Archive(repository, key, manifest, archive.name, cache).delete(stats)
+            if to_delete and not args.dry_run:
+                manifest.write()
+                repository.commit(save_space=args.save_space)
+                cache.commit()
+            if args.stats:
+                log_multi(DASHES,
+                          stats.summary.format(label='Deleted data:', stats=stats),
+                          str(cache),
+                          DASHES)
         return self.exit_code
 
     def do_upgrade(self, args):

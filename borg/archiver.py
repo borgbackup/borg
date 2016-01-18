@@ -611,12 +611,12 @@ class Archiver:
 
     helptext = {}
     helptext['patterns'] = textwrap.dedent('''
-        Exclusion patterns support two separate styles, fnmatch and regular
-        expressions. If followed by a colon (':') the first two characters of
-        a pattern are used as a style selector. Explicit style selection is necessary
-        when regular expressions are desired or when the desired fnmatch pattern
-        starts with two alphanumeric characters followed by a colon (i.e.
-        `aa:something/*`).
+        Exclusion patterns support three separate styles, fnmatch, regular
+        expressions and path prefixes. If followed by a colon (':') the first two
+        characters of a pattern are used as a style selector. Explicit style
+        selection is necessary when a non-default style is desired or when the
+        desired pattern starts with two alphanumeric characters followed by a colon
+        (i.e. `aa:something/*`).
 
         `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_ patterns use
         a variant of shell pattern syntax, with '*' matching any number of
@@ -639,6 +639,10 @@ class Archiver:
         a pattern. The regular expression syntax is described in the `Python
         documentation for the re module
         <https://docs.python.org/3/library/re.html>`_.
+
+        Prefix path patterns can be selected with the prefix `pp:`. This pattern
+        style is useful to match whole sub-directories. The pattern `pp:/data/bar`
+        matches `/data/bar` and everything therein.
 
         Exclusions can be passed via the command line option `--exclude`. When used
         from within a shell the patterns should be quoted to protect them from

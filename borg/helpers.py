@@ -412,6 +412,7 @@ class RegexPattern(PatternBase):
 
 _PATTERN_STYLES = set([
     FnmatchPattern,
+    PathPrefixPattern,
     RegexPattern,
 ])
 

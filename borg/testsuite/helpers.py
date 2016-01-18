@@ -324,6 +324,10 @@ def test_invalid_unicode_pattern(pattern):
      ["/more/data"]),
     ([r"  re:^\s  "], ["/data/something00.txt", "/more/data", "/home", "/whitespace/end\t"]),
     ([r"  re:\s$  "], ["/data/something00.txt", "/more/data", "/home", " #/wsfoobar", "\tstart/whitespace"]),
+    (["pp:./"], None),
+    (["pp:/"], [" #/wsfoobar", "\tstart/whitespace"]),
+    (["pp:aaabbb"], None),
+    (["pp:/data", "pp: #/", "pp:\tstart", "pp:/whitespace"], ["/more/data", "/home"]),
     ])
 def test_patterns_from_file(tmpdir, lines, expected):
     files = [
@@ -364,6 +368,12 @@ def test_patterns_from_file(tmpdir, lines, expected):
     ("re:.*", RegexPattern),
     ("re:^/something/", RegexPattern),
     ("re:re:^/something/", RegexPattern),
+
+    # Path prefix
+    ("pp:", PathPrefixPattern),
+    ("pp:/", PathPrefixPattern),
+    ("pp:/data/", PathPrefixPattern),
+    ("pp:pp:/data/", PathPrefixPattern),
     ])
 def test_parse_pattern(pattern, cls):
     assert isinstance(parse_pattern(pattern), cls)

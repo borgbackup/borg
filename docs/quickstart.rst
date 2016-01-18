@@ -207,7 +207,7 @@ the remote server's authorized_keys file. Only the forced command will be run
 when the key authenticates a connection. This example will start |project_name| in server
 mode, and limit the |project_name| server to a specific filesystem path::
 
-  command="borg serve --restrict-to-path /mnt/backup" ssh-rsa AAAAB3[...]
+  command="borg serve --restrict-to-path /mnt/backup",no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-user-rc ssh-rsa AAAAB3[...]
 
 If it is not possible to install |project_name| on the remote host,
 it is still possible to use the remote host to store a repository by

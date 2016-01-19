@@ -1,6 +1,69 @@
 Changelog
 =========
 
+Version 0.30.0 (not released yet)
+---------------------------------
+
+Compatibility notes:
+
+- you may need to use -v (or --info) more often to actually see output emitted
+  at INFO log level (because it is suppressed at the default WARNING log level).
+  See the "general" section in the usage docs.
+- see below about BORG_DELETE_I_KNOW_WHAT_I_AM_DOING (was:
+  BORG_CHECK_I_KNOW_WHAT_I_AM_DOING)
+
+Bug fixes:
+
+- fix crash when using borg create --dry-run --keep-tag-files, #570
+- make sure teardown with cleanup happens for Cache and RepositoryCache,
+  avoiding leftover locks and TEMP dir contents, #285 (partially), #548
+- fix locking KeyError, partial fix for #502
+- log stats consistently, #526
+- add abbreviated weekday to timestamp format, fixes #496
+- strip whitespace when loading exclusions from file
+- unset LD_LIBRARY_PATH before invoking ssh, fixes strange OpenSSL library
+  version warning when using the borg binary, #514
+- add some error handling/fallback for C library loading, #494
+- added BORG_DELETE_I_KNOW_WHAT_I_AM_DOING for check in "borg delete", #503
+- remove unused "repair" rpc method name
+
+New features:
+
+- implement exclusions using regular expression patterns.
+- support patterns for borg extract, #361
+- support different styles for patterns:
+
+  - fnmatch (fm: prefix, default when omitted), like borg <= 0.29.
+  - regular expression (re:), new!
+- --progress option for borg upgrade (#291) and borg delete <archive>
+- update progress indication more often (e.g. within big files), #500
+- finer chunker granularity for items metadata stream, #547, #487
+- borg create --list now used (additionally to -v) to enable the verbose
+  file list output
+- display borg version below tracebacks, #532
+
+Other changes:
+
+- hashtable size (and thus: RAM and disk consumption) follows a growth policy:
+  grows fast while small, grows slower when getting bigger, #527
+- Vagrantfile: use pyinstaller 3.1 to build binaries, freebsd sqlite3 fix,
+  fixes #569
+- docs:
+
+  - important: clarify -v and log levels in usage -> general, please read!
+  - sphinx configuration: create a simple man page from usage docs
+  - add a repo server setup example
+  - disable unneeded SSH features in authorized_keys examples for security.
+  - borg prune only knows "--keep-within" and not "--within"
+  - add gource video to resources docs, #507
+  - authors: make it more clear what refers to borg and what to attic
+  - document standalone binary requirements, #499
+  - rephrase the mailing list section
+  - development docs: run build_api and build_usage before tagging release
+  - internals docs: hash table max. load factor is 0.75 now
+  - markup, typo, grammar, phrasing, clarifications and other fixes.
+
+
 Version 0.29.0
 --------------
 

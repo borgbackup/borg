@@ -229,6 +229,9 @@ Examples
     # Backup ~/Documents into an archive named "my-documents"
     $ borg create /mnt/backup::my-documents ~/Documents
 
+    # Backup ~/Documents into a remote archive named "my-documents"
+    $ borg create user@hostname:backup::my-documents ~/Documents
+
     # Backup ~/Documents and ~/src but exclude pyc files
     $ borg create /mnt/backup::my-files   \
         ~/Documents                       \
@@ -272,6 +275,9 @@ Examples
     # Extract entire archive
     $ borg extract /mnt/backup::my-files
 
+    # Extract entire archive from a remote repository
+    $ borg extract user@hostname:backup::my-files
+
     # Extract entire archive and list files while processing
     $ borg extract -v --list /mnt/backup::my-files
 
@@ -300,6 +306,9 @@ Examples
     $ borg list /mnt/backup
     newname                              Mon Nov  2 20:40:06 2015
 
+    # Renaming a remote archive:
+    $ borg rename user@hostname:backup::archivename newname
+
 
 .. include:: usage/delete.rst.inc
 
@@ -310,6 +319,14 @@ Examples
 ::
 
     $ borg list /mnt/backup
+    my-files            Thu Aug  1 23:33:22 2013
+    my-documents        Thu Aug  1 23:35:43 2013
+    root-2013-08-01     Thu Aug  1 23:43:55 2013
+    root-2013-08-02     Fri Aug  2 15:18:17 2013
+    ...
+
+    # Listing the contents of a remote repository:
+    $ borg list user@hostname:backup
     my-files            Thu Aug  1 23:33:22 2013
     my-documents        Thu Aug  1 23:35:43 2013
     root-2013-08-01     Thu Aug  1 23:43:55 2013
@@ -358,6 +375,9 @@ will see what it would do without it actually doing anything.
     # and an end of month archive for every month:
     $ borg prune --keep-within=10d --keep-weekly=4 --keep-monthly=-1 /mnt/backup
 
+    # Same as above but with a remote repository:
+    $ borg prune user@hostname:backup --keep-within=10d --keep-weekly=4 --keep-monthly=-1
+
 
 .. include:: usage/info.rst.inc
 
@@ -377,6 +397,19 @@ Examples
     Compressed size: 1748189642 (1.63 GB)
     Unique data: 64805454 (61.80 MB)
 
+    # Same as above but with a remote repository:
+    $ borg info user@hostname:backup::root-2013-08-02
+    Name: root-2013-08-02
+    Fingerprint: bc3902e2c79b6d25f5d769b335c5c49331e6537f324d8d3badcb9a0917536dbb
+    Hostname: myhostname
+    Username: root
+    Time: Fri Aug  2 15:18:17 2013
+    Command line: /usr/bin/borg create --stats -C zlib,6 /mnt/backup::root-2013-08-02 / --do-not-cross-mountpoints
+    Number of files: 147429
+    Original size: 5344169493 (4.98 GB)
+    Compressed size: 1748189642 (1.63 GB)
+    Unique data: 64805454 (61.80 MB)
+
 
 .. include:: usage/mount.rst.inc
 
@@ -385,6 +418,12 @@ Examples
 ::
 
     $ borg mount /mnt/backup::root-2013-08-02 /tmp/mymountpoint
+    $ ls /tmp/mymountpoint
+    bin  boot  etc  lib  lib64  mnt  opt  root  sbin  srv  usr  var
+    $ fusermount -u /tmp/mymountpoint
+
+    # Same as above but with a remote repository:
+    $ borg mount user@hostname:backup::root-2013-08-02 /tmp/mymountpoint
     $ ls /tmp/mymountpoint
     bin  boot  etc  lib  lib64  mnt  opt  root  sbin  srv  usr  var
     $ fusermount -u /tmp/mymountpoint

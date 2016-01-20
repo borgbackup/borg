@@ -29,11 +29,14 @@ Bug fixes:
 
 New features:
 
-- implement exclusions using regular expression patterns.
-- support patterns for borg extract, #361
+- borg create: implement exclusions using regular expression patterns.
+- borg create: implement inclusions using patterns.
+- borg extract: support patterns, #361
 - support different styles for patterns:
 
   - fnmatch (fm: prefix, default when omitted), like borg <= 0.29.
+  - path prefix (pp: prefix, for unifying borg create pp1 pp2 into the
+    patterns system), semantics like in borg <= 0.29
   - regular expression (re:), new!
 - --progress option for borg upgrade (#291) and borg delete <archive>
 - update progress indication more often (e.g. within big files), #500

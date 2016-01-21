@@ -642,11 +642,20 @@ class Archiver:
             matching any single character specified, including ranges, and '[!...]'
             matching any character not specified. For the purpose of these patterns,
             the path separator ('\\' for Windows and '/' on other systems) is not
-            treated specially. For a path to match a pattern, it must completely
-            match from start to end, or must match from the start to just before
-            a path separator. Except for the root path, paths will never end in the
-            path separator when matching is attempted. Thus, if a given pattern ends
-            in a path separator, a '*' is appended before matching is attempted.
+            treated specially. Wrap meta-characters in brackets for a literal match
+            (i.e. `[?]` to match the literal character `?`). For a path to match
+            a pattern, it must completely match from start to end, or must match from
+            the start to just before a path separator. Except for the root path,
+            paths will never end in the path separator when matching is attempted.
+            Thus, if a given pattern ends in a path separator, a '*' is appended
+            before matching is attempted.
+
+        Shell-style patterns, selector `sh:`
+
+            Like fnmatch patterns these are similar to shell patterns. The difference
+            is that the pattern may include `**/` for matching zero or more directory
+            levels, `*` for matching zero or more arbitrary characters with the
+            exception of any path separator.
 
         Regular expressions, selector `re:`
 
@@ -701,6 +710,7 @@ class Archiver:
         *.tmp
         fm:aa:something/*
         re:^/home/[^/]\.tmp/
+        sh:/home/*/.thumbnails
         EOF
         $ borg create --exclude-from exclude.txt backup /
         ''')

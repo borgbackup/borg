@@ -139,6 +139,7 @@ Install the dependencies with development headers::
     sudo dnf install openssl-devel openssl
     sudo dnf install libacl-devel libacl
     sudo dnf install lz4-devel
+    sudo dnf install gcc gcc-c++
     sudo dnf install fuse-devel fuse pkgconfig         # optional, for FUSE support
 
 

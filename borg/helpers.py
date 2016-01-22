@@ -30,6 +30,7 @@ from . import __version__ as borg_version
 from . import hashindex
 from . import chunker
 from . import crypto
+from . import shellpattern
 import msgpack
 import msgpack.fallback
 
@@ -332,11 +333,9 @@ class PatternBase:
         raise NotImplementedError
 
 
-# For both PathPrefixPattern and FnmatchPattern, we require that
-# the pattern either match the whole path or an initial segment
-# of the path up to but not including a path separator.  To
-# unify the two cases, we add a path separator to the end of
-# the path before matching.
+# For PathPrefixPattern, FnmatchPattern and ShellPattern, we require that the pattern either match the whole path
+# or an initial segment of the path up to but not including a path separator. To unify the two cases, we add a path
+# separator to the end of the path before matching.
 
 
 class PathPrefixPattern(PatternBase):
@@ -376,6 +375,27 @@ class FnmatchPattern(PatternBase):
         return (self.regex.match(path + os.path.sep) is not None)
 
 
+class ShellPattern(PatternBase):
+    """Shell glob patterns to exclude.  A trailing slash means to
+    exclude the contents of a directory, but not the directory itself.
+    """
+    PREFIX = "sh"
+
+    def _prepare(self, pattern):
+        sep = os.path.sep
+
+        if pattern.endswith(sep):
+            pattern = os.path.normpath(pattern).rstrip(sep) + sep + "**" + sep + "*" + sep
+        else:
+            pattern = os.path.normpath(pattern) + sep + "**" + sep + "*"
+
+        self.pattern = pattern
+        self.regex = re.compile(shellpattern.translate(self.pattern))
+
+    def _match(self, path):
+        return (self.regex.match(path + os.path.sep) is not None)
+
+
 class RegexPattern(PatternBase):
     """Regular expression to exclude.
     """
@@ -397,6 +417,7 @@ _PATTERN_STYLES = set([
     FnmatchPattern,
     PathPrefixPattern,
     RegexPattern,
+    ShellPattern,
 ])
 
 _PATTERN_STYLE_BY_PREFIX = dict((i.PREFIX, i) for i in _PATTERN_STYLES)

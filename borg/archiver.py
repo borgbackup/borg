@@ -628,38 +628,50 @@ class Archiver:
 
     helptext = {}
     helptext['patterns'] = textwrap.dedent('''
-        Exclusion patterns support three separate styles, fnmatch, regular
+        Exclusion patterns support four separate styles, fnmatch, shell, regular
         expressions and path prefixes. If followed by a colon (':') the first two
         characters of a pattern are used as a style selector. Explicit style
         selection is necessary when a non-default style is desired or when the
         desired pattern starts with two alphanumeric characters followed by a colon
         (i.e. `aa:something/*`).
 
-        `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_ patterns use
-        a variant of shell pattern syntax, with '*' matching any number of
-        characters, '?' matching any single character, '[...]' matching any single
-        character specified, including ranges, and '[!...]' matching any character
-        not specified. The style selector is `fm`. For the purpose of these patterns,
-        the path separator ('\\' for Windows and '/' on other systems) is not treated
-        specially. For a path to match a pattern, it must completely match from start
-        to end, or must match from the start to just before a path separator. Except
-        for the root path, paths will never end in the path separator when matching
-        is attempted. Thus, if a given pattern ends in a path separator, a '*' is
-        appended before matching is attempted.
+        `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_, selector `fm:`
 
-        Regular expressions similar to those found in Perl are supported with the
-        selection prefix `re:`. Unlike shell patterns regular expressions are not
-        required to match the complete path and any substring match is sufficient. It
-        is strongly recommended to anchor patterns to the start ('^'), to the end
-        ('$') or both. Path separators ('\\' for Windows and '/' on other systems) in
-        paths are always normalized to a forward slash ('/') before applying
-        a pattern. The regular expression syntax is described in the `Python
-        documentation for the re module
-        <https://docs.python.org/3/library/re.html>`_.
+            These patterns use a variant of shell pattern syntax, with '*' matching
+            any number of characters, '?' matching any single character, '[...]'
+            matching any single character specified, including ranges, and '[!...]'
+            matching any character not specified. For the purpose of these patterns,
+            the path separator ('\\' for Windows and '/' on other systems) is not
+            treated specially. Wrap meta-characters in brackets for a literal match
+            (i.e. `[?]` to match the literal character `?`). For a path to match
+            a pattern, it must completely match from start to end, or must match from
+            the start to just before a path separator. Except for the root path,
+            paths will never end in the path separator when matching is attempted.
+            Thus, if a given pattern ends in a path separator, a '*' is appended
+            before matching is attempted.
 
-        Prefix path patterns can be selected with the prefix `pp:`. This pattern
-        style is useful to match whole sub-directories. The pattern `pp:/data/bar`
-        matches `/data/bar` and everything therein.
+        Shell-style patterns, selector `sh:`
+
+            Like fnmatch patterns these are similar to shell patterns. The difference
+            is that the pattern may include `**/` for matching zero or more directory
+            levels, `*` for matching zero or more arbitrary characters with the
+            exception of any path separator.
+
+        Regular expressions, selector `re:`
+
+            Regular expressions similar to those found in Perl are supported. Unlike
+            shell patterns regular expressions are not required to match the complete
+            path and any substring match is sufficient. It is strongly recommended to
+            anchor patterns to the start ('^'), to the end ('$') or both. Path
+            separators ('\\' for Windows and '/' on other systems) in paths are
+            always normalized to a forward slash ('/') before applying a pattern. The
+            regular expression syntax is described in the `Python documentation for
+            the re module <https://docs.python.org/3/library/re.html>`_.
+
+        Prefix path, selector `pp:`
+
+            This pattern style is useful to match whole sub-directories. The pattern
+            `pp:/data/bar` matches `/data/bar` and everything therein.
 
         Exclusions can be passed via the command line option `--exclude`. When used
         from within a shell the patterns should be quoted to protect them from
@@ -698,6 +710,7 @@ class Archiver:
         *.tmp
         fm:aa:something/*
         re:^/home/[^/]\.tmp/
+        sh:/home/*/.thumbnails
         EOF
         $ borg create --exclude-from exclude.txt backup /
         ''')

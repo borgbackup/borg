@@ -12,7 +12,8 @@ import msgpack.fallback
 from ..helpers import Location, format_file_size, format_timedelta, PathPrefixPattern, FnmatchPattern, make_path_safe, \
     prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, yes, RegexPattern, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
-    ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, PatternMatcher
+    ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, PatternMatcher, \
+    ShellPattern
 from . import BaseTestCase, environment_variable, FakeInputs
 
 
@@ -236,6 +237,45 @@ def test_patterns_fnmatch(pattern, expected):
 
 @pytest.mark.parametrize("pattern, expected", [
     # "None" means all files, i.e. all match the given pattern
+    ("*", None),
+    ("**/*", None),
+    ("/**/*", None),
+    ("/./*", None),
+    ("*/*", None),
+    ("*///*", None),
+    ("/home/u", []),
+    ("/home/*",
+     ["/home/user/.profile", "/home/user/.bashrc", "/home/user2/.profile", "/home/user2/public_html/index.html",
+      "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails"]),
+    ("/home/user/*", ["/home/user/.profile", "/home/user/.bashrc"]),
+    ("/etc/*/*", ["/etc/server/config", "/etc/server/hosts"]),
+    ("/etc/**/*", ["/etc/server/config", "/etc/server/hosts"]),
+    ("/etc/**/*/*", ["/etc/server/config", "/etc/server/hosts"]),
+    ("*/.pr????e", []),
+    ("**/.pr????e", ["/home/user/.profile", "/home/user2/.profile"]),
+    ("///etc//////*", ["/etc/server/config", "/etc/server/hosts"]),
+    ("/./home//..//home/user2/", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
+    ("/./home//..//home/user2/**/*", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
+    ("/srv*/", ["/srv/messages", "/srv/dmesg", "/srv2/blafasel"]),
+    ("/srv*", ["/srv", "/srv/messages", "/srv/dmesg", "/srv2", "/srv2/blafasel"]),
+    ("/srv/*", ["/srv/messages", "/srv/dmesg"]),
+    ("/srv2/**", ["/srv2", "/srv2/blafasel"]),
+    ("/srv2/**/", ["/srv2/blafasel"]),
+    ("/home/*/.thumbnails", ["/home/foo/.thumbnails"]),
+    ("/home/*/*/.thumbnails", ["/home/foo/bar/.thumbnails"]),
+    ])
+def test_patterns_shell(pattern, expected):
+    files = [
+        "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
+        "/home/user2/.profile", "/home/user2/public_html/index.html", "/srv", "/srv/messages", "/srv/dmesg",
+        "/srv2", "/srv2/blafasel", "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails",
+    ]
+
+    check_patterns(files, ShellPattern(pattern), expected)
+
+
+@pytest.mark.parametrize("pattern, expected", [
+    # "None" means all files, i.e. all match the given pattern
     ("", None),
     (".*", None),
     ("^/", None),
@@ -276,6 +316,7 @@ def _make_test_patterns(pattern):
     return [PathPrefixPattern(pattern),
             FnmatchPattern(pattern),
             RegexPattern("^{}/foo$".format(pattern)),
+            ShellPattern(pattern),
             ]
 
 
@@ -374,6 +415,12 @@ def test_patterns_from_file(tmpdir, lines, expected):
     ("pp:/", PathPrefixPattern),
     ("pp:/data/", PathPrefixPattern),
     ("pp:pp:/data/", PathPrefixPattern),
+
+    # Shell-pattern style
+    ("sh:", ShellPattern),
+    ("sh:*", ShellPattern),
+    ("sh:/data/*", ShellPattern),
+    ("sh:sh:/data/*", ShellPattern),
     ])
 def test_parse_pattern(pattern, cls):
     assert isinstance(parse_pattern(pattern), cls)

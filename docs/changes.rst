@@ -1,8 +1,8 @@
 Changelog
 =========
 
-Version 0.30.0 (not released yet)
----------------------------------
+Version 0.30.0
+--------------
 
 Compatibility notes:
 
@@ -43,7 +43,8 @@ New features:
     patterns system), semantics like in borg <= 0.29
   - regular expression (`re:`), new!
 - --progress option for borg upgrade (#291) and borg delete <archive>
-- update progress indication more often (e.g. within big files), #500
+- update progress indication more often (e.g. for borg create within big
+  files or for borg check repo), #500
 - finer chunker granularity for items metadata stream, #547, #487
 - borg create --list now used (additionally to -v) to enable the verbose
   file list output
@@ -55,6 +56,10 @@ Other changes:
   grows fast while small, grows slower when getting bigger, #527
 - Vagrantfile: use pyinstaller 3.1 to build binaries, freebsd sqlite3 fix,
   fixes #569
+- no separate binaries for centos6 any more because the generic linux binaries
+  also work on centos6 (or in general: on systems with a slightly older glibc
+  than debian7
+- dev environment: require virtualenv<14.0 so we get a py32 compatible pip
 - docs:
 
   - important: clarify -v and log levels in usage -> general, please read!
@@ -63,12 +68,14 @@ Other changes:
   - disable unneeded SSH features in authorized_keys examples for security.
   - borg prune only knows "--keep-within" and not "--within"
   - add gource video to resources docs, #507
+  - add netbsd install instructions
   - authors: make it more clear what refers to borg and what to attic
   - document standalone binary requirements, #499
   - rephrase the mailing list section
   - development docs: run build_api and build_usage before tagging release
   - internals docs: hash table max. load factor is 0.75 now
   - markup, typo, grammar, phrasing, clarifications and other fixes.
+  - add gcc gcc-c++ to redhat/fedora/corora install docs, fixes #583
 
 
 Version 0.29.0

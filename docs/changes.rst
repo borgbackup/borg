@@ -34,10 +34,12 @@ New features:
 - borg extract: support patterns, #361
 - support different styles for patterns:
 
-  - fnmatch (fm: prefix, default when omitted), like borg <= 0.29.
-  - path prefix (pp: prefix, for unifying borg create pp1 pp2 into the
+  - fnmatch (`fm:` prefix, default when omitted), like borg <= 0.29.
+  - shell (`sh:` prefix) with `*` not matching directory separators and
+    `**/` matching 0..n directories
+  - path prefix (`pp:` prefix, for unifying borg create pp1 pp2 into the
     patterns system), semantics like in borg <= 0.29
-  - regular expression (re:), new!
+  - regular expression (`re:`), new!
 - --progress option for borg upgrade (#291) and borg delete <archive>
 - update progress indication more often (e.g. within big files), #500
 - finer chunker granularity for items metadata stream, #547, #487

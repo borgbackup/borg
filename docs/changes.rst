@@ -62,6 +62,7 @@ Other changes:
 - dev environment: require virtualenv<14.0 so we get a py32 compatible pip
 - docs:
 
+  - add space-saving chunks.archive.d trick to FAQ
   - important: clarify -v and log levels in usage -> general, please read!
   - sphinx configuration: create a simple man page from usage docs
   - add a repo server setup example

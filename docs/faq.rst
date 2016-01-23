@@ -111,6 +111,33 @@ into the repository.
 Yes, as an attacker with access to the remote server could delete (or
 otherwise make unavailable) all your backups.
 
+The borg cache eats way too much disk space, what can I do?
+-----------------------------------------------------------
+
+There is a temporary (but maybe long lived) hack to avoid using lots of disk
+space for chunks.archive.d (see issue #235 for details):
+
+    # this assumes you are working with the same user as the backup
+    cd ~/.cache/borg/<REPOID>
+    rm -rf chunks.archive.d ; touch chunks.archive.d
+
+This deletes all the cached archive chunk indexes and replaces the directory
+that kept them with a file, so borg won't be able to store anything "in" there
+in future.
+
+This has some pros and cons, though:
+
+- much less disk space needs for ~/.cache/borg.
+- chunk cache resyncs will be slower as it will have to transfer chunk usage
+  metadata for all archives from the repository (which might be slow if your
+  repo connection is slow) and it will also have to build the hashtables from
+  that data.
+  chunk cache resyncs happen e.g. if your repo was written to by another
+  machine (if you share same backup repo between multiple machines) or if
+  your local chunks cache was lost somehow.
+
+The long term plan to improve this is called "borgception", see ticket #474.
+
 If a backup stops mid-way, does the already-backed-up data stay there?
 ----------------------------------------------------------------------
 

@@ -26,6 +26,10 @@ API Documentation
     :members:
     :undoc-members:
 
+.. automodule:: borg.shellpattern
+    :members:
+    :undoc-members:
+
 .. automodule:: borg.repository
     :members:
     :undoc-members:
@@ -35,6 +39,10 @@ API Documentation
     :undoc-members:
 
 .. automodule:: borg.remote
+    :members:
+    :undoc-members:
+
+.. automodule:: borg.hash_sizes
     :members:
     :undoc-members:
 

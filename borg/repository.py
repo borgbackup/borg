@@ -346,7 +346,7 @@ class Repository:
         segments_transaction_id = self.io.get_segments_transaction_id()
         self.prepare_txn(None)  # self.index, self.compact, self.segments all empty now!
         segment_count = sum(1 for _ in self.io.segment_iterator())
-        pi = ProgressIndicatorPercent(total=segment_count, msg="Checking segments %3.0f%%", same_line=True)
+        pi = ProgressIndicatorPercent(total=segment_count, msg="Checking segments %3.1f%%", step=0.1, same_line=True)
         for i, (segment, filename) in enumerate(self.io.segment_iterator()):
             pi.show(i)
             if segment > transaction_id:

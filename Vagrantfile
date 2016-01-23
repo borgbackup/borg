@@ -129,7 +129,8 @@ def packages_netbsd
     ln -s /usr/pkg/lib/liblz4* /usr/local/opt/lz4/lib/
     touch /etc/openssl/openssl.cnf  # avoids a flood of "can't open ..."
     mozilla-rootcerts install
-    # pkg_add fuse pkg-config  # llfuse 0.41.1 supports netbsd, but is still buggy.
+    pkg_add pkg-config  # avoids some "pkg-config missing" error msg, even without fuse
+    # pkg_add fuse  # llfuse 0.41.1 supports netbsd, but is still buggy.
     # https://bitbucket.org/nikratio/python-llfuse/issues/70/perfuse_open-setsockopt-no-buffer-space
     pkg_add python34 py34-setuptools
     ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python

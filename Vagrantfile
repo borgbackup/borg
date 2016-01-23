@@ -28,8 +28,10 @@ def packages_debianoid
     # for building python:
     apt-get install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev
     # this way it works on older dists (like ubuntu 12.04) also:
-    easy_install3 pip
-    pip3 install virtualenv
+    # for python 3.2 on ubuntu 12.04 we need pip<8 and virtualenv<14 as
+    # newer versions are not compatible with py 3.2 any more.
+    easy_install3 'pip<8.0'
+    pip3 install 'virtualenv<14.0'
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
   EOF
 end
@@ -158,7 +160,6 @@ end
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
-    pyenv install 3.2.2  # tests, 3.2(.0) and 3.2.1 deadlock, issue #221
     pyenv install 3.3.0  # tests
     pyenv install 3.4.0  # tests
     pyenv install 3.5.0  # tests
@@ -249,7 +250,7 @@ def run_tests(boxname)
     . ../borg-env/bin/activate
     if which pyenv > /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.2.2 3.3.0 3.4.0 3.5.0
+      pyenv global 3.3.0 3.4.0 3.5.0
     fi
     # otherwise: just use the system python
     if which fakeroot > /dev/null; then

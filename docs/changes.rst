@@ -9,6 +9,8 @@ Compatibility notes:
 - you may need to use -v (or --info) more often to actually see output emitted
   at INFO log level (because it is suppressed at the default WARNING log level).
   See the "general" section in the usage docs.
+- for borg create, you need --list (additionally to -v) to see the long file
+  list (was needed so you can have e.g. --stats alone without the long list)
 - see below about BORG_DELETE_I_KNOW_WHAT_I_AM_DOING (was:
   BORG_CHECK_I_KNOW_WHAT_I_AM_DOING)
 

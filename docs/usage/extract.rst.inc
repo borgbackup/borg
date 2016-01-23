@@ -15,7 +15,7 @@ borg extract
     
     positional arguments:
       ARCHIVE               archive to extract
-      PATH                  paths to extract
+      PATH                  paths to extract; patterns are supported
     
     optional arguments:
       -h, --help            show this help message and exit

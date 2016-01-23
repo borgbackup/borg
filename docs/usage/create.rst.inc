@@ -6,7 +6,7 @@ borg create
 
     usage: borg create [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
                        [--no-files-cache] [--umask M] [--remote-path PATH] [-s]
-                       [-p] [--filter STATUSCHARS] [-e PATTERN]
+                       [-p] [--list] [--filter STATUSCHARS] [-e PATTERN]
                        [--exclude-from EXCLUDEFILE] [--exclude-caches]
                        [--exclude-if-present FILENAME] [--keep-tag-files]
                        [-c SECONDS] [-x] [--numeric-owner]
@@ -39,6 +39,7 @@ borg create
                             showing Original, Compressed and Deduplicated sizes,
                             followed by the Number of files seen and the path
                             being processed, default: False
+      --list                output verbose list of items (files, dirs, ...)
       --filter STATUSCHARS  only display items with the given status characters
       -e PATTERN, --exclude PATTERN
                             exclude paths matching PATTERN

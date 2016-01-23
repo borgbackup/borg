@@ -5,8 +5,8 @@ borg delete
 ::
 
     usage: borg delete [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
-                       [--no-files-cache] [--umask M] [--remote-path PATH] [-s]
-                       [-c] [--save-space]
+                       [--no-files-cache] [--umask M] [--remote-path PATH] [-p]
+                       [-s] [-c] [--save-space]
                        [TARGET]
     
     Delete an existing repository or archive
@@ -26,6 +26,7 @@ borg delete
                             detect unchanged files
       --umask M             set umask to M (local and remote, default: 0077)
       --remote-path PATH    set remote path to executable (default: "borg")
+      -p, --progress        show progress display while deleting a single archive
       -s, --stats           print statistics for the deleted archive
       -c, --cache-only      delete only the local cache for the given repository
       --save-space          work slower, but using less space

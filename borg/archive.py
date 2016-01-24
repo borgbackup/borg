@@ -18,7 +18,7 @@ from io import BytesIO
 from . import xattr
 from .helpers import parse_timestamp, Error, uid2user, user2uid, gid2group, group2gid, format_timedelta, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
-    st_atime_ns, st_ctime_ns, st_mtime_ns, ProgressIndicatorPercent
+    ProgressIndicatorPercent
 from .platform import acl_get, acl_set
 from .chunker import Chunker
 from .hashindex import ChunkIndex
@@ -26,10 +26,10 @@ import msgpack
 
 ITEMS_BUFFER = 1024 * 1024
 
-CHUNK_MIN_EXP = 10  # 2**10 == 1kiB
+CHUNK_MIN_EXP = 19  # 2**19 == 512kiB
 CHUNK_MAX_EXP = 23  # 2**23 == 8MiB
 HASH_WINDOW_SIZE = 0xfff  # 4095B
-HASH_MASK_BITS = 16  # results in ~64kiB chunks statistically
+HASH_MASK_BITS = 21  # results in ~2MiB chunks statistically
 
 # defaults, use --chunker-params to override
 CHUNKER_PARAMS = (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
@@ -37,17 +37,8 @@ CHUNKER_PARAMS = (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE
 # chunker params for the items metadata stream, finer granularity
 ITEMS_CHUNKER_PARAMS = (12, 16, 14, HASH_WINDOW_SIZE)
 
-utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
-utime_supports_follow_symlinks = os.utime in getattr(os, 'supports_follow_symlinks', {})
-has_mtime_ns = sys.version >= '3.3'
 has_lchmod = hasattr(os, 'lchmod')
 has_lchflags = hasattr(os, 'lchflags')
-
-# Python <= 3.2 raises OSError instead of PermissionError (See #164)
-try:
-    PermissionError = PermissionError
-except NameError:
-    PermissionError = OSError
 
 
 class DownloadPipeline:
@@ -301,7 +292,7 @@ Number of files: {0.stats.nfiles}'''.format(self)
             else:
                 os.unlink(path)
         except UnicodeEncodeError:
-            raise self.IncompatibleFilesystemEncodingError(path, sys.getfilesystemencoding())
+            raise self.IncompatibleFilesystemEncodingError(path, sys.getfilesystemencoding()) from None
         except OSError:
             pass
         mode = item[b'mode']
@@ -341,7 +332,7 @@ Number of files: {0.stats.nfiles}'''.format(self)
             try:
                 os.symlink(source, path)
             except UnicodeEncodeError:
-                raise self.IncompatibleFilesystemEncodingError(source, sys.getfilesystemencoding())
+                raise self.IncompatibleFilesystemEncodingError(source, sys.getfilesystemencoding()) from None
             self.restore_attrs(path, item, symlink=True)
         elif stat.S_ISFIFO(mode):
             if not os.path.exists(os.path.dirname(path)):
@@ -392,12 +383,10 @@ Number of files: {0.stats.nfiles}'''.format(self)
         else:
             # old archives only had mtime in item metadata
             atime = mtime
-        if fd and utime_supports_fd:  # Python >= 3.3
+        if fd:
             os.utime(fd, None, ns=(atime, mtime))
-        elif utime_supports_follow_symlinks:  # Python >= 3.3
+        else:
             os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
-        elif not symlink:
-            os.utime(path, (atime / 1e9, mtime / 1e9))
         acl_set(path, item, self.numeric_owner)
         # Only available on OS X and FreeBSD
         if has_lchflags and b'bsdflags' in item:
@@ -441,9 +430,9 @@ Number of files: {0.stats.nfiles}'''.format(self)
             b'mode': st.st_mode,
             b'uid': st.st_uid, b'user': uid2user(st.st_uid),
             b'gid': st.st_gid, b'group': gid2group(st.st_gid),
-            b'atime': int_to_bigint(st_atime_ns(st)),
-            b'ctime': int_to_bigint(st_ctime_ns(st)),
-            b'mtime': int_to_bigint(st_mtime_ns(st)),
+            b'atime': int_to_bigint(st.st_atime_ns),
+            b'ctime': int_to_bigint(st.st_ctime_ns),
+            b'mtime': int_to_bigint(st.st_mtime_ns),
         }
         if self.numeric_owner:
             item[b'user'] = item[b'group'] = None

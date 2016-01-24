@@ -8,26 +8,12 @@ cache:
 
 matrix:
     include:
-        - python: 3.2
-          os: linux
-          env: TOXENV=py32
-        - python: 3.3
-          os: linux
-          env: TOXENV=py33
         - python: 3.4
           os: linux
           env: TOXENV=py34
         - python: 3.5
           os: linux
           env: TOXENV=py35
-        - language: generic
-          os: osx
-          osx_image: xcode6.4
-          env: TOXENV=py32
-        - language: generic
-          os: osx
-          osx_image: xcode6.4
-          env: TOXENV=py33
         - language: generic
           os: osx
           osx_image: xcode6.4

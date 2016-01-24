@@ -146,9 +146,10 @@ Keep an eye on CPU load and throughput.
 Repository encryption
 ---------------------
 
-Repository encryption is enabled at repository creation time::
+Repository encryption can be enabled or disabled at repository creation time
+(the default is enabled, with `repokey` method)::
 
-    $ borg init --encryption=repokey|keyfile PATH
+    $ borg init --encryption=none|repokey|keyfile PATH
 
 When repository encryption is enabled all data is encrypted using 256-bit AES_
 encryption and the integrity and authenticity is verified using `HMAC-SHA256`_.

@@ -7,7 +7,6 @@ import sys
 import sysconfig
 import time
 import unittest
-from ..helpers import st_mtime_ns
 from ..xattr import get_all
 
 try:
@@ -30,9 +29,6 @@ else:
 
 if sys.platform.startswith('netbsd'):
     st_mtime_ns_round = -4  # only >1 microsecond resolution here?
-
-has_mtime_ns = sys.version >= '3.3'
-utime_supports_fd = os.utime in getattr(os, 'supports_fd', {})
 
 
 class BaseTestCase(unittest.TestCase):
@@ -80,14 +76,13 @@ class BaseTestCase(unittest.TestCase):
                 d1[4] = None
             if not stat.S_ISCHR(d2[1]) and not stat.S_ISBLK(d2[1]):
                 d2[4] = None
-            if not os.path.islink(path1) or utime_supports_fd:
-                # Older versions of llfuse do not support ns precision properly
-                if fuse and not have_fuse_mtime_ns:
-                    d1.append(round(st_mtime_ns(s1), -4))
-                    d2.append(round(st_mtime_ns(s2), -4))
-                else:
-                    d1.append(round(st_mtime_ns(s1), st_mtime_ns_round))
-                    d2.append(round(st_mtime_ns(s2), st_mtime_ns_round))
+            # Older versions of llfuse do not support ns precision properly
+            if fuse and not have_fuse_mtime_ns:
+                d1.append(round(s1.st_mtime_ns, -4))
+                d2.append(round(s2.st_mtime_ns, -4))
+            else:
+                d1.append(round(s1.st_mtime_ns, st_mtime_ns_round))
+                d2.append(round(s2.st_mtime_ns, st_mtime_ns_round))
             d1.append(get_all(path1, follow_symlinks=False))
             d2.append(get_all(path2, follow_symlinks=False))
             self.assert_equal(d1, d2)
@@ -149,4 +144,4 @@ class FakeInputs:
         try:
             return self.inputs.pop(0)
         except IndexError:
-            raise EOFError
+            raise EOFError from None

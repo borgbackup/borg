@@ -3,13 +3,13 @@ from .remote import cache_if_remote
 from collections import namedtuple
 import os
 import stat
-from binascii import hexlify
+from binascii import hexlify, unhexlify
 import shutil
 
 from .key import PlaintextKey
 from .logger import create_logger
 logger = create_logger()
-from .helpers import Error, get_cache_dir, decode_dict, st_mtime_ns, unhexlify, int_to_bigint, \
+from .helpers import Error, get_cache_dir, decode_dict, int_to_bigint, \
     bigint_to_int, format_file_size, yes
 from .locking import UpgradableLock
 from .hashindex import ChunkIndex
@@ -54,8 +54,7 @@ class Cache:
                 msg = ("Warning: Attempting to access a previously unknown unencrypted repository!" +
                        "\n" +
                        "Do you want to continue? [yN] ")
-                if not yes(msg, false_msg="Aborting.", default_notty=False,
-                           env_var_override='BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'):
+                if not yes(msg, false_msg="Aborting.", env_var_override='BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'):
                     raise self.CacheInitAbortedError()
             self.create()
         self.open(lock_wait=lock_wait)
@@ -64,8 +63,7 @@ class Cache:
             msg = ("Warning: The repository at location {} was previously located at {}".format(repository._location.canonical_path(), self.previous_location) +
                    "\n" +
                    "Do you want to continue? [yN] ")
-            if not yes(msg, false_msg="Aborting.", default_notty=False,
-                       env_var_override='BORG_RELOCATED_REPO_ACCESS_IS_OK'):
+            if not yes(msg, false_msg="Aborting.", env_var_override='BORG_RELOCATED_REPO_ACCESS_IS_OK'):
                 raise self.RepositoryAccessAborted()
 
         if sync and self.manifest.id != self.manifest_id:
@@ -136,7 +134,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 raise Exception('%s has unexpected cache version %d (wanted: %d).' % (
                     config_path, cache_version, wanted_version))
         except configparser.NoSectionError as e:
-            raise Exception('%s does not look like a Borg cache.' % config_path)
+            raise Exception('%s does not look like a Borg cache.' % config_path) from None
         self.id = self.config.get('cache', 'repository')
         self.manifest_id = unhexlify(self.config.get('cache', 'manifest'))
         self.timestamp = self.config.get('cache', 'timestamp', fallback=None)
@@ -401,7 +399,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not entry:
             return None
         entry = msgpack.unpackb(entry)
-        if entry[2] == st.st_size and bigint_to_int(entry[3]) == st_mtime_ns(st) and entry[1] == st.st_ino:
+        if entry[2] == st.st_size and bigint_to_int(entry[3]) == st.st_mtime_ns and entry[1] == st.st_ino:
             # reset entry age
             entry[0] = 0
             self.files[path_hash] = msgpack.packb(entry)
@@ -413,6 +411,6 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not (self.do_files and stat.S_ISREG(st.st_mode)):
             return
         # Entry: Age, inode, size, mtime, chunk ids
-        mtime_ns = st_mtime_ns(st)
+        mtime_ns = st.st_mtime_ns
         self.files[path_hash] = msgpack.packb((0, st.st_ino, st.st_size, int_to_bigint(mtime_ns), ids))
         self._newest_mtime = max(self._newest_mtime, mtime_ns)

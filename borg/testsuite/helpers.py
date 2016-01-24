@@ -9,11 +9,11 @@ import sys
 import msgpack
 import msgpack.fallback
 
-from ..helpers import Location, format_file_size, format_timedelta, PathPrefixPattern, FnmatchPattern, make_path_safe, \
-    prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, yes, RegexPattern, \
+from ..helpers import Location, format_file_size, format_timedelta, make_path_safe, \
+    prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, yes, TRUISH, FALSISH, DEFAULTISH, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
-    ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, PatternMatcher, \
-    ShellPattern
+    ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
+    PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern
 from . import BaseTestCase, environment_variable, FakeInputs
 
 
@@ -458,11 +458,6 @@ def test_pattern_matcher():
 def test_compression_specs():
     with pytest.raises(ValueError):
         CompressionSpec('')
-    assert CompressionSpec('0') == dict(name='zlib', level=0)
-    assert CompressionSpec('1') == dict(name='zlib', level=1)
-    assert CompressionSpec('9') == dict(name='zlib', level=9)
-    with pytest.raises(ValueError):
-        CompressionSpec('10')
     assert CompressionSpec('none') == dict(name='none')
     assert CompressionSpec('lz4') == dict(name='lz4')
     assert CompressionSpec('zlib') == dict(name='zlib', level=6)
@@ -691,20 +686,28 @@ def test_is_slow_msgpack():
     assert not is_slow_msgpack()
 
 
-def test_yes_simple():
-    input = FakeInputs(['y', 'Y', 'yes', 'Yes', ])
-    assert yes(input=input)
-    assert yes(input=input)
-    assert yes(input=input)
-    assert yes(input=input)
-    input = FakeInputs(['n', 'N', 'no', 'No', ])
-    assert not yes(input=input)
-    assert not yes(input=input)
-    assert not yes(input=input)
-    assert not yes(input=input)
+def test_yes_input():
+    inputs = list(TRUISH)
+    input = FakeInputs(inputs)
+    for i in inputs:
+        assert yes(input=input)
+    inputs = list(FALSISH)
+    input = FakeInputs(inputs)
+    for i in inputs:
+        assert not yes(input=input)
 
 
-def test_yes_custom():
+def test_yes_input_defaults():
+    inputs = list(DEFAULTISH)
+    input = FakeInputs(inputs)
+    for i in inputs:
+        assert yes(default=True, input=input)
+    input = FakeInputs(inputs)
+    for i in inputs:
+        assert not yes(default=False, input=input)
+
+
+def test_yes_input_custom():
     input = FakeInputs(['YES', 'SURE', 'NOPE', ])
     assert yes(truish=('YES', ), input=input)
     assert yes(truish=('SURE', ), input=input)
@@ -712,11 +715,20 @@ def test_yes_custom():
 
 
 def test_yes_env():
-    input = FakeInputs(['n', 'n'])
-    with environment_variable(OVERRIDE_THIS='nonempty'):
-        assert yes(env_var_override='OVERRIDE_THIS', input=input)
-    with environment_variable(OVERRIDE_THIS=None):  # env not set
-        assert not yes(env_var_override='OVERRIDE_THIS', input=input)
+    for value in TRUISH:
+        with environment_variable(OVERRIDE_THIS=value):
+            assert yes(env_var_override='OVERRIDE_THIS')
+    for value in FALSISH:
+        with environment_variable(OVERRIDE_THIS=value):
+            assert not yes(env_var_override='OVERRIDE_THIS')
+
+
+def test_yes_env_default():
+    for value in DEFAULTISH:
+        with environment_variable(OVERRIDE_THIS=value):
+            assert yes(env_var_override='OVERRIDE_THIS', default=True)
+        with environment_variable(OVERRIDE_THIS=value):
+            assert not yes(env_var_override='OVERRIDE_THIS', default=False)
 
 
 def test_yes_defaults():
@@ -728,25 +740,25 @@ def test_yes_defaults():
     assert yes(default=True, input=input)
     assert yes(default=True, input=input)
     assert yes(default=True, input=input)
-    ifile = StringIO()
-    assert yes(default_notty=True, ifile=ifile)
-    assert not yes(default_notty=False, ifile=ifile)
     input = FakeInputs([])
-    assert yes(default_eof=True, input=input)
-    assert not yes(default_eof=False, input=input)
+    assert yes(default=True, input=input)
+    assert not yes(default=False, input=input)
     with pytest.raises(ValueError):
         yes(default=None)
-    with pytest.raises(ValueError):
-        yes(default_notty='invalid')
-    with pytest.raises(ValueError):
-        yes(default_eof='invalid')
 
 
 def test_yes_retry():
-    input = FakeInputs(['foo', 'bar', 'y', ])
+    input = FakeInputs(['foo', 'bar', TRUISH[0], ])
     assert yes(retry_msg='Retry: ', input=input)
-    input = FakeInputs(['foo', 'bar', 'N', ])
+    input = FakeInputs(['foo', 'bar', FALSISH[0], ])
     assert not yes(retry_msg='Retry: ', input=input)
+
+
+def test_yes_no_retry():
+    input = FakeInputs(['foo', 'bar', TRUISH[0], ])
+    assert not yes(retry=False, default=False, input=input)
+    input = FakeInputs(['foo', 'bar', FALSISH[0], ])
+    assert yes(retry=False, default=True, input=input)
 
 
 def test_yes_output(capfd):

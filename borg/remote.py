@@ -129,7 +129,7 @@ class RemoteRepository:
             self.name = name
 
     def __init__(self, location, create=False, lock_wait=None, lock=True, args=None):
-        self.location = location
+        self.location = self._location = location
         self.preload_ids = []
         self.msgid = 0
         self.to_send = b''
@@ -159,7 +159,7 @@ class RemoteRepository:
         try:
             version = self.call('negotiate', RPC_PROTOCOL_VERSION)
         except ConnectionClosed:
-            raise ConnectionClosedWithHint('Is borg working on the server?')
+            raise ConnectionClosedWithHint('Is borg working on the server?') from None
         if version != RPC_PROTOCOL_VERSION:
             raise Exception('Server insisted on using unsupported protocol version %d' % version)
         self.id = self.call('open', location.path, create, lock_wait, lock)
@@ -268,7 +268,7 @@ class RemoteRepository:
                     if not data:
                         raise ConnectionClosed()
                     data = data.decode('utf-8')
-                    for line in data.splitlines(True):  # keepends=True for py3.3+
+                    for line in data.splitlines(keepends=True):
                         if line.startswith('$LOG '):
                             _, level, msg = line.split(' ', 2)
                             level = getattr(logging, level, logging.CRITICAL)  # str -> int

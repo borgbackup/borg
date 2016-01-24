@@ -7,7 +7,7 @@ from glob import glob
 from distutils.command.build import build
 from distutils.core import Command
 
-min_python = (3, 2)
+min_python = (3, 4)
 my_python = sys.version_info
 
 if my_python < min_python:
@@ -211,7 +211,7 @@ if not on_rtd:
     Extension('borg.chunker', [chunker_source]),
     Extension('borg.hashindex', [hashindex_source])
 ]
-    if sys.platform.startswith('linux'):
+    if sys.platform == 'linux':
         ext_modules.append(Extension('borg.platform_linux', [platform_linux_source], libraries=['acl']))
     elif sys.platform.startswith('freebsd'):
         ext_modules.append(Extension('borg.platform_freebsd', [platform_freebsd_source]))
@@ -242,14 +242,12 @@ setup(
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.2',
-        'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Topic :: Security :: Cryptography',
         'Topic :: System :: Archiving :: Backup',
     ],
-    packages=['borg', 'borg.testsuite', 'borg.support', ],
+    packages=['borg', 'borg.testsuite', ],
     entry_points={
         'console_scripts': [
             'borg = borg.archiver:main',

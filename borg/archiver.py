@@ -1,10 +1,8 @@
-from .support import argparse  # see support/__init__.py docstring
-                               # DEPRECATED - remove after requiring py 3.4
-
-from binascii import hexlify
+from binascii import hexlify, unhexlify
 from datetime import datetime
 from hashlib import sha256
 from operator import attrgetter
+import argparse
 import functools
 import inspect
 import io
@@ -17,8 +15,8 @@ import traceback
 
 from . import __version__
 from .helpers import Error, location_validator, format_time, format_file_size, \
-    format_file_mode, parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
-    get_cache_dir, get_keys_dir, prune_within, prune_split, unhexlify, \
+    parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
+    get_cache_dir, get_keys_dir, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher
@@ -28,7 +26,7 @@ from .compress import Compressor, COMPR_BUFFER
 from .upgrader import AtticRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache
-from .key import key_creator
+from .key import key_creator, RepoKey, PassphraseKey
 from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 
@@ -66,7 +64,6 @@ class Archiver:
             repository = RemoteRepository(location, create=create, lock_wait=self.lock_wait, lock=lock, args=args)
         else:
             repository = Repository(location.path, create=create, exclusive=exclusive, lock_wait=self.lock_wait, lock=lock)
-        repository._location = location
         return repository
 
     def print_error(self, msg, *args):
@@ -108,8 +105,8 @@ class Archiver:
             msg = ("'check --repair' is an experimental feature that might result in data loss." +
                    "\n" +
                    "Type 'YES' if you understand this and want to continue: ")
-            if not yes(msg, false_msg="Aborting.", default_notty=False,
-                       env_var_override='BORG_CHECK_I_KNOW_WHAT_I_AM_DOING', truish=('YES', )):
+            if not yes(msg, false_msg="Aborting.", truish=('YES', ),
+                       env_var_override='BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
                 return EXIT_ERROR
         if not args.archives_only:
             if not repository.check(repair=args.repair, save_space=args.save_space):
@@ -127,6 +124,23 @@ class Archiver:
         key.change_passphrase()
         return EXIT_SUCCESS
 
+    def do_migrate_to_repokey(self, args):
+        """Migrate passphrase -> repokey"""
+        repository = self.open_repository(args)
+        manifest_data = repository.get(Manifest.MANIFEST_ID)
+        key_old = PassphraseKey.detect(repository, manifest_data)
+        key_new = RepoKey(repository)
+        key_new.target = repository
+        key_new.repository_id = repository.id
+        key_new.enc_key = key_old.enc_key
+        key_new.enc_hmac_key = key_old.enc_hmac_key
+        key_new.id_key = key_old.id_key
+        key_new.chunk_seed = key_old.chunk_seed
+        key_new.change_passphrase()  # option to change key protection passphrase, save
+        return EXIT_SUCCESS
+
+        return EXIT_SUCCESS
+
     def do_create(self, args):
         """Create new archive"""
         matcher = PatternMatcher(fallback=True)
@@ -139,14 +153,14 @@ class Archiver:
             try:
                 st = os.stat(get_cache_dir())
                 skip_inodes.add((st.st_ino, st.st_dev))
-            except IOError:
+            except OSError:
                 pass
             # Add local repository dir to inode_skip list
             if not args.location.host:
                 try:
                     st = os.stat(args.location.path)
                     skip_inodes.add((st.st_ino, st.st_dev))
-                except IOError:
+                except OSError:
                     pass
             for path in args.paths:
                 if path == '-':  # stdin
@@ -154,7 +168,7 @@ class Archiver:
                     if not dry_run:
                         try:
                             status = archive.process_stdin(path, cache)
-                        except IOError as e:
+                        except OSError as e:
                             status = 'E'
                             self.print_warning('%s: %s', path, e)
                     else:
@@ -231,7 +245,7 @@ class Archiver:
             if not dry_run:
                 try:
                     status = archive.process_file(path, st, cache)
-                except IOError as e:
+                except OSError as e:
                     status = 'E'
                     self.print_warning('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
@@ -328,7 +342,7 @@ class Archiver:
                         archive.extract_item(item, restore_attrs=False)
                     else:
                         archive.extract_item(item, stdout=stdout, sparse=sparse)
-            except IOError as e:
+            except OSError as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 
         if not args.dry_run:
@@ -377,8 +391,8 @@ class Archiver:
                         msg.append(format_archive(archive_info))
                     msg.append("Type 'YES' if you understand this and want to continue: ")
                     msg = '\n'.join(msg)
-                    if not yes(msg, false_msg="Aborting.", default_notty=False,
-                               env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING', truish=('YES', )):
+                    if not yes(msg, false_msg="Aborting.", truish=('YES', ),
+                               env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'):
                         self.exit_code = EXIT_ERROR
                         return self.exit_code
                     repository.destroy()
@@ -428,10 +442,9 @@ class Archiver:
                 for item in archive.iter_items():
                     print(remove_surrogates(item[b'path']))
             else:
-                tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 0o10: '-', 0o12: 'l', 0o14: 's'}
                 for item in archive.iter_items():
-                    type = tmap.get(item[b'mode'] // 4096, '?')
-                    mode = format_file_mode(item[b'mode'])
+                    mode = stat.filemode(item[b'mode'])
+                    type = mode[0]
                     size = 0
                     if type == '-':
                         try:
@@ -440,19 +453,19 @@ class Archiver:
                             pass
                     try:
                         mtime = datetime.fromtimestamp(bigint_to_int(item[b'mtime']) / 1e9)
-                    except ValueError:
+                    except OverflowError:
                         # likely a broken mtime and datetime did not want to go beyond year 9999
                         mtime = datetime(9999, 12, 31, 23, 59, 59)
                     if b'source' in item:
                         if type == 'l':
                             extra = ' -> %s' % item[b'source']
                         else:
-                            type = 'h'
+                            mode = 'h' + mode[1:]
                             extra = ' link to %s' % item[b'source']
                     else:
                         extra = ''
-                    print('%s%s %-6s %-6s %8d %s %s%s' % (
-                        type, mode, item[b'user'] or item[b'uid'],
+                    print('%s %-6s %-6s %8d %s %s%s' % (
+                        mode, item[b'user'] or item[b'uid'],
                         item[b'group'] or item[b'gid'], size, format_time(mtime),
                         remove_surrogates(item[b'path']), extra))
         else:
@@ -734,17 +747,8 @@ class Archiver:
 
     def preprocess_args(self, args):
         deprecations = [
-            ('--hourly', '--keep-hourly', 'Warning: "--hourly" has been deprecated. Use "--keep-hourly" instead.'),
-            ('--daily', '--keep-daily', 'Warning: "--daily" has been deprecated. Use "--keep-daily" instead.'),
-            ('--weekly', '--keep-weekly', 'Warning: "--weekly" has been deprecated. Use "--keep-weekly" instead.'),
-            ('--monthly', '--keep-monthly', 'Warning: "--monthly" has been deprecated. Use "--keep-monthly" instead.'),
-            ('--yearly', '--keep-yearly', 'Warning: "--yearly" has been deprecated. Use "--keep-yearly" instead.'),
-            ('--do-not-cross-mountpoints', '--one-file-system',
-             'Warning:  "--do-no-cross-mountpoints" has been deprecated. Use "--one-file-system" instead.'),
+            #('--old', '--new', 'Warning: "--old" has been deprecated. Use "--new" instead.'),
         ]
-        if args and args[0] == 'verify':
-            print('Warning: "borg verify" has been deprecated. Use "borg extract --dry-run" instead.')
-            args = ['extract', '--dry-run'] + args[1:]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
                 if arg.startswith(old_name):
@@ -789,8 +793,6 @@ class Archiver:
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
         Encryption can be enabled at repository init time.
-        Please note that the 'passphrase' encryption mode is DEPRECATED (instead of it,
-        consider using 'repokey').
         """)
         subparser = subparsers.add_parser('init', parents=[common_parser],
                                           description=self.do_init.__doc__, epilog=init_epilog,
@@ -800,8 +802,8 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption',
-                               choices=('none', 'keyfile', 'repokey', 'passphrase'), default='none',
-                               help='select encryption key mode')
+                               choices=('none', 'keyfile', 'repokey'), default='repokey',
+                               help='select encryption key mode (default: "%(default)s")')
 
         check_epilog = textwrap.dedent("""
         The check command verifies the consistency of a repository and the corresponding archives.
@@ -874,6 +876,32 @@ class Archiver:
                                           epilog=change_passphrase_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser.set_defaults(func=self.do_change_passphrase)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False))
+
+        migrate_to_repokey_epilog = textwrap.dedent("""
+        This command migrates a repository from passphrase mode (not supported any
+        more) to repokey mode.
+
+        You will be first asked for the repository passphrase (to open it in passphrase
+        mode). This is the same passphrase as you used to use for this repo before 1.0.
+
+        It will then derive the different secrets from this passphrase.
+
+        Then you will be asked for a new passphrase (twice, for safety). This
+        passphrase will be used to protect the repokey (which contains these same
+        secrets in encrypted form). You may use the same passphrase as you used to
+        use, but you may also use a different one.
+
+        After migrating to repokey mode, you can change the passphrase at any time.
+        But please note: the secrets will always stay the same and they could always
+        be derived from your (old) passphrase-mode passphrase.
+        """)
+        subparser = subparsers.add_parser('migrate-to-repokey', parents=[common_parser],
+                                          description=self.do_migrate_to_repokey.__doc__,
+                                          epilog=migrate_to_repokey_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+        subparser.set_defaults(func=self.do_migrate_to_repokey)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 

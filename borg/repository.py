@@ -1,5 +1,5 @@
 from configparser import ConfigParser
-from binascii import hexlify
+from binascii import hexlify, unhexlify
 from itertools import islice
 import errno
 import logging
@@ -11,7 +11,7 @@ import struct
 from zlib import crc32
 
 import msgpack
-from .helpers import Error, ErrorWithTraceback, IntegrityError, unhexlify, ProgressIndicatorPercent
+from .helpers import Error, ErrorWithTraceback, IntegrityError, Location, ProgressIndicatorPercent
 from .hashindex import NSIndex
 from .locking import UpgradableLock, LockError, LockErrorT
 from .lrucache import LRUCache
@@ -54,6 +54,7 @@ class Repository:
 
     def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True):
         self.path = os.path.abspath(path)
+        self._location = Location('file://%s' % self.path)
         self.io = None
         self.lock = None
         self.index = None
@@ -417,7 +418,7 @@ class Repository:
             segment, offset = self.index[id_]
             return self.io.read(segment, offset, id_)
         except KeyError:
-            raise self.ObjectNotFound(id_, self.path)
+            raise self.ObjectNotFound(id_, self.path) from None
 
     def get_many(self, ids, is_preloaded=False):
         for id_ in ids:
@@ -446,7 +447,7 @@ class Repository:
         try:
             segment, offset = self.index.pop(id)
         except KeyError:
-            raise self.ObjectNotFound(id, self.path)
+            raise self.ObjectNotFound(id, self.path) from None
         self.segments[segment] -= 1
         self.compact.add(segment)
         segment = self.io.write_delete(id)
@@ -567,7 +568,7 @@ class LoggedIO:
             del self.fds[segment]
         try:
             os.unlink(self.segment_filename(segment))
-        except OSError:
+        except FileNotFoundError:
             pass
 
     def segment_exists(self, segment):
@@ -628,7 +629,7 @@ class LoggedIO:
             hdr_tuple = fmt.unpack(header)
         except struct.error as err:
             raise IntegrityError('Invalid segment entry header [segment {}, offset {}]: {}'.format(
-                segment, offset, err))
+                segment, offset, err)) from None
         if fmt is self.put_header_fmt:
             crc, size, tag, key = hdr_tuple
         elif fmt is self.header_fmt:
@@ -685,7 +686,7 @@ class LoggedIO:
             self.offset = 0
             self._write_fd.flush()
             os.fsync(self._write_fd.fileno())
-            if hasattr(os, 'posix_fadvise'):  # python >= 3.3, only on UNIX
+            if hasattr(os, 'posix_fadvise'):  # only on UNIX
                 # tell the OS that it does not need to cache what we just wrote,
                 # avoids spoiling the cache for the OS and other processes.
                 os.posix_fadvise(self._write_fd.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)

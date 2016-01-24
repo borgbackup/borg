@@ -98,7 +98,7 @@ Dependencies
 To install |project_name| from a source package (including pip), you have to install the
 following dependencies first:
 
-* `Python 3`_ >= 3.2.2. Even though Python 3 is not the default Python version on
+* `Python 3`_ >= 3.4.0. Even though Python 3 is not the default Python version on
   most systems, it is usually available as an optional install.
 * OpenSSL_ >= 1.0.0
 * libacl_ (that pulls in libattr_ also)

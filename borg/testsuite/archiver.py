@@ -11,9 +11,9 @@ import shutil
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 from hashlib import sha256
 
-from mock import patch
 import pytest
 
 from .. import xattr
@@ -21,7 +21,7 @@ from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP
 from ..archiver import Archiver
 from ..cache import Cache
 from ..crypto import bytes_to_long, num_aes_blocks
-from ..helpers import Manifest, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, st_atime_ns, st_mtime_ns
+from ..helpers import Manifest, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import BaseTestCase, changedir, environment_variable
@@ -34,13 +34,7 @@ except ImportError:
 
 has_lchflags = hasattr(os, 'lchflags')
 
-src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__), '..')
-
-# Python <= 3.2 raises OSError instead of PermissionError (See #164)
-try:
-    PermissionError = PermissionError
-except NameError:
-    PermissionError = OSError
+src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 
 def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
@@ -76,9 +70,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
 try:
     exec_cmd('help', exe='borg.exe', fork=True)
     BORG_EXES = ['python', 'binary', ]
-except (IOError, OSError) as err:
-    if err.errno != errno.ENOENT:
-        raise
+except FileNotFoundError:
     BORG_EXES = ['python', ]
 
 
@@ -100,7 +92,7 @@ def test_return_codes(cmd, tmpdir):
     input = tmpdir.mkdir('input')
     output = tmpdir.mkdir('output')
     input.join('test_file').write('content')
-    rc, out = cmd('init', '%s' % str(repo))
+    rc, out = cmd('init', '--encryption=none', '%s' % str(repo))
     assert rc == EXIT_SUCCESS
     rc, out = cmd('create', '%s::archive' % repo, str(input))
     assert rc == EXIT_SUCCESS
@@ -144,7 +136,7 @@ def test_disk_full(cmd):
                 data = os.urandom(size)
                 f.write(data)
 
-    with environment_variable(BORG_CHECK_I_KNOW_WHAT_I_AM_DOING='1'):
+    with environment_variable(BORG_CHECK_I_KNOW_WHAT_I_AM_DOING='YES'):
         mount = DF_MOUNT
         assert os.path.exists(mount)
         repo = os.path.join(mount, 'repo')
@@ -198,8 +190,9 @@ class ArchiverTestCaseBase(BaseTestCase):
     prefix = ''
 
     def setUp(self):
-        os.environ['BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'] = '1'
-        os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = '1'
+        os.environ['BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
+        os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
+        os.environ['BORG_PASSPHRASE'] = 'waytooeasyonlyfortests'
         self.archiver = not self.FORK_DEFAULT and Archiver() or None
         self.tmpdir = tempfile.mkdtemp()
         self.repository_path = os.path.join(self.tmpdir, 'repository')
@@ -337,7 +330,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         item_count = 3 if has_lchflags else 4  # one file is UF_NODUMP
         self.assert_in('Number of files: %d' % item_count, info_output)
         shutil.rmtree(self.cache_path)
-        with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='1'):
+        with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='yes'):
             info_output2 = self.cmd('info', self.repository_location + '::test')
 
         def filter(output):
@@ -364,12 +357,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
         sti = os.stat('input/file1')
         sto = os.stat('output/input/file1')
-        assert st_mtime_ns(sti) == st_mtime_ns(sto) == mtime * 1e9
+        assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
         if hasattr(os, 'O_NOATIME'):
-            assert st_atime_ns(sti) == st_atime_ns(sto) == atime * 1e9
+            assert sti.st_atime_ns == sto.st_atime_ns == atime * 1e9
         else:
             # it touched the input file's atime while backing it up
-            assert st_atime_ns(sto) == atime * 1e9
+            assert sto.st_atime_ns == atime * 1e9
 
     def _extract_repository_id(self, path):
         return Repository(self.repository_path).id
@@ -433,7 +426,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_repository_swap_detection(self):
         self.create_test_files()
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
-        self.cmd('init', '--encryption=passphrase', self.repository_location)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
         repository_id = self._extract_repository_id(self.repository_path)
         self.cmd('create', self.repository_location + '::test', 'input')
         shutil.rmtree(self.repository_path)
@@ -449,7 +442,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_test_files()
         self.cmd('init', '--encryption=none', self.repository_location + '_unencrypted')
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
-        self.cmd('init', '--encryption=passphrase', self.repository_location + '_encrypted')
+        self.cmd('init', '--encryption=repokey', self.repository_location + '_encrypted')
         self.cmd('create', self.repository_location + '_encrypted::test', 'input')
         shutil.rmtree(self.repository_path + '_encrypted')
         os.rename(self.repository_path + '_unencrypted', self.repository_path + '_encrypted')
@@ -829,14 +822,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('create', '-v', '--list', '--filter=AM', self.repository_location + '::test3', 'input')
         self.assert_in('file1', output)
 
-    def test_cmdline_compatibility(self):
-        self.create_regular_file('file1', size=1024 * 80)
-        self.cmd('init', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        output = self.cmd('verify', '-v', self.repository_location + '::test')
-        self.assert_in('"borg verify" has been deprecated', output)
-        output = self.cmd('prune', self.repository_location, '--hourly=1')
-        self.assert_in('"--hourly" has been deprecated. Use "--keep-hourly" instead', output)
+    #def test_cmdline_compatibility(self):
+    #    self.create_regular_file('file1', size=1024 * 80)
+    #    self.cmd('init', self.repository_location)
+    #    self.cmd('create', self.repository_location + '::test', 'input')
+    #    output = self.cmd('foo', self.repository_location, '--old')
+    #    self.assert_in('"--old" has been deprecated. Use "--new" instead', output)
 
     def test_prune_repository(self):
         self.cmd('init', self.repository_location)
@@ -993,7 +984,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.verify_aes_counter_uniqueness('keyfile')
 
     def test_aes_counter_uniqueness_passphrase(self):
-        self.verify_aes_counter_uniqueness('passphrase')
+        self.verify_aes_counter_uniqueness('repokey')
 
     def test_debug_dump_archive_items(self):
         self.create_test_files()

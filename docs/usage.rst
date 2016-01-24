@@ -69,15 +69,19 @@ General:
     TMPDIR
         where temporary files are stored (might need a lot of temporary space for some operations)
 
-Some "yes" sayers (if set, they automatically confirm that you really want to do X even if there is that warning):
-    BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK
+Some automatic "answerers" (if set, they automatically answer confirmation questions):
+    BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=no (or =yes)
         For "Warning: Attempting to access a previously unknown unencrypted repository"
-    BORG_RELOCATED_REPO_ACCESS_IS_OK
+    BORG_RELOCATED_REPO_ACCESS_IS_OK=no (or =yes)
         For "Warning: The repository at location ... was previously located at ..."
-    BORG_CHECK_I_KNOW_WHAT_I_AM_DOING
-        For "Warning: '``check --repair``' is an experimental feature that might result in data loss."
-    BORG_DELETE_I_KNOW_WHAT_I_AM_DOING
-        For "You requested to completely DELETE the repository *including* all archives it contains:  "
+    BORG_CHECK_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
+        For "Warning: 'check --repair' is an experimental feature that might result in data loss."
+    BORG_DELETE_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
+        For "You requested to completely DELETE the repository *including* all archives it contains:"
+
+    Note: answers are case sensitive. setting an invalid answer value might either give the default
+    answer or ask you interactively, depending on whether retries are allowed (they by default are
+    allowed). So please test your scripts interactively before making them a non-interactive script.
 
 Directories:
     BORG_KEYS_DIR
@@ -100,7 +104,7 @@ Please note:
   (e.g. mode 600, root:root).
 
 
-.. _INI: https://docs.python.org/3.2/library/logging.config.html#configuration-file-format
+.. _INI: https://docs.python.org/3.4/library/logging.config.html#configuration-file-format
 
 Resource Usage
 ~~~~~~~~~~~~~~
@@ -194,12 +198,7 @@ an attacker has access to your backup repository.
 
 But be careful with the key / the passphrase:
 
-``--encryption=passphrase`` is DEPRECATED and will be removed in next major release.
-This mode has very fundamental, unfixable problems (like you can never change
-your passphrase or the pbkdf2 iteration count for an existing repository, because
-the encryption / decryption key is directly derived from the passphrase).
-
-If you want "passphrase-only" security, just use the ``repokey`` mode. The key will
+If you want "passphrase-only" security, use the ``repokey`` mode. The key will
 be stored inside the repository (in its "config" file). In above mentioned
 attack scenario, the attacker will have the key (but not the passphrase).
 
@@ -216,8 +215,10 @@ The backup that is encrypted with that key won't help you with that, of course.
 Make sure you use a good passphrase. Not too short, not too simple. The real
 encryption / decryption key is encrypted with / locked by your passphrase.
 If an attacker gets your key, he can't unlock and use it without knowing the
-passphrase. In ``repokey`` and ``keyfile`` modes, you can change your passphrase
-for existing repos.
+passphrase.
+
+You can change your passphrase for existing repos at any time, it won't affect
+the encryption/decryption key or other secrets.
 
 
 .. include:: usage/create.rst.inc
@@ -249,8 +250,10 @@ Examples
     NAME="root-`date +%Y-%m-%d`"
     $ borg create -C zlib,6 /mnt/backup::$NAME / --do-not-cross-mountpoints
 
-    # Backup huge files with little chunk management overhead
-    $ borg create --chunker-params 19,23,21,4095 /mnt/backup::VMs /srv/VMs
+    # Make a big effort in fine granular deduplication (big chunk management
+    # overhead, needs a lot of RAM and disk space, see formula in internals
+    # docs - same parameters as borg < 1.0 or attic):
+    $ borg create --chunker-params 10,23,16,4095 /mnt/backup::small /smallstuff
 
     # Backup a raw device (must not be active/in use/mounted at that time)
     $ dd if=/dev/sda bs=10M | borg create /mnt/backup::my-sda -
@@ -506,15 +509,15 @@ resource usage (RAM and disk space) as the amount of resources needed is
 (also) determined by the total amount of chunks in the repository (see
 `Indexes / Caches memory usage` for details).
 
-``--chunker-params=10,23,16,4095 (default)`` results in a fine-grained deduplication
-and creates a big amount of chunks and thus uses a lot of resources to manage them.
-This is good for relatively small data volumes and if the machine has a good
-amount of free RAM and disk space.
+``--chunker-params=10,23,16,4095`` results in a fine-grained deduplication
+and creates a big amount of chunks and thus uses a lot of resources to manage
+them. This is good for relatively small data volumes and if the machine has a
+good amount of free RAM and disk space.
 
-``--chunker-params=19,23,21,4095`` results in a coarse-grained deduplication and
-creates a much smaller amount of chunks and thus uses less resources.
-This is good for relatively big data volumes and if the machine has a relatively
-low amount of free RAM and disk space.
+``--chunker-params=19,23,21,4095`` (default) results in a coarse-grained
+deduplication and creates a much smaller amount of chunks and thus uses less
+resources. This is good for relatively big data volumes and if the machine has
+a relatively low amount of free RAM and disk space.
 
 If you already have made some archives in a repository and you then change
 chunker params, this of course impacts deduplication as the chunks will be

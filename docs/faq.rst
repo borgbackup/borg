@@ -37,7 +37,7 @@ Which file types, attributes, etc. are preserved?
     * FIFOs ("named pipes")
     * Name
     * Contents
-    * Time of last modification (nanosecond precision with Python >= 3.3)
+    * Time of last modification (nanosecond precision)
     * IDs of owning user and owning group
     * Names of owning user and owning group (if the IDs can be resolved)
     * Unix Mode/Permissions (u/g/o permissions, suid, sgid, sticky)

@@ -187,19 +187,6 @@ chunker_fill(Chunker *c)
 }
 
 static PyObject *
-PyBuffer_FromMemory(void *data, Py_ssize_t len)
-{
-    Py_buffer buffer;
-    PyObject *mv;
-
-    PyBuffer_FillInfo(&buffer, NULL, data, len, 1, PyBUF_CONTIG_RO);
-    mv = PyMemoryView_FromBuffer(&buffer);
-    PyBuffer_Release(&buffer);
-    return mv;
-}
-
-
-static PyObject *
 chunker_process(Chunker *c)
 {
     uint32_t sum, chunk_mask = c->chunk_mask;
@@ -221,7 +208,7 @@ chunker_process(Chunker *c)
         c->done = 1;
         if(c->remaining) {
             c->bytes_yielded += c->remaining;
-            return PyBuffer_FromMemory(c->data + c->position, c->remaining);
+            return PyMemoryView_FromMemory(c->data + c->position, c->remaining, PyBUF_READ);
         }
         else {
             if(c->bytes_read == c->bytes_yielded)
@@ -253,5 +240,5 @@ chunker_process(Chunker *c)
     c->last = c->position;
     n = c->last - old_last;
     c->bytes_yielded += n;
-    return PyBuffer_FromMemory(c->data + old_last, n);
+    return PyMemoryView_FromMemory(c->data + old_last, n, PyBUF_READ);
 }

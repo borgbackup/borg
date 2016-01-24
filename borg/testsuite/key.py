@@ -2,11 +2,11 @@ import os
 import re
 import shutil
 import tempfile
-from binascii import hexlify
+from binascii import hexlify, unhexlify
 
 from ..crypto import bytes_to_long, num_aes_blocks
 from ..key import PlaintextKey, PassphraseKey, KeyfileKey
-from ..helpers import Location, unhexlify
+from ..helpers import Location
 from . import BaseTestCase
 
 

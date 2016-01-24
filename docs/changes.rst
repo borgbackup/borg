@@ -1,6 +1,85 @@
 Changelog
 =========
 
+Version 1.0.0 (not released yet)
+--------------------------------
+
+The major release number change (0.x -> 1.x) indicates bigger incompatible
+changes, please read the compatibility notes carefully and adapt / test your
+scripts and carefully check your backup logs.
+
+Compatibility notes:
+
+- drop support for python 3.2 and 3.3, require 3.4 or 3.5, #221 #65 #490
+  note: we provide binaries that include python 3.5.1 and everything else
+  needed. they are an option in case you are stuck with < 3.4 otherwise.
+- change encryption to be on by default (using "repokey" mode)
+- remove support for --encryption=passphrase,
+  use borg migrate-to-repokey to switch to repokey mode, #97
+- remove deprecated "--compression <number>",
+  use --compression zlib,<number> instead
+  in case of 0, you could also use --compression none
+- remove deprecated "--hourly/daily/weekly/monthly/yearly"
+  use --keep-hourly/daily/weekly/monthly/yearly instead
+- remove deprecated "--do-not-cross-mountpoints",
+  use --one-file-system instead
+- disambiguate -p option, #563:
+
+  - -p now is same as --progress
+  - -P now is same as --prefix  
+- remove deprecated "borg verify",
+  use borg extract --dry-run instead
+- cleanup environment variable semantics, #355
+  the environment variables used to be "yes sayers" when set, this was
+  conceptually generalized to "automatic answerers" and they just give their
+  value as answer (as if you typed in that value when being asked).
+  See the "usage" / "Environment Variables" section of the docs for details.
+- change the builtin default for --chunker-params, create 2MiB chunks, #343
+  --chunker-params new default: 19,23,21,4095 - old default: 10,23,16,4096
+
+  one of the biggest issues with borg < 1.0 (and also attic) was that it had a
+  default target chunk size of 64kiB, thus it created a lot of chunks and thus
+  also a huge chunk management overhead (high RAM and disk usage).
+
+  please note that the new default won't change the chunks that you already
+  have in your repository. the new big chunks do not deduplicate with the old
+  small chunks, so expect your repo to grow at least by the size of every
+  changed file and in the worst case (e.g. if your files cache was lost / is
+  not used) by the size of every file (minus any compression you might use).
+
+  in case you want to immediately see a much lower resource usage (RAM / disk)
+  for chunks management, it might be better to start with a new repo than
+  continuing in the existing repo (with an existing repo, you'ld have to wait
+  until all archives with small chunks got pruned to see a lower resource
+  usage).
+
+  if you used the old --chunker-params default value (or if you did not use
+  --chunker-params option at all) and you'ld like to continue using small
+  chunks (and you accept the huge resource usage that comes with that), just
+  explicitly use borg create --chunker-params=10,23,16,4095.
+
+New features:
+
+- borg migrate-to-repokey ("passphrase" -> "repokey" encryption key mode)
+
+Other changes:
+
+- suppress unneeded exception context (PEP 409), simpler tracebacks
+- removed special code needed to deal with imperfections / incompatibilities /
+  missing stuff in py 3.2/3.3, simplify code that can be done simpler in 3.4
+- removed some version requirements that were kept on old versions because
+  newer did not support py 3.2 any more
+- use some py 3.4+ stdlib code instead of own/openssl/pypi code:
+
+  - use os.urandom instead of own cython openssl RAND_bytes wrapper, fixes #493
+  - use hashlib.pbkdf2_hmac from py stdlib instead of own openssl wrapper
+  - use hmac.compare_digest instead of == operator (constant time comparison)
+  - use stat.filemode instead of homegrown code
+  - use "mock" library from stdlib, #145
+  - remove borg.support (with non-broken argparse copy), it is ok in 3.4+, #358
+- Vagrant: copy CHANGES.rst as symlink, #592
+
+
 Version 0.30.0
 --------------
 

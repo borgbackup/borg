@@ -862,7 +862,7 @@ class Archiver:
         subparser.add_argument('--last', dest='last',
                                type=int, default=None, metavar='N',
                                help='only check last N archives (Default: all)')
-        subparser.add_argument('-p', '--prefix', dest='prefix', type=str,
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')
 
         change_passphrase_epilog = textwrap.dedent("""
@@ -1048,7 +1048,7 @@ class Archiver:
         subparser.add_argument('--short', dest='short',
                                action='store_true', default=False,
                                help='only print file/directory names, nothing else')
-        subparser.add_argument('-p', '--prefix', dest='prefix', type=str,
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
@@ -1120,7 +1120,7 @@ class Archiver:
         "1m" is taken to mean "31d". The archives kept with this option do not
         count towards the totals specified by any other options.
 
-        If a prefix is set with -p, then only archives that start with the prefix are
+        If a prefix is set with -P, then only archives that start with the prefix are
         considered for deletion and only those archives count towards the totals
         specified by the rules.
         Otherwise, *all* archives in the repository are candidates for deletion!
@@ -1148,7 +1148,7 @@ class Archiver:
                                help='number of monthly archives to keep')
         subparser.add_argument('-y', '--keep-yearly', dest='yearly', type=int, default=0,
                                help='number of yearly archives to keep')
-        subparser.add_argument('-p', '--prefix', dest='prefix', type=str,
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,

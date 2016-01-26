@@ -105,7 +105,7 @@ certain number of old archives::
         $REPOSITORY::`hostname`-`date +%Y-%m-%d`    \
         /home                                       \
         /var/www                                    \
-        --exclude /home/*/.cache                    \
+        --exclude '/home/*/.cache'                  \
         --exclude /home/Ben/Music/Justin\ Bieber    \
         --exclude '*.pyc'
 

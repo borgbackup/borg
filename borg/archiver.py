@@ -778,14 +778,16 @@ class Archiver:
         parser = argparse.ArgumentParser(prog=prog, description='Borg - Deduplicated Backups')
         parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,
                                    help='show version number and exit')
-        subparsers = parser.add_subparsers(title='Available commands')
+        subparsers = parser.add_subparsers(title='required arguments',
+                                           metavar='<command>')
 
         serve_epilog = textwrap.dedent("""
         This command starts a repository server process. This command is usually not used manually.
         """)
         subparser = subparsers.add_parser('serve', parents=[common_parser],
                                           description=self.do_serve.__doc__, epilog=serve_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='start repository server process')
         subparser.set_defaults(func=self.do_serve)
         subparser.add_argument('--restrict-to-path', dest='restrict_to_paths', action='append',
                                metavar='PATH', help='restrict repository access to PATH')
@@ -796,7 +798,8 @@ class Archiver:
         """)
         subparser = subparsers.add_parser('init', parents=[common_parser],
                                           description=self.do_init.__doc__, epilog=init_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='initialize empty repository')
         subparser.set_defaults(func=self.do_init)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
@@ -844,7 +847,8 @@ class Archiver:
         subparser = subparsers.add_parser('check', parents=[common_parser],
                                           description=self.do_check.__doc__,
                                           epilog=check_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='verify repository')
         subparser.set_defaults(func=self.do_check)
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
@@ -874,7 +878,8 @@ class Archiver:
         subparser = subparsers.add_parser('change-passphrase', parents=[common_parser],
                                           description=self.do_change_passphrase.__doc__,
                                           epilog=change_passphrase_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='change repository passphrase')
         subparser.set_defaults(func=self.do_change_passphrase)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
@@ -900,7 +905,8 @@ class Archiver:
         subparser = subparsers.add_parser('migrate-to-repokey', parents=[common_parser],
                                           description=self.do_migrate_to_repokey.__doc__,
                                           epilog=migrate_to_repokey_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='migrate passphrase-mode repository to repokey')
         subparser.set_defaults(func=self.do_migrate_to_repokey)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
@@ -916,7 +922,8 @@ class Archiver:
         subparser = subparsers.add_parser('create', parents=[common_parser],
                                           description=self.do_create.__doc__,
                                           epilog=create_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='create backup')
         subparser.set_defaults(func=self.do_create)
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
@@ -996,7 +1003,8 @@ class Archiver:
         subparser = subparsers.add_parser('extract', parents=[common_parser],
                                           description=self.do_extract.__doc__,
                                           epilog=extract_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='extract archive contents')
         subparser.set_defaults(func=self.do_extract)
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
@@ -1031,7 +1039,8 @@ class Archiver:
         subparser = subparsers.add_parser('rename', parents=[common_parser],
                                           description=self.do_rename.__doc__,
                                           epilog=rename_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='rename archive')
         subparser.set_defaults(func=self.do_rename)
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
@@ -1047,7 +1056,8 @@ class Archiver:
         subparser = subparsers.add_parser('delete', parents=[common_parser],
                                           description=self.do_delete.__doc__,
                                           epilog=delete_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='delete archive')
         subparser.set_defaults(func=self.do_delete)
         subparser.add_argument('-p', '--progress', dest='progress',
                                action='store_true', default=False,
@@ -1071,7 +1081,8 @@ class Archiver:
         subparser = subparsers.add_parser('list', parents=[common_parser],
                                           description=self.do_list.__doc__,
                                           epilog=list_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='list archive or repository contents')
         subparser.set_defaults(func=self.do_list)
         subparser.add_argument('--short', dest='short',
                                action='store_true', default=False,
@@ -1091,7 +1102,8 @@ class Archiver:
         subparser = subparsers.add_parser('mount', parents=[common_parser],
                                           description=self.do_mount.__doc__,
                                           epilog=mount_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='mount repository')
         subparser.set_defaults(func=self.do_mount)
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
                                help='repository/archive to mount')
@@ -1109,7 +1121,8 @@ class Archiver:
         subparser = subparsers.add_parser('info', parents=[common_parser],
                                           description=self.do_info.__doc__,
                                           epilog=info_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='show archive information')
         subparser.set_defaults(func=self.do_info)
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
@@ -1123,7 +1136,8 @@ class Archiver:
         subparser = subparsers.add_parser('break-lock', parents=[common_parser],
                                           description=self.do_break_lock.__doc__,
                                           epilog=break_lock_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='break repository and cache locks')
         subparser.set_defaults(func=self.do_break_lock)
         subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
@@ -1156,7 +1170,8 @@ class Archiver:
         subparser = subparsers.add_parser('prune', parents=[common_parser],
                                           description=self.do_prune.__doc__,
                                           epilog=prune_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='prune archives')
         subparser.set_defaults(func=self.do_prune)
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
@@ -1224,7 +1239,8 @@ class Archiver:
         subparser = subparsers.add_parser('upgrade', parents=[common_parser],
                                           description=self.do_upgrade.__doc__,
                                           epilog=upgrade_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='upgrade repository format')
         subparser.set_defaults(func=self.do_upgrade)
         subparser.add_argument('-p', '--progress', dest='progress',
                                action='store_true', default=False,
@@ -1256,7 +1272,8 @@ class Archiver:
         subparser = subparsers.add_parser('debug-dump-archive-items', parents=[common_parser],
                                           description=self.do_debug_dump_archive_items.__doc__,
                                           epilog=debug_dump_archive_items_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='dump archive items (metadata) (debug)')
         subparser.set_defaults(func=self.do_debug_dump_archive_items)
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
@@ -1268,7 +1285,8 @@ class Archiver:
         subparser = subparsers.add_parser('debug-get-obj', parents=[common_parser],
                                           description=self.do_debug_get_obj.__doc__,
                                           epilog=debug_get_obj_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='get object from repository (debug)')
         subparser.set_defaults(func=self.do_debug_get_obj)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
@@ -1284,7 +1302,8 @@ class Archiver:
         subparser = subparsers.add_parser('debug-put-obj', parents=[common_parser],
                                           description=self.do_debug_put_obj.__doc__,
                                           epilog=debug_put_obj_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='put object to repository (debug)')
         subparser.set_defaults(func=self.do_debug_put_obj)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
@@ -1298,7 +1317,8 @@ class Archiver:
         subparser = subparsers.add_parser('debug-delete-obj', parents=[common_parser],
                                           description=self.do_debug_delete_obj.__doc__,
                                           epilog=debug_delete_obj_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='delete object from repository (debug)')
         subparser.set_defaults(func=self.do_debug_delete_obj)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),

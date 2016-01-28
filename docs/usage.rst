@@ -279,9 +279,6 @@ Examples
     # Extract entire archive
     $ borg extract /mnt/backup::my-files
 
-    # Extract entire archive and list files while processing
-    $ borg extract -v --list /mnt/backup::my-files
-
     # Extract the "src" directory
     $ borg extract /mnt/backup::my-files home/USERNAME/src
 

@@ -318,6 +318,7 @@ class Archiver:
 
         matcher.fallback = not include_patterns
 
+        output_list = args.output_list
         dry_run = args.dry_run
         stdout = args.stdout
         sparse = args.sparse
@@ -332,7 +333,8 @@ class Archiver:
             if not args.dry_run:
                 while dirs and not item[b'path'].startswith(dirs[-1][b'path']):
                     archive.extract_item(dirs.pop(-1), stdout=stdout)
-            logger.info(remove_surrogates(orig_path))
+            if output_list:
+                logger.info(remove_surrogates(orig_path))
             try:
                 if dry_run:
                     archive.extract_item(item, dry_run=True)
@@ -1006,6 +1008,9 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='extract archive contents')
         subparser.set_defaults(func=self.do_extract)
+        subparser.add_argument('--list', dest='output_list',
+                               action='store_true', default=False,
+                               help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
                                help='do not actually change any files')

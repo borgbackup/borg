@@ -1129,3 +1129,24 @@ class RemoteArchiverTestCase(ArchiverTestCase):
     @unittest.skip('only works locally')
     def test_debug_put_get_delete_obj(self):
         pass
+
+
+def test_get_args():
+    archiver = Archiver()
+    # everything normal:
+    # first param is argv as produced by ssh forced command,
+    # second param is like from SSH_ORIGINAL_COMMAND env variable
+    args = archiver.get_args(['borg', 'serve', '--restrict-to-path=/p1', '--restrict-to-path=/p2', ],
+                             'borg serve --info --umask=0027')
+    assert args.func == archiver.do_serve
+    assert args.restrict_to_paths == ['/p1', '/p2']
+    assert args.umask == 0o027
+    assert args.log_level == 'info'
+    # trying to cheat - break out of path restriction
+    args = archiver.get_args(['borg', 'serve', '--restrict-to-path=/p1', '--restrict-to-path=/p2', ],
+                             'borg serve --restrict-to-path=/')
+    assert args.restrict_to_paths == ['/p1', '/p2']
+    # trying to cheat - try to execute different subcommand
+    args = archiver.get_args(['borg', 'serve', '--restrict-to-path=/p1', '--restrict-to-path=/p2', ],
+                             'borg init /')
+    assert args.func == archiver.do_serve

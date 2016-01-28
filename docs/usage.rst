@@ -230,6 +230,9 @@ Examples
     # Backup ~/Documents into an archive named "my-documents"
     $ borg create /mnt/backup::my-documents ~/Documents
 
+    # same, but verbosely list all files as we process them
+    $ borg create -v --list /mnt/backup::my-documents ~/Documents
+
     # Backup ~/Documents and ~/src but exclude pyc files
     $ borg create /mnt/backup::my-files   \
         ~/Documents                       \

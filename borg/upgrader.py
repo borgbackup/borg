@@ -137,7 +137,7 @@ class AtticRepositoryUpgrader(Repository):
         replacement pattern is `s/ATTIC KEY/BORG_KEY/` in
         `get_keys_dir()`, that is `$ATTIC_KEYS_DIR` or
         `$HOME/.attic/keys`, and moved to `$BORG_KEYS_DIR` or
-        `$HOME/.borg/keys`.
+        `$HOME/.config/borg/keys`.
 
         no need to decrypt to convert. we need to rewrite the whole
         key file because magic string length changed, but that's not a

@@ -85,7 +85,7 @@ Some automatic "answerers" (if set, they automatically answer confirmation quest
 
 Directories:
     BORG_KEYS_DIR
-        Default to '~/.borg/keys'. This directory contains keys for encrypted repositories.
+        Default to '~/.config/borg/keys'. This directory contains keys for encrypted repositories.
     BORG_CACHE_DIR
         Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
         of space for dealing with big repositories).
@@ -203,9 +203,9 @@ be stored inside the repository (in its "config" file). In above mentioned
 attack scenario, the attacker will have the key (but not the passphrase).
 
 If you want "passphrase and having-the-key" security, use the ``keyfile`` mode.
-The key will be stored in your home directory (in ``.borg/keys``). In the attack
-scenario, the attacker who has just access to your repo won't have the key (and
-also not the passphrase).
+The key will be stored in your home directory (in ``.config/borg/keys``). In
+the attack scenario, the attacker who has just access to your repo won't have
+the key (and also not the passphrase).
 
 Make a backup copy of the key file (``keyfile`` mode) or repo config file
 (``repokey`` mode) and keep it at a safe place, so you still have the key in
@@ -411,15 +411,15 @@ Examples
     Initializing repository at "/mnt/backup"
     Enter passphrase (empty for no passphrase):
     Enter same passphrase again: 
-    Key file "/home/USER/.borg/keys/mnt_backup" created.
+    Key file "/home/USER/.config/borg/keys/mnt_backup" created.
     Keep this file safe. Your data will be inaccessible without it.
 
     # Change key file passphrase
     $ borg change-passphrase /mnt/backup
-    Enter passphrase for key file /home/USER/.borg/keys/mnt_backup:
+    Enter passphrase for key file /home/USER/.config/borg/keys/mnt_backup:
     New passphrase: 
     Enter same passphrase again: 
-    Key file "/home/USER/.borg/keys/mnt_backup" updated
+    Key file "/home/USER/.config/borg/keys/mnt_backup" updated
 
 
 .. include:: usage/serve.rst.inc

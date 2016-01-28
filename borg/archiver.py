@@ -1213,7 +1213,7 @@ class Archiver:
         It will change the magic strings in the repository's segments
         to match the new Borg magic strings. The keyfiles found in
         $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
-        copied to $BORG_KEYS_DIR or ~/.borg/keys.
+        copied to $BORG_KEYS_DIR or ~/.config/borg/keys.
 
         The cache files are converted, from $ATTIC_CACHE_DIR or
         ~/.cache/attic to $BORG_CACHE_DIR or ~/.cache/borg, but the

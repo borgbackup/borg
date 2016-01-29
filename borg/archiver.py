@@ -1153,8 +1153,8 @@ class Archiver:
         any of the specified retention options. This command is normally used by
         automated backup scripts wanting to keep a certain number of historic backups.
 
-        As an example, "-d 7" means to keep the latest backup on each day for 7 days.
-        Days without backups do not count towards the total.
+        As an example, "-d 7" means to keep the latest backup on each day, up to 7
+        most recent days with backups (days without backups do not count).
         The rules are applied from hourly to yearly, and backups selected by previous
         rules do not count towards those of later rules. The time that each backup
         completes is used for pruning purposes. Dates and times are interpreted in

@@ -474,7 +474,10 @@ class Archiver:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 if args.prefix and not archive_info.name.startswith(args.prefix):
                     continue
-                print(format_archive(archive_info))
+                if args.short:
+                    print(archive_info.name)
+                else:
+                    print(format_archive(archive_info))
         return self.exit_code
 
     def do_info(self, args):

@@ -132,7 +132,7 @@ class AESKeyBase(KeyBase):
         return b''.join((self.TYPE_STR, hmac, data))
 
     def decrypt(self, id, data):
-        if not (data[0] == self.TYPE or \
+        if not (data[0] == self.TYPE or
             data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             raise IntegrityError('Invalid encryption envelope')
         hmac_given = memoryview(data)[1:33]
@@ -149,7 +149,7 @@ class AESKeyBase(KeyBase):
         return data
 
     def extract_nonce(self, payload):
-        if not (payload[0] == self.TYPE or \
+        if not (payload[0] == self.TYPE or
             payload[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             raise IntegrityError('Invalid encryption envelope')
         nonce = bytes_to_long(payload[33:41])

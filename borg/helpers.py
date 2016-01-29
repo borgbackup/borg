@@ -1,5 +1,4 @@
 import argparse
-import binascii
 from collections import namedtuple
 from functools import wraps
 import grp

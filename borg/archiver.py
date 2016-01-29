@@ -139,8 +139,6 @@ class Archiver:
         key_new.change_passphrase()  # option to change key protection passphrase, save
         return EXIT_SUCCESS
 
-        return EXIT_SUCCESS
-
     def do_create(self, args):
         """Create new archive"""
         matcher = PatternMatcher(fallback=True)

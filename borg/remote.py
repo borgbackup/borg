@@ -7,7 +7,6 @@ import shlex
 from subprocess import Popen, PIPE
 import sys
 import tempfile
-import traceback
 
 from . import __version__
 

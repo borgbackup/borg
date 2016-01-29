@@ -23,7 +23,6 @@
 .. _llfuse: https://pypi.python.org/pypi/llfuse/
 .. _homebrew: http://brew.sh/
 .. _userspace filesystems: https://en.wikipedia.org/wiki/Filesystem_in_Userspace
-.. _librelist: http://librelist.com/
 .. _Cython: http://cython.org/
 .. _virtualenv: https://pypi.python.org/pypi/virtualenv/
 .. _mailing list discussion about internals: http://librelist.com/browser/attic/2014/5/6/questions-and-suggestions-about-inner-working-of-attic>

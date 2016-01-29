@@ -4,7 +4,6 @@ import logging
 logger = logging.getLogger(__name__)
 import os
 import shutil
-import sys
 import time
 
 from .helpers import get_keys_dir, get_cache_dir, ProgressIndicatorPercent

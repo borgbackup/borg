@@ -321,6 +321,6 @@ class Borg0xxKeyfileKey(KeyfileKey):
             filename = os.path.join(keys_dir, name)
             with open(filename, 'r') as fd:
                 line = fd.readline().strip()
-                if line and line.startswith(cls.FILE_ID) and line[len(cls.FILE_ID)+1:] == id:
+                if line and line.startswith(cls.FILE_ID) and line[len(cls.FILE_ID) + 1:] == id:
                     return filename
         raise KeyfileNotFoundError(repository.path, keys_dir)

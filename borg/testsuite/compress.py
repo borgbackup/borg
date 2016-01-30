@@ -98,5 +98,3 @@ def test_compressor():
     for params in params_list:
         c = Compressor(**params)
         assert data == c.decompress(c.compress(data))
-
-

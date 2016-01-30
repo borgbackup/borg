@@ -231,8 +231,8 @@ elif sys.platform.startswith('freebsd'):  # pragma: freebsd only
         mv = memoryview(namebuf.raw)
         while mv:
             length = mv[0]
-            names.append(os.fsdecode(bytes(mv[1:1+length])))
-            mv = mv[1+length:]
+            names.append(os.fsdecode(bytes(mv[1:1 + length])))
+            mv = mv[1 + length:]
         return names
 
     def getxattr(path, name, *, follow_symlinks=True):

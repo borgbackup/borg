@@ -111,7 +111,7 @@ class ExclusiveLock:
         self.sleep = sleep
         self.path = os.path.abspath(path)
         self.id = id or get_id()
-        self.unique_name  = os.path.join(self.path, "%s.%d-%x" % self.id)
+        self.unique_name = os.path.join(self.path, "%s.%d-%x" % self.id)
 
     def __enter__(self):
         return self.acquire()

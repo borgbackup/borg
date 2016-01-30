@@ -19,7 +19,7 @@ on_rtd = os.environ.get('READTHEDOCS')
 
 # msgpack pure python data corruption was fixed in 0.4.6.
 # Also, we might use some rather recent API features.
-install_requires=['msgpack-python>=0.4.6', ]
+install_requires = ['msgpack-python>=0.4.6', ]
 
 
 from setuptools import setup, Extension
@@ -120,12 +120,14 @@ elif not on_rtd:
 with open('README.rst', 'r') as fd:
     long_description = fd.read()
 
+
 class build_usage(Command):
     description = "generate usage for each command"
 
     user_options = [
         ('output=', 'O', 'output directory'),
     ]
+
     def initialize_options(self):
         pass
 
@@ -172,6 +174,7 @@ class build_api(Command):
     user_options = [
         ('output=', 'O', 'output directory'),
     ]
+
     def initialize_options(self):
         pass
 

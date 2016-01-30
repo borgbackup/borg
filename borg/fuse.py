@@ -209,7 +209,7 @@ class FuseOperations(llfuse.Operations):
                 continue
             n = min(size, s - offset)
             chunk = self.key.decrypt(id, self.repository.get(id))
-            parts.append(chunk[offset:offset+n])
+            parts.append(chunk[offset:offset + n])
             offset = 0
             size -= n
             if not size:

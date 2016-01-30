@@ -360,7 +360,7 @@ class KeyfileKey(KeyfileKeyBase):
             filename = os.path.join(keys_dir, name)
             with open(filename, 'r') as fd:
                 line = fd.readline().strip()
-                if line.startswith(self.FILE_ID) and line[len(self.FILE_ID)+1:] == id:
+                if line.startswith(self.FILE_ID) and line[len(self.FILE_ID) + 1:] == id:
                     return filename
         raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
 

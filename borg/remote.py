@@ -185,7 +185,7 @@ class RemoteRepository:
             else:
                 raise ValueError('log level missing, fix this code')
         if testing:
-            return [sys.executable, '-m', 'borg.archiver', 'serve' ] + opts + self.extra_test_args
+            return [sys.executable, '-m', 'borg.archiver', 'serve'] + opts + self.extra_test_args
         else:  # pragma: no cover
             return [args.remote_path, 'serve'] + opts
 

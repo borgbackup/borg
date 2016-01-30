@@ -688,20 +688,20 @@ class Location:
             self.user = m.group('user')
             self.host = m.group('host')
             self.port = m.group('port') and int(m.group('port')) or None
-            self.path = m.group('path')
+            self.path = os.path.normpath(m.group('path'))
             self.archive = m.group('archive')
             return True
         m = self.file_re.match(text)
         if m:
             self.proto = m.group('proto')
-            self.path = m.group('path')
+            self.path = os.path.normpath(m.group('path'))
             self.archive = m.group('archive')
             return True
         m = self.scp_re.match(text)
         if m:
             self.user = m.group('user')
             self.host = m.group('host')
-            self.path = m.group('path')
+            self.path = os.path.normpath(m.group('path'))
             self.archive = m.group('archive')
             self.proto = self.host and 'ssh' or 'file'
             return True

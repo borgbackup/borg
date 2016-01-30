@@ -7,6 +7,7 @@ import functools
 import inspect
 import io
 import os
+import shlex
 import signal
 import stat
 import sys
@@ -1338,6 +1339,20 @@ class Archiver:
                                help='hex object ID(s) to delete from the repo')
         return parser
 
+    def get_args(self, argv, cmd):
+        """usually, just returns argv, except if we deal with a ssh forced command for borg serve."""
+        result = self.parse_args(argv[1:])
+        if cmd is not None and result.func == self.do_serve:
+            forced_result = result
+            argv = shlex.split(cmd)
+            result = self.parse_args(argv[1:])
+            if result.func != forced_result.func:
+                # someone is trying to execute a different borg subcommand, don't do that!
+                return forced_result
+            # the only thing we take from the forced "borg serve" ssh command is --restrict-to-path
+            result.restrict_to_paths = forced_result.restrict_to_paths
+        return result
+
     def parse_args(self, args=None):
         # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
         if args:
@@ -1413,7 +1428,7 @@ def main():  # pragma: no cover
     setup_signal_handlers()
     archiver = Archiver()
     msg = None
-    args = archiver.parse_args(sys.argv[1:])
+    args = archiver.get_args(sys.argv, os.environ.get('SSH_ORIGINAL_COMMAND'))
     try:
         exit_code = archiver.run(args)
     except Error as e:

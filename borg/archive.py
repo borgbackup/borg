@@ -187,7 +187,7 @@ class Archive:
 
     @property
     def duration(self):
-        return format_timedelta(self.end-self.start)
+        return format_timedelta(self.end - self.start)
 
     def __str__(self):
         return '''Archive name: {0.name}
@@ -591,8 +591,7 @@ Number of files: {0.stats.nfiles}'''.format(self)
 # this set must be kept complete, otherwise the RobustUnpacker might malfunction:
 ITEM_KEYS = set([b'path', b'source', b'rdev', b'chunks',
                  b'mode', b'user', b'group', b'uid', b'gid', b'mtime', b'atime', b'ctime',
-                 b'xattrs', b'bsdflags', b'acl_nfs4', b'acl_access', b'acl_default', b'acl_extended',
-            ])
+                 b'xattrs', b'bsdflags', b'acl_nfs4', b'acl_access', b'acl_default', b'acl_extended', ])
 
 
 class RobustUnpacker:

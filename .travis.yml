@@ -14,6 +14,9 @@ matrix:
         - python: 3.5
           os: linux
           env: TOXENV=py35
+        - python: 3.5
+          os: linux
+          env: TOXENV=flake8
         - language: generic
           os: osx
           osx_image: xcode6.4

@@ -9,6 +9,7 @@ from ..locking import get_id, TimeoutTimer, ExclusiveLock, UpgradableLock, LockR
 ID1 = "foo", 1, 1
 ID2 = "bar", 2, 2
 
+
 def test_id():
     hostname, pid, tid = get_id()
     assert isinstance(hostname, str)

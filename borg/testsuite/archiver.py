@@ -82,6 +82,7 @@ def cmd(request):
         exe = 'borg.exe'
     else:
         raise ValueError("param must be 'python' or 'binary'")
+
     def exec_fn(*args, **kw):
         return exec_cmd(*args, exe=exe, fork=True, **kw)
     return exec_fn
@@ -120,6 +121,7 @@ sudo mount /tmp/borg-disk /tmp/borg-mount
 if the directory does not exist, the test will be skipped.
 """
 DF_MOUNT = '/tmp/borg-mount'
+
 
 @pytest.mark.skipif(not os.path.exists(DF_MOUNT), reason="needs a 16MB fs mounted on %s" % DF_MOUNT)
 def test_disk_full(cmd):
@@ -177,7 +179,7 @@ def test_disk_full(cmd):
                 shutil.rmtree(reserve, ignore_errors=True)
             rc, out = cmd('list', repo)
             if rc != EXIT_SUCCESS:
-               print('list', rc, out)
+                print('list', rc, out)
             rc, out = cmd('check', '--repair', repo)
             if rc != EXIT_SUCCESS:
                 print('check', rc, out)
@@ -301,7 +303,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         list_output = self.cmd('list', '--short', self.repository_location)
         self.assert_in('test', list_output)
         self.assert_in('test.2', list_output)
-        expected =  [
+        expected = [
             'input',
             'input/bdev',
             'input/cdev',
@@ -320,7 +322,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             expected.remove('input/cdev')
         if has_lchflags:
             # remove the file we did not backup, so input and output become equal
-            expected.remove('input/flagfile') # this file is UF_NODUMP
+            expected.remove('input/flagfile')  # this file is UF_NODUMP
             os.remove(os.path.join('input', 'flagfile'))
         list_output = self.cmd('list', '--short', self.repository_location + '::test')
         for name in expected:
@@ -348,7 +350,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_equal(filter(info_output), filter(info_output2))
 
     def test_atime(self):
-        have_root = self.create_test_files()
+        self.create_test_files()
         atime, mtime = 123456780, 234567890
         os.utime('input/file1', (atime, mtime))
         self.cmd('init', self.repository_location)
@@ -414,7 +416,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         filenames = ['normal', 'with some blanks', '(with_parens)', ]
         for filename in filenames:
             filename = os.path.join(self.input_path, filename)
-            with open(filename, 'wb') as fd:
+            with open(filename, 'wb'):
                 pass
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
@@ -617,11 +619,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('tagged1/file1', size=1024)
         self.create_regular_file('tagged2/.NOBACKUP2')
         self.create_regular_file('tagged2/file2', size=1024)
-        self.create_regular_file('tagged3/CACHEDIR.TAG', contents = b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
+        self.create_regular_file('tagged3/CACHEDIR.TAG', contents=b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
         self.create_regular_file('tagged3/file3', size=1024)
         self.create_regular_file('taggedall/.NOBACKUP1')
         self.create_regular_file('taggedall/.NOBACKUP2')
-        self.create_regular_file('taggedall/CACHEDIR.TAG', contents = b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
+        self.create_regular_file('taggedall/CACHEDIR.TAG', contents=b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
         self.create_regular_file('taggedall/file4', size=1024)
         self.cmd('create', '--exclude-if-present', '.NOBACKUP1', '--exclude-if-present', '.NOBACKUP2',
                  '--exclude-caches', '--keep-tag-files', self.repository_location + '::test', 'input')
@@ -785,7 +787,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         clearly incomplete: only tests for the weird "unchanged" status for now"""
         now = time.time()
         self.create_regular_file('file1', size=1024 * 80)
-        os.utime('input/file1', (now - 5, now - 5)) # 5 seconds ago
+        os.utime('input/file1', (now - 5, now - 5))  # 5 seconds ago
         self.create_regular_file('file2', size=1024 * 80)
         self.cmd('init', self.repository_location)
         output = self.cmd('create', '-v', '--list', self.repository_location + '::test', 'input')
@@ -822,7 +824,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('create', '-v', '--list', '--filter=AM', self.repository_location + '::test3', 'input')
         self.assert_in('file1', output)
 
-    #def test_cmdline_compatibility(self):
+    # def test_cmdline_compatibility(self):
     #    self.create_regular_file('file1', size=1024 * 80)
     #    self.cmd('init', self.repository_location)
     #    self.cmd('create', self.repository_location + '::test', 'input')

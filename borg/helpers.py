@@ -128,7 +128,7 @@ class Manifest:
 
 
 def prune_within(archives, within):
-    multiplier = {'H': 1, 'd': 24, 'w': 24*7, 'm': 24*31, 'y': 24*365}
+    multiplier = {'H': 1, 'd': 24, 'w': 24 * 7, 'm': 24 * 31, 'y': 24 * 365}
     try:
         hours = int(within[:-1]) * multiplier[within[-1]]
     except (KeyError, ValueError):
@@ -136,7 +136,7 @@ def prune_within(archives, within):
         raise argparse.ArgumentTypeError('Unable to parse --within option: "%s"' % within)
     if hours <= 0:
         raise argparse.ArgumentTypeError('Number specified using --within option must be positive')
-    target = datetime.now(timezone.utc) - timedelta(seconds=hours*60*60)
+    target = datetime.now(timezone.utc) - timedelta(seconds=hours * 3600)
     return [a for a in archives if a.ts > target]
 
 
@@ -200,7 +200,7 @@ class Statistics:
                 path = remove_surrogates(item[b'path']) if item else ''
                 space = columns - len(msg)
                 if space < len('...') + len(path):
-                    path = '%s...%s' % (path[:(space//2)-len('...')], path[-space//2:])
+                    path = '%s...%s' % (path[:(space // 2) - len('...')], path[-space // 2:])
                 msg += "{0:<{space}}".format(path, space=space)
             else:
                 msg = ' ' * columns
@@ -355,7 +355,7 @@ class FnmatchPattern(PatternBase):
         if pattern.endswith(os.path.sep):
             pattern = os.path.normpath(pattern).rstrip(os.path.sep) + os.path.sep + '*' + os.path.sep
         else:
-            pattern = os.path.normpath(pattern) + os.path.sep+'*'
+            pattern = os.path.normpath(pattern) + os.path.sep + '*'
 
         self.pattern = pattern
 
@@ -831,6 +831,7 @@ FALSISH = ('No', 'NO', 'no', 'N', 'n', '0', )
 TRUISH = ('Yes', 'YES', 'yes', 'Y', 'y', '1', )
 DEFAULTISH = ('Default', 'DEFAULT', 'default', 'D', 'd', '', )
 
+
 def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
         retry_msg=None, invalid_msg=None, env_msg=None,
         falsish=FALSISH, truish=TRUISH, defaultish=DEFAULTISH,
@@ -949,7 +950,6 @@ class ProgressIndicatorPercent:
     def finish(self):
         if self.same_line:
             print(" " * len(self.msg % 100.0), file=self.file, end='\r')
-
 
 
 class ProgressIndicatorEndless:

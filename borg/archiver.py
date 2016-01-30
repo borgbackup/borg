@@ -239,8 +239,7 @@ class Archiver:
         # Ignore if nodump flag is set
         if has_lchflags and (st.st_flags & stat.UF_NODUMP):
             return
-        if (stat.S_ISREG(st.st_mode) or
-            read_special and not stat.S_ISDIR(st.st_mode)):
+        if stat.S_ISREG(st.st_mode) or read_special and not stat.S_ISDIR(st.st_mode):
             if not dry_run:
                 try:
                     status = archive.process_file(path, st, cache)
@@ -576,7 +575,7 @@ class Archiver:
         archive = Archive(repository, key, manifest, args.location.archive)
         for i, item_id in enumerate(archive.metadata[b'items']):
             data = key.decrypt(item_id, repository.get(item_id))
-            filename = '%06d_%s.items' %(i, hexlify(item_id).decode('ascii'))
+            filename = '%06d_%s.items' % (i, hexlify(item_id).decode('ascii'))
             print('Dumping', filename)
             with open(filename, 'wb') as fd:
                 fd.write(data)
@@ -594,7 +593,7 @@ class Archiver:
             print("object id %s is invalid." % hex_id)
         else:
             try:
-                data =repository.get(id)
+                data = repository.get(id)
             except repository.ObjectNotFound:
                 print("object %s not found." % hex_id)
             else:
@@ -756,7 +755,7 @@ class Archiver:
 
     def preprocess_args(self, args):
         deprecations = [
-            #('--old', '--new', 'Warning: "--old" has been deprecated. Use "--new" instead.'),
+            # ('--old', '--new', 'Warning: "--old" has been deprecated. Use "--new" instead.'),
         ]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
@@ -787,8 +786,7 @@ class Archiver:
         parser = argparse.ArgumentParser(prog=prog, description='Borg - Deduplicated Backups')
         parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,
                                    help='show version number and exit')
-        subparsers = parser.add_subparsers(title='required arguments',
-                                           metavar='<command>')
+        subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
 
         serve_epilog = textwrap.dedent("""
         This command starts a repository server process. This command is usually not used manually.

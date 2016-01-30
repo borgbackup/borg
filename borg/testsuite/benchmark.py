@@ -38,12 +38,14 @@ def testdata(request, tmpdir_factory):
     data_type = request.param
     if data_type == 'zeros':
         # do not use a binary zero (\0) to avoid sparse detection
-        data = lambda: b'0' * size
+        def data(size):
+            return b'0' * size
     if data_type == 'random':
-        data = lambda: os.urandom(size)
+        def data(size):
+            return os.urandom(size)
     for i in range(count):
         with open(str(p.join(str(i))), "wb") as f:
-            f.write(data())
+            f.write(data(size))
     yield str(p)
     p.remove(rec=1)
 
@@ -95,4 +97,3 @@ def test_check(benchmark, cmd, archive):
 def test_help(benchmark, cmd):
     result, out = benchmark(cmd, 'help')
     assert result == 0
-

@@ -165,8 +165,7 @@ class FormatTimedeltaTestCase(BaseTestCase):
 def check_patterns(files, pattern, expected):
     """Utility for testing patterns.
     """
-    assert all([f == os.path.normpath(f) for f in files]), \
-            "Pattern matchers expect normalized input paths"
+    assert all([f == os.path.normpath(f) for f in files]), "Pattern matchers expect normalized input paths"
 
     matched = [f for f in files if pattern.match(f)]
 
@@ -284,7 +283,7 @@ def test_patterns_shell(pattern, expected):
     ("^[^/]", []),
     ("^(?!/srv|/foo|/opt)",
      ["/home", "/home/user/.profile", "/home/user/.bashrc", "/home/user2/.profile",
-      "/home/user2/public_html/index.html", "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails",]),
+      "/home/user2/public_html/index.html", "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails", ]),
     ])
 def test_patterns_regex(pattern, expected):
     files = [

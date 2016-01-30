@@ -5,8 +5,8 @@ Version 1.0.0 (not released yet)
 --------------------------------
 
 The major release number change (0.x -> 1.x) indicates bigger incompatible
-changes, please read the compatibility notes carefully and adapt / test your
-scripts and carefully check your backup logs.
+changes, please read the compatibility notes, adapt / test your scripts and
+check your backup logs.
 
 Compatibility notes:
 
@@ -14,6 +14,8 @@ Compatibility notes:
   note: we provide binaries that include python 3.5.1 and everything else
   needed. they are an option in case you are stuck with < 3.4 otherwise.
 - change encryption to be on by default (using "repokey" mode)
+- moved keyfile keys from ~/.borg/keys to ~/.config/borg/keys,
+  you can either move them manually or run "borg upgrade <REPO>"
 - remove support for --encryption=passphrase,
   use borg migrate-to-repokey to switch to repokey mode, #97
 - remove deprecated "--compression <number>",
@@ -61,6 +63,16 @@ Compatibility notes:
 New features:
 
 - borg migrate-to-repokey ("passphrase" -> "repokey" encryption key mode)
+- implement --short for borg list REPO, fixes #611
+- implement --list for borg extract (consistency with borg create)
+- borg serve: overwrite client's --restrict-to-path with ssh forced command's
+  option value (but keep everything else from the client commandline), #544
+- use $XDG_CONFIG_HOME/keys for keyfile keys (~/.config/borg/keys), #515
+- "borg upgrade" moves the keyfile keys to the new location
+
+Bug fixes:
+
+- normalize trailing slashes for the repository path, #606
 
 Other changes:
 
@@ -78,6 +90,15 @@ Other changes:
   - use "mock" library from stdlib, #145
   - remove borg.support (with non-broken argparse copy), it is ok in 3.4+, #358
 - Vagrant: copy CHANGES.rst as symlink, #592
+- cosmetic code cleanups, add flake8 to tox/travis, #4
+- docs / help:
+
+  - make "borg -h" output prettier, #591
+  - slightly rephrase prune help
+  - add missing example for --list option of borg create
+  - quote exclude line that includes an asterisk to prevent shell expansion
+  - fix dead link to license
+  - delete Ubuntu Vivid, it is not supported anymore (EOL)
 
 
 Version 0.30.0

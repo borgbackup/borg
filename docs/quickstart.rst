@@ -167,7 +167,7 @@ is being made.
     protection. The repository server never sees the plaintext key.
 
 ``keyfile`` mode
-    The key is stored on your local disk (in ``~/.borg/keys/``).
+    The key is stored on your local disk (in ``~/.config/borg/keys/``).
     Use this mode if you want "passphrase and having-the-key" security.
 
 In both modes, the key is stored in encrypted form and can be only decrypted

@@ -358,7 +358,7 @@ Key files
 ---------
 
 When initialized with the ``init -e keyfile`` command, |project_name|
-needs an associated file in ``$HOME/.borg/keys`` to read and write
+needs an associated file in ``$HOME/.config/borg/keys`` to read and write
 the repository. The format is based on msgpack_, base64 encoding and
 PBKDF2_ SHA256 hashing, which is then encoded again in a msgpack_.
 

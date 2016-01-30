@@ -23,7 +23,7 @@ from .helpers import Error, location_validator, format_time, format_file_size, \
 from .logger import create_logger, setup_logging
 logger = create_logger()
 from .compress import Compressor, COMPR_BUFFER
-from .upgrader import AtticRepositoryUpgrader
+from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache
 from .key import key_creator, RepoKey, PassphraseKey
@@ -557,6 +557,11 @@ class Archiver:
 
         # XXX: should auto-detect if it is an attic repository here
         repo = AtticRepositoryUpgrader(args.location.path, create=False)
+        try:
+            repo.upgrade(args.dry_run, inplace=args.inplace, progress=args.progress)
+        except NotImplementedError as e:
+            print("warning: %s" % e)
+        repo = BorgRepositoryUpgrader(args.location.path, create=False)
         try:
             repo.upgrade(args.dry_run, inplace=args.inplace, progress=args.progress)
         except NotImplementedError as e:
@@ -1214,7 +1219,7 @@ class Archiver:
         It will change the magic strings in the repository's segments
         to match the new Borg magic strings. The keyfiles found in
         $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
-        copied to $BORG_KEYS_DIR or ~/.borg/keys.
+        copied to $BORG_KEYS_DIR or ~/.config/borg/keys.
 
         The cache files are converted, from $ATTIC_CACHE_DIR or
         ~/.cache/attic to $BORG_CACHE_DIR or ~/.cache/borg, but the

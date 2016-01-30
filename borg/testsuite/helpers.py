@@ -10,7 +10,8 @@ import msgpack
 import msgpack.fallback
 
 from ..helpers import Location, format_file_size, format_timedelta, make_path_safe, \
-    prune_within, prune_split, get_cache_dir, Statistics, is_slow_msgpack, yes, TRUISH, FALSISH, DEFAULTISH, \
+    prune_within, prune_split, get_cache_dir, get_keys_dir, Statistics, is_slow_msgpack, \
+    yes, TRUISH, FALSISH, DEFAULTISH, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
     ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
     PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern
@@ -579,7 +580,7 @@ class TestParseTimestamp(BaseTestCase):
 
 
 def test_get_cache_dir():
-    """test that get_cache_dir respects environement"""
+    """test that get_cache_dir respects environment"""
     # reset BORG_CACHE_DIR in order to test default
     old_env = None
     if os.environ.get('BORG_CACHE_DIR'):
@@ -593,6 +594,23 @@ def test_get_cache_dir():
     # reset old env
     if old_env is not None:
         os.environ['BORG_CACHE_DIR'] = old_env
+
+
+def test_get_keys_dir():
+    """test that get_keys_dir respects environment"""
+    # reset BORG_KEYS_DIR in order to test default
+    old_env = None
+    if os.environ.get('BORG_KEYS_DIR'):
+        old_env = os.environ['BORG_KEYS_DIR']
+        del(os.environ['BORG_KEYS_DIR'])
+    assert get_keys_dir() == os.path.join(os.path.expanduser('~'), '.config', 'borg', 'keys')
+    os.environ['XDG_CONFIG_HOME'] = '/var/tmp/.config'
+    assert get_keys_dir() == os.path.join('/var/tmp/.config', 'borg', 'keys')
+    os.environ['BORG_KEYS_DIR'] = '/var/tmp'
+    assert get_keys_dir() == '/var/tmp'
+    # reset old env
+    if old_env is not None:
+        os.environ['BORG_KEYS_DIR'] = old_env
 
 
 @pytest.fixture()

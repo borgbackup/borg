@@ -209,8 +209,8 @@ class Statistics:
 
 def get_keys_dir():
     """Determine where to repository keys and cache"""
-    return os.environ.get('BORG_KEYS_DIR',
-                          os.path.join(os.path.expanduser('~'), '.borg', 'keys'))
+    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(os.path.expanduser('~'), '.config'))
+    return os.environ.get('BORG_KEYS_DIR', os.path.join(xdg_config, 'borg', 'keys'))
 
 
 def get_cache_dir():

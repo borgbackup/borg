@@ -69,7 +69,7 @@ forced command and restrictions applied as shown below:
 
 The options which are added to the key will perform the following:
 
-1. Force command on the ssh key and dont allow any other command to run
+1. Force command on the ssh key and don't allow any other command to run
 2. Change working directory
 3. Run ``borg serve`` restricted at the client base path
 4. Restrict ssh and do not allow stuff which imposes a security risk
@@ -111,7 +111,7 @@ Ansible
 
 Ansible takes care of all the system-specific commands to add the user, create the
 folder. Even when the configuration is changed the repository server configuration is
-satisfied and reproducable.
+satisfied and reproducible.
 
 Automate setting up an repository server with the user, group, folders and
 permissions a Ansible playbook could be used. Keep in mind the playbook
@@ -158,7 +158,7 @@ autodetect it runs under SSH by checking the `SSH_ORIGINAL_COMMAND` environment
 variable. This is left open for future improvements.
 
 When extending ssh autodetection in borg no external wrapper script is necessary
-and no other interpreter or apllication has to be deployed.
+and no other interpreter or application has to be deployed.
 
 See also
 --------

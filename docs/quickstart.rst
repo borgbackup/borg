@@ -180,7 +180,7 @@ For automated backups the passphrase can be specified using the
           :ref:`this note about password environments <password_env>`
           for more information.
 
-.. important:: The repository data is totally inaccessible without the key:**
+.. warning:: The repository data is totally inaccessible without the key:
     Make a backup copy of the key file (``keyfile`` mode) or repo config
     file (``repokey`` mode) and keep it at a safe place, so you still have
     the key in case it gets corrupted or lost.
@@ -204,9 +204,8 @@ or::
 
 Remote operations over SSH can be automated with SSH keys. You can restrict the
 use of the SSH keypair by prepending a forced command to the SSH public key in
-the remote server's authorized_keys file. Only the forced command will be run
-when the key authenticates a connection. This example will start |project_name| in server
-mode, and limit the |project_name| server to a specific filesystem path::
+the remote server's `authorized_keys` file. This example will start |project_name|
+in server mode and limit it to a specific filesystem path::
 
   command="borg serve --restrict-to-path /mnt/backup",no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-user-rc ssh-rsa AAAAB3[...]
 

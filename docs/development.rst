@@ -15,9 +15,8 @@ Style guide
 We generally follow `pep8
 <https://www.python.org/dev/peps/pep-0008/>`_, with 120 columns
 instead of 79. We do *not* use form-feed (``^L``) characters to
-separate sections either. The `flake8
-<https://flake8.readthedocs.org/>`_ commandline tool should be used to
-check for style errors before sending pull requests.
+separate sections either. Compliance is tested automatically when
+you run the tests.
 
 Output and Logging
 ------------------
@@ -29,7 +28,7 @@ When directly talking to the user (e.g. Y/N questions), do not use logging,
 but directly output to stderr (not: stdout, it could be connected to a pipe).
 
 To control the amount and kinds of messages output to stderr or emitted at
-info level, use flags like --stats.
+info level, use flags like ``--stats`` or ``--list``.
 
 Building a development environment
 ----------------------------------
@@ -70,7 +69,7 @@ Some more advanced examples::
 
 Important notes:
 
-- When using -- to give options to py.test, you MUST also give borg.testsuite[.module].
+- When using ``--`` to give options to py.test, you MUST also give ``borg.testsuite[.module]``.
 
 
 Regenerate usage files
@@ -120,16 +119,16 @@ The plugin `vagrant-scp` is useful to copy stuff from the VMs to the host.
 
 Usage::
 
-   To create and provision the VM:
-     vagrant up OS
-   To create an ssh session to the VM:
-     vagrant ssh OS command
-   To shut down the VM:
-     vagrant halt OS
-   To shut down and destroy the VM:
-     vagrant destroy OS
-   To copy files from the VM (in this case, the generated binary):
-     vagrant scp OS:/vagrant/borg/borg.exe .
+   # To create and provision the VM:
+   vagrant up OS
+   # To create an ssh session to the VM:
+   vagrant ssh OS command
+   # To shut down the VM:
+   vagrant halt OS
+   # To shut down and destroy the VM:
+   vagrant destroy OS
+   # To copy files from the VM (in this case, the generated binary):
+   vagrant scp OS:/vagrant/borg/borg.exe .
 
 
 Creating standalone binaries
@@ -140,7 +139,7 @@ When using the Vagrant VMs, pyinstaller will already be installed.
 
 With virtual env activated::
 
-  pip install pyinstaller>=3.0  # or git checkout master
+  pip install pyinstaller  # or git checkout master
   pyinstaller -F -n borg-PLATFORM borg/__main__.py
   for file in dist/borg-*; do gpg --armor --detach-sign $file; done
 

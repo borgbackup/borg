@@ -60,8 +60,8 @@ created by some other process), lock acquisition fails.
 The cache lock is usually in `~/.cache/borg/REPOID/lock.*`.
 The repository lock is in `repository/lock.*`.
 
-In case you run into troubles with the locks, you can just delete the `lock.*`
-directory and file IF you first make sure that no |project_name| process is
+In case you run into troubles with the locks, you can use the ``borg break-lock``
+command after you first have made sure that no |project_name| process is
 running on any machine that accesses this resource. Be very careful, the cache
 or repository might get damaged if multiple processes use it at the same time.
 
@@ -181,13 +181,10 @@ Each item represents a file, directory or other fs item and is stored as an
 * mode (item type + permissions)
 * source (for links)
 * rdev (for devices)
-* mtime
+* mtime, atime, ctime in nanoseconds
 * xattrs
 * acl
 * bsdfiles
-
-``ctime`` (change time) is not stored because there is no API to set
-it and it is reset every time an inode's metadata is changed.
 
 All items are serialized using msgpack and the resulting byte stream
 is fed into the same chunker algorithm as used for regular file data
@@ -278,8 +275,8 @@ buckets. As a consequence the hash is just a start position for a linear
 search, and if the element is not in the table the index is linearly crossed
 until an empty bucket is found.
 
-When the hash table is filled to 75%, its size is doubled. When it's
-emptied to 25%, its size is halved. So operations on it have a variable
+When the hash table is filled to 75%, its size is grown. When it's
+emptied to 25%, its size is shrinked. So operations on it have a variable
 complexity between constant and linear with low factor, and memory overhead
 varies between 33% and 300%.
 

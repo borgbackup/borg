@@ -26,6 +26,26 @@ repository is only modified from one place. Also keep in mind that
 |project_name| will keep an exclusive lock on the repository while creating
 or deleting archives, which may make *simultaneous* backups fail.
 
+Can I copy or synchronize my repo to another location?
+------------------------------------------------------
+
+Yes, you could just copy all the files. Make sure you do that while no
+backup is running. So what you get here is this:
+
+- client machine ---borg create---> repo1
+- repo1 ---copy---> repo2
+
+There is no special borg command to do the copying, just use cp or rsync if
+you want to do that.
+
+But think about whether that is really what you want. If something goes
+wrong in repo1, you will have the same issue in repo2 after the copy.
+
+If you want to have 2 independent backups, it is better to do it like this:
+
+- client machine ---borg create---> repo1
+- client machine ---borg create---> repo2
+
 Which file types, attributes, etc. are preserved?
 -------------------------------------------------
 
@@ -37,7 +57,7 @@ Which file types, attributes, etc. are preserved?
     * FIFOs ("named pipes")
     * Name
     * Contents
-    * Time of last modification (nanosecond precision)
+    * Timestamps in nanosecond precision: mtime, atime, ctime
     * IDs of owning user and owning group
     * Names of owning user and owning group (if the IDs can be resolved)
     * Unix Mode/Permissions (u/g/o permissions, suid, sgid, sticky)
@@ -57,6 +77,7 @@ Which file types, attributes, etc. are *not* preserved?
       backed up as (deduplicated and compressed) runs of zero bytes.
       Archive extraction has optional support to extract all-zero chunks as
       holes in a sparse file.
+    * filesystem specific attributes, like ext4 immutable bit, see :issue:`618`.
 
 Why is my backup bigger than with attic? Why doesn't |project_name| do compression by default?
 ----------------------------------------------------------------------------------------------
@@ -115,9 +136,12 @@ The borg cache eats way too much disk space, what can I do?
 -----------------------------------------------------------
 
 There is a temporary (but maybe long lived) hack to avoid using lots of disk
-space for chunks.archive.d (see issue #235 for details):
+space for chunks.archive.d (see :issue:`235` for details):
 
-    # this assumes you are working with the same user as the backup
+::
+
+    # this assumes you are working with the same user as the backup.
+    # you can get the REPOID from the "config" file inside the repository.
     cd ~/.cache/borg/<REPOID>
     rm -rf chunks.archive.d ; touch chunks.archive.d
 
@@ -136,7 +160,7 @@ This has some pros and cons, though:
   machine (if you share same backup repo between multiple machines) or if
   your local chunks cache was lost somehow.
 
-The long term plan to improve this is called "borgception", see ticket #474.
+The long term plan to improve this is called "borgception", see :issue:`474`.
 
 If a backup stops mid-way, does the already-backed-up data stay there?
 ----------------------------------------------------------------------

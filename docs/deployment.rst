@@ -69,10 +69,9 @@ forced command and restrictions applied as shown below:
 
 The options which are added to the key will perform the following:
 
-1. Force command on the ssh key and don't allow any other command to run
-2. Change working directory
-3. Run ``borg serve`` restricted at the client base path
-4. Restrict ssh and do not allow stuff which imposes a security risk
+1. Change working directory
+2. Run ``borg serve`` restricted to the client base path
+3. Restrict ssh and do not allow stuff which imposes a security risk
 
 Due to the ``cd`` command we use, the server automatically changes the current
 working directory. Then client doesn't need to have knowledge of the absolute

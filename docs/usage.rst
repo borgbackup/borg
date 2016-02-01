@@ -426,6 +426,15 @@ Examples
 
 Examples
 ~~~~~~~~
+
+borg serve has special support for ssh forced commands (see ``authorized_keys``
+example below): it will detect that you use such a forced command and extract
+the value of the ``--restrict-to-path`` option(s).
+It will then parse the original command that came from the client, makes sure
+that it is also ``borg serve`` and enforce path restriction(s) as given by the
+forced command. That way, other options given by the client (like ``--info`` or
+``--umask``) are preserved (and are not fixed by the forced command).
+
 ::
 
     # Allow an SSH keypair to only run borg, and only have access to /mnt/backup.

@@ -442,18 +442,18 @@ class Archiver:
                 for item in archive.iter_items():
                     print(remove_surrogates(item[b'path']))
             else:
-                longformat="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}"
-                userformat=longformat
+                long_format = "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}"
+                user_format = long_format
                 """use_user_format flag is used to speed up default listing.
                 When user issues format options, listing is a bit slower, but more keys are available and
                 precalculated
-                """ 
-                use_user_format=False
+                """
+                use_user_format = False
                 if args.listformat:
-                    userformat=args.listformat
-                    use_user_format=True
-                
-                archive_name=archive.name
+                    user_format = args.listformat
+                    use_user_format = True
+
+                archive_name = archive.name
 
                 for item in archive.iter_items():
                     mode = stat.filemode(item[b'mode'])
@@ -464,13 +464,12 @@ class Archiver:
                             size = sum(size for _, size, _ in item[b'chunks'])
                         except KeyError:
                             pass
-                    mtime=safe_timestamp(item[b'mtime'])
-                    
+                    mtime = safe_timestamp(item[b'mtime'])
+
                     if use_user_format:
-                        atime=safe_timestamp(item[b'atime'])
-                        ctime=safe_timestamp(item[b'ctime'])
-                    
-                    
+                        atime = safe_timestamp(item[b'atime'])
+                        ctime = safe_timestamp(item[b'ctime'])
+
                     if b'source' in item:
                         source = item[b'source']
                         if type == 'l':
@@ -481,18 +480,18 @@ class Archiver:
                     else:
                         extra = ''
                         source = ''
-                    
-                    formatdata={
+
+                    item_data = {
                             'mode': mode,
                             'user': item[b'user'] or item[b'uid'],
-                            'group': item[b'group'] or item[b'gid'],                        
+                            'group': item[b'group'] or item[b'gid'],
                             'size': size,
-                            'isomtime': format_time(mtime),                        
-                            'path': remove_surrogates(item[b'path']), 
+                            'isomtime': format_time(mtime),
+                            'path': remove_surrogates(item[b'path']),
                             'extra': extra,
                             }
                     if use_user_format:
-                        formatdata_user_format={
+                        item_data_advanced = {
                             'bmode': item[b'mode'],
                             'type': type,
                             'source': source,
@@ -512,13 +511,13 @@ class Archiver:
                             'NEWLINE': os.linesep,
                             'formatkeys': ()
                             }
-                        formatdata_user_format["formatkeys"]=list(formatdata.keys())
-                        formatdata.update(formatdata_user_format)
-                    
+                        item_data_advanced["formatkeys"] = list(item_data.keys())
+                        item_data.update(item_data_advanced)
+
                     if use_user_format:
-                        print(format_line(userformat, formatdata), end='')
+                        print(format_line(user_format, item_data), end='')
                     else:
-                        print(format_line(userformat, formatdata))
+                        print(format_line(user_format, item_data))
 
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
@@ -1151,7 +1150,9 @@ class Archiver:
                                action='store_true', default=False,
                                help='only print file/directory names, nothing else')
         subparser.add_argument('--list-format', dest='listformat', type=str,
-                               help='Format archive listing line')
+                               help="""specify format for archive file listing
+                                (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}")
+                                Special "{formatkeys}" exists to list available keys""")
         subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',

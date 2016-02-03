@@ -518,24 +518,25 @@ def dir_is_tagged(path, exclude_caches, exclude_if_present):
                 tag_paths.append(tag_path)
     return tag_paths
 
-def format_line(formatstr, data):
-    """Filter out unwanted properties of str.format(), because "formatstr" 
-    is user provided. 
-    """    
+
+def format_line(format, data):
+    # TODO: Filter out unwanted properties of str.format(), because "format" is user provided.
+
     try:
-        return(formatstr.format(**data))
-    except KeyError as e:
-        print('Error in lineformat: "{}" - reason "{}"'.format(formatstr, str(e)))
-    except ValueError as e:
-        print('Error in lineformat: "{}" - reason "{}"'.format(formatstr, str(e)))
+        return format.format(**data)
+    except (KeyError, ValueError) as e:
+        # this should catch format errors
+        print('Error in lineformat: "{}" - reason "{}"'.format(format, str(e)))
     except:
-        print('Line format error')
-        raise   
+        # something unexpected, print error and raise exception
+        print('Error in lineformat: "{}" - reason "{}"'.format(format, str(e)))
+        raise
     return ''
 
-def safe_timestamp(timedata):    
+
+def safe_timestamp(item_timestamp_ns):
     try:
-        return datetime.fromtimestamp(bigint_to_int(timedata) / 1e9)
+        return datetime.fromtimestamp(bigint_to_int(item_timestamp_ns) / 1e9)
     except OverflowError:
         # likely a broken file time and datetime did not want to go beyond year 9999
         return datetime(9999, 12, 31, 23, 59, 59)

@@ -442,10 +442,16 @@ class Archiver:
                 for item in archive.iter_items():
                     print(remove_surrogates(item[b'path']))
             else:
-                longformat="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}"
+                longformat="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}"
                 userformat=longformat
+                """use_user_format flag is used to speed up default listing.
+                When user issues format options, listing is a bit slower, but more keys are available and
+                precalculated
+                """ 
+                use_user_format=False
                 if args.listformat:
-                    userformat=args.listformat                
+                    userformat=args.listformat
+                    use_user_format=True
                 
                 archive_name=archive.name
 
@@ -458,9 +464,12 @@ class Archiver:
                             size = sum(size for _, size, _ in item[b'chunks'])
                         except KeyError:
                             pass
-                    atime=safe_timestamp(item[b'atime'])
-                    ctime=safe_timestamp(item[b'ctime'])
                     mtime=safe_timestamp(item[b'mtime'])
+                    
+                    if use_user_format:
+                        atime=safe_timestamp(item[b'atime'])
+                        ctime=safe_timestamp(item[b'ctime'])
+                    
                     
                     if b'source' in item:
                         source = item[b'source']
@@ -472,38 +481,44 @@ class Archiver:
                     else:
                         extra = ''
                         source = ''
-                     
-                    formatdata={
-                        'mode': mode,
-                        'bmode': item[b'mode'],
-                        'type': type,
-                        'source': source,
-                        'linktarget': source,
-                        'user': item[b'user'] or item[b'uid'],
-                        'uid': item[b'uid'],
-                        'group': item[b'group'] or item[b'gid'],
-                        'gid': item[b'gid'],
-                        'size': size,
-                        'isomtime': format_time(mtime),
-                        'mtime': mtime,
-                        'isoctime': format_time(ctime),
-                        'ctime': ctime,
-                        'isoatime': format_time(atime),
-                        'atime': atime,
-                        'path': remove_surrogates(item[b'path']), 
-                        'extra': extra,
-                        'archivename': archive_name,
-                        'SPACE': " ",
-                        'TAB': "\t",
-                        'LF': "\n",
-                        'CR': "\r",
-                        'NEWLINE': os.linesep,
-                        'formatkeys': ()
-                        }
-                    formatdata["formatkeys"]=list(formatdata.keys())
                     
-
-                    print(format_line(userformat, formatdata), end='')
+                    formatdata={
+                            'mode': mode,
+                            'user': item[b'user'] or item[b'uid'],
+                            'group': item[b'group'] or item[b'gid'],                        
+                            'size': size,
+                            'isomtime': format_time(mtime),                        
+                            'path': remove_surrogates(item[b'path']), 
+                            'extra': extra,
+                            }
+                    if use_user_format:
+                        formatdata_user_format={
+                            'bmode': item[b'mode'],
+                            'type': type,
+                            'source': source,
+                            'linktarget': source,
+                            'uid': item[b'uid'],
+                            'gid': item[b'gid'],
+                            'mtime': mtime,
+                            'isoctime': format_time(ctime),
+                            'ctime': ctime,
+                            'isoatime': format_time(atime),
+                            'atime': atime,
+                            'archivename': archive_name,
+                            'SPACE': " ",
+                            'TAB': "\t",
+                            'LF': "\n",
+                            'CR': "\r",
+                            'NEWLINE': os.linesep,
+                            'formatkeys': ()
+                            }
+                        formatdata_user_format["formatkeys"]=list(formatdata.keys())
+                        formatdata.update(formatdata_user_format)
+                    
+                    if use_user_format:
+                        print(format_line(userformat, formatdata), end='')
+                    else:
+                        print(format_line(userformat, formatdata))
 
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):

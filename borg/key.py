@@ -2,42 +2,32 @@ from binascii import hexlify, a2b_base64, b2a_base64
 import configparser
 import getpass
 import os
+import sys
 import textwrap
-import hmac
-from hashlib import sha256
+from hmac import HMAC, compare_digest
+from hashlib import sha256, pbkdf2_hmac
 
-from .helpers import IntegrityError, get_keys_dir, Error, have_cython
+from .helpers import IntegrityError, get_keys_dir, Error
 from .logger import create_logger
 logger = create_logger()
 
-if have_cython():
-    from .crypto import pbkdf2_sha256, get_random_bytes, AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
-    from .compress import Compressor, COMPR_BUFFER
-    import msgpack
+from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
+from .compress import Compressor, COMPR_BUFFER
+import msgpack
 
 PREFIX = b'\0' * 8
 
 
 class UnsupportedPayloadError(Error):
-    """Unsupported payload type {}. A newer version is required to access this repository.
-    """
+    """Unsupported payload type {}. A newer version is required to access this repository."""
 
 
 class KeyfileNotFoundError(Error):
-    """No key file for repository {} found in {}.
-    """
+    """No key file for repository {} found in {}."""
 
 
 class RepoKeyNotFoundError(Error):
-    """No key entry found in the config of repository {}.
-    """
-
-
-class HMAC(hmac.HMAC):
-    """Workaround a bug in Python < 3.4 Where HMAC does not accept memoryviews
-    """
-    def update(self, msg):
-        self.inner.update(msg)
+    """No key entry found in the config of repository {}."""
 
 
 def key_creator(repository, args):
@@ -45,8 +35,6 @@ def key_creator(repository, args):
         return KeyfileKey.create(repository, args)
     elif args.encryption == 'repokey':
         return RepoKey.create(repository, args)
-    elif args.encryption == 'passphrase':  # deprecated, kill in 1.x
-        return PassphraseKey.create(repository, args)
     else:
         return PlaintextKey.create(repository, args)
 
@@ -57,8 +45,10 @@ def key_factory(repository, manifest_data):
         return KeyfileKey.detect(repository, manifest_data)
     elif key_type == RepoKey.TYPE:
         return RepoKey.detect(repository, manifest_data)
-    elif key_type == PassphraseKey.TYPE:  # deprecated, kill in 1.x
-        return PassphraseKey.detect(repository, manifest_data)
+    elif key_type == PassphraseKey.TYPE:
+        # we just dispatch to repokey mode and assume the passphrase was migrated to a repokey.
+        # see also comment in PassphraseKey class.
+        return RepoKey.detect(repository, manifest_data)
     elif key_type == PlaintextKey.TYPE:
         return PlaintextKey.detect(repository, manifest_data)
     else:
@@ -92,7 +82,7 @@ class PlaintextKey(KeyBase):
 
     @classmethod
     def create(cls, repository, args):
-        logger.info('Encryption NOT enabled.\nUse the "--encryption=repokey|keyfile|passphrase" to enable encryption.')
+        logger.info('Encryption NOT enabled.\nUse the "--encryption=repokey|keyfile" to enable encryption.')
         return cls(repository)
 
     @classmethod
@@ -142,19 +132,25 @@ class AESKeyBase(KeyBase):
         return b''.join((self.TYPE_STR, hmac, data))
 
     def decrypt(self, id, data):
-        if data[0] != self.TYPE:
+        if not (data[0] == self.TYPE or
+            data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             raise IntegrityError('Invalid encryption envelope')
-        hmac = memoryview(data)[1:33]
-        if memoryview(HMAC(self.enc_hmac_key, memoryview(data)[33:], sha256).digest()) != hmac:
+        hmac_given = memoryview(data)[1:33]
+        hmac_computed = memoryview(HMAC(self.enc_hmac_key, memoryview(data)[33:], sha256).digest())
+        if not compare_digest(hmac_computed, hmac_given):
             raise IntegrityError('Encryption envelope checksum mismatch')
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
         data = self.compressor.decompress(self.dec_cipher.decrypt(data[41:]))
-        if id and HMAC(self.id_key, data, sha256).digest() != id:
-            raise IntegrityError('Chunk id verification failed')
+        if id:
+            hmac_given = id
+            hmac_computed = HMAC(self.id_key, data, sha256).digest()
+            if not compare_digest(hmac_computed, hmac_given):
+                raise IntegrityError('Chunk id verification failed')
         return data
 
     def extract_nonce(self, payload):
-        if payload[0] != self.TYPE:
+        if not (payload[0] == self.TYPE or
+            payload[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             raise IntegrityError('Invalid encryption envelope')
         nonce = bytes_to_long(payload[33:41])
         return nonce
@@ -205,22 +201,25 @@ class Passphrase(str):
         return '<Passphrase "***hidden***">'
 
     def kdf(self, salt, iterations, length):
-        return pbkdf2_sha256(self.encode('utf-8'), salt, iterations, length)
+        return pbkdf2_hmac('sha256', self.encode('utf-8'), salt, iterations, length)
 
 
 class PassphraseKey(AESKeyBase):
-    # This mode is DEPRECATED and will be killed at 1.0 release.
-    # With this mode:
+    # This mode was killed in borg 1.0, see: https://github.com/borgbackup/borg/issues/97
+    # Reasons:
     # - you can never ever change your passphrase for existing repos.
     # - you can never ever use a different iterations count for existing repos.
+    # "Killed" means:
+    # - there is no automatic dispatch to this class via type byte
+    # - --encryption=passphrase is an invalid argument now
+    # This class is kept for a while to support migration from passphrase to repokey mode.
     TYPE = 0x01
     iterations = 100000  # must not be changed ever!
 
     @classmethod
     def create(cls, repository, args):
         key = cls(repository)
-        logger.warning('WARNING: "passphrase" mode is deprecated and will be removed in 1.0.')
-        logger.warning('If you want something similar (but with less issues), use "repokey" mode.')
+        logger.warning('WARNING: "passphrase" mode is unsupported since borg 1.0.')
         passphrase = Passphrase.new(allow_empty=False)
         key.init(repository, passphrase)
         return key
@@ -273,7 +272,7 @@ class KeyfileKeyBase(AESKeyBase):
         raise NotImplementedError
 
     def _load(self, key_data, passphrase):
-        cdata = a2b_base64(key_data.encode('ascii'))  # .encode needed for Python 3.[0-2]
+        cdata = a2b_base64(key_data)
         data = self.decrypt_key_file(cdata, passphrase)
         if data:
             key = msgpack.unpackb(data)
@@ -297,7 +296,7 @@ class KeyfileKeyBase(AESKeyBase):
             return data
 
     def encrypt_key_file(self, data, passphrase):
-        salt = get_random_bytes(32)
+        salt = os.urandom(32)
         iterations = 100000
         key = passphrase.kdf(salt, iterations, 32)
         hash = HMAC(key, data, sha256).digest()
@@ -335,7 +334,7 @@ class KeyfileKeyBase(AESKeyBase):
         passphrase = Passphrase.new(allow_empty=True)
         key = cls(repository)
         key.repository_id = repository.id
-        key.init_from_random_data(get_random_bytes(100))
+        key.init_from_random_data(os.urandom(100))
         key.init_ciphers()
         target = key.get_new_target(args)
         key.save(target, passphrase)
@@ -361,12 +360,12 @@ class KeyfileKey(KeyfileKeyBase):
             filename = os.path.join(keys_dir, name)
             with open(filename, 'r') as fd:
                 line = fd.readline().strip()
-                if line.startswith(self.FILE_ID) and line[len(self.FILE_ID)+1:] == id:
+                if line.startswith(self.FILE_ID) and line[len(self.FILE_ID) + 1:] == id:
                     return filename
         raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
 
     def get_new_target(self, args):
-        filename = args.repository.to_key_filename()
+        filename = args.location.to_key_filename()
         path = filename
         i = 1
         while os.path.exists(path):
@@ -400,7 +399,7 @@ class RepoKey(KeyfileKeyBase):
             self.repository.load_key()
             return loc
         except configparser.NoOptionError:
-            raise RepoKeyNotFoundError(loc)
+            raise RepoKeyNotFoundError(loc) from None
 
     def get_new_target(self, args):
         return self.repository

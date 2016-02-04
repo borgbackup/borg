@@ -7,6 +7,9 @@ import tempfile
 from ctypes import CDLL, create_string_buffer, c_ssize_t, c_size_t, c_char_p, c_int, c_uint32, get_errno
 from ctypes.util import find_library
 
+from .logger import create_logger
+logger = create_logger()
+
 
 def is_enabled(path=None):
     """Determine if xattr is enabled on the filesystem
@@ -27,8 +30,28 @@ def get_all(path, follow_symlinks=True):
         if e.errno in (errno.ENOTSUP, errno.EPERM):
             return {}
 
+libc_name = find_library('c')
+if libc_name is None:
+    # find_library didn't work, maybe we are on some minimal system that misses essential
+    # tools used by find_library, like ldconfig, gcc/cc, objdump.
+    # so we can only try some "usual" names for the C library:
+    if sys.platform.startswith('linux'):
+        libc_name = 'libc.so.6'
+    elif sys.platform.startswith(('freebsd', 'netbsd')):
+        libc_name = 'libc.so'
+    elif sys.platform == 'darwin':
+        libc_name = 'libc.dylib'
+    else:
+        msg = "Can't find C library. No fallback known. Try installing ldconfig, gcc/cc or objdump."
+        logger.error(msg)
+        raise Exception(msg)
 
-libc = CDLL(find_library('c'), use_errno=True)
+try:
+    libc = CDLL(libc_name, use_errno=True)
+except OSError as e:
+    msg = "Can't find C library [%s]. Try installing ldconfig, gcc/cc or objdump." % e
+    logger.error(msg)
+    raise Exception(msg)
 
 
 def _check(rv, path=None):
@@ -36,7 +59,7 @@ def _check(rv, path=None):
         raise OSError(get_errno(), path)
     return rv
 
-if sys.platform.startswith('linux'):
+if sys.platform.startswith('linux'):  # pragma: linux only
     libc.llistxattr.argtypes = (c_char_p, c_char_p, c_size_t)
     libc.llistxattr.restype = c_ssize_t
     libc.flistxattr.argtypes = (c_int, c_char_p, c_size_t)
@@ -100,7 +123,7 @@ if sys.platform.startswith('linux'):
             func = libc.lsetxattr
         _check(func(path, name, value, len(value) if value else 0, 0), path)
 
-elif sys.platform == 'darwin':
+elif sys.platform == 'darwin':  # pragma: darwin only
     libc.listxattr.argtypes = (c_char_p, c_char_p, c_size_t, c_int)
     libc.listxattr.restype = c_ssize_t
     libc.flistxattr.argtypes = (c_int, c_char_p, c_size_t)
@@ -166,7 +189,7 @@ elif sys.platform == 'darwin':
             flags = XATTR_NOFOLLOW
         _check(func(path, name, value, len(value) if value else 0, 0, flags), path)
 
-elif sys.platform.startswith('freebsd'):
+elif sys.platform.startswith('freebsd'):  # pragma: freebsd only
     EXTATTR_NAMESPACE_USER = 0x0001
     libc.extattr_list_fd.argtypes = (c_int, c_int, c_char_p, c_size_t)
     libc.extattr_list_fd.restype = c_ssize_t
@@ -208,11 +231,8 @@ elif sys.platform.startswith('freebsd'):
         mv = memoryview(namebuf.raw)
         while mv:
             length = mv[0]
-            # Python < 3.3 returns bytes instead of int
-            if isinstance(length, bytes):
-                length = ord(length)
-            names.append(os.fsdecode(bytes(mv[1:1+length])))
-            mv = mv[1+length:]
+            names.append(os.fsdecode(bytes(mv[1:1 + length])))
+            mv = mv[1 + length:]
         return names
 
     def getxattr(path, name, *, follow_symlinks=True):
@@ -247,7 +267,7 @@ elif sys.platform.startswith('freebsd'):
             func = libc.extattr_set_link
         _check(func(path, EXTATTR_NAMESPACE_USER, name, value, len(value) if value else 0), path)
 
-else:
+else:  # pragma: unknown platform only
     def listxattr(path, *, follow_symlinks=True):
         return []
 

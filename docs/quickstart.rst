@@ -8,6 +8,30 @@ This chapter will get you started with |project_name|. The first section
 presents a simple step by step example that uses |project_name| to backup data.
 The next section continues by showing how backups can be automated.
 
+Important note about free space
+-------------------------------
+
+Before you start creating backups, please make sure that there is **always**
+a good amount of free space on the filesystem that has your backup repository
+(and also on ~/.cache). It is hard to tell how much, maybe 1-5%.
+
+If you run out of disk space, it can be hard or impossible to free space,
+because |project_name| needs free space to operate - even to delete backup
+archives. There is a ``--save-space`` option for some commands, but even with
+that |project_name| will need free space to operate.
+
+You can use some monitoring process or just include the free space information
+in your backup log files (you check them regularly anyway, right?).
+
+Also helpful:
+
+- create a big file as a "space reserve", that you can delete to free space
+- if you use LVM: use a LV + a filesystem that you can resize later and have
+  some unallocated PEs you can add to the LV.
+- consider using quotas
+- use `prune` regularly
+
+
 A step by step example
 ----------------------
 
@@ -22,7 +46,7 @@ A step by step example
 
 3. The next day create a new archive called *Tuesday*::
 
-    $ borg create --stats /mnt/backup::Tuesday ~/src ~/Documents
+    $ borg create -v --stats /mnt/backup::Tuesday ~/src ~/Documents
 
    This backup will be a lot quicker and a lot smaller since only new never
    before seen data is stored. The ``--stats`` option causes |project_name| to
@@ -77,11 +101,11 @@ certain number of old archives::
 
     # Backup all of /home and /var/www except a few
     # excluded directories
-    borg create --stats                             \
+    borg create -v --stats                          \
         $REPOSITORY::`hostname`-`date +%Y-%m-%d`    \
         /home                                       \
         /var/www                                    \
-        --exclude /home/*/.cache                    \
+        --exclude '/home/*/.cache'                  \
         --exclude /home/Ben/Music/Justin\ Bieber    \
         --exclude '*.pyc'
 
@@ -122,26 +146,28 @@ Keep an eye on CPU load and throughput.
 Repository encryption
 ---------------------
 
-Repository encryption is enabled at repository creation time::
+Repository encryption can be enabled or disabled at repository creation time
+(the default is enabled, with `repokey` method)::
 
-    $ borg init --encryption=repokey|keyfile PATH
+    $ borg init --encryption=none|repokey|keyfile PATH
 
 When repository encryption is enabled all data is encrypted using 256-bit AES_
 encryption and the integrity and authenticity is verified using `HMAC-SHA256`_.
 
-All data is encrypted before being written to the repository. This means that
-an attacker who manages to compromise the host containing an encrypted
-archive will not be able to access any of the data.
+All data is encrypted on the client before being written to the repository. This
+means that an attacker who manages to compromise the host containing an
+encrypted archive will not be able to access any of the data, even as the backup
+is being made.
 
 |project_name| supports different methods to store the AES and HMAC keys.
 
 ``repokey`` mode
     The key is stored inside the repository (in its "config" file).
     Use this mode if you trust in your good passphrase giving you enough
-    protection.
+    protection. The repository server never sees the plaintext key.
 
 ``keyfile`` mode
-    The key is stored on your local disk (in ``~/.borg/keys/``).
+    The key is stored on your local disk (in ``~/.config/borg/keys/``).
     Use this mode if you want "passphrase and having-the-key" security.
 
 In both modes, the key is stored in encrypted form and can be only decrypted
@@ -154,7 +180,7 @@ For automated backups the passphrase can be specified using the
           :ref:`this note about password environments <password_env>`
           for more information.
 
-.. important:: The repository data is totally inaccessible without the key:**
+.. warning:: The repository data is totally inaccessible without the key:
     Make a backup copy of the key file (``keyfile`` mode) or repo config
     file (``repokey`` mode) and keep it at a safe place, so you still have
     the key in case it gets corrupted or lost.
@@ -178,11 +204,10 @@ or::
 
 Remote operations over SSH can be automated with SSH keys. You can restrict the
 use of the SSH keypair by prepending a forced command to the SSH public key in
-the remote server's authorized_keys file. Only the forced command will be run
-when the key authenticates a connection. This example will start |project_name| in server
-mode, and limit the |project_name| server to a specific filesystem path::
+the remote server's `authorized_keys` file. This example will start |project_name|
+in server mode and limit it to a specific filesystem path::
 
-  command="borg serve --restrict-to-path /mnt/backup" ssh-rsa AAAAB3[...]
+  command="borg serve --restrict-to-path /mnt/backup",no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-user-rc ssh-rsa AAAAB3[...]
 
 If it is not possible to install |project_name| on the remote host,
 it is still possible to use the remote host to store a repository by

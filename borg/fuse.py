@@ -7,11 +7,9 @@ import stat
 import tempfile
 import time
 from .archive import Archive
-from .helpers import daemonize, have_cython
-from .remote import cache_if_remote
+from .helpers import daemonize
 
-if have_cython():
-    import msgpack
+import msgpack
 
 # Does this version of llfuse support ns precision?
 have_fuse_xtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
@@ -29,17 +27,17 @@ class ItemCache:
 
     def get(self, inode):
         self.fd.seek(inode - self.offset, io.SEEK_SET)
-        return next(msgpack.Unpacker(self.fd))
+        return next(msgpack.Unpacker(self.fd, read_size=1024))
 
 
 class FuseOperations(llfuse.Operations):
     """Export archive as a fuse filesystem
     """
-    def __init__(self, key, repository, manifest, archive):
+    def __init__(self, key, repository, manifest, archive, cached_repo):
         super().__init__()
         self._inode_count = 0
         self.key = key
-        self.repository = cache_if_remote(repository)
+        self.repository = cached_repo
         self.items = {}
         self.parent = {}
         self.contents = defaultdict(dict)
@@ -175,7 +173,7 @@ class FuseOperations(llfuse.Operations):
         try:
             return item.get(b'xattrs', {})[name]
         except KeyError:
-            raise llfuse.FUSEError(errno.ENODATA)
+            raise llfuse.FUSEError(errno.ENODATA) from None
 
     def _load_pending_archive(self, inode):
         # Check if this is an archive we need to load
@@ -211,7 +209,7 @@ class FuseOperations(llfuse.Operations):
                 continue
             n = min(size, s - offset)
             chunk = self.key.decrypt(id, self.repository.get(id))
-            parts.append(chunk[offset:offset+n])
+            parts.append(chunk[offset:offset + n])
             offset = 0
             size -= n
             if not size:

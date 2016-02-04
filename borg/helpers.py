@@ -1,5 +1,4 @@
-from .support import argparse  # see support/__init__.py docstring, DEPRECATED - remove after requiring py 3.4
-
+import argparse
 import binascii
 from collections import namedtuple
 from functools import wraps
@@ -8,41 +7,27 @@ import os
 import pwd
 import queue
 import re
-try:
-    from shutil import get_terminal_size
-except ImportError:
-    def get_terminal_size(fallback=(80, 24)):
-        TerminalSize = namedtuple('TerminalSize', ['columns', 'lines'])
-        return TerminalSize(int(os.environ.get('COLUMNS', fallback[0])), int(os.environ.get('LINES', fallback[1])))
+from shutil import get_terminal_size
 import sys
+import platform
 import time
 import unicodedata
+
+import logging
+from .logger import create_logger
+logger = create_logger()
 
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from operator import attrgetter
 
-
-def have_cython():
-    """allow for a way to disable Cython includes
-
-    this is used during usage docs build, in setup.py. It is to avoid
-    loading the Cython libraries which are built, but sometimes not in
-    the search path (namely, during Tox runs).
-
-    we simply check an environment variable (``BORG_CYTHON_DISABLE``)
-    which, when set (to anything) will disable includes of Cython
-    libraries in key places to enable usage docs to be built.
-
-    :returns: True if Cython is available, False otherwise.
-    """
-    return not os.environ.get('BORG_CYTHON_DISABLE')
-
-if have_cython():
-    from . import hashindex
-    from . import chunker
-    from . import crypto
-    import msgpack
+from . import __version__ as borg_version
+from . import hashindex
+from . import chunker
+from . import crypto
+from . import shellpattern
+import msgpack
+import msgpack.fallback
 
 
 # return codes returned by borg command
@@ -61,12 +46,19 @@ class Error(Exception):
     # exception handler (that exits short after with the given exit_code),
     # it is always a (fatal and abrupt) EXIT_ERROR, never just a warning.
     exit_code = EXIT_ERROR
+    # show a traceback?
+    traceback = False
 
     def get_message(self):
         return type(self).__doc__.format(*self.args)
 
 
-class IntegrityError(Error):
+class ErrorWithTraceback(Error):
+    """like Error, but show a traceback also"""
+    traceback = True
+
+
+class IntegrityError(ErrorWithTraceback):
     """Data integrity error"""
 
 
@@ -140,7 +132,7 @@ class Manifest:
 
 
 def prune_within(archives, within):
-    multiplier = {'H': 1, 'd': 24, 'w': 24*7, 'm': 24*31, 'y': 24*365}
+    multiplier = {'H': 1, 'd': 24, 'w': 24 * 7, 'm': 24 * 31, 'y': 24 * 365}
     try:
         hours = int(within[:-1]) * multiplier[within[-1]]
     except (KeyError, ValueError):
@@ -148,7 +140,7 @@ def prune_within(archives, within):
         raise argparse.ArgumentTypeError('Unable to parse --within option: "%s"' % within)
     if hours <= 0:
         raise argparse.ArgumentTypeError('Number specified using --within option must be positive')
-    target = datetime.now(timezone.utc) - timedelta(seconds=hours*60*60)
+    target = datetime.now(timezone.utc) - timedelta(seconds=hours * 3600)
     return [a for a in archives if a.ts > target]
 
 
@@ -172,6 +164,7 @@ class Statistics:
 
     def __init__(self):
         self.osize = self.csize = self.usize = self.nfiles = 0
+        self.last_progress = 0  # timestamp when last progress was shown
 
     def update(self, size, csize, unique):
         self.osize += size
@@ -201,25 +194,27 @@ class Statistics:
     def csize_fmt(self):
         return format_file_size(self.csize)
 
-    def show_progress(self, item=None, final=False, stream=None):
-        columns, lines = get_terminal_size()
-        if not final:
-            msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
-            path = remove_surrogates(item[b'path']) if item else ''
-            space = columns - len(msg)
-            if space < len('...') + len(path):
-                path = '%s...%s' % (path[:(space//2)-len('...')], path[-space//2:])
-            msg += "{0:<{space}}".format(path, space=space)
-        else:
-            msg = ' ' * columns
-        print(msg, file=stream or sys.stderr, end="\r")
-        (stream or sys.stderr).flush()
+    def show_progress(self, item=None, final=False, stream=None, dt=None):
+        now = time.time()
+        if dt is None or now - self.last_progress > dt:
+            self.last_progress = now
+            columns, lines = get_terminal_size()
+            if not final:
+                msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
+                path = remove_surrogates(item[b'path']) if item else ''
+                space = columns - len(msg)
+                if space < len('...') + len(path):
+                    path = '%s...%s' % (path[:(space // 2) - len('...')], path[-space // 2:])
+                msg += "{0:<{space}}".format(path, space=space)
+            else:
+                msg = ' ' * columns
+            print(msg, file=stream or sys.stderr, end="\r", flush=True)
 
 
 def get_keys_dir():
     """Determine where to repository keys and cache"""
-    return os.environ.get('BORG_KEYS_DIR',
-                          os.path.join(os.path.expanduser('~'), '.borg', 'keys'))
+    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(os.path.expanduser('~'), '.config'))
+    return os.environ.get('BORG_KEYS_DIR', os.path.join(xdg_config, 'borg', 'keys'))
 
 
 def get_cache_dir():
@@ -235,47 +230,50 @@ def to_localtime(ts):
 
 def parse_timestamp(timestamp):
     """Parse a ISO 8601 timestamp string"""
-    if '.' in timestamp:  # microseconds might not be pressent
+    if '.' in timestamp:  # microseconds might not be present
         return datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%f').replace(tzinfo=timezone.utc)
     else:
         return datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
 
 
+def load_excludes(fh):
+    """Load and parse exclude patterns from file object. Lines empty or starting with '#' after stripping whitespace on
+    both line ends are ignored.
+    """
+    patterns = (line for line in (i.strip() for i in fh) if not line.startswith('#'))
+    return [parse_pattern(pattern) for pattern in patterns if pattern]
+
+
 def update_excludes(args):
-    """Merge exclude patterns from files with those on command line.
-    Empty lines and lines starting with '#' are ignored, but whitespace
-    is not stripped."""
+    """Merge exclude patterns from files with those on command line."""
     if hasattr(args, 'exclude_files') and args.exclude_files:
         if not hasattr(args, 'excludes') or args.excludes is None:
             args.excludes = []
         for file in args.exclude_files:
-            patterns = [line.rstrip('\r\n') for line in file if not line.startswith('#')]
-            args.excludes += [ExcludePattern(pattern) for pattern in patterns if pattern]
+            args.excludes += load_excludes(file)
             file.close()
 
 
-def adjust_patterns(paths, excludes):
-    if paths:
-        return (excludes or []) + [IncludePattern(path) for path in paths] + [ExcludePattern('*')]
-    else:
-        return excludes
+class PatternMatcher:
+    def __init__(self, fallback=None):
+        self._items = []
 
+        # Value to return from match function when none of the patterns match.
+        self.fallback = fallback
 
-def exclude_path(path, patterns):
-    """Used by create and extract sub-commands to determine
-    whether or not an item should be processed.
-    """
-    for pattern in (patterns or []):
-        if pattern.match(path):
-            return isinstance(pattern, ExcludePattern)
-    return False
+    def add(self, patterns, value):
+        """Add list of patterns to internal list. The given value is returned from the match function when one of the
+        given patterns matches.
+        """
+        self._items.extend((i, value) for i in patterns)
 
+    def match(self, path):
+        for (pattern, value) in self._items:
+            if pattern.match(path):
+                return value
 
-# For both IncludePattern and ExcludePattern, we require that
-# the pattern either match the whole path or an initial segment
-# of the path up to but not including a path separator.  To
-# unify the two cases, we add a path separator to the end of
-# the path before matching.
+        return self.fallback
+
 
 def normalized(func):
     """ Decorator for the Pattern match methods, returning a wrapper that
@@ -295,12 +293,11 @@ def normalized(func):
         return func
 
 
-class IncludePattern:
-    """Literal files or directories listed on the command line
-    for some operations (e.g. extract, but not create).
-    If a directory is specified, all paths that start with that
-    path match as well.  A trailing slash makes no difference.
+class PatternBase:
+    """Shared logic for inclusion/exclusion patterns.
     """
+    PREFIX = NotImplemented
+
     def __init__(self, pattern):
         self.pattern_orig = pattern
         self.match_count = 0
@@ -308,13 +305,15 @@ class IncludePattern:
         if sys.platform in ('darwin',):
             pattern = unicodedata.normalize("NFD", pattern)
 
-        self.pattern = os.path.normpath(pattern).rstrip(os.path.sep)+os.path.sep
+        self._prepare(pattern)
 
     @normalized
     def match(self, path):
-        matches = (path+os.path.sep).startswith(self.pattern)
+        matches = self._match(path)
+
         if matches:
             self.match_count += 1
+
         return matches
 
     def __repr__(self):
@@ -323,39 +322,117 @@ class IncludePattern:
     def __str__(self):
         return self.pattern_orig
 
+    def _prepare(self, pattern):
+        raise NotImplementedError
 
-class ExcludePattern(IncludePattern):
+    def _match(self, path):
+        raise NotImplementedError
+
+
+# For PathPrefixPattern, FnmatchPattern and ShellPattern, we require that the pattern either match the whole path
+# or an initial segment of the path up to but not including a path separator. To unify the two cases, we add a path
+# separator to the end of the path before matching.
+
+
+class PathPrefixPattern(PatternBase):
+    """Literal files or directories listed on the command line
+    for some operations (e.g. extract, but not create).
+    If a directory is specified, all paths that start with that
+    path match as well.  A trailing slash makes no difference.
+    """
+    PREFIX = "pp"
+
+    def _prepare(self, pattern):
+        self.pattern = os.path.normpath(pattern).rstrip(os.path.sep) + os.path.sep
+
+    def _match(self, path):
+        return (path + os.path.sep).startswith(self.pattern)
+
+
+class FnmatchPattern(PatternBase):
     """Shell glob patterns to exclude.  A trailing slash means to
     exclude the contents of a directory, but not the directory itself.
     """
-    def __init__(self, pattern):
-        self.pattern_orig = pattern
-        self.match_count = 0
+    PREFIX = "fm"
 
+    def _prepare(self, pattern):
         if pattern.endswith(os.path.sep):
-            self.pattern = os.path.normpath(pattern).rstrip(os.path.sep)+os.path.sep+'*'+os.path.sep
+            pattern = os.path.normpath(pattern).rstrip(os.path.sep) + os.path.sep + '*' + os.path.sep
         else:
-            self.pattern = os.path.normpath(pattern)+os.path.sep+'*'
+            pattern = os.path.normpath(pattern) + os.path.sep + '*'
 
-        if sys.platform in ('darwin',):
-            self.pattern = unicodedata.normalize("NFD", self.pattern)
+        self.pattern = pattern
 
         # fnmatch and re.match both cache compiled regular expressions.
         # Nevertheless, this is about 10 times faster.
         self.regex = re.compile(translate(self.pattern))
 
-    @normalized
-    def match(self, path):
-        matches = self.regex.match(path+os.path.sep) is not None
-        if matches:
-            self.match_count += 1
-        return matches
+    def _match(self, path):
+        return (self.regex.match(path + os.path.sep) is not None)
 
-    def __repr__(self):
-        return '%s(%s)' % (type(self), self.pattern)
 
-    def __str__(self):
-        return self.pattern_orig
+class ShellPattern(PatternBase):
+    """Shell glob patterns to exclude.  A trailing slash means to
+    exclude the contents of a directory, but not the directory itself.
+    """
+    PREFIX = "sh"
+
+    def _prepare(self, pattern):
+        sep = os.path.sep
+
+        if pattern.endswith(sep):
+            pattern = os.path.normpath(pattern).rstrip(sep) + sep + "**" + sep + "*" + sep
+        else:
+            pattern = os.path.normpath(pattern) + sep + "**" + sep + "*"
+
+        self.pattern = pattern
+        self.regex = re.compile(shellpattern.translate(self.pattern))
+
+    def _match(self, path):
+        return (self.regex.match(path + os.path.sep) is not None)
+
+
+class RegexPattern(PatternBase):
+    """Regular expression to exclude.
+    """
+    PREFIX = "re"
+
+    def _prepare(self, pattern):
+        self.pattern = pattern
+        self.regex = re.compile(pattern)
+
+    def _match(self, path):
+        # Normalize path separators
+        if os.path.sep != '/':
+            path = path.replace(os.path.sep, '/')
+
+        return (self.regex.search(path) is not None)
+
+
+_PATTERN_STYLES = set([
+    FnmatchPattern,
+    PathPrefixPattern,
+    RegexPattern,
+    ShellPattern,
+])
+
+_PATTERN_STYLE_BY_PREFIX = dict((i.PREFIX, i) for i in _PATTERN_STYLES)
+
+
+def parse_pattern(pattern, fallback=FnmatchPattern):
+    """Read pattern from string and return an instance of the appropriate implementation class.
+    """
+    if len(pattern) > 2 and pattern[2] == ":" and pattern[:2].isalnum():
+        (style, pattern) = (pattern[:2], pattern[3:])
+
+        cls = _PATTERN_STYLE_BY_PREFIX.get(style, None)
+
+        if cls is None:
+            raise ValueError("Unknown pattern style: {}".format(style))
+    else:
+        cls = fallback
+
+    return cls(pattern)
 
 
 def timestamp(s):
@@ -392,34 +469,24 @@ def CompressionSpec(s):
     count = len(values)
     if count < 1:
         raise ValueError
-    compression = values[0]
-    try:
-        compression = int(compression)
-        if count > 1:
-            raise ValueError
-        # DEPRECATED: it is just --compression N
-        if 0 <= compression <= 9:
-            return dict(name='zlib', level=compression)
-        raise ValueError
-    except ValueError:
-        # --compression algo[,...]
-        name = compression
-        if name in ('none', 'lz4', ):
-            return dict(name=name)
-        if name in ('zlib', 'lzma', ):
-            if count < 2:
-                level = 6  # default compression level in py stdlib
-            elif count == 2:
-                level = int(values[1])
-                if not 0 <= level <= 9:
-                    raise ValueError
-            else:
+    # --compression algo[,level]
+    name = values[0]
+    if name in ('none', 'lz4', ):
+        return dict(name=name)
+    if name in ('zlib', 'lzma', ):
+        if count < 2:
+            level = 6  # default compression level in py stdlib
+        elif count == 2:
+            level = int(values[1])
+            if not 0 <= level <= 9:
                 raise ValueError
-            return dict(name=name, level=level)
-        raise ValueError
+        else:
+            raise ValueError
+        return dict(name=name, level=level)
+    raise ValueError
 
 
-def is_cachedir(path):
+def dir_is_cachedir(path):
     """Determines whether the specified path is a cache directory (and
     therefore should potentially be excluded from the backup) according to
     the CACHEDIR.TAG protocol
@@ -439,13 +506,27 @@ def is_cachedir(path):
     return False
 
 
-def format_time(t):
-    """Format datetime suitable for fixed length list output
+def dir_is_tagged(path, exclude_caches, exclude_if_present):
+    """Determines whether the specified path is excluded by being a cache
+    directory or containing user-specified tag files. Returns a list of the
+    paths of the tag files (either CACHEDIR.TAG or the matching
+    user-specified files).
     """
-    if abs((datetime.now() - t).days) < 365:
-        return t.strftime('%b %d %H:%M')
-    else:
-        return t.strftime('%b %d  %Y')
+    tag_paths = []
+    if exclude_caches and dir_is_cachedir(path):
+        tag_paths.append(os.path.join(path, 'CACHEDIR.TAG'))
+    if exclude_if_present is not None:
+        for tag in exclude_if_present:
+            tag_path = os.path.join(path, tag)
+            if os.path.isfile(tag_path):
+                tag_paths.append(tag_path)
+    return tag_paths
+
+
+def format_time(t):
+    """use ISO-8601 date and time format
+    """
+    return t.strftime('%a, %Y-%m-%d %H:%M:%S')
 
 
 def format_timedelta(td):
@@ -464,15 +545,6 @@ def format_timedelta(td):
     if td.days:
         txt = '%d days %s' % (td.days, txt)
     return txt
-
-
-def format_file_mode(mod):
-    """Format file mode bits for list output
-    """
-    def x(v):
-        return ''.join(v & m and s or '-'
-                       for m, s in ((4, 'r'), (2, 'w'), (1, 'x')))
-    return '%s%s%s' % (x(mod // 64), x(mod // 8), x(mod))
 
 
 def format_file_size(v, precision=2):
@@ -501,7 +573,7 @@ def sizeof_fmt_decimal(num, suffix='B', sep='', precision=2):
 
 
 def format_archive(archive):
-    return '%-36s %s' % (archive.name, to_localtime(archive.ts).strftime('%c'))
+    return '%-36s %s' % (archive.name, format_time(to_localtime(archive.ts)))
 
 
 def memoize(function):
@@ -620,33 +692,34 @@ class Location:
             self.user = m.group('user')
             self.host = m.group('host')
             self.port = m.group('port') and int(m.group('port')) or None
-            self.path = m.group('path')
+            self.path = os.path.normpath(m.group('path'))
             self.archive = m.group('archive')
             return True
         m = self.file_re.match(text)
         if m:
             self.proto = m.group('proto')
-            self.path = m.group('path')
+            self.path = os.path.normpath(m.group('path'))
             self.archive = m.group('archive')
             return True
         m = self.scp_re.match(text)
         if m:
             self.user = m.group('user')
             self.host = m.group('host')
-            self.path = m.group('path')
+            self.path = os.path.normpath(m.group('path'))
             self.archive = m.group('archive')
             self.proto = self.host and 'ssh' or 'file'
             return True
         return False
 
     def __str__(self):
-        items = []
-        items.append('proto=%r' % self.proto)
-        items.append('user=%r' % self.user)
-        items.append('host=%r' % self.host)
-        items.append('port=%r' % self.port)
-        items.append('path=%r' % self.path)
-        items.append('archive=%r' % self.archive)
+        items = [
+            'proto=%r' % self.proto,
+            'user=%r' % self.user,
+            'host=%r' % self.host,
+            'port=%r' % self.port,
+            'path=%r' % self.path,
+            'archive=%r' % self.archive,
+        ]
         return ', '.join(items)
 
     def to_key_filename(self):
@@ -679,26 +752,13 @@ def location_validator(archive=None):
         try:
             loc = Location(text)
         except ValueError:
-            raise argparse.ArgumentTypeError('Invalid location format: "%s"' % text)
+            raise argparse.ArgumentTypeError('Invalid location format: "%s"' % text) from None
         if archive is True and not loc.archive:
             raise argparse.ArgumentTypeError('"%s": No archive specified' % text)
         elif archive is False and loc.archive:
             raise argparse.ArgumentTypeError('"%s" No archive can be specified' % text)
         return loc
     return validator
-
-
-def read_msgpack(filename):
-    with open(filename, 'rb') as fd:
-        return msgpack.unpack(fd)
-
-
-def write_msgpack(filename, d):
-    with open(filename + '.tmp', 'wb') as fd:
-        msgpack.pack(d, fd)
-        fd.flush()
-        os.fsync(fd.fileno())
-    os.rename(filename + '.tmp', filename)
 
 
 def decode_dict(d, keys, encoding='utf-8', errors='surrogateescape'):
@@ -747,35 +807,6 @@ class StableDict(dict):
     """A dict subclass with stable items() ordering"""
     def items(self):
         return sorted(super().items())
-
-
-if sys.version < '3.3':
-    # st_xtime_ns attributes only available in 3.3+
-    def st_atime_ns(st):
-        return int(st.st_atime * 1e9)
-
-    def st_ctime_ns(st):
-        return int(st.st_ctime * 1e9)
-
-    def st_mtime_ns(st):
-        return int(st.st_mtime * 1e9)
-
-    # unhexlify in < 3.3 incorrectly only accepts bytes input
-    def unhexlify(data):
-        if isinstance(data, str):
-            data = data.encode('ascii')
-        return binascii.unhexlify(data)
-else:
-    def st_atime_ns(st):
-        return st.st_atime_ns
-
-    def st_ctime_ns(st):
-        return st.st_ctime_ns
-
-    def st_mtime_ns(st):
-        return st.st_mtime_ns
-
-    unhexlify = binascii.unhexlify
 
 
 def bigint_to_int(mtime):
@@ -868,3 +899,187 @@ def make_queue(name, maxsize=0, debug=QUEUE_DEBUG):
         return DebugQueue(name, maxsize)
     else:
         return queue.Queue(maxsize)
+
+
+def is_slow_msgpack():
+    return msgpack.Packer is msgpack.fallback.Packer
+
+
+FALSISH = ('No', 'NO', 'no', 'N', 'n', '0', )
+TRUISH = ('Yes', 'YES', 'yes', 'Y', 'y', '1', )
+DEFAULTISH = ('Default', 'DEFAULT', 'default', 'D', 'd', '', )
+
+
+def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
+        retry_msg=None, invalid_msg=None, env_msg=None,
+        falsish=FALSISH, truish=TRUISH, defaultish=DEFAULTISH,
+        default=False, retry=True, env_var_override=None, ofile=None, input=input):
+    """
+    Output <msg> (usually a question) and let user input an answer.
+    Qualifies the answer according to falsish, truish and defaultish as True, False or <default>.
+    If it didn't qualify and retry_msg is None (no retries wanted),
+    return the default [which defaults to False]. Otherwise let user retry
+    answering until answer is qualified.
+
+    If env_var_override is given and this var is present in the environment, do not ask
+    the user, but just use the env var contents as answer as if it was typed in.
+    Otherwise read input from stdin and proceed as normal.
+    If EOF is received instead an input or an invalid input without retry possibility,
+    return default.
+
+    :param msg: introducing message to output on ofile, no \n is added [None]
+    :param retry_msg: retry message to output on ofile, no \n is added [None]
+    :param false_msg: message to output before returning False [None]
+    :param true_msg: message to output before returning True [None]
+    :param default_msg: message to output before returning a <default> [None]
+    :param invalid_msg: message to output after a invalid answer was given [None]
+    :param env_msg: message to output when using input from env_var_override [None],
+           needs to have 2 placeholders for answer and env var name, e.g.: "{} (from {})"
+    :param falsish: sequence of answers qualifying as False
+    :param truish: sequence of answers qualifying as True
+    :param defaultish: sequence of answers qualifying as <default>
+    :param default: default return value (defaultish answer was given or no-answer condition) [False]
+    :param retry: if True and input is incorrect, retry. Otherwise return default. [True]
+    :param env_var_override: environment variable name [None]
+    :param ofile: output stream [sys.stderr]
+    :param input: input function [input from builtins]
+    :return: boolean answer value, True or False
+    """
+    # note: we do not assign sys.stderr as default above, so it is
+    # really evaluated NOW,  not at function definition time.
+    if ofile is None:
+        ofile = sys.stderr
+    if default not in (True, False):
+        raise ValueError("invalid default value, must be True or False")
+    if msg:
+        print(msg, file=ofile, end='', flush=True)
+    while True:
+        answer = None
+        if env_var_override:
+            answer = os.environ.get(env_var_override)
+            if answer is not None and env_msg:
+                print(env_msg.format(answer, env_var_override), file=ofile)
+        if answer is None:
+            try:
+                answer = input()
+            except EOFError:
+                # avoid defaultish[0], defaultish could be empty
+                answer = truish[0] if default else falsish[0]
+        if answer in defaultish:
+            if default_msg:
+                print(default_msg, file=ofile)
+            return default
+        if answer in truish:
+            if true_msg:
+                print(true_msg, file=ofile)
+            return True
+        if answer in falsish:
+            if false_msg:
+                print(false_msg, file=ofile)
+            return False
+        # if we get here, the answer was invalid
+        if invalid_msg:
+            print(invalid_msg, file=ofile)
+        if not retry:
+            return default
+        if retry_msg:
+            print(retry_msg, file=ofile, end='', flush=True)
+        # in case we used an environment variable and it gave an invalid answer, do not use it again:
+        env_var_override = None
+
+
+class ProgressIndicatorPercent:
+    def __init__(self, total, step=5, start=0, same_line=False, msg="%3.0f%%", file=sys.stderr):
+        """
+        Percentage-based progress indicator
+
+        :param total: total amount of items
+        :param step: step size in percent
+        :param start: at which percent value to start
+        :param same_line: if True, emit output always on same line
+        :param msg: output message, must contain one %f placeholder for the percentage
+        :param file: output file, default: sys.stderr
+        """
+        self.counter = 0  # 0 .. (total-1)
+        self.total = total
+        self.trigger_at = start  # output next percentage value when reaching (at least) this
+        self.step = step
+        self.file = file
+        self.msg = msg
+        self.same_line = same_line
+
+    def progress(self, current=None):
+        if current is not None:
+            self.counter = current
+        pct = self.counter * 100 / self.total
+        self.counter += 1
+        if pct >= self.trigger_at:
+            self.trigger_at += self.step
+            return pct
+
+    def show(self, current=None):
+        pct = self.progress(current)
+        if pct is not None:
+            return self.output(pct)
+
+    def output(self, percent):
+        print(self.msg % percent, file=self.file, end='\r' if self.same_line else '\n', flush=True)
+
+    def finish(self):
+        if self.same_line:
+            print(" " * len(self.msg % 100.0), file=self.file, end='\r')
+
+
+class ProgressIndicatorEndless:
+    def __init__(self, step=10, file=sys.stderr):
+        """
+        Progress indicator (long row of dots)
+
+        :param step: every Nth call, call the func
+        :param file: output file, default: sys.stderr
+        """
+        self.counter = 0  # call counter
+        self.triggered = 0  # increases 1 per trigger event
+        self.step = step  # trigger every <step> calls
+        self.file = file
+
+    def progress(self):
+        self.counter += 1
+        trigger = self.counter % self.step == 0
+        if trigger:
+            self.triggered += 1
+        return trigger
+
+    def show(self):
+        trigger = self.progress()
+        if trigger:
+            return self.output(self.triggered)
+
+    def output(self, triggered):
+        print('.', end='', file=self.file, flush=True)
+
+    def finish(self):
+        print(file=self.file)
+
+
+def sysinfo():
+    info = []
+    info.append('Platform: %s' % (' '.join(platform.uname()), ))
+    if sys.platform.startswith('linux'):
+        info.append('Linux: %s %s %s  LibC: %s %s' % (platform.linux_distribution() + platform.libc_ver()))
+    info.append('Borg: %s Python: %s %s' % (borg_version, platform.python_implementation(), platform.python_version()))
+    info.append('')
+    return '\n'.join(info)
+
+
+def log_multi(*msgs, level=logging.INFO):
+    """
+    log multiple lines of text, each line by a separate logging call for cosmetic reasons
+
+    each positional argument may be a single or multiple lines (separated by \n) of text.
+    """
+    lines = []
+    for msg in msgs:
+        lines.extend(msg.splitlines())
+    for line in lines:
+        logger.log(level, line)

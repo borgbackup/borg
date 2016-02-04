@@ -2,14 +2,19 @@
 branch = True
 source = borg
 omit =
-    borg/__init__.py
-    borg/__main__.py
-    borg/_version.py
-    borg/support/*.py
+    */borg/__init__.py
+    */borg/__main__.py
+    */borg/_version.py
+    */borg/fuse.py
+    */borg/support/*
+    */borg/testsuite/*
+    */borg/hash_sizes.py
 
 [report]
 exclude_lines =
     pragma: no cover
+    pragma: freebsd only
+    pragma: unknown platform only
     def __repr__
     raise AssertionError
     raise NotImplementedError

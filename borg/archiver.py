@@ -1,13 +1,13 @@
-from .support import argparse  # see support/__init__.py docstring
-                               # DEPRECATED - remove after requiring py 3.4
-
-from binascii import hexlify
+from binascii import hexlify, unhexlify
 from datetime import datetime
+from hashlib import sha256
 from operator import attrgetter
+import argparse
 import functools
 import inspect
 import io
 import os
+import shlex
 import signal
 import stat
 import sys
@@ -16,37 +16,55 @@ import traceback
 
 from . import __version__
 from .helpers import Error, location_validator, format_time, format_file_size, \
-    format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
-    get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
+    parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
+    get_cache_dir, get_keys_dir, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    is_cachedir, bigint_to_int, ChunkerParams, CompressionSpec, have_cython, \
-    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
+    dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
+    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher
 from .logger import create_logger, setup_logging
 logger = create_logger()
-if have_cython():
-    from .compress import Compressor, COMPR_BUFFER
-    from .upgrader import AtticRepositoryUpgrader
-    from .repository import Repository
-    from .cache import Cache
-    from .key import key_creator
+from .compress import Compressor, COMPR_BUFFER
+from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
+from .repository import Repository
+from .cache import Cache
+from .key import key_creator, RepoKey, PassphraseKey
 from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
-from .remote import RepositoryServer, RemoteRepository
+from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 
 has_lchflags = hasattr(os, 'lchflags')
+
+# default umask, overriden by --umask, defaults to read/write only for owner
+UMASK_DEFAULT = 0o077
+
+DASHES = '-' * 78
+
+
+class ToggleAction(argparse.Action):
+    """argparse action to handle "toggle" flags easily
+
+    toggle flags are in the form of ``--foo``, ``--no-foo``.
+
+    the ``--no-foo`` argument still needs to be passed to the
+    ``add_argument()`` call, but it simplifies the ``--no``
+    detection.
+    """
+    def __call__(self, parser, ns, values, option):
+        """set the given flag to true unless ``--no`` is passed"""
+        setattr(ns, self.dest, not option.startswith('--no-'))
 
 
 class Archiver:
 
-    def __init__(self, verbose=False):
+    def __init__(self, lock_wait=None):
         self.exit_code = EXIT_SUCCESS
-        self.verbose = verbose
+        self.lock_wait = lock_wait
 
-    def open_repository(self, location, create=False, exclusive=False):
+    def open_repository(self, args, create=False, exclusive=False, lock=True):
+        location = args.location  # note: 'location' must be always present in args
         if location.proto == 'ssh':
-            repository = RemoteRepository(location, create=create)
+            repository = RemoteRepository(location, create=create, lock_wait=self.lock_wait, lock=lock, args=args)
         else:
-            repository = Repository(location.path, create=create, exclusive=exclusive)
-        repository._location = location
+            repository = Repository(location.path, create=create, exclusive=exclusive, lock_wait=self.lock_wait, lock=lock)
         return repository
 
     def print_error(self, msg, *args):
@@ -59,13 +77,9 @@ class Archiver:
         self.exit_code = EXIT_WARNING  # we do not terminate here, so it is a warning
         logger.warning(msg)
 
-    def print_info(self, msg, *args):
-        if self.verbose:
-            msg = args and msg % args or msg
-            logger.info(msg)
-
-    def print_status(self, status, path):
-        self.print_info("%1s %s", status, remove_surrogates(path))
+    def print_file_status(self, status, path):
+        if self.output_list and (self.output_filter is None or status in self.output_filter):
+            logger.info("%1s %s", status, remove_surrogates(path))
 
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
@@ -74,76 +88,78 @@ class Archiver:
 
     def do_init(self, args):
         """Initialize an empty repository"""
-        logger.info('Initializing repository at "%s"' % args.repository.orig)
-        repository = self.open_repository(args.repository, create=True, exclusive=True)
+        logger.info('Initializing repository at "%s"' % args.location.canonical_path())
+        repository = self.open_repository(args, create=True, exclusive=True)
         key = key_creator(repository, args)
         manifest = Manifest(key, repository)
         manifest.key = key
         manifest.write()
         repository.commit()
-        Cache(repository, key, manifest, warn_if_unencrypted=False)
+        with Cache(repository, key, manifest, warn_if_unencrypted=False):
+            pass
         return self.exit_code
 
     def do_check(self, args):
         """Check repository consistency"""
-        repository = self.open_repository(args.repository, exclusive=args.repair)
+        repository = self.open_repository(args, exclusive=args.repair)
         if args.repair:
-            while not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
-                self.print_warning("""'check --repair' is an experimental feature that might result
-in data loss.
-
-Type "Yes I am sure" if you understand this and want to continue.\n""")
-                if input('Do you want to continue? ') == 'Yes I am sure':
-                    break
+            msg = ("'check --repair' is an experimental feature that might result in data loss." +
+                   "\n" +
+                   "Type 'YES' if you understand this and want to continue: ")
+            if not yes(msg, false_msg="Aborting.", truish=('YES', ),
+                       env_var_override='BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
+                return EXIT_ERROR
         if not args.archives_only:
-            logger.info('Starting repository check...')
-            if repository.check(repair=args.repair):
-                logger.info('Repository check complete, no problems found.')
-            else:
+            if not repository.check(repair=args.repair, save_space=args.save_space):
                 return EXIT_WARNING
         if not args.repo_only and not ArchiveChecker().check(
-                repository, repair=args.repair, archive=args.repository.archive, last=args.last):
+                repository, repair=args.repair, archive=args.location.archive,
+                last=args.last, prefix=args.prefix, save_space=args.save_space):
             return EXIT_WARNING
         return EXIT_SUCCESS
 
     def do_change_passphrase(self, args):
         """Change repository key file passphrase"""
-        repository = self.open_repository(args.repository)
+        repository = self.open_repository(args)
         manifest, key = Manifest.load(repository)
         key.change_passphrase()
         return EXIT_SUCCESS
 
+    def do_migrate_to_repokey(self, args):
+        """Migrate passphrase -> repokey"""
+        repository = self.open_repository(args)
+        manifest_data = repository.get(Manifest.MANIFEST_ID)
+        key_old = PassphraseKey.detect(repository, manifest_data)
+        key_new = RepoKey(repository)
+        key_new.target = repository
+        key_new.repository_id = repository.id
+        key_new.enc_key = key_old.enc_key
+        key_new.enc_hmac_key = key_old.enc_hmac_key
+        key_new.id_key = key_old.id_key
+        key_new.chunk_seed = key_old.chunk_seed
+        key_new.change_passphrase()  # option to change key protection passphrase, save
+        return EXIT_SUCCESS
+
     def do_create(self, args):
         """Create new archive"""
-        dry_run = args.dry_run
-        t0 = datetime.now()
-        if not dry_run:
-            repository = self.open_repository(args.archive, exclusive=True)
-            manifest, key = Manifest.load(repository)
-            compr_args = dict(buffer=COMPR_BUFFER)
-            compr_args.update(args.compression)
-            key.compressor = Compressor(**compr_args)
-            cache = Cache(repository, key, manifest, do_files=args.cache_files)
-            archive = Archive(repository, key, manifest, args.archive.archive, cache=cache,
-                              create=True, checkpoint_interval=args.checkpoint_interval,
-                              numeric_owner=args.numeric_owner, progress=args.progress,
-                              chunker_params=args.chunker_params, start=t0)
-        else:
-            archive = cache = None
-        try:
+        matcher = PatternMatcher(fallback=True)
+        if args.excludes:
+            matcher.add(args.excludes, False)
+
+        def create_inner(archive, cache):
             # Add cache dir to inode_skip list
             skip_inodes = set()
             try:
                 st = os.stat(get_cache_dir())
                 skip_inodes.add((st.st_ino, st.st_dev))
-            except IOError:
+            except OSError:
                 pass
             # Add local repository dir to inode_skip list
-            if not args.archive.host:
+            if not args.location.host:
                 try:
-                    st = os.stat(args.archive.path)
+                    st = os.stat(args.location.path)
                     skip_inodes.add((st.st_ino, st.st_dev))
-                except IOError:
+                except OSError:
                     pass
             for path in args.paths:
                 if path == '-':  # stdin
@@ -151,12 +167,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     if not dry_run:
                         try:
                             status = archive.process_stdin(path, cache)
-                        except IOError as e:
+                        except OSError as e:
                             status = 'E'
                             self.print_warning('%s: %s', path, e)
                     else:
                         status = '-'
-                    self.print_status(status, path)
+                    self.print_file_status(status, path)
                     continue
                 path = os.path.normpath(path)
                 if args.one_file_system:
@@ -167,7 +183,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                         continue
                 else:
                     restrict_dev = None
-                self._process(archive, cache, args.excludes, args.exclude_caches, skip_inodes, path, restrict_dev,
+                self._process(archive, cache, matcher, args.exclude_caches, args.exclude_if_present,
+                              args.keep_tag_files, skip_inodes, path, restrict_dev,
                               read_special=args.read_special, dry_run=dry_run)
             if not dry_run:
                 archive.save(timestamp=args.timestamp)
@@ -175,21 +192,42 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     archive.stats.show_progress(final=True)
                 if args.stats:
                     archive.end = datetime.now()
-                    print('-' * 78)
-                    print(str(archive))
-                    print()
-                    print(str(archive.stats))
-                    print(str(cache))
-                    print('-' * 78)
-        finally:
-            if not dry_run:
-                archive.close()
+                    log_multi(DASHES,
+                              str(archive),
+                              DASHES,
+                              str(archive.stats),
+                              str(cache),
+                              DASHES)
+
+        self.output_filter = args.output_filter
+        self.output_list = args.output_list
+        dry_run = args.dry_run
+        t0 = datetime.now()
+        if not dry_run:
+            repository = self.open_repository(args, exclusive=True)
+            manifest, key = Manifest.load(repository)
+            compr_args = dict(buffer=COMPR_BUFFER)
+            compr_args.update(args.compression)
+            key.compressor = Compressor(**compr_args)
+            with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
+                archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
+                                  create=True, checkpoint_interval=args.checkpoint_interval,
+                                  numeric_owner=args.numeric_owner, progress=args.progress,
+                                  chunker_params=args.chunker_params, start=t0)
+                try:
+                    create_inner(archive, cache)
+                finally:
+                    archive.close()
+        else:
+            create_inner(None, None)
         return self.exit_code
 
-    def _process(self, archive, cache, excludes, exclude_caches, skip_inodes, path, restrict_dev,
+    def _process(self, archive, cache, matcher, exclude_caches, exclude_if_present,
+                 keep_tag_files, skip_inodes, path, restrict_dev,
                  read_special=False, dry_run=False):
-        if exclude_path(path, excludes):
+        if not matcher.match(path):
             return
+
         try:
             st = os.lstat(path)
         except OSError as e:
@@ -204,16 +242,22 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         # Ignore if nodump flag is set
         if has_lchflags and (st.st_flags & stat.UF_NODUMP):
             return
-        if (stat.S_ISREG(st.st_mode) or
-            read_special and not stat.S_ISDIR(st.st_mode)):
+        if stat.S_ISREG(st.st_mode) or read_special and not stat.S_ISDIR(st.st_mode):
             if not dry_run:
                 try:
                     status = archive.process_file(path, st, cache)
-                except IOError as e:
+                except OSError as e:
                     status = 'E'
                     self.print_warning('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
-            if exclude_caches and is_cachedir(path):
+            tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)
+            if tag_paths:
+                if keep_tag_files and not dry_run:
+                    archive.process_dir(path, st)
+                    for tag_path in tag_paths:
+                        self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
+                                      keep_tag_files, skip_inodes, tag_path, restrict_dev,
+                                      read_special=read_special, dry_run=dry_run)
                 return
             if not dry_run:
                 status = archive.process_dir(path, st)
@@ -225,9 +269,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             else:
                 for filename in sorted(entries):
                     entry_path = os.path.normpath(os.path.join(path, filename))
-                    self._process(archive, cache, excludes, exclude_caches, skip_inodes,
-                                  entry_path, restrict_dev, read_special=read_special,
-                                  dry_run=dry_run)
+                    self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
+                                  keep_tag_files, skip_inodes, entry_path, restrict_dev,
+                                  read_special=read_special, dry_run=dry_run)
         elif stat.S_ISLNK(st.st_mode):
             if not dry_run:
                 status = archive.process_symlink(path, st)
@@ -244,44 +288,51 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             self.print_warning('Unknown file type: %s', path)
             return
         # Status output
-        # A lowercase character means a file type other than a regular file,
-        # borg usually just stores them. E.g. (d)irectory.
-        # Hardlinks to already seen content are indicated by (h).
-        # A uppercase character means a regular file that was (A)dded,
-        # (M)odified or was (U)nchanged.
-        # Note: A/M/U is relative to the "files" cache, not to the repo.
-        # This would be an issue if the files cache is not used.
         if status is None:
             if not dry_run:
                 status = '?'  # need to add a status code somewhere
             else:
                 status = '-'  # dry run, item was not backed up
-        # output ALL the stuff - it can be easily filtered using grep.
-        # even stuff considered unchanged might be interesting.
-        self.print_status(status, path)
+        self.print_file_status(status, path)
 
     def do_extract(self, args):
         """Extract archive contents"""
         # be restrictive when restoring files, restore permissions later
         if sys.getfilesystemencoding() == 'ascii':
             logger.warning('Warning: File system encoding is "ascii", extracting non-ascii filenames will not be supported.')
-        repository = self.open_repository(args.archive)
+            if sys.platform.startswith(('linux', 'freebsd', 'netbsd', 'openbsd', 'darwin', )):
+                logger.warning('Hint: You likely need to fix your locale setup. E.g. install locales and use: LANG=en_US.UTF-8')
+        repository = self.open_repository(args)
         manifest, key = Manifest.load(repository)
-        archive = Archive(repository, key, manifest, args.archive.archive,
+        archive = Archive(repository, key, manifest, args.location.archive,
                           numeric_owner=args.numeric_owner)
-        patterns = adjust_patterns(args.paths, args.excludes)
+
+        matcher = PatternMatcher()
+        if args.excludes:
+            matcher.add(args.excludes, False)
+
+        include_patterns = []
+
+        if args.paths:
+            include_patterns.extend(parse_pattern(i, PathPrefixPattern) for i in args.paths)
+            matcher.add(include_patterns, True)
+
+        matcher.fallback = not include_patterns
+
+        output_list = args.output_list
         dry_run = args.dry_run
         stdout = args.stdout
         sparse = args.sparse
         strip_components = args.strip_components
         dirs = []
-        for item in archive.iter_items(lambda item: not exclude_path(item[b'path'], patterns), preload=True):
+        for item in archive.iter_items(lambda item: matcher.match(item[b'path']), preload=True):
             orig_path = item[b'path']
             if strip_components:
                 item[b'path'] = os.sep.join(orig_path.split(os.sep)[strip_components:])
                 if not item[b'path']:
                     continue
-            self.print_info(remove_surrogates(orig_path))
+            if output_list:
+                logger.info(remove_surrogates(orig_path))
             try:
                 if dry_run:
                     archive.extract_item(item, dry_run=True)
@@ -291,7 +342,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                         archive.extract_item(item, restore_attrs=False)
                     else:
                         archive.extract_item(item, stdout=stdout, sparse=sparse)
-            except IOError as e:
+            except OSError as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 
         if not args.dry_run:
@@ -300,53 +351,57 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             # processing time, archive order is not as traversal order on "create".
             while dirs:
                 archive.extract_item(dirs.pop(-1))
-        for pattern in (patterns or []):
-            if isinstance(pattern, IncludePattern) and  pattern.match_count == 0:
+        for pattern in include_patterns:
+            if pattern.match_count == 0:
                 self.print_warning("Include pattern '%s' never matched.", pattern)
         return self.exit_code
 
     def do_rename(self, args):
         """Rename an existing archive"""
-        repository = self.open_repository(args.archive, exclusive=True)
+        repository = self.open_repository(args, exclusive=True)
         manifest, key = Manifest.load(repository)
-        cache = Cache(repository, key, manifest)
-        archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
-        archive.rename(args.name)
-        manifest.write()
-        repository.commit()
-        cache.commit()
+        with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
+            archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
+            archive.rename(args.name)
+            manifest.write()
+            repository.commit()
+            cache.commit()
         return self.exit_code
 
     def do_delete(self, args):
         """Delete an existing repository or archive"""
-        repository = self.open_repository(args.target, exclusive=True)
+        repository = self.open_repository(args, exclusive=True)
         manifest, key = Manifest.load(repository)
-        cache = Cache(repository, key, manifest, do_files=args.cache_files)
-        if args.target.archive:
-            archive = Archive(repository, key, manifest, args.target.archive, cache=cache)
-            stats = Statistics()
-            archive.delete(stats)
-            manifest.write()
-            repository.commit()
-            cache.commit()
-            if args.stats:
-                logger.info(stats.summary.format(label='Deleted data:', stats=stats))
-                logger.info(str(cache))
-        else:
-            if not args.cache_only:
-                print("You requested to completely DELETE the repository *including* all archives it contains:", file=sys.stderr)
-                for archive_info in manifest.list_archive_infos(sort_by='ts'):
-                    print(format_archive(archive_info), file=sys.stderr)
-                if not os.environ.get('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
-                    print("""Type "YES" if you understand this and want to continue.\n""", file=sys.stderr)
-                    # XXX: prompt may end up on stdout, but we'll assume that input() does the right thing
-                    if input('Do you want to continue? ') != 'YES':
+        with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
+            if args.location.archive:
+                archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
+                stats = Statistics()
+                archive.delete(stats, progress=args.progress)
+                manifest.write()
+                repository.commit(save_space=args.save_space)
+                cache.commit()
+                logger.info("Archive deleted.")
+                if args.stats:
+                    log_multi(DASHES,
+                              stats.summary.format(label='Deleted data:', stats=stats),
+                              str(cache),
+                              DASHES)
+            else:
+                if not args.cache_only:
+                    msg = []
+                    msg.append("You requested to completely DELETE the repository *including* all archives it contains:")
+                    for archive_info in manifest.list_archive_infos(sort_by='ts'):
+                        msg.append(format_archive(archive_info))
+                    msg.append("Type 'YES' if you understand this and want to continue: ")
+                    msg = '\n'.join(msg)
+                    if not yes(msg, false_msg="Aborting.", truish=('YES', ),
+                               env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'):
                         self.exit_code = EXIT_ERROR
                         return self.exit_code
-                repository.destroy()
-                logger.info("Repository deleted.")
-            cache.destroy()
-            logger.info("Cache deleted.")
+                    repository.destroy()
+                    logger.info("Repository deleted.")
+                cache.destroy()
+                logger.info("Cache deleted.")
         return self.exit_code
 
     def do_mount(self, args):
@@ -361,38 +416,38 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             self.print_error('%s: Mountpoint must be a writable directory' % args.mountpoint)
             return self.exit_code
 
-        repository = self.open_repository(args.src)
+        repository = self.open_repository(args)
         try:
-            manifest, key = Manifest.load(repository)
-            if args.src.archive:
-                archive = Archive(repository, key, manifest, args.src.archive)
-            else:
-                archive = None
-            operations = FuseOperations(key, repository, manifest, archive)
-            self.print_info("Mounting filesystem")
-            try:
-                operations.mount(args.mountpoint, args.options, args.foreground)
-            except RuntimeError:
-                # Relevant error message already printed to stderr by fuse
-                self.exit_code = EXIT_ERROR
+            with cache_if_remote(repository) as cached_repo:
+                manifest, key = Manifest.load(repository)
+                if args.location.archive:
+                    archive = Archive(repository, key, manifest, args.location.archive)
+                else:
+                    archive = None
+                operations = FuseOperations(key, repository, manifest, archive, cached_repo)
+                logger.info("Mounting filesystem")
+                try:
+                    operations.mount(args.mountpoint, args.options, args.foreground)
+                except RuntimeError:
+                    # Relevant error message already printed to stderr by fuse
+                    self.exit_code = EXIT_ERROR
         finally:
             repository.close()
         return self.exit_code
 
     def do_list(self, args):
         """List archive or repository contents"""
-        repository = self.open_repository(args.src)
+        repository = self.open_repository(args)
         manifest, key = Manifest.load(repository)
-        if args.src.archive:
-            archive = Archive(repository, key, manifest, args.src.archive)
+        if args.location.archive:
+            archive = Archive(repository, key, manifest, args.location.archive)
             if args.short:
                 for item in archive.iter_items():
                     print(remove_surrogates(item[b'path']))
             else:
-                tmap = {1: 'p', 2: 'c', 4: 'd', 6: 'b', 0o10: '-', 0o12: 'l', 0o14: 's'}
                 for item in archive.iter_items():
-                    type = tmap.get(item[b'mode'] // 4096, '?')
-                    mode = format_file_mode(item[b'mode'])
+                    mode = stat.filemode(item[b'mode'])
+                    type = mode[0]
                     size = 0
                     if type == '-':
                         try:
@@ -401,53 +456,57 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                             pass
                     try:
                         mtime = datetime.fromtimestamp(bigint_to_int(item[b'mtime']) / 1e9)
-                    except ValueError:
+                    except OverflowError:
                         # likely a broken mtime and datetime did not want to go beyond year 9999
                         mtime = datetime(9999, 12, 31, 23, 59, 59)
                     if b'source' in item:
                         if type == 'l':
                             extra = ' -> %s' % item[b'source']
                         else:
-                            type = 'h'
+                            mode = 'h' + mode[1:]
                             extra = ' link to %s' % item[b'source']
                     else:
                         extra = ''
-                    print('%s%s %-6s %-6s %8d %s %s%s' % (
-                        type, mode, item[b'user'] or item[b'uid'],
+                    print('%s %-6s %-6s %8d %s %s%s' % (
+                        mode, item[b'user'] or item[b'uid'],
                         item[b'group'] or item[b'gid'], size, format_time(mtime),
                         remove_surrogates(item[b'path']), extra))
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
-                print(format_archive(archive_info))
+                if args.prefix and not archive_info.name.startswith(args.prefix):
+                    continue
+                if args.short:
+                    print(archive_info.name)
+                else:
+                    print(format_archive(archive_info))
         return self.exit_code
 
     def do_info(self, args):
         """Show archive details such as disk space used"""
-        repository = self.open_repository(args.archive)
+        repository = self.open_repository(args)
         manifest, key = Manifest.load(repository)
-        cache = Cache(repository, key, manifest, do_files=args.cache_files)
-        archive = Archive(repository, key, manifest, args.archive.archive, cache=cache)
-        stats = archive.calc_stats(cache)
-        print('Name:', archive.name)
-        print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
-        print('Hostname:', archive.metadata[b'hostname'])
-        print('Username:', archive.metadata[b'username'])
-        print('Time: %s' % to_localtime(archive.ts).strftime('%c'))
-        print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
-        print('Number of files: %d' % stats.nfiles)
-        print()
-        print(str(stats))
-        print(str(cache))
+        with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
+            archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
+            stats = archive.calc_stats(cache)
+            print('Name:', archive.name)
+            print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
+            print('Hostname:', archive.metadata[b'hostname'])
+            print('Username:', archive.metadata[b'username'])
+            print('Time: %s' % format_time(to_localtime(archive.ts)))
+            print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
+            print('Number of files: %d' % stats.nfiles)
+            print()
+            print(str(stats))
+            print(str(cache))
         return self.exit_code
 
     def do_prune(self, args):
         """Prune repository archives according to specified rules"""
-        repository = self.open_repository(args.repository, exclusive=True)
+        repository = self.open_repository(args, exclusive=True)
         manifest, key = Manifest.load(repository)
-        cache = Cache(repository, key, manifest, do_files=args.cache_files)
         archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
         if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0 and args.within is None:
-            self.print_error('At least one of the "within", "keep-hourly", "keep-daily", "keep-weekly", '
+            self.print_error('At least one of the "keep-within", "keep-hourly", "keep-daily", "keep-weekly", '
                              '"keep-monthly" or "keep-yearly" settings must be specified')
             return self.exit_code
         if args.prefix:
@@ -469,21 +528,24 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         keep.sort(key=attrgetter('ts'), reverse=True)
         to_delete = [a for a in archives if a not in keep]
         stats = Statistics()
-        for archive in keep:
-            self.print_info('Keeping archive: %s' % format_archive(archive))
-        for archive in to_delete:
-            if args.dry_run:
-                self.print_info('Would prune:     %s' % format_archive(archive))
-            else:
-                self.print_info('Pruning archive: %s' % format_archive(archive))
-                Archive(repository, key, manifest, archive.name, cache).delete(stats)
-        if to_delete and not args.dry_run:
-            manifest.write()
-            repository.commit()
-            cache.commit()
-        if args.stats:
-            logger.info(stats.summary.format(label='Deleted data:', stats=stats))
-            logger.info(str(cache))
+        with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
+            for archive in keep:
+                logger.info('Keeping archive: %s' % format_archive(archive))
+            for archive in to_delete:
+                if args.dry_run:
+                    logger.info('Would prune:     %s' % format_archive(archive))
+                else:
+                    logger.info('Pruning archive: %s' % format_archive(archive))
+                    Archive(repository, key, manifest, archive.name, cache).delete(stats)
+            if to_delete and not args.dry_run:
+                manifest.write()
+                repository.commit(save_space=args.save_space)
+                cache.commit()
+            if args.stats:
+                log_multi(DASHES,
+                          stats.summary.format(label='Deleted data:', stats=stats),
+                          str(cache),
+                          DASHES)
         return self.exit_code
 
     def do_upgrade(self, args):
@@ -497,26 +559,154 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         # to be implemented.
 
         # XXX: should auto-detect if it is an attic repository here
-        repo = AtticRepositoryUpgrader(args.repository.path, create=False)
+        repo = AtticRepositoryUpgrader(args.location.path, create=False)
         try:
-            repo.upgrade(args.dry_run, inplace=args.inplace)
+            repo.upgrade(args.dry_run, inplace=args.inplace, progress=args.progress)
+        except NotImplementedError as e:
+            print("warning: %s" % e)
+        repo = BorgRepositoryUpgrader(args.location.path, create=False)
+        try:
+            repo.upgrade(args.dry_run, inplace=args.inplace, progress=args.progress)
         except NotImplementedError as e:
             print("warning: %s" % e)
         return self.exit_code
 
+    def do_debug_dump_archive_items(self, args):
+        """dump (decrypted, decompressed) archive items metadata (not: data)"""
+        repository = self.open_repository(args)
+        manifest, key = Manifest.load(repository)
+        archive = Archive(repository, key, manifest, args.location.archive)
+        for i, item_id in enumerate(archive.metadata[b'items']):
+            data = key.decrypt(item_id, repository.get(item_id))
+            filename = '%06d_%s.items' % (i, hexlify(item_id).decode('ascii'))
+            print('Dumping', filename)
+            with open(filename, 'wb') as fd:
+                fd.write(data)
+        print('Done.')
+        return EXIT_SUCCESS
+
+    def do_debug_get_obj(self, args):
+        """get object contents from the repository and write it into file"""
+        repository = self.open_repository(args)
+        manifest, key = Manifest.load(repository)
+        hex_id = args.id
+        try:
+            id = unhexlify(hex_id)
+        except ValueError:
+            print("object id %s is invalid." % hex_id)
+        else:
+            try:
+                data = repository.get(id)
+            except repository.ObjectNotFound:
+                print("object %s not found." % hex_id)
+            else:
+                with open(args.path, "wb") as f:
+                    f.write(data)
+                print("object %s fetched." % hex_id)
+        return EXIT_SUCCESS
+
+    def do_debug_put_obj(self, args):
+        """put file(s) contents into the repository"""
+        repository = self.open_repository(args)
+        manifest, key = Manifest.load(repository)
+        for path in args.paths:
+            with open(path, "rb") as f:
+                data = f.read()
+            h = sha256(data)  # XXX hardcoded
+            repository.put(h.digest(), data)
+            print("object %s put." % h.hexdigest())
+        repository.commit()
+        return EXIT_SUCCESS
+
+    def do_debug_delete_obj(self, args):
+        """delete the objects with the given IDs from the repo"""
+        repository = self.open_repository(args)
+        manifest, key = Manifest.load(repository)
+        modified = False
+        for hex_id in args.ids:
+            try:
+                id = unhexlify(hex_id)
+            except ValueError:
+                print("object id %s is invalid." % hex_id)
+            else:
+                try:
+                    repository.delete(id)
+                    modified = True
+                    print("object %s deleted." % hex_id)
+                except repository.ObjectNotFound:
+                    print("object %s not found." % hex_id)
+        if modified:
+            repository.commit()
+        print('Done.')
+        return EXIT_SUCCESS
+
+    def do_break_lock(self, args):
+        """Break the repository lock (e.g. in case it was left by a dead borg."""
+        repository = self.open_repository(args, lock=False)
+        try:
+            repository.break_lock()
+            Cache.break_lock(repository)
+        finally:
+            repository.close()
+        return self.exit_code
+
     helptext = {}
-    helptext['patterns'] = '''
-        Exclude patterns use a variant of shell pattern syntax, with '*' matching any
-        number of characters, '?' matching any single character, '[...]' matching any
-        single character specified, including ranges, and '[!...]' matching any
-        character not specified.  For the purpose of these patterns, the path
-        separator ('\\' for Windows and '/' on other systems) is not treated
-        specially.  For a path to match a pattern, it must completely match from
-        start to end, or must match from the start to just before a path separator.
-        Except for the root path, paths will never end in the path separator when
-        matching is attempted.  Thus, if a given pattern ends in a path separator, a
-        '*' is appended before matching is attempted.  Patterns with wildcards should
-        be quoted to protect them from shell expansion.
+    helptext['patterns'] = textwrap.dedent('''
+        Exclusion patterns support four separate styles, fnmatch, shell, regular
+        expressions and path prefixes. If followed by a colon (':') the first two
+        characters of a pattern are used as a style selector. Explicit style
+        selection is necessary when a non-default style is desired or when the
+        desired pattern starts with two alphanumeric characters followed by a colon
+        (i.e. `aa:something/*`).
+
+        `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_, selector `fm:`
+
+            These patterns use a variant of shell pattern syntax, with '*' matching
+            any number of characters, '?' matching any single character, '[...]'
+            matching any single character specified, including ranges, and '[!...]'
+            matching any character not specified. For the purpose of these patterns,
+            the path separator ('\\' for Windows and '/' on other systems) is not
+            treated specially. Wrap meta-characters in brackets for a literal match
+            (i.e. `[?]` to match the literal character `?`). For a path to match
+            a pattern, it must completely match from start to end, or must match from
+            the start to just before a path separator. Except for the root path,
+            paths will never end in the path separator when matching is attempted.
+            Thus, if a given pattern ends in a path separator, a '*' is appended
+            before matching is attempted.
+
+        Shell-style patterns, selector `sh:`
+
+            Like fnmatch patterns these are similar to shell patterns. The difference
+            is that the pattern may include `**/` for matching zero or more directory
+            levels, `*` for matching zero or more arbitrary characters with the
+            exception of any path separator.
+
+        Regular expressions, selector `re:`
+
+            Regular expressions similar to those found in Perl are supported. Unlike
+            shell patterns regular expressions are not required to match the complete
+            path and any substring match is sufficient. It is strongly recommended to
+            anchor patterns to the start ('^'), to the end ('$') or both. Path
+            separators ('\\' for Windows and '/' on other systems) in paths are
+            always normalized to a forward slash ('/') before applying a pattern. The
+            regular expression syntax is described in the `Python documentation for
+            the re module <https://docs.python.org/3/library/re.html>`_.
+
+        Prefix path, selector `pp:`
+
+            This pattern style is useful to match whole sub-directories. The pattern
+            `pp:/data/bar` matches `/data/bar` and everything therein.
+
+        Exclusions can be passed via the command line option `--exclude`. When used
+        from within a shell the patterns should be quoted to protect them from
+        expansion.
+
+        The `--exclude-from` option permits loading exclusion patterns from a text
+        file with one pattern per line. Lines empty or starting with the number sign
+        ('#') after removing whitespace on both ends are ignored. The optional style
+        selector prefix is also supported for patterns loaded from a file. Due to
+        whitespace removal paths with whitespace at the beginning or end can only be
+        excluded using regular expressions.
 
         Examples:
 
@@ -532,7 +722,22 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
         # The file '/home/user/cache/important' is *not* backed up:
         $ borg create -e /home/user/cache/ backup / /home/user/cache/important
-        '''
+
+        # The contents of directories in '/home' are not backed up when their name
+        # ends in '.tmp'
+        $ borg create --exclude 're:^/home/[^/]+\.tmp/' backup /
+
+        # Load exclusions from file
+        $ cat >exclude.txt <<EOF
+        # Comment line
+        /home/*/junk
+        *.tmp
+        fm:aa:something/*
+        re:^/home/[^/]\.tmp/
+        sh:/home/*/.thumbnails
+        EOF
+        $ borg create --exclude-from exclude.txt backup /
+        ''')
 
     def do_help(self, parser, commands, args):
         if not args.topic:
@@ -553,17 +758,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
     def preprocess_args(self, args):
         deprecations = [
-            ('--hourly', '--keep-hourly', 'Warning: "--hourly" has been deprecated. Use "--keep-hourly" instead.'),
-            ('--daily', '--keep-daily', 'Warning: "--daily" has been deprecated. Use "--keep-daily" instead.'),
-            ('--weekly', '--keep-weekly', 'Warning: "--weekly" has been deprecated. Use "--keep-weekly" instead.'),
-            ('--monthly', '--keep-monthly', 'Warning: "--monthly" has been deprecated. Use "--keep-monthly" instead.'),
-            ('--yearly', '--keep-yearly', 'Warning: "--yearly" has been deprecated. Use "--keep-yearly" instead.'),
-            ('--do-not-cross-mountpoints', '--one-file-system',
-             'Warning:  "--do-no-cross-mountpoints" has been deprecated. Use "--one-file-system" instead.'),
+            # ('--old', '--new', 'Warning: "--old" has been deprecated. Use "--new" instead.'),
         ]
-        if args and args[0] == 'verify':
-            print('Warning: "borg verify" has been deprecated. Use "borg extract --dry-run" instead.')
-            args = ['extract', '--dry-run'] + args[1:]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
                 if arg.startswith(old_name):
@@ -573,26 +769,35 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
 
     def build_parser(self, args=None, prog=None):
         common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
-        common_parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False,
-                                   help='verbose output')
+        common_parser.add_argument('-v', '--verbose', '--info', dest='log_level',
+                                   action='store_const', const='info', default='warning',
+                                   help='enable informative (verbose) output, work on log level INFO')
+        common_parser.add_argument('--debug', dest='log_level',
+                                   action='store_const', const='debug', default='warning',
+                                   help='enable debug output, work on log level DEBUG')
+        common_parser.add_argument('--lock-wait', dest='lock_wait', type=int, metavar='N', default=1,
+                                   help='wait for the lock, but max. N seconds (default: %(default)d).')
+        common_parser.add_argument('--show-rc', dest='show_rc', action='store_true', default=False,
+                                   help='show/log the return code (rc)')
         common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
                                    help='do not load/update the file metadata cache used to detect unchanged files')
-        common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=RemoteRepository.umask, metavar='M',
-                                   help='set umask to M (local and remote, default: %(default)s)')
-        common_parser.add_argument('--remote-path', dest='remote_path', default=RemoteRepository.remote_path, metavar='PATH',
+        common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=UMASK_DEFAULT, metavar='M',
+                                   help='set umask to M (local and remote, default: %(default)04o)')
+        common_parser.add_argument('--remote-path', dest='remote_path', default='borg', metavar='PATH',
                                    help='set remote path to executable (default: "%(default)s")')
 
         parser = argparse.ArgumentParser(prog=prog, description='Borg - Deduplicated Backups')
         parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,
                                    help='show version number and exit')
-        subparsers = parser.add_subparsers(title='Available commands')
+        subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
 
         serve_epilog = textwrap.dedent("""
         This command starts a repository server process. This command is usually not used manually.
         """)
         subparser = subparsers.add_parser('serve', parents=[common_parser],
                                           description=self.do_serve.__doc__, epilog=serve_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='start repository server process')
         subparser.set_defaults(func=self.do_serve)
         subparser.add_argument('--restrict-to-path', dest='restrict_to_paths', action='append',
                                metavar='PATH', help='restrict repository access to PATH')
@@ -600,19 +805,18 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
         Encryption can be enabled at repository init time.
-        Please note that the 'passphrase' encryption mode is DEPRECATED (instead of it,
-        consider using 'repokey').
         """)
         subparser = subparsers.add_parser('init', parents=[common_parser],
                                           description=self.do_init.__doc__, epilog=init_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='initialize empty repository')
         subparser.set_defaults(func=self.do_init)
-        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption',
-                               choices=('none', 'keyfile', 'repokey', 'passphrase'), default='none',
-                               help='select encryption key mode')
+                               choices=('none', 'keyfile', 'repokey'), default='repokey',
+                               help='select encryption key mode (default: "%(default)s")')
 
         check_epilog = textwrap.dedent("""
         The check command verifies the consistency of a repository and the corresponding archives.
@@ -653,9 +857,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser = subparsers.add_parser('check', parents=[common_parser],
                                           description=self.do_check.__doc__,
                                           epilog=check_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='verify repository')
         subparser.set_defaults(func=self.do_check)
-        subparser.add_argument('repository', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='repository or archive to check consistency of')
         subparser.add_argument('--repository-only', dest='repo_only', action='store_true',
@@ -667,9 +872,14 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('--repair', dest='repair', action='store_true',
                                default=False,
                                help='attempt to repair any inconsistencies found')
+        subparser.add_argument('--save-space', dest='save_space', action='store_true',
+                               default=False,
+                               help='work slower, but using less space')
         subparser.add_argument('--last', dest='last',
                                type=int, default=None, metavar='N',
                                help='only check last N archives (Default: all)')
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
+                               help='only consider archive names starting with this prefix')
 
         change_passphrase_epilog = textwrap.dedent("""
         The key files used for repository encryption are optionally passphrase
@@ -678,9 +888,37 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser = subparsers.add_parser('change-passphrase', parents=[common_parser],
                                           description=self.do_change_passphrase.__doc__,
                                           epilog=change_passphrase_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='change repository passphrase')
         subparser.set_defaults(func=self.do_change_passphrase)
-        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False))
+
+        migrate_to_repokey_epilog = textwrap.dedent("""
+        This command migrates a repository from passphrase mode (not supported any
+        more) to repokey mode.
+
+        You will be first asked for the repository passphrase (to open it in passphrase
+        mode). This is the same passphrase as you used to use for this repo before 1.0.
+
+        It will then derive the different secrets from this passphrase.
+
+        Then you will be asked for a new passphrase (twice, for safety). This
+        passphrase will be used to protect the repokey (which contains these same
+        secrets in encrypted form). You may use the same passphrase as you used to
+        use, but you may also use a different one.
+
+        After migrating to repokey mode, you can change the passphrase at any time.
+        But please note: the secrets will always stay the same and they could always
+        be derived from your (old) passphrase-mode passphrase.
+        """)
+        subparser = subparsers.add_parser('migrate-to-repokey', parents=[common_parser],
+                                          description=self.do_migrate_to_repokey.__doc__,
+                                          epilog=migrate_to_repokey_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='migrate passphrase-mode repository to repokey')
+        subparser.set_defaults(func=self.do_migrate_to_repokey)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 
         create_epilog = textwrap.dedent("""
@@ -694,18 +932,24 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser = subparsers.add_parser('create', parents=[common_parser],
                                           description=self.do_create.__doc__,
                                           epilog=create_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='create backup')
         subparser.set_defaults(func=self.do_create)
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the created archive')
-        subparser.add_argument('-p', '--progress', dest='progress', const=not sys.stderr.isatty(),
-                               action='store_const', default=sys.stdin.isatty(),
-                               help="""toggle progress display while creating the archive, showing Original,
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help="""show progress display while creating the archive, showing Original,
                                Compressed and Deduplicated sizes, followed by the Number of files seen
                                and the path being processed, default: %(default)s""")
+        subparser.add_argument('--list', dest='output_list',
+                               action='store_true', default=False,
+                               help='output verbose list of items (files, dirs, ...)')
+        subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
+                               help='only display items with the given status characters')
         subparser.add_argument('-e', '--exclude', dest='excludes',
-                               type=ExcludePattern, action='append',
+                               type=parse_pattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
         subparser.add_argument('--exclude-from', dest='exclude_files',
                                type=argparse.FileType('r'), action='append',
@@ -713,6 +957,12 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('--exclude-caches', dest='exclude_caches',
                                action='store_true', default=False,
                                help='exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)')
+        subparser.add_argument('--exclude-if-present', dest='exclude_if_present',
+                               metavar='FILENAME', action='append', type=str,
+                               help='exclude directories that contain the specified file')
+        subparser.add_argument('--keep-tag-files', dest='keep_tag_files',
+                               action='store_true', default=False,
+                               help='keep tag files of excluded caches/directories')
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                type=int, default=300, metavar='SECONDS',
                                help='write checkpoint every SECONDS seconds (Default: 300)')
@@ -746,7 +996,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                action='store_true', default=False,
                                help='do not create a backup archive')
-        subparser.add_argument('archive', metavar='ARCHIVE',
+        subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='name of archive to create (must be also a valid directory name)')
         subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
@@ -763,13 +1013,17 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser = subparsers.add_parser('extract', parents=[common_parser],
                                           description=self.do_extract.__doc__,
                                           epilog=extract_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='extract archive contents')
         subparser.set_defaults(func=self.do_extract)
+        subparser.add_argument('--list', dest='output_list',
+                               action='store_true', default=False,
+                               help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
                                help='do not actually change any files')
         subparser.add_argument('-e', '--exclude', dest='excludes',
-                               type=ExcludePattern, action='append',
+                               type=parse_pattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
         subparser.add_argument('--exclude-from', dest='exclude_files',
                                type=argparse.FileType('r'), action='append',
@@ -786,11 +1040,11 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('--sparse', dest='sparse',
                                action='store_true', default=False,
                                help='create holes in output sparse file from all-zero chunks')
-        subparser.add_argument('archive', metavar='ARCHIVE',
+        subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to extract')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to extract')
+                               help='paths to extract; patterns are supported')
 
         rename_epilog = textwrap.dedent("""
         This command renames an archive in the repository.
@@ -798,9 +1052,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser = subparsers.add_parser('rename', parents=[common_parser],
                                           description=self.do_rename.__doc__,
                                           epilog=rename_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='rename archive')
         subparser.set_defaults(func=self.do_rename)
-        subparser.add_argument('archive', metavar='ARCHIVE',
+        subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to rename')
         subparser.add_argument('name', metavar='NEWNAME', type=str,
@@ -814,15 +1069,22 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser = subparsers.add_parser('delete', parents=[common_parser],
                                           description=self.do_delete.__doc__,
                                           epilog=delete_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='delete archive')
         subparser.set_defaults(func=self.do_delete)
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help="""show progress display while deleting a single archive""")
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the deleted archive')
         subparser.add_argument('-c', '--cache-only', dest='cache_only',
                                action='store_true', default=False,
                                help='delete only the local cache for the given repository')
-        subparser.add_argument('target', metavar='TARGET', nargs='?', default='',
+        subparser.add_argument('--save-space', dest='save_space', action='store_true',
+                               default=False,
+                               help='work slower, but using less space')
+        subparser.add_argument('location', metavar='TARGET', nargs='?', default='',
                                type=location_validator(),
                                help='archive or repository to delete')
 
@@ -832,14 +1094,18 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser = subparsers.add_parser('list', parents=[common_parser],
                                           description=self.do_list.__doc__,
                                           epilog=list_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='list archive or repository contents')
         subparser.set_defaults(func=self.do_list)
         subparser.add_argument('--short', dest='short',
                                action='store_true', default=False,
                                help='only print file/directory names, nothing else')
-        subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
+                               help='only consider archive names starting with this prefix')
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='repository/archive to list contents of')
+
         mount_epilog = textwrap.dedent("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
         browsing an archive or restoring individual files. Unless the ``--foreground``
@@ -849,9 +1115,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser = subparsers.add_parser('mount', parents=[common_parser],
                                           description=self.do_mount.__doc__,
                                           epilog=mount_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='mount repository')
         subparser.set_defaults(func=self.do_mount)
-        subparser.add_argument('src', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
                                help='repository/archive to mount')
         subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
                                help='where to mount filesystem')
@@ -867,19 +1134,35 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser = subparsers.add_parser('info', parents=[common_parser],
                                           description=self.do_info.__doc__,
                                           epilog=info_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='show archive information')
         subparser.set_defaults(func=self.do_info)
-        subparser.add_argument('archive', metavar='ARCHIVE',
+        subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to display information about')
+
+        break_lock_epilog = textwrap.dedent("""
+        This command breaks the repository and cache locks.
+        Please use carefully and only while no borg process (on any machine) is
+        trying to access the Cache or the Repository.
+        """)
+        subparser = subparsers.add_parser('break-lock', parents=[common_parser],
+                                          description=self.do_break_lock.__doc__,
+                                          epilog=break_lock_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='break repository and cache locks')
+        subparser.set_defaults(func=self.do_break_lock)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repository for which to break the locks')
 
         prune_epilog = textwrap.dedent("""
         The prune command prunes a repository by deleting archives not matching
         any of the specified retention options. This command is normally used by
         automated backup scripts wanting to keep a certain number of historic backups.
 
-        As an example, "-d 7" means to keep the latest backup on each day for 7 days.
-        Days without backups do not count towards the total.
+        As an example, "-d 7" means to keep the latest backup on each day, up to 7
+        most recent days with backups (days without backups do not count).
         The rules are applied from hourly to yearly, and backups selected by previous
         rules do not count towards those of later rules. The time that each backup
         completes is used for pruning purposes. Dates and times are interpreted in
@@ -892,7 +1175,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         "1m" is taken to mean "31d". The archives kept with this option do not
         count towards the totals specified by any other options.
 
-        If a prefix is set with -p, then only archives that start with the prefix are
+        If a prefix is set with -P, then only archives that start with the prefix are
         considered for deletion and only those archives count towards the totals
         specified by the rules.
         Otherwise, *all* archives in the repository are candidates for deletion!
@@ -900,7 +1183,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser = subparsers.add_parser('prune', parents=[common_parser],
                                           description=self.do_prune.__doc__,
                                           epilog=prune_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='prune archives')
         subparser.set_defaults(func=self.do_prune)
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
@@ -920,53 +1204,60 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                help='number of monthly archives to keep')
         subparser.add_argument('-y', '--keep-yearly', dest='yearly', type=int, default=0,
                                help='number of yearly archives to keep')
-        subparser.add_argument('-p', '--prefix', dest='prefix', type=str,
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')
-        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('--save-space', dest='save_space', action='store_true',
+                               default=False,
+                               help='work slower, but using less space')
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to prune')
 
         upgrade_epilog = textwrap.dedent("""
-        upgrade an existing Borg repository. this currently
-        only support converting an Attic repository, but may
+        Upgrade an existing Borg repository. This currently
+        only supports converting an Attic repository, but may
         eventually be extended to cover major Borg upgrades as well.
 
-        it will change the magic strings in the repository's segments
-        to match the new Borg magic strings. the keyfiles found in
+        It will change the magic strings in the repository's segments
+        to match the new Borg magic strings. The keyfiles found in
         $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
-        copied to $BORG_KEYS_DIR or ~/.borg/keys.
+        copied to $BORG_KEYS_DIR or ~/.config/borg/keys.
 
-        the cache files are converted, from $ATTIC_CACHE_DIR or
+        The cache files are converted, from $ATTIC_CACHE_DIR or
         ~/.cache/attic to $BORG_CACHE_DIR or ~/.cache/borg, but the
         cache layout between Borg and Attic changed, so it is possible
         the first backup after the conversion takes longer than expected
         due to the cache resync.
 
-        upgrade should be able to resume if interrupted, although it
-        will still iterate over all segments. if you want to start
+        Upgrade should be able to resume if interrupted, although it
+        will still iterate over all segments. If you want to start
         from scratch, use `borg delete` over the copied repository to
         make sure the cache files are also removed:
 
             borg delete borg
 
-        unless ``--inplace`` is specified, the upgrade process first
+        Unless ``--inplace`` is specified, the upgrade process first
         creates a backup copy of the repository, in
-        REPOSITORY.upgrade-DATETIME, using hardlinks. this takes
+        REPOSITORY.upgrade-DATETIME, using hardlinks. This takes
         longer than in place upgrades, but is much safer and gives
-        progress information (as opposed to ``cp -al``). once you are
+        progress information (as opposed to ``cp -al``). Once you are
         satisfied with the conversion, you can safely destroy the
         backup copy.
 
-        WARNING: running the upgrade in place will make the current
+        WARNING: Running the upgrade in place will make the current
         copy unusable with older version, with no way of going back
-        to previous versions. this can PERMANENTLY DAMAGE YOUR
+        to previous versions. This can PERMANENTLY DAMAGE YOUR
         REPOSITORY!  Attic CAN NOT READ BORG REPOSITORIES, as the
-        magic strings have changed. you have been warned.""")
+        magic strings have changed. You have been warned.""")
         subparser = subparsers.add_parser('upgrade', parents=[common_parser],
                                           description=self.do_upgrade.__doc__,
                                           epilog=upgrade_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='upgrade repository format')
         subparser.set_defaults(func=self.do_upgrade)
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help="""show progress display while upgrading the repository""")
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
                                help='do not change repository')
@@ -974,7 +1265,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                                default=False, action='store_true',
                                help="""rewrite repository in place, with no chance of going back to older
                                versions of the repository.""")
-        subparser.add_argument('repository', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')
 
@@ -987,9 +1278,95 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
         subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
                                help='additional help on TOPIC')
+
+        debug_dump_archive_items_epilog = textwrap.dedent("""
+        This command dumps raw (but decrypted and decompressed) archive items (only metadata) to files.
+        """)
+        subparser = subparsers.add_parser('debug-dump-archive-items', parents=[common_parser],
+                                          description=self.do_debug_dump_archive_items.__doc__,
+                                          epilog=debug_dump_archive_items_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='dump archive items (metadata) (debug)')
+        subparser.set_defaults(func=self.do_debug_dump_archive_items)
+        subparser.add_argument('location', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='archive to dump')
+
+        debug_get_obj_epilog = textwrap.dedent("""
+        This command gets an object from the repository.
+        """)
+        subparser = subparsers.add_parser('debug-get-obj', parents=[common_parser],
+                                          description=self.do_debug_get_obj.__doc__,
+                                          epilog=debug_get_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='get object from repository (debug)')
+        subparser.set_defaults(func=self.do_debug_get_obj)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('id', metavar='ID', type=str,
+                               help='hex object ID to get from the repo')
+        subparser.add_argument('path', metavar='PATH', type=str,
+                               help='file to write object data into')
+
+        debug_put_obj_epilog = textwrap.dedent("""
+        This command puts objects into the repository.
+        """)
+        subparser = subparsers.add_parser('debug-put-obj', parents=[common_parser],
+                                          description=self.do_debug_put_obj.__doc__,
+                                          epilog=debug_put_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='put object to repository (debug)')
+        subparser.set_defaults(func=self.do_debug_put_obj)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
+                               help='file(s) to read and create object(s) from')
+
+        debug_delete_obj_epilog = textwrap.dedent("""
+        This command deletes objects from the repository.
+        """)
+        subparser = subparsers.add_parser('debug-delete-obj', parents=[common_parser],
+                                          description=self.do_debug_delete_obj.__doc__,
+                                          epilog=debug_delete_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='delete object from repository (debug)')
+        subparser.set_defaults(func=self.do_debug_delete_obj)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
+                               help='hex object ID(s) to delete from the repo')
         return parser
 
-    def run(self, args=None):
+    def get_args(self, argv, cmd):
+        """usually, just returns argv, except if we deal with a ssh forced command for borg serve."""
+        result = self.parse_args(argv[1:])
+        if cmd is not None and result.func == self.do_serve:
+            forced_result = result
+            argv = shlex.split(cmd)
+            result = self.parse_args(argv[1:])
+            if result.func != forced_result.func:
+                # someone is trying to execute a different borg subcommand, don't do that!
+                return forced_result
+            # the only thing we take from the forced "borg serve" ssh command is --restrict-to-path
+            result.restrict_to_paths = forced_result.restrict_to_paths
+        return result
+
+    def parse_args(self, args=None):
+        # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
+        if args:
+            args = self.preprocess_args(args)
+        parser = self.build_parser(args)
+        args = parser.parse_args(args or ['-h'])
+        update_excludes(args)
+        return args
+
+    def run(self, args):
+        os.umask(args.umask)  # early, before opening files
+        self.lock_wait = args.lock_wait
+        setup_logging(level=args.log_level, is_serve=args.func == self.do_serve)  # do not use loggers before this!
         check_extension_modules()
         keys_dir = get_keys_dir()
         if not os.path.exists(keys_dir):
@@ -1006,19 +1383,8 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     # For information about cache directory tags, see:
                     #       http://www.brynosaurus.com/cachedir/
                     """).lstrip())
-
-        # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
-        if args:
-            args = self.preprocess_args(args)
-        parser = self.build_parser(args)
-
-        args = parser.parse_args(args or ['-h'])
-        self.verbose = args.verbose
-        setup_logging()
-        os.umask(args.umask)
-        RemoteRepository.remote_path = args.remote_path
-        RemoteRepository.umask = args.umask
-        update_excludes(args)
+        if is_slow_msgpack():
+            logger.warning("Using a pure-python msgpack! This will result in lower performance.")
         return args.func(args)
 
 
@@ -1062,33 +1428,37 @@ def main():  # pragma: no cover
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, sys.stderr.encoding, 'replace', line_buffering=True)
     setup_signal_handlers()
     archiver = Archiver()
+    msg = None
+    args = archiver.get_args(sys.argv, os.environ.get('SSH_ORIGINAL_COMMAND'))
     try:
-        msg = None
-        exit_code = archiver.run(sys.argv[1:])
+        exit_code = archiver.run(args)
     except Error as e:
-        msg = e.get_message() + "\n%s" % traceback.format_exc()
+        msg = e.get_message()
+        if e.traceback:
+            msg += "\n%s\n%s" % (traceback.format_exc(), sysinfo())
         exit_code = e.exit_code
     except RemoteRepository.RPCError as e:
-        msg = 'Remote Exception.\n%s' % str(e)
+        msg = '%s\n%s' % (str(e), sysinfo())
         exit_code = EXIT_ERROR
     except Exception:
-        msg = 'Local Exception.\n%s' % traceback.format_exc()
+        msg = 'Local Exception.\n%s\n%s' % (traceback.format_exc(), sysinfo())
         exit_code = EXIT_ERROR
     except KeyboardInterrupt:
-        msg = 'Keyboard interrupt.\n%s' % traceback.format_exc()
+        msg = 'Keyboard interrupt.\n%s\n%s' % (traceback.format_exc(), sysinfo())
         exit_code = EXIT_ERROR
     if msg:
         logger.error(msg)
-    exit_msg = 'terminating with %s status, rc %d'
-    if exit_code == EXIT_SUCCESS:
-        logger.info(exit_msg % ('success', exit_code))
-    elif exit_code == EXIT_WARNING:
-        logger.warning(exit_msg % ('warning', exit_code))
-    elif exit_code == EXIT_ERROR:
-        logger.error(exit_msg % ('error', exit_code))
-    else:
-        # if you see 666 in output, it usually means exit_code was None
-        logger.error(exit_msg % ('abnormal', exit_code or 666))
+    if args.show_rc:
+        exit_msg = 'terminating with %s status, rc %d'
+        if exit_code == EXIT_SUCCESS:
+            logger.info(exit_msg % ('success', exit_code))
+        elif exit_code == EXIT_WARNING:
+            logger.warning(exit_msg % ('warning', exit_code))
+        elif exit_code == EXIT_ERROR:
+            logger.error(exit_msg % ('error', exit_code))
+        else:
+            # if you see 666 in output, it usually means exit_code was None
+            logger.error(exit_msg % ('abnormal', exit_code or 666))
     sys.exit(exit_code)
 
 

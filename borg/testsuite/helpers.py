@@ -7,11 +7,15 @@ import os
 import pytest
 import sys
 import msgpack
+import msgpack.fallback
 
-from ..helpers import adjust_patterns, exclude_path, Location, format_file_size, format_timedelta, IncludePattern, ExcludePattern, make_path_safe, \
-    prune_within, prune_split, get_cache_dir, Statistics, \
-    StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams
-from . import BaseTestCase
+from ..helpers import Location, format_file_size, format_timedelta, make_path_safe, \
+    prune_within, prune_split, get_cache_dir, get_keys_dir, Statistics, is_slow_msgpack, \
+    yes, TRUISH, FALSISH, DEFAULTISH, \
+    StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
+    ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
+    PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern
+from . import BaseTestCase, environment_variable, FakeInputs
 
 
 class BigIntTestCase(BaseTestCase):
@@ -158,113 +162,302 @@ class FormatTimedeltaTestCase(BaseTestCase):
         )
 
 
-class PatternTestCase(BaseTestCase):
+def check_patterns(files, pattern, expected):
+    """Utility for testing patterns.
+    """
+    assert all([f == os.path.normpath(f) for f in files]), "Pattern matchers expect normalized input paths"
 
+    matched = [f for f in files if pattern.match(f)]
+
+    assert matched == (files if expected is None else expected)
+
+
+@pytest.mark.parametrize("pattern, expected", [
+    # "None" means all files, i.e. all match the given pattern
+    ("/", None),
+    ("/./", None),
+    ("", []),
+    ("/home/u", []),
+    ("/home/user", ["/home/user/.profile", "/home/user/.bashrc"]),
+    ("/etc", ["/etc/server/config", "/etc/server/hosts"]),
+    ("///etc//////", ["/etc/server/config", "/etc/server/hosts"]),
+    ("/./home//..//home/user2", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
+    ("/srv", ["/srv/messages", "/srv/dmesg"]),
+    ])
+def test_patterns_prefix(pattern, expected):
     files = [
-        '/etc/passwd', '/etc/hosts', '/home',
-        '/home/user/.profile', '/home/user/.bashrc',
-        '/home/user2/.profile', '/home/user2/public_html/index.html',
-        '/var/log/messages', '/var/log/dmesg',
+        "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
+        "/home/user2/.profile", "/home/user2/public_html/index.html", "/srv/messages", "/srv/dmesg",
     ]
 
-    def evaluate(self, paths, excludes):
-        patterns = adjust_patterns(paths, [ExcludePattern(p) for p in excludes])
-        return [path for path in self.files if not exclude_path(path, patterns)]
-
-    def test(self):
-        self.assert_equal(self.evaluate(['/'], []), self.files)
-        self.assert_equal(self.evaluate([], []), self.files)
-        self.assert_equal(self.evaluate(['/'], ['/h']), self.files)
-        self.assert_equal(self.evaluate(['/'], ['/home']),
-                          ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg'])
-        self.assert_equal(self.evaluate(['/'], ['/home/']),
-                          ['/etc/passwd', '/etc/hosts', '/home', '/var/log/messages', '/var/log/dmesg'])
-        self.assert_equal(self.evaluate(['/home/u'], []), [])
-        self.assert_equal(self.evaluate(['/', '/home', '/etc/hosts'], ['/']), [])
-        self.assert_equal(self.evaluate(['/home/'], ['/home/user2']),
-                          ['/home', '/home/user/.profile', '/home/user/.bashrc'])
-        self.assert_equal(self.evaluate(['/'], ['*.profile', '/var/log']),
-                          ['/etc/passwd', '/etc/hosts', '/home', '/home/user/.bashrc', '/home/user2/public_html/index.html'])
-        self.assert_equal(self.evaluate(['/'], ['/home/*/public_html', '*.profile', '*/log/*']),
-                          ['/etc/passwd', '/etc/hosts', '/home', '/home/user/.bashrc'])
-        self.assert_equal(self.evaluate(['/etc/', '/var'], ['dmesg']),
-                          ['/etc/passwd', '/etc/hosts', '/var/log/messages', '/var/log/dmesg'])
+    check_patterns(files, PathPrefixPattern(pattern), expected)
 
 
-@pytest.mark.skipif(sys.platform in ('darwin',), reason='all but OS X test')
-class PatternNonAsciiTestCase(BaseTestCase):
-    def testComposedUnicode(self):
-        pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
+@pytest.mark.parametrize("pattern, expected", [
+    # "None" means all files, i.e. all match the given pattern
+    ("", []),
+    ("foo", []),
+    ("relative", ["relative/path1", "relative/two"]),
+    ("more", ["more/relative"]),
+    ])
+def test_patterns_prefix_relative(pattern, expected):
+    files = ["relative/path1", "relative/two", "more/relative"]
 
-        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert not i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert not e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-
-    def testDecomposedUnicode(self):
-        pattern = 'ba\N{COMBINING ACUTE ACCENT}'
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
-
-        assert not i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert not e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-
-    def testInvalidUnicode(self):
-        pattern = str(b'ba\x80', 'latin1')
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
-
-        assert not i.match("ba/foo")
-        assert i.match(str(b"ba\x80/foo", 'latin1'))
-        assert not e.match("ba/foo")
-        assert e.match(str(b"ba\x80/foo", 'latin1'))
+    check_patterns(files, PathPrefixPattern(pattern), expected)
 
 
-@pytest.mark.skipif(sys.platform not in ('darwin',), reason='OS X test')
-class OSXPatternNormalizationTestCase(BaseTestCase):
-    def testComposedUnicode(self):
-        pattern = 'b\N{LATIN SMALL LETTER A WITH ACUTE}'
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
+@pytest.mark.parametrize("pattern, expected", [
+    # "None" means all files, i.e. all match the given pattern
+    ("/*", None),
+    ("/./*", None),
+    ("*", None),
+    ("*/*", None),
+    ("*///*", None),
+    ("/home/u", []),
+    ("/home/*",
+     ["/home/user/.profile", "/home/user/.bashrc", "/home/user2/.profile", "/home/user2/public_html/index.html",
+      "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails"]),
+    ("/home/user/*", ["/home/user/.profile", "/home/user/.bashrc"]),
+    ("/etc/*", ["/etc/server/config", "/etc/server/hosts"]),
+    ("*/.pr????e", ["/home/user/.profile", "/home/user2/.profile"]),
+    ("///etc//////*", ["/etc/server/config", "/etc/server/hosts"]),
+    ("/./home//..//home/user2/*", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
+    ("/srv*", ["/srv/messages", "/srv/dmesg"]),
+    ("/home/*/.thumbnails", ["/home/foo/.thumbnails", "/home/foo/bar/.thumbnails"]),
+    ])
+def test_patterns_fnmatch(pattern, expected):
+    files = [
+        "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
+        "/home/user2/.profile", "/home/user2/public_html/index.html", "/srv/messages", "/srv/dmesg",
+        "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails",
+    ]
 
-        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+    check_patterns(files, FnmatchPattern(pattern), expected)
 
-    def testDecomposedUnicode(self):
-        pattern = 'ba\N{COMBINING ACUTE ACCENT}'
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
 
-        assert i.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert i.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-        assert e.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-        assert e.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+@pytest.mark.parametrize("pattern, expected", [
+    # "None" means all files, i.e. all match the given pattern
+    ("*", None),
+    ("**/*", None),
+    ("/**/*", None),
+    ("/./*", None),
+    ("*/*", None),
+    ("*///*", None),
+    ("/home/u", []),
+    ("/home/*",
+     ["/home/user/.profile", "/home/user/.bashrc", "/home/user2/.profile", "/home/user2/public_html/index.html",
+      "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails"]),
+    ("/home/user/*", ["/home/user/.profile", "/home/user/.bashrc"]),
+    ("/etc/*/*", ["/etc/server/config", "/etc/server/hosts"]),
+    ("/etc/**/*", ["/etc/server/config", "/etc/server/hosts"]),
+    ("/etc/**/*/*", ["/etc/server/config", "/etc/server/hosts"]),
+    ("*/.pr????e", []),
+    ("**/.pr????e", ["/home/user/.profile", "/home/user2/.profile"]),
+    ("///etc//////*", ["/etc/server/config", "/etc/server/hosts"]),
+    ("/./home//..//home/user2/", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
+    ("/./home//..//home/user2/**/*", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
+    ("/srv*/", ["/srv/messages", "/srv/dmesg", "/srv2/blafasel"]),
+    ("/srv*", ["/srv", "/srv/messages", "/srv/dmesg", "/srv2", "/srv2/blafasel"]),
+    ("/srv/*", ["/srv/messages", "/srv/dmesg"]),
+    ("/srv2/**", ["/srv2", "/srv2/blafasel"]),
+    ("/srv2/**/", ["/srv2/blafasel"]),
+    ("/home/*/.thumbnails", ["/home/foo/.thumbnails"]),
+    ("/home/*/*/.thumbnails", ["/home/foo/bar/.thumbnails"]),
+    ])
+def test_patterns_shell(pattern, expected):
+    files = [
+        "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
+        "/home/user2/.profile", "/home/user2/public_html/index.html", "/srv", "/srv/messages", "/srv/dmesg",
+        "/srv2", "/srv2/blafasel", "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails",
+    ]
 
-    def testInvalidUnicode(self):
-        pattern = str(b'ba\x80', 'latin1')
-        i = IncludePattern(pattern)
-        e = ExcludePattern(pattern)
+    check_patterns(files, ShellPattern(pattern), expected)
 
-        assert not i.match("ba/foo")
-        assert i.match(str(b"ba\x80/foo", 'latin1'))
-        assert not e.match("ba/foo")
-        assert e.match(str(b"ba\x80/foo", 'latin1'))
+
+@pytest.mark.parametrize("pattern, expected", [
+    # "None" means all files, i.e. all match the given pattern
+    ("", None),
+    (".*", None),
+    ("^/", None),
+    ("^abc$", []),
+    ("^[^/]", []),
+    ("^(?!/srv|/foo|/opt)",
+     ["/home", "/home/user/.profile", "/home/user/.bashrc", "/home/user2/.profile",
+      "/home/user2/public_html/index.html", "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails", ]),
+    ])
+def test_patterns_regex(pattern, expected):
+    files = [
+        '/srv/data', '/foo/bar', '/home',
+        '/home/user/.profile', '/home/user/.bashrc',
+        '/home/user2/.profile', '/home/user2/public_html/index.html',
+        '/opt/log/messages.txt', '/opt/log/dmesg.txt',
+        "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails",
+    ]
+
+    obj = RegexPattern(pattern)
+    assert str(obj) == pattern
+    assert obj.pattern == pattern
+
+    check_patterns(files, obj, expected)
+
+
+def test_regex_pattern():
+    # The forward slash must match the platform-specific path separator
+    assert RegexPattern("^/$").match("/")
+    assert RegexPattern("^/$").match(os.path.sep)
+    assert not RegexPattern(r"^\\$").match("/")
+
+
+def use_normalized_unicode():
+    return sys.platform in ("darwin",)
+
+
+def _make_test_patterns(pattern):
+    return [PathPrefixPattern(pattern),
+            FnmatchPattern(pattern),
+            RegexPattern("^{}/foo$".format(pattern)),
+            ShellPattern(pattern),
+            ]
+
+
+@pytest.mark.parametrize("pattern", _make_test_patterns("b\N{LATIN SMALL LETTER A WITH ACUTE}"))
+def test_composed_unicode_pattern(pattern):
+    assert pattern.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
+    assert pattern.match("ba\N{COMBINING ACUTE ACCENT}/foo") == use_normalized_unicode()
+
+
+@pytest.mark.parametrize("pattern", _make_test_patterns("ba\N{COMBINING ACUTE ACCENT}"))
+def test_decomposed_unicode_pattern(pattern):
+    assert pattern.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo") == use_normalized_unicode()
+    assert pattern.match("ba\N{COMBINING ACUTE ACCENT}/foo")
+
+
+@pytest.mark.parametrize("pattern", _make_test_patterns(str(b"ba\x80", "latin1")))
+def test_invalid_unicode_pattern(pattern):
+    assert not pattern.match("ba/foo")
+    assert pattern.match(str(b"ba\x80/foo", "latin1"))
+
+
+@pytest.mark.parametrize("lines, expected", [
+    # "None" means all files, i.e. none excluded
+    ([], None),
+    (["# Comment only"], None),
+    (["*"], []),
+    (["# Comment",
+      "*/something00.txt",
+      "  *whitespace*  ",
+      # Whitespace before comment
+      " #/ws*",
+      # Empty line
+      "",
+      "# EOF"],
+     ["/more/data", "/home", " #/wsfoobar"]),
+    (["re:.*"], []),
+    (["re:\s"], ["/data/something00.txt", "/more/data", "/home"]),
+    ([r"re:(.)(\1)"], ["/more/data", "/home", "\tstart/whitespace", "/whitespace/end\t"]),
+    (["", "", "",
+      "# This is a test with mixed pattern styles",
+      # Case-insensitive pattern
+      "re:(?i)BAR|ME$",
+      "",
+      "*whitespace*",
+      "fm:*/something00*"],
+     ["/more/data"]),
+    ([r"  re:^\s  "], ["/data/something00.txt", "/more/data", "/home", "/whitespace/end\t"]),
+    ([r"  re:\s$  "], ["/data/something00.txt", "/more/data", "/home", " #/wsfoobar", "\tstart/whitespace"]),
+    (["pp:./"], None),
+    (["pp:/"], [" #/wsfoobar", "\tstart/whitespace"]),
+    (["pp:aaabbb"], None),
+    (["pp:/data", "pp: #/", "pp:\tstart", "pp:/whitespace"], ["/more/data", "/home"]),
+    ])
+def test_patterns_from_file(tmpdir, lines, expected):
+    files = [
+        '/data/something00.txt', '/more/data', '/home',
+        ' #/wsfoobar',
+        '\tstart/whitespace',
+        '/whitespace/end\t',
+    ]
+
+    def evaluate(filename):
+        matcher = PatternMatcher(fallback=True)
+        matcher.add(load_excludes(open(filename, "rt")), False)
+        return [path for path in files if matcher.match(path)]
+
+    exclfile = tmpdir.join("exclude.txt")
+
+    with exclfile.open("wt") as fh:
+        fh.write("\n".join(lines))
+
+    assert evaluate(str(exclfile)) == (files if expected is None else expected)
+
+
+@pytest.mark.parametrize("pattern, cls", [
+    ("", FnmatchPattern),
+
+    # Default style
+    ("*", FnmatchPattern),
+    ("/data/*", FnmatchPattern),
+
+    # fnmatch style
+    ("fm:", FnmatchPattern),
+    ("fm:*", FnmatchPattern),
+    ("fm:/data/*", FnmatchPattern),
+    ("fm:fm:/data/*", FnmatchPattern),
+
+    # Regular expression
+    ("re:", RegexPattern),
+    ("re:.*", RegexPattern),
+    ("re:^/something/", RegexPattern),
+    ("re:re:^/something/", RegexPattern),
+
+    # Path prefix
+    ("pp:", PathPrefixPattern),
+    ("pp:/", PathPrefixPattern),
+    ("pp:/data/", PathPrefixPattern),
+    ("pp:pp:/data/", PathPrefixPattern),
+
+    # Shell-pattern style
+    ("sh:", ShellPattern),
+    ("sh:*", ShellPattern),
+    ("sh:/data/*", ShellPattern),
+    ("sh:sh:/data/*", ShellPattern),
+    ])
+def test_parse_pattern(pattern, cls):
+    assert isinstance(parse_pattern(pattern), cls)
+
+
+@pytest.mark.parametrize("pattern", ["aa:", "fo:*", "00:", "x1:abc"])
+def test_parse_pattern_error(pattern):
+    with pytest.raises(ValueError):
+        parse_pattern(pattern)
+
+
+def test_pattern_matcher():
+    pm = PatternMatcher()
+
+    assert pm.fallback is None
+
+    for i in ["", "foo", "bar"]:
+        assert pm.match(i) is None
+
+    pm.add([RegexPattern("^a")], "A")
+    pm.add([RegexPattern("^b"), RegexPattern("^z")], "B")
+    pm.add([RegexPattern("^$")], "Empty")
+    pm.fallback = "FileNotFound"
+
+    assert pm.match("") == "Empty"
+    assert pm.match("aaa") == "A"
+    assert pm.match("bbb") == "B"
+    assert pm.match("ccc") == "FileNotFound"
+    assert pm.match("xyz") == "FileNotFound"
+    assert pm.match("z") == "B"
+
+    assert PatternMatcher(fallback="hey!").fallback == "hey!"
 
 
 def test_compression_specs():
     with pytest.raises(ValueError):
         CompressionSpec('')
-    assert CompressionSpec('0') == dict(name='zlib', level=0)
-    assert CompressionSpec('1') == dict(name='zlib', level=1)
-    assert CompressionSpec('9') == dict(name='zlib', level=9)
-    with pytest.raises(ValueError):
-        CompressionSpec('10')
     assert CompressionSpec('none') == dict(name='none')
     assert CompressionSpec('lz4') == dict(name='lz4')
     assert CompressionSpec('zlib') == dict(name='zlib', level=6)
@@ -386,7 +579,7 @@ class TestParseTimestamp(BaseTestCase):
 
 
 def test_get_cache_dir():
-    """test that get_cache_dir respects environement"""
+    """test that get_cache_dir respects environment"""
     # reset BORG_CACHE_DIR in order to test default
     old_env = None
     if os.environ.get('BORG_CACHE_DIR'):
@@ -400,6 +593,23 @@ def test_get_cache_dir():
     # reset old env
     if old_env is not None:
         os.environ['BORG_CACHE_DIR'] = old_env
+
+
+def test_get_keys_dir():
+    """test that get_keys_dir respects environment"""
+    # reset BORG_KEYS_DIR in order to test default
+    old_env = None
+    if os.environ.get('BORG_KEYS_DIR'):
+        old_env = os.environ['BORG_KEYS_DIR']
+        del(os.environ['BORG_KEYS_DIR'])
+    assert get_keys_dir() == os.path.join(os.path.expanduser('~'), '.config', 'borg', 'keys')
+    os.environ['XDG_CONFIG_HOME'] = '/var/tmp/.config'
+    assert get_keys_dir() == os.path.join('/var/tmp/.config', 'borg', 'keys')
+    os.environ['BORG_KEYS_DIR'] = '/var/tmp'
+    assert get_keys_dir() == '/var/tmp'
+    # reset old env
+    if old_env is not None:
+        os.environ['BORG_KEYS_DIR'] = old_env
 
 
 @pytest.fixture()
@@ -480,3 +690,179 @@ def test_file_size_precision():
     assert format_file_size(1234, precision=1) == '1.2 kB'  # rounded down
     assert format_file_size(1254, precision=1) == '1.3 kB'  # rounded up
     assert format_file_size(999990000, precision=1) == '1.0 GB'  # and not 999.9 MB or 1000.0 MB
+
+
+def test_is_slow_msgpack():
+    saved_packer = msgpack.Packer
+    try:
+        msgpack.Packer = msgpack.fallback.Packer
+        assert is_slow_msgpack()
+    finally:
+        msgpack.Packer = saved_packer
+    # this assumes that we have fast msgpack on test platform:
+    assert not is_slow_msgpack()
+
+
+def test_yes_input():
+    inputs = list(TRUISH)
+    input = FakeInputs(inputs)
+    for i in inputs:
+        assert yes(input=input)
+    inputs = list(FALSISH)
+    input = FakeInputs(inputs)
+    for i in inputs:
+        assert not yes(input=input)
+
+
+def test_yes_input_defaults():
+    inputs = list(DEFAULTISH)
+    input = FakeInputs(inputs)
+    for i in inputs:
+        assert yes(default=True, input=input)
+    input = FakeInputs(inputs)
+    for i in inputs:
+        assert not yes(default=False, input=input)
+
+
+def test_yes_input_custom():
+    input = FakeInputs(['YES', 'SURE', 'NOPE', ])
+    assert yes(truish=('YES', ), input=input)
+    assert yes(truish=('SURE', ), input=input)
+    assert not yes(falsish=('NOPE', ), input=input)
+
+
+def test_yes_env():
+    for value in TRUISH:
+        with environment_variable(OVERRIDE_THIS=value):
+            assert yes(env_var_override='OVERRIDE_THIS')
+    for value in FALSISH:
+        with environment_variable(OVERRIDE_THIS=value):
+            assert not yes(env_var_override='OVERRIDE_THIS')
+
+
+def test_yes_env_default():
+    for value in DEFAULTISH:
+        with environment_variable(OVERRIDE_THIS=value):
+            assert yes(env_var_override='OVERRIDE_THIS', default=True)
+        with environment_variable(OVERRIDE_THIS=value):
+            assert not yes(env_var_override='OVERRIDE_THIS', default=False)
+
+
+def test_yes_defaults():
+    input = FakeInputs(['invalid', '', ' '])
+    assert not yes(input=input)  # default=False
+    assert not yes(input=input)
+    assert not yes(input=input)
+    input = FakeInputs(['invalid', '', ' '])
+    assert yes(default=True, input=input)
+    assert yes(default=True, input=input)
+    assert yes(default=True, input=input)
+    input = FakeInputs([])
+    assert yes(default=True, input=input)
+    assert not yes(default=False, input=input)
+    with pytest.raises(ValueError):
+        yes(default=None)
+
+
+def test_yes_retry():
+    input = FakeInputs(['foo', 'bar', TRUISH[0], ])
+    assert yes(retry_msg='Retry: ', input=input)
+    input = FakeInputs(['foo', 'bar', FALSISH[0], ])
+    assert not yes(retry_msg='Retry: ', input=input)
+
+
+def test_yes_no_retry():
+    input = FakeInputs(['foo', 'bar', TRUISH[0], ])
+    assert not yes(retry=False, default=False, input=input)
+    input = FakeInputs(['foo', 'bar', FALSISH[0], ])
+    assert yes(retry=False, default=True, input=input)
+
+
+def test_yes_output(capfd):
+    input = FakeInputs(['invalid', 'y', 'n'])
+    assert yes(msg='intro-msg', false_msg='false-msg', true_msg='true-msg', retry_msg='retry-msg', input=input)
+    out, err = capfd.readouterr()
+    assert out == ''
+    assert 'intro-msg' in err
+    assert 'retry-msg' in err
+    assert 'true-msg' in err
+    assert not yes(msg='intro-msg', false_msg='false-msg', true_msg='true-msg', retry_msg='retry-msg', input=input)
+    out, err = capfd.readouterr()
+    assert out == ''
+    assert 'intro-msg' in err
+    assert 'retry-msg' not in err
+    assert 'false-msg' in err
+
+
+def test_progress_percentage_multiline(capfd):
+    pi = ProgressIndicatorPercent(1000, step=5, start=0, same_line=False, msg="%3.0f%%", file=sys.stderr)
+    pi.show(0)
+    out, err = capfd.readouterr()
+    assert err == '  0%\n'
+    pi.show(420)
+    out, err = capfd.readouterr()
+    assert err == ' 42%\n'
+    pi.show(1000)
+    out, err = capfd.readouterr()
+    assert err == '100%\n'
+    pi.finish()
+    out, err = capfd.readouterr()
+    assert err == ''
+
+
+def test_progress_percentage_sameline(capfd):
+    pi = ProgressIndicatorPercent(1000, step=5, start=0, same_line=True, msg="%3.0f%%", file=sys.stderr)
+    pi.show(0)
+    out, err = capfd.readouterr()
+    assert err == '  0%\r'
+    pi.show(420)
+    out, err = capfd.readouterr()
+    assert err == ' 42%\r'
+    pi.show(1000)
+    out, err = capfd.readouterr()
+    assert err == '100%\r'
+    pi.finish()
+    out, err = capfd.readouterr()
+    assert err == ' ' * 4 + '\r'
+
+
+def test_progress_percentage_step(capfd):
+    pi = ProgressIndicatorPercent(100, step=2, start=0, same_line=False, msg="%3.0f%%", file=sys.stderr)
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == '  0%\n'
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == ''  # no output at 1% as we have step == 2
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == '  2%\n'
+
+
+def test_progress_endless(capfd):
+    pi = ProgressIndicatorEndless(step=1, file=sys.stderr)
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == '.'
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == '.'
+    pi.finish()
+    out, err = capfd.readouterr()
+    assert err == '\n'
+
+
+def test_progress_endless_step(capfd):
+    pi = ProgressIndicatorEndless(step=2, file=sys.stderr)
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == ''  # no output here as we have step == 2
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == '.'
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == ''  # no output here as we have step == 2
+    pi.show()
+    out, err = capfd.readouterr()
+    assert err == '.'

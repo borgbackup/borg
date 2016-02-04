@@ -6,7 +6,7 @@ About borg create --chunker-params
 CHUNK_MIN_EXP and CHUNK_MAX_EXP give the exponent N of the 2^N minimum and
 maximum chunk size. Required: CHUNK_MIN_EXP < CHUNK_MAX_EXP.
 
-Defaults: 10 (2^10 == 1KiB) minimum, 23 (2^23 == 8MiB) maximum.
+Defaults: 19 (2^19 == 512KiB) minimum, 23 (2^23 == 8MiB) maximum.
 
 HASH_MASK_BITS is the number of least-significant bits of the rolling hash
 that need to be zero to trigger a chunk cut.
@@ -14,7 +14,7 @@ Recommended: CHUNK_MIN_EXP + X <= HASH_MASK_BITS <= CHUNK_MAX_EXP - X, X >= 2
 (this allows the rolling hash some freedom to make its cut at a place
 determined by the windows contents rather than the min/max. chunk size).
 
-Default: 16 (statistically, chunks will be about 2^16 == 64kiB in size)
+Default: 21 (statistically, chunks will be about 2^21 == 2MiB in size)
 
 HASH_WINDOW_SIZE: the size of the window used for the rolling hash computation.
 Default: 4095B

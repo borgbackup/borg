@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
+from unittest.mock import Mock
 
 import msgpack
-from mock import Mock
 
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker
 from ..key import PlaintextKey

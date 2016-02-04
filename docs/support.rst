@@ -4,8 +4,8 @@
 Support
 =======
 
-Please first read the docs and existing issue tracker issues and mailing
-list posts, a lot of stuff is already documented / explained / discussed /
+Please first read the docs, the existing issue tracker issues and mailing
+list posts -- a lot of stuff is already documented / explained / discussed /
 filed there.
 
 Issue Tracker
@@ -26,15 +26,10 @@ Stay connected.
 Mailing list
 ------------
 
-There is a mailing list for Borg on librelist_ that you can use for feature
-requests and general discussions about Borg. A mailing list archive is
-available `here <http://librelist.com/browser/borgbackup/>`_.
-
-To subscribe to the list, send an email to borgbackup@librelist.com and reply
-to the confirmation mail.
-
-To unsubscribe, send an email to borgbackup-unsubscribe@librelist.com and reply
-to the confirmation mail.
+To find out about the mailing list, its topic, how to subscribe, how to
+unsubscribe and where you can find the archives of the list, see the
+`mailing list homepage
+<https://mail.python.org/mailman/listinfo/borgbackup>`_.
 
 Bounties and Fundraisers
 ------------------------

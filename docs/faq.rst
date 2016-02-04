@@ -26,6 +26,26 @@ repository is only modified from one place. Also keep in mind that
 |project_name| will keep an exclusive lock on the repository while creating
 or deleting archives, which may make *simultaneous* backups fail.
 
+Can I copy or synchronize my repo to another location?
+------------------------------------------------------
+
+Yes, you could just copy all the files. Make sure you do that while no
+backup is running. So what you get here is this:
+
+- client machine ---borg create---> repo1
+- repo1 ---copy---> repo2
+
+There is no special borg command to do the copying, just use cp or rsync if
+you want to do that.
+
+But think about whether that is really what you want. If something goes
+wrong in repo1, you will have the same issue in repo2 after the copy.
+
+If you want to have 2 independent backups, it is better to do it like this:
+
+- client machine ---borg create---> repo1
+- client machine ---borg create---> repo2
+
 Which file types, attributes, etc. are preserved?
 -------------------------------------------------
 
@@ -37,9 +57,9 @@ Which file types, attributes, etc. are preserved?
     * FIFOs ("named pipes")
     * Name
     * Contents
-    * Time of last modification (nanosecond precision with Python >= 3.3)
-    * User ID of owner
-    * Group ID of owner
+    * Timestamps in nanosecond precision: mtime, atime, ctime
+    * IDs of owning user and owning group
+    * Names of owning user and owning group (if the IDs can be resolved)
     * Unix Mode/Permissions (u/g/o permissions, suid, sgid, sticky)
     * Extended Attributes (xattrs) on Linux, OS X and FreeBSD
     * Access Control Lists (ACL_) on Linux, OS X and FreeBSD
@@ -57,6 +77,7 @@ Which file types, attributes, etc. are *not* preserved?
       backed up as (deduplicated and compressed) runs of zero bytes.
       Archive extraction has optional support to extract all-zero chunks as
       holes in a sparse file.
+    * filesystem specific attributes, like ext4 immutable bit, see :issue:`618`.
 
 Why is my backup bigger than with attic? Why doesn't |project_name| do compression by default?
 ----------------------------------------------------------------------------------------------
@@ -67,14 +88,14 @@ adjust the level or algorithm).
 
 |project_name| offers a lot of different compression algorithms and
 levels. Which of them is the best for you pretty much depends on your
-use case, your data, your hardware - so you need to do an informed
+use case, your data, your hardware -- so you need to do an informed
 decision about whether you want to use compression, which algorithm
 and which level you want to use. This is why compression defaults to
 none.
 
 How can I specify the encryption passphrase programmatically?
 -------------------------------------------------------------
-      
+
 The encryption passphrase can be specified programmatically using the
 `BORG_PASSPHRASE` environment variable. This is convenient when setting up
 automated encrypted backups. Another option is to use
@@ -89,11 +110,11 @@ key file based encryption with a blank passphrase. See
           ``export`` in a shell script file should be safe, however, as
           the environment of a process is `accessible only to that
           user
-          <http://security.stackexchange.com/questions/14000/environment-variable-accessibility-in-linux/14009#14009>`_.
+          <https://security.stackexchange.com/questions/14000/environment-variable-accessibility-in-linux/14009#14009>`_.
 
 When backing up to remote encrypted repos, is encryption done locally?
 ----------------------------------------------------------------------
-     
+
 Yes, file and directory metadata and data is locally encrypted, before
 leaving the local machine. We do not mean the transport layer encryption
 by that, but the data/metadata itself. Transport layer encryption (e.g.
@@ -110,6 +131,36 @@ into the repository.
 
 Yes, as an attacker with access to the remote server could delete (or
 otherwise make unavailable) all your backups.
+
+The borg cache eats way too much disk space, what can I do?
+-----------------------------------------------------------
+
+There is a temporary (but maybe long lived) hack to avoid using lots of disk
+space for chunks.archive.d (see :issue:`235` for details):
+
+::
+
+    # this assumes you are working with the same user as the backup.
+    # you can get the REPOID from the "config" file inside the repository.
+    cd ~/.cache/borg/<REPOID>
+    rm -rf chunks.archive.d ; touch chunks.archive.d
+
+This deletes all the cached archive chunk indexes and replaces the directory
+that kept them with a file, so borg won't be able to store anything "in" there
+in future.
+
+This has some pros and cons, though:
+
+- much less disk space needs for ~/.cache/borg.
+- chunk cache resyncs will be slower as it will have to transfer chunk usage
+  metadata for all archives from the repository (which might be slow if your
+  repo connection is slow) and it will also have to build the hashtables from
+  that data.
+  chunk cache resyncs happen e.g. if your repo was written to by another
+  machine (if you share same backup repo between multiple machines) or if
+  your local chunks cache was lost somehow.
+
+The long term plan to improve this is called "borgception", see :issue:`474`.
 
 If a backup stops mid-way, does the already-backed-up data stay there?
 ----------------------------------------------------------------------
@@ -164,6 +215,38 @@ Yes, if you want to detect accidental data damage (like bit rot), use the
 ``check`` operation. It will notice corruption using CRCs and hashes.
 If you want to be able to detect malicious tampering also, use a encrypted
 repo. It will then be able to check using CRCs and HMACs.
+
+.. _a_status_oddity:
+
+I am seeing 'A' (added) status for a unchanged file!?
+-----------------------------------------------------
+
+The files cache is used to determine whether |project_name| already
+"knows" / has backed up a file and if so, to skip the file from
+chunking. It does intentionally *not* contain files that:
+
+- have >= 10 as "entry age" (|project_name| has not seen this file for a while)
+- have a modification time (mtime) same as the newest mtime in the created
+  archive
+
+So, if you see an 'A' status for unchanged file(s), they are likely the files
+with the most recent mtime in that archive.
+
+This is expected: it is to avoid data loss with files that are backed up from
+a snapshot and that are immediately changed after the snapshot (but within
+mtime granularity time, so the mtime would not change). Without the code that
+removes these files from the files cache, the change that happened right after
+the snapshot would not be contained in the next backup as |project_name| would
+think the file is unchanged.
+
+This does not affect deduplication, the file will be chunked, but as the chunks
+will often be the same and already stored in the repo (except in the above
+mentioned rare condition), it will just re-use them as usual and not store new
+data chunks.
+
+Since only the files cache is used in the display of files status,
+those files are reported as being added when, really, chunks are
+already used.
 
 Why was Borg forked from Attic?
 -------------------------------

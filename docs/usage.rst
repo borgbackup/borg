@@ -8,15 +8,33 @@ Usage
 a number of arguments and options. The following sections will describe each
 command in detail.
 
-Quiet by default
-----------------
+General
+-------
 
-Like most UNIX commands |project_name| is quiet by default but the ``-v`` or
-``--verbose`` option can be used to get the program to output more status
-messages as it is processing.
+Type of log output
+~~~~~~~~~~~~~~~~~~
+
+The log level of the builtin logging configuration defaults to WARNING.
+This is because we want |project_name| to be mostly silent and only output
+warnings (plus errors and critical messages).
+
+Use ``--verbose`` or ``--info`` to set INFO (you will get informative output then
+additionally to warnings, errors, critical messages).
+Use ``--debug`` to set DEBUG to get output made for debugging.
+
+All log messages created with at least the set level will be output.
+
+Log levels: DEBUG < INFO < WARNING < ERROR < CRITICAL
+
+While you can set misc. log levels, do not expect that every command will
+give different output on different log levels - it's just a possibility.
+
+.. warning:: While some options (like ``--stats`` or ``--list``) will emit more
+informational messages, you have to use INFO (or lower) log level to make
+them show up in log output. Use ``-v`` or a logging configuration.
 
 Return codes
-------------
+~~~~~~~~~~~~
 
 |project_name| can exit with the following return codes (rc):
 
@@ -33,7 +51,7 @@ The return code is also logged at the indicated level as the last log entry.
 
 
 Environment Variables
----------------------
+~~~~~~~~~~~~~~~~~~~~~
 
 |project_name| uses some environment variables for automation:
 
@@ -44,28 +62,30 @@ General:
         can either leave it away or abbreviate as `::`, if a positional parameter is required.
     BORG_PASSPHRASE
         When set, use the value to answer the passphrase question for encrypted repositories.
+    BORG_LOGGING_CONF
+        When set, use the given filename as INI_-style logging configuration.
     BORG_RSH
         When set, use this command instead of ``ssh``.
     TMPDIR
         where temporary files are stored (might need a lot of temporary space for some operations)
 
-Some "yes" sayers (if set, they automatically confirm that you really want to do X even if there is that warning):
-    BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK
+Some automatic "answerers" (if set, they automatically answer confirmation questions):
+    BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=no (or =yes)
         For "Warning: Attempting to access a previously unknown unencrypted repository"
-    BORG_RELOCATED_REPO_ACCESS_IS_OK
+    BORG_RELOCATED_REPO_ACCESS_IS_OK=no (or =yes)
         For "Warning: The repository at location ... was previously located at ..."
-    BORG_CHECK_I_KNOW_WHAT_I_AM_DOING
+    BORG_CHECK_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
         For "Warning: 'check --repair' is an experimental feature that might result in data loss."
-    BORG_CYTHON_DISABLE
-        Disables the loading of Cython modules. This is currently
-        experimental and is used only to generate usage docs at build
-        time. It is unlikely to produce good results on a regular
-        run. The variable should be set to the name of the  calling class, and
-        should be unique across all of borg. It is currently only used by ``build_usage``.
+    BORG_DELETE_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
+        For "You requested to completely DELETE the repository *including* all archives it contains:"
+
+    Note: answers are case sensitive. setting an invalid answer value might either give the default
+    answer or ask you interactively, depending on whether retries are allowed (they by default are
+    allowed). So please test your scripts interactively before making them a non-interactive script.
 
 Directories:
     BORG_KEYS_DIR
-        Default to '~/.borg/keys'. This directory contains keys for encrypted repositories.
+        Default to '~/.config/borg/keys'. This directory contains keys for encrypted repositories.
     BORG_CACHE_DIR
         Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
         of space for dealing with big repositories).
@@ -84,8 +104,10 @@ Please note:
   (e.g. mode 600, root:root).
 
 
+.. _INI: https://docs.python.org/3.4/library/logging.config.html#configuration-file-format
+
 Resource Usage
---------------
+~~~~~~~~~~~~~~
 
 |project_name| might use a lot of resources depending on the size of the data set it is dealing with.
 
@@ -131,7 +153,7 @@ In case you are interested in more details, please read the internals documentat
 
 
 Units
------
+~~~~~
 
 To display quantities, |project_name| takes care of respecting the
 usual conventions of scale. Disk sizes are displayed in `decimal
@@ -141,6 +163,14 @@ usual conventions of scale. Disk sizes are displayed in `decimal
 indicated using the `IEC binary prefixes
 <https://en.wikipedia.org/wiki/IEC_80000-13#Prefixes_for_binary_multiples>`_,
 using powers of two (so ``KiB`` means 1024 bytes).
+
+
+Date and Time
+~~~~~~~~~~~~~
+
+We format date and time conforming to ISO-8601, that is: YYYY-MM-DD and HH:MM:SS
+
+For more information, see: https://xkcd.com/1179/
 
 
 .. include:: usage/init.rst.inc
@@ -168,19 +198,14 @@ an attacker has access to your backup repository.
 
 But be careful with the key / the passphrase:
 
-``--encryption=passphrase`` is DEPRECATED and will be removed in next major release.
-This mode has very fundamental, unfixable problems (like you can never change
-your passphrase or the pbkdf2 iteration count for an existing repository, because
-the encryption / decryption key is directly derived from the passphrase).
-
-If you want "passphrase-only" security, just use the ``repokey`` mode. The key will
+If you want "passphrase-only" security, use the ``repokey`` mode. The key will
 be stored inside the repository (in its "config" file). In above mentioned
 attack scenario, the attacker will have the key (but not the passphrase).
 
 If you want "passphrase and having-the-key" security, use the ``keyfile`` mode.
-The key will be stored in your home directory (in ``.borg/keys``). In the attack
-scenario, the attacker who has just access to your repo won't have the key (and
-also not the passphrase).
+The key will be stored in your home directory (in ``.config/borg/keys``). In
+the attack scenario, the attacker who has just access to your repo won't have
+the key (and also not the passphrase).
 
 Make a backup copy of the key file (``keyfile`` mode) or repo config file
 (``repokey`` mode) and keep it at a safe place, so you still have the key in
@@ -190,8 +215,10 @@ The backup that is encrypted with that key won't help you with that, of course.
 Make sure you use a good passphrase. Not too short, not too simple. The real
 encryption / decryption key is encrypted with / locked by your passphrase.
 If an attacker gets your key, he can't unlock and use it without knowing the
-passphrase. In ``repokey`` and ``keyfile`` modes, you can change your passphrase
-for existing repos.
+passphrase.
+
+You can change your passphrase for existing repos at any time, it won't affect
+the encryption/decryption key or other secrets.
 
 
 .. include:: usage/create.rst.inc
@@ -203,19 +230,33 @@ Examples
     # Backup ~/Documents into an archive named "my-documents"
     $ borg create /mnt/backup::my-documents ~/Documents
 
+    # same, but verbosely list all files as we process them
+    $ borg create -v --list /mnt/backup::my-documents ~/Documents
+
     # Backup ~/Documents and ~/src but exclude pyc files
     $ borg create /mnt/backup::my-files   \
         ~/Documents                       \
         ~/src                             \
         --exclude '*.pyc'
 
+    # Backup home directories excluding image thumbnails (i.e. only
+    # /home/*/.thumbnails is excluded, not /home/*/*/.thumbnails)
+    $ borg create /mnt/backup::my-files /home \
+        --exclude 're:^/home/[^/]+/\.thumbnails/'
+
+    # Do the same using a shell-style pattern
+    $ borg create /mnt/backup::my-files /home \
+        --exclude 'sh:/home/*/.thumbnails'
+
     # Backup the root filesystem into an archive named "root-YYYY-MM-DD"
     # use zlib compression (good, but slow) - default is no compression
     NAME="root-`date +%Y-%m-%d`"
-    $ borg create -C zlib,6 /mnt/backup::$NAME / --do-not-cross-mountpoints
+    $ borg create -C zlib,6 /mnt/backup::$NAME / --one-file-system
 
-    # Backup huge files with little chunk management overhead
-    $ borg create --chunker-params 19,23,21,4095 /mnt/backup::VMs /srv/VMs
+    # Make a big effort in fine granular deduplication (big chunk management
+    # overhead, needs a lot of RAM and disk space, see formula in internals
+    # docs - same parameters as borg < 1.0 or attic):
+    $ borg create --chunker-params 10,23,16,4095 /mnt/backup::small /smallstuff
 
     # Backup a raw device (must not be active/in use/mounted at that time)
     $ dd if=/dev/sda bs=10M | borg create /mnt/backup::my-sda -
@@ -242,7 +283,7 @@ Examples
     $ borg extract /mnt/backup::my-files
 
     # Extract entire archive and list files while processing
-    $ borg extract -v /mnt/backup::my-files
+    $ borg extract -v --list /mnt/backup::my-files
 
     # Extract the "src" directory
     $ borg extract /mnt/backup::my-files home/USERNAME/src
@@ -256,6 +297,19 @@ Note: currently, extract always writes into the current working directory ("."),
 .. include:: usage/check.rst.inc
 
 .. include:: usage/rename.rst.inc
+
+Examples
+~~~~~~~~
+::
+
+    $ borg create /mnt/backup::archivename ~
+    $ borg list /mnt/backup
+    archivename                          Mon Nov  2 20:40:06 2015
+
+    $ borg rename /mnt/backup::archivename newname
+    $ borg list /mnt/backup
+    newname                              Mon Nov  2 20:40:06 2015
+
 
 .. include:: usage/delete.rst.inc
 
@@ -290,29 +344,29 @@ Be careful, prune is potentially dangerous command, it will remove backup
 archives.
 
 The default of prune is to apply to **all archives in the repository** unless
-you restrict its operation to a subset of the archives using `--prefix`.
-When using --prefix, be careful to choose a good prefix - e.g. do not use a
+you restrict its operation to a subset of the archives using ``--prefix``.
+When using ``--prefix``, be careful to choose a good prefix - e.g. do not use a
 prefix "foo" if you do not also want to match "foobar".
 
-It is strongly recommended to always run `prune --dry-run ...` first so you
+It is strongly recommended to always run ``prune --dry-run ...`` first so you
 will see what it would do without it actually doing anything.
 
 ::
 
     # Keep 7 end of day and 4 additional end of week archives.
     # Do a dry-run without actually deleting anything.
-    $ borg prune /mnt/backup --dry-run --keep-daily=7 --keep-weekly=4
+    $ borg prune --dry-run --keep-daily=7 --keep-weekly=4 /mnt/backup
 
     # Same as above but only apply to archive names starting with "foo":
-    $ borg prune /mnt/backup --keep-daily=7 --keep-weekly=4 --prefix=foo
+    $ borg prune --keep-daily=7 --keep-weekly=4 --prefix=foo /mnt/backup
 
     # Keep 7 end of day, 4 additional end of week archives,
     # and an end of month archive for every month:
-    $ borg prune /mnt/backup --keep-daily=7 --keep-weekly=4 --keep-monthly=-1
+    $ borg prune --keep-daily=7 --keep-weekly=4 --keep-monthly=-1 /mnt/backup
 
     # Keep all backups in the last 10 days, 4 additional end of week archives,
     # and an end of month archive for every month:
-    $ borg prune /mnt/backup --keep-within=10d --keep-weekly=4 --keep-monthly=-1
+    $ borg prune --keep-within=10d --keep-weekly=4 --keep-monthly=-1 /mnt/backup
 
 
 .. include:: usage/info.rst.inc
@@ -327,7 +381,7 @@ Examples
     Hostname: myhostname
     Username: root
     Time: Fri Aug  2 15:18:17 2013
-    Command line: /usr/bin/borg create --stats -C zlib,6 /mnt/backup::root-2013-08-02 / --do-not-cross-mountpoints
+    Command line: /usr/bin/borg create --stats -C zlib,6 /mnt/backup::root-2013-08-02 / --one-file-system
     Number of files: 147429
     Original size: 5344169493 (4.98 GB)
     Compressed size: 1748189642 (1.63 GB)
@@ -357,27 +411,46 @@ Examples
     Initializing repository at "/mnt/backup"
     Enter passphrase (empty for no passphrase):
     Enter same passphrase again: 
-    Key file "/home/USER/.borg/keys/mnt_backup" created.
+    Key file "/home/USER/.config/borg/keys/mnt_backup" created.
     Keep this file safe. Your data will be inaccessible without it.
 
     # Change key file passphrase
     $ borg change-passphrase /mnt/backup
-    Enter passphrase for key file /home/USER/.borg/keys/mnt_backup:
+    Enter passphrase for key file /home/USER/.config/borg/keys/mnt_backup:
     New passphrase: 
     Enter same passphrase again: 
-    Key file "/home/USER/.borg/keys/mnt_backup" updated
+    Key file "/home/USER/.config/borg/keys/mnt_backup" updated
 
 
 .. include:: usage/serve.rst.inc
 
 Examples
 ~~~~~~~~
+
+borg serve has special support for ssh forced commands (see ``authorized_keys``
+example below): it will detect that you use such a forced command and extract
+the value of the ``--restrict-to-path`` option(s).
+It will then parse the original command that came from the client, makes sure
+that it is also ``borg serve`` and enforce path restriction(s) as given by the
+forced command. That way, other options given by the client (like ``--info`` or
+``--umask``) are preserved (and are not fixed by the forced command).
+
 ::
 
-    # Allow an SSH keypair to only run |project_name|, and only have access to /mnt/backup.
+    # Allow an SSH keypair to only run borg, and only have access to /mnt/backup.
+    # Use key options to disable unneeded and potentially dangerous SSH functionality.
     # This will help to secure an automated remote backup system.
     $ cat ~/.ssh/authorized_keys
-    command="borg serve --restrict-to-path /mnt/backup" ssh-rsa AAAAB3[...]
+    command="borg serve --restrict-to-path /mnt/backup",no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-user-rc ssh-rsa AAAAB3[...]
+
+
+.. include:: usage/upgrade.rst.inc
+
+Examples
+~~~~~~~~
+::
+
+    borg upgrade -v /mnt/backup
 
 
 Miscellaneous Help
@@ -386,10 +459,102 @@ Miscellaneous Help
 .. include:: usage/help.rst.inc
 
 
+Debug Commands
+--------------
+There are some more commands (all starting with "debug-") which are all
+**not intended for normal use** and **potentially very dangerous** if used incorrectly.
+
+They exist to improve debugging capabilities without direct system access, e.g.
+in case you ever run into some severe malfunction. Use them only if you know
+what you are doing or if a trusted |project_name| developer tells you what to do.
+
+
 Additional Notes
 ----------------
 
 Here are misc. notes about topics that are maybe not covered in enough detail in the usage section.
+
+Item flags
+~~~~~~~~~~
+
+``borg create -v --list`` outputs a verbose list of all files, directories and other
+file system items it considered (no matter whether they had content changes
+or not). For each item, it prefixes a single-letter flag that indicates type
+and/or status of the item.
+
+If you are interested only in a subset of that output, you can give e.g.
+``--filter=AME`` and it will only show regular files with A, M or E status (see
+below).
+
+A uppercase character represents the status of a regular file relative to the
+"files" cache (not relative to the repo -- this is an issue if the files cache
+is not used). Metadata is stored in any case and for 'A' and 'M' also new data
+chunks are stored. For 'U' all data chunks refer to already existing chunks.
+
+- 'A' = regular file, added (see also :ref:`a_status_oddity` in the FAQ)
+- 'M' = regular file, modified
+- 'U' = regular file, unchanged
+- 'E' = regular file, an error happened while accessing/reading *this* file
+
+A lowercase character means a file type other than a regular file,
+borg usually just stores their metadata:
+
+- 'd' = directory
+- 'b' = block device
+- 'c' = char device
+- 'h' = regular file, hardlink (to already seen inodes)
+- 's' = symlink
+- 'f' = fifo
+
+Other flags used include:
+
+- 'i' = backup data was read from standard input (stdin)
+- '-' = dry run, item was *not* backed up
+- '?' = missing status code (if you see this, please file a bug report!)
+
+
+--chunker-params
+~~~~~~~~~~~~~~~~
+The chunker params influence how input files are cut into pieces (chunks)
+which are then considered for deduplication. They also have a big impact on
+resource usage (RAM and disk space) as the amount of resources needed is
+(also) determined by the total amount of chunks in the repository (see
+`Indexes / Caches memory usage` for details).
+
+``--chunker-params=10,23,16,4095`` results in a fine-grained deduplication
+and creates a big amount of chunks and thus uses a lot of resources to manage
+them. This is good for relatively small data volumes and if the machine has a
+good amount of free RAM and disk space.
+
+``--chunker-params=19,23,21,4095`` (default) results in a coarse-grained
+deduplication and creates a much smaller amount of chunks and thus uses less
+resources. This is good for relatively big data volumes and if the machine has
+a relatively low amount of free RAM and disk space.
+
+If you already have made some archives in a repository and you then change
+chunker params, this of course impacts deduplication as the chunks will be
+cut differently.
+
+In the worst case (all files are big and were touched in between backups), this
+will store all content into the repository again.
+
+Usually, it is not that bad though:
+
+- usually most files are not touched, so it will just re-use the old chunks
+  it already has in the repo
+- files smaller than the (both old and new) minimum chunksize result in only
+  one chunk anyway, so the resulting chunks are same and deduplication will apply
+
+If you switch chunker params to save resources for an existing repo that
+already has some backup archives, you will see an increasing effect over time,
+when more and more files have been touched and stored again using the bigger
+chunksize **and** all references to the smaller older chunks have been removed
+(by deleting / pruning archives).
+
+If you want to see an immediate big effect on resource usage, you better start
+a new repository when changing chunker params.
+
+For more details, see :ref:`chunker_details`.
 
 --read-special
 ~~~~~~~~~~~~~~
@@ -412,7 +577,7 @@ You need to be careful with what you give as filename when using ``--read-specia
 e.g. if you give ``/dev/zero``, your backup will never terminate.
 
 The given files' metadata is saved as it would be saved without
-``--read-special`` (e.g. its name, its size [might be 0], its mode, etc.) - but
+``--read-special`` (e.g. its name, its size [might be 0], its mode, etc.) -- but
 additionally, also the content read from it will be saved for it.
 
 Restoring such files' content is currently only supported one at a time via
@@ -421,7 +586,7 @@ maybe directly into an existing device file of your choice or indirectly via
 ``dd``).
 
 Example
-~~~~~~~
++++++++
 
 Imagine you have made some snapshots of logical volumes (LVs) you want to backup.
 

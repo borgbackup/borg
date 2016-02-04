@@ -2,18 +2,18 @@ import os
 import re
 import shutil
 import tempfile
-from binascii import hexlify
+from binascii import hexlify, unhexlify
 
 from ..crypto import bytes_to_long, num_aes_blocks
 from ..key import PlaintextKey, PassphraseKey, KeyfileKey
-from ..helpers import Location, unhexlify
+from ..helpers import Location
 from . import BaseTestCase
 
 
 class KeyTestCase(BaseTestCase):
 
     class MockArgs:
-        repository = Location(tempfile.mkstemp()[1])
+        location = Location(tempfile.mkstemp()[1])
 
     keyfile2_key_file = """
         BORG_KEY 0000000000000000000000000000000000000000000000000000000000000000

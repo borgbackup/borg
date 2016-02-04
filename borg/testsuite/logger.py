@@ -1,7 +1,6 @@
 import logging
 from io import StringIO
 
-from mock import Mock
 import pytest
 
 from ..logger import find_parent_module, create_logger, setup_logging
@@ -11,7 +10,7 @@ logger = create_logger()
 @pytest.fixture()
 def io_logger():
     io = StringIO()
-    handler = setup_logging(io)
+    handler = setup_logging(stream=io, env_var=None)
     handler.setFormatter(logging.Formatter('%(name)s: %(message)s'))
     logger.setLevel(logging.DEBUG)
     return io
@@ -38,3 +37,18 @@ def test_multiple_loggers(io_logger):
 
 def test_parent_module():
     assert find_parent_module() == __name__
+
+
+def test_lazy_logger():
+    # just calling all the methods of the proxy
+    logger.setLevel(logging.DEBUG)
+    logger.debug("debug")
+    logger.info("info")
+    logger.warning("warning")
+    logger.error("error")
+    logger.critical("critical")
+    logger.log(logging.INFO, "info")
+    try:
+        raise Exception
+    except Exception:
+        logger.exception("exception")

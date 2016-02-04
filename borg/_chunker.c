@@ -76,19 +76,18 @@ buzhash_update(uint32_t sum, unsigned char remove, unsigned char add, size_t len
 }
 
 typedef struct {
-    int window_size, chunk_mask, min_size;
-    size_t buf_size;
+    uint32_t chunk_mask;
     uint32_t *table;
     uint8_t *data;
     PyObject *fd;
     int fh;
     int done, eof;
-    size_t remaining, position, last;
+    size_t min_size, buf_size, window_size, remaining, position, last;
     off_t bytes_read, bytes_yielded;
 } Chunker;
 
 static Chunker *
-chunker_init(int window_size, int chunk_mask, int min_size, int max_size, uint32_t seed)
+chunker_init(size_t window_size, uint32_t chunk_mask, size_t min_size, size_t max_size, uint32_t seed)
 {
     Chunker *c = calloc(sizeof(Chunker), 1);
     c->window_size = window_size;
@@ -192,24 +191,11 @@ chunker_fill(Chunker *c, PyThreadState **tstatep)
 }
 
 static PyObject *
-PyBuffer_FromMemory(void *data, Py_ssize_t len)
-{
-    Py_buffer buffer;
-    PyObject *mv;
-
-    PyBuffer_FillInfo(&buffer, NULL, data, len, 1, PyBUF_CONTIG_RO);
-    mv = PyMemoryView_FromBuffer(&buffer);
-    PyBuffer_Release(&buffer);
-    return mv;
-}
-
-
-static PyObject *
 chunker_process(Chunker *c)
 {
-    uint32_t sum, chunk_mask = c->chunk_mask, min_size = c->min_size, window_size = c->window_size;
-    int n = 0, rc = 0;
-    int old_last;
+    uint32_t sum, chunk_mask = c->chunk_mask;
+    size_t n = 0, old_last, min_size = c->min_size, window_size = c->window_size;
+    int rc = 0;
     PyThreadState *tstate;
 
     if(c->done) {
@@ -231,7 +217,7 @@ chunker_process(Chunker *c)
         c->done = 1;
         if(c->remaining) {
             c->bytes_yielded += c->remaining;
-            return PyBuffer_FromMemory(c->data + c->position, c->remaining);
+            return PyMemoryView_FromMemory(c->data + c->position, c->remaining, PyBUF_READ);
         }
         else {
             if(c->bytes_read == c->bytes_yielded)
@@ -266,5 +252,5 @@ chunker_process(Chunker *c)
     n = c->last - old_last;
     c->bytes_yielded += n;
     PyEval_RestoreThread(tstate);  // acquire GIL
-    return PyBuffer_FromMemory(c->data + old_last, n);
+    return PyMemoryView_FromMemory(c->data + old_last, n, PyBUF_READ);
 }

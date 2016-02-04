@@ -1,10 +1,9 @@
-import errno
 import json
 import os
 import socket
 import time
 
-from borg.helpers import Error
+from borg.helpers import Error, ErrorWithTraceback
 
 ADD, REMOVE = 'add', 'remove'
 SHARED, EXCLUSIVE = 'shared', 'exclusive'
@@ -74,32 +73,45 @@ class TimeoutTimer:
             return False
 
 
+class LockError(Error):
+    """Failed to acquire the lock {}."""
+
+
+class LockErrorT(ErrorWithTraceback):
+    """Failed to acquire the lock {}."""
+
+
+class LockTimeout(LockError):
+    """Failed to create/acquire the lock {} (timeout)."""
+
+
+class LockFailed(LockErrorT):
+    """Failed to create/acquire the lock {} ({})."""
+
+
+class NotLocked(LockErrorT):
+    """Failed to release the lock {} (was not locked)."""
+
+
+class NotMyLock(LockErrorT):
+    """Failed to release the lock {} (was/is locked, but not by me)."""
+
+
 class ExclusiveLock:
-    """An exclusive Lock based on mkdir fs operation being atomic"""
-    class LockError(Error):
-        """Failed to acquire the lock {}."""
+    """An exclusive Lock based on mkdir fs operation being atomic.
 
-    class LockTimeout(LockError):
-        """Failed to create/acquire the lock {} (timeout)."""
-
-    class LockFailed(LockError):
-        """Failed to create/acquire the lock {} ({})."""
-
-    class UnlockError(Error):
-        """Failed to release the lock {}."""
-
-    class NotLocked(UnlockError):
-        """Failed to release the lock {} (was not locked)."""
-
-    class NotMyLock(UnlockError):
-        """Failed to release the lock {} (was/is locked, but not by me)."""
-
+    If possible, try to use the contextmanager here like:
+    with ExclusiveLock(...) as lock:
+        ...
+    This makes sure the lock is released again if the block is left, no
+    matter how (e.g. if an exception occurred).
+    """
     def __init__(self, path, timeout=None, sleep=None, id=None):
         self.timeout = timeout
         self.sleep = sleep
         self.path = os.path.abspath(path)
         self.id = id or get_id()
-        self.unique_name  = os.path.join(self.path, "%s.%d-%x" % self.id)
+        self.unique_name = os.path.join(self.path, "%s.%d-%x" % self.id)
 
     def __enter__(self):
         return self.acquire()
@@ -119,14 +131,13 @@ class ExclusiveLock:
         while True:
             try:
                 os.mkdir(self.path)
+            except FileExistsError:  # already locked
+                if self.by_me():
+                    return self
+                if timer.timed_out_or_sleep():
+                    raise LockTimeout(self.path)
             except OSError as err:
-                if err.errno == errno.EEXIST:  # already locked
-                    if self.by_me():
-                        return self
-                    if timer.timed_out_or_sleep():
-                        raise self.LockTimeout(self.path)
-                else:
-                    raise self.LockFailed(self.path, str(err))
+                raise LockFailed(self.path, str(err)) from None
             else:
                 with open(self.unique_name, "wb"):
                     pass
@@ -134,9 +145,9 @@ class ExclusiveLock:
 
     def release(self):
         if not self.is_locked():
-            raise self.NotLocked(self.path)
+            raise NotLocked(self.path)
         if not self.by_me():
-            raise self.NotMyLock(self.path)
+            raise NotMyLock(self.path)
         os.unlink(self.unique_name)
         os.rmdir(self.path)
 
@@ -168,12 +179,8 @@ class LockRoster:
         try:
             with open(self.path) as f:
                 data = json.load(f)
-        except IOError as err:
-            if err.errno != errno.ENOENT:
-                raise
-            data = {}
-        except ValueError:
-            # corrupt/empty roster file?
+        except (FileNotFoundError, ValueError):
+            # no or corrupt/empty roster file?
             data = {}
         return data
 
@@ -184,9 +191,8 @@ class LockRoster:
     def remove(self):
         try:
             os.unlink(self.path)
-        except OSError as e:
-            if e.errno != errno.ENOENT:
-                raise
+        except FileNotFoundError:
+            pass
 
     def get(self, key):
         roster = self.load()
@@ -214,24 +220,25 @@ class UpgradableLock:
     Typically, write access to a resource needs an exclusive lock (1 writer,
     noone is allowed reading) and read access to a resource needs a shared
     lock (multiple readers are allowed).
+
+    If possible, try to use the contextmanager here like:
+    with UpgradableLock(...) as lock:
+        ...
+    This makes sure the lock is released again if the block is left, no
+    matter how (e.g. if an exception occurred).
     """
-    class SharedLockFailed(Error):
-        """Failed to acquire shared lock [{}]"""
-
-    class ExclusiveLockFailed(Error):
-        """Failed to acquire write lock [{}]"""
-
-    def __init__(self, path, exclusive=False, sleep=None, id=None):
+    def __init__(self, path, exclusive=False, sleep=None, timeout=None, id=None):
         self.path = path
         self.is_exclusive = exclusive
         self.sleep = sleep
+        self.timeout = timeout
         self.id = id or get_id()
         # globally keeping track of shared and exclusive lockers:
         self._roster = LockRoster(path + '.roster', id=id)
         # an exclusive lock, used for:
         # - holding while doing roster queries / updates
         # - holding while the UpgradableLock itself is exclusive
-        self._lock = ExclusiveLock(path + '.exclusive', id=id)
+        self._lock = ExclusiveLock(path + '.exclusive', id=id, timeout=timeout)
 
     def __enter__(self):
         return self.acquire()
@@ -246,34 +253,37 @@ class UpgradableLock:
         if exclusive is None:
             exclusive = self.is_exclusive
         sleep = sleep or self.sleep or 0.2
-        try:
-            if exclusive:
-                self._wait_for_readers_finishing(remove, sleep)
-                self._roster.modify(EXCLUSIVE, ADD)
-            else:
-                with self._lock:
-                    if remove is not None:
-                        self._roster.modify(remove, REMOVE)
-                    self._roster.modify(SHARED, ADD)
-            self.is_exclusive = exclusive
-            return self
-        except ExclusiveLock.LockError as err:
-            msg = str(err)
-            if exclusive:
-                raise self.ExclusiveLockFailed(msg)
-            else:
-                raise self.SharedLockFailed(msg)
+        if exclusive:
+            self._wait_for_readers_finishing(remove, sleep)
+            self._roster.modify(EXCLUSIVE, ADD)
+        else:
+            with self._lock:
+                if remove is not None:
+                    self._roster.modify(remove, REMOVE)
+                self._roster.modify(SHARED, ADD)
+        self.is_exclusive = exclusive
+        return self
 
     def _wait_for_readers_finishing(self, remove, sleep):
+        timer = TimeoutTimer(self.timeout, sleep).start()
         while True:
             self._lock.acquire()
-            if remove is not None:
-                self._roster.modify(remove, REMOVE)
-                remove = None
-            if len(self._roster.get(SHARED)) == 0:
-                return  # we are the only one and we keep the lock!
-            self._lock.release()
-            time.sleep(sleep)
+            try:
+                if remove is not None:
+                    self._roster.modify(remove, REMOVE)
+                if len(self._roster.get(SHARED)) == 0:
+                    return  # we are the only one and we keep the lock!
+                # restore the roster state as before (undo the roster change):
+                if remove is not None:
+                    self._roster.modify(remove, ADD)
+            except:
+                # avoid orphan lock when an exception happens here, e.g. Ctrl-C!
+                self._lock.release()
+                raise
+            else:
+                self._lock.release()
+            if timer.timed_out_or_sleep():
+                raise LockTimeout(self.path)
 
     def release(self):
         if self.is_exclusive:

@@ -1,0 +1,18 @@
+@import url("theme.css");
+
+/*  The Return of the Borg.
+ *
+ *  Have a bit green and grey and darkness (and if only in the upper left corner).
+ */
+
+.wy-side-nav-search {
+    background-color: black;
+}
+
+.wy-side-nav-search > a {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.wy-side-nav-search > div.version {
+    color: rgba(255, 255, 255, 0.5);
+}

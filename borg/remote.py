@@ -1,20 +1,21 @@
 import errno
 import fcntl
+import logging
 import os
 import select
 import shlex
 from subprocess import Popen, PIPE
 import sys
 import tempfile
-import traceback
 
 from . import __version__
 
-from .helpers import Error, IntegrityError, have_cython
+from .helpers import Error, IntegrityError, sysinfo
 from .repository import Repository
 
-if have_cython():
-    import msgpack
+import msgpack
+
+RPC_PROTOCOL_VERSION = 2
 
 BUFSIZE = 10 * 1024 * 1024
 
@@ -23,12 +24,16 @@ class ConnectionClosed(Error):
     """Connection closed by remote host"""
 
 
+class ConnectionClosedWithHint(ConnectionClosed):
+    """Connection closed by remote host. {}"""
+
+
 class PathNotAllowed(Error):
     """Repository path not allowed"""
 
 
 class InvalidRPCMethod(Error):
-    """RPC method is not valid"""
+    """RPC method {} is not valid"""
 
 
 class RepositoryServer:  # pragma: no cover
@@ -43,10 +48,10 @@ class RepositoryServer:  # pragma: no cover
         'negotiate',
         'open',
         'put',
-        'repair',
         'rollback',
         'save_key',
         'load_key',
+        'break_lock',
     )
 
     def __init__(self, restrict_to_paths):
@@ -56,12 +61,16 @@ class RepositoryServer:  # pragma: no cover
     def serve(self):
         stdin_fd = sys.stdin.fileno()
         stdout_fd = sys.stdout.fileno()
+        stderr_fd = sys.stdout.fileno()
         # Make stdin non-blocking
         fl = fcntl.fcntl(stdin_fd, fcntl.F_GETFL)
         fcntl.fcntl(stdin_fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
         # Make stdout blocking
         fl = fcntl.fcntl(stdout_fd, fcntl.F_GETFL)
         fcntl.fcntl(stdout_fd, fcntl.F_SETFL, fl & ~os.O_NONBLOCK)
+        # Make stderr blocking
+        fl = fcntl.fcntl(stderr_fd, fcntl.F_GETFL)
+        fcntl.fcntl(stderr_fd, fcntl.F_SETFL, fl & ~os.O_NONBLOCK)
         unpacker = msgpack.Unpacker(use_list=False)
         while True:
             r, w, es = select.select([stdin_fd], [], [], 10)
@@ -84,7 +93,9 @@ class RepositoryServer:  # pragma: no cover
                             f = getattr(self.repository, method)
                         res = f(*args)
                     except BaseException as e:
-                        exc = "Remote Traceback by Borg %s%s%s" % (__version__, os.linesep, traceback.format_exc())
+                        logging.exception('Borg %s: exception in RPC call:', __version__)
+                        logging.error(sysinfo())
+                        exc = "Remote Exception (see remote log for the traceback)"
                         os.write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc)))
                     else:
                         os.write(stdout_fd, msgpack.packb((1, msgid, None, res)))
@@ -92,9 +103,9 @@ class RepositoryServer:  # pragma: no cover
                 return
 
     def negotiate(self, versions):
-        return 1
+        return RPC_PROTOCOL_VERSION
 
-    def open(self, path, create=False):
+    def open(self, path, create=False, lock_wait=None, lock=True):
         path = os.fsdecode(path)
         if path.startswith('/~'):
             path = path[1:]
@@ -105,22 +116,19 @@ class RepositoryServer:  # pragma: no cover
                     break
             else:
                 raise PathNotAllowed(path)
-        self.repository = Repository(path, create)
+        self.repository = Repository(path, create, lock_wait=lock_wait, lock=lock)
         return self.repository.id
 
 
 class RemoteRepository:
     extra_test_args = []
-    remote_path = 'borg'
-    # default umask, overriden by --umask, defaults to read/write only for owner
-    umask = 0o077
 
     class RPCError(Exception):
         def __init__(self, name):
             self.name = name
 
-    def __init__(self, location, create=False):
-        self.location = location
+    def __init__(self, location, create=False, lock_wait=None, lock=True, args=None):
+        self.location = self._location = location
         self.preload_ids = []
         self.msgid = 0
         self.to_send = b''
@@ -129,29 +137,31 @@ class RemoteRepository:
         self.responses = {}
         self.unpacker = msgpack.Unpacker(use_list=False)
         self.p = None
-        # XXX: ideally, the testsuite would subclass Repository and
-        # override ssh_cmd() instead of this crude hack, although
-        # __testsuite__ is not a valid domain name so this is pretty
-        # safe.
-        if location.host == '__testsuite__':
-            args = [sys.executable, '-m', 'borg.archiver', 'serve' ] + self.extra_test_args
-        else:  # pragma: no cover
-            args = self.ssh_cmd(location)
-        self.p = Popen(args, bufsize=0, stdin=PIPE, stdout=PIPE)
+        testing = location.host == '__testsuite__'
+        borg_cmd = self.borg_cmd(args, testing)
+        env = dict(os.environ)
+        if not testing:
+            borg_cmd = self.ssh_cmd(location) + borg_cmd
+            # pyinstaller binary adds LD_LIBRARY_PATH=/tmp/_ME... but we do not want
+            # that the system's ssh binary picks up (non-matching) libraries from there
+            env.pop('LD_LIBRARY_PATH', None)
+        self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()
+        self.stderr_fd = self.p.stderr.fileno()
         fcntl.fcntl(self.stdin_fd, fcntl.F_SETFL, fcntl.fcntl(self.stdin_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
         fcntl.fcntl(self.stdout_fd, fcntl.F_SETFL, fcntl.fcntl(self.stdout_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
-        self.r_fds = [self.stdout_fd]
-        self.x_fds = [self.stdin_fd, self.stdout_fd]
+        fcntl.fcntl(self.stderr_fd, fcntl.F_SETFL, fcntl.fcntl(self.stderr_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
+        self.r_fds = [self.stdout_fd, self.stderr_fd]
+        self.x_fds = [self.stdin_fd, self.stdout_fd, self.stderr_fd]
 
         try:
-            version = self.call('negotiate', 1)
+            version = self.call('negotiate', RPC_PROTOCOL_VERSION)
         except ConnectionClosed:
-            raise Exception('Server immediately closed connection - is Borg installed and working on the server?')
-        if version != 1:
+            raise ConnectionClosedWithHint('Is borg working on the server?') from None
+        if version != RPC_PROTOCOL_VERSION:
             raise Exception('Server insisted on using unsupported protocol version %d' % version)
-        self.id = self.call('open', location.path, create)
+        self.id = self.call('open', location.path, create, lock_wait, lock)
 
     def __del__(self):
         self.close()
@@ -159,10 +169,28 @@ class RemoteRepository:
     def __repr__(self):
         return '<%s %s>' % (self.__class__.__name__, self.location.canonical_path())
 
-    def umask_flag(self):
-        return ['--umask', '%03o' % self.umask]
+    def borg_cmd(self, args, testing):
+        """return a borg serve command line"""
+        # give some args/options to "borg serve" process as they were given to us
+        opts = []
+        if args is not None:
+            opts.append('--umask=%03o' % args.umask)
+            root_logger = logging.getLogger()
+            if root_logger.isEnabledFor(logging.DEBUG):
+                opts.append('--debug')
+            elif root_logger.isEnabledFor(logging.INFO):
+                opts.append('--info')
+            elif root_logger.isEnabledFor(logging.WARNING):
+                pass  # warning is default
+            else:
+                raise ValueError('log level missing, fix this code')
+        if testing:
+            return [sys.executable, '-m', 'borg.archiver', 'serve'] + opts + self.extra_test_args
+        else:  # pragma: no cover
+            return [args.remote_path, 'serve'] + opts
 
     def ssh_cmd(self, location):
+        """return a ssh command line that can be prefixed to a borg command line"""
         args = shlex.split(os.environ.get('BORG_RSH', 'ssh'))
         if location.port:
             args += ['-p', str(location.port)]
@@ -170,8 +198,6 @@ class RemoteRepository:
             args.append('%s@%s' % (location.user, location.host))
         else:
             args.append('%s' % location.host)
-        # use local umask also for the remote process
-        args += [self.remote_path, 'serve'] + self.umask_flag()
         return args
 
     def call(self, cmd, *args, **kw):
@@ -222,19 +248,32 @@ class RemoteRepository:
             r, w, x = select.select(self.r_fds, w_fds, self.x_fds, 1)
             if x:
                 raise Exception('FD exception occurred')
-            if r:
-                data = os.read(self.stdout_fd, BUFSIZE)
-                if not data:
-                    raise ConnectionClosed()
-                self.unpacker.feed(data)
-                for unpacked in self.unpacker:
-                    if not (isinstance(unpacked, tuple) and len(unpacked) == 4):
-                        raise Exception("Unexpected RPC data format.")
-                    type, msgid, error, res = unpacked
-                    if msgid in self.ignore_responses:
-                        self.ignore_responses.remove(msgid)
-                    else:
-                        self.responses[msgid] = error, res
+            for fd in r:
+                if fd is self.stdout_fd:
+                    data = os.read(fd, BUFSIZE)
+                    if not data:
+                        raise ConnectionClosed()
+                    self.unpacker.feed(data)
+                    for unpacked in self.unpacker:
+                        if not (isinstance(unpacked, tuple) and len(unpacked) == 4):
+                            raise Exception("Unexpected RPC data format.")
+                        type, msgid, error, res = unpacked
+                        if msgid in self.ignore_responses:
+                            self.ignore_responses.remove(msgid)
+                        else:
+                            self.responses[msgid] = error, res
+                elif fd is self.stderr_fd:
+                    data = os.read(fd, 32768)
+                    if not data:
+                        raise ConnectionClosed()
+                    data = data.decode('utf-8')
+                    for line in data.splitlines(keepends=True):
+                        if line.startswith('$LOG '):
+                            _, level, msg = line.split(' ', 2)
+                            level = getattr(logging, level, logging.CRITICAL)  # str -> int
+                            logging.log(level, msg.rstrip())
+                        else:
+                            sys.stderr.write("Remote: " + line)
             if w:
                 while not self.to_send and (calls or self.preload_ids) and len(waiting_for) < 100:
                     if calls:
@@ -267,11 +306,11 @@ class RemoteRepository:
                     w_fds = []
         self.ignore_responses |= set(waiting_for)
 
-    def check(self, repair=False):
-        return self.call('check', repair)
+    def check(self, repair=False, save_space=False):
+        return self.call('check', repair, save_space)
 
-    def commit(self, *args):
-        return self.call('commit')
+    def commit(self, save_space=False):
+        return self.call('commit', save_space)
 
     def rollback(self, *args):
         return self.call('rollback')
@@ -305,6 +344,9 @@ class RemoteRepository:
     def load_key(self):
         return self.call('load_key')
 
+    def break_lock(self):
+        return self.call('break_lock')
+
     def close(self):
         if self.p:
             self.p.stdin.close()
@@ -316,21 +358,45 @@ class RemoteRepository:
         self.preload_ids += ids
 
 
-class RepositoryCache:
+class RepositoryNoCache:
+    """A not caching Repository wrapper, passes through to repository.
+
+    Just to have same API (including the context manager) as RepositoryCache.
+    """
+    def __init__(self, repository):
+        self.repository = repository
+
+    def close(self):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    def get(self, key):
+        return next(self.get_many([key]))
+
+    def get_many(self, keys):
+        for data in self.repository.get_many(keys):
+            yield data
+
+
+class RepositoryCache(RepositoryNoCache):
     """A caching Repository wrapper
 
     Caches Repository GET operations using a local temporary Repository.
     """
     def __init__(self, repository):
-        self.repository = repository
+        super().__init__(repository)
         tmppath = tempfile.mkdtemp(prefix='borg-tmp')
         self.caching_repo = Repository(tmppath, create=True, exclusive=True)
 
-    def __del__(self):
-        self.caching_repo.destroy()
-
-    def get(self, key):
-        return next(self.get_many([key]))
+    def close(self):
+        if self.caching_repo is not None:
+            self.caching_repo.destroy()
+            self.caching_repo = None
 
     def get_many(self, keys):
         unknown_keys = [key for key in keys if key not in self.caching_repo]
@@ -352,4 +418,5 @@ class RepositoryCache:
 def cache_if_remote(repository):
     if isinstance(repository, RemoteRepository):
         return RepositoryCache(repository)
-    return repository
+    else:
+        return RepositoryNoCache(repository)

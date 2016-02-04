@@ -1,8 +1,9 @@
 from binascii import hexlify
-from configparser import RawConfigParser
+from configparser import ConfigParser
 import errno
 import os
 from io import StringIO
+import random
 import stat
 import subprocess
 import sys
@@ -10,9 +11,9 @@ import shutil
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 from hashlib import sha256
 
-from mock import patch
 import pytest
 
 from .. import xattr
@@ -20,10 +21,10 @@ from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP
 from ..archiver import Archiver
 from ..cache import Cache
 from ..crypto import bytes_to_long, num_aes_blocks
-from ..helpers import Manifest, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, st_atime_ns, st_mtime_ns
+from ..helpers import Manifest, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
-from . import BaseTestCase
+from . import BaseTestCase, changedir, environment_variable
 
 try:
     import llfuse
@@ -33,43 +34,8 @@ except ImportError:
 
 has_lchflags = hasattr(os, 'lchflags')
 
-src_dir = os.path.join(os.getcwd(), os.path.dirname(__file__), '..')
+src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
-# Python <= 3.2 raises OSError instead of PermissionError (See #164)
-try:
-    PermissionError = PermissionError
-except NameError:
-    PermissionError = OSError
-
-
-class changedir:
-    def __init__(self, dir):
-        self.dir = dir
-
-    def __enter__(self):
-        self.old = os.getcwd()
-        os.chdir(self.dir)
-
-    def __exit__(self, *args, **kw):
-        os.chdir(self.old)
-
-
-class environment_variable:
-    def __init__(self, **values):
-        self.values = values
-        self.old_values = {}
-
-    def __enter__(self):
-        for k, v in self.values.items():
-            self.old_values[k] = os.environ.get(k)
-            os.environ[k] = v
-
-    def __exit__(self, *args, **kw):
-        for k, v in self.old_values.items():
-            if v is None:
-                del os.environ[k]
-            else:
-                os.environ[k] = v
 
 def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
     if fork:
@@ -93,7 +59,8 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
             sys.stdout = sys.stderr = output = StringIO()
             if archiver is None:
                 archiver = Archiver()
-            ret = archiver.run(list(args))
+            args = archiver.parse_args(list(args))
+            ret = archiver.run(args)
             return ret, output.getvalue()
         finally:
             sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
@@ -103,9 +70,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
 try:
     exec_cmd('help', exe='borg.exe', fork=True)
     BORG_EXES = ['python', 'binary', ]
-except (IOError, OSError) as err:
-    if err.errno != errno.ENOENT:
-        raise
+except FileNotFoundError:
     BORG_EXES = ['python', ]
 
 
@@ -117,6 +82,7 @@ def cmd(request):
         exe = 'borg.exe'
     else:
         raise ValueError("param must be 'python' or 'binary'")
+
     def exec_fn(*args, **kw):
         return exec_cmd(*args, exe=exe, fork=True, **kw)
     return exec_fn
@@ -128,7 +94,7 @@ def test_return_codes(cmd, tmpdir):
     input = tmpdir.mkdir('input')
     output = tmpdir.mkdir('output')
     input.join('test_file').write('content')
-    rc, out = cmd('init', '%s' % str(repo))
+    rc, out = cmd('init', '--encryption=none', '%s' % str(repo))
     assert rc == EXIT_SUCCESS
     rc, out = cmd('create', '%s::archive' % repo, str(input))
     assert rc == EXIT_SUCCESS
@@ -141,13 +107,95 @@ def test_return_codes(cmd, tmpdir):
     assert rc == EXIT_ERROR  # duplicate archive name
 
 
+"""
+test_disk_full is very slow and not recommended to be included in daily testing.
+for this test, an empty, writable 16MB filesystem mounted on DF_MOUNT is required.
+for speed and other reasons, it is recommended that the underlying block device is
+in RAM, not a magnetic or flash disk.
+
+assuming /tmp is a tmpfs (in memory filesystem), one can use this:
+dd if=/dev/zero of=/tmp/borg-disk bs=16M count=1
+mkfs.ext4 /tmp/borg-disk
+mkdir /tmp/borg-mount
+sudo mount /tmp/borg-disk /tmp/borg-mount
+
+if the directory does not exist, the test will be skipped.
+"""
+DF_MOUNT = '/tmp/borg-mount'
+
+
+@pytest.mark.skipif(not os.path.exists(DF_MOUNT), reason="needs a 16MB fs mounted on %s" % DF_MOUNT)
+def test_disk_full(cmd):
+    def make_files(dir, count, size, rnd=True):
+        shutil.rmtree(dir, ignore_errors=True)
+        os.mkdir(dir)
+        if rnd:
+            count = random.randint(1, count)
+            if size > 1:
+                size = random.randint(1, size)
+        for i in range(count):
+            fn = os.path.join(dir, "file%03d" % i)
+            with open(fn, 'wb') as f:
+                data = os.urandom(size)
+                f.write(data)
+
+    with environment_variable(BORG_CHECK_I_KNOW_WHAT_I_AM_DOING='YES'):
+        mount = DF_MOUNT
+        assert os.path.exists(mount)
+        repo = os.path.join(mount, 'repo')
+        input = os.path.join(mount, 'input')
+        reserve = os.path.join(mount, 'reserve')
+        for j in range(100):
+            shutil.rmtree(repo, ignore_errors=True)
+            shutil.rmtree(input, ignore_errors=True)
+            # keep some space and some inodes in reserve that we can free up later:
+            make_files(reserve, 80, 100000, rnd=False)
+            rc, out = cmd('init', repo)
+            if rc != EXIT_SUCCESS:
+                print('init', rc, out)
+            assert rc == EXIT_SUCCESS
+            try:
+                success, i = True, 0
+                while success:
+                    i += 1
+                    try:
+                        make_files(input, 20, 200000)
+                    except OSError as err:
+                        if err.errno == errno.ENOSPC:
+                            # already out of space
+                            break
+                        raise
+                    try:
+                        rc, out = cmd('create', '%s::test%03d' % (repo, i), input)
+                        success = rc == EXIT_SUCCESS
+                        if not success:
+                            print('create', rc, out)
+                    finally:
+                        # make sure repo is not locked
+                        shutil.rmtree(os.path.join(repo, 'lock.exclusive'), ignore_errors=True)
+                        os.remove(os.path.join(repo, 'lock.roster'))
+            finally:
+                # now some error happened, likely we are out of disk space.
+                # free some space so we can expect borg to be able to work normally:
+                shutil.rmtree(reserve, ignore_errors=True)
+            rc, out = cmd('list', repo)
+            if rc != EXIT_SUCCESS:
+                print('list', rc, out)
+            rc, out = cmd('check', '--repair', repo)
+            if rc != EXIT_SUCCESS:
+                print('check', rc, out)
+            assert rc == EXIT_SUCCESS
+
+
 class ArchiverTestCaseBase(BaseTestCase):
     EXE = None  # python source based
     FORK_DEFAULT = False
     prefix = ''
 
     def setUp(self):
-        os.environ['BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'] = '1'
+        os.environ['BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
+        os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
+        os.environ['BORG_PASSPHRASE'] = 'waytooeasyonlyfortests'
         self.archiver = not self.FORK_DEFAULT and Archiver() or None
         self.tmpdir = tempfile.mkdtemp()
         self.repository_path = os.path.join(self.tmpdir, 'repository')
@@ -253,7 +301,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', '--stats', self.repository_location + '::test.2', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
-        self.assert_equal(len(self.cmd('list', self.repository_location).splitlines()), 2)
+        list_output = self.cmd('list', '--short', self.repository_location)
+        self.assert_in('test', list_output)
+        self.assert_in('test.2', list_output)
         expected =  set([
             'input',
             'input/bdev',
@@ -273,15 +323,17 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             expected.remove('input/cdev')
         if has_lchflags:
             # remove the file we did not backup, so input and output become equal
-            expected.remove('input/flagfile') # this file is UF_NODUMP
+            expected.remove('input/flagfile')  # this file is UF_NODUMP
             os.remove(os.path.join('input', 'flagfile'))
-        self.assert_equal(set(self.cmd('list', '--short', self.repository_location + '::test').splitlines()), expected)
+        list_output = self.cmd('list', '--short', self.repository_location + '::test')
+        for name in expected:
+            self.assert_in(name, list_output)
         self.assert_dirs_equal('input', 'output/input')
         info_output = self.cmd('info', self.repository_location + '::test')
         item_count = 3 if has_lchflags else 4  # one file is UF_NODUMP
         self.assert_in('Number of files: %d' % item_count, info_output)
         shutil.rmtree(self.cache_path)
-        with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='1'):
+        with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='yes'):
             info_output2 = self.cmd('info', self.repository_location + '::test')
 
         def filter(output):
@@ -299,7 +351,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_equal(filter(info_output), filter(info_output2))
 
     def test_atime(self):
-        have_root = self.create_test_files()
+        self.create_test_files()
         atime, mtime = 123456780, 234567890
         os.utime('input/file1', (atime, mtime))
         self.cmd('init', self.repository_location)
@@ -308,18 +360,18 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
         sti = os.stat('input/file1')
         sto = os.stat('output/input/file1')
-        assert st_mtime_ns(sti) == st_mtime_ns(sto) == mtime * 1e9
+        assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
         if hasattr(os, 'O_NOATIME'):
-            assert st_atime_ns(sti) == st_atime_ns(sto) == atime * 1e9
+            assert sti.st_atime_ns == sto.st_atime_ns == atime * 1e9
         else:
             # it touched the input file's atime while backing it up
-            assert st_atime_ns(sto) == atime * 1e9
+            assert sto.st_atime_ns == atime * 1e9
 
     def _extract_repository_id(self, path):
         return Repository(self.repository_path).id
 
     def _set_repository_id(self, path, id):
-        config = RawConfigParser()
+        config = ConfigParser(interpolation=None)
         config.read(os.path.join(path, 'config'))
         config.set('repository', 'id', hexlify(id).decode('ascii'))
         with open(os.path.join(path, 'config'), 'w') as fd:
@@ -365,7 +417,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         filenames = ['normal', 'with some blanks', '(with_parens)', ]
         for filename in filenames:
             filename = os.path.join(self.input_path, filename)
-            with open(filename, 'wb') as fd:
+            with open(filename, 'wb'):
                 pass
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
@@ -377,7 +429,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_repository_swap_detection(self):
         self.create_test_files()
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
-        self.cmd('init', '--encryption=passphrase', self.repository_location)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
         repository_id = self._extract_repository_id(self.repository_path)
         self.cmd('create', self.repository_location + '::test', 'input')
         shutil.rmtree(self.repository_path)
@@ -393,7 +445,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_test_files()
         self.cmd('init', '--encryption=none', self.repository_location + '_unencrypted')
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
-        self.cmd('init', '--encryption=passphrase', self.repository_location + '_encrypted')
+        self.cmd('init', '--encryption=repokey', self.repository_location + '_encrypted')
         self.cmd('create', self.repository_location + '_encrypted::test', 'input')
         shutil.rmtree(self.repository_path + '_encrypted')
         os.rename(self.repository_path + '_unencrypted', self.repository_path + '_encrypted')
@@ -433,6 +485,112 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file3'])
 
+    def test_extract_include_exclude_regex(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('file1', size=1024 * 80)
+        self.create_regular_file('file2', size=1024 * 80)
+        self.create_regular_file('file3', size=1024 * 80)
+        self.create_regular_file('file4', size=1024 * 80)
+        self.create_regular_file('file333', size=1024 * 80)
+
+        # Create with regular expression exclusion for file4
+        self.cmd('create', '--exclude=re:input/file4$', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2', 'file3', 'file333'])
+        shutil.rmtree('output/input')
+
+        # Extract with regular expression exclusion
+        with changedir('output'):
+            self.cmd('extract', '--exclude=re:file3+', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2'])
+        shutil.rmtree('output/input')
+
+        # Combine --exclude with fnmatch and regular expression
+        with changedir('output'):
+            self.cmd('extract', '--exclude=input/file2', '--exclude=re:file[01]', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file3', 'file333'])
+        shutil.rmtree('output/input')
+
+        # Combine --exclude-from and regular expression exclusion
+        with changedir('output'):
+            self.cmd('extract', '--exclude-from=' + self.exclude_file_path, '--exclude=re:file1',
+                     '--exclude=re:file(\\d)\\1\\1$', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file3'])
+
+    def test_extract_include_exclude_regex_from_file(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('file1', size=1024 * 80)
+        self.create_regular_file('file2', size=1024 * 80)
+        self.create_regular_file('file3', size=1024 * 80)
+        self.create_regular_file('file4', size=1024 * 80)
+        self.create_regular_file('file333', size=1024 * 80)
+        self.create_regular_file('aa:something', size=1024 * 80)
+
+        # Create while excluding using mixed pattern styles
+        with open(self.exclude_file_path, 'wb') as fd:
+            fd.write(b're:input/file4$\n')
+            fd.write(b'fm:*aa:*thing\n')
+
+        self.cmd('create', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2', 'file3', 'file333'])
+        shutil.rmtree('output/input')
+
+        # Exclude using regular expression
+        with open(self.exclude_file_path, 'wb') as fd:
+            fd.write(b're:file3+\n')
+
+        with changedir('output'):
+            self.cmd('extract', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2'])
+        shutil.rmtree('output/input')
+
+        # Mixed exclude pattern styles
+        with open(self.exclude_file_path, 'wb') as fd:
+            fd.write(b're:file(\\d)\\1\\1$\n')
+            fd.write(b'fm:nothingwillmatchthis\n')
+            fd.write(b'*/file1\n')
+            fd.write(b're:file2$\n')
+
+        with changedir('output'):
+            self.cmd('extract', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file3'])
+
+    def test_extract_with_pattern(self):
+        self.cmd("init", self.repository_location)
+        self.create_regular_file("file1", size=1024 * 80)
+        self.create_regular_file("file2", size=1024 * 80)
+        self.create_regular_file("file3", size=1024 * 80)
+        self.create_regular_file("file4", size=1024 * 80)
+        self.create_regular_file("file333", size=1024 * 80)
+
+        self.cmd("create", self.repository_location + "::test", "input")
+
+        # Extract everything with regular expression
+        with changedir("output"):
+            self.cmd("extract", self.repository_location + "::test", "re:.*")
+        self.assert_equal(sorted(os.listdir("output/input")), ["file1", "file2", "file3", "file333", "file4"])
+        shutil.rmtree("output/input")
+
+        # Extract with pattern while also excluding files
+        with changedir("output"):
+            self.cmd("extract", "--exclude=re:file[34]$", self.repository_location + "::test", r"re:file\d$")
+        self.assert_equal(sorted(os.listdir("output/input")), ["file1", "file2"])
+        shutil.rmtree("output/input")
+
+        # Combine --exclude with pattern for extraction
+        with changedir("output"):
+            self.cmd("extract", "--exclude=input/file1", self.repository_location + "::test", "re:file[12]$")
+        self.assert_equal(sorted(os.listdir("output/input")), ["file2"])
+        shutil.rmtree("output/input")
+
+        # Multiple pattern
+        with changedir("output"):
+            self.cmd("extract", self.repository_location + "::test", "fm:input/file1", "fm:*file33*", "input/file2")
+        self.assert_equal(sorted(os.listdir("output/input")), ["file1", "file2", "file333"])
+
     def test_exclude_caches(self):
         self.cmd('init', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)
@@ -443,6 +601,41 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['cache2', 'file1'])
         self.assert_equal(sorted(os.listdir('output/input/cache2')), ['CACHEDIR.TAG'])
+
+    def test_exclude_tagged(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('file1', size=1024 * 80)
+        self.create_regular_file('tagged1/.NOBACKUP')
+        self.create_regular_file('tagged2/00-NOBACKUP')
+        self.create_regular_file('tagged3/.NOBACKUP/file2')
+        self.cmd('create', '--exclude-if-present', '.NOBACKUP', '--exclude-if-present', '00-NOBACKUP', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'tagged3'])
+
+    def test_exclude_keep_tagged(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('file0', size=1024)
+        self.create_regular_file('tagged1/.NOBACKUP1')
+        self.create_regular_file('tagged1/file1', size=1024)
+        self.create_regular_file('tagged2/.NOBACKUP2')
+        self.create_regular_file('tagged2/file2', size=1024)
+        self.create_regular_file('tagged3/CACHEDIR.TAG', contents=b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
+        self.create_regular_file('tagged3/file3', size=1024)
+        self.create_regular_file('taggedall/.NOBACKUP1')
+        self.create_regular_file('taggedall/.NOBACKUP2')
+        self.create_regular_file('taggedall/CACHEDIR.TAG', contents=b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
+        self.create_regular_file('taggedall/file4', size=1024)
+        self.cmd('create', '--exclude-if-present', '.NOBACKUP1', '--exclude-if-present', '.NOBACKUP2',
+                 '--exclude-caches', '--keep-tag-files', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file0', 'tagged1', 'tagged2', 'tagged3', 'taggedall'])
+        self.assert_equal(os.listdir('output/input/tagged1'), ['.NOBACKUP1'])
+        self.assert_equal(os.listdir('output/input/tagged2'), ['.NOBACKUP2'])
+        self.assert_equal(os.listdir('output/input/tagged3'), ['CACHEDIR.TAG'])
+        self.assert_equal(sorted(os.listdir('output/input/taggedall')),
+                          ['.NOBACKUP1', '.NOBACKUP2', 'CACHEDIR.TAG', ])
 
     def test_path_normalization(self):
         self.cmd('init', self.repository_location)
@@ -579,14 +772,65 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         manifest, key = Manifest.load(repository)
         self.assert_equal(len(manifest.archives), 0)
 
-    def test_cmdline_compatibility(self):
+    def test_progress(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        output = self.cmd('verify', '-v', self.repository_location + '::test')
-        self.assert_in('"borg verify" has been deprecated', output)
-        output = self.cmd('prune', self.repository_location, '--hourly=1')
-        self.assert_in('"--hourly" has been deprecated. Use "--keep-hourly" instead', output)
+        # progress forced on
+        output = self.cmd('create', '--progress', self.repository_location + '::test4', 'input')
+        self.assert_in("\r", output)
+        # progress forced off
+        output = self.cmd('create', self.repository_location + '::test5', 'input')
+        self.assert_not_in("\r", output)
+
+    def test_file_status(self):
+        """test that various file status show expected results
+
+        clearly incomplete: only tests for the weird "unchanged" status for now"""
+        now = time.time()
+        self.create_regular_file('file1', size=1024 * 80)
+        os.utime('input/file1', (now - 5, now - 5))  # 5 seconds ago
+        self.create_regular_file('file2', size=1024 * 80)
+        self.cmd('init', self.repository_location)
+        output = self.cmd('create', '-v', '--list', self.repository_location + '::test', 'input')
+        self.assert_in("A input/file1", output)
+        self.assert_in("A input/file2", output)
+        # should find first file as unmodified
+        output = self.cmd('create', '-v', '--list', self.repository_location + '::test1', 'input')
+        self.assert_in("U input/file1", output)
+        # this is expected, although surprising, for why, see:
+        # https://borgbackup.readthedocs.org/en/latest/faq.html#i-am-seeing-a-added-status-for-a-unchanged-file
+        self.assert_in("A input/file2", output)
+
+    def test_create_topical(self):
+        now = time.time()
+        self.create_regular_file('file1', size=1024 * 80)
+        os.utime('input/file1', (now-5, now-5))
+        self.create_regular_file('file2', size=1024 * 80)
+        self.cmd('init', self.repository_location)
+        # no listing by default
+        output = self.cmd('create', self.repository_location + '::test', 'input')
+        self.assert_not_in('file1', output)
+        # shouldn't be listed even if unchanged
+        output = self.cmd('create', self.repository_location + '::test0', 'input')
+        self.assert_not_in('file1', output)
+        # should list the file as unchanged
+        output = self.cmd('create', '-v', '--list', '--filter=U', self.repository_location + '::test1', 'input')
+        self.assert_in('file1', output)
+        # should *not* list the file as changed
+        output = self.cmd('create', '-v', '--filter=AM', self.repository_location + '::test2', 'input')
+        self.assert_not_in('file1', output)
+        # change the file
+        self.create_regular_file('file1', size=1024 * 100)
+        # should list the file as changed
+        output = self.cmd('create', '-v', '--list', '--filter=AM', self.repository_location + '::test3', 'input')
+        self.assert_in('file1', output)
+
+    # def test_cmdline_compatibility(self):
+    #    self.create_regular_file('file1', size=1024 * 80)
+    #    self.cmd('init', self.repository_location)
+    #    self.cmd('create', self.repository_location + '::test', 'input')
+    #    output = self.cmd('foo', self.repository_location, '--old')
+    #    self.assert_in('"--old" has been deprecated. Use "--new" instead', output)
 
     def test_prune_repository(self):
         self.cmd('init', self.repository_location)
@@ -599,6 +843,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('test1', output)
         self.assert_in('test2', output)
         self.cmd('prune', self.repository_location, '--keep-daily=2')
+        output = self.cmd('list', self.repository_location)
+        self.assert_not_in('test1', output)
+        self.assert_in('test2', output)
+
+    def test_prune_repository_save_space(self):
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test1', src_dir)
+        self.cmd('create', self.repository_location + '::test2', src_dir)
+        output = self.cmd('prune', '-v', '--dry-run', self.repository_location, '--keep-daily=2')
+        self.assert_in('Keeping archive: test2', output)
+        self.assert_in('Would prune:     test1', output)
+        output = self.cmd('list', self.repository_location)
+        self.assert_in('test1', output)
+        self.assert_in('test2', output)
+        self.cmd('prune', '--save-space', self.repository_location, '--keep-daily=2')
         output = self.cmd('list', self.repository_location)
         self.assert_not_in('test1', output)
         self.assert_in('test2', output)
@@ -623,6 +882,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('foo-2015-08-12-20:00', output)
         self.assert_in('bar-2015-08-12-10:00', output)
         self.assert_in('bar-2015-08-12-20:00', output)
+
+    def test_list_prefix(self):
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test-1', src_dir)
+        self.cmd('create', self.repository_location + '::something-else-than-test-1', src_dir)
+        self.cmd('create', self.repository_location + '::test-2', src_dir)
+        output = self.cmd('list', '--prefix=test-', self.repository_location)
+        self.assert_in('test-1', output)
+        self.assert_in('test-2', output)
+        self.assert_not_in('something-else', output)
+
+    def test_break_lock(self):
+        self.cmd('init', self.repository_location)
+        self.cmd('break-lock', self.repository_location)
 
     def test_usage(self):
         if self.FORK_DEFAULT:
@@ -714,7 +987,36 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.verify_aes_counter_uniqueness('keyfile')
 
     def test_aes_counter_uniqueness_passphrase(self):
-        self.verify_aes_counter_uniqueness('passphrase')
+        self.verify_aes_counter_uniqueness('repokey')
+
+    def test_debug_dump_archive_items(self):
+        self.create_test_files()
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            output = self.cmd('debug-dump-archive-items', self.repository_location + '::test')
+        output_dir = sorted(os.listdir('output'))
+        assert len(output_dir) > 0 and output_dir[0].startswith('000000_')
+        assert 'Done.' in output
+
+    def test_debug_put_get_delete_obj(self):
+        self.cmd('init', self.repository_location)
+        data = b'some data'
+        hexkey = sha256(data).hexdigest()
+        self.create_regular_file('file', contents=data)
+        output = self.cmd('debug-put-obj', self.repository_location, 'input/file')
+        assert hexkey in output
+        output = self.cmd('debug-get-obj', self.repository_location, hexkey, 'output/file')
+        assert hexkey in output
+        with open('output/file', 'rb') as f:
+            data_read = f.read()
+        assert data == data_read
+        output = self.cmd('debug-delete-obj', self.repository_location, hexkey)
+        assert "deleted" in output
+        output = self.cmd('debug-delete-obj', self.repository_location, hexkey)
+        assert "not found" in output
+        output = self.cmd('debug-delete-obj', self.repository_location, 'invalid')
+        assert "is invalid" in output
 
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
@@ -739,15 +1041,17 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         return archive, repository
 
     def test_check_usage(self):
-        output = self.cmd('check', self.repository_location, exit_code=0)
+        output = self.cmd('check', '-v', self.repository_location, exit_code=0)
         self.assert_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)
-        output = self.cmd('check', '--repository-only', self.repository_location, exit_code=0)
+        output = self.cmd('check', '-v', '--repository-only', self.repository_location, exit_code=0)
         self.assert_in('Starting repository check', output)
         self.assert_not_in('Starting archive consistency check', output)
-        output = self.cmd('check', '--archives-only', self.repository_location, exit_code=0)
+        output = self.cmd('check', '-v', '--archives-only', self.repository_location, exit_code=0)
         self.assert_not_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)
+        output = self.cmd('check', '-v', '--archives-only', '--prefix=archive2', self.repository_location, exit_code=0)
+        self.assert_not_in('archive1', output)
 
     def test_missing_file_chunk(self):
         archive, repository = self.open_archive('archive1')
@@ -781,7 +1085,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         repository.delete(Manifest.MANIFEST_ID)
         repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
-        output = self.cmd('check', '--repair', self.repository_location, exit_code=0)
+        output = self.cmd('check', '-v', '--repair', self.repository_location, exit_code=0)
         self.assert_in('archive1', output)
         self.assert_in('archive2', output)
         self.cmd('check', self.repository_location, exit_code=0)
@@ -825,3 +1129,28 @@ if 0:
         @unittest.skip('deadlock issues')
         def test_fuse_mount_archive(self):
             pass
+
+        @unittest.skip('only works locally')
+        def test_debug_put_get_delete_obj(self):
+            pass
+
+
+def test_get_args():
+    archiver = Archiver()
+    # everything normal:
+    # first param is argv as produced by ssh forced command,
+    # second param is like from SSH_ORIGINAL_COMMAND env variable
+    args = archiver.get_args(['borg', 'serve', '--restrict-to-path=/p1', '--restrict-to-path=/p2', ],
+                             'borg serve --info --umask=0027')
+    assert args.func == archiver.do_serve
+    assert args.restrict_to_paths == ['/p1', '/p2']
+    assert args.umask == 0o027
+    assert args.log_level == 'info'
+    # trying to cheat - break out of path restriction
+    args = archiver.get_args(['borg', 'serve', '--restrict-to-path=/p1', '--restrict-to-path=/p2', ],
+                             'borg serve --restrict-to-path=/')
+    assert args.restrict_to_paths == ['/p1', '/p2']
+    # trying to cheat - try to execute different subcommand
+    args = archiver.get_args(['borg', 'serve', '--restrict-to-path=/p1', '--restrict-to-path=/p2', ],
+                             'borg init /')
+    assert args.func == archiver.do_serve

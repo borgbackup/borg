@@ -16,15 +16,16 @@ from .archiver import changedir, cmd
 @pytest.yield_fixture
 def repo_url(request, tmpdir):
     os.environ['BORG_PASSPHRASE'] = '123456'
-    os.environ['BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'] = '1'
-    os.environ['BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'] = '1'
+    os.environ['BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
+    os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
+    os.environ['BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'] = 'yes'
     os.environ['BORG_KEYS_DIR'] = str(tmpdir.join('keys'))
     os.environ['BORG_CACHE_DIR'] = str(tmpdir.join('cache'))
     yield str(tmpdir.join('repository'))
     tmpdir.remove(rec=1)
 
 
-@pytest.fixture(params=["none", "passphrase"])
+@pytest.fixture(params=["none", "repokey"])
 def repo(request, cmd, repo_url):
     cmd('init', '--encryption', request.param, repo_url)
     return repo_url
@@ -37,15 +38,14 @@ def testdata(request, tmpdir_factory):
     data_type = request.param
     if data_type == 'zeros':
         # do not use a binary zero (\0) to avoid sparse detection
-        data = lambda: b'0' * size
+        def data(size):
+            return b'0' * size
     if data_type == 'random':
-        rnd = open('/dev/urandom', 'rb')
-        data = lambda: rnd.read(size)
+        def data(size):
+            return os.urandom(size)
     for i in range(count):
         with open(str(p.join(str(i))), "wb") as f:
-            f.write(data())
-    if data_type == 'random':
-        rnd.close()
+            f.write(data(size))
     yield str(p)
     p.remove(rec=1)
 
@@ -98,4 +98,3 @@ def test_check(benchmark, cmd, archive):
 def test_help(benchmark, cmd):
     result, out = benchmark(cmd, 'help')
     assert result == 0
-

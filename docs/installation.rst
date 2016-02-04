@@ -67,7 +67,7 @@ Standalone Binary
 on the releases_ page for the following platforms:
 
 * **Linux**: glibc >= 2.13 (ok for most supported Linux releases)
-* **Mac OS X**: 10.10 (unknown whether it works for older releases)
+* **Mac OS X**: 10.10 (does not work with older OS X releases)
 * **FreeBSD**: 10.2 (unknown whether it works for older releases)
 
 To install such a binary, just drop it into a directory in your ``PATH``,

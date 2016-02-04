@@ -128,7 +128,7 @@ class Archive:
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False, progress=False,
                  chunker_params=CHUNKER_PARAMS,
-                 start=datetime.now(), end=datetime.now()):
+                 start=datetime.utcnow(), end=datetime.utcnow()):
         self.cwd = os.getcwd()
         self.key = key
         self.repository = repository

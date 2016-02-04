@@ -191,7 +191,7 @@ class Archiver:
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 if args.stats:
-                    archive.end = datetime.now()
+                    archive.end = datetime.utcnow()
                     log_multi(DASHES,
                               str(archive),
                               DASHES,
@@ -202,7 +202,7 @@ class Archiver:
         self.output_filter = args.output_filter
         self.output_list = args.output_list
         dry_run = args.dry_run
-        t0 = datetime.now()
+        t0 = datetime.utcnow()
         if not dry_run:
             repository = self.open_repository(args, exclusive=True)
             manifest, key = Manifest.load(repository)

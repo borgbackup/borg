@@ -58,23 +58,27 @@ class Cache:
                     raise self.CacheInitAbortedError()
             self.create()
         self.open(lock_wait=lock_wait)
-        # Warn user before sending data to a relocated repository
-        if self.previous_location and self.previous_location != repository._location.canonical_path():
-            msg = ("Warning: The repository at location {} was previously located at {}".format(repository._location.canonical_path(), self.previous_location) +
-                   "\n" +
-                   "Do you want to continue? [yN] ")
-            if not yes(msg, false_msg="Aborting.", env_var_override='BORG_RELOCATED_REPO_ACCESS_IS_OK'):
-                raise self.RepositoryAccessAborted()
+        try:
+            # Warn user before sending data to a relocated repository
+            if self.previous_location and self.previous_location != repository._location.canonical_path():
+                msg = ("Warning: The repository at location {} was previously located at {}".format(repository._location.canonical_path(), self.previous_location) +
+                       "\n" +
+                       "Do you want to continue? [yN] ")
+                if not yes(msg, false_msg="Aborting.", env_var_override='BORG_RELOCATED_REPO_ACCESS_IS_OK'):
+                    raise self.RepositoryAccessAborted()
 
-        if sync and self.manifest.id != self.manifest_id:
-            # If repository is older than the cache something fishy is going on
-            if self.timestamp and self.timestamp > manifest.timestamp:
-                raise self.RepositoryReplay()
-            # Make sure an encrypted repository has not been swapped for an unencrypted repository
-            if self.key_type is not None and self.key_type != str(key.TYPE):
-                raise self.EncryptionMethodMismatch()
-            self.sync()
-            self.commit()
+            if sync and self.manifest.id != self.manifest_id:
+                # If repository is older than the cache something fishy is going on
+                if self.timestamp and self.timestamp > manifest.timestamp:
+                    raise self.RepositoryReplay()
+                # Make sure an encrypted repository has not been swapped for an unencrypted repository
+                if self.key_type is not None and self.key_type != str(key.TYPE):
+                    raise self.EncryptionMethodMismatch()
+                self.sync()
+                self.commit()
+        except:
+            self.close()
+            raise
 
     def __enter__(self):
         return self

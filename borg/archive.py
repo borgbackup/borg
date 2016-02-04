@@ -226,7 +226,7 @@ Number of files: {0.stats.nfiles}'''.format(self)
             raise self.AlreadyExists(name)
         self.items_buffer.flush(flush=True)
         if timestamp is None:
-            timestamp = datetime.utcnow()
+            timestamp = self.start
         metadata = StableDict({
             'version': 1,
             'name': name,

@@ -334,7 +334,23 @@ Examples
     -rw-r--r-- root   root       1383 May 22 22:25 etc/ImageMagick-6/colors.xml
     ...
 
+    $ borg list /mnt/backup::archiveA --list-format="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}"
+    drwxrwxr-x user   user          0 Sun, 2015-02-01 11:00:00 .
+    drwxrwxr-x user   user          0 Sun, 2015-02-01 11:00:00 code
+    drwxrwxr-x user   user          0 Sun, 2015-02-01 11:00:00 code/myproject
+    -rw-rw-r-- user   user    1416192 Sun, 2015-02-01 11:00:00 code/myproject/file.ext
+    ...
 
+    # see what is change between archives, based on file modification time, size and file path
+    $ borg list /mnt/backup::archiveA --list-format="{mtime:%s}{TAB}{size}{TAB}{path}{LF}" |sort -n > /tmp/list.archiveA
+    $ borg list /mnt/backup::archiveB --list-format="{mtime:%s}{TAB}{size}{TAB}{path}{LF}" |sort -n > /tmp/list.archiveB
+    $ diff -y /tmp/list.archiveA /tmp/list.archiveB
+    1422781200      0       .                                       1422781200      0       .
+    1422781200      0       code                                    1422781200      0       code
+    1422781200      0       code/myproject                          1422781200      0       code/myproject
+    1422781200      1416192 code/myproject/file.ext               | 1454664653      1416192 code/myproject/file.ext
+    ...
+    
 .. include:: usage/prune.rst.inc
 
 Examples

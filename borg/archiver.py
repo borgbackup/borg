@@ -15,7 +15,7 @@ import textwrap
 import traceback
 
 from . import __version__
-from .helpers import Error, location_validator, format_time, format_file_size, \
+from .helpers import Error, location_validator, format_time, format_line, safe_timestamp, format_file_size, \
     parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
@@ -442,6 +442,13 @@ class Archiver:
                 for item in archive.iter_items():
                     print(remove_surrogates(item[b'path']))
             else:
+                longformat="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}"
+                userformat=longformat
+                if args.listformat:
+                    userformat=args.listformat                
+                
+                archive_name=archive.name
+
                 for item in archive.iter_items():
                     mode = stat.filemode(item[b'mode'])
                     type = mode[0]
@@ -451,12 +458,12 @@ class Archiver:
                             size = sum(size for _, size, _ in item[b'chunks'])
                         except KeyError:
                             pass
-                    try:
-                        mtime = datetime.fromtimestamp(bigint_to_int(item[b'mtime']) / 1e9)
-                    except OverflowError:
-                        # likely a broken mtime and datetime did not want to go beyond year 9999
-                        mtime = datetime(9999, 12, 31, 23, 59, 59)
+                    atime=safe_timestamp(item[b'atime'])
+                    ctime=safe_timestamp(item[b'ctime'])
+                    mtime=safe_timestamp(item[b'mtime'])
+                    
                     if b'source' in item:
+                        source = item[b'source']
                         if type == 'l':
                             extra = ' -> %s' % item[b'source']
                         else:
@@ -464,10 +471,40 @@ class Archiver:
                             extra = ' link to %s' % item[b'source']
                     else:
                         extra = ''
-                    print('%s %-6s %-6s %8d %s %s%s' % (
-                        mode, item[b'user'] or item[b'uid'],
-                        item[b'group'] or item[b'gid'], size, format_time(mtime),
-                        remove_surrogates(item[b'path']), extra))
+                        source = ''
+                     
+                    formatdata={
+                        'mode': mode,
+                        'bmode': item[b'mode'],
+                        'type': type,
+                        'source': source,
+                        'linktarget': source,
+                        'user': item[b'user'] or item[b'uid'],
+                        'uid': item[b'uid'],
+                        'group': item[b'group'] or item[b'gid'],
+                        'gid': item[b'gid'],
+                        'size': size,
+                        'isomtime': format_time(mtime),
+                        'mtime': mtime,
+                        'isoctime': format_time(ctime),
+                        'ctime': ctime,
+                        'isoatime': format_time(atime),
+                        'atime': atime,
+                        'path': remove_surrogates(item[b'path']), 
+                        'extra': extra,
+                        'archivename': archive_name,
+                        'SPACE': " ",
+                        'TAB': "\t",
+                        'LF': "\n",
+                        'CR': "\r",
+                        'NEWLINE': os.linesep,
+                        'formatkeys': ()
+                        }
+                    formatdata["formatkeys"]=list(formatdata.keys())
+                    
+
+                    print(format_line(userformat, formatdata), end='')
+
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 if args.prefix and not archive_info.name.startswith(args.prefix):
@@ -1098,6 +1135,8 @@ class Archiver:
         subparser.add_argument('--short', dest='short',
                                action='store_true', default=False,
                                help='only print file/directory names, nothing else')
+        subparser.add_argument('--list-format', dest='listformat', type=str,
+                               help='Format archive listing line')
         subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',

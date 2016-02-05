@@ -518,6 +518,28 @@ def dir_is_tagged(path, exclude_caches, exclude_if_present):
                 tag_paths.append(tag_path)
     return tag_paths
 
+def format_line(formatstr, data):
+    """Filter out unwanted properties of str.format(), because "formatstr" 
+    is user provided. 
+    """    
+    try:
+        return(formatstr.format(**data))
+    except KeyError as e:
+        print('Error in lineformat: "{}" - reason "{}"'.format(formatstr, str(e)))
+    except ValueError as e:
+        print('Error in lineformat: "{}" - reason "{}"'.format(formatstr, str(e)))
+    except:
+        print('Line format error')
+        raise   
+    return ''
+
+def safe_timestamp(timedata):    
+    try:
+        return datetime.fromtimestamp(bigint_to_int(timedata) / 1e9)
+    except OverflowError:
+        # likely a broken file time and datetime did not want to go beyond year 9999
+        return datetime(9999, 12, 31, 23, 59, 59)
+
 
 def format_time(t):
     """use ISO-8601 date and time format

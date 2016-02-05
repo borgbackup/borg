@@ -191,7 +191,7 @@ class Archiver:
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 if args.stats:
-                    archive.end = datetime.now()
+                    archive.end = datetime.utcnow()
                     log_multi(DASHES,
                               str(archive),
                               DASHES,
@@ -202,7 +202,7 @@ class Archiver:
         self.output_filter = args.output_filter
         self.output_list = args.output_list
         dry_run = args.dry_run
-        t0 = datetime.now()
+        t0 = datetime.utcnow()
         if not dry_run:
             repository = self.open_repository(args, exclusive=True)
             manifest, key = Manifest.load(repository)
@@ -489,7 +489,8 @@ class Archiver:
             print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
             print('Hostname:', archive.metadata[b'hostname'])
             print('Username:', archive.metadata[b'username'])
-            print('Time: %s' % format_time(to_localtime(archive.ts)))
+            print('Time (start): %s' % format_time(to_localtime(archive.ts)))
+            print('Time (end):   %s' % format_time(to_localtime(archive.ts_end)))
             print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
             print('Number of files: %d' % stats.nfiles)
             print()

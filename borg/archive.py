@@ -172,14 +172,19 @@ class Archive:
     def load(self, id):
         self.id = id
         self.metadata = self._load_meta(self.id)
-        decode_dict(self.metadata, (b'name', b'hostname', b'username', b'time'))
+        decode_dict(self.metadata, (b'name', b'hostname', b'username', b'time', b'time_end'))
         self.metadata[b'cmdline'] = [arg.decode('utf-8', 'surrogateescape') for arg in self.metadata[b'cmdline']]
         self.name = self.metadata[b'name']
 
     @property
     def ts(self):
-        """Timestamp of archive creation in UTC"""
+        """Timestamp of archive creation (start) in UTC"""
         return parse_timestamp(self.metadata[b'time'])
+
+    @property
+    def ts_end(self):
+        """Timestamp of archive creation (end) in UTC"""
+        return parse_timestamp(self.metadata[b'time_end'])
 
     @property
     def fpr(self):
@@ -226,7 +231,11 @@ Number of files: {0.stats.nfiles}'''.format(self)
             raise self.AlreadyExists(name)
         self.items_buffer.flush(flush=True)
         if timestamp is None:
-            timestamp = self.start
+            start = self.start
+            end = self.end
+        else:
+            start = timestamp
+            end = timestamp  # we only have 1 value
         metadata = StableDict({
             'version': 1,
             'name': name,
@@ -234,7 +243,8 @@ Number of files: {0.stats.nfiles}'''.format(self)
             'cmdline': sys.argv,
             'hostname': socket.gethostname(),
             'username': getuser(),
-            'time': timestamp.isoformat(),
+            'time': start.isoformat(),
+            'time_end': end.isoformat(),
         })
         data = msgpack.packb(metadata, unicode_errors='surrogateescape')
         self.id = self.key.id_hash(data)
@@ -851,7 +861,7 @@ class ArchiveChecker:
                 archive = StableDict(msgpack.unpackb(data))
                 if archive[b'version'] != 1:
                     raise Exception('Unknown archive metadata version')
-                decode_dict(archive, (b'name', b'hostname', b'username', b'time'))
+                decode_dict(archive, (b'name', b'hostname', b'username', b'time', b'time_end'))
                 archive[b'cmdline'] = [arg.decode('utf-8', 'surrogateescape') for arg in archive[b'cmdline']]
                 items_buffer = ChunkBuffer(self.key)
                 items_buffer.write_chunk = add_callback

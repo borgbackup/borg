@@ -59,20 +59,28 @@ Compatibility notes:
   --chunker-params option at all) and you'ld like to continue using small
   chunks (and you accept the huge resource usage that comes with that), just
   explicitly use borg create --chunker-params=10,23,16,4095.
+- archive timestamps: the 'time' timestamp now refers to archive creation
+  start time (was: end time), the new 'time_end' timestamp refers to archive
+  creation end time. This might affect prune if your backups take rather long.
+  if you give a timestamp via cli this is stored into 'time', therefore it now
+  needs to mean archive creation start time.
 
 New features:
 
 - borg migrate-to-repokey ("passphrase" -> "repokey" encryption key mode)
-- implement --short for borg list REPO, fixes #611
+- implement --short for borg list REPO, #611
 - implement --list for borg extract (consistency with borg create)
 - borg serve: overwrite client's --restrict-to-path with ssh forced command's
   option value (but keep everything else from the client commandline), #544
 - use $XDG_CONFIG_HOME/keys for keyfile keys (~/.config/borg/keys), #515
 - "borg upgrade" moves the keyfile keys to the new location
+- display both archive creation start and end time in "borg info", #627
+
 
 Bug fixes:
 
 - normalize trailing slashes for the repository path, #606
+- Cache: fix exception handling in __init__, release lock, #610
 
 Other changes:
 
@@ -83,7 +91,7 @@ Other changes:
   newer did not support py 3.2 any more
 - use some py 3.4+ stdlib code instead of own/openssl/pypi code:
 
-  - use os.urandom instead of own cython openssl RAND_bytes wrapper, fixes #493
+  - use os.urandom instead of own cython openssl RAND_bytes wrapper, #493
   - use hashlib.pbkdf2_hmac from py stdlib instead of own openssl wrapper
   - use hmac.compare_digest instead of == operator (constant time comparison)
   - use stat.filemode instead of homegrown code
@@ -99,6 +107,9 @@ Other changes:
   - quote exclude line that includes an asterisk to prevent shell expansion
   - fix dead link to license
   - delete Ubuntu Vivid, it is not supported anymore (EOL)
+  - OS X binary does not work for older OS X releases, #629
+  - borg serve's special support for forced/original ssh commands, #544
+  - misc. updates and fixes
 
 
 Version 0.30.0

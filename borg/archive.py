@@ -179,12 +179,15 @@ class Archive:
     @property
     def ts(self):
         """Timestamp of archive creation (start) in UTC"""
-        return parse_timestamp(self.metadata[b'time'])
+        ts = self.metadata[b'time']
+        return parse_timestamp(ts)
 
     @property
     def ts_end(self):
         """Timestamp of archive creation (end) in UTC"""
-        return parse_timestamp(self.metadata[b'time_end'])
+        # fall back to time if there is no time_end present in metadata
+        ts = self.metadata.get(b'time_end') or self.metadata[b'time']
+        return parse_timestamp(ts)
 
     @property
     def fpr(self):
@@ -231,9 +234,11 @@ Number of files: {0.stats.nfiles}'''.format(self)
             raise self.AlreadyExists(name)
         self.items_buffer.flush(flush=True)
         if timestamp is None:
+            self.end = datetime.utcnow()
             start = self.start
             end = self.end
         else:
+            self.end = timestamp
             start = timestamp
             end = timestamp  # we only have 1 value
         metadata = StableDict({

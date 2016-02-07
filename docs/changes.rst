@@ -1,6 +1,42 @@
 Changelog
 =========
 
+Version 0.30.1 (not released yet)
+---------------------------------
+
+Compatibility / maintenance notes:
+
+- Python 3.2 is dead and everybody is dropping support for it.
+  Python 3.3 is rather old and not feeling too well either.
+- Thus, 0.30.x is the last borgbackup version that is compatible with python
+  3.2 and 3.3, all 1.x.x releases require python 3.4 or 3.5.
+- 0.30.x releases will get a few critical fixes, so you can use them for
+  a while, but do not expect 0.30.x to be maintained for a long time.
+  Neither will any new features be added in 0.30.x.
+  Nor will any minor/cosmetic bugs be fixed in 0.30.x.
+- There will be no binary releases for 0.30.x - just use the 1.x.x releases
+  if you want a binary.
+- The 1.x.x binaries include python 3.5, so using them might be an option for
+  older systems that do not have python >= 3.4.
+- Alternatively, you can always install python 3.4 or 3.5 to /usr/local/bin
+  (make altinstall) without causing issues/conflicts with your system python.
+
+Bug fixes:
+
+- seeking to an invalid position is an IOError in python 3.2, #621
+- Cache: fix exception handling in __init__, release lock, #610
+
+Other changes:
+
+- allow llfuse version 0.41.x, #642
+- document and automate llfuse requirement (setup.py / requirements.d/fuse.txt)
+- require msgpack==0.4.6 - no python 3.2 support in 0.4.7+
+- Vagrantfile: avoid pkg-config missing error msg on netbsd
+- add chunks.archive.d trick to FAQ
+- Vagrantfile: remove python 3.2, use older pip/venv for trusty
+  pyenv installs latest virtualenv/pip that is not compatible with py 3.2 any more
+
+
 Version 0.30.0
 --------------
 

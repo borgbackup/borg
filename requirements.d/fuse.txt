@@ -1,4 +1,4 @@
 # low-level FUSE support library for "borg mount"
 # see comments setup.py about this version requirement.
-llfuse<0.41
+llfuse<0.42
 

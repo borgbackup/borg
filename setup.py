@@ -24,9 +24,9 @@ install_requires=['msgpack-python==0.4.6', ]
 
 extras_require = {
     # llfuse 0.40 (tested, proven, ok), needs FUSE version >= 2.8.0
-    # llfuse 0.41 (unknown, maybe ok)
+    # llfuse 0.41 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 0.42 (tested, does not work, incompatible api changes)
-    'fuse': ['llfuse<0.41', ],
+    'fuse': ['llfuse<0.42', ],
 }
 
 from setuptools import setup, Extension

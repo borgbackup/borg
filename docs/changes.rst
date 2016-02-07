@@ -1,8 +1,8 @@
 Changelog
 =========
 
-Version 1.0.0 (not released yet)
---------------------------------
+Version 1.0.0rc1
+----------------
 
 The major release number change (0.x -> 1.x) indicates bigger incompatible
 changes, please read the compatibility notes, adapt / test your scripts and
@@ -18,19 +18,19 @@ Compatibility notes:
   you can either move them manually or run "borg upgrade <REPO>"
 - remove support for --encryption=passphrase,
   use borg migrate-to-repokey to switch to repokey mode, #97
-- remove deprecated "--compression <number>",
+- remove deprecated --compression <number>,
   use --compression zlib,<number> instead
   in case of 0, you could also use --compression none
-- remove deprecated "--hourly/daily/weekly/monthly/yearly"
+- remove deprecated --hourly/daily/weekly/monthly/yearly
   use --keep-hourly/daily/weekly/monthly/yearly instead
-- remove deprecated "--do-not-cross-mountpoints",
+- remove deprecated --do-not-cross-mountpoints,
   use --one-file-system instead
 - disambiguate -p option, #563:
 
   - -p now is same as --progress
   - -P now is same as --prefix  
 - remove deprecated "borg verify",
-  use borg extract --dry-run instead
+  use "borg extract --dry-run" instead
 - cleanup environment variable semantics, #355
   the environment variables used to be "yes sayers" when set, this was
   conceptually generalized to "automatic answerers" and they just give their

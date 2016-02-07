@@ -1,8 +1,8 @@
 Changelog
 =========
 
-Version 0.30.1 (not released yet)
----------------------------------
+Version 0.30.1
+--------------
 
 Compatibility / maintenance notes:
 
@@ -10,6 +10,7 @@ Compatibility / maintenance notes:
   Python 3.3 is rather old and not feeling too well either.
 - Thus, 0.30.x is the last borgbackup version that is compatible with python
   3.2 and 3.3, all 1.x.x releases require python 3.4 or 3.5.
+- 1.0.0rc1 is already released, use that (and later 1.x.x), if possible.
 - 0.30.x releases will get a few critical fixes, so you can use them for
   a while, but do not expect 0.30.x to be maintained for a long time.
   Neither will any new features be added in 0.30.x.
@@ -31,6 +32,8 @@ Other changes:
 - allow llfuse version 0.41.x, #642
 - document and automate llfuse requirement (setup.py / requirements.d/fuse.txt)
 - require msgpack==0.4.6 - no python 3.2 support in 0.4.7+
+
+Missing in 0.30.0 change log:
 - Vagrantfile: avoid pkg-config missing error msg on netbsd
 - add chunks.archive.d trick to FAQ
 - Vagrantfile: remove python 3.2, use older pip/venv for trusty

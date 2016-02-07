@@ -34,9 +34,9 @@ borg upgrade
 Description
 ~~~~~~~~~~~
 
-Upgrade an existing Borg repository. This currently
-only supports converting an Attic repository, but may
-eventually be extended to cover major Borg upgrades as well.
+Upgrade an existing Borg repository.
+This currently supports converting an Attic repository to Borg and also
+helps with converting Borg 0.xx to 1.0.
 
 It will change the magic strings in the repository's segments
 to match the new Borg magic strings. The keyfiles found in

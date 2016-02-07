@@ -548,15 +548,13 @@ class Archiver:
 
     def do_upgrade(self, args):
         """upgrade a repository from a previous version"""
-        # XXX: currently only upgrades from Attic repositories, but may
-        # eventually be extended to deal with major upgrades for borg
-        # itself.
+        # mainly for upgrades from Attic repositories,
+        # but also supports borg 0.xx -> 1.0 upgrade.
         #
-        # in this case, it should auto-detect the current repository
-        # format and fire up necessary upgrade mechanism. this remains
-        # to be implemented.
+        # TODO:
+        # it should auto-detect the current repository format and fire up
+        # necessary upgrade mechanism.
 
-        # XXX: should auto-detect if it is an attic repository here
         repo = AtticRepositoryUpgrader(args.location.path, create=False)
         try:
             repo.upgrade(args.dry_run, inplace=args.inplace, progress=args.progress)
@@ -1212,9 +1210,9 @@ class Archiver:
                                help='repository to prune')
 
         upgrade_epilog = textwrap.dedent("""
-        Upgrade an existing Borg repository. This currently
-        only supports converting an Attic repository, but may
-        eventually be extended to cover major Borg upgrades as well.
+        Upgrade an existing Borg repository.
+        This currently supports converting an Attic repository to Borg and also
+        helps with converting Borg 0.xx to 1.0.
 
         It will change the magic strings in the repository's segments
         to match the new Borg magic strings. The keyfiles found in

@@ -158,8 +158,7 @@ Checklist:
 - make sure all issues for this milestone are closed or moved to the
   next milestone
 - find and fix any low hanging fruit left on the issue tracker
-- run tox on all supported platforms via vagrant, check for test failures
-- check that Travis CI is also happy
+- check that Travis CI is happy
 - update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``
 - check version number of upcoming release in ``CHANGES.rst``
 - verify that ``MANIFEST.in`` and ``setup.py`` are complete
@@ -168,6 +167,8 @@ Checklist:
 
     git tag -s -m "tagged/signed release X.Y.Z" X.Y.Z
 
+- run tox and/or binary builds on all supported platforms via vagrant,
+  check for test failures
 - create a release on PyPi::
 
     python setup.py register sdist upload --identity="Thomas Waldmann" --sign

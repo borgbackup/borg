@@ -550,10 +550,6 @@ class Archiver:
         """upgrade a repository from a previous version"""
         # mainly for upgrades from Attic repositories,
         # but also supports borg 0.xx -> 1.0 upgrade.
-        #
-        # TODO:
-        # it should auto-detect the current repository format and fire up
-        # necessary upgrade mechanism.
 
         repo = AtticRepositoryUpgrader(args.location.path, create=False)
         try:

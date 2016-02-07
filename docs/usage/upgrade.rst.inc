@@ -38,6 +38,8 @@ Upgrade an existing Borg repository.
 This currently supports converting an Attic repository to Borg and also
 helps with converting Borg 0.xx to 1.0.
 
+Currently, only LOCAL repositories can be upgraded (issue #465).
+
 It will change the magic strings in the repository's segments
 to match the new Borg magic strings. The keyfiles found in
 $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and

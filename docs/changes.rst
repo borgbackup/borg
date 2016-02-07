@@ -1,6 +1,24 @@
 Changelog
 =========
 
+
+Version 1.0.0 (not released yet)
+--------------------------------
+
+Other changes:
+- it is now possible to use "pip install borgbackup[fuse]" to automatically
+  install the llfuse dependency using the correction version requirement
+  for it. you still need to care about having installed the FUSE / build
+  related OS package first, though, so that building llfuse can succeed.
+
+- docs:
+ 
+  - borg upgrade also handles borg 0.xx -> 1.0
+  - use pip extras or requirements file to install llfuse
+  - fix order in release process
+  - updated usage docs and other minor / cosmetic fixes
+
+
 Version 1.0.0rc1
 ----------------
 

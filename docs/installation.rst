@@ -105,7 +105,7 @@ following dependencies first:
 * liblz4_
 * some Python dependencies, pip will automatically install them for you
 * optionally, the llfuse_ Python package is required if you wish to mount an
-  archive as a FUSE filesystem. FUSE >= 2.8.0 is required for llfuse.
+  archive as a FUSE filesystem. See setup.py about the version requirements.
 
 In the following, the steps needed to install the dependencies are listed for a
 selection of platforms. If your distribution is not covered by these

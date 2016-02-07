@@ -989,7 +989,10 @@ def sysinfo():
     info.append('Platform: %s' % (' '.join(platform.uname()), ))
     if sys.platform.startswith('linux'):
         info.append('Linux: %s %s %s  LibC: %s %s' % (platform.linux_distribution() + platform.libc_ver()))
-    info.append('Borg: %s Python: %s %s' % (borg_version, platform.python_implementation(), platform.python_version()))
+    info.append('Borg: %s  Python: %s %s' % (borg_version, platform.python_implementation(), platform.python_version()))
+    info.append('PID: %d  CWD: %s' % (os.getpid(), os.getcwd()))
+    info.append('sys.argv: %r' % sys.argv)
+    info.append('SSH_ORIGINAL_COMMAND: %r' % os.environ.get('SSH_ORIGINAL_COMMAND'))
     info.append('')
     return '\n'.join(info)
 

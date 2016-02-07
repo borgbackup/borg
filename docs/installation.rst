@@ -206,14 +206,14 @@ This will use ``pip`` to install the latest release from PyPi::
     source borg-env/bin/activate
 
     # install Borg + Python dependencies into virtualenv
-    pip install 'llfuse<0.41'  # optional, for FUSE support
-                               # 0.41 and 0.41.1 have unicode issues at install time
     pip install borgbackup
+    # or alternatively (if you want FUSE support):
+    pip install borgbackup[fuse]
 
 To upgrade |project_name| to a new version later, run the following after
 activating your virtual environment::
 
-    pip install -U borgbackup
+    pip install -U borgbackup  # or ... borgbackup[fuse]
 
 .. _git-installation:
 
@@ -231,10 +231,9 @@ While we try not to break master, there are no guarantees on anything. ::
 
     # install borg + dependencies into virtualenv
     pip install sphinx  # optional, to build the docs
-    pip install 'llfuse<0.41'  # optional, for FUSE support
-                               # 0.41 and 0.41.1 have unicode issues at install time
     cd borg
     pip install -r requirements.d/development.txt
+    pip install -r requirements.d/fuse.txt  # optional, for FUSE support
     pip install -e .  # in-place editable mode
 
     # optional: run all the tests, on all supported Python versions

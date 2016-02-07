@@ -5,8 +5,8 @@ borg extract
 ::
 
     usage: borg extract [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
-                        [--no-files-cache] [--umask M] [--remote-path PATH] [-n]
-                        [-e PATTERN] [--exclude-from EXCLUDEFILE]
+                        [--no-files-cache] [--umask M] [--remote-path PATH]
+                        [--list] [-n] [-e PATTERN] [--exclude-from EXCLUDEFILE]
                         [--numeric-owner] [--strip-components NUMBER] [--stdout]
                         [--sparse]
                         ARCHIVE [PATH [PATH ...]]
@@ -29,6 +29,7 @@ borg extract
                             detect unchanged files
       --umask M             set umask to M (local and remote, default: 0077)
       --remote-path PATH    set remote path to executable (default: "borg")
+      --list                output verbose list of items (files, dirs, ...)
       -n, --dry-run         do not actually change any files
       -e PATTERN, --exclude PATTERN
                             exclude paths matching PATTERN

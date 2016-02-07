@@ -6,7 +6,7 @@ borg init
 
     usage: borg init [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
                      [--no-files-cache] [--umask M] [--remote-path PATH]
-                     [-e {none,keyfile,repokey,passphrase}]
+                     [-e {none,keyfile,repokey}]
                      [REPOSITORY]
     
     Initialize an empty repository
@@ -26,8 +26,8 @@ borg init
                             detect unchanged files
       --umask M             set umask to M (local and remote, default: 0077)
       --remote-path PATH    set remote path to executable (default: "borg")
-      -e {none,keyfile,repokey,passphrase}, --encryption {none,keyfile,repokey,passphrase}
-                            select encryption key mode
+      -e {none,keyfile,repokey}, --encryption {none,keyfile,repokey}
+                            select encryption key mode (default: "repokey")
     
 Description
 ~~~~~~~~~~~
@@ -35,5 +35,3 @@ Description
 This command initializes an empty repository. A repository is a filesystem
 directory containing the deduplicated data from zero or more archives.
 Encryption can be enabled at repository init time.
-Please note that the 'passphrase' encryption mode is DEPRECATED (instead of it,
-consider using 'repokey').

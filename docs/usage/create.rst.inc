@@ -59,7 +59,7 @@ borg create
                             manually specify the archive creation date/time (UTC).
                             alternatively, give a reference file/directory.
       --chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE
-                            specify the chunker parameters. default: 10,23,16,4095
+                            specify the chunker parameters. default: 19,23,21,4095
       -C COMPRESSION, --compression COMPRESSION
                             select compression algorithm (and level): none == no
                             compression (default), lz4 == lz4, zlib == zlib

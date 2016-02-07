@@ -6,7 +6,7 @@ borg list
 
     usage: borg list [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
                      [--no-files-cache] [--umask M] [--remote-path PATH] [--short]
-                     [-p PREFIX]
+                     [-P PREFIX]
                      [REPOSITORY_OR_ARCHIVE]
     
     List archive or repository contents
@@ -28,7 +28,7 @@ borg list
       --umask M             set umask to M (local and remote, default: 0077)
       --remote-path PATH    set remote path to executable (default: "borg")
       --short               only print file/directory names, nothing else
-      -p PREFIX, --prefix PREFIX
+      -P PREFIX, --prefix PREFIX
                             only consider archive names starting with this prefix
     
 Description

@@ -7,7 +7,7 @@ borg prune
     usage: borg prune [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
                       [--no-files-cache] [--umask M] [--remote-path PATH] [-n]
                       [-s] [--keep-within WITHIN] [-H HOURLY] [-d DAILY]
-                      [-w WEEKLY] [-m MONTHLY] [-y YEARLY] [-p PREFIX]
+                      [-w WEEKLY] [-m MONTHLY] [-y YEARLY] [-P PREFIX]
                       [--save-space]
                       [REPOSITORY]
     
@@ -41,7 +41,7 @@ borg prune
                             number of monthly archives to keep
       -y YEARLY, --keep-yearly YEARLY
                             number of yearly archives to keep
-      -p PREFIX, --prefix PREFIX
+      -P PREFIX, --prefix PREFIX
                             only consider archive names starting with this prefix
       --save-space          work slower, but using less space
     
@@ -52,8 +52,8 @@ The prune command prunes a repository by deleting archives not matching
 any of the specified retention options. This command is normally used by
 automated backup scripts wanting to keep a certain number of historic backups.
 
-As an example, "-d 7" means to keep the latest backup on each day for 7 days.
-Days without backups do not count towards the total.
+As an example, "-d 7" means to keep the latest backup on each day, up to 7
+most recent days with backups (days without backups do not count).
 The rules are applied from hourly to yearly, and backups selected by previous
 rules do not count towards those of later rules. The time that each backup
 completes is used for pruning purposes. Dates and times are interpreted in
@@ -66,7 +66,7 @@ to keep all archives that were created within the past 48 hours.
 "1m" is taken to mean "31d". The archives kept with this option do not
 count towards the totals specified by any other options.
 
-If a prefix is set with -p, then only archives that start with the prefix are
+If a prefix is set with -P, then only archives that start with the prefix are
 considered for deletion and only those archives count towards the totals
 specified by the rules.
 Otherwise, *all* archives in the repository are candidates for deletion!

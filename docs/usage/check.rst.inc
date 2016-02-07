@@ -7,7 +7,7 @@ borg check
     usage: borg check [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
                       [--no-files-cache] [--umask M] [--remote-path PATH]
                       [--repository-only] [--archives-only] [--repair]
-                      [--save-space] [--last N] [-p PREFIX]
+                      [--save-space] [--last N] [-P PREFIX]
                       [REPOSITORY_OR_ARCHIVE]
     
     Check repository consistency
@@ -33,7 +33,7 @@ borg check
       --repair              attempt to repair any inconsistencies found
       --save-space          work slower, but using less space
       --last N              only check last N archives (Default: all)
-      -p PREFIX, --prefix PREFIX
+      -P PREFIX, --prefix PREFIX
                             only consider archive names starting with this prefix
     
 Description

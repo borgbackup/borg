@@ -132,6 +132,16 @@ into the repository.
 Yes, as an attacker with access to the remote server could delete (or
 otherwise make unavailable) all your backups.
 
+Why do I get "connection closed by remote" after a while?
+---------------------------------------------------------
+
+When doing a backup to a remote server (using a ssh: repo URL), it sometimes
+stops after a while (some minutes, hours, ... - not immediately) with
+"connection closed by remote" error message. Why?
+
+That's a good question and we are trying to find a good answer in
+`ticket 636 <https://github.com/borgbackup/borg/issues/636>`_.
+
 The borg cache eats way too much disk space, what can I do?
 -----------------------------------------------------------
 

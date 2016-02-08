@@ -1,5 +1,5 @@
 from binascii import hexlify
-from datetime import datetime
+from datetime import datetime, timezone
 from getpass import getuser
 from itertools import groupby
 import errno
@@ -16,7 +16,8 @@ import sys
 import time
 from io import BytesIO
 from . import xattr
-from .helpers import parse_timestamp, Error, uid2user, user2uid, gid2group, group2gid, format_timedelta, \
+from .helpers import Error, uid2user, user2uid, gid2group, group2gid, \
+    parse_timestamp, to_localtime, format_time, format_timedelta, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
     ProgressIndicatorPercent
 from .platform import acl_get, acl_set
@@ -198,12 +199,16 @@ class Archive:
         return format_timedelta(self.end - self.start)
 
     def __str__(self):
-        return '''Archive name: {0.name}
+        return '''\
+Archive name: {0.name}
 Archive fingerprint: {0.fpr}
-Start time: {0.start:%c}
-End time: {0.end:%c}
+Time (start): {start}
+Time (end):   {end}
 Duration: {0.duration}
-Number of files: {0.stats.nfiles}'''.format(self)
+Number of files: {0.stats.nfiles}'''.format(
+            self,
+            start=format_time(to_localtime(self.start.replace(tzinfo=timezone.utc))),
+            end=format_time(to_localtime(self.end.replace(tzinfo=timezone.utc))))
 
     def __repr__(self):
         return 'Archive(%r)' % self.name

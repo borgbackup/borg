@@ -65,7 +65,8 @@ General:
     BORG_LOGGING_CONF
         When set, use the given filename as INI_-style logging configuration.
     BORG_RSH
-        When set, use this command instead of ``ssh``.
+        When set, use this command instead of ``ssh``. This can be used to specify ssh options, such as
+        a custom identity file ``ssh -i /path/to/private/key``. See ``man ssh`` for other options.
     TMPDIR
         where temporary files are stored (might need a lot of temporary space for some operations)
 

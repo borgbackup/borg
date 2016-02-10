@@ -27,6 +27,7 @@ from . import shellpattern
 import msgpack
 import msgpack.fallback
 
+import socket
 
 # return codes returned by borg command
 # when borg is killed by signal N, rc = 128 + N
@@ -688,7 +689,21 @@ class Location:
         if not self.parse(self.orig):
             raise ValueError
 
+    def preformat_text(self, text):
+        """Format repository and archive path with common tags"""
+        current_time = datetime.now()
+        data = {
+            'pid': os.getpid(),
+            'fqdn': socket.getfqdn(),
+            'hostname': socket.gethostname(),
+            'now': current_time.now(),
+            'utcnow': current_time.utcnow(),
+            'user': uid2user(os.getuid(), os.getuid())
+            }
+        return format_line(text, data)
+
     def parse(self, text):
+        text = self.preformat_text(text)
         valid = self._parse(text)
         if valid:
             return True

@@ -401,6 +401,19 @@ Examples
     $ fusermount -u /tmp/mymountpoint
 
 
+If you're using FreeBSD, you will need to install a package and load the fuse kernel module:
+
+::
+
+    $ sudo pkg install fusefs-libs
+    $ sudo kldload fuse
+    $ borg mount /mnt/backup::root-2013-08-02 /tmp/mymountpoint
+    $ ls /tmp/mymountpoint
+    bin  boot  etc  lib  lib64  mnt  opt  root  sbin  srv  usr  var
+    $ umount /tmp/mymountpoint
+    
+    
+
 .. include:: usage/change-passphrase.rst.inc
 
 Examples

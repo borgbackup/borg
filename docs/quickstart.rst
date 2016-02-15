@@ -53,28 +53,33 @@ A step by step example
    output statistics about the newly created archive such as the amount of unique
    data (not shared with other archives)::
 
+    ------------------------------------------------------------------------------
     Archive name: Tuesday
-    Archive fingerprint: 387a5e3f9b0e792e91ce87134b0f4bfe17677d9248cb5337f3fbf3a8e157942a
-    Start time: Tue Mar 25 12:00:10 2014
-    End time:   Tue Mar 25 12:00:10 2014
-    Duration: 0.08 seconds
-    Number of files: 358
-                           Original size      Compressed size    Deduplicated size
-    This archive:               57.16 MB             46.78 MB            151.67 kB
-    All archives:              114.02 MB             93.46 MB             44.81 MB
+    Archive fingerprint: bd31004d58f51ea06ff735d2e5ac49376901b21d58035f8fb05dbf866566e3c2
+    Start time: Tue Feb 16 18:15:11 2016
+    End time: Mon Feb 16 18:15:11 2016
+    Duration: 0.19 seconds
+    Number of files: 127
+    ------------------------------------------------------------------------------
+                          Original size      Compressed size    Deduplicated size
+    This archive:                4.16 MB              4.17 MB             26.78 kB
+    All archives:                8.33 MB              8.34 MB              4.19 MB
 
+                          Unique chunks         Total chunks
+    Chunk index:                     132                  261
+    ------------------------------------------------------------------------------
 
 4. List all archives in the repository::
 
     $ borg list /mnt/backup
-    Monday                               Mon Mar 24 11:59:35 2014
-    Tuesday                              Tue Mar 25 12:00:10 2014
+    Monday                               Mon, 2016-02-15 19:14:44
+    Tuesday                              Tue, 2016-02-16 19:15:11
 
 5. List the contents of the *Monday* archive::
 
     $ borg list /mnt/backup::Monday
-    drwxr-xr-x user  group         0 Jan 06 15:22 home/user/Documents
-    -rw-r--r-- user  group      7961 Nov 17  2012 home/user/Documents/Important.doc
+    drwxr-xr-x user   group          0 Mon, 2016-02-15 18:22:30 home/user/Documents
+    -rw-r--r-- user   group       7961 Mon, 2016-02-15 18:22:30 home/user/Documents/Important.doc
     ...
 
 6. Restore the *Monday* archive::
@@ -216,4 +221,3 @@ mounting the remote filesystem, for example, using sshfs::
   $ sshfs user@hostname:/mnt /mnt
   $ borg init /mnt/backup
   $ fusermount -u /mnt
-

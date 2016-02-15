@@ -51,7 +51,7 @@ Restrictions
 ------------
 
 Borg is instructed to restrict clients into their own paths:
-``borg serve --restrict-path /home/backup/repos/<client fqdn>``
+``borg serve --restrict-to-path /home/backup/repos/<client fqdn>``
 
 There is only one ssh key per client allowed. Keys are added for ``johndoe.clnt.local``, ``web01.srv.local`` and
 ``app01.srv.local``. But they will access the backup under only one UNIX user account as:
@@ -61,7 +61,7 @@ forced command and restrictions applied as shown below:
 ::
 
   command="cd /home/backup/repos/<client fqdn>;
-           borg serve --restrict-path /home/backup/repos/<client fqdn>",
+           borg serve --restrict-to-path /home/backup/repos/<client fqdn>",
            no-port-forwarding,no-X11-forwarding,no-pty,
            no-agent-forwarding,no-user-rc <keytype> <key> <host>
 

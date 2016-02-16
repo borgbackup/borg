@@ -892,6 +892,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('test-2', output)
         self.assert_not_in('something-else', output)
 
+    def test_list_list_format(self):
+        self.cmd('init', self.repository_location)
+        test_archive = self.repository_location + '::test'
+        self.cmd('create', test_archive, src_dir)
+        output_1 = self.cmd('list', test_archive)
+        output_2 = self.cmd('list', '--list-format', '{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}', test_archive)
+        output_not_equel = self.cmd('list', '--list-format', '{mtime:%s} {path}{NL}', test_archive)
+        self.assertEqual(output_1, output_2)
+        self.assertNotEqual(output_1, output_not_equel)
+
     def test_break_lock(self):
         self.cmd('init', self.repository_location)
         self.cmd('break-lock', self.repository_location)

@@ -312,8 +312,6 @@ Examples
     newname                              Mon, 2016-02-15 19:50:19
 
 
-.. include:: usage/delete.rst.inc
-
 .. include:: usage/list.rst.inc
 
 Examples
@@ -334,6 +332,24 @@ Examples
     lrwxrwxrwx root   root          0 Fri, 2015-03-27 20:24:26 bin/bzcmp -> bzdiff
     -rwxr-xr-x root   root       2140 Fri, 2015-03-27 20:24:22 bin/bzdiff
     ...
+
+
+.. include:: usage/delete.rst.inc
+
+Examples
+~~~~~~~~
+::
+
+    # delete a single backup archive:
+    $ borg delete /mnt/backup::Monday
+
+    # delete the whole repository and the related local cache:
+    $ borg delete /mnt/backup
+    You requested to completely DELETE the repository *including* all archives it contains:
+    repo                                 Mon, 2016-02-15 19:26:54
+    root-2016-02-15                      Mon, 2016-02-15 19:36:29
+    newname                              Mon, 2016-02-15 19:50:19
+    Type 'YES' if you understand this and want to continue: YES
 
 
 .. include:: usage/prune.rst.inc

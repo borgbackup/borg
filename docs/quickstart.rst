@@ -56,8 +56,9 @@ A step by step example
     ------------------------------------------------------------------------------
     Archive name: Tuesday
     Archive fingerprint: bd31004d58f51ea06ff735d2e5ac49376901b21d58035f8fb05dbf866566e3c2
-    Start time: Tue Feb 16 18:15:11 2016
-    End time: Mon Feb 16 18:15:11 2016
+    Time (start): Tue, 2016-02-16 18:15:11
+    Time (end):   Tue, 2016-02-16 18:15:11
+
     Duration: 0.19 seconds
     Number of files: 127
     ------------------------------------------------------------------------------

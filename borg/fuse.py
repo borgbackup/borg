@@ -23,6 +23,7 @@ else:
         llfuse.main(single=True)
         return None
 
+
 class ItemCache:
     def __init__(self):
         self.fd = tempfile.TemporaryFile(prefix='borg-tmp')
@@ -250,6 +251,6 @@ class FuseOperations(llfuse.Operations):
         umount = False
         try:
             signal = fuse_main()
-            umount = (signal is None) # no crash and no signal -> umount request
+            umount = (signal is None)  # no crash and no signal -> umount request
         finally:
             llfuse.close(umount)

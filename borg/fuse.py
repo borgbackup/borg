@@ -8,11 +8,20 @@ import tempfile
 import time
 from .archive import Archive
 from .helpers import daemonize
-
+from distutils.version import LooseVersion
 import msgpack
 
 # Does this version of llfuse support ns precision?
 have_fuse_xtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
+
+fuse_version = LooseVersion(getattr(llfuse, '__version__', '0.1'))
+if fuse_version >= '0.42':
+    def fuse_main():
+        return llfuse.main(workers=1)
+else:
+    def fuse_main():
+        llfuse.main(single=True)
+        return None
 
 
 class ItemCache:
@@ -103,7 +112,7 @@ class FuseOperations(llfuse.Operations):
         self._inode_count += 1
         return self._inode_count
 
-    def statfs(self):
+    def statfs(self, ctx=None):
         stat_ = llfuse.StatvfsData()
         stat_.f_bsize = 512
         stat_.f_frsize = 512
@@ -128,7 +137,7 @@ class FuseOperations(llfuse.Operations):
             inode = self.contents[inode][segment]
         return inode
 
-    def getattr(self, inode):
+    def getattr(self, inode, ctx=None):
         item = self.get_item(inode)
         size = 0
         dsize = 0
@@ -164,11 +173,11 @@ class FuseOperations(llfuse.Operations):
             entry.st_ctime = (item.get(b'ctime') or item[b'mtime']) / 1e9
         return entry
 
-    def listxattr(self, inode):
+    def listxattr(self, inode, ctx=None):
         item = self.get_item(inode)
         return item.get(b'xattrs', {}).keys()
 
-    def getxattr(self, inode, name):
+    def getxattr(self, inode, name, ctx=None):
         item = self.get_item(inode)
         try:
             return item.get(b'xattrs', {})[name]
@@ -181,7 +190,7 @@ class FuseOperations(llfuse.Operations):
         if archive:
             self.process_archive(archive, [os.fsencode(archive.name)])
 
-    def lookup(self, parent_inode, name):
+    def lookup(self, parent_inode, name, ctx=None):
         self._load_pending_archive(parent_inode)
         if name == b'.':
             inode = parent_inode
@@ -193,10 +202,10 @@ class FuseOperations(llfuse.Operations):
                 raise llfuse.FUSEError(errno.ENOENT)
         return self.getattr(inode)
 
-    def open(self, inode, flags):
+    def open(self, inode, flags, ctx=None):
         return inode
 
-    def opendir(self, inode):
+    def opendir(self, inode, ctx=None):
         self._load_pending_archive(inode)
         return inode
 
@@ -222,7 +231,7 @@ class FuseOperations(llfuse.Operations):
         for i, (name, inode) in enumerate(entries[off:], off):
             yield name, self.getattr(inode), i + 1
 
-    def readlink(self, inode):
+    def readlink(self, inode, ctx=None):
         item = self.get_item(inode)
         return os.fsencode(item[b'source'])
 
@@ -233,7 +242,15 @@ class FuseOperations(llfuse.Operations):
         llfuse.init(self, mountpoint, options)
         if not foreground:
             daemonize()
+
+        # If the file system crashes, we do not want to umount because in that
+        # case the mountpoint suddenly appears to become empty. This can have
+        # nasty consequences, imagine the user has e.g. an active rsync mirror
+        # job - seeing the mountpoint empty, rsync would delete everything in the
+        # mirror.
+        umount = False
         try:
-            llfuse.main(single=True)
+            signal = fuse_main()
+            umount = (signal is None)  # no crash and no signal -> umount request
         finally:
-            llfuse.close()
+            llfuse.close(umount)

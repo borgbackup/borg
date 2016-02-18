@@ -98,14 +98,18 @@ Dependencies
 To install |project_name| from a source package (including pip), you have to install the
 following dependencies first:
 
-* `Python 3`_ >= 3.4.0. Even though Python 3 is not the default Python version on
-  most systems, it is usually available as an optional install.
-* OpenSSL_ >= 1.0.0
-* libacl_ (that pulls in libattr_ also)
-* liblz4_
+* `Python 3`_ >= 3.4.0, plus development headers. Even though Python 3 is not
+  the default Python version on most systems, it is usually available as an
+  optional install.
+* OpenSSL_ >= 1.0.0, plus development headers.
+* libacl_ (that pulls in libattr_ also), both plus development headers.
+* liblz4_, plus development headers.
 * some Python dependencies, pip will automatically install them for you
 * optionally, the llfuse_ Python package is required if you wish to mount an
   archive as a FUSE filesystem. See setup.py about the version requirements.
+
+If you have troubles finding the right package names, have a look at the
+distribution specific sections below and also at the Vagrantfile in our repo.
 
 In the following, the steps needed to install the dependencies are listed for a
 selection of platforms. If your distribution is not covered by these

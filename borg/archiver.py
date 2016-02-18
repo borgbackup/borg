@@ -1035,7 +1035,7 @@ class Archiver:
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to extract')
-        subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to extract; patterns are supported')
 
         rename_epilog = textwrap.dedent("""

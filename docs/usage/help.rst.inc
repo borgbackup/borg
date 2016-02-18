@@ -61,32 +61,34 @@ selector prefix is also supported for patterns loaded from a file. Due to
 whitespace removal paths with whitespace at the beginning or end can only be
 excluded using regular expressions.
 
-Examples:
+Examples
+~~~~~~~~
+::
 
-# Exclude '/home/user/file.o' but not '/home/user/file.odt':
-$ borg create -e '*.o' backup /
+    # Exclude '/home/user/file.o' but not '/home/user/file.odt':
+    $ borg create -e '*.o' backup /
 
-# Exclude '/home/user/junk' and '/home/user/subdir/junk' but
-# not '/home/user/importantjunk' or '/etc/junk':
-$ borg create -e '/home/*/junk' backup /
+    # Exclude '/home/user/junk' and '/home/user/subdir/junk' but
+    # not '/home/user/importantjunk' or '/etc/junk':
+    $ borg create -e '/home/*/junk' backup /
 
-# Exclude the contents of '/home/user/cache' but not the directory itself:
-$ borg create -e /home/user/cache/ backup /
+    # Exclude the contents of '/home/user/cache' but not the directory itself:
+    $ borg create -e /home/user/cache/ backup /
 
-# The file '/home/user/cache/important' is *not* backed up:
-$ borg create -e /home/user/cache/ backup / /home/user/cache/important
+    # The file '/home/user/cache/important' is *not* backed up:
+    $ borg create -e /home/user/cache/ backup / /home/user/cache/important
 
-# The contents of directories in '/home' are not backed up when their name
-# ends in '.tmp'
-$ borg create --exclude 're:^/home/[^/]+\.tmp/' backup /
+    # The contents of directories in '/home' are not backed up when their name
+    # ends in '.tmp'
+    $ borg create --exclude 're:^/home/[^/]+\.tmp/' backup /
 
-# Load exclusions from file
-$ cat >exclude.txt <<EOF
-# Comment line
-/home/*/junk
-*.tmp
-fm:aa:something/*
-re:^/home/[^/]\.tmp/
-sh:/home/*/.thumbnails
-EOF
-$ borg create --exclude-from exclude.txt backup /
+    # Load exclusions from file
+    $ cat >exclude.txt <<EOF
+    # Comment line
+    /home/*/junk
+    *.tmp
+    fm:aa:something/*
+    re:^/home/[^/]\.tmp/
+    sh:/home/*/.thumbnails
+    EOF
+    $ borg create --exclude-from exclude.txt backup /

@@ -260,7 +260,7 @@ Examples
     $ borg create --chunker-params 10,23,16,4095 /mnt/backup::small /smallstuff
 
     # Backup a raw device (must not be active/in use/mounted at that time)
-    $ dd if=/dev/sda bs=10M | borg create /mnt/backup::my-sda -
+    $ dd if=/dev/sdx bs=10M | borg create /mnt/backup::my-sdx -
 
     # No compression (default)
     $ borg create /mnt/backup::repo ~
@@ -291,6 +291,9 @@ Examples
 
     # Extract the "src" directory but exclude object files
     $ borg extract /mnt/backup::my-files home/USERNAME/src --exclude '*.o'
+
+    # Restore a raw device (must not be active/in use/mounted at that time)
+    $ borg extract --stdout /mnt/backup::my-sdx | dd of=/dev/sdx bs=10M
 
 Note: currently, extract always writes into the current working directory ("."),
       so make sure you ``cd`` to the right place before calling ``borg extract``.

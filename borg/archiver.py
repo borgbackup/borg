@@ -15,7 +15,7 @@ import textwrap
 import traceback
 
 from . import __version__
-from .helpers import Error, location_validator, format_time, format_file_size, \
+from .helpers import Error, location_validator, archivename_validator, format_time, format_file_size, \
     parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
@@ -1050,7 +1050,8 @@ class Archiver:
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to rename')
-        subparser.add_argument('name', metavar='NEWNAME', type=str,
+        subparser.add_argument('name', metavar='NEWNAME',
+                               type=archivename_validator(),
                                help='the new archive name to use')
 
         delete_epilog = textwrap.dedent("""

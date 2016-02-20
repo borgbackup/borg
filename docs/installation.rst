@@ -166,19 +166,20 @@ FUSE for OS X, which is available as a pre-release_.
 
 FreeBSD
 ++++++++
-
-If you're using FreeBSD, you will need to install a package and load the fuse kernel module:
+Listed below are packages you will need to install |project_name|, its dependencies,
+and commands to make fuse work for using the mount command.
 
 ::
 
-    $ sudo pkg install fusefs-libs
-    $ sudo kldload fuse
-    $ borg mount /mnt/backup::root-2013-08-02 /tmp/mymountpoint
-    $ ls /tmp/mymountpoint
-    bin  boot  etc  lib  lib64  mnt  opt  root  sbin  srv  usr  var
-    $ umount /tmp/mymountpoint
-
-
+     pkg install -y python3 openssl liblz4 fusefs-libs pkgconf
+     pkg install -y git
+     python3.4 -m ensurepip # to install pip for Python3
+     To use the mount command:
+     echo 'fuse_load="YES"' >> /boot/loader.conf
+     echo 'vfs.usermount=1' >> /etc/sysctl.conf
+     kldload fuse
+     sysctl vfs.usermount=1
+    
 
 Cygwin
 ++++++

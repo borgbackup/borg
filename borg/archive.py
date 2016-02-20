@@ -41,6 +41,9 @@ ITEMS_CHUNKER_PARAMS = (12, 16, 14, HASH_WINDOW_SIZE)
 has_lchmod = hasattr(os, 'lchmod')
 has_lchflags = hasattr(os, 'lchflags')
 
+flags_normal = os.O_RDONLY | getattr(os, 'O_BINARY', 0)
+flags_noatime = flags_normal | getattr(os, 'O_NOATIME', 0)
+
 
 class DownloadPipeline:
 
@@ -544,7 +547,7 @@ Number of files: {0.stats.nfiles}'''.format(
         item = {b'path': safe_path}
         # Only chunkify the file if needed
         if chunks is None:
-            fh = Archive._open_rb(path, st)
+            fh = Archive._open_rb(path)
             with os.fdopen(fh, 'rb') as fd:
                 chunks = []
                 for chunk in self.chunker.chunkify(fd, fh):
@@ -566,46 +569,16 @@ Number of files: {0.stats.nfiles}'''.format(
             yield Archive(repository, key, manifest, name, cache=cache)
 
     @staticmethod
-    def _open_rb(path, st):
-        flags_normal = os.O_RDONLY | getattr(os, 'O_BINARY', 0)
-        flags_noatime = flags_normal | getattr(os, 'O_NOATIME', 0)
-        euid = None
-
-        def open_simple(p, s):
-            return os.open(p, flags_normal)
-
-        def open_noatime(p, s):
-            return os.open(p, flags_noatime)
-
-        def open_noatime_if_owner(p, s):
-            if euid == 0 or s.st_uid == euid:
-                # we are root or owner of file
-                return open_noatime(p, s)
-            else:
-                return open_simple(p, s)
-
-        def open_noatime_with_fallback(p, s):
-            try:
-                fd = os.open(p, flags_noatime)
-            except PermissionError:
-                # Was this EPERM due to the O_NOATIME flag?
-                fd = os.open(p, flags_normal)
-                # Yes, it was -- otherwise the above line would have thrown
-                # another exception.
-                nonlocal euid
-                euid = os.geteuid()
-                # So in future, let's check whether the file is owned by us
-                # before attempting to use O_NOATIME.
-                Archive._open_rb = open_noatime_if_owner
-            return fd
-
-        if flags_noatime != flags_normal:
-            # Always use O_NOATIME version.
-            Archive._open_rb = open_noatime_with_fallback
-        else:
-            # Always use non-O_NOATIME version.
-            Archive._open_rb = open_simple
-        return Archive._open_rb(path, st)
+    def _open_rb(path):
+        try:
+            # if we have O_NOATIME, this likely will succeed if we are root or owner of file:
+            return os.open(path, flags_noatime)
+        except PermissionError:
+            if flags_noatime == flags_normal:
+                # we do not have O_NOATIME, no need to try again:
+                raise
+            # Was this EPERM due to the O_NOATIME flag? Try again without it:
+            return os.open(path, flags_normal)
 
 
 # this set must be kept complete, otherwise the RobustUnpacker might malfunction:

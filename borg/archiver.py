@@ -806,7 +806,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='initialize empty repository')
         subparser.set_defaults(func=self.do_init)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption',
@@ -855,7 +855,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='verify repository')
         subparser.set_defaults(func=self.do_check)
-        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE',
                                type=location_validator(),
                                help='repository or archive to check consistency of')
         subparser.add_argument('--repository-only', dest='repo_only', action='store_true',
@@ -886,7 +886,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='change repository passphrase')
         subparser.set_defaults(func=self.do_change_passphrase)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False))
 
         migrate_to_repokey_epilog = textwrap.dedent("""
@@ -913,7 +913,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='migrate passphrase-mode repository to repokey')
         subparser.set_defaults(func=self.do_migrate_to_repokey)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False))
 
         create_epilog = textwrap.dedent("""
@@ -1080,7 +1080,7 @@ class Archiver:
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
                                help='work slower, but using less space')
-        subparser.add_argument('location', metavar='TARGET', nargs='?', default='',
+        subparser.add_argument('location', metavar='TARGET',
                                type=location_validator(),
                                help='archive or repository to delete')
 
@@ -1098,7 +1098,7 @@ class Archiver:
                                help='only print file/directory names, nothing else')
         subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')
-        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE',
                                type=location_validator(),
                                help='repository/archive to list contents of')
 
@@ -1208,7 +1208,7 @@ class Archiver:
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
                                help='work slower, but using less space')
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to prune')
 
@@ -1266,7 +1266,7 @@ class Archiver:
                                default=False, action='store_true',
                                help="""rewrite repository in place, with no chance of going back to older
                                versions of the repository.""")
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')
 
@@ -1302,7 +1302,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='get object from repository (debug)')
         subparser.set_defaults(func=self.do_debug_get_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to use')
         subparser.add_argument('id', metavar='ID', type=str,
@@ -1319,7 +1319,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='put object to repository (debug)')
         subparser.set_defaults(func=self.do_debug_put_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to use')
         subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
@@ -1334,10 +1334,10 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='delete object from repository (debug)')
         subparser.set_defaults(func=self.do_debug_delete_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to use')
-        subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
+        subparser.add_argument('ids', metavar='ID', nargs='+', type=str,
                                help='hex object ID(s) to delete from the repo')
         return parser
 

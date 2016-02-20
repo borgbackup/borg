@@ -528,12 +528,15 @@ class Archiver:
         stats = Statistics()
         with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
             for archive in keep:
-                logger.info('Keeping archive: %s' % format_archive(archive))
+                if args.output_list:
+                    logger.info('Keeping archive: %s' % format_archive(archive))
             for archive in to_delete:
                 if args.dry_run:
-                    logger.info('Would prune:     %s' % format_archive(archive))
+                    if args.output_list:
+                        logger.info('Would prune:     %s' % format_archive(archive))
                 else:
-                    logger.info('Pruning archive: %s' % format_archive(archive))
+                    if args.output_list:
+                        logger.info('Pruning archive: %s' % format_archive(archive))
                     Archive(repository, key, manifest, archive.name, cache).delete(stats)
             if to_delete and not args.dry_run:
                 manifest.write()
@@ -1184,6 +1187,9 @@ class Archiver:
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the deleted archive')
+        subparser.add_argument('--list', dest='output_list',
+                               action='store_true', default=False,
+                               help='output verbose list of archives it keeps/prunes')
         subparser.add_argument('--keep-within', dest='within', type=str, metavar='WITHIN',
                                help='keep all archives within this time interval')
         subparser.add_argument('-H', '--keep-hourly', dest='hourly', type=int, default=0,

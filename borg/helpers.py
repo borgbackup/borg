@@ -757,6 +757,14 @@ def location_validator(archive=None):
     return validator
 
 
+def archivename_validator():
+    def validator(text):
+        if '/' in text or '::' in text or not text:
+            raise argparse.ArgumentTypeError('Invalid repository name: "%s"' % text)
+        return text
+    return validator
+
+
 def decode_dict(d, keys, encoding='utf-8', errors='surrogateescape'):
     for key in keys:
         if isinstance(d.get(key), bytes):

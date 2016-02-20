@@ -163,6 +163,23 @@ FUSE for OS X, which is available as a pre-release_.
 
 .. _pre-release: https://github.com/osxfuse/osxfuse/releases
 
+
+FreeBSD
+++++++++
+
+If you're using FreeBSD, you will need to install a package and load the fuse kernel module:
+
+::
+
+    $ sudo pkg install fusefs-libs
+    $ sudo kldload fuse
+    $ borg mount /mnt/backup::root-2013-08-02 /tmp/mymountpoint
+    $ ls /tmp/mymountpoint
+    bin  boot  etc  lib  lib64  mnt  opt  root  sbin  srv  usr  var
+    $ umount /tmp/mymountpoint
+
+
+
 Cygwin
 ++++++
 

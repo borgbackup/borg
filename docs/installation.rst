@@ -163,6 +163,24 @@ FUSE for OS X, which is available as a pre-release_.
 
 .. _pre-release: https://github.com/osxfuse/osxfuse/releases
 
+
+FreeBSD
+++++++++
+Listed below are packages you will need to install |project_name|, its dependencies,
+and commands to make fuse work for using the mount command.
+
+::
+
+     pkg install -y python3 openssl liblz4 fusefs-libs pkgconf
+     pkg install -y git
+     python3.4 -m ensurepip # to install pip for Python3
+     To use the mount command:
+     echo 'fuse_load="YES"' >> /boot/loader.conf
+     echo 'vfs.usermount=1' >> /etc/sysctl.conf
+     kldload fuse
+     sysctl vfs.usermount=1
+    
+
 Cygwin
 ++++++
 

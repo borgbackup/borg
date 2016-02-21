@@ -438,77 +438,77 @@ class Archiver:
         manifest, key = Manifest.load(repository)
         if args.location.archive:
             archive = Archive(repository, key, manifest, args.location.archive)
-            if args.short:
-                for item in archive.iter_items():
-                    print(remove_surrogates(item[b'path']))
+            """use_user_format flag is used to speed up default listing.
+            When user issues format options, listing is a bit slower, but more keys are available and
+            precalculated.
+            """
+            use_user_format = args.listformat is not None
+            if use_user_format:
+                list_format = args.listformat
+            elif args.short:
+                list_format = "{path}{LF}"
             else:
-                """use_user_format flag is used to speed up default listing.
-                When user issues format options, listing is a bit slower, but more keys are available and
-                precalculated.
-                """
-                use_user_format = args.listformat is not None
-                list_format = args.listformat if use_user_format else \
-                              "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{LF}"
+                list_format = "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{LF}"
 
-                for item in archive.iter_items():
-                    mode = stat.filemode(item[b'mode'])
-                    type = mode[0]
-                    size = 0
-                    if type == '-':
-                        try:
-                            size = sum(size for _, size, _ in item[b'chunks'])
-                        except KeyError:
-                            pass
+            for item in archive.iter_items():
+                mode = stat.filemode(item[b'mode'])
+                type = mode[0]
+                size = 0
+                if type == '-':
+                    try:
+                        size = sum(size for _, size, _ in item[b'chunks'])
+                    except KeyError:
+                        pass
 
-                    mtime = safe_timestamp(item[b'mtime'])
-                    if use_user_format:
-                        atime = safe_timestamp(item.get(b'atime') or item[b'mtime'])
-                        ctime = safe_timestamp(item.get(b'ctime') or item[b'mtime'])
+                mtime = safe_timestamp(item[b'mtime'])
+                if use_user_format:
+                    atime = safe_timestamp(item.get(b'atime') or item[b'mtime'])
+                    ctime = safe_timestamp(item.get(b'ctime') or item[b'mtime'])
 
-                    if b'source' in item:
-                        source = item[b'source']
-                        if type == 'l':
-                            extra = ' -> %s' % item[b'source']
-                        else:
-                            mode = 'h' + mode[1:]
-                            extra = ' link to %s' % item[b'source']
+                if b'source' in item:
+                    source = item[b'source']
+                    if type == 'l':
+                        extra = ' -> %s' % item[b'source']
                     else:
-                        extra = ''
-                        source = ''
+                        mode = 'h' + mode[1:]
+                        extra = ' link to %s' % item[b'source']
+                else:
+                    extra = ''
+                    source = ''
 
-                    item_data = {
-                            'mode': mode,
-                            'user': item[b'user'] or item[b'uid'],
-                            'group': item[b'group'] or item[b'gid'],
-                            'size': size,
-                            'isomtime': format_time(mtime),
-                            'path': remove_surrogates(item[b'path']),
-                            'extra': extra,
-                            'LF': '\n',
-                            }
-                    if use_user_format:
-                        item_data_advanced = {
-                            'bmode': item[b'mode'],
-                            'type': type,
-                            'source': source,
-                            'linktarget': source,
-                            'uid': item[b'uid'],
-                            'gid': item[b'gid'],
-                            'mtime': mtime,
-                            'isoctime': format_time(ctime),
-                            'ctime': ctime,
-                            'isoatime': format_time(atime),
-                            'atime': atime,
-                            'archivename': archive.name,
-                            'SPACE': ' ',
-                            'TAB': '\t',
-                            'CR': '\r',
-                            'NEWLINE': os.linesep,
-                            }
-                        item_data.update(item_data_advanced)
-                    item_data['formatkeys'] = list(item_data.keys())
+                item_data = {
+                        'mode': mode,
+                        'user': item[b'user'] or item[b'uid'],
+                        'group': item[b'group'] or item[b'gid'],
+                        'size': size,
+                        'isomtime': format_time(mtime),
+                        'path': remove_surrogates(item[b'path']),
+                        'extra': extra,
+                        'LF': '\n',
+                        }
+                if use_user_format:
+                    item_data_advanced = {
+                        'bmode': item[b'mode'],
+                        'type': type,
+                        'source': source,
+                        'linktarget': source,
+                        'uid': item[b'uid'],
+                        'gid': item[b'gid'],
+                        'mtime': mtime,
+                        'isoctime': format_time(ctime),
+                        'ctime': ctime,
+                        'isoatime': format_time(atime),
+                        'atime': atime,
+                        'archivename': archive.name,
+                        'SPACE': ' ',
+                        'TAB': '\t',
+                        'CR': '\r',
+                        'NEWLINE': os.linesep,
+                        }
+                    item_data.update(item_data_advanced)
+                item_data['formatkeys'] = list(item_data.keys())
 
-                    print(format_line(list_format, item_data), end='')
+                print(format_line(list_format, item_data), end='')
 
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):

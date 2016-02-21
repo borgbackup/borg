@@ -775,6 +775,7 @@ Version 0.17
 ~~~~~~~~~~~~
 
 (bugfix release, released on X)
+
 - Fix hashindex ARM memory alignment issue (#309)
 - Improve hashindex error messages (#298)
 
@@ -782,6 +783,7 @@ Version 0.16
 ~~~~~~~~~~~~
 
 (bugfix release, released on May 16, 2015)
+
 - Fix typo preventing the security confirmation prompt from working (#303)
 - Improve handling of systems with improperly configured file system encoding (#289)
 - Fix "All archives" output for attic info. (#183)
@@ -792,6 +794,7 @@ Version 0.15
 ~~~~~~~~~~~~
 
 (bugfix release, released on Apr 15, 2015)
+
 - xattr: Be less strict about unknown/unsupported platforms (#239)
 - Reduce repository listing memory usage (#163).
 - Fix BrokenPipeError for remote repositories (#233)

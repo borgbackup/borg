@@ -336,6 +336,23 @@ Examples
     -rwxr-xr-x root   root       2140 Fri, 2015-03-27 20:24:22 bin/bzdiff
     ...
 
+    $ borg list /mnt/backup::archiveA --list-format="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}"
+    drwxrwxr-x user   user          0 Sun, 2015-02-01 11:00:00 .
+    drwxrwxr-x user   user          0 Sun, 2015-02-01 11:00:00 code
+    drwxrwxr-x user   user          0 Sun, 2015-02-01 11:00:00 code/myproject
+    -rw-rw-r-- user   user    1416192 Sun, 2015-02-01 11:00:00 code/myproject/file.ext
+    ...
+
+    # see what is changed between archives, based on file modification time, size and file path
+    $ borg list /mnt/backup::archiveA --list-format="{mtime:%s}{TAB}{size}{TAB}{path}{LF}" |sort -n > /tmp/list.archiveA
+    $ borg list /mnt/backup::archiveB --list-format="{mtime:%s}{TAB}{size}{TAB}{path}{LF}" |sort -n > /tmp/list.archiveB
+    $ diff -y /tmp/list.archiveA /tmp/list.archiveB
+    1422781200      0       .                                       1422781200      0       .
+    1422781200      0       code                                    1422781200      0       code
+    1422781200      0       code/myproject                          1422781200      0       code/myproject
+    1422781200      1416192 code/myproject/file.ext               | 1454664653      1416192 code/myproject/file.ext
+    ...
+
 
 .. include:: usage/delete.rst.inc
 

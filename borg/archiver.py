@@ -462,8 +462,8 @@ class Archiver:
 
                     mtime = safe_timestamp(item[b'mtime'])
                     if use_user_format:
-                        atime = safe_timestamp(item[b'atime'])
-                        ctime = safe_timestamp(item[b'ctime'])
+                        atime = safe_timestamp(item.get(b'atime') or item[b'mtime'])
+                        ctime = safe_timestamp(item.get(b'ctime') or item[b'mtime'])
 
                     if b'source' in item:
                         source = item[b'source']

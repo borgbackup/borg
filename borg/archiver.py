@@ -442,18 +442,13 @@ class Archiver:
                 for item in archive.iter_items():
                     print(remove_surrogates(item[b'path']))
             else:
-                long_format = "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}"
-                user_format = long_format
                 """use_user_format flag is used to speed up default listing.
                 When user issues format options, listing is a bit slower, but more keys are available and
-                precalculated
+                precalculated.
                 """
-                use_user_format = False
-                if args.listformat:
-                    user_format = args.listformat
-                    use_user_format = True
-
-                archive_name = archive.name
+                use_user_format = args.listformat is not None
+                list_format = args.listformat if use_user_format else \
+                              "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{LF}"
 
                 for item in archive.iter_items():
                     mode = stat.filemode(item[b'mode'])
@@ -464,8 +459,8 @@ class Archiver:
                             size = sum(size for _, size, _ in item[b'chunks'])
                         except KeyError:
                             pass
-                    mtime = safe_timestamp(item[b'mtime'])
 
+                    mtime = safe_timestamp(item[b'mtime'])
                     if use_user_format:
                         atime = safe_timestamp(item[b'atime'])
                         ctime = safe_timestamp(item[b'ctime'])
@@ -489,6 +484,7 @@ class Archiver:
                             'isomtime': format_time(mtime),
                             'path': remove_surrogates(item[b'path']),
                             'extra': extra,
+                            'LF': '\n',
                             }
                     if use_user_format:
                         item_data_advanced = {
@@ -503,20 +499,16 @@ class Archiver:
                             'ctime': ctime,
                             'isoatime': format_time(atime),
                             'atime': atime,
-                            'archivename': archive_name,
-                            'SPACE': " ",
-                            'TAB': "\t",
-                            'LF': "\n",
-                            'CR': "\r",
+                            'archivename': archive.name,
+                            'SPACE': ' ',
+                            'TAB': '\t',
+                            'CR': '\r',
                             'NEWLINE': os.linesep,
                             }
                         item_data.update(item_data_advanced)
                     item_data['formatkeys'] = list(item_data.keys())
 
-                    if use_user_format:
-                        print(format_line(user_format, item_data), end='')
-                    else:
-                        print(format_line(user_format, item_data))
+                    print(format_line(list_format, item_data), end='')
 
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):

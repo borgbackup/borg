@@ -509,10 +509,9 @@ class Archiver:
                             'LF': "\n",
                             'CR': "\r",
                             'NEWLINE': os.linesep,
-                            'formatkeys': ()
                             }
-                        item_data_advanced["formatkeys"] = list(item_data.keys())
                         item_data.update(item_data_advanced)
+                    item_data['formatkeys'] = list(item_data.keys())
 
                     if use_user_format:
                         print(format_line(user_format, item_data), end='')

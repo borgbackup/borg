@@ -8,6 +8,7 @@ import pytest
 import sys
 import msgpack
 import msgpack.fallback
+import time
 
 from ..helpers import Location, format_file_size, format_timedelta, make_path_safe, \
     prune_within, prune_split, get_cache_dir, get_keys_dir, Statistics, is_slow_msgpack, \
@@ -100,6 +101,16 @@ class TestLocationWithoutEnv:
         for location in locations:
             assert Location(location).canonical_path() == \
                 Location(Location(location).canonical_path()).canonical_path()
+
+    def test_format_path(self, monkeypatch):
+        monkeypatch.delenv('BORG_REPO', raising=False)
+        test_pid = os.getpid()
+        assert repr(Location('/some/path::archive{pid}')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive{}')".format(test_pid)
+        location_time1 = Location('/some/path::archive{now:%s}')
+        time.sleep(1.1)
+        location_time2 = Location('/some/path::archive{now:%s}')
+        assert location_time1.archive != location_time2.archive
 
 
 class TestLocationWithEnv:

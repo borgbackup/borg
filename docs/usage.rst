@@ -251,8 +251,7 @@ Examples
 
     # Backup the root filesystem into an archive named "root-YYYY-MM-DD"
     # use zlib compression (good, but slow) - default is no compression
-    NAME="root-`date +%Y-%m-%d`"
-    $ borg create -C zlib,6 /mnt/backup::$NAME / --one-file-system
+    $ borg create -C zlib,6 /mnt/backup::root-{now:%Y-%m-%d} / --one-file-system
 
     # Make a big effort in fine granular deduplication (big chunk management
     # overhead, needs a lot of RAM and disk space, see formula in internals
@@ -273,6 +272,11 @@ Examples
 
     # Even slower, even higher compression (N = 0..9)
     $ borg create --compression lzma,N /mnt/backup::repo ~
+
+    # Format tags available for archive name:
+    # {now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}
+    # add short hostname, backup username and current unixtime (seconds from epoch)
+    $ borg create  /mnt/backup::{hostname}-{user}-{now:%s} ~
 
 .. include:: usage/extract.rst.inc
 

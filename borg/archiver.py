@@ -15,8 +15,8 @@ import textwrap
 import traceback
 
 from . import __version__
-from .helpers import Error, location_validator, archivename_validator, format_time, format_file_size, \
-    parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
+from .helpers import Error, location_validator, archivename_validator, format_line, format_time, format_file_size, \
+    parse_pattern, PathPrefixPattern, to_localtime, timestamp, safe_timestamp, \
     get_cache_dir, get_keys_dir, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
@@ -438,36 +438,78 @@ class Archiver:
         manifest, key = Manifest.load(repository)
         if args.location.archive:
             archive = Archive(repository, key, manifest, args.location.archive)
-            if args.short:
-                for item in archive.iter_items():
-                    print(remove_surrogates(item[b'path']))
+            """use_user_format flag is used to speed up default listing.
+            When user issues format options, listing is a bit slower, but more keys are available and
+            precalculated.
+            """
+            use_user_format = args.listformat is not None
+            if use_user_format:
+                list_format = args.listformat
+            elif args.short:
+                list_format = "{path}{LF}"
             else:
-                for item in archive.iter_items():
-                    mode = stat.filemode(item[b'mode'])
-                    type = mode[0]
-                    size = 0
-                    if type == '-':
-                        try:
-                            size = sum(size for _, size, _ in item[b'chunks'])
-                        except KeyError:
-                            pass
+                list_format = "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{LF}"
+
+            for item in archive.iter_items():
+                mode = stat.filemode(item[b'mode'])
+                type = mode[0]
+                size = 0
+                if type == '-':
                     try:
-                        mtime = datetime.fromtimestamp(bigint_to_int(item[b'mtime']) / 1e9)
-                    except OverflowError:
-                        # likely a broken mtime and datetime did not want to go beyond year 9999
-                        mtime = datetime(9999, 12, 31, 23, 59, 59)
-                    if b'source' in item:
-                        if type == 'l':
-                            extra = ' -> %s' % item[b'source']
-                        else:
-                            mode = 'h' + mode[1:]
-                            extra = ' link to %s' % item[b'source']
+                        size = sum(size for _, size, _ in item[b'chunks'])
+                    except KeyError:
+                        pass
+
+                mtime = safe_timestamp(item[b'mtime'])
+                if use_user_format:
+                    atime = safe_timestamp(item.get(b'atime') or item[b'mtime'])
+                    ctime = safe_timestamp(item.get(b'ctime') or item[b'mtime'])
+
+                if b'source' in item:
+                    source = item[b'source']
+                    if type == 'l':
+                        extra = ' -> %s' % item[b'source']
                     else:
-                        extra = ''
-                    print('%s %-6s %-6s %8d %s %s%s' % (
-                        mode, item[b'user'] or item[b'uid'],
-                        item[b'group'] or item[b'gid'], size, format_time(mtime),
-                        remove_surrogates(item[b'path']), extra))
+                        mode = 'h' + mode[1:]
+                        extra = ' link to %s' % item[b'source']
+                else:
+                    extra = ''
+                    source = ''
+
+                item_data = {
+                        'mode': mode,
+                        'user': item[b'user'] or item[b'uid'],
+                        'group': item[b'group'] or item[b'gid'],
+                        'size': size,
+                        'isomtime': format_time(mtime),
+                        'path': remove_surrogates(item[b'path']),
+                        'extra': extra,
+                        'LF': '\n',
+                        }
+                if use_user_format:
+                    item_data_advanced = {
+                        'bmode': item[b'mode'],
+                        'type': type,
+                        'source': source,
+                        'linktarget': source,
+                        'uid': item[b'uid'],
+                        'gid': item[b'gid'],
+                        'mtime': mtime,
+                        'isoctime': format_time(ctime),
+                        'ctime': ctime,
+                        'isoatime': format_time(atime),
+                        'atime': atime,
+                        'archivename': archive.name,
+                        'SPACE': ' ',
+                        'TAB': '\t',
+                        'CR': '\r',
+                        'NEWLINE': os.linesep,
+                        }
+                    item_data.update(item_data_advanced)
+                item_data['formatkeys'] = list(item_data.keys())
+
+                print(format_line(list_format, item_data), end='')
+
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 if args.prefix and not archive_info.name.startswith(args.prefix):
@@ -1096,6 +1138,10 @@ class Archiver:
         subparser.add_argument('--short', dest='short',
                                action='store_true', default=False,
                                help='only print file/directory names, nothing else')
+        subparser.add_argument('--list-format', dest='listformat', type=str,
+                               help="""specify format for archive file listing
+                                (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}")
+                                Special "{formatkeys}" exists to list available keys""")
         subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',

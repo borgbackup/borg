@@ -2,8 +2,22 @@ Changelog
 =========
 
 
-Version 1.0.0 (not released yet)
---------------------------------
+Version 1.0.0rc2 (not released yet)
+-----------------------------------
+
+New features:
+
+- format options for location: user, pid, fqdn, hostname, now, utcnow, user
+- borg list --list-format
+- borg prune -v --list enables the keep/prune list output, #658
+ 
+Bug fixes:
+
+- fix _open_rb noatime handling, #657
+- add a simple archivename validator, #680
+- borg create --stats: show timestamps in localtime, use same labels/formatting
+  as borg info, #651
+- llfuse compatibility fixes (now compatible with: 0.40, 0.41, 0.42)
 
 Other changes:
 
@@ -11,13 +25,21 @@ Other changes:
   install the llfuse dependency using the correct version requirement
   for it. you still need to care about having installed the FUSE / build
   related OS package first, though, so that building llfuse can succeed.
-
 - docs:
  
+  - borg upgrade: add to docs that only LOCAL repos are supported
   - borg upgrade also handles borg 0.xx -> 1.0
   - use pip extras or requirements file to install llfuse
   - fix order in release process
   - updated usage docs and other minor / cosmetic fixes
+  - verified borg examples in docs, #644
+  - freebsd dependency installation and fuse configuration, #649
+  - add example how to restore a raw device, #671
+  - add a hint about the dev headers needed when installing from source
+  - add examples for delete (and handle delete after list, before prune), #656
+  - update example for borg create -v --stats (use iso datetime format), #663
+  - added example to BORG_RSH docs
+  - "connection closed by remote": add FAQ entry and point to issue #636
 
 
 Version 1.0.0rc1

@@ -92,7 +92,9 @@ A step by step example
     $ borg delete /mnt/backup::Monday
 
 .. Note::
-    Borg is quiet by default. Add the ``-v`` or ``--verbose`` option to
+    Borg is quiet by default (it works on WARNING log level).
+    Add the ``-v`` (or ``--verbose`` or ``--info``) option to adjust the log
+    level to INFO and also use options like ``--progress`` or ``--list`` to
     get progress reporting during command execution.
 
 Automating backups
@@ -130,11 +132,11 @@ Backup compression
 Default is no compression, but we support different methods with high speed
 or high compression:
 
-If you have a quick repo storage and you want a little compression: ::
+If you have a fast repo storage and you want some compression: ::
 
     $ borg create --compression lz4 /mnt/backup::repo ~
 
-If you have a medium fast repo storage and you want a bit more compression (N=0..9,
+If you have a less fast repo storage and you want a bit more compression (N=0..9,
 0 means no compression, 9 means high compression): ::
 
     $ borg create --compression zlib,N /mnt/backup::repo ~
@@ -162,7 +164,7 @@ encryption and the integrity and authenticity is verified using `HMAC-SHA256`_.
 
 All data is encrypted on the client before being written to the repository. This
 means that an attacker who manages to compromise the host containing an
-encrypted archive will not be able to access any of the data, even as the backup
+encrypted archive will not be able to access any of the data, even while the backup
 is being made.
 
 |project_name| supports different methods to store the AES and HMAC keys.
@@ -186,12 +188,16 @@ For automated backups the passphrase can be specified using the
           :ref:`this note about password environments <password_env>`
           for more information.
 
-.. warning:: The repository data is totally inaccessible without the key:
+.. warning:: The repository data is totally inaccessible without the key
+    and the key passphrase.
+
     Make a backup copy of the key file (``keyfile`` mode) or repo config
     file (``repokey`` mode) and keep it at a safe place, so you still have
-    the key in case it gets corrupted or lost.
-    The backup that is encrypted with that key won't help you with that,
-    of course.
+    the key in case it gets corrupted or lost. Also keep your passphrase
+    at a safe place.
+
+    The backup that is encrypted with that key/passphrase won't help you
+    with that, of course.
 
 .. _remote_repos:
 

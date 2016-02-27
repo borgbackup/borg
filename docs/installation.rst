@@ -66,7 +66,8 @@ Standalone Binary
 |project_name| binaries (generated with `pyinstaller`_) are available
 on the releases_ page for the following platforms:
 
-* **Linux**: glibc >= 2.13 (ok for most supported Linux releases)
+* **Linux**: glibc >= 2.13 (ok for most supported Linux releases). Maybe older
+  glibc versions also work, if they are compatible to 2.13.
 * **Mac OS X**: 10.10 (does not work with older OS X releases)
 * **FreeBSD**: 10.2 (unknown whether it works for older releases)
 

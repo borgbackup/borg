@@ -19,6 +19,7 @@ downloaded Borg, ``docs/installation.rst`` to get started with Borg.
 
 Main features
 -------------
+
 **Space efficient storage**
   Deduplication based on content-defined chunking is used to reduce the number
   of bytes stored: each file is split into a number of variable length chunks
@@ -80,24 +81,31 @@ Main features
 
 Easy to use
 -----------
+
 Initialize a new backup repository and create a backup archive::
 
     $ borg init /mnt/backup
-    $ borg create /mnt/backup::Monday ~/Documents
+    $ borg create /mnt/backup::Saturday1 ~/Documents
 
 Now doing another backup, just to show off the great deduplication::
 
-    $ borg create --stats -C zlib,6 /mnt/backup::Tuesday ~/Documents
+    $ borg create -v --stats /mnt/backup::Saturday2 ~/Documents
+    -----------------------------------------------------------------------------
+    Archive name: Saturday2
+    Archive fingerprint: 622b7c53c...
+    Time (start): Sat, 2016-02-27 14:48:13
+    Time (end):   Sat, 2016-02-27 14:48:14
+    Duration: 0.88 seconds
+    Number of files: 163
+    -----------------------------------------------------------------------------
+                   Original size      Compressed size    Deduplicated size
+    This archive:        6.85 MB              6.85 MB             30.79 kB  <-- !
+    All archives:       13.69 MB             13.71 MB              6.88 MB
 
-    Archive name: Tuesday
-    Archive fingerprint: 387a5e3f9b0e792e91c...
-    Start time: Tue Mar 25 12:00:10 2014
-    End time:   Tue Mar 25 12:00:10 2014
-    Duration: 0.08 seconds
-    Number of files: 358
-                      Original size    Compressed size    Deduplicated size
-    This archive:          57.16 MB           46.78 MB            151.67 kB  <--- !
-    All archives:         114.02 MB           93.46 MB             44.81 MB
+                   Unique chunks         Total chunks
+    Chunk index:             167                  330
+    -----------------------------------------------------------------------------
+
 
 For a graphical frontend refer to our complementary project `BorgWeb <https://borgbackup.github.io/borgweb/>`_.
 
@@ -129,7 +137,7 @@ Here's a (incomplete) list of some major changes:
 
 * more open, faster paced development (see `issue #1 <https://github.com/borgbackup/borg/issues/1>`_)
 * lots of attic issues fixed (see `issue #5 <https://github.com/borgbackup/borg/issues/5>`_)
-* less chunk management overhead via --chunker-params option (less memory and disk usage)
+* less chunk management overhead (less memory and disk usage for chunks index)
 * faster remote cache resync (useful when backing up multiple machines into same repo)
 * compression: no, lz4, zlib or lzma compression, adjustable compression levels
 * repokey replaces problematic passphrase mode (you can't change the passphrase nor the pbkdf2 iteration count in "passphrase" mode)
@@ -147,14 +155,13 @@ information.
 BORG IS NOT COMPATIBLE WITH ORIGINAL ATTIC (but there is a one-way conversion).
 
 EXPECT THAT WE WILL BREAK COMPATIBILITY REPEATEDLY WHEN MAJOR RELEASE NUMBER
-CHANGES (like when going from 0.x.y to 1.0.0).
+CHANGES (like when going from 0.x.y to 1.0.0 or from 1.x.y to 2.0.0).
 
 NOT RELEASED DEVELOPMENT VERSIONS HAVE UNKNOWN COMPATIBILITY PROPERTIES.
 
 THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
 
-Borg is distributed under a 3-clause BSD license, see `License`_
-for the complete license.
+Borg is distributed under a 3-clause BSD license, see `License`_ for the complete license.
 
 |doc| |build| |coverage|
 
@@ -162,7 +169,7 @@ for the complete license.
         :alt: Documentation
         :target: https://borgbackup.readthedocs.org/en/stable/
 
-.. |build| image:: https://travis-ci.org/borgbackup/borg.svg
+.. |build| image:: https://travis-ci.org/borgbackup/borg.png
         :alt: Build Status
         :target: https://travis-ci.org/borgbackup/borg
 

@@ -6,7 +6,7 @@ borg prune
 
     usage: borg prune [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
                       [--no-files-cache] [--umask M] [--remote-path PATH] [-n]
-                      [-s] [--keep-within WITHIN] [-H HOURLY] [-d DAILY]
+                      [-s] [--list] [--keep-within WITHIN] [-H HOURLY] [-d DAILY]
                       [-w WEEKLY] [-m MONTHLY] [-y YEARLY] [-P PREFIX]
                       [--save-space]
                       [REPOSITORY]
@@ -30,6 +30,7 @@ borg prune
       --remote-path PATH    set remote path to executable (default: "borg")
       -n, --dry-run         do not change repository
       -s, --stats           print statistics for the deleted archive
+      --list                output verbose list of archives it keeps/prunes
       --keep-within WITHIN  keep all archives within this time interval
       -H HOURLY, --keep-hourly HOURLY
                             number of hourly archives to keep

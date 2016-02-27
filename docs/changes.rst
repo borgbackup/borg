@@ -2,8 +2,8 @@ Changelog
 =========
 
 
-Version 1.0.0rc2 (not released yet)
------------------------------------
+Version 1.0.0rc2
+----------------
 
 The major release number change (0.x -> 1.x) indicates bigger incompatible
 changes, please read the compatibility notes, adapt / test your scripts and

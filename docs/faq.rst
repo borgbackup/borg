@@ -72,7 +72,8 @@ Which file types, attributes, etc. are *not* preserved?
       meaningless without the running process that created them and the process
       needs to recreate them in any case). So, don't panic if your backup
       misses a UDS!
-    * The precise on-disk representation of the holes in a sparse file.
+    * The precise on-disk (or rather: not-on-disk) representation of the holes
+      in a sparse file.
       Archive creation has no special support for sparse files, holes are
       backed up as (deduplicated and compressed) runs of zero bytes.
       Archive extraction has optional support to extract all-zero chunks as
@@ -183,8 +184,8 @@ minutes) containing all the data backed-up until that point. This means
 that at most <checkpoint interval> worth of data needs to be retransmitted
 if a backup needs to be restarted.
 
-Once your backup has finished successfully, you can delete all ``*.checkpoint``
-archives.
+Once your backup has finished successfully, you can delete all
+``<archive-name>.checkpoint`` archives.
 
 If it crashes with a UnicodeError, what can I do?
 -------------------------------------------------
@@ -223,7 +224,7 @@ Can |project_name| verify data integrity of a backup archive?
 
 Yes, if you want to detect accidental data damage (like bit rot), use the
 ``check`` operation. It will notice corruption using CRCs and hashes.
-If you want to be able to detect malicious tampering also, use a encrypted
+If you want to be able to detect malicious tampering also, use an encrypted
 repo. It will then be able to check using CRCs and HMACs.
 
 .. _a_status_oddity:
@@ -253,6 +254,11 @@ This does not affect deduplication, the file will be chunked, but as the chunks
 will often be the same and already stored in the repo (except in the above
 mentioned rare condition), it will just re-use them as usual and not store new
 data chunks.
+
+If you want to avoid unnecessary chunking, just create or touch a small or
+empty file in your backup source file set (so that one has the latest mtime,
+not your 50GB VM disk image) and, if you do snapshots, do the snapshot after
+that.
 
 Since only the files cache is used in the display of files status,
 those files are reported as being added when, really, chunks are

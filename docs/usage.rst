@@ -47,7 +47,8 @@ Return codes
         did not reach its normal end, logged as ERROR)
     128+N = killed by signal N (e.g. 137 == kill -9)
 
-The return code is also logged at the indicated level as the last log entry.
+If you use ``--show-rc``, the return code is also logged at the indicated
+level as the last log entry.
 
 
 Environment Variables
@@ -133,10 +134,9 @@ Cache files:
     single-archive chunk indexes).
 
 Chunks index:
-    Proportional to the amount of data chunks in your repo. Lots of small chunks
-    in your repo imply a big chunks index. You may need to tweak the chunker
-    params (see create options) if you have a lot of data and you want to keep
-    the chunks index at some reasonable size.
+    Proportional to the amount of data chunks in your repo. Lots of chunks
+    in your repo imply a big chunks index.
+    It is possible to tweak the chunker params (see create options).
 
 Files index:
     Proportional to the amount of files in your last backup. Can be switched
@@ -169,9 +169,13 @@ using powers of two (so ``KiB`` means 1024 bytes).
 Date and Time
 ~~~~~~~~~~~~~
 
-We format date and time conforming to ISO-8601, that is: YYYY-MM-DD and HH:MM:SS
+We format date and time conforming to ISO-8601, that is: YYYY-MM-DD and
+HH:MM:SS (24h clock).
 
-For more information, see: https://xkcd.com/1179/
+For more information about that, see: https://xkcd.com/1179/
+
+Unless otherwise noted, we display local date and time.
+Internally, we store and process date and time as UTC.
 
 
 .. include:: usage/init.rst.inc
@@ -180,22 +184,22 @@ Examples
 ~~~~~~~~
 ::
 
-    # Local repository
+    # Local repository (default is to use encryption in repokey mode)
     $ borg init /mnt/backup
+
+    # Local repository (no encryption)
+    $ borg init --encryption=none /mnt/backup
 
     # Remote repository (accesses a remote borg via ssh)
     $ borg init user@hostname:backup
 
-    # Encrypted remote repository, store the key in the repo
-    $ borg init --encryption=repokey user@hostname:backup
-
-    # Encrypted remote repository, store the key your home dir
+    # Remote repository (store the key your home dir)
     $ borg init --encryption=keyfile user@hostname:backup
 
 Important notes about encryption:
 
-Use encryption! Repository encryption protects you e.g. against the case that
-an attacker has access to your backup repository.
+It is not recommended to disable encryption. Repository encryption protects you
+e.g. against the case that an attacker has access to your backup repository.
 
 But be careful with the key / the passphrase:
 
@@ -210,13 +214,23 @@ the key (and also not the passphrase).
 
 Make a backup copy of the key file (``keyfile`` mode) or repo config file
 (``repokey`` mode) and keep it at a safe place, so you still have the key in
-case it gets corrupted or lost.
+case it gets corrupted or lost. Also keep the passphrase at a safe place.
 The backup that is encrypted with that key won't help you with that, of course.
 
 Make sure you use a good passphrase. Not too short, not too simple. The real
 encryption / decryption key is encrypted with / locked by your passphrase.
 If an attacker gets your key, he can't unlock and use it without knowing the
 passphrase.
+
+Be careful with special or non-ascii characters in your passphrase:
+
+- |project_name| processes the passphrase as unicode (and encodes it as utf-8),
+  so it does not have problems dealing with even the strangest characters.
+- BUT: that does not necessarily apply to your OS / VM / keyboard configuration.
+
+So better use a long passphrase made from simple ascii chars than one that
+includes non-ascii stuff or characters that are hard/impossible to enter on
+a different keyboard layout.
 
 You can change your passphrase for existing repos at any time, it won't affect
 the encryption/decryption key or other secrets.

@@ -169,7 +169,7 @@ Borg is distributed under a 3-clause BSD license, see `License`_ for the complet
         :alt: Documentation
         :target: https://borgbackup.readthedocs.org/en/stable/
 
-.. |build| image:: https://travis-ci.org/borgbackup/borg.png
+.. |build| image:: https://api.travis-ci.org/borgbackup/borg.svg
         :alt: Build Status
         :target: https://travis-ci.org/borgbackup/borg
 

@@ -212,7 +212,7 @@ def install_pyinstaller(boxname)
     . borg-env/bin/activate
     git clone https://github.com/pyinstaller/pyinstaller.git
     cd pyinstaller
-    git checkout v3.1
+    git checkout v3.1.1
     pip install -e .
   EOF
 end
@@ -224,7 +224,7 @@ def install_pyinstaller_bootloader(boxname)
     . borg-env/bin/activate
     git clone https://github.com/pyinstaller/pyinstaller.git
     cd pyinstaller
-    git checkout v3.1
+    git checkout v3.1.1
     # build bootloader, if it is not included
     cd bootloader
     python ./waf all

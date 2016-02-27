@@ -10,13 +10,6 @@ def packages_prepare_wheezy
   EOF
 end
 
-def packages_prepare_precise
-  return <<-EOF
-      # ubuntu 12.04 precise does not have lz4, but it is available from a ppa:
-      add-apt-repository -y ppa:gezakovacs/lz4
-  EOF
-end
-
 def packages_debianoid
   return <<-EOF
     apt-get update
@@ -334,15 +327,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("trusty64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("trusty64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("trusty64")
-  end
-
-  config.vm.define "precise32" do |b|
-    b.vm.box = "ubuntu/precise32"
-    b.vm.provision "packages prepare precise", :type => :shell, :inline => packages_prepare_precise
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("precise32")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("precise32")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("precise32")
   end
 
   config.vm.define "jessie64" do |b|

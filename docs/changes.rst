@@ -1,7 +1,6 @@
 Changelog
 =========
 
-
 Version 1.0.0rc2
 ----------------
 
@@ -86,6 +85,8 @@ Other changes:
   install the llfuse dependency using the correct version requirement
   for it. you still need to care about having installed the FUSE / build
   related OS package first, though, so that building llfuse can succeed.
+- Vagrant: drop Ubuntu Precise (12.04) - does not have Python >= 3.4
+- Vagrant: use pyinstaller v3.1.1 to build binaries
 - docs:
  
   - borg upgrade: add to docs that only LOCAL repos are supported

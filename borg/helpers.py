@@ -3,6 +3,8 @@ from collections import namedtuple
 from functools import wraps
 import grp
 import os
+import stat
+import textwrap
 import pwd
 import re
 from shutil import get_terminal_size
@@ -211,13 +213,28 @@ class Statistics:
 def get_keys_dir():
     """Determine where to repository keys and cache"""
     xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(os.path.expanduser('~'), '.config'))
-    return os.environ.get('BORG_KEYS_DIR', os.path.join(xdg_config, 'borg', 'keys'))
+    keys_dir = os.environ.get('BORG_KEYS_DIR', os.path.join(xdg_config, 'borg', 'keys'))
+    if not os.path.exists(keys_dir):
+        os.makedirs(keys_dir)
+        os.chmod(keys_dir, stat.S_IRWXU)
+    return keys_dir
 
 
 def get_cache_dir():
     """Determine where to repository keys and cache"""
     xdg_cache = os.environ.get('XDG_CACHE_HOME', os.path.join(os.path.expanduser('~'), '.cache'))
-    return os.environ.get('BORG_CACHE_DIR', os.path.join(xdg_cache, 'borg'))
+    cache_dir = os.environ.get('BORG_CACHE_DIR', os.path.join(xdg_cache, 'borg'))
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir)
+        os.chmod(cache_dir, stat.S_IRWXU)
+        with open(os.path.join(cache_dir, 'CACHEDIR.TAG'), 'w') as fd:
+            fd.write(textwrap.dedent("""
+                Signature: 8a477f597d28d172789f06886806bc55
+                # This file is a cache directory tag created by Borg.
+                # For information about cache directory tags, see:
+                #       http://www.brynosaurus.com/cachedir/
+                """).lstrip())
+    return cache_dir
 
 
 def to_localtime(ts):

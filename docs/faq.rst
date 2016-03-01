@@ -264,6 +264,32 @@ Since only the files cache is used in the display of files status,
 those files are reported as being added when, really, chunks are
 already used.
 
+
+Is there a way to limit bandwidth with |project_name|?
+------------------------------------------------------
+
+There is no command line option to limit bandwidth with |project_name|, but
+bandwidth limiting can be accomplished with pipeviewer_:
+
+Create a wrapper script:  /usr/local/bin/pv-wrapper  ::
+
+    #!/bin/bash
+        ## -q, --quiet              do not output any transfer information at all
+        ## -L, --rate-limit RATE    limit transfer to RATE bytes per second
+    export RATE=307200
+    pv -q -L $RATE  | "$@"
+
+Add BORG_RSH environment variable to use pipeviewer wrapper script with ssh. ::
+
+    export BORG_RSH='/usr/local/bin/pv-wrapper.sh ssh'
+
+Now |project_name| will be bandwidth limited. Nice thing about pv is that you can change rate-limit on the fly: ::
+
+    pv -R $(pidof pv) -L 102400
+
+.. _pipeviewer: http://www.ivarch.com/programs/pv.shtml
+
+
 Why was Borg forked from Attic?
 -------------------------------
 

@@ -17,7 +17,7 @@ import traceback
 from . import __version__
 from .helpers import Error, location_validator, archivename_validator, format_line, format_time, format_file_size, \
     parse_pattern, PathPrefixPattern, to_localtime, timestamp, safe_timestamp, \
-    get_cache_dir, get_keys_dir, prune_within, prune_split, \
+    get_cache_dir, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher
@@ -1415,21 +1415,6 @@ class Archiver:
         self.lock_wait = args.lock_wait
         setup_logging(level=args.log_level, is_serve=args.func == self.do_serve)  # do not use loggers before this!
         check_extension_modules()
-        keys_dir = get_keys_dir()
-        if not os.path.exists(keys_dir):
-            os.makedirs(keys_dir)
-            os.chmod(keys_dir, stat.S_IRWXU)
-        cache_dir = get_cache_dir()
-        if not os.path.exists(cache_dir):
-            os.makedirs(cache_dir)
-            os.chmod(cache_dir, stat.S_IRWXU)
-            with open(os.path.join(cache_dir, 'CACHEDIR.TAG'), 'w') as fd:
-                fd.write(textwrap.dedent("""
-                    Signature: 8a477f597d28d172789f06886806bc55
-                    # This file is a cache directory tag created by Borg.
-                    # For information about cache directory tags, see:
-                    #       http://www.brynosaurus.com/cachedir/
-                    """).lstrip())
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
         return args.func(args)

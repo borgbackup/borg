@@ -37,7 +37,7 @@ Compatibility notes:
   value as answer (as if you typed in that value when being asked).
   See the "usage" / "Environment Variables" section of the docs for details.
 - change the builtin default for --chunker-params, create 2MiB chunks, #343
-  --chunker-params new default: 19,23,21,4095 - old default: 10,23,16,4096
+  --chunker-params new default: 19,23,21,4095 - old default: 10,23,16,4095
 
   one of the biggest issues with borg < 1.0 (and also attic) was that it had a
   default target chunk size of 64kiB, thus it created a lot of chunks and thus

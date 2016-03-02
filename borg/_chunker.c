@@ -208,7 +208,7 @@ chunker_process(Chunker *c)
         c->done = 1;
         if(c->remaining) {
             c->bytes_yielded += c->remaining;
-            return PyMemoryView_FromMemory(c->data + c->position, c->remaining, PyBUF_READ);
+            return PyMemoryView_FromMemory((char *)(c->data + c->position), c->remaining, PyBUF_READ);
         }
         else {
             if(c->bytes_read == c->bytes_yielded)
@@ -240,5 +240,5 @@ chunker_process(Chunker *c)
     c->last = c->position;
     n = c->last - old_last;
     c->bytes_yielded += n;
-    return PyMemoryView_FromMemory(c->data + old_last, n, PyBUF_READ);
+    return PyMemoryView_FromMemory((char *)(c->data + old_last), n, PyBUF_READ);
 }

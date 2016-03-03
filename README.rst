@@ -115,7 +115,7 @@ Links
 * `Main Web Site <https://borgbackup.readthedocs.org/>`_
 * `Releases <https://github.com/borgbackup/borg/releases>`_
 * `PyPI packages <https://pypi.python.org/pypi/borgbackup>`_
-* `ChangeLog <https://github.com/borgbackup/borg/blob/master/CHANGES.rst>`_
+* `ChangeLog <https://github.com/borgbackup/borg/blob/master/docs/changes.rst>`_
 * `GitHub <https://github.com/borgbackup/borg>`_
 * `Issue Tracker <https://github.com/borgbackup/borg/issues>`_
 * `Bounties & Fundraisers <https://www.bountysource.com/teams/borgbackup>`_
@@ -149,7 +149,7 @@ Here's a (incomplete) list of some major changes:
 * better logging, screen output, progress indication
 * tested on misc. Linux systems, 32 and 64bit, FreeBSD, OpenBSD, NetBSD, Mac OS X
 
-Please read the `ChangeLog`_ (or ``CHANGES.rst`` in the source distribution) for more
+Please read the `ChangeLog`_ (or ``docs/changes.rst`` in the source distribution) for more
 information.
 
 BORG IS NOT COMPATIBLE WITH ORIGINAL ATTIC (but there is a one-way conversion).

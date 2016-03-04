@@ -18,6 +18,10 @@ import msgpack
 PREFIX = b'\0' * 8
 
 
+class PasswordRetriesExceeded(Error):
+    """exceeded the maximum password retries"""
+
+
 class UnsupportedPayloadError(Error):
     """Unsupported payload type {}. A newer version is required to access this repository."""
 
@@ -185,7 +189,7 @@ class Passphrase(str):
         passphrase = cls.env_passphrase()
         if passphrase is not None:
             return passphrase
-        while True:
+        for retry in range(1, 11):
             passphrase = cls.getpass('Enter new passphrase: ')
             if allow_empty or passphrase:
                 passphrase2 = cls.getpass('Enter same passphrase again: ')
@@ -196,6 +200,8 @@ class Passphrase(str):
                     print('Passphrases do not match', file=sys.stderr)
             else:
                 print('Passphrase must not be blank', file=sys.stderr)
+        else:
+            raise PasswordRetriesExceeded
 
     def __repr__(self):
         return '<Passphrase "***hidden***">'
@@ -231,7 +237,7 @@ class PassphraseKey(AESKeyBase):
         passphrase = Passphrase.env_passphrase()
         if passphrase is None:
             passphrase = Passphrase.getpass(prompt)
-        while True:
+        for retry in range(1, 3):
             key.init(repository, passphrase)
             try:
                 key.decrypt(None, manifest_data)
@@ -240,6 +246,8 @@ class PassphraseKey(AESKeyBase):
                 return key
             except IntegrityError:
                 passphrase = Passphrase.getpass(prompt)
+        else:
+            raise PasswordRetriesExceeded
 
     def change_passphrase(self):
         class ImmutablePassphraseError(Error):
@@ -259,8 +267,12 @@ class KeyfileKeyBase(AESKeyBase):
         target = key.find_key()
         prompt = 'Enter passphrase for key %s: ' % target
         passphrase = Passphrase.env_passphrase(default='')
-        while not key.load(target, passphrase):
+        for retry in range(1, 4):
+            if key.load(target, passphrase):
+                break
             passphrase = Passphrase.getpass(prompt)
+        else:
+            raise PasswordRetriesExceeded
         num_blocks = num_aes_blocks(len(manifest_data) - 41)
         key.init_ciphers(PREFIX + long_to_bytes(key.extract_nonce(manifest_data) + num_blocks))
         return key

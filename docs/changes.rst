@@ -1,8 +1,8 @@
 Changelog
 =========
 
-Version 1.0.0 (not released yet)
---------------------------------
+Version 1.0.0
+-------------
 
 The major release number change (0.x -> 1.x) indicates bigger incompatible
 changes, please read the compatibility notes, adapt / test your scripts and
@@ -67,17 +67,17 @@ Compatibility notes:
 
 Bug fixes:
 
-- remote end does not need cache nor keys directories, do not create them.
-- added retry counter for passwords, fixes #703
+- remote end does not need cache nor keys directories, do not create them, #701
+- added retry counter for passwords, #703
 
 Other changes:
 
-- fix compiler warnings, fixes #697
+- fix compiler warnings, #697
 - docs:
 
   - update README.rst to new changelog location in docs/changes.rst
   - add Teemu to AUTHORS
-  - changes.rst: fix old chunker params, fixes #698
+  - changes.rst: fix old chunker params, #698
   - FAQ: how to limit bandwidth
 
 

@@ -1,8 +1,8 @@
 Changelog
 =========
 
-Version 1.0.0rc2
-----------------
+Version 1.0.0 (not released yet)
+--------------------------------
 
 The major release number change (0.x -> 1.x) indicates bigger incompatible
 changes, please read the compatibility notes, adapt / test your scripts and
@@ -64,6 +64,25 @@ Compatibility notes:
   creation end time. This might affect prune if your backups take rather long.
   if you give a timestamp via cli this is stored into 'time', therefore it now
   needs to mean archive creation start time.
+
+Bug fixes:
+
+- remote end does not need cache nor keys directories, do not create them.
+- added retry counter for passwords, fixes #703
+
+Other changes:
+
+- fix compiler warnings, fixes #697
+- docs:
+
+  - update README.rst to new changelog location in docs/changes.rst
+  - add Teemu to AUTHORS
+  - changes.rst: fix old chunker params, fixes #698
+  - FAQ: how to limit bandwidth
+
+
+Version 1.0.0rc2
+----------------
 
 New features:
 

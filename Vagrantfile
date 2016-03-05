@@ -13,6 +13,8 @@ end
 def packages_debianoid
   return <<-EOF
     apt-get update
+    # install all the (security and other) updates
+    apt-get dist-upgrade -y
     # for building borgbackup and dependencies:
     apt-get install -y libssl-dev libacl1-dev liblz4-dev libfuse-dev fuse pkg-config
     usermod -a -G fuse vagrant
@@ -49,6 +51,8 @@ end
 
 def packages_darwin
   return <<-EOF
+    # install all the (security and other) updates
+    sudo softwareupdate --install --all
     # get osxfuse 3.0.x pre-release code from github:
     curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.0.9/osxfuse-3.0.9.dmg >osxfuse.dmg
     MOUNTDIR=$(echo `hdiutil mount osxfuse.dmg | tail -1 | awk '{$1="" ; print $0}'` | xargs -0 echo) \
@@ -67,6 +71,8 @@ end
 
 def packages_freebsd
   return <<-EOF
+    # install all the (security and other) updates, base system
+    freebsd-update --not-running-from-cron fetch install
     # for building borgbackup and dependencies:
     pkg install -y openssl liblz4 fusefs-libs pkgconf
     pkg install -y fakeroot git bash
@@ -83,6 +89,9 @@ def packages_freebsd
     sysctl vfs.usermount=1
     pw groupmod operator -M vagrant
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
+    # install all the (security and other) updates, packages
+    pkg update
+    yes | pkg upgrade
   EOF
 end
 

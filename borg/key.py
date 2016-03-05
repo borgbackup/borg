@@ -7,7 +7,7 @@ import textwrap
 from hmac import HMAC, compare_digest
 from hashlib import sha256, pbkdf2_hmac
 
-from .helpers import IntegrityError, get_keys_dir, Error
+from .helpers import IntegrityError, get_keys_dir, Error, yes
 from .logger import create_logger
 logger = create_logger()
 
@@ -185,6 +185,23 @@ class Passphrase(str):
         return cls(getpass.getpass(prompt))
 
     @classmethod
+    def verification(cls, passphrase):
+        if yes('Do you want your passphrase to be displayed for verification? [yN]: ',
+               env_var_override='BORG_DISPLAY_PASSPHRASE'):
+            print('Your passphrase (between double-quotes): "%s"' % passphrase,
+                  file=sys.stderr)
+            print('Make sure the passphrase displayed above is exactly what you wanted.',
+                  file=sys.stderr)
+            try:
+                passphrase.encode('ascii')
+            except UnicodeEncodeError:
+                print('Your passphrase (UTF-8 encoding in hex): %s' %
+                      hexlify(passphrase.encode('utf-8')).decode('ascii'),
+                      file=sys.stderr)
+                print('As you have a non-ASCII passphrase, it is recommended to keep the UTF-8 encoding in hex together with the passphrase at a safe place.',
+                      file=sys.stderr)
+
+    @classmethod
     def new(cls, allow_empty=False):
         passphrase = cls.env_passphrase()
         if passphrase is not None:
@@ -194,6 +211,7 @@ class Passphrase(str):
             if allow_empty or passphrase:
                 passphrase2 = cls.getpass('Enter same passphrase again: ')
                 if passphrase == passphrase2:
+                    cls.verification(passphrase)
                     logger.info('Remember your passphrase. Your data will be inaccessible without it.')
                     return passphrase
                 else:

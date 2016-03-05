@@ -65,6 +65,10 @@ Compatibility notes:
   if you give a timestamp via cli this is stored into 'time', therefore it now
   needs to mean archive creation start time.
 
+New features:
+
+- implement password roundtrip, #695
+
 Bug fixes:
 
 - remote end does not need cache nor keys directories, do not create them, #701

@@ -63,6 +63,8 @@ General:
         can either leave it away or abbreviate as `::`, if a positional parameter is required.
     BORG_PASSPHRASE
         When set, use the value to answer the passphrase question for encrypted repositories.
+    BORG_DISPLAY_PASSPHRASE
+        When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
     BORG_LOGGING_CONF
         When set, use the given filename as INI_-style logging configuration.
     BORG_RSH

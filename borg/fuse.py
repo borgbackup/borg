@@ -7,7 +7,7 @@ import stat
 import tempfile
 import time
 from .archive import Archive
-from .helpers import daemonize
+from .helpers import daemonize, bigint_to_int
 from distutils.version import LooseVersion
 import msgpack
 
@@ -164,13 +164,25 @@ class FuseOperations(llfuse.Operations):
         entry.st_blocks = dsize / 512
         # note: older archives only have mtime (not atime nor ctime)
         if have_fuse_xtime_ns:
-            entry.st_atime_ns = item.get(b'atime') or item[b'mtime']
-            entry.st_mtime_ns = item[b'mtime']
-            entry.st_ctime_ns = item.get(b'ctime') or item[b'mtime']
+            entry.st_mtime_ns = bigint_to_int(item[b'mtime'])
+            if b'atime' in item:
+                entry.st_atime_ns = bigint_to_int(item[b'atime'])
+            else:
+                entry.st_atime_ns = bigint_to_int(item[b'mtime'])
+            if b'ctime' in item:
+                entry.st_ctime_ns = bigint_to_int(item[b'ctime'])
+            else:
+                entry.st_ctime_ns = bigint_to_int(item[b'mtime'])
         else:
-            entry.st_atime = (item.get(b'atime') or item[b'mtime']) / 1e9
-            entry.st_mtime = item[b'mtime'] / 1e9
-            entry.st_ctime = (item.get(b'ctime') or item[b'mtime']) / 1e9
+            entry.st_mtime_ns = bigint_to_int(item[b'mtime']) / 1e9
+            if b'atime' in item:
+                entry.st_atime_ns = bigint_to_int(item[b'atime']) / 1e9
+            else:
+                entry.st_atime_ns = bigint_to_int(item[b'mtime']) / 1e9
+            if b'ctime' in item:
+                entry.st_ctime_ns = bigint_to_int(item[b'ctime']) / 1e9
+            else:
+                entry.st_ctime_ns = bigint_to_int(item[b'mtime']) / 1e9
         return entry
 
     def listxattr(self, inode, ctx=None):

@@ -6,7 +6,7 @@
  */
 
 .wy-side-nav-search {
-    background-color: black;
+    background-color: #000000 !important;
 }
 
 .wy-side-nav-search > a {

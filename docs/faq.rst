@@ -290,6 +290,26 @@ Now |project_name| will be bandwidth limited. Nice thing about pv is that you ca
 .. _pipeviewer: http://www.ivarch.com/programs/pv.shtml
 
 
+I am having troubles with some network/FUSE/special filesystem, why?
+--------------------------------------------------------------------
+
+|project_name| is doing nothing special in the filesystem, it only uses very
+common and compatible operations (even the locking is just "mkdir").
+
+So, if you are encountering issues like slowness, corruption or malfunction
+when using a specific filesystem, please try if you can reproduce the issues
+with a local (non-network) and proven filesystem (like ext4 on Linux).
+
+If you can't reproduce the issue then, you maybe have found an issue within
+the filesystem code you used (not with |project_name|). For this case, it is
+recommended that you talk to the developers / support of the network fs and
+maybe open an issue in their issue tracker. Do not file an issue in the
+|project_name| issue tracker.
+
+If you can reproduce the issue with the proven filesystem, please file an
+issue in the |project_name| issue tracker about that.
+
+
 Why was Borg forked from Attic?
 -------------------------------
 

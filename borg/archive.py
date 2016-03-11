@@ -131,8 +131,7 @@ class Archive:
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False, progress=False,
-                 chunker_params=CHUNKER_PARAMS,
-                 start=datetime.utcnow(), end=datetime.utcnow()):
+                 chunker_params=CHUNKER_PARAMS, start=None, end=None):
         self.cwd = os.getcwd()
         self.key = key
         self.repository = repository
@@ -144,7 +143,11 @@ class Archive:
         self.name = name
         self.checkpoint_interval = checkpoint_interval
         self.numeric_owner = numeric_owner
+        if start is None:
+            start = datetime.utcnow()
         self.start = start
+        if end is None:
+            end = datetime.utcnow()
         self.end = end
         self.pipeline = DownloadPipeline(self.repository, self.key)
         if create:

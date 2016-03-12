@@ -1,4 +1,5 @@
 import argparse
+from binascii import hexlify
 from collections import namedtuple
 from functools import wraps
 import grp
@@ -610,7 +611,11 @@ def sizeof_fmt_decimal(num, suffix='B', sep='', precision=2):
 
 
 def format_archive(archive):
-    return '%-36s %s' % (archive.name, format_time(to_localtime(archive.ts)))
+    return '%-36s %s [%s]' % (
+        archive.name,
+        format_time(to_localtime(archive.ts)),
+        hexlify(archive.id).decode('ascii'),
+    )
 
 
 def memoize(function):

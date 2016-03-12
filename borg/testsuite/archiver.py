@@ -1143,6 +1143,43 @@ class RemoteArchiverTestCase(ArchiverTestCase):
         pass
 
 
+class DiffArchiverTestCase(ArchiverTestCaseBase):
+    create_test_files = ArchiverTestCase.create_test_files
+    create_regular_file = ArchiverTestCase.create_regular_file
+
+    def test_basic_functionality(self):
+        self.create_test_files()
+        self.cmd('init', self.repository_location)
+        os.chmod('input/dir2', stat.S_IFDIR | 0o755)
+        self.create_regular_file('file3', size=1024)
+        self.cmd('create', self.repository_location + '::test0', 'input')
+        # replace 'hardlink' with a file
+        os.unlink('input/hardlink')
+        self.create_regular_file('hardlink', size=1024 * 80)
+        # replace directory with a file
+        os.unlink('input/dir2/file2')
+        os.rmdir('input/dir2')
+        self.create_regular_file('dir2', size=1024 * 80)
+        os.chmod('input/dir2', stat.S_IFREG | 0o755)
+        self.create_regular_file('file3', size=1024, contents=b'0')
+        self.cmd('create', self.repository_location + '::test1a', 'input')
+        self.cmd('create', '--chunker-params', '16,18,17,4095', self.repository_location + '::test1b', 'input')
+
+        def do_asserts(output, archive):
+            assert 'input/file3 different contents' in output
+            assert 'input/hardlink different mode' in output
+            assert ('input/hardlink different link\n'
+                    '	 test0 input/file1\n'
+                    '	 test%s <regular file>' % archive) in output
+            assert ('input/dir2 different mode\n'
+                    '	 test0 drwxr-xr-x\n'
+                    '	 test%s -rwxr-xr-x\n' % archive) in output
+            assert 'input/dir2/file2 different contents' in output
+        do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1a'), '1a')
+        # We expect exit_code=1 due to the chunker params warning
+        do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1b', exit_code=1), '1b')
+
+
 def test_get_args():
     archiver = Archiver()
     # everything normal:
@@ -1162,3 +1199,34 @@ def test_get_args():
     args = archiver.get_args(['borg', 'serve', '--restrict-to-path=/p1', '--restrict-to-path=/p2', ],
                              'borg init /')
     assert args.func == archiver.do_serve
+
+
+def test_compare_chunk_contents():
+    def ccc(a, b):
+        compare1 = Archiver.compare_chunk_contents(iter(a), iter(b))
+        compare2 = Archiver.compare_chunk_contents(iter(b), iter(a))
+        assert compare1 == compare2
+        return compare1
+    assert ccc([
+        b'1234', b'567A', b'bC'
+    ], [
+        b'1', b'23', b'4567A', b'b', b'C'
+    ])
+    # one iterator exhausted before the other
+    assert not ccc([
+        b'12345',
+    ], [
+        b'1234', b'56'
+    ])
+    # content mismatch
+    assert not ccc([
+        b'1234', b'65'
+    ], [
+        b'1234', b'56'
+    ])
+    # first is the prefix of second
+    assert not ccc([
+        b'1234', b'56'
+    ], [
+        b'1234', b'565'
+    ])

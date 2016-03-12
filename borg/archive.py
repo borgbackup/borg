@@ -145,6 +145,7 @@ class Archive:
         self.numeric_owner = numeric_owner
         if start is None:
             start = datetime.utcnow()
+        self.chunker_params = chunker_params
         self.start = start
         if end is None:
             end = datetime.utcnow()
@@ -261,6 +262,7 @@ Number of files: {0.stats.nfiles}'''.format(
             'username': getuser(),
             'time': start.isoformat(),
             'time_end': end.isoformat(),
+            'chunker_params': self.chunker_params,
         })
         data = msgpack.packb(metadata, unicode_errors='surrogateescape')
         self.id = self.key.id_hash(data)

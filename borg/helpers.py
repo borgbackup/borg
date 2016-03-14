@@ -974,7 +974,7 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
 
 
 class ProgressIndicatorPercent:
-    def __init__(self, total, step=5, start=0, same_line=False, msg="%3.0f%%", file=sys.stderr):
+    def __init__(self, total, step=5, start=0, same_line=False, msg="%3.0f%%", file=None):
         """
         Percentage-based progress indicator
 
@@ -989,6 +989,8 @@ class ProgressIndicatorPercent:
         self.total = total
         self.trigger_at = start  # output next percentage value when reaching (at least) this
         self.step = step
+        if file is None:
+            file = sys.stderr
         self.file = file
         self.msg = msg
         self.same_line = same_line
@@ -1016,7 +1018,7 @@ class ProgressIndicatorPercent:
 
 
 class ProgressIndicatorEndless:
-    def __init__(self, step=10, file=sys.stderr):
+    def __init__(self, step=10, file=None):
         """
         Progress indicator (long row of dots)
 
@@ -1026,6 +1028,8 @@ class ProgressIndicatorEndless:
         self.counter = 0  # call counter
         self.triggered = 0  # increases 1 per trigger event
         self.step = step  # trigger every <step> calls
+        if file is None:
+            file = sys.stderr
         self.file = file
 
     def progress(self):

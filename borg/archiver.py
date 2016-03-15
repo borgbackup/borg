@@ -1262,7 +1262,7 @@ class Archiver:
                                type=location_validator(archive=True),
                                help='archive')
         subparser.add_argument('archive2', metavar='ARCHIVE2',
-                               type=str,
+                               type=archivename_validator(),
                                help='archive to compare with ARCHIVE1 (no repository location)')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to compare; patterns are supported')

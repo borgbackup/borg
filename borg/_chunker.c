@@ -152,6 +152,7 @@ chunker_fill(Chunker *c)
         }
         else {
             // some error happened
+            PyErr_SetFromErrno(PyExc_OSError);
             return 0;
         }
         length = c->bytes_read - offset;

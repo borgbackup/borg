@@ -814,6 +814,8 @@ class Archiver:
                                    help='enable debug output, work on log level DEBUG')
         common_parser.add_argument('--lock-wait', dest='lock_wait', type=int, metavar='N', default=1,
                                    help='wait for the lock, but max. N seconds (default: %(default)d).')
+        common_parser.add_argument('--show-version', dest='show_version', action='store_true', default=False,
+                                   help='show/log the borg version')
         common_parser.add_argument('--show-rc', dest='show_rc', action='store_true', default=False,
                                    help='show/log the return code (rc)')
         common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
@@ -1414,6 +1416,8 @@ class Archiver:
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
         setup_logging(level=args.log_level, is_serve=args.func == self.do_serve)  # do not use loggers before this!
+        if args.show_version:
+            logger.info('borgbackup version %s' % __version__)
         check_extension_modules()
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")

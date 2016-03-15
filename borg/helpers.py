@@ -1116,7 +1116,7 @@ class ItemFormatter:
             b'mode': 0, b'path': '', b'user': '', b'group': '', b'mtime': 0,
             b'uid': 0, b'gid': 0,
         }).keys())
-        return sorted(sorted(keys), key=str.isupper)
+        return sorted(keys, key=lambda s: (s.isupper(), s))
 
     @classmethod
     def keys_help(cls):
@@ -1143,12 +1143,16 @@ class ItemFormatter:
             'atime': partial(self.time, b'atime'),
         }
         for hash_function in hashlib.algorithms_guaranteed:
-            self.call_keys[hash_function] = partial(self.hash_item, hash_function)
+            self.add_key(hash_function, partial(self.hash_item, hash_function))
         self.keys = set(self.call_keys) & self.format_keys
         self.item_data = {
             'archivename': archive.name
         }
         self.item_data.update(self.FIXED_KEYS)
+
+    def add_key(self, key, callable_with_item):
+        self.call_keys[key] = callable_with_item
+        self.keys = set(self.call_keys) & self.format_keys
 
     def get_item_data(self, item):
         mode = stat.filemode(item[b'mode'])

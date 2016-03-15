@@ -451,9 +451,9 @@ class Archiver:
             if args.format:
                 format = args.format
             elif args.short:
-                format = "{path}{LF}"
+                format = "{path}{NL}"
             else:
-                format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{LF}"
+                format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
             formatter = ItemFormatter(archive, format)
             if not hasattr(sys.stdout, 'buffer'):
                 # This is a shim for supporting unit tests replacing sys.stdout with e.g. StringIO,
@@ -1101,7 +1101,7 @@ class Archiver:
                                help='only print file/directory names, nothing else')
         subparser.add_argument('--format', '--list-format', dest='format', type=str,
                                help="""specify format for file listing
-                                (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}")""")
+                                (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")""")
         subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('-e', '--exclude', dest='excludes',

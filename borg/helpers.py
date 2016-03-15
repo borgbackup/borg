@@ -1093,8 +1093,10 @@ class ItemFormatter:
         'CR': '\r',
         'NUL': '\0',
         'NEWLINE': os.linesep,
+        'NL': os.linesep,
     }
     KEY_DESCRIPTIONS = {
+        'NL': 'Alias of NEWLINE (OS dependent line separator)',
         'NUL': 'NUL character for creating print0 / xargs -0 like ouput, see bpath',
         'csize': 'compressed size',
         'bpath': 'verbatim POSIX path, can contain any character except NUL',

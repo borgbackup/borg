@@ -201,6 +201,7 @@ class Archiver:
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list
+        self.ignore_inode = args.ignore_inode
         dry_run = args.dry_run
         t0 = datetime.utcnow()
         if not dry_run:
@@ -242,7 +243,7 @@ class Archiver:
         if stat.S_ISREG(st.st_mode) or read_special and not stat.S_ISDIR(st.st_mode):
             if not dry_run:
                 try:
-                    status = archive.process_file(path, st, cache)
+                    status = archive.process_file(path, st, cache, self.ignore_inode)
                 except OSError as e:
                     status = 'E'
                     self.print_warning('%s: %s', path, e)
@@ -1018,6 +1019,9 @@ class Archiver:
                                type=ChunkerParams, default=CHUNKER_PARAMS,
                                metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
                                help='specify the chunker parameters. default: %d,%d,%d,%d' % CHUNKER_PARAMS)
+        subparser.add_argument('--ignore-inode', dest='ignore_inode',
+                               action='store_true', default=False,
+                               help='ignore inode data in the file metadata cache used to detect unchanged files.')
         subparser.add_argument('-C', '--compression', dest='compression',
                                type=CompressionSpec, default=dict(name='none'), metavar='COMPRESSION',
                                help='select compression algorithm (and level): '

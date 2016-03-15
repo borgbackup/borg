@@ -1111,13 +1111,14 @@ class ItemFormatter:
         class FakeArchive:
             name = ""
 
+        fake_item = {
+            b'mode': 0, b'path': '', b'user': '', b'group': '', b'mtime': 0,
+            b'uid': 0, b'gid': 0,
+        }
         formatter = cls(FakeArchive, "")
         keys = []
         keys.extend(formatter.call_keys.keys())
-        keys.extend(formatter.get_item_data({
-            b'mode': 0, b'path': '', b'user': '', b'group': '', b'mtime': 0,
-            b'uid': 0, b'gid': 0,
-        }).keys())
+        keys.extend(formatter.get_item_data(fake_item).keys())
         return sorted(keys, key=lambda s: (s.isupper(), s))
 
     @classmethod

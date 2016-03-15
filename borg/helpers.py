@@ -1,8 +1,9 @@
 import argparse
 from binascii import hexlify
 from collections import namedtuple
-from functools import wraps
+from functools import wraps, partial
 import grp
+import hashlib
 import os
 import stat
 import textwrap
@@ -10,6 +11,7 @@ import pwd
 import re
 from shutil import get_terminal_size
 import sys
+from string import Formatter
 import platform
 import time
 import unicodedata
@@ -546,7 +548,7 @@ def format_line(format, data):
     except (KeyError, ValueError) as e:
         # this should catch format errors
         print('Error in lineformat: "{}" - reason "{}"'.format(format, str(e)))
-    except:
+    except Exception as e:
         # something unexpected, print error and raise exception
         print('Error in lineformat: "{}" - reason "{}"'.format(format, str(e)))
         raise
@@ -1080,3 +1082,111 @@ def log_multi(*msgs, level=logging.INFO):
         lines.extend(msg.splitlines())
     for line in lines:
         logger.log(level, line)
+
+
+class ItemFormatter:
+    FIXED_KEYS = {
+        # Formatting aids
+        'LF': '\n',
+        'SPACE': ' ',
+        'TAB': '\t',
+        'CR': '\r',
+        'NUL': '\0',
+        'NEWLINE': os.linesep,
+    }
+
+    @classmethod
+    def available_keys(cls):
+        class FakeArchive:
+            name = ""
+
+        formatter = cls(FakeArchive, "")
+        keys = []
+        keys.extend(formatter.call_keys.keys())
+        keys.extend(formatter.get_item_data({
+            b'mode': 0, b'path': '', b'user': '', b'group': '', b'mtime': 0,
+            b'uid': 0, b'gid': 0,
+        }).keys())
+        keys.sort()
+        keys.sort(key=str.isupper)
+        return keys
+
+    def __init__(self, archive, format):
+        self.archive = archive
+        self.format = format
+        self.format_keys = {f[1] for f in Formatter().parse(format)}
+        self.call_keys = {
+            'size': self.calculate_size,
+            'isomtime': partial(self.format_time, b'mtime'),
+            'isoctime': partial(self.format_time, b'ctime'),
+            'isoatime': partial(self.format_time, b'atime'),
+            'mtime': partial(self.time, b'mtime'),
+            'ctime': partial(self.time, b'ctime'),
+            'atime': partial(self.time, b'atime'),
+        }
+        for hash_function in hashlib.algorithms_guaranteed:
+            self.call_keys[hash_function] = partial(self.hash_item, hash_function)
+        self.keys = set(self.call_keys) & self.format_keys
+        self.item_data = {
+            'archivename': archive.name
+        }
+        self.item_data.update(self.FIXED_KEYS)
+
+    def get_item_data(self, item):
+        mode = stat.filemode(item[b'mode'])
+        item_type = mode[0]
+        item_data = self.item_data
+
+        source = item.get(b'source', '')
+        extra = ''
+        if source:
+            source = remove_surrogates(source)
+            if item_type == 'l':
+                extra = ' -> %s' % source
+            else:
+                mode = 'h' + mode[1:]
+                extra = ' link to %s' % source
+        item_data.update({
+            # Basic item data
+            'type': item_type,
+
+            'mode': mode,
+            'user': item[b'user'] or item[b'uid'],
+            'group': item[b'group'] or item[b'gid'],
+            'uid': item[b'uid'],
+            'gid': item[b'gid'],
+
+            'path': remove_surrogates(item[b'path']),
+            'bpath': item[b'path'],
+            'source': source,
+            'linktarget': source,
+            'extra': extra
+        })
+        for key in self.keys:
+            item_data[key] = self.call_keys[key](item)
+        return item_data
+
+    def format_item(self, item):
+        return self.format.format(**self.get_item_data(item))
+
+    def calculate_size(self, item):
+        if stat.S_ISREG(item[b'mode']):
+            try:
+                return sum(size for _, size, _ in item[b'chunks'])
+            except KeyError:
+                pass
+        return 0
+
+    def hash_item(self, hash_function, item):
+        if b'chunks' not in item:
+            return ""
+        hash = hashlib.new(hash_function)
+        for chunk in self.archive.pipeline.fetch_many([c[0] for c in item[b'chunks']]):
+            hash.update(chunk)
+        return hash.hexdigest()
+
+    def format_time(self, key, item):
+        return format_time(safe_timestamp(item[key]))
+
+    def time(self, key, item):
+        return safe_timestamp(item[key])

@@ -437,33 +437,34 @@ class Archiver:
         repository = self.open_repository(args)
         manifest, key = Manifest.load(repository)
         if args.location.archive:
-            archive = Archive(repository, key, manifest, args.location.archive)
+            with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
+                archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
 
-            matcher = PatternMatcher()
-            if args.excludes:
-                matcher.add(args.excludes, False)
-            include_patterns = []
-            if args.paths:
-                include_patterns.extend(parse_pattern(i, PathPrefixPattern) for i in args.paths)
-                matcher.add(include_patterns, True)
-            matcher.fallback = not include_patterns
+                matcher = PatternMatcher()
+                if args.excludes:
+                    matcher.add(args.excludes, False)
+                include_patterns = []
+                if args.paths:
+                    include_patterns.extend(parse_pattern(i, PathPrefixPattern) for i in args.paths)
+                    matcher.add(include_patterns, True)
+                matcher.fallback = not include_patterns
 
-            if args.format:
-                format = args.format
-            elif args.short:
-                format = "{path}{NL}"
-            else:
-                format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
-            formatter = ItemFormatter(archive, format)
-            if not hasattr(sys.stdout, 'buffer'):
-                # This is a shim for supporting unit tests replacing sys.stdout with e.g. StringIO,
-                # which doesn't have an underlying buffer (= lower file object).
-                def write(bytestring):
-                    sys.stdout.write(bytestring.decode('utf-8', errors='replace'))
-            else:
-                write = sys.stdout.buffer.write
-            for item in archive.iter_items(lambda item: matcher.match(item[b'path'])):
-                write(formatter.format_item(item).encode('utf-8', errors='surrogateescape'))
+                if args.format:
+                    format = args.format
+                elif args.short:
+                    format = "{path}{NL}"
+                else:
+                    format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
+                formatter = ItemFormatter(archive, format)
+                if not hasattr(sys.stdout, 'buffer'):
+                    # This is a shim for supporting unit tests replacing sys.stdout with e.g. StringIO,
+                    # which doesn't have an underlying buffer (= lower file object).
+                    def write(bytestring):
+                        sys.stdout.write(bytestring.decode('utf-8', errors='replace'))
+                else:
+                    write = sys.stdout.buffer.write
+                for item in archive.iter_items(lambda item: matcher.match(item[b'path'])):
+                    write(formatter.format_item(item).encode('utf-8', errors='surrogateescape'))
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 if args.prefix and not archive_info.name.startswith(args.prefix):

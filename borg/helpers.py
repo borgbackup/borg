@@ -1103,6 +1103,7 @@ class ItemFormatter:
         'path': 'path interpreted as text (might be missing non-text characters, see bpath)',
         'source': 'link target for links (identical to linktarget)',
         'num_chunks': 'number of chunks in this file',
+        'unique_chunks': 'number of unique chunks in this file',
     }
 
     @classmethod
@@ -1137,6 +1138,7 @@ class ItemFormatter:
             'size': self.calculate_size,
             'csize': self.calculate_csize,
             'num_chunks': self.calculate_num_chunks,
+            'unique_chunks': self.calculate_unique_chunks,
             'isomtime': partial(self.format_time, b'mtime'),
             'isoctime': partial(self.format_time, b'ctime'),
             'isoatime': partial(self.format_time, b'atime'),
@@ -1195,6 +1197,10 @@ class ItemFormatter:
 
     def calculate_num_chunks(self, item):
         return len(item.get(b'chunks', []))
+
+    def calculate_unique_chunks(self, item):
+        chunk_index = self.archive.cache.chunks
+        return sum(1 for chunk_id, _, _ in item.get(b'chunks', []) if chunk_index[chunk_id][0] > 1)
 
     def calculate_size(self, item):
         return sum(size for _, size, _ in item.get(b'chunks', []))

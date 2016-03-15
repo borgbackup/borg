@@ -1096,12 +1096,13 @@ class ItemFormatter:
         'NL': os.linesep,
     }
     KEY_DESCRIPTIONS = {
-        'NL': 'Alias of NEWLINE (OS dependent line separator)',
+        'NL': 'alias of NEWLINE (OS dependent line separator)',
         'NUL': 'NUL character for creating print0 / xargs -0 like ouput, see bpath',
         'csize': 'compressed size',
         'bpath': 'verbatim POSIX path, can contain any character except NUL',
         'path': 'path interpreted as text (might be missing non-text characters, see bpath)',
         'source': 'link target for links (identical to linktarget)',
+        'num_chunks': 'number of chunks in this file',
     }
 
     @classmethod
@@ -1135,6 +1136,7 @@ class ItemFormatter:
         self.call_keys = {
             'size': self.calculate_size,
             'csize': self.calculate_csize,
+            'num_chunks': self.calculate_num_chunks,
             'isomtime': partial(self.format_time, b'mtime'),
             'isoctime': partial(self.format_time, b'ctime'),
             'isoatime': partial(self.format_time, b'atime'),
@@ -1190,6 +1192,9 @@ class ItemFormatter:
 
     def format_item(self, item):
         return self.format.format(**self.get_item_data(item))
+
+    def calculate_num_chunks(self, item):
+        return len(item.get(b'chunks', []))
 
     def calculate_size(self, item):
         return sum(size for _, size, _ in item.get(b'chunks', []))

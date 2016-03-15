@@ -458,7 +458,8 @@ class Archiver:
             if not hasattr(sys.stdout, 'buffer'):
                 # This is a shim for supporting unit tests replacing sys.stdout with e.g. StringIO,
                 # which doesn't have an underlying buffer (= lower file object).
-                write = lambda bytestring: sys.stdout.write(bytestring.decode('utf-8', errors='replace'))
+                def write(bytestring):
+                    sys.stdout.write(bytestring.decode('utf-8', errors='replace'))
             else:
                 write = sys.stdout.buffer.write
             for item in archive.iter_items(lambda item: matcher.match(item[b'path'])):

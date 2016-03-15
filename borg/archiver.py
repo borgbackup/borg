@@ -964,6 +964,12 @@ class Archiver:
         traversing all paths specified. The archive will consume almost no disk space for
         files or parts of files that have already been stored in other archives.
 
+
+        To speed up pulling backups over sshfs and similar network file systems which do
+        not provide correct inode information the --ignore-inode flag can be used. This
+        potentially decreases reliability of change detection, while avoiding always reading
+        all files on these file systems.
+
         See the output of the "borg help patterns" command for more help on exclude patterns.
         """)
 

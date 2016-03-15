@@ -1094,6 +1094,13 @@ class ItemFormatter:
         'NUL': '\0',
         'NEWLINE': os.linesep,
     }
+    KEY_DESCRIPTIONS = {
+        'NUL': 'NUL character for creating print0 / xargs -0 like ouput, see bpath',
+        'csize': 'compressed size',
+        'bpath': 'verbatim POSIX path, can contain any character except NUL',
+        'path': 'path interpreted as text (might be missing non-text characters, see bpath)',
+        'source': 'link target for links (identical to linktarget)',
+    }
 
     @classmethod
     def available_keys(cls):
@@ -1107,9 +1114,17 @@ class ItemFormatter:
             b'mode': 0, b'path': '', b'user': '', b'group': '', b'mtime': 0,
             b'uid': 0, b'gid': 0,
         }).keys())
-        keys.sort()
-        keys.sort(key=str.isupper)
-        return keys
+        return sorted(sorted(keys), key=str.isupper)
+
+    @classmethod
+    def keys_help(cls):
+        help = []
+        for key in cls.available_keys():
+            text = " - " + key
+            if key in cls.KEY_DESCRIPTIONS:
+                text += ": " + cls.KEY_DESCRIPTIONS[key]
+            help.append(text)
+        return "\n".join(help)
 
     def __init__(self, archive, format):
         self.archive = archive
@@ -1117,6 +1132,7 @@ class ItemFormatter:
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
             'size': self.calculate_size,
+            'csize': self.calculate_csize,
             'isomtime': partial(self.format_time, b'mtime'),
             'isoctime': partial(self.format_time, b'ctime'),
             'isoatime': partial(self.format_time, b'atime'),
@@ -1170,12 +1186,10 @@ class ItemFormatter:
         return self.format.format(**self.get_item_data(item))
 
     def calculate_size(self, item):
-        if stat.S_ISREG(item[b'mode']):
-            try:
-                return sum(size for _, size, _ in item[b'chunks'])
-            except KeyError:
-                pass
-        return 0
+        return sum(size for _, size, _ in item.get(b'chunks', []))
+
+    def calculate_csize(self, item):
+        return sum(csize for _, _, csize in item.get(b'chunks', []))
 
     def hash_item(self, hash_function, item):
         if b'chunks' not in item:
@@ -1186,7 +1200,7 @@ class ItemFormatter:
         return hash.hexdigest()
 
     def format_time(self, key, item):
-        return format_time(safe_timestamp(item[key]))
+        return format_time(safe_timestamp(item.get(key) or item[b'mtime']))
 
     def time(self, key, item):
-        return safe_timestamp(item[key])
+        return safe_timestamp(item.get(key) or item[b'mtime'])

@@ -1,7 +1,6 @@
 from binascii import hexlify, unhexlify
 from datetime import datetime
 from operator import attrgetter
-from string import Formatter
 import argparse
 import functools
 import hashlib
@@ -16,11 +15,11 @@ import textwrap
 import traceback
 
 from . import __version__
-from .helpers import Error, location_validator, archivename_validator, format_line, format_time, format_file_size, \
-    parse_pattern, PathPrefixPattern, to_localtime, timestamp, safe_timestamp, \
+from .helpers import Error, location_validator, archivename_validator, format_time, format_file_size, \
+    parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
     get_cache_dir, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
+    dir_is_tagged, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ItemFormatter
 from .logger import create_logger, setup_logging
 logger = create_logger()
@@ -456,8 +455,14 @@ class Archiver:
             else:
                 format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{LF}"
             formatter = ItemFormatter(archive, format)
+            if not hasattr(sys.stdout, 'buffer'):
+                # This is a shim for supporting unit tests replacing sys.stdout with e.g. StringIO,
+                # which doesn't have an underlying buffer (= lower file object).
+                write = lambda bytestring: sys.stdout.write(bytestring.decode('utf-8', errors='replace'))
+            else:
+                write = sys.stdout.buffer.write
             for item in archive.iter_items(lambda item: matcher.match(item[b'path'])):
-                sys.stdout.buffer.write(formatter.format_item(item).encode('utf-8', errors='surrogateescape'))
+                write(formatter.format_item(item).encode('utf-8', errors='surrogateescape'))
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 if args.prefix and not archive_info.name.startswith(args.prefix):
@@ -1083,7 +1088,7 @@ class Archiver:
 
         The following keys are available for --format:
 
-        """) + "\n".join(ItemFormatter.available_keys())
+        """) + ItemFormatter.keys_help()
         subparser = subparsers.add_parser('list', parents=[common_parser],
                                           description=self.do_list.__doc__,
                                           epilog=list_epilog,
@@ -1093,7 +1098,7 @@ class Archiver:
         subparser.add_argument('--short', dest='short',
                                action='store_true', default=False,
                                help='only print file/directory names, nothing else')
-        subparser.add_argument('-f', '--format', '--list-format', dest='format', type=str,
+        subparser.add_argument('--format', '--list-format', dest='format', type=str,
                                help="""specify format for file listing
                                 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}")""")
         subparser.add_argument('-P', '--prefix', dest='prefix', type=str,

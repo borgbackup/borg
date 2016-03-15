@@ -1254,7 +1254,7 @@ class Archiver:
                                metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,
-                               help='only obey numeric user and group identifiers')
+                               help='only consider numeric user and group identifiers')
         subparser.add_argument('--same-chunker-params', dest='same_chunker_params',
                                action='store_true', default=False,
                                help='Override check of chunker parameters.')

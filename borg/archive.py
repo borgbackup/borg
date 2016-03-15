@@ -517,7 +517,7 @@ Number of files: {0.stats.nfiles}'''.format(
         self.add_item(item)
         return 'i'  # stdin
 
-    def process_file(self, path, st, cache):
+    def process_file(self, path, st, cache, ignore_inode=False):
         status = None
         safe_path = make_path_safe(path)
         # Is it a hard link?
@@ -533,7 +533,7 @@ Number of files: {0.stats.nfiles}'''.format(
                 self.hard_links[st.st_ino, st.st_dev] = safe_path
         path_hash = self.key.id_hash(os.path.join(self.cwd, path).encode('utf-8', 'surrogateescape'))
         first_run = not cache.files
-        ids = cache.file_known_and_unchanged(path_hash, st)
+        ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode)
         if first_run:
             logger.info('processing files')
         chunks = None

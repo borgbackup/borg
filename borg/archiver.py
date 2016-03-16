@@ -601,14 +601,19 @@ class Archiver:
                 new_size += len(data)
                 chunks[id_] = data
             if not dry_run:
-                for id_, data in chunks.items():
-                    repository.put(id_, data)
-                if repository.io.get_latest_segment() > last_segment_id + 10:
-                    last_segment_id = repository.io.get_latest_segment()
-                    repository.compact_segments()
-                    repository.commit()
-                    sys.stdout.write('.')
-                    sys.stdout.flush()
+                try:
+                    for id_, data in chunks.items():
+                        repository.put(id_, data)
+                    if repository.io.get_latest_segment() > last_segment_id + 10:
+                        last_segment_id = repository.io.get_latest_segment()
+                        repository.compact_segments()
+                        repository.commit()
+                        sys.stdout.write('.')
+                        sys.stdout.flush()
+                except Exception as e:  # too broad!
+                    self.print_error("Exception while recompressing, rolling transaction back...")
+                    repository.rollback()
+                    raise
         manifest.write()
         repository.commit()
         if args.stats:

@@ -586,6 +586,7 @@ class Archiver:
         old_size = 0
         new_size = 0
         seen_chunks = recompressed_chunks = skipped_chunks = 0
+        has_changes = False
         for segment_id, segment_filename in repository.io.segment_iterator():
             if segment_id > last_segment_id:
                 print("Reached beginning of recompressed segments")
@@ -623,6 +624,8 @@ class Archiver:
                 chunks[id_] = data
             if not dry_run:
                 try:
+                    if not has_changes and len(chunks):
+                        has_changes = True
                     for id_, data in chunks.items():
                         recompressed_chunks += 1
                         repository.put(id_, data)
@@ -636,8 +639,9 @@ class Archiver:
                     self.print_error("Exception while recompressing, rolling transaction back...")
                     repository.rollback()
                     raise
-        manifest.write()
-        repository.commit()
+        if not dry_run and has_changes:
+            manifest.write()
+            repository.commit()
         if args.stats:
             print("\n")
             print("Repositoy:", repository.path)

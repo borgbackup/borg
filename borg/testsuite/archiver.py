@@ -912,6 +912,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0 input/amb" in output
         assert "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 input/empty_file" in output
 
+    def test_list_chunk_counts(self):
+        self.create_regular_file('empty_file', size=0)
+        self.create_regular_file('two_chunks')
+        with open(os.path.join(self.input_path, 'two_chunks'), 'wb') as fd:
+            fd.write(b'abba' * 2000000)
+            fd.write(b'baab' * 2000000)
+        self.cmd('init', self.repository_location)
+        test_archive = self.repository_location + '::test'
+        self.cmd('create', test_archive, 'input')
+        output = self.cmd('list', '--format', '{num_chunks} {unique_chunks} {path}{NL}', test_archive)
+        assert "0 0 input/empty_file" in output
+        assert "2 2 input/two_chunks" in output
+
     def test_break_lock(self):
         self.cmd('init', self.repository_location)
         self.cmd('break-lock', self.repository_location)

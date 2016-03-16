@@ -570,18 +570,22 @@ class Archiver:
         repository = self.open_repository(args, exclusive=True)
         manifest, key = Manifest.load(repository)
         compr_args = dict(buffer=COMPR_BUFFER)
+        # see compress.pyx:197, COMPR_BUFFER
+        DECOMPRESS_BUFFER = bytes(int(1.1 * 2 ** 23))
         compr_args.update(args.compression)
         # Compressor.decompress can decompress data compressed by compressor
         # (For each chunk the compressor tag is looked up)
         key.compressor = Compressor(**compr_args)
 
         from borg.repository import TAG_PUT
+        from borg.compress import COMPRESSOR_LIST
 
         segment_count = sum(1 for _ in repository.io.segment_iterator())
         last_segment_id = repository.io.get_latest_segment()
         print(segment_count, "segments in repository")
         old_size = 0
         new_size = 0
+        seen_chunks = recompressed_chunks = skipped_chunks = 0
         for segment_id, segment_filename in repository.io.segment_iterator():
             if segment_id > last_segment_id:
                 print("Reached beginning of recompressed segments")
@@ -595,14 +599,32 @@ class Archiver:
                     continue
                 # TODO: add decompress kwarg to key.decrypt, so we can detect manually what compressor
                 # TODO: was used here, and skip the chunk if it uses key.compressor
+                seen_chunks += 1
                 # validate, decrypt, decompress, compress, encrypt
                 old_size += len(data)
-                data = key.encrypt(key.decrypt(id_, data))
+                decrypted_data = key.decrypt(id_, data, no_decompress=True)
+                compression_header = bytes(decrypted_data[:2])
+                skip = False
+                for compressor in COMPRESSOR_LIST:
+                    if compressor.detect(compression_header):
+                        if not args.force_recompress and isinstance(key.compressor, compressor):
+                            skip = True
+                            break
+                        decompressed_data = compressor(buffer=DECOMPRESS_BUFFER).decompress(decrypted_data)
+                        key.assert_chunk_id(id_, decompressed_data)
+                        break
+                else:
+                    raise ValueError('No decompressor for this data found: %r.', data[:2])
+                if skip:
+                    skipped_chunks += 1
+                    continue
+                data = key.encrypt(decompressed_data)
                 new_size += len(data)
                 chunks[id_] = data
             if not dry_run:
                 try:
                     for id_, data in chunks.items():
+                        recompressed_chunks += 1
                         repository.put(id_, data)
                     if repository.io.get_latest_segment() > last_segment_id + 10:
                         last_segment_id = repository.io.get_latest_segment()
@@ -625,6 +647,7 @@ class Archiver:
             print("Old size:", format_file_size(old_size))
             print("New size:", format_file_size(new_size))
             print("Ratio:", int(new_size / old_size * 100), "%")
+            print("Chunks seen, recompressed, skipped:", seen_chunks, recompressed_chunks, skipped_chunks)
 
         return self.exit_code
 
@@ -980,7 +1003,7 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 
-        recompress_epilog = textwrap.dedent("""
+        create_epilog = textwrap.dedent("""
         This command creates a backup archive containing all files found while recursively
         traversing all paths specified. The archive will consume almost no disk space for
         files or parts of files that have already been stored in other archives.
@@ -990,7 +1013,7 @@ class Archiver:
 
         subparser = subparsers.add_parser('create', parents=[common_parser],
                                           description=self.do_create.__doc__,
-                                          epilog=recompress_epilog,
+                                          epilog=create_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='create backup')
         subparser.set_defaults(func=self.do_create)
@@ -1353,7 +1376,6 @@ class Archiver:
         recompress_epilog = textwrap.dedent("""
         Recompress data in a repository.
         """)
-
         subparser = subparsers.add_parser('recompress', parents=[common_parser],
                                           description=self.do_recompress.__doc__,
                                           epilog=recompress_epilog,

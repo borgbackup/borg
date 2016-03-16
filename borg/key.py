@@ -75,7 +75,11 @@ class KeyBase:
     def encrypt(self, data):
         pass
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, no_decompress=False):
+        pass
+
+    def assert_chunk_id(self, id, data):
+        """raise IntegrityError if id doesn't match data"""
         pass
 
 
@@ -99,13 +103,19 @@ class PlaintextKey(KeyBase):
     def encrypt(self, data):
         return b''.join([self.TYPE_STR, self.compressor.compress(data)])
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, no_decompress=False):
         if data[0] != self.TYPE:
             raise IntegrityError('Invalid encryption envelope')
+        if no_decompress:
+            return memoryview(data)[1:]
         data = self.compressor.decompress(memoryview(data)[1:])
-        if id and sha256(data).digest() != id:
-            raise IntegrityError('Chunk id verification failed')
+        if id:
+            self.assert_chunk_id(id, data)
         return data
+
+    def assert_chunk_id(self, id, data):
+        if sha256(data).digest() != id:
+            raise IntegrityError('Chunk id verification failed')
 
 
 class AESKeyBase(KeyBase):
@@ -135,7 +145,7 @@ class AESKeyBase(KeyBase):
         hmac = HMAC(self.enc_hmac_key, data, sha256).digest()
         return b''.join((self.TYPE_STR, hmac, data))
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, no_decompress=False):
         if not (data[0] == self.TYPE or
             data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             raise IntegrityError('Invalid encryption envelope')
@@ -144,13 +154,18 @@ class AESKeyBase(KeyBase):
         if not compare_digest(hmac_computed, hmac_given):
             raise IntegrityError('Encryption envelope checksum mismatch')
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
+        if no_decompress:
+            return self.dec_cipher.decrypt(data[41:])
         data = self.compressor.decompress(self.dec_cipher.decrypt(data[41:]))
         if id:
-            hmac_given = id
-            hmac_computed = HMAC(self.id_key, data, sha256).digest()
-            if not compare_digest(hmac_computed, hmac_given):
-                raise IntegrityError('Chunk id verification failed')
+            self.assert_chunk_id(id, data)
         return data
+
+    def assert_chunk_id(self, id, data):
+        hmac_given = id
+        hmac_computed = HMAC(self.id_key, data, sha256).digest()
+        if not compare_digest(hmac_computed, hmac_given):
+            raise IntegrityError('Chunk id verification failed')
 
     def extract_nonce(self, payload):
         if not (payload[0] == self.TYPE or

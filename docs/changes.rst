@@ -24,6 +24,7 @@ Compatibility / maintenance notes:
 
 Bug fixes:
 
+- silently skips disk I/O errors, includes truncated files into archive, #748
 - seeking to an invalid position is an IOError in python 3.2, #621
 - Cache: fix exception handling in __init__, release lock, #610
 

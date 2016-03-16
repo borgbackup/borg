@@ -1,9 +1,10 @@
 from binascii import hexlify, unhexlify
 from datetime import datetime
-from hashlib import sha256
+from itertools import zip_longest
 from operator import attrgetter
 import argparse
 import functools
+import hashlib
 import inspect
 import io
 import os
@@ -80,6 +81,45 @@ class Archiver:
     def print_file_status(self, status, path):
         if self.output_list and (self.output_filter is None or status in self.output_filter):
             logger.info("%1s %s", status, remove_surrogates(path))
+
+    @staticmethod
+    def compare_chunk_contents(chunks1, chunks2):
+        """Compare two chunk iterators (like returned by :meth:`.DownloadPipeline.fetch_many`)"""
+        end = object()
+        alen = ai = 0
+        blen = bi = 0
+        while True:
+            if not alen - ai:
+                a = next(chunks1, end)
+                if a is end:
+                    return not blen - bi and next(chunks2, end) is end
+                a = memoryview(a)
+                alen = len(a)
+                ai = 0
+            if not blen - bi:
+                b = next(chunks2, end)
+                if b is end:
+                    return not alen - ai and next(chunks1, end) is end
+                b = memoryview(b)
+                blen = len(b)
+                bi = 0
+            slicelen = min(alen - ai, blen - bi)
+            if a[ai:ai + slicelen] != b[bi:bi + slicelen]:
+                return False
+            ai += slicelen
+            bi += slicelen
+
+    @staticmethod
+    def build_matcher(excludes, paths):
+        matcher = PatternMatcher()
+        if excludes:
+            matcher.add(excludes, False)
+        include_patterns = []
+        if paths:
+            include_patterns.extend(parse_pattern(i, PathPrefixPattern) for i in paths)
+            matcher.add(include_patterns, True)
+        matcher.fallback = not include_patterns
+        return matcher, include_patterns
 
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
@@ -305,17 +345,7 @@ class Archiver:
         archive = Archive(repository, key, manifest, args.location.archive,
                           numeric_owner=args.numeric_owner)
 
-        matcher = PatternMatcher()
-        if args.excludes:
-            matcher.add(args.excludes, False)
-
-        include_patterns = []
-
-        if args.paths:
-            include_patterns.extend(parse_pattern(i, PathPrefixPattern) for i in args.paths)
-            matcher.add(include_patterns, True)
-
-        matcher.fallback = not include_patterns
+        matcher, include_patterns = self.build_matcher(args.excludes, args.paths)
 
         output_list = args.output_list
         dry_run = args.dry_run
@@ -349,6 +379,123 @@ class Archiver:
         if not args.dry_run:
             while dirs:
                 archive.extract_item(dirs.pop(-1))
+        for pattern in include_patterns:
+            if pattern.match_count == 0:
+                self.print_warning("Include pattern '%s' never matched.", pattern)
+        return self.exit_code
+
+    def do_diff(self, args):
+        """Diff contents of two archives"""
+        def format_bytes(count):
+            if count is None:
+                return "<deleted>"
+            return format_file_size(count)
+
+        def fetch_and_compare_chunks(chunk_ids1, chunk_ids2, archive1, archive2):
+            chunks1 = archive1.pipeline.fetch_many(chunk_ids1)
+            chunks2 = archive2.pipeline.fetch_many(chunk_ids2)
+            return self.compare_chunk_contents(chunks1, chunks2)
+
+        def get_owner(item):
+            if args.numeric_owner:
+                return item[b'uid'], item[b'gid']
+            else:
+                return item[b'user'], item[b'group']
+
+        def compare_items(path, item1, item2, deleted=False):
+            """
+            Compare two items with identical paths.
+            :param deleted: Whether one of the items has been deleted
+            """
+            if not deleted:
+                if item1[b'mode'] != item2[b'mode']:
+                    print(remove_surrogates(path), 'different mode')
+                    print('\t', args.location.archive, stat.filemode(item1[b'mode']))
+                    print('\t', args.archive2, stat.filemode(item2[b'mode']))
+
+                user1, group1 = get_owner(item1)
+                user2, group2 = get_owner(item2)
+                if user1 != user2 or group1 != group2:
+                    print(remove_surrogates(path), 'different owner')
+                    print('\t', args.location.archive, 'user=%s, group=%s' % (user1, group1))
+                    print('\t', args.archive2, 'user=%s, group=%s' % (user2, group2))
+
+                if not stat.S_ISREG(item1[b'mode']):
+                    return
+            if b'chunks' not in item1 or b'chunks' not in item2:
+                # At least one of the items is a link
+                if item1.get(b'source') != item2.get(b'source'):
+                    print(remove_surrogates(path), 'different link')
+                    print('\t', args.location.archive, item1.get(b'source', '<regular file>'))
+                    print('\t', args.archive2, item2.get(b'source', '<regular file>'))
+                return
+            if deleted or not can_compare_chunk_ids or item1[b'chunks'] != item2[b'chunks']:
+                # Contents are different
+                chunk_ids1 = [c[0] for c in item1[b'chunks']]
+                chunk_ids2 = [c[0] for c in item2[b'chunks']]
+                chunk_id_set1 = set(chunk_ids1)
+                chunk_id_set2 = set(chunk_ids2)
+                total1 = None if item1.get(b'deleted') else sum(c[1] for c in item1[b'chunks'])
+                total2 = None if item2.get(b'deleted') else sum(c[1] for c in item2[b'chunks'])
+                if (not can_compare_chunk_ids and total1 == total2 and not deleted and
+                        fetch_and_compare_chunks(chunk_ids1, chunk_ids2, archive1, archive2)):
+                    return
+                added = sum(c[1] for c in (chunk_id_set2 - chunk_id_set1))
+                removed = sum(c[1] for c in (chunk_id_set1 - chunk_id_set2))
+                print(remove_surrogates(path), 'different contents')
+                print('\t +%s, -%s, %s, %s' % (format_bytes(added), format_bytes(removed),
+                                               format_bytes(total1), format_bytes(total2)))
+
+        def compare_archives(archive1, archive2, matcher):
+            orphans_archive1 = {}
+            orphans_archive2 = {}
+            for item1, item2 in zip_longest(
+                    archive1.iter_items(lambda item: matcher.match(item[b'path'])),
+                    archive2.iter_items(lambda item: matcher.match(item[b'path'])),
+            ):
+                if item1 and item2 and item1[b'path'] == item2[b'path']:
+                    compare_items(item1[b'path'], item1, item2)
+                    continue
+                if item1:
+                    matching_orphan = orphans_archive2.pop(item1[b'path'], None)
+                    if matching_orphan:
+                        compare_items(item1[b'path'], item1, matching_orphan)
+                    else:
+                        orphans_archive1[item1[b'path']] = item1
+                if item2:
+                    matching_orphan = orphans_archive1.pop(item2[b'path'], None)
+                    if matching_orphan:
+                        compare_items(item2[b'path'], matching_orphan, item2)
+                    else:
+                        orphans_archive2[item2[b'path']] = item2
+            # At this point orphans_* contain items that had no matching partner in the other archive
+            for added in orphans_archive2.values():
+                compare_items(added[b'path'], {
+                    b'deleted': True,
+                    b'chunks': [],
+                }, added, deleted=True)
+            for deleted in orphans_archive1.values():
+                compare_items(deleted[b'path'], deleted, {
+                    b'deleted': True,
+                    b'chunks': [],
+                }, deleted=True)
+
+        repository = self.open_repository(args)
+        manifest, key = Manifest.load(repository)
+        archive1 = Archive(repository, key, manifest, args.location.archive)
+        archive2 = Archive(repository, key, manifest, args.archive2)
+
+        can_compare_chunk_ids = archive1.metadata.get(b'chunker_params', False) == archive2.metadata.get(
+            b'chunker_params', True) or args.same_chunker_params
+        if not can_compare_chunk_ids:
+            self.print_warning('--chunker-params might be different between archives, diff will be slow.\n'
+                               'If you know for certain that they are the same, pass --same-chunker-params '
+                               'to override this check.')
+
+        matcher, include_patterns = self.build_matcher(args.excludes, args.paths)
+
+        compare_archives(archive1, archive2, matcher)
+
         for pattern in include_patterns:
             if pattern.match_count == 0:
                 self.print_warning("Include pattern '%s' never matched.", pattern)
@@ -650,7 +797,7 @@ class Archiver:
         for path in args.paths:
             with open(path, "rb") as f:
                 data = f.read()
-            h = sha256(data)  # XXX hardcoded
+            h = hashlib.sha256(data)  # XXX hardcoded
             repository.put(h.digest(), data)
             print("object %s put." % h.hexdigest())
         repository.commit()
@@ -1094,6 +1241,41 @@ class Archiver:
                                help='archive to extract')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to extract; patterns are supported')
+
+        diff_epilog = textwrap.dedent("""
+            This command finds differences in files (contents, user, group, mode) between archives.
+
+            Both archives need to be in the same repository, and a repository location may only
+            be specified for ARCHIVE1.
+
+            See the output of the "borg help patterns" command for more help on exclude patterns.
+            """)
+        subparser = subparsers.add_parser('diff', parents=[common_parser],
+                                          description=self.do_diff.__doc__,
+                                          epilog=diff_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='find differences in archive contents')
+        subparser.set_defaults(func=self.do_diff)
+        subparser.add_argument('-e', '--exclude', dest='excludes',
+                               type=parse_pattern, action='append',
+                               metavar="PATTERN", help='exclude paths matching PATTERN')
+        subparser.add_argument('--exclude-from', dest='exclude_files',
+                               type=argparse.FileType('r'), action='append',
+                               metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
+        subparser.add_argument('--numeric-owner', dest='numeric_owner',
+                               action='store_true', default=False,
+                               help='only consider numeric user and group identifiers')
+        subparser.add_argument('--same-chunker-params', dest='same_chunker_params',
+                               action='store_true', default=False,
+                               help='Override check of chunker parameters.')
+        subparser.add_argument('location', metavar='ARCHIVE1',
+                               type=location_validator(archive=True),
+                               help='archive')
+        subparser.add_argument('archive2', metavar='ARCHIVE2',
+                               type=archivename_validator(),
+                               help='archive to compare with ARCHIVE1 (no repository location)')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to compare; patterns are supported')
 
         rename_epilog = textwrap.dedent("""
         This command renames an archive in the repository.

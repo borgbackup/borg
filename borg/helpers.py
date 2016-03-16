@@ -1204,7 +1204,7 @@ class ItemFormatter:
 
     def calculate_unique_chunks(self, item):
         chunk_index = self.archive.cache.chunks
-        return sum(1 for chunk_id, _, _ in item.get(b'chunks', []) if chunk_index[chunk_id][0] > 1)
+        return sum(1 for chunk_id, _, _ in item.get(b'chunks', []) if chunk_index[chunk_id][0] == 1)
 
     def calculate_size(self, item):
         return sum(size for _, size, _ in item.get(b'chunks', []))

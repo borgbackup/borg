@@ -902,6 +902,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assertEqual(output_1, output_2)
         self.assertNotEqual(output_1, output_3)
 
+    def test_list_hash(self):
+        self.create_regular_file('empty_file', size=0)
+        self.create_regular_file('amb', contents=b'a' * 1000000)
+        self.cmd('init', self.repository_location)
+        test_archive = self.repository_location + '::test'
+        self.cmd('create', test_archive, 'input')
+        output = self.cmd('list', '--format', '{sha256} {path}{NL}', test_archive)
+        assert "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0 input/amb" in output
+        assert "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 input/empty_file" in output
+
     def test_break_lock(self):
         self.cmd('init', self.repository_location)
         self.cmd('break-lock', self.repository_location)

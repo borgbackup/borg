@@ -437,17 +437,17 @@ class Archiver:
         repository = self.open_repository(args)
         manifest, key = Manifest.load(repository)
         if args.location.archive:
+            matcher = PatternMatcher()
+            if args.excludes:
+                matcher.add(args.excludes, False)
+            include_patterns = []
+            if args.paths:
+                include_patterns.extend(parse_pattern(i, PathPrefixPattern) for i in args.paths)
+                matcher.add(include_patterns, True)
+            matcher.fallback = not include_patterns
+
             with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
-
-                matcher = PatternMatcher()
-                if args.excludes:
-                    matcher.add(args.excludes, False)
-                include_patterns = []
-                if args.paths:
-                    include_patterns.extend(parse_pattern(i, PathPrefixPattern) for i in args.paths)
-                    matcher.add(include_patterns, True)
-                matcher.fallback = not include_patterns
 
                 if args.format:
                     format = args.format
@@ -456,6 +456,7 @@ class Archiver:
                 else:
                     format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
                 formatter = ItemFormatter(archive, format)
+
                 if not hasattr(sys.stdout, 'buffer'):
                     # This is a shim for supporting unit tests replacing sys.stdout with e.g. StringIO,
                     # which doesn't have an underlying buffer (= lower file object).

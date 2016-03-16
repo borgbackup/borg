@@ -1133,7 +1133,11 @@ class ItemFormatter:
 
     def __init__(self, archive, format):
         self.archive = archive
-        self.format = format
+        static_keys = {
+            'archivename': archive.name
+        }
+        static_keys.update(self.FIXED_KEYS)
+        self.format = self.partial_format(format, static_keys)
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
             'size': self.calculate_size,
@@ -1150,10 +1154,13 @@ class ItemFormatter:
         for hash_function in hashlib.algorithms_guaranteed:
             self.add_key(hash_function, partial(self.hash_item, hash_function))
         self.keys = set(self.call_keys) & self.format_keys
-        self.item_data = {
-            'archivename': archive.name
-        }
-        self.item_data.update(self.FIXED_KEYS)
+        self.item_data = static_keys
+
+    def partial_format(self, format, mapping):
+        # str.format wishlist: leave_unknown_keys_alone_and_dont_throw_up=True
+        for key, value in mapping.items():
+            format = re.sub(r'(?<!\{)(\{%s(:[^\}]+)?\})' % key, value, format)
+        return format
 
     def add_key(self, key, callable_with_item):
         self.call_keys[key] = callable_with_item
@@ -1173,28 +1180,23 @@ class ItemFormatter:
             else:
                 mode = 'h' + mode[1:]
                 extra = ' link to %s' % source
-        item_data.update({
-            # Basic item data
-            'type': item_type,
-
-            'mode': mode,
-            'user': item[b'user'] or item[b'uid'],
-            'group': item[b'group'] or item[b'gid'],
-            'uid': item[b'uid'],
-            'gid': item[b'gid'],
-
-            'path': remove_surrogates(item[b'path']),
-            'bpath': item[b'path'],
-            'source': source,
-            'linktarget': source,
-            'extra': extra
-        })
+        item_data['type'] = item_type
+        item_data['mode'] = mode
+        item_data['user'] = item[b'user'] or item[b'uid']
+        item_data['group'] = item[b'group'] or item[b'gid']
+        item_data['uid'] = item[b'uid']
+        item_data['gid'] = item[b'gid']
+        item_data['path'] = remove_surrogates(item[b'path'])
+        item_data['bpath'] = item[b'path']
+        item_data['source'] = source
+        item_data['linktarget'] = source
+        item_data['extra'] = extra
         for key in self.keys:
             item_data[key] = self.call_keys[key](item)
         return item_data
 
     def format_item(self, item):
-        return self.format.format(**self.get_item_data(item))
+        return self.format.format_map(self.get_item_data(item))
 
     def calculate_num_chunks(self, item):
         return len(item.get(b'chunks', []))

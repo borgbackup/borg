@@ -1,9 +1,9 @@
 from binascii import hexlify, unhexlify
 from datetime import datetime
-from hashlib import sha256
 from operator import attrgetter
 import argparse
 import functools
+import hashlib
 import inspect
 import io
 import os
@@ -15,12 +15,12 @@ import textwrap
 import traceback
 
 from . import __version__
-from .helpers import Error, location_validator, archivename_validator, format_line, format_time, format_file_size, \
-    parse_pattern, PathPrefixPattern, to_localtime, timestamp, safe_timestamp, \
+from .helpers import Error, location_validator, archivename_validator, format_time, format_file_size, \
+    parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
     get_cache_dir, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
-    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher
+    dir_is_tagged, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
+    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ItemFormatter
 from .logger import create_logger, setup_logging
 logger = create_logger()
 from .compress import Compressor, COMPR_BUFFER
@@ -438,79 +438,35 @@ class Archiver:
         repository = self.open_repository(args)
         manifest, key = Manifest.load(repository)
         if args.location.archive:
-            archive = Archive(repository, key, manifest, args.location.archive)
-            """use_user_format flag is used to speed up default listing.
-            When user issues format options, listing is a bit slower, but more keys are available and
-            precalculated.
-            """
-            use_user_format = args.listformat is not None
-            if use_user_format:
-                list_format = args.listformat
-            elif args.short:
-                list_format = "{path}{LF}"
-            else:
-                list_format = "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{LF}"
+            matcher = PatternMatcher()
+            if args.excludes:
+                matcher.add(args.excludes, False)
+            include_patterns = []
+            if args.paths:
+                include_patterns.extend(parse_pattern(i, PathPrefixPattern) for i in args.paths)
+                matcher.add(include_patterns, True)
+            matcher.fallback = not include_patterns
 
-            for item in archive.iter_items():
-                mode = stat.filemode(item[b'mode'])
-                type = mode[0]
-                size = 0
-                if type == '-':
-                    try:
-                        size = sum(size for _, size, _ in item[b'chunks'])
-                    except KeyError:
-                        pass
+            with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
+                archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
 
-                mtime = safe_timestamp(item[b'mtime'])
-                if use_user_format:
-                    atime = safe_timestamp(item.get(b'atime') or item[b'mtime'])
-                    ctime = safe_timestamp(item.get(b'ctime') or item[b'mtime'])
-
-                if b'source' in item:
-                    source = item[b'source']
-                    if type == 'l':
-                        extra = ' -> %s' % item[b'source']
-                    else:
-                        mode = 'h' + mode[1:]
-                        extra = ' link to %s' % item[b'source']
+                if args.format:
+                    format = args.format
+                elif args.short:
+                    format = "{path}{NL}"
                 else:
-                    extra = ''
-                    source = ''
+                    format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
+                formatter = ItemFormatter(archive, format)
 
-                item_data = {
-                        'mode': mode,
-                        'user': item[b'user'] or item[b'uid'],
-                        'group': item[b'group'] or item[b'gid'],
-                        'size': size,
-                        'isomtime': format_time(mtime),
-                        'path': remove_surrogates(item[b'path']),
-                        'extra': extra,
-                        'LF': '\n',
-                        }
-                if use_user_format:
-                    item_data_advanced = {
-                        'bmode': item[b'mode'],
-                        'type': type,
-                        'source': source,
-                        'linktarget': source,
-                        'uid': item[b'uid'],
-                        'gid': item[b'gid'],
-                        'mtime': mtime,
-                        'isoctime': format_time(ctime),
-                        'ctime': ctime,
-                        'isoatime': format_time(atime),
-                        'atime': atime,
-                        'archivename': archive.name,
-                        'SPACE': ' ',
-                        'TAB': '\t',
-                        'CR': '\r',
-                        'NEWLINE': os.linesep,
-                        }
-                    item_data.update(item_data_advanced)
-                item_data['formatkeys'] = list(item_data.keys())
-
-                print(format_line(list_format, item_data), end='')
-
+                if not hasattr(sys.stdout, 'buffer'):
+                    # This is a shim for supporting unit tests replacing sys.stdout with e.g. StringIO,
+                    # which doesn't have an underlying buffer (= lower file object).
+                    def write(bytestring):
+                        sys.stdout.write(bytestring.decode('utf-8', errors='replace'))
+                else:
+                    write = sys.stdout.buffer.write
+                for item in archive.iter_items(lambda item: matcher.match(item[b'path'])):
+                    write(formatter.format_item(item).encode('utf-8', errors='surrogateescape'))
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 if args.prefix and not archive_info.name.startswith(args.prefix):
@@ -609,6 +565,159 @@ class Archiver:
             print("warning: %s" % e)
         return self.exit_code
 
+    def do_recompress(self, args):
+        """Recompress data"""
+        dry_run = args.dry_run
+        repository = self.open_repository(args, exclusive=True)
+        manifest, key = Manifest.load(repository)
+        compr_args = dict(buffer=COMPR_BUFFER)
+        # see compress.pyx:197, COMPR_BUFFER
+        DECOMPRESS_BUFFER = bytes(int(1.1 * 2 ** 23))
+        compr_args.update(args.compression)
+        # Compressor.decompress can decompress data compressed by compressor
+        # (For each chunk the compressor tag is looked up)
+        key.compressor = Compressor(**compr_args)
+
+        if args.compression["name"] == "lz4" and args.cores:
+            logger.info("Disabling multithreading due to LZ4 compression")
+            args.cores = 0
+
+        from borg.repository import TAG_PUT
+        from borg.compress import COMPRESSOR_LIST
+
+        segment_count = sum(1 for _ in repository.io.segment_iterator())
+        last_segment_id = repository.io.get_latest_segment()
+        print(segment_count, "segments in repository")
+        old_size = 0
+        new_size = 0
+        seen_chunks = recompressed_chunks = skipped_chunks = 0
+
+        from queue import Queue, Empty
+        queued_memory_limit = 300 * 1000 * 1000
+        queued_memory = 0
+        to_be_compressed = Queue()
+        compressed = Queue()
+
+        import threading
+
+        def compressor_thread():
+            compr_args = dict(buffer=bytes(int(1.1 * 2 ** 23)))
+            compr_args.update(args.compression)
+            compressor = Compressor(**compr_args)
+            print("compressor_thread online")
+            while True:
+                item = to_be_compressed.get()
+                if item is None:
+                    break
+                id_, data = item
+                compressed.put((id_, compressor.compress(data), len(data)))
+                to_be_compressed.task_done()
+            print("compressor_thread done")
+
+        compression_threads = []
+        for i in range(args.cores):
+            thread = threading.Thread(target=compressor_thread)
+            thread.start()
+            compression_threads.append(thread)
+
+        for segment_id, segment_filename in repository.io.segment_iterator():
+            if segment_id > last_segment_id:
+                print("Reached beginning of recompressed segments")
+                break
+            for tag, id_, offset, data in repository.io.iter_objects(segment_id, True):
+                if tag != TAG_PUT:
+                    continue
+                if id_ == Manifest.MANIFEST_ID:
+                    print("\nFound manifest - end reached")
+                    if not dry_run:
+                        repository.delete(id_)
+                    continue
+                seen_chunks += 1
+                # validate, decrypt, decompress, compress, encrypt
+                old_size += len(data)
+                decrypted_data = key.decrypt(id_, data, no_decompress=True)
+                compression_header = bytes(decrypted_data[:2])
+                skip = False
+                for compressor in COMPRESSOR_LIST:
+                    if compressor.detect(compression_header):
+                        if not args.force_recompress and isinstance(key.compressor.compressor, compressor):
+                            skip = True
+                            break
+                        decompressed_data = compressor(buffer=DECOMPRESS_BUFFER).decompress(decrypted_data)
+                        key.assert_chunk_id(id_, decompressed_data)
+                        break
+                else:
+                    raise ValueError('No decompressor for this data found: %r.', data[:2])
+                if skip:
+                    skipped_chunks += 1
+                    new_size += len(data)
+                    continue
+                if args.cores == 0 or len(decompressed_data) < 1000:
+                    encrypted_data = key.encrypt(decompressed_data)
+                    if not dry_run:
+                        repository.put(id_, encrypted_data)
+                    recompressed_chunks += 1
+                else:
+                    to_be_compressed.put((id_, decompressed_data))
+                    queued_memory += len(decompressed_data)
+            while queued_memory >= queued_memory_limit:
+                try:
+                    id_, data, unqueued_memory = compressed.get_nowait()
+                except Empty:
+                    continue
+                new_size += len(data)
+                recompressed_chunks += 1
+                queued_memory -= unqueued_memory
+                encrypted_data = key.encrypt(data, no_compress=True)
+                if not dry_run:
+                    repository.put(id_, encrypted_data)
+            if not dry_run and repository.io.get_latest_segment() > last_segment_id + 10:
+                last_segment_id = repository.io.get_latest_segment()
+                repository.compact_segments()
+                repository.commit()
+                sys.stdout.write('.')
+                sys.stdout.flush()
+        sys.stdout.write("-- clearing queue\n")
+        sys.stdout.flush()
+        while (skipped_chunks + recompressed_chunks) < seen_chunks or any(t.is_alive() for t in compression_threads):
+            to_be_compressed.put(None)
+            try:
+                id_, data, _ = compressed.get_nowait()
+            except Empty:
+                continue
+            new_size += len(data)
+            recompressed_chunks += 1
+            encrypted_data = key.encrypt(data, no_compress=True)
+            if not dry_run:
+                repository.put(id_, encrypted_data)
+                if repository.io.get_latest_segment() > last_segment_id + 10:
+                    last_segment_id = repository.io.get_latest_segment()
+                    repository.compact_segments()
+                    repository.commit()
+                    sys.stdout.write('.')
+                    sys.stdout.flush()
+        sys.stdout.write("-- joining threads\n")
+        sys.stdout.flush()
+        for t in compression_threads:
+            t.join()
+        sys.stdout.write("-- joining threads done\n")
+        sys.stdout.flush()
+        if not dry_run:
+            manifest.write()
+            repository.commit()
+        if args.stats:
+            print("\n")
+            print("Repositoy:", repository.path)
+            print("Old segment count:", segment_count)
+            print("New segment count:", sum(1 for _ in repository.io.segment_iterator()))
+            print("\n", repository.io.get_latest_segment() - last_segment_id, "segments written")
+            print("Old size:", format_file_size(old_size))
+            print("New size:", format_file_size(new_size))
+            print("Ratio:", int(new_size / old_size * 100), "%")
+            print("Chunks seen, recompressed, skipped:", seen_chunks, recompressed_chunks, skipped_chunks)
+
+        return self.exit_code
+
     def do_debug_dump_archive_items(self, args):
         """dump (decrypted, decompressed) archive items metadata (not: data)"""
         repository = self.open_repository(args)
@@ -650,7 +759,7 @@ class Archiver:
         for path in args.paths:
             with open(path, "rb") as f:
                 data = f.read()
-            h = sha256(data)  # XXX hardcoded
+            h = hashlib.sha256(data)  # XXX hardcoded
             repository.put(h.digest(), data)
             print("object %s put." % h.hexdigest())
         repository.commit()
@@ -1140,7 +1249,12 @@ class Archiver:
 
         list_epilog = textwrap.dedent("""
         This command lists the contents of a repository or an archive.
-        """)
+
+        See the "borg help patterns" command for more help on exclude patterns.
+
+        The following keys are available for --format:
+
+        """) + ItemFormatter.keys_help()
         subparser = subparsers.add_parser('list', parents=[common_parser],
                                           description=self.do_list.__doc__,
                                           epilog=list_epilog,
@@ -1150,15 +1264,22 @@ class Archiver:
         subparser.add_argument('--short', dest='short',
                                action='store_true', default=False,
                                help='only print file/directory names, nothing else')
-        subparser.add_argument('--list-format', dest='listformat', type=str,
-                               help="""specify format for archive file listing
-                                (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}")
-                                Special "{formatkeys}" exists to list available keys""")
+        subparser.add_argument('--format', '--list-format', dest='format', type=str,
+                               help="""specify format for file listing
+                                (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")""")
         subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')
+        subparser.add_argument('-e', '--exclude', dest='excludes',
+                               type=parse_pattern, action='append',
+                               metavar="PATTERN", help='exclude paths matching PATTERN')
+        subparser.add_argument('--exclude-from', dest='exclude_files',
+                               type=argparse.FileType('r'), action='append',
+                               metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='repository/archive to list contents of')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to extract; patterns are supported')
 
         mount_epilog = textwrap.dedent("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -1327,6 +1448,46 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')
+
+        recompress_epilog = textwrap.dedent("""
+        Recompress data in a repository.
+        """)
+        subparser = subparsers.add_parser('recompress', parents=[common_parser],
+                                          description=self.do_recompress.__doc__,
+                                          epilog=recompress_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='recompress repository')
+        subparser.set_defaults(func=self.do_recompress)
+        subparser.add_argument('-f', '--force', dest='force_recompress',
+                               action='store_true', default=False,
+                               help='even recompress chunks already compressed with the algorithm set with '
+                                    '--compression')
+        from multiprocessing import cpu_count
+        subparser.add_argument('--cores', dest='cores',
+                               action='store', default=cpu_count() - 1, type=int,
+                               help='number of extra CPU cores to use for compression (default: %d)' %
+                                    (cpu_count() - 1))
+        subparser.add_argument('-s', '--stats', dest='stats',
+                               action='store_true', default=False,
+                               help='print statistics at end')
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help='show progress, one dot is printed for each processed chunk')
+        subparser.add_argument('-C', '--compression', dest='compression',
+                               type=CompressionSpec, default=dict(name='none'), metavar='COMPRESSION',
+                               help='select compression algorithm (and level): '
+                                    'none == no compression (default), '
+                                    'lz4 == lz4, '
+                                    'zlib == zlib (default level 6), '
+                                    'zlib,0 .. zlib,9 == zlib (with level 0..9), '
+                                    'lzma == lzma (default level 6), '
+                                    'lzma,0 .. lzma,9 == lzma (with level 0..9).')
+        subparser.add_argument('-n', '--dry-run', dest='dry_run',
+                               action='store_true', default=False,
+                               help='do not create a backup archive')
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(),
+                               help='repository to recompress')
 
         subparser = subparsers.add_parser('help', parents=[common_parser],
                                           description='Extra help')

@@ -1,8 +1,9 @@
 import argparse
 from binascii import hexlify
 from collections import namedtuple
-from functools import wraps
+from functools import wraps, partial
 import grp
+import hashlib
 import os
 import stat
 import textwrap
@@ -10,6 +11,7 @@ import pwd
 import re
 from shutil import get_terminal_size
 import sys
+from string import Formatter
 import platform
 import time
 import unicodedata
@@ -546,7 +548,7 @@ def format_line(format, data):
     except (KeyError, ValueError) as e:
         # this should catch format errors
         print('Error in lineformat: "{}" - reason "{}"'.format(format, str(e)))
-    except:
+    except Exception as e:
         # something unexpected, print error and raise exception
         print('Error in lineformat: "{}" - reason "{}"'.format(format, str(e)))
         raise
@@ -1080,3 +1082,146 @@ def log_multi(*msgs, level=logging.INFO):
         lines.extend(msg.splitlines())
     for line in lines:
         logger.log(level, line)
+
+
+class ItemFormatter:
+    FIXED_KEYS = {
+        # Formatting aids
+        'LF': '\n',
+        'SPACE': ' ',
+        'TAB': '\t',
+        'CR': '\r',
+        'NUL': '\0',
+        'NEWLINE': os.linesep,
+        'NL': os.linesep,
+    }
+    KEY_DESCRIPTIONS = {
+        'NL': 'alias of NEWLINE (OS dependent line separator)',
+        'NUL': 'NUL character for creating print0 / xargs -0 like ouput, see bpath',
+        'csize': 'compressed size',
+        'bpath': 'verbatim POSIX path, can contain any character except NUL',
+        'path': 'path interpreted as text (might be missing non-text characters, see bpath)',
+        'source': 'link target for links (identical to linktarget)',
+        'num_chunks': 'number of chunks in this file',
+        'unique_chunks': 'number of unique chunks in this file',
+    }
+
+    @classmethod
+    def available_keys(cls):
+        class FakeArchive:
+            fpr = name = ""
+
+        fake_item = {
+            b'mode': 0, b'path': '', b'user': '', b'group': '', b'mtime': 0,
+            b'uid': 0, b'gid': 0,
+        }
+        formatter = cls(FakeArchive, "")
+        keys = []
+        keys.extend(formatter.call_keys.keys())
+        keys.extend(formatter.get_item_data(fake_item).keys())
+        return sorted(keys, key=lambda s: (s.isupper(), s))
+
+    @classmethod
+    def keys_help(cls):
+        help = []
+        for key in cls.available_keys():
+            text = " - " + key
+            if key in cls.KEY_DESCRIPTIONS:
+                text += ": " + cls.KEY_DESCRIPTIONS[key]
+            help.append(text)
+        return "\n".join(help)
+
+    def __init__(self, archive, format):
+        self.archive = archive
+        static_keys = {
+            'archivename': archive.name,
+            'archiveid': archive.fpr,
+        }
+        static_keys.update(self.FIXED_KEYS)
+        self.format = self.partial_format(format, static_keys)
+        self.format_keys = {f[1] for f in Formatter().parse(format)}
+        self.call_keys = {
+            'size': self.calculate_size,
+            'csize': self.calculate_csize,
+            'num_chunks': self.calculate_num_chunks,
+            'unique_chunks': self.calculate_unique_chunks,
+            'isomtime': partial(self.format_time, b'mtime'),
+            'isoctime': partial(self.format_time, b'ctime'),
+            'isoatime': partial(self.format_time, b'atime'),
+            'mtime': partial(self.time, b'mtime'),
+            'ctime': partial(self.time, b'ctime'),
+            'atime': partial(self.time, b'atime'),
+        }
+        for hash_function in hashlib.algorithms_guaranteed:
+            self.add_key(hash_function, partial(self.hash_item, hash_function))
+        self.used_call_keys = set(self.call_keys) & self.format_keys
+        self.item_data = static_keys
+
+    def partial_format(self, format, mapping):
+        # str.format wishlist: leave_unknown_keys_alone_and_dont_throw_up=True
+        for key, value in mapping.items():
+            format = re.sub(r'(?<!\{)(\{%s(:[^\}]+)?\})' % key, value, format)
+        return format
+
+    def add_key(self, key, callable_with_item):
+        self.call_keys[key] = callable_with_item
+        self.used_call_keys = set(self.call_keys) & self.format_keys
+
+    def get_item_data(self, item):
+        mode = stat.filemode(item[b'mode'])
+        item_type = mode[0]
+        item_data = self.item_data
+
+        source = item.get(b'source', '')
+        extra = ''
+        if source:
+            source = remove_surrogates(source)
+            if item_type == 'l':
+                extra = ' -> %s' % source
+            else:
+                mode = 'h' + mode[1:]
+                extra = ' link to %s' % source
+        item_data['type'] = item_type
+        item_data['mode'] = mode
+        item_data['user'] = item[b'user'] or item[b'uid']
+        item_data['group'] = item[b'group'] or item[b'gid']
+        item_data['uid'] = item[b'uid']
+        item_data['gid'] = item[b'gid']
+        item_data['path'] = remove_surrogates(item[b'path'])
+        item_data['bpath'] = item[b'path']
+        item_data['source'] = source
+        item_data['linktarget'] = source
+        item_data['extra'] = extra
+        for key in self.used_call_keys:
+            item_data[key] = self.call_keys[key](item)
+        return item_data
+
+    def format_item(self, item):
+        return self.format.format_map(self.get_item_data(item))
+
+    def calculate_num_chunks(self, item):
+        return len(item.get(b'chunks', []))
+
+    def calculate_unique_chunks(self, item):
+        chunk_index = self.archive.cache.chunks
+        return sum(1 for chunk_id, _, _ in item.get(b'chunks', []) if chunk_index[chunk_id][0] == 1)
+
+    def calculate_size(self, item):
+        return sum(size for _, size, _ in item.get(b'chunks', []))
+
+    def calculate_csize(self, item):
+        return sum(csize for _, _, csize in item.get(b'chunks', []))
+
+    def hash_item(self, hash_function, item):
+        if b'chunks' not in item:
+            return ""
+        hash = hashlib.new(hash_function)
+        for chunk in self.archive.pipeline.fetch_many([c[0] for c in item[b'chunks']]):
+            hash.update(chunk)
+        return hash.hexdigest()
+
+    def format_time(self, key, item):
+        return format_time(safe_timestamp(item.get(key) or item[b'mtime']))
+
+    def time(self, key, item):
+        return safe_timestamp(item.get(key) or item[b'mtime'])

@@ -72,10 +72,14 @@ class KeyBase:
         """Return HMAC hash using the "id" HMAC key
         """
 
-    def encrypt(self, data):
+    def encrypt(self, data, no_compress=False):
         pass
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, no_decompress=False):
+        pass
+
+    def assert_chunk_id(self, id, data):
+        """raise IntegrityError if id doesn't match data"""
         pass
 
 
@@ -96,16 +100,24 @@ class PlaintextKey(KeyBase):
     def id_hash(self, data):
         return sha256(data).digest()
 
-    def encrypt(self, data):
+    def encrypt(self, data, no_compress=False):
+        if no_compress:
+            return b''.join([self.TYPE_STR, data])
         return b''.join([self.TYPE_STR, self.compressor.compress(data)])
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, no_decompress=False):
         if data[0] != self.TYPE:
             raise IntegrityError('Invalid encryption envelope')
+        if no_decompress:
+            return memoryview(data)[1:]
         data = self.compressor.decompress(memoryview(data)[1:])
-        if id and sha256(data).digest() != id:
-            raise IntegrityError('Chunk id verification failed')
+        if id:
+            self.assert_chunk_id(id, data)
         return data
+
+    def assert_chunk_id(self, id, data):
+        if sha256(data).digest() != id:
+            raise IntegrityError('Chunk id verification failed')
 
 
 class AESKeyBase(KeyBase):
@@ -128,33 +140,37 @@ class AESKeyBase(KeyBase):
         """
         return HMAC(self.id_key, data, sha256).digest()
 
-    def encrypt(self, data):
-        data = self.compressor.compress(data)
+    def encrypt(self, data, no_compress=False):
+        if not no_compress:
+            data = self.compressor.compress(data)
         self.enc_cipher.reset()
         data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(data)))
         hmac = HMAC(self.enc_hmac_key, data, sha256).digest()
         return b''.join((self.TYPE_STR, hmac, data))
 
-    def decrypt(self, id, data):
-        if not (data[0] == self.TYPE or
-            data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
+    def decrypt(self, id, data, no_decompress=False):
+        if not (data[0] == self.TYPE or data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             raise IntegrityError('Invalid encryption envelope')
         hmac_given = memoryview(data)[1:33]
         hmac_computed = memoryview(HMAC(self.enc_hmac_key, memoryview(data)[33:], sha256).digest())
         if not compare_digest(hmac_computed, hmac_given):
             raise IntegrityError('Encryption envelope checksum mismatch')
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
+        if no_decompress:
+            return self.dec_cipher.decrypt(data[41:])
         data = self.compressor.decompress(self.dec_cipher.decrypt(data[41:]))
         if id:
-            hmac_given = id
-            hmac_computed = HMAC(self.id_key, data, sha256).digest()
-            if not compare_digest(hmac_computed, hmac_given):
-                raise IntegrityError('Chunk id verification failed')
+            self.assert_chunk_id(id, data)
         return data
 
+    def assert_chunk_id(self, id, data):
+        hmac_given = id
+        hmac_computed = HMAC(self.id_key, data, sha256).digest()
+        if not compare_digest(hmac_computed, hmac_given):
+            raise IntegrityError('Chunk id verification failed')
+
     def extract_nonce(self, payload):
-        if not (payload[0] == self.TYPE or
-            payload[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
+        if not (payload[0] == self.TYPE or payload[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             raise IntegrityError('Invalid encryption envelope')
         nonce = bytes_to_long(payload[33:41])
         return nonce

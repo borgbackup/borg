@@ -1154,7 +1154,7 @@ class ItemFormatter:
         }
         for hash_function in hashlib.algorithms_guaranteed:
             self.add_key(hash_function, partial(self.hash_item, hash_function))
-        self.keys = set(self.call_keys) & self.format_keys
+        self.used_call_keys = set(self.call_keys) & self.format_keys
         self.item_data = static_keys
 
     def partial_format(self, format, mapping):
@@ -1165,7 +1165,7 @@ class ItemFormatter:
 
     def add_key(self, key, callable_with_item):
         self.call_keys[key] = callable_with_item
-        self.keys = set(self.call_keys) & self.format_keys
+        self.used_call_keys = set(self.call_keys) & self.format_keys
 
     def get_item_data(self, item):
         mode = stat.filemode(item[b'mode'])
@@ -1192,7 +1192,7 @@ class ItemFormatter:
         item_data['source'] = source
         item_data['linktarget'] = source
         item_data['extra'] = extra
-        for key in self.keys:
+        for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)
         return item_data
 

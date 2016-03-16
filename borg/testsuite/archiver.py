@@ -925,6 +925,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert "0 0 input/empty_file" in output
         assert "2 2 input/two_chunks" in output
 
+    def test_list_size(self):
+        self.create_regular_file('compressible_file', size=10000)
+        self.cmd('init', self.repository_location)
+        test_archive = self.repository_location + '::test'
+        self.cmd('create', '-C', 'lz4', test_archive, 'input')
+        output = self.cmd('list', '--format', '{size} {csize} {path}{NL}', test_archive)
+        size, csize, path = output.split("\n")[1].split(" ")
+        assert int(csize) < int(size)
+
     def test_break_lock(self):
         self.cmd('init', self.repository_location)
         self.cmd('break-lock', self.repository_location)

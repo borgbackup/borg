@@ -564,6 +564,46 @@ class Archiver:
             print("warning: %s" % e)
         return self.exit_code
 
+    def do_recompress(self, args):
+        """Recompress data"""
+        dry_run = args.dry_run
+        repository = self.open_repository(args, exclusive=True)
+        manifest, key = Manifest.load(repository)
+        compr_args = dict(buffer=COMPR_BUFFER)
+        compr_args.update(args.compression)
+        # Compressor.decompress can decompress data compressed by compressor
+        # (For each chunk the compressor tag is looked up)
+        key.compressor = Compressor(**compr_args)
+
+        from borg.repository import TAG_PUT
+
+        last_segment_id = repository.io.get_latest_segment()
+        print(last_segment_id, "segments in repository")
+        for segment_id, segment_filename in repository.io.segment_iterator():
+            if segment_id > last_segment_id:
+                print("Reached beginning of recompressed segments")
+                break
+            for tag, id_, offset, data in repository.io.iter_objects(segment_id, True):
+                if tag != TAG_PUT:
+                    continue
+                if set(id_) == {0}:
+                    print("\nFound manifest - end reached")
+                    break
+                # TODO: add decompress kwarg to key.decrypt, so we can detect manually what compressor
+                # TODO: was used here, and skip the chunk if it uses key.compressor
+                # validate, decrypt, decompress, compress, encrypt
+                data = key.encrypt(key.decrypt(id_, data))
+                if not dry_run:
+                    repository.put(id_, data)
+            if not dry_run:
+                repository.commit()
+                repository.io.delete_segment(segment_id)
+            sys.stdout.write('.')
+            sys.stdout.flush()
+        print("\n", repository.io.get_latest_segment() - last_segment_id, "segments written")
+
+        return self.exit_code
+
     def do_debug_dump_archive_items(self, args):
         """dump (decrypted, decompressed) archive items metadata (not: data)"""
         repository = self.open_repository(args)
@@ -916,7 +956,7 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 
-        create_epilog = textwrap.dedent("""
+        recompress_epilog = textwrap.dedent("""
         This command creates a backup archive containing all files found while recursively
         traversing all paths specified. The archive will consume almost no disk space for
         files or parts of files that have already been stored in other archives.
@@ -926,7 +966,7 @@ class Archiver:
 
         subparser = subparsers.add_parser('create', parents=[common_parser],
                                           description=self.do_create.__doc__,
-                                          epilog=create_epilog,
+                                          epilog=recompress_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='create backup')
         subparser.set_defaults(func=self.do_create)
@@ -1285,6 +1325,38 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')
+
+        recompress_epilog = textwrap.dedent("""
+        Recompress data in a repository.
+        """)
+
+        subparser = subparsers.add_parser('recompress', parents=[common_parser],
+                                          description=self.do_recompress.__doc__,
+                                          epilog=recompress_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='create backup')
+        subparser.set_defaults(func=self.do_recompress)
+        subparser.add_argument('-s', '--stats', dest='stats',
+                               action='store_true', default=False,
+                               help='print statistics at end')
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help='show progress, one dot is printed for each processed chunk')
+        subparser.add_argument('-C', '--compression', dest='compression',
+                               type=CompressionSpec, default=dict(name='none'), metavar='COMPRESSION',
+                               help='select compression algorithm (and level): '
+                                    'none == no compression (default), '
+                                    'lz4 == lz4, '
+                                    'zlib == zlib (default level 6), '
+                                    'zlib,0 .. zlib,9 == zlib (with level 0..9), '
+                                    'lzma == lzma (default level 6), '
+                                    'lzma,0 .. lzma,9 == lzma (with level 0..9).')
+        subparser.add_argument('-n', '--dry-run', dest='dry_run',
+                               action='store_true', default=False,
+                               help='do not create a backup archive')
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(),
+                               help='repository to recompress')
 
         subparser = subparsers.add_parser('help', parents=[common_parser],
                                           description='Extra help')

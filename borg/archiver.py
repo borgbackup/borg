@@ -607,7 +607,7 @@ class Archiver:
                 skip = False
                 for compressor in COMPRESSOR_LIST:
                     if compressor.detect(compression_header):
-                        if not args.force_recompress and isinstance(key.compressor, compressor):
+                        if not args.force_recompress and isinstance(key.compressor.compressor, compressor):
                             skip = True
                             break
                         decompressed_data = compressor(buffer=DECOMPRESS_BUFFER).decompress(decrypted_data)

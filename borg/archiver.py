@@ -586,7 +586,6 @@ class Archiver:
         old_size = 0
         new_size = 0
         seen_chunks = recompressed_chunks = skipped_chunks = 0
-        has_changes = False
         for segment_id, segment_filename in repository.io.segment_iterator():
             if segment_id > last_segment_id:
                 print("Reached beginning of recompressed segments")
@@ -597,6 +596,7 @@ class Archiver:
                     continue
                 if set(id_) == {0}:
                     print("\nFound manifest - end reached")
+                    repository.delete(id_)
                     continue
                 # TODO: add decompress kwarg to key.decrypt, so we can detect manually what compressor
                 # TODO: was used here, and skip the chunk if it uses key.compressor
@@ -618,14 +618,13 @@ class Archiver:
                     raise ValueError('No decompressor for this data found: %r.', data[:2])
                 if skip:
                     skipped_chunks += 1
+                    new_size += len(data)
                     continue
                 data = key.encrypt(decompressed_data)
                 new_size += len(data)
                 chunks[id_] = data
             if not dry_run:
                 try:
-                    if not has_changes and len(chunks):
-                        has_changes = True
                     for id_, data in chunks.items():
                         recompressed_chunks += 1
                         repository.put(id_, data)
@@ -639,7 +638,7 @@ class Archiver:
                     self.print_error("Exception while recompressing, rolling transaction back...")
                     repository.rollback()
                     raise
-        if not dry_run and has_changes:
+        if not dry_run:
             manifest.write()
             repository.commit()
         if args.stats:

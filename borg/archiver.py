@@ -577,30 +577,49 @@ class Archiver:
 
         from borg.repository import TAG_PUT
 
+        segment_count = sum(1 for _ in repository.io.segment_iterator())
         last_segment_id = repository.io.get_latest_segment()
-        print(last_segment_id, "segments in repository")
+        print(segment_count, "segments in repository")
+        old_size = 0
+        new_size = 0
         for segment_id, segment_filename in repository.io.segment_iterator():
             if segment_id > last_segment_id:
                 print("Reached beginning of recompressed segments")
                 break
+            chunks = {}
             for tag, id_, offset, data in repository.io.iter_objects(segment_id, True):
                 if tag != TAG_PUT:
                     continue
                 if set(id_) == {0}:
                     print("\nFound manifest - end reached")
-                    break
+                    continue
                 # TODO: add decompress kwarg to key.decrypt, so we can detect manually what compressor
                 # TODO: was used here, and skip the chunk if it uses key.compressor
                 # validate, decrypt, decompress, compress, encrypt
+                old_size += len(data)
                 data = key.encrypt(key.decrypt(id_, data))
-                if not dry_run:
-                    repository.put(id_, data)
+                new_size += len(data)
+                chunks[id_] = data
             if not dry_run:
-                repository.commit()
-                repository.io.delete_segment(segment_id)
-            sys.stdout.write('.')
-            sys.stdout.flush()
-        print("\n", repository.io.get_latest_segment() - last_segment_id, "segments written")
+                for id_, data in chunks.items():
+                    repository.put(id_, data)
+                if repository.io.get_latest_segment() > last_segment_id + 10:
+                    last_segment_id = repository.io.get_latest_segment()
+                    repository.compact_segments()
+                    repository.commit()
+                    sys.stdout.write('.')
+                    sys.stdout.flush()
+        manifest.write()
+        repository.commit()
+        if args.stats:
+            print("\n")
+            print("Repositoy:", repository.path)
+            print("Old segment count:", segment_count)
+            print("New segment count:", sum(1 for _ in repository.io.segment_iterator()))
+            print("\n", repository.io.get_latest_segment() - last_segment_id, "segments written")
+            print("Old size:", format_file_size(old_size))
+            print("New size:", format_file_size(new_size))
+            print("Ratio:", int(new_size / old_size * 100), "%")
 
         return self.exit_code
 
@@ -1336,6 +1355,10 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='create backup')
         subparser.set_defaults(func=self.do_recompress)
+        subparser.add_argument('-f', '--force', dest='force_recompress',
+                               action='store_true', default=False,
+                               help='even recompress chunks already compressed with the algorithm set with '
+                                    '--compression')
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics at end')

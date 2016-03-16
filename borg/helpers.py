@@ -1109,7 +1109,7 @@ class ItemFormatter:
     @classmethod
     def available_keys(cls):
         class FakeArchive:
-            name = ""
+            fpr = name = ""
 
         fake_item = {
             b'mode': 0, b'path': '', b'user': '', b'group': '', b'mtime': 0,
@@ -1134,7 +1134,8 @@ class ItemFormatter:
     def __init__(self, archive, format):
         self.archive = archive
         static_keys = {
-            'archivename': archive.name
+            'archivename': archive.name,
+            'archiveid': archive.fpr,
         }
         static_keys.update(self.FIXED_KEYS)
         self.format = self.partial_format(format, static_keys)

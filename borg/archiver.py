@@ -577,6 +577,10 @@ class Archiver:
         # (For each chunk the compressor tag is looked up)
         key.compressor = Compressor(**compr_args)
 
+        if args.compression["name"] == "lz4" and args.cores:
+            logger.info("Disabling multithreading due to LZ4 compression")
+            args.cores = 0
+
         from borg.repository import TAG_PUT
         from borg.compress import COMPRESSOR_LIST
 
@@ -586,20 +590,47 @@ class Archiver:
         old_size = 0
         new_size = 0
         seen_chunks = recompressed_chunks = skipped_chunks = 0
+
+        from queue import Queue, Empty
+        queued_memory_limit = 300 * 1000 * 1000
+        queued_memory = 0
+        to_be_compressed = Queue()
+        compressed = Queue()
+
+        import threading
+
+        def compressor_thread():
+            compr_args = dict(buffer=bytes(int(1.1 * 2 ** 23)))
+            compr_args.update(args.compression)
+            compressor = Compressor(**compr_args)
+            print("compressor_thread online")
+            while True:
+                item = to_be_compressed.get()
+                if item is None:
+                    break
+                id_, data = item
+                compressed.put((id_, compressor.compress(data), len(data)))
+                to_be_compressed.task_done()
+            print("compressor_thread done")
+
+        compression_threads = []
+        for i in range(args.cores):
+            thread = threading.Thread(target=compressor_thread)
+            thread.start()
+            compression_threads.append(thread)
+
         for segment_id, segment_filename in repository.io.segment_iterator():
             if segment_id > last_segment_id:
                 print("Reached beginning of recompressed segments")
                 break
-            chunks = {}
             for tag, id_, offset, data in repository.io.iter_objects(segment_id, True):
                 if tag != TAG_PUT:
                     continue
-                if set(id_) == {0}:
+                if id_ == Manifest.MANIFEST_ID:
                     print("\nFound manifest - end reached")
-                    repository.delete(id_)
+                    if not dry_run:
+                        repository.delete(id_)
                     continue
-                # TODO: add decompress kwarg to key.decrypt, so we can detect manually what compressor
-                # TODO: was used here, and skip the chunk if it uses key.compressor
                 seen_chunks += 1
                 # validate, decrypt, decompress, compress, encrypt
                 old_size += len(data)
@@ -620,24 +651,56 @@ class Archiver:
                     skipped_chunks += 1
                     new_size += len(data)
                     continue
-                data = key.encrypt(decompressed_data)
-                new_size += len(data)
-                chunks[id_] = data
-            if not dry_run:
+                if args.cores == 0 or len(decompressed_data) < 1000:
+                    encrypted_data = key.encrypt(decompressed_data)
+                    if not dry_run:
+                        repository.put(id_, encrypted_data)
+                    recompressed_chunks += 1
+                else:
+                    to_be_compressed.put((id_, decompressed_data))
+                    queued_memory += len(decompressed_data)
+            while queued_memory >= queued_memory_limit:
                 try:
-                    for id_, data in chunks.items():
-                        recompressed_chunks += 1
-                        repository.put(id_, data)
-                    if repository.io.get_latest_segment() > last_segment_id + 10:
-                        last_segment_id = repository.io.get_latest_segment()
-                        repository.compact_segments()
-                        repository.commit()
-                        sys.stdout.write('.')
-                        sys.stdout.flush()
-                except Exception as e:  # too broad!
-                    self.print_error("Exception while recompressing, rolling transaction back...")
-                    repository.rollback()
-                    raise
+                    id_, data, unqueued_memory = compressed.get_nowait()
+                except Empty:
+                    continue
+                new_size += len(data)
+                recompressed_chunks += 1
+                queued_memory -= unqueued_memory
+                encrypted_data = key.encrypt(data, no_compress=True)
+                if not dry_run:
+                    repository.put(id_, encrypted_data)
+            if not dry_run and repository.io.get_latest_segment() > last_segment_id + 10:
+                last_segment_id = repository.io.get_latest_segment()
+                repository.compact_segments()
+                repository.commit()
+                sys.stdout.write('.')
+                sys.stdout.flush()
+        sys.stdout.write("-- clearing queue\n")
+        sys.stdout.flush()
+        while (skipped_chunks + recompressed_chunks) < seen_chunks or any(t.is_alive() for t in compression_threads):
+            to_be_compressed.put(None)
+            try:
+                id_, data, _ = compressed.get_nowait()
+            except Empty:
+                continue
+            new_size += len(data)
+            recompressed_chunks += 1
+            encrypted_data = key.encrypt(data, no_compress=True)
+            if not dry_run:
+                repository.put(id_, encrypted_data)
+                if repository.io.get_latest_segment() > last_segment_id + 10:
+                    last_segment_id = repository.io.get_latest_segment()
+                    repository.compact_segments()
+                    repository.commit()
+                    sys.stdout.write('.')
+                    sys.stdout.flush()
+        sys.stdout.write("-- joining threads\n")
+        sys.stdout.flush()
+        for t in compression_threads:
+            t.join()
+        sys.stdout.write("-- joining threads done\n")
+        sys.stdout.flush()
         if not dry_run:
             manifest.write()
             repository.commit()
@@ -1383,12 +1446,17 @@ class Archiver:
                                           description=self.do_recompress.__doc__,
                                           epilog=recompress_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='create backup')
+                                          help='recompress repository')
         subparser.set_defaults(func=self.do_recompress)
         subparser.add_argument('-f', '--force', dest='force_recompress',
                                action='store_true', default=False,
                                help='even recompress chunks already compressed with the algorithm set with '
                                     '--compression')
+        from multiprocessing import cpu_count
+        subparser.add_argument('--cores', dest='cores',
+                               action='store', default=cpu_count() - 1, type=int,
+                               help='number of extra CPU cores to use for compression (default: %d)' %
+                                    (cpu_count() - 1))
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics at end')

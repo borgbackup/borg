@@ -72,7 +72,7 @@ class KeyBase:
         """Return HMAC hash using the "id" HMAC key
         """
 
-    def encrypt(self, data):
+    def encrypt(self, data, no_compress=False):
         pass
 
     def decrypt(self, id, data, no_decompress=False):
@@ -100,7 +100,9 @@ class PlaintextKey(KeyBase):
     def id_hash(self, data):
         return sha256(data).digest()
 
-    def encrypt(self, data):
+    def encrypt(self, data, no_compress=False):
+        if no_compress:
+            return b''.join([self.TYPE_STR, data])
         return b''.join([self.TYPE_STR, self.compressor.compress(data)])
 
     def decrypt(self, id, data, no_decompress=False):
@@ -138,16 +140,16 @@ class AESKeyBase(KeyBase):
         """
         return HMAC(self.id_key, data, sha256).digest()
 
-    def encrypt(self, data):
-        data = self.compressor.compress(data)
+    def encrypt(self, data, no_compress=False):
+        if not no_compress:
+            data = self.compressor.compress(data)
         self.enc_cipher.reset()
         data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(data)))
         hmac = HMAC(self.enc_hmac_key, data, sha256).digest()
         return b''.join((self.TYPE_STR, hmac, data))
 
     def decrypt(self, id, data, no_decompress=False):
-        if not (data[0] == self.TYPE or
-            data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
+        if not (data[0] == self.TYPE or data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             raise IntegrityError('Invalid encryption envelope')
         hmac_given = memoryview(data)[1:33]
         hmac_computed = memoryview(HMAC(self.enc_hmac_key, memoryview(data)[33:], sha256).digest())
@@ -168,8 +170,7 @@ class AESKeyBase(KeyBase):
             raise IntegrityError('Chunk id verification failed')
 
     def extract_nonce(self, payload):
-        if not (payload[0] == self.TYPE or
-            payload[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
+        if not (payload[0] == self.TYPE or payload[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             raise IntegrityError('Invalid encryption envelope')
         nonce = bytes_to_long(payload[33:41])
         return nonce

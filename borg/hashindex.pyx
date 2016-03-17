@@ -15,6 +15,7 @@ cdef extern from "_hashindex.c":
                              long long *unique_size, long long *unique_csize,
                              long long *total_unique_chunks, long long *total_chunks)
     void hashindex_merge(HashIndex *index, HashIndex *other)
+    void hashindex_add(HashIndex *index, void *key, void *value)
     int hashindex_get_size(HashIndex *index)
     int hashindex_write(HashIndex *index, char *path)
     void *hashindex_get(HashIndex *index, void *key)
@@ -195,6 +196,14 @@ cdef class ChunkIndex(IndexBase):
                             &unique_size, &unique_csize,
                             &total_unique_chunks, &total_chunks)
         return total_size, total_csize, unique_size, unique_csize, total_unique_chunks, total_chunks
+
+    def add(self, key, refs, size, csize):
+        assert len(key) == self.key_size
+        cdef int[3] data
+        data[0] = _htole32(refs)
+        data[1] = _htole32(size)
+        data[2] = _htole32(csize)
+        hashindex_add(self.index, <char *>key, data)
 
     def merge(self, ChunkIndex other):
         hashindex_merge(self.index, other.index)

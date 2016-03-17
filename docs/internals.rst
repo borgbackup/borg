@@ -60,8 +60,8 @@ created by some other process), lock acquisition fails.
 The cache lock is usually in `~/.cache/borg/REPOID/lock.*`.
 The repository lock is in `repository/lock.*`.
 
-In case you run into troubles with the locks, you can just delete the `lock.*`
-directory and file IF you first make sure that no |project_name| process is
+In case you run into troubles with the locks, you can use the ``borg break-lock``
+command after you first have made sure that no |project_name| process is
 running on any machine that accesses this resource. Be very careful, the cache
 or repository might get damaged if multiple processes use it at the same time.
 
@@ -181,21 +181,21 @@ Each item represents a file, directory or other fs item and is stored as an
 * mode (item type + permissions)
 * source (for links)
 * rdev (for devices)
-* mtime
+* mtime, atime, ctime in nanoseconds
 * xattrs
 * acl
 * bsdfiles
 
-``ctime`` (change time) is not stored because there is no API to set
-it and it is reset every time an inode's metadata is changed.
-
 All items are serialized using msgpack and the resulting byte stream
-is fed into the same chunker used for regular file data and turned
-into deduplicated chunks. The reference to these chunks is then added
-to the archive metadata.
+is fed into the same chunker algorithm as used for regular file data
+and turned into deduplicated chunks. The reference to these chunks is then added
+to the archive metadata. To achieve a finer granularity on this metadata
+stream, we use different chunker params for this chunker, which result in
+smaller chunks.
 
 A chunk is stored as an object as well, of course.
 
+.. _chunker_details:
 
 Chunks
 ------
@@ -204,23 +204,20 @@ The |project_name| chunker uses a rolling hash computed by the Buzhash_ algorith
 It triggers (chunks) when the last HASH_MASK_BITS bits of the hash are zero,
 producing chunks of 2^HASH_MASK_BITS Bytes on average.
 
-create --chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE
+``borg create --chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE``
 can be used to tune the chunker parameters, the default is:
 
-- CHUNK_MIN_EXP = 10 (minimum chunk size = 2^10 B = 1 kiB)
+- CHUNK_MIN_EXP = 19 (minimum chunk size = 2^19 B = 512 kiB)
 - CHUNK_MAX_EXP = 23 (maximum chunk size = 2^23 B = 8 MiB)
-- HASH_MASK_BITS = 16 (statistical medium chunk size ~= 2^16 B = 64 kiB)
+- HASH_MASK_BITS = 21 (statistical medium chunk size ~= 2^21 B = 2 MiB)
 - HASH_WINDOW_SIZE = 4095 [B] (`0xFFF`)
-
-The default parameters are OK for relatively small backup data volumes and
-repository sizes and a lot of available memory (RAM) and disk space for the
-chunk index. If that does not apply, you are advised to tune these parameters
-to keep the chunk count lower than with the defaults.
 
 The buzhash table is altered by XORing it with a seed randomly generated once
 for the archive, and stored encrypted in the keyfile. This is to prevent chunk
 size based fingerprinting attacks on your encrypted repo contents (to guess
 what files you have based on a specific set of chunk sizes).
+
+For some more general usage hints see also ``--chunker-params``.
 
 
 Indexes / Caches
@@ -278,10 +275,10 @@ buckets. As a consequence the hash is just a start position for a linear
 search, and if the element is not in the table the index is linearly crossed
 until an empty bucket is found.
 
-When the hash table is almost full at 90%, its size is doubled. When it's
-almost empty at 25%, its size is halved. So operations on it have a variable
+When the hash table is filled to 75%, its size is grown. When it's
+emptied to 25%, its size is shrinked. So operations on it have a variable
 complexity between constant and linear with low factor, and memory overhead
-varies between 10% and 300%.
+varies between 33% and 300%.
 
 
 Indexes / Caches memory usage
@@ -311,28 +308,27 @@ more chunks than estimated above, because 1 file is at least 1 chunk).
 
 If a remote repository is used the repo index will be allocated on the remote side.
 
-E.g. backing up a total count of 1Mi files with a total size of 1TiB.
+E.g. backing up a total count of 1 Mi (IEC binary prefix e.g. 2^20) files with a total size of 1TiB.
 
-a) with create --chunker-params 10,23,16,4095 (default):
+a) with ``create --chunker-params 10,23,16,4095`` (custom, like borg < 1.0 or attic):
 
   mem_usage  =  2.8GiB
 
-b) with create --chunker-params 10,23,20,4095 (custom):
+b) with ``create --chunker-params 19,23,21,4095`` (default):
 
-  mem_usage  =  0.4GiB
+  mem_usage  =  0.31GiB
 
-Note: there is also the --no-files-cache option to switch off the files cache.
-You'll save some memory, but it will need to read / chunk all the files then as
-it can not skip unmodified files then.
-
+.. note:: There is also the ``--no-files-cache`` option to switch off the files cache.
+   You'll save some memory, but it will need to read / chunk all the files as
+   it can not skip unmodified files then.
 
 Encryption
 ----------
 
-AES_ is used in CTR mode (so no need for padding). A 64bit initialization
+AES_-256 is used in CTR mode (so no need for padding). A 64bit initialization
 vector is used, a `HMAC-SHA256`_ is computed on the encrypted chunk with a
 random 64bit nonce and both are stored in the chunk.
-The header of each chunk is : ``TYPE(1)`` + ``HMAC(32)`` + ``NONCE(8)`` + ``CIPHERTEXT``.
+The header of each chunk is: ``TYPE(1)`` + ``HMAC(32)`` + ``NONCE(8)`` + ``CIPHERTEXT``.
 Encryption and HMAC use two different keys.
 
 In AES CTR mode you can think of the IV as the start value for the counter.
@@ -345,7 +341,12 @@ To reduce payload size, only 8 bytes of the 16 bytes nonce is saved in the
 payload, the first 8 bytes are always zeros. This does not affect security but
 limits the maximum repository capacity to only 295 exabytes (2**64 * 16 bytes).
 
-Encryption keys are either derived from a passphrase or kept in a key file.
+Encryption keys (and other secrets) are kept either in a key file on the client
+('keyfile' mode) or in the repository config on the server ('repokey' mode).
+In both cases, the secrets are generated from random and then encrypted by a
+key derived from your passphrase (this happens on the client before the key
+is stored into the keyfile or as repokey).
+
 The passphrase is passed through the ``BORG_PASSPHRASE`` environment variable
 or prompted for interactive usage.
 
@@ -354,7 +355,7 @@ Key files
 ---------
 
 When initialized with the ``init -e keyfile`` command, |project_name|
-needs an associated file in ``$HOME/.borg/keys`` to read and write
+needs an associated file in ``$HOME/.config/borg/keys`` to read and write
 the repository. The format is based on msgpack_, base64 encoding and
 PBKDF2_ SHA256 hashing, which is then encoded again in a msgpack_.
 

@@ -1,5 +1,5 @@
-from configparser import RawConfigParser
-from binascii import hexlify
+from configparser import ConfigParser
+from binascii import hexlify, unhexlify
 from itertools import islice
 import errno
 import logging
@@ -8,13 +8,12 @@ logger = logging.getLogger(__name__)
 import os
 import shutil
 import struct
-import sys
 from zlib import crc32
 
-from .helpers import Error, IntegrityError, read_msgpack, write_msgpack, unhexlify, have_cython
-if have_cython():
-    from .hashindex import NSIndex
-from .locking import UpgradableLock
+import msgpack
+from .helpers import Error, ErrorWithTraceback, IntegrityError, Location, ProgressIndicatorPercent
+from .hashindex import NSIndex
+from .locking import UpgradableLock, LockError, LockErrorT
 from .lrucache import LRUCache
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
@@ -45,23 +44,24 @@ class Repository:
         """Repository {} already exists."""
 
     class InvalidRepository(Error):
-        """{} is not a valid repository."""
+        """{} is not a valid repository. Check repo config."""
 
-    class CheckNeeded(Error):
+    class CheckNeeded(ErrorWithTraceback):
         """Inconsistency detected. Please run "borg check {}"."""
 
-    class ObjectNotFound(Error):
+    class ObjectNotFound(ErrorWithTraceback):
         """Object with key {} not found in repository {}."""
 
-    def __init__(self, path, create=False, exclusive=False):
+    def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True):
         self.path = os.path.abspath(path)
+        self._location = Location('file://%s' % self.path)
         self.io = None
         self.lock = None
         self.index = None
         self._active_txn = False
         if create:
             self.create(self.path)
-        self.open(self.path, exclusive)
+        self.open(self.path, exclusive, lock_wait=lock_wait, lock=lock)
 
     def __del__(self):
         self.close()
@@ -79,11 +79,11 @@ class Repository:
         with open(os.path.join(path, 'README'), 'w') as fd:
             fd.write('This is a Borg repository\n')
         os.mkdir(os.path.join(path, 'data'))
-        config = RawConfigParser()
+        config = ConfigParser(interpolation=None)
         config.add_section('repository')
         config.set('repository', 'version', '1')
-        config.set('repository', 'segments_per_dir', self.DEFAULT_SEGMENTS_PER_DIR)
-        config.set('repository', 'max_segment_size', self.DEFAULT_MAX_SEGMENT_SIZE)
+        config.set('repository', 'segments_per_dir', str(self.DEFAULT_SEGMENTS_PER_DIR))
+        config.set('repository', 'max_segment_size', str(self.DEFAULT_MAX_SEGMENT_SIZE))
         config.set('repository', 'id', hexlify(os.urandom(32)).decode('ascii'))
         self.save_config(path, config)
 
@@ -131,12 +131,18 @@ class Repository:
             self.replay_segments(replay_from, segments_transaction_id)
         return self.get_index_transaction_id()
 
-    def open(self, path, exclusive):
+    def break_lock(self):
+        UpgradableLock(os.path.join(self.path, 'lock')).break_lock()
+
+    def open(self, path, exclusive, lock_wait=None, lock=True):
         self.path = path
         if not os.path.isdir(path):
             raise self.DoesNotExist(path)
-        self.lock = UpgradableLock(os.path.join(path, 'lock'), exclusive).acquire()
-        self.config = RawConfigParser()
+        if lock:
+            self.lock = UpgradableLock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait).acquire()
+        else:
+            self.lock = None
+        self.config = ConfigParser(interpolation=None)
         self.config.read(os.path.join(self.path, 'config'))
         if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:
             raise self.InvalidRepository(path)
@@ -153,11 +159,11 @@ class Repository:
             self.lock.release()
             self.lock = None
 
-    def commit(self):
+    def commit(self, save_space=False):
         """Commit transaction
         """
         self.io.write_commit()
-        self.compact_segments()
+        self.compact_segments(save_space=save_space)
         self.write_index()
         self.rollback()
 
@@ -170,21 +176,22 @@ class Repository:
         self._active_txn = True
         try:
             self.lock.upgrade()
-        except UpgradableLock.ExclusiveLockFailed:
+        except (LockError, LockErrorT):
             # if upgrading the lock to exclusive fails, we do not have an
             # active transaction. this is important for "serve" mode, where
             # the repository instance lives on - even if exceptions happened.
             self._active_txn = False
             raise
-        if not self.index:
+        if not self.index or transaction_id is None:
             self.index = self.open_index(transaction_id)
         if transaction_id is None:
-            self.segments = {}
-            self.compact = set()
+            self.segments = {}  # XXX bad name: usage_count_of_segment_x = self.segments[x]
+            self.compact = set()  # XXX bad name: segments_needing_compaction = self.compact
         else:
             if do_cleanup:
                 self.io.cleanup(transaction_id)
-            hints = read_msgpack(os.path.join(self.path, 'hints.%d' % transaction_id))
+            with open(os.path.join(self.path, 'hints.%d' % transaction_id), 'rb') as fd:
+                hints = msgpack.unpack(fd)
             if hints[b'version'] != 1:
                 raise ValueError('Unknown hints file version: %d' % hints['version'])
             self.segments = hints[b'segments']
@@ -195,7 +202,12 @@ class Repository:
                  b'segments': self.segments,
                  b'compact': list(self.compact)}
         transaction_id = self.io.get_segments_transaction_id()
-        write_msgpack(os.path.join(self.path, 'hints.%d' % transaction_id), hints)
+        hints_file = os.path.join(self.path, 'hints.%d' % transaction_id)
+        with open(hints_file + '.tmp', 'wb') as fd:
+            msgpack.pack(hints, fd)
+            fd.flush()
+            os.fsync(fd.fileno())
+        os.rename(hints_file + '.tmp', hints_file)
         self.index.write(os.path.join(self.path, 'index.tmp'))
         os.rename(os.path.join(self.path, 'index.tmp'),
                   os.path.join(self.path, 'index.%d' % transaction_id))
@@ -209,69 +221,103 @@ class Repository:
             os.unlink(os.path.join(self.path, name))
         self.index = None
 
-    def compact_segments(self):
+    def compact_segments(self, save_space=False):
         """Compact sparse segments by copying data into new segments
         """
         if not self.compact:
             return
         index_transaction_id = self.get_index_transaction_id()
         segments = self.segments
+        unused = []  # list of segments, that are not used anymore
+
+        def complete_xfer():
+            # complete the transfer (usually exactly when some target segment
+            # is full, or at the very end when everything is processed)
+            nonlocal unused
+            # commit the new, compact, used segments
+            self.io.write_commit()
+            # get rid of the old, sparse, unused segments. free space.
+            for segment in unused:
+                assert self.segments.pop(segment) == 0
+                self.io.delete_segment(segment)
+            unused = []
+
         for segment in sorted(self.compact):
             if self.io.segment_exists(segment):
                 for tag, key, offset, data in self.io.iter_objects(segment, include_data=True):
                     if tag == TAG_PUT and self.index.get(key, (-1, -1)) == (segment, offset):
-                        new_segment, offset = self.io.write_put(key, data)
+                        try:
+                            new_segment, offset = self.io.write_put(key, data, raise_full=save_space)
+                        except LoggedIO.SegmentFull:
+                            complete_xfer()
+                            new_segment, offset = self.io.write_put(key, data)
                         self.index[key] = new_segment, offset
                         segments.setdefault(new_segment, 0)
                         segments[new_segment] += 1
                         segments[segment] -= 1
                     elif tag == TAG_DELETE:
                         if index_transaction_id is None or segment > index_transaction_id:
-                            self.io.write_delete(key)
+                            try:
+                                self.io.write_delete(key, raise_full=save_space)
+                            except LoggedIO.SegmentFull:
+                                complete_xfer()
+                                self.io.write_delete(key)
                 assert segments[segment] == 0
-
-        self.io.write_commit()
-        for segment in sorted(self.compact):
-            assert self.segments.pop(segment) == 0
-            self.io.delete_segment(segment)
+                unused.append(segment)
+        complete_xfer()
         self.compact = set()
 
     def replay_segments(self, index_transaction_id, segments_transaction_id):
         self.prepare_txn(index_transaction_id, do_cleanup=False)
-        for segment, filename in self.io.segment_iterator():
-            if index_transaction_id is not None and segment <= index_transaction_id:
-                continue
-            if segment > segments_transaction_id:
-                break
-            self.segments[segment] = 0
-            for tag, key, offset in self.io.iter_objects(segment):
-                if tag == TAG_PUT:
-                    try:
-                        s, _ = self.index[key]
-                        self.compact.add(s)
-                        self.segments[s] -= 1
-                    except KeyError:
-                        pass
-                    self.index[key] = segment, offset
-                    self.segments[segment] += 1
-                elif tag == TAG_DELETE:
-                    try:
-                        s, _ = self.index.pop(key)
-                        self.segments[s] -= 1
-                        self.compact.add(s)
-                    except KeyError:
-                        pass
-                    self.compact.add(segment)
-                elif tag == TAG_COMMIT:
+        try:
+            segment_count = sum(1 for _ in self.io.segment_iterator())
+            pi = ProgressIndicatorPercent(total=segment_count, msg="Replaying segments %3.0f%%", same_line=True)
+            for i, (segment, filename) in enumerate(self.io.segment_iterator()):
+                pi.show(i)
+                if index_transaction_id is not None and segment <= index_transaction_id:
                     continue
-                else:
-                    raise self.CheckNeeded(self.path)
-            if self.segments[segment] == 0:
-                self.compact.add(segment)
-        self.write_index()
-        self.rollback()
+                if segment > segments_transaction_id:
+                    break
+                objects = self.io.iter_objects(segment)
+                self._update_index(segment, objects)
+            pi.finish()
+            self.write_index()
+        finally:
+            self.rollback()
 
-    def check(self, repair=False):
+    def _update_index(self, segment, objects, report=None):
+        """some code shared between replay_segments and check"""
+        self.segments[segment] = 0
+        for tag, key, offset in objects:
+            if tag == TAG_PUT:
+                try:
+                    s, _ = self.index[key]
+                    self.compact.add(s)
+                    self.segments[s] -= 1
+                except KeyError:
+                    pass
+                self.index[key] = segment, offset
+                self.segments[segment] += 1
+            elif tag == TAG_DELETE:
+                try:
+                    s, _ = self.index.pop(key)
+                    self.segments[s] -= 1
+                    self.compact.add(s)
+                except KeyError:
+                    pass
+                self.compact.add(segment)
+            elif tag == TAG_COMMIT:
+                continue
+            else:
+                msg = 'Unexpected tag {} in segment {}'.format(tag, segment)
+                if report is None:
+                    raise self.CheckNeeded(msg)
+                else:
+                    report(msg)
+        if self.segments[segment] == 0:
+            self.compact.add(segment)
+
+    def check(self, repair=False, save_space=False):
         """Check repository consistency
 
         This method verifies all segment checksums and makes sure
@@ -284,6 +330,7 @@ class Repository:
             error_found = True
             logger.error(msg)
 
+        logger.info('Starting repository check')
         assert not self._active_txn
         try:
             transaction_id = self.get_transaction_id()
@@ -298,8 +345,11 @@ class Repository:
         if repair:
             self.io.cleanup(transaction_id)
         segments_transaction_id = self.io.get_segments_transaction_id()
-        self.prepare_txn(None)
-        for segment, filename in self.io.segment_iterator():
+        self.prepare_txn(None)  # self.index, self.compact, self.segments all empty now!
+        segment_count = sum(1 for _ in self.io.segment_iterator())
+        pi = ProgressIndicatorPercent(total=segment_count, msg="Checking segments %3.1f%%", step=0.1, same_line=True)
+        for i, (segment, filename) in enumerate(self.io.segment_iterator()):
+            pi.show(i)
             if segment > transaction_id:
                 continue
             try:
@@ -310,35 +360,17 @@ class Repository:
                 if repair:
                     self.io.recover_segment(segment, filename)
                     objects = list(self.io.iter_objects(segment))
-            self.segments[segment] = 0
-            for tag, key, offset in objects:
-                if tag == TAG_PUT:
-                    try:
-                        s, _ = self.index[key]
-                        self.compact.add(s)
-                        self.segments[s] -= 1
-                    except KeyError:
-                        pass
-                    self.index[key] = segment, offset
-                    self.segments[segment] += 1
-                elif tag == TAG_DELETE:
-                    try:
-                        s, _ = self.index.pop(key)
-                        self.segments[s] -= 1
-                        self.compact.add(s)
-                    except KeyError:
-                        pass
-                    self.compact.add(segment)
-                elif tag == TAG_COMMIT:
-                    continue
-                else:
-                    report_error('Unexpected tag {} in segment {}'.format(tag, segment))
+            self._update_index(segment, objects, report_error)
+        pi.finish()
+        # self.index, self.segments, self.compact now reflect the state of the segment files up to <transaction_id>
         # We might need to add a commit tag if no committed segment is found
         if repair and segments_transaction_id is None:
             report_error('Adding commit tag to segment {}'.format(transaction_id))
             self.io.segment = transaction_id + 1
             self.io.write_commit()
         if current_index and not repair:
+            # current_index = "as found on disk"
+            # self.index = "as rebuilt in-memory from segments"
             if len(current_index) != len(self.index):
                 report_error('Index object count mismatch. {} != {}'.format(len(current_index), len(self.index)))
             elif current_index:
@@ -346,9 +378,16 @@ class Repository:
                     if current_index.get(key, (-1, -1)) != value:
                         report_error('Index mismatch for key {}. {} != {}'.format(key, value, current_index.get(key, (-1, -1))))
         if repair:
-            self.compact_segments()
+            self.compact_segments(save_space=save_space)
             self.write_index()
         self.rollback()
+        if error_found:
+            if repair:
+                logger.info('Completed repository check, errors found and repaired.')
+            else:
+                logger.error('Completed repository check, errors found.')
+        else:
+            logger.info('Completed repository check, no problems found.')
         return not error_found or repair
 
     def rollback(self):
@@ -379,7 +418,7 @@ class Repository:
             segment, offset = self.index[id_]
             return self.io.read(segment, offset, id_)
         except KeyError:
-            raise self.ObjectNotFound(id_, self.path)
+            raise self.ObjectNotFound(id_, self.path) from None
 
     def get_many(self, ids, is_preloaded=False):
         for id_ in ids:
@@ -408,7 +447,7 @@ class Repository:
         try:
             segment, offset = self.index.pop(id)
         except KeyError:
-            raise self.ObjectNotFound(id, self.path)
+            raise self.ObjectNotFound(id, self.path) from None
         self.segments[segment] -= 1
         self.compact.add(segment)
         segment = self.io.write_delete(id)
@@ -421,6 +460,9 @@ class Repository:
 
 
 class LoggedIO:
+
+    class SegmentFull(Exception):
+        """raised when a segment is full, before opening next"""
 
     header_fmt = struct.Struct('<IIB')
     assert header_fmt.size == 9
@@ -498,8 +540,10 @@ class LoggedIO:
     def segment_filename(self, segment):
         return os.path.join(self.path, 'data', str(segment // self.segments_per_dir), str(segment))
 
-    def get_write_fd(self, no_new=False):
+    def get_write_fd(self, no_new=False, raise_full=False):
         if not no_new and self.offset and self.offset > self.limit:
+            if raise_full:
+                raise self.SegmentFull
             self.close_segment()
         if not self._write_fd:
             if self.segment % self.segments_per_dir == 0:
@@ -524,7 +568,7 @@ class LoggedIO:
             del self.fds[segment]
         try:
             os.unlink(self.segment_filename(segment))
-        except OSError:
+        except FileNotFoundError:
             pass
 
     def segment_exists(self, segment):
@@ -585,7 +629,7 @@ class LoggedIO:
             hdr_tuple = fmt.unpack(header)
         except struct.error as err:
             raise IntegrityError('Invalid segment entry header [segment {}, offset {}]: {}'.format(
-                segment, offset, err))
+                segment, offset, err)) from None
         if fmt is self.put_header_fmt:
             crc, size, tag, key = hdr_tuple
         elif fmt is self.header_fmt:
@@ -611,9 +655,9 @@ class LoggedIO:
             key, data = data[:32], data[32:]
         return size, tag, key, data
 
-    def write_put(self, id, data):
+    def write_put(self, id, data, raise_full=False):
+        fd = self.get_write_fd(raise_full=raise_full)
         size = len(data) + self.put_header_fmt.size
-        fd = self.get_write_fd()
         offset = self.offset
         header = self.header_no_crc_fmt.pack(size, TAG_PUT)
         crc = self.crc_fmt.pack(crc32(data, crc32(id, crc32(header))) & 0xffffffff)
@@ -621,8 +665,8 @@ class LoggedIO:
         self.offset += size
         return self.segment, offset
 
-    def write_delete(self, id):
-        fd = self.get_write_fd()
+    def write_delete(self, id, raise_full=False):
+        fd = self.get_write_fd(raise_full=raise_full)
         header = self.header_no_crc_fmt.pack(self.put_header_fmt.size, TAG_DELETE)
         crc = self.crc_fmt.pack(crc32(id, crc32(header)) & 0xffffffff)
         fd.write(b''.join((crc, header, id)))
@@ -642,7 +686,7 @@ class LoggedIO:
             self.offset = 0
             self._write_fd.flush()
             os.fsync(self._write_fd.fileno())
-            if hasattr(os, 'posix_fadvise'):  # python >= 3.3, only on UNIX
+            if hasattr(os, 'posix_fadvise'):  # only on UNIX
                 # tell the OS that it does not need to cache what we just wrote,
                 # avoids spoiling the cache for the OS and other processes.
                 os.posix_fadvise(self._write_fd.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)

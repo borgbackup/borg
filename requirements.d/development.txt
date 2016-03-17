@@ -1,6 +1,6 @@
+virtualenv<14.0
 tox
-mock
 pytest
-pytest-cov<2.0.0
-pytest-benchmark==3.0.0b1
+pytest-cov
+pytest-benchmark
 Cython

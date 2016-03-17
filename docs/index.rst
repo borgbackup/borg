@@ -12,8 +12,10 @@ Borg Documentation
    installation
    quickstart
    usage
+   deployment
    faq
    support
+   resources
    changes
    internals
    development

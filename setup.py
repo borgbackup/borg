@@ -6,11 +6,8 @@ from glob import glob
 
 from distutils.command.build import build
 from distutils.core import Command
-from distutils.errors import DistutilsOptionError
-from distutils import log
-from setuptools.command.build_py import build_py
 
-min_python = (3, 2)
+min_python = (3, 4)
 my_python = sys.version_info
 
 if my_python < min_python:
@@ -22,7 +19,7 @@ on_rtd = os.environ.get('READTHEDOCS')
 
 # msgpack pure python data corruption was fixed in 0.4.6.
 # Also, we might use some rather recent API features.
-install_requires=['msgpack-python>=0.4.6', ]
+install_requires = ['msgpack-python>=0.4.6', ]
 
 
 from setuptools import setup, Extension
@@ -123,12 +120,14 @@ elif not on_rtd:
 with open('README.rst', 'r') as fd:
     long_description = fd.read()
 
+
 class build_usage(Command):
     description = "generate usage for each command"
 
     user_options = [
         ('output=', 'O', 'output directory'),
     ]
+
     def initialize_options(self):
         pass
 
@@ -138,8 +137,6 @@ class build_usage(Command):
     def run(self):
         print('generating usage docs')
         # allows us to build docs without the C modules fully loaded during help generation
-        if 'BORG_CYTHON_DISABLE' not in os.environ:
-            os.environ['BORG_CYTHON_DISABLE'] = self.__class__.__name__
         from borg.archiver import Archiver
         parser = Archiver().build_parser(prog='borg')
         choices = {}
@@ -169,9 +166,6 @@ class build_usage(Command):
                     doc.write(re.sub("^", "    ", parser.format_help(), flags=re.M))
                     doc.write("\nDescription\n~~~~~~~~~~~\n")
                     doc.write(epilog)
-        # return to regular Cython configuration, if we changed it
-        if os.environ.get('BORG_CYTHON_DISABLE') == self.__class__.__name__:
-            del os.environ['BORG_CYTHON_DISABLE']
 
 
 class build_api(Command):
@@ -180,6 +174,7 @@ class build_api(Command):
     user_options = [
         ('output=', 'O', 'output directory'),
     ]
+
     def initialize_options(self):
         pass
 
@@ -203,40 +198,11 @@ API Documentation
     :undoc-members:
 """ % mod)
 
-# (function, predicate), see http://docs.python.org/2/distutils/apiref.html#distutils.cmd.Command.sub_commands
-# seems like this doesn't work on RTD, see below for build_py hack.
-build.sub_commands.append(('build_api', None))
-build.sub_commands.append(('build_usage', None))
-
-
-class build_py_custom(build_py):
-    """override build_py to also build our stuff
-
-    it is unclear why this is necessary, but in some environments
-    (Readthedocs.org, specifically), the above
-    ``build.sub_commands.append()`` doesn't seem to have an effect:
-    our custom build commands seem to be ignored when running
-    ``setup.py install``.
-
-    This class overrides the ``build_py`` target by forcing it to run
-    our custom steps as well.
-
-    See also the `bug report on RTD
-    <https://github.com/rtfd/readthedocs.org/issues/1740>`_.
-    """
-    def run(self):
-        super().run()
-        self.announce('calling custom build steps', level=log.INFO)
-        self.run_command('build_ext')
-        self.run_command('build_api')
-        self.run_command('build_usage')
-
 
 cmdclass = {
     'build_ext': build_ext,
     'build_api': build_api,
     'build_usage': build_usage,
-    'build_py': build_py_custom,
     'sdist': Sdist
 }
 
@@ -248,7 +214,7 @@ if not on_rtd:
     Extension('borg.chunker', [chunker_source]),
     Extension('borg.hashindex', [hashindex_source])
 ]
-    if sys.platform.startswith('linux'):
+    if sys.platform == 'linux':
         ext_modules.append(Extension('borg.platform_linux', [platform_linux_source], libraries=['acl']))
     elif sys.platform.startswith('freebsd'):
         ext_modules.append(Extension('borg.platform_freebsd', [platform_freebsd_source]))
@@ -261,7 +227,7 @@ setup(
         'write_to': 'borg/_version.py',
     },
     author='The Borg Collective (see AUTHORS file)',
-    author_email='borgbackup@librelist.com',
+    author_email='borgbackup@python.org',
     url='https://borgbackup.readthedocs.org/',
     description='Deduplicated, encrypted, authenticated and compressed backups',
     long_description=long_description,
@@ -279,14 +245,12 @@ setup(
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.2',
-        'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Topic :: Security :: Cryptography',
         'Topic :: System :: Archiving :: Backup',
     ],
-    packages=['borg', 'borg.testsuite', 'borg.support', ],
+    packages=['borg', 'borg.testsuite', ],
     entry_points={
         'console_scripts': [
             'borg = borg.archiver:main',

@@ -1,12 +1,12 @@
 import os
 import shutil
+import sys
 import tempfile
-
-from mock import patch
+from unittest.mock import patch
 
 from ..hashindex import NSIndex
 from ..helpers import Location, IntegrityError
-from ..locking import UpgradableLock
+from ..locking import UpgradableLock, LockFailed
 from ..remote import RemoteRepository, InvalidRPCMethod
 from ..repository import Repository
 from . import BaseTestCase
@@ -158,9 +158,9 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         for name in os.listdir(self.repository.path):
             if name.startswith('index.'):
                 os.unlink(os.path.join(self.repository.path, name))
-        with patch.object(UpgradableLock, 'upgrade', side_effect=UpgradableLock.ExclusiveLockFailed) as upgrade:
+        with patch.object(UpgradableLock, 'upgrade', side_effect=LockFailed) as upgrade:
             self.reopen()
-            self.assert_raises(UpgradableLock.ExclusiveLockFailed, lambda: len(self.repository))
+            self.assert_raises(LockFailed, lambda: len(self.repository))
             upgrade.assert_called_once_with()
 
     def test_crash_before_write_index(self):
@@ -311,7 +311,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         # Simulate a crash before compact
         with patch.object(Repository, 'compact_segments') as compact:
             self.repository.commit()
-            compact.assert_called_once_with()
+            compact.assert_called_once_with(save_space=False)
         self.reopen()
         self.check(repair=True)
         self.assert_equal(self.repository.get(bytes(32)), b'data2')
@@ -326,13 +326,24 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         self.assert_raises(InvalidRPCMethod, lambda: self.repository.call('__init__', None))
 
     def test_ssh_cmd(self):
-        assert self.repository.umask is not None
-        assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', 'example.com', 'borg', 'serve'] + self.repository.umask_flag()
-        assert self.repository.ssh_cmd(Location('ssh://example.com/foo')) == ['ssh', 'example.com', 'borg', 'serve'] + self.repository.umask_flag()
-        assert self.repository.ssh_cmd(Location('ssh://user@example.com/foo')) == ['ssh', 'user@example.com', 'borg', 'serve'] + self.repository.umask_flag()
-        assert self.repository.ssh_cmd(Location('ssh://user@example.com:1234/foo')) == ['ssh', '-p', '1234', 'user@example.com', 'borg', 'serve'] + self.repository.umask_flag()
+        assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', 'example.com']
+        assert self.repository.ssh_cmd(Location('ssh://example.com/foo')) == ['ssh', 'example.com']
+        assert self.repository.ssh_cmd(Location('ssh://user@example.com/foo')) == ['ssh', 'user@example.com']
+        assert self.repository.ssh_cmd(Location('ssh://user@example.com:1234/foo')) == ['ssh', '-p', '1234', 'user@example.com']
         os.environ['BORG_RSH'] = 'ssh --foo'
-        assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', '--foo', 'example.com', 'borg', 'serve'] + self.repository.umask_flag()
+        assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', '--foo', 'example.com']
+
+    def test_borg_cmd(self):
+        class MockArgs:
+            remote_path = 'borg'
+            umask = 0o077
+
+        assert self.repository.borg_cmd(None, testing=True) == [sys.executable, '-m', 'borg.archiver', 'serve']
+        args = MockArgs()
+        # note: test logger is on info log level, so --info gets added automagically
+        assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--umask=077', '--info']
+        args.remote_path = 'borg-0.28.2'
+        assert self.repository.borg_cmd(args, testing=False) == ['borg-0.28.2', 'serve', '--umask=077', '--info']
 
 
 class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):

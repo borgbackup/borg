@@ -1,26 +1,23 @@
 import configparser
 from .remote import cache_if_remote
 from collections import namedtuple
-import errno
 import os
 import stat
-import sys
+
 import threading
-from binascii import hexlify
+from binascii import hexlify, unhexlify
+
 import shutil
-import tarfile
-import tempfile
 
 from .key import PlaintextKey
 from .logger import create_logger
 logger = create_logger()
-from .helpers import Error, get_cache_dir, decode_dict, st_mtime_ns, unhexlify, int_to_bigint, \
-    bigint_to_int, format_file_size, have_cython
+from .helpers import Error, get_cache_dir, decode_dict, int_to_bigint, \
+    bigint_to_int, format_file_size, yes
 from .locking import UpgradableLock
 from .hashindex import ChunkIndex
 
-if have_cython():
-    import msgpack
+import msgpack
 
 
 class Cache:
@@ -36,13 +33,18 @@ class Cache:
         """Repository access aborted"""
 
     class EncryptionMethodMismatch(Error):
-        """Repository encryption method changed since last acccess, refusing to continue
-        """
+        """Repository encryption method changed since last access, refusing to continue"""
+
+    @staticmethod
+    def break_lock(repository, path=None):
+        path = path or os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
+        UpgradableLock(os.path.join(path, 'lock'), exclusive=True).break_lock()
 
     class ChunkSizeNotReady(Exception):
         """computation of some chunk size is not yet finished"""
 
-    def __init__(self, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True):
+    def __init__(self, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True,
+                 lock_wait=None):
         self.lock = None
         self.timestamp = None
         self.thread_lock = threading.Lock()
@@ -52,19 +54,22 @@ class Cache:
         self.manifest = manifest
         self.path = path or os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
         self.do_files = do_files
-        logger.info('initializing cache')
         # Warn user before sending data to a never seen before unencrypted repository
         if not os.path.exists(self.path):
             if warn_if_unencrypted and isinstance(key, PlaintextKey):
-                if not self._confirm('Warning: Attempting to access a previously unknown unencrypted repository',
-                                     'BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'):
+                msg = ("Warning: Attempting to access a previously unknown unencrypted repository!" +
+                       "\n" +
+                       "Do you want to continue? [yN] ")
+                if not yes(msg, false_msg="Aborting.", env_var_override='BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'):
                     raise self.CacheInitAbortedError()
             self.create()
-        self.open()
+        self.open(lock_wait=lock_wait)
         # Warn user before sending data to a relocated repository
         if self.previous_location and self.previous_location != repository._location.canonical_path():
-            msg = 'Warning: The repository at location {} was previously located at {}'.format(repository._location.canonical_path(), self.previous_location)
-            if not self._confirm(msg, 'BORG_RELOCATED_REPO_ACCESS_IS_OK'):
+            msg = ("Warning: The repository at location {} was previously located at {}".format(repository._location.canonical_path(), self.previous_location) +
+                   "\n" +
+                   "Do you want to continue? [yN] ")
+            if not yes(msg, false_msg="Aborting.", env_var_override='BORG_RELOCATED_REPO_ACCESS_IS_OK'):
                 raise self.RepositoryAccessAborted()
 
         if sync and self.manifest.id != self.manifest_id:
@@ -74,11 +79,13 @@ class Cache:
             # Make sure an encrypted repository has not been swapped for an unencrypted repository
             if self.key_type is not None and self.key_type != str(key.TYPE):
                 raise self.EncryptionMethodMismatch()
-            logger.info('synchronizing cache')
             self.sync()
             self.commit()
 
-    def __del__(self):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
     def __str__(self):
@@ -97,26 +104,13 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             stats[field] = format_file_size(stats[field])
         return Summary(**stats)
 
-    def _confirm(self, message, env_var_override=None):
-        print(message, file=sys.stderr)
-        if env_var_override and os.environ.get(env_var_override):
-            print("Yes (From {})".format(env_var_override), file=sys.stderr)
-            return True
-        if not sys.stdin.isatty():
-            return False
-        try:
-            answer = input('Do you want to continue? [yN] ')
-        except EOFError:
-            return False
-        return answer and answer in 'Yy'
-
     def create(self):
         """Create a new empty cache at `self.path`
         """
         os.makedirs(self.path)
         with open(os.path.join(self.path, 'README'), 'w') as fd:
             fd.write('This is a Borg cache')
-        config = configparser.RawConfigParser()
+        config = configparser.ConfigParser(interpolation=None)
         config.add_section('cache')
         config.set('cache', 'version', '1')
         config.set('cache', 'repository', hexlify(self.repository.id).decode('ascii'))
@@ -136,17 +130,17 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         shutil.rmtree(self.path)
 
     def _do_open(self):
-        self.config = configparser.RawConfigParser()
+        self.config = configparser.ConfigParser(interpolation=None)
         config_path = os.path.join(self.path, 'config')
         self.config.read(config_path)
         try:
             cache_version = self.config.getint('cache', 'version')
             wanted_version = 1
-            if  cache_version != wanted_version:
+            if cache_version != wanted_version:
                 raise Exception('%s has unexpected cache version %d (wanted: %d).' % (
                     config_path, cache_version, wanted_version))
-        except configparser.NoSectionError as e:
-            raise Exception('%s does not look like a Borg cache.' % config_path)
+        except configparser.NoSectionError:
+            raise Exception('%s does not look like a Borg cache.' % config_path) from None
         self.id = self.config.get('cache', 'repository')
         self.manifest_id = unhexlify(self.config.get('cache', 'manifest'))
         self.timestamp = self.config.get('cache', 'timestamp', fallback=None)
@@ -155,14 +149,14 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         self.chunks = ChunkIndex.read(os.path.join(self.path, 'chunks').encode('utf-8'))
         self.files = None
 
-    def open(self):
+    def open(self, lock_wait=None):
         if not os.path.isdir(self.path):
             raise Exception('%s Does not look like a Borg cache' % self.path)
-        self.lock = UpgradableLock(os.path.join(self.path, 'lock'), exclusive=True).acquire()
+        self.lock = UpgradableLock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait).acquire()
         self.rollback()
 
     def close(self):
-        if self.lock:
+        if self.lock is not None:
             self.lock.release()
             self.lock = None
 
@@ -268,18 +262,11 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             for id in ids:
                 os.unlink(mkpath(id))
 
-        def add(chunk_idx, id, size, csize, incr=1):
-            try:
-                count, size, csize = chunk_idx[id]
-                chunk_idx[id] = count + incr, size, csize
-            except KeyError:
-                chunk_idx[id] = incr, size, csize
-
         def fetch_and_build_idx(archive_id, repository, key):
             chunk_idx = ChunkIndex()
             cdata = repository.get(archive_id)
             data = key.decrypt(archive_id, cdata)
-            add(chunk_idx, archive_id, len(data), len(cdata))
+            chunk_idx.add(archive_id, 1, len(data), len(cdata))
             archive = msgpack.unpackb(data)
             if archive[b'version'] != 1:
                 raise Exception('Unknown archive metadata version')
@@ -287,7 +274,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             unpacker = msgpack.Unpacker()
             for item_id, chunk in zip(archive[b'items'], repository.get_many(archive[b'items'])):
                 data = key.decrypt(item_id, chunk)
-                add(chunk_idx, item_id, len(data), len(chunk))
+                chunk_idx.add(item_id, 1, len(data), len(chunk))
                 unpacker.feed(data)
                 for item in unpacker:
                     if not isinstance(item, dict):
@@ -295,7 +282,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                         continue
                     if b'chunks' in item:
                         for chunk_id, size, csize in item[b'chunks']:
-                            add(chunk_idx, chunk_id, size, csize)
+                            chunk_idx.add(chunk_id, 1, size, csize)
             if self.do_cache:
                 fn = mkpath(archive_id)
                 fn_tmp = mkpath(archive_id, suffix='.tmp')
@@ -360,12 +347,12 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 pass
 
         self.begin_txn()
-        repository = cache_if_remote(self.repository)
-        legacy_cleanup()
-        # TEMPORARY HACK: to avoid archive index caching, create a FILE named ~/.cache/borg/REPOID/chunks.archive.d -
-        # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local disk)
-        self.do_cache = os.path.isdir(archive_path)
-        self.chunks = create_master_idx(self.chunks)
+        with cache_if_remote(self.repository) as repository:
+            legacy_cleanup()
+            # TEMPORARY HACK: to avoid archive index caching, create a FILE named ~/.cache/borg/REPOID/chunks.archive.d -
+            # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local disk)
+            self.do_cache = os.path.isdir(archive_path)
+            self.chunks = create_master_idx(self.chunks)
 
     def add_chunk(self, id, data, stats):
         if not self.txn_active:
@@ -500,7 +487,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not entry:
             return None
         entry = msgpack.unpackb(entry)
-        if entry[2] == st.st_size and bigint_to_int(entry[3]) == st_mtime_ns(st) and entry[1] == st.st_ino:
+        if entry[2] == st.st_size and bigint_to_int(entry[3]) == st.st_mtime_ns and entry[1] == st.st_ino:
             # reset entry age
             entry[0] = 0
             self.files[path_hash] = msgpack.packb(entry)
@@ -512,6 +499,6 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not (self.do_files and stat.S_ISREG(st.st_mode)):
             return
         # Entry: Age, inode, size, mtime, chunk ids
-        mtime_ns = st_mtime_ns(st)
+        mtime_ns = st.st_mtime_ns
         self.files[path_hash] = msgpack.packb((0, st.st_ino, st.st_size, int_to_bigint(mtime_ns), ids))
         self._newest_mtime = max(self._newest_mtime, mtime_ns)

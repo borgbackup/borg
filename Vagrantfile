@@ -28,8 +28,10 @@ def packages_debianoid
     # for building python:
     apt-get install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev
     # this way it works on older dists (like ubuntu 12.04) also:
-    easy_install3 pip
-    pip3 install virtualenv
+    # for python 3.2 on ubuntu 12.04 we need pip<8 and virtualenv<14 as
+    # newer versions are not compatible with py 3.2 any more.
+    easy_install3 'pip<8.0'
+    pip3 install 'virtualenv<14.0'
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
   EOF
 end
@@ -42,6 +44,8 @@ def packages_redhatted
     yum install -y openssl-devel openssl libacl-devel libacl lz4-devel fuse-devel fuse pkgconfig
     usermod -a -G fuse vagrant
     yum install -y fakeroot gcc git patch
+    # needed to compile msgpack-python (otherwise it will use slow fallback code):
+    yum install -y gcc-c++
     # for building python:
     yum install -y zlib-devel bzip2-devel ncurses-devel readline-devel xz-devel sqlite-devel
     #yum install -y python-pip
@@ -53,9 +57,9 @@ end
 def packages_darwin
   return <<-EOF
     # get osxfuse 3.0.x pre-release code from github:
-    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.0.5/osxfuse-3.0.5.dmg >osxfuse.dmg
+    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.0.9/osxfuse-3.0.9.dmg >osxfuse.dmg
     MOUNTDIR=$(echo `hdiutil mount osxfuse.dmg | tail -1 | awk '{$1="" ; print $0}'` | xargs -0 echo) \
-    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for OS X 3.0.5.pkg" -target /
+    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for OS X 3.0.9.pkg" -target /
     sudo chown -R vagrant /usr/local  # brew must be able to create stuff here
     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     brew update
@@ -74,7 +78,7 @@ def packages_freebsd
     pkg install -y openssl liblz4 fusefs-libs pkgconf
     pkg install -y fakeroot git bash
     # for building python:
-    pkg install sqlite3
+    pkg install -y sqlite3
     # make bash default / work:
     chsh -s bash vagrant
     mount -t fdescfs fdesc /dev/fd
@@ -125,7 +129,9 @@ def packages_netbsd
     ln -s /usr/pkg/lib/liblz4* /usr/local/opt/lz4/lib/
     touch /etc/openssl/openssl.cnf  # avoids a flood of "can't open ..."
     mozilla-rootcerts install
-    # llfuse does not support netbsd
+    pkg_add pkg-config  # avoids some "pkg-config missing" error msg, even without fuse
+    # pkg_add fuse  # llfuse 0.41.1 supports netbsd, but is still buggy.
+    # https://bitbucket.org/nikratio/python-llfuse/issues/70/perfuse_open-setsockopt-no-buffer-space
     pkg_add python34 py34-setuptools
     ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python
     ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python3
@@ -142,6 +148,7 @@ def install_pyenv(boxname)
     echo 'eval "$(pyenv init -)"' >> ~/.bash_profile
     echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bash_profile
     echo 'export PYTHON_CONFIGURE_OPTS="--enable-shared"' >> ~/.bash_profile
+    echo 'export LANG=en_US.UTF-8' >> ~/.bash_profile
   EOF
 end
 
@@ -154,11 +161,9 @@ end
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
-    pyenv install 3.2.2  # tests, 3.2(.0) and 3.2.1 deadlock, issue #221
-    pyenv install 3.3.0  # tests
     pyenv install 3.4.0  # tests
     pyenv install 3.5.0  # tests
-    #pyenv install 3.5.1  # binary build, use latest 3.5.x release
+    pyenv install 3.5.1  # binary build, use latest 3.5.x release
     pyenv rehash
   EOF
 end
@@ -176,8 +181,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.5 release
-    pyenv global 3.5.0
-    pyenv virtualenv 3.5.0 borg-env
+    pyenv global 3.5.1
+    pyenv virtualenv 3.5.1 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -193,7 +198,8 @@ def install_borg(boxname)
     rm -f borg/*.so borg/*.cpy*
     rm -f borg/{chunker,crypto,compress,hashindex,platform_linux}.c
     rm -rf borg/__pycache__ borg/support/__pycache__ borg/testsuite/__pycache__
-    pip install 'llfuse<0.41'  # 0.41 does not install due to UnicodeDecodeError
+    pip install 'llfuse<0.41'  # 0.41.1 throws UnicodeDecodeError at install time:
+    # https://bitbucket.org/nikratio/python-llfuse/issues/69/unicode-exception-at-install-time
     pip install -r requirements.d/development.txt
     pip install -e .
   EOF
@@ -206,7 +212,7 @@ def install_pyinstaller(boxname)
     . borg-env/bin/activate
     git clone https://github.com/pyinstaller/pyinstaller.git
     cd pyinstaller
-    git checkout master
+    git checkout v3.1
     pip install -e .
   EOF
 end
@@ -218,7 +224,7 @@ def install_pyinstaller_bootloader(boxname)
     . borg-env/bin/activate
     git clone https://github.com/pyinstaller/pyinstaller.git
     cd pyinstaller
-    git checkout master
+    git checkout v3.1
     # build bootloader, if it is not included
     cd bootloader
     python ./waf all
@@ -233,7 +239,7 @@ def build_binary_with_pyinstaller(boxname)
     cd /vagrant/borg
     . borg-env/bin/activate
     cd borg
-    pyinstaller -F -n borg.exe --distpath=/vagrant/borg --clean --hidden-import=logging.config borg/__main__.py
+    pyinstaller -F -n borg.exe --distpath=/vagrant/borg --clean borg/__main__.py
   EOF
 end
 
@@ -244,7 +250,7 @@ def run_tests(boxname)
     . ../borg-env/bin/activate
     if which pyenv > /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.2.2 3.3.0 3.4.0 3.5.0
+      pyenv global 3.4.0 3.5.0
     fi
     # otherwise: just use the system python
     if which fakeroot > /dev/null; then
@@ -266,7 +272,7 @@ end
 
 Vagrant.configure(2) do |config|
   # use rsync to copy content to the folder
-  config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync"
+  config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"]
   # do not let the VM access . on the host machine via the default shared folder!
   config.vm.synced_folder ".", "/vagrant", disabled: true
 

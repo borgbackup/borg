@@ -467,6 +467,49 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             with self.assert_creates_file('input/dir/file'):
                 self.cmd('extract', self.repository_location + '::test', '--strip-components', '0')
 
+    def _extract_hardlinks_setup(self):
+        os.mkdir(os.path.join(self.input_path, 'dir1'))
+        os.mkdir(os.path.join(self.input_path, 'dir1/subdir'))
+
+        self.create_regular_file('source')
+        os.link(os.path.join(self.input_path, 'source'),
+                os.path.join(self.input_path, 'abba'))
+        os.link(os.path.join(self.input_path, 'source'),
+                os.path.join(self.input_path, 'dir1/hardlink'))
+        os.link(os.path.join(self.input_path, 'source'),
+                os.path.join(self.input_path, 'dir1/subdir/hardlink'))
+
+        self.create_regular_file('dir1/source2')
+        os.link(os.path.join(self.input_path, 'dir1/source2'),
+                os.path.join(self.input_path, 'dir1/aaaa'))
+
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+
+    def test_strip_components_links(self):
+        self._extract_hardlinks_setup()
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test', '--strip-components', '2')
+            assert os.stat('hardlink').st_nlink == 2
+            assert os.stat('subdir/hardlink').st_nlink == 2
+            assert os.stat('aaaa').st_nlink == 2
+            assert os.stat('source2').st_nlink == 2
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+            assert os.stat('input/dir1/hardlink').st_nlink == 4
+
+    def test_extract_hardlinks(self):
+        self._extract_hardlinks_setup()
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test', 'input/dir1')
+            assert os.stat('input/dir1/hardlink').st_nlink == 2
+            assert os.stat('input/dir1/subdir/hardlink').st_nlink == 2
+            assert os.stat('input/dir1/aaaa').st_nlink == 2
+            assert os.stat('input/dir1/source2').st_nlink == 2
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+            assert os.stat('input/dir1/hardlink').st_nlink == 4
+
     def test_extract_include_exclude(self):
         self.cmd('init', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)

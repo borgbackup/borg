@@ -298,7 +298,19 @@ Number of files: {0.stats.nfiles}'''.format(
         cache.rollback()
         return stats
 
-    def extract_item(self, item, restore_attrs=True, dry_run=False, stdout=False, sparse=False):
+    def extract_item(self, item, restore_attrs=True, dry_run=False, stdout=False, sparse=False,
+                     hardlink_masters=None, original_path=None):
+        """
+        Extract archive item.
+
+        :param item: the item to extract
+        :param restore_attrs: restore file attributes
+        :param dry_run: do not write any data
+        :param stdout: write extracted data to stdout
+        :param sparse: write sparse files (chunk-granularity, independent of the original being sparse)
+        :param hardlink_masters: maps paths to (chunks, link_target) for extracting subtrees with hardlinks correctly
+        :param original_path: b'path' key as stored in archive
+        """
         if dry_run or stdout:
             if b'chunks' in item:
                 for data in self.pipeline.fetch_many([c[0] for c in item[b'chunks']], is_preloaded=True):
@@ -308,6 +320,7 @@ Number of files: {0.stats.nfiles}'''.format(
                     sys.stdout.buffer.flush()
             return
 
+        original_path = original_path or item[b'path']
         dest = self.cwd
         if item[b'path'].startswith('/') or item[b'path'].startswith('..'):
             raise Exception('Path should be relative and local')
@@ -327,25 +340,36 @@ Number of files: {0.stats.nfiles}'''.format(
         if stat.S_ISREG(mode):
             if not os.path.exists(os.path.dirname(path)):
                 os.makedirs(os.path.dirname(path))
+
             # Hard link?
             if b'source' in item:
                 source = os.path.join(dest, item[b'source'])
                 if os.path.exists(path):
                     os.unlink(path)
-                os.link(source, path)
-            else:
-                with open(path, 'wb') as fd:
-                    ids = [c[0] for c in item[b'chunks']]
-                    for data in self.pipeline.fetch_many(ids, is_preloaded=True):
-                        if sparse and self.zeros.startswith(data):
-                            # all-zero chunk: create a hole in a sparse file
-                            fd.seek(len(data), 1)
-                        else:
-                            fd.write(data)
-                    pos = fd.tell()
-                    fd.truncate(pos)
-                    fd.flush()
-                    self.restore_attrs(path, item, fd=fd.fileno())
+                if not hardlink_masters:
+                    os.link(source, path)
+                    return
+                item[b'chunks'], link_target = hardlink_masters[item[b'source']]
+                if link_target:
+                    # Hard link was extracted previously, just link
+                    os.link(link_target, path)
+                    return
+                # Extract chunks, since the item which had the chunks was not extracted
+            with open(path, 'wb') as fd:
+                ids = [c[0] for c in item[b'chunks']]
+                for data in self.pipeline.fetch_many(ids, is_preloaded=True):
+                    if sparse and self.zeros.startswith(data):
+                        # all-zero chunk: create a hole in a sparse file
+                        fd.seek(len(data), 1)
+                    else:
+                        fd.write(data)
+                pos = fd.tell()
+                fd.truncate(pos)
+                fd.flush()
+                self.restore_attrs(path, item, fd=fd.fileno())
+            if hardlink_masters:
+                # Update master entry with extracted file path, so that following hardlinks don't extract twice.
+                hardlink_masters[item.get(b'source') or original_path] = (None, path)
         elif stat.S_ISDIR(mode):
             if not os.path.exists(path):
                 os.makedirs(path)
@@ -527,7 +551,10 @@ Number of files: {0.stats.nfiles}'''.format(
             source = self.hard_links.get((st.st_ino, st.st_dev))
             if (st.st_ino, st.st_dev) in self.hard_links:
                 item = self.stat_attrs(st, path)
-                item.update({b'path': safe_path, b'source': source})
+                item.update({
+                    b'path': safe_path,
+                    b'source': source,
+                })
                 self.add_item(item)
                 status = 'h'  # regular file, hardlink (to already seen inodes)
                 return status
@@ -549,7 +576,10 @@ Number of files: {0.stats.nfiles}'''.format(
                 status = 'U'  # regular file, unchanged
         else:
             status = 'A'  # regular file, added
-        item = {b'path': safe_path}
+        item = {
+            b'path': safe_path,
+            b'hardlink_master': st.st_nlink > 1,  # item is a hard link and has the chunks
+        }
         # Only chunkify the file if needed
         if chunks is None:
             fh = Archive._open_rb(path)
@@ -587,7 +617,7 @@ Number of files: {0.stats.nfiles}'''.format(
 
 
 # this set must be kept complete, otherwise the RobustUnpacker might malfunction:
-ITEM_KEYS = set([b'path', b'source', b'rdev', b'chunks',
+ITEM_KEYS = set([b'path', b'source', b'rdev', b'chunks', b'hardlink_master',
                  b'mode', b'user', b'group', b'uid', b'gid', b'mtime', b'atime', b'ctime',
                  b'xattrs', b'bsdflags', b'acl_nfs4', b'acl_access', b'acl_default', b'acl_extended', ])
 

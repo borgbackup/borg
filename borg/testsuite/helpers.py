@@ -15,7 +15,7 @@ from ..helpers import Location, format_file_size, format_timedelta, make_path_sa
     yes, TRUISH, FALSISH, DEFAULTISH, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
     ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
-    PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern
+    PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, partial_format
 from . import BaseTestCase, environment_variable, FakeInputs
 
 
@@ -877,3 +877,11 @@ def test_progress_endless_step(capfd):
     pi.show()
     out, err = capfd.readouterr()
     assert err == '.'
+
+
+def test_partial_format():
+    assert partial_format('{space:10}', {'space': ' '}) == ' ' * 10
+    assert partial_format('{foobar}', {'bar': 'wrong', 'foobar': 'correct'}) == 'correct'
+    assert partial_format('{unknown_key}', {}) == '{unknown_key}'
+    assert partial_format('{key}{{escaped_key}}', {}) == '{key}{{escaped_key}}'
+    assert partial_format('{{escaped_key}}', {'escaped_key': 1234}) == '{{escaped_key}}'

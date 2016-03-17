@@ -16,12 +16,12 @@ import textwrap
 import traceback
 
 from . import __version__
-from .helpers import Error, location_validator, archivename_validator, format_line, format_time, format_file_size, \
-    parse_pattern, PathPrefixPattern, to_localtime, timestamp, safe_timestamp, \
+from .helpers import Error, location_validator, archivename_validator, format_time, format_file_size, \
+    parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
     get_cache_dir, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
-    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher
+    dir_is_tagged, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
+    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ItemFormatter
 from .logger import create_logger, setup_logging
 logger = create_logger()
 from .compress import Compressor, COMPR_BUFFER
@@ -585,79 +585,29 @@ class Archiver:
         repository = self.open_repository(args)
         manifest, key = Manifest.load(repository)
         if args.location.archive:
-            archive = Archive(repository, key, manifest, args.location.archive)
-            """use_user_format flag is used to speed up default listing.
-            When user issues format options, listing is a bit slower, but more keys are available and
-            precalculated.
-            """
-            use_user_format = args.listformat is not None
-            if use_user_format:
-                list_format = args.listformat
-            elif args.short:
-                list_format = "{path}{LF}"
-            else:
-                list_format = "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{LF}"
+            matcher, _ = self.build_matcher(args.excludes, args.paths)
 
-            for item in archive.iter_items():
-                mode = stat.filemode(item[b'mode'])
-                type = mode[0]
-                size = 0
-                if type == '-':
-                    try:
-                        size = sum(size for _, size, _ in item[b'chunks'])
-                    except KeyError:
-                        pass
+            with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
+                archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
 
-                mtime = safe_timestamp(item[b'mtime'])
-                if use_user_format:
-                    atime = safe_timestamp(item.get(b'atime') or item[b'mtime'])
-                    ctime = safe_timestamp(item.get(b'ctime') or item[b'mtime'])
-
-                if b'source' in item:
-                    source = item[b'source']
-                    if type == 'l':
-                        extra = ' -> %s' % item[b'source']
-                    else:
-                        mode = 'h' + mode[1:]
-                        extra = ' link to %s' % item[b'source']
+                if args.format:
+                    format = args.format
+                elif args.short:
+                    format = "{path}{NL}"
                 else:
-                    extra = ''
-                    source = ''
+                    format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
+                formatter = ItemFormatter(archive, format)
 
-                item_data = {
-                        'mode': mode,
-                        'user': item[b'user'] or item[b'uid'],
-                        'group': item[b'group'] or item[b'gid'],
-                        'size': size,
-                        'isomtime': format_time(mtime),
-                        'path': remove_surrogates(item[b'path']),
-                        'extra': extra,
-                        'LF': '\n',
-                        }
-                if use_user_format:
-                    item_data_advanced = {
-                        'bmode': item[b'mode'],
-                        'type': type,
-                        'source': source,
-                        'linktarget': source,
-                        'uid': item[b'uid'],
-                        'gid': item[b'gid'],
-                        'mtime': mtime,
-                        'isoctime': format_time(ctime),
-                        'ctime': ctime,
-                        'isoatime': format_time(atime),
-                        'atime': atime,
-                        'archivename': archive.name,
-                        'SPACE': ' ',
-                        'TAB': '\t',
-                        'CR': '\r',
-                        'NEWLINE': os.linesep,
-                        }
-                    item_data.update(item_data_advanced)
-                item_data['formatkeys'] = list(item_data.keys())
-
-                print(format_line(list_format, item_data), end='')
-
+                if not hasattr(sys.stdout, 'buffer'):
+                    # This is a shim for supporting unit tests replacing sys.stdout with e.g. StringIO,
+                    # which doesn't have an underlying buffer (= lower file object).
+                    def write(bytestring):
+                        sys.stdout.write(bytestring.decode('utf-8', errors='replace'))
+                else:
+                    write = sys.stdout.buffer.write
+                for item in archive.iter_items(lambda item: matcher.match(item[b'path'])):
+                    write(formatter.format_item(item).encode('utf-8', errors='surrogateescape'))
+            repository.close()
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 if args.prefix and not archive_info.name.startswith(args.prefix):
@@ -944,12 +894,13 @@ class Archiver:
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new', 'Warning: "--old" has been deprecated. Use "--new" instead.'),
+            ('--list-format', '--format', 'Warning: "--list-format" has been deprecated. Use "--format" instead.'),
         ]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
                 if arg.startswith(old_name):
                     args[i] = arg.replace(old_name, new_name)
-                    print(warning)
+                    self.print_warning(warning)
         return args
 
     def build_parser(self, args=None, prog=None):
@@ -1322,7 +1273,12 @@ class Archiver:
 
         list_epilog = textwrap.dedent("""
         This command lists the contents of a repository or an archive.
-        """)
+
+        See the "borg help patterns" command for more help on exclude patterns.
+
+        The following keys are available for --format:
+
+        """) + ItemFormatter.keys_help()
         subparser = subparsers.add_parser('list', parents=[common_parser],
                                           description=self.do_list.__doc__,
                                           epilog=list_epilog,
@@ -1332,15 +1288,22 @@ class Archiver:
         subparser.add_argument('--short', dest='short',
                                action='store_true', default=False,
                                help='only print file/directory names, nothing else')
-        subparser.add_argument('--list-format', dest='listformat', type=str,
-                               help="""specify format for archive file listing
-                                (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}")
-                                Special "{formatkeys}" exists to list available keys""")
+        subparser.add_argument('--format', '--list-format', dest='format', type=str,
+                               help="""specify format for file listing
+                                (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")""")
         subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')
+        subparser.add_argument('-e', '--exclude', dest='excludes',
+                               type=parse_pattern, action='append',
+                               metavar="PATTERN", help='exclude paths matching PATTERN')
+        subparser.add_argument('--exclude-from', dest='exclude_files',
+                               type=argparse.FileType('r'), action='append',
+                               metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='repository/archive to list contents of')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to extract; patterns are supported')
 
         mount_epilog = textwrap.dedent("""
         This command mounts an archive as a FUSE filesystem. This can be useful for

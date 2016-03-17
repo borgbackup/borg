@@ -4,9 +4,9 @@ borg debug-delete-obj
 ---------------------
 ::
 
-    usage: borg debug-delete-obj [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
-                                 [--no-files-cache] [--umask M]
-                                 [--remote-path PATH]
+    usage: borg debug-delete-obj [-h] [-v] [--debug] [--lock-wait N]
+                                 [--show-version] [--show-rc] [--no-files-cache]
+                                 [--umask M] [--remote-path PATH]
                                  [REPOSITORY] IDs [IDs ...]
     
     delete the objects with the given IDs from the repo
@@ -22,6 +22,7 @@ borg debug-delete-obj
                             INFO
       --debug               enable debug output, work on log level DEBUG
       --lock-wait N         wait for the lock, but max. N seconds (default: 1).
+      --show-version        show/log the borg version
       --show-rc             show/log the return code (rc)
       --no-files-cache      do not load/update the file metadata cache used to
                             detect unchanged files

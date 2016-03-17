@@ -286,6 +286,9 @@ class PatternMatcher:
         # Value to return from match function when none of the patterns match.
         self.fallback = fallback
 
+    def empty(self):
+        return not len(self._items)
+
     def add(self, patterns, value):
         """Add list of patterns to internal list. The given value is returned from the match function when one of the
         given patterns matches.

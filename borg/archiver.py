@@ -353,8 +353,20 @@ class Archiver:
         sparse = args.sparse
         strip_components = args.strip_components
         dirs = []
-        for item in archive.iter_items(lambda item: matcher.match(item[b'path']), preload=True):
+        partial_extract = not matcher.empty() or strip_components
+        hardlink_masters = {} if partial_extract else None
+
+        def item_is_hardlink_master(item):
+            return (partial_extract and stat.S_ISREG(item[b'mode']) and
+                    item.get(b'hardlink_master', True) and b'source' not in item)
+
+        for item in archive.iter_items(preload=True,
+                filter=lambda item: item_is_hardlink_master(item) or matcher.match(item[b'path'])):
             orig_path = item[b'path']
+            if item_is_hardlink_master(item):
+                hardlink_masters[orig_path] = (item.get(b'chunks'), item.get(b'source'))
+            if not matcher.match(item[b'path']):
+                continue
             if strip_components:
                 item[b'path'] = os.sep.join(orig_path.split(os.sep)[strip_components:])
                 if not item[b'path']:
@@ -372,7 +384,8 @@ class Archiver:
                         dirs.append(item)
                         archive.extract_item(item, restore_attrs=False)
                     else:
-                        archive.extract_item(item, stdout=stdout, sparse=sparse)
+                        archive.extract_item(item, stdout=stdout, sparse=sparse, hardlink_masters=hardlink_masters,
+                                             original_path=orig_path)
             except OSError as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 

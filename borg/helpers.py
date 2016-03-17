@@ -213,7 +213,17 @@ class Statistics:
 
 def get_keys_dir():
     """Determine where to repository keys and cache"""
-    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(os.path.expanduser('~'), '.config'))
+
+    # os.path.expanduser() behaves differently for '~' and '~someuser' as
+    # parameters: when called with an explicit username, the possibly set
+    # environment variable HOME is no longer respected. So we have to check if
+    # it is set and only expand the user's home directory if HOME is unset.
+    if os.environ.get('HOME', ''):
+        home_dir = os.environ.get('HOME')
+    else:
+        home_dir = os.path.expanduser('~%s' % os.environ.get('USER'))
+
+    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(home_dir, '.config'))
     keys_dir = os.environ.get('BORG_KEYS_DIR', os.path.join(xdg_config, 'borg', 'keys'))
     if not os.path.exists(keys_dir):
         os.makedirs(keys_dir)

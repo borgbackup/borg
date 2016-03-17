@@ -78,6 +78,11 @@ make borg readable and executable for its users and then you can run ``borg``::
     sudo chown root:root /usr/local/bin/borg
     sudo chmod 755 /usr/local/bin/borg
 
+Optionally you can create a symlink to have ``borgfs`` available, which is an
+alias for ``borg mount``::
+
+    ln -s /usr/local/bin/borg /usr/local/bin/borgfs
+
 Note that the binary uses /tmp to unpack |project_name| with all dependencies.
 It will fail if /tmp has not enough free space or is mounted with the ``noexec`` option.
 You can change the temporary directory by setting the ``TEMP`` environment variable before running |project_name|.

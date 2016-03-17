@@ -1347,6 +1347,13 @@ class Archiver:
         browsing an archive or restoring individual files. Unless the ``--foreground``
         option is given the command will run in the background until the filesystem
         is ``umounted``.
+
+        The command ``borgfs`` provides a wrapper for ``borg mount``. This can also be
+        used in fstab entries:
+        ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto 0 0``
+
+        To allow a regular user to use fstab entries, add the ``user`` option:
+        ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto,user 0 0``
         """)
         subparser = subparsers.add_parser('mount', parents=[common_parser],
                                           description=self.do_mount.__doc__,
@@ -1650,6 +1657,10 @@ def setup_signal_handlers():  # pragma: no cover
 
 
 def main():  # pragma: no cover
+    # provide 'borg mount' behaviour when the main script/executable is named borgfs
+    if os.path.basename(sys.argv[0]) == "borgfs":
+        sys.argv.insert(1, "mount")
+
     # Make sure stdout and stderr have errors='replace') to avoid unicode
     # issues when print()-ing unicode file names
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=True)

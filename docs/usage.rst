@@ -454,6 +454,8 @@ Examples
 
 Examples
 ~~~~~~~~
+borg mount/borgfs
++++++++++++++++++
 ::
 
     $ borg mount /mnt/backup::root-2016-02-15 /tmp/mymountpoint
@@ -461,6 +463,25 @@ Examples
     bin  boot  etc	home  lib  lib64  lost+found  media  mnt  opt  root  sbin  srv  tmp  usr  var
     $ fusermount -u /tmp/mymountpoint
 
+borgfs
+++++++
+::
+
+    $ echo '/mnt/backup /tmp/myrepo fuse.borgfs defaults,noauto 0 0' >> /etc/fstab
+    $ echo '/mnt/backup::root-2016-02-15 /tmp/myarchive fuse.borgfs defaults,noauto 0 0' >> /etc/fstab
+    $ mount /tmp/myrepo
+    $ mount /tmp/myarchive
+    $ ls /tmp/myrepo
+    root-2016-02-01 root-2016-02-2015
+    $ ls /tmp/myarchive
+    bin  boot  etc	home  lib  lib64  lost+found  media  mnt  opt  root  sbin  srv  tmp  usr  var
+
+.. Note::
+
+    ``borgfs`` will be automatically provided if you used a distribution
+    package, ``pip`` or ``setup.py`` to install |project_name|. Users of the
+    standalone binary will have to manually create a symlink (see
+    :ref:`pyinstaller-binary`).
 
 .. include:: usage/change-passphrase.rst.inc
 

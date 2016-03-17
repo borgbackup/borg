@@ -213,19 +213,24 @@ class Statistics:
             print(msg, file=stream or sys.stderr, end="\r", flush=True)
 
 
-def get_keys_dir():
-    """Determine where to repository keys and cache"""
-
+def get_home_dir():
+    """Get user's home directory while preferring a possibly set HOME
+    environment variable
+    """
     # os.path.expanduser() behaves differently for '~' and '~someuser' as
     # parameters: when called with an explicit username, the possibly set
     # environment variable HOME is no longer respected. So we have to check if
     # it is set and only expand the user's home directory if HOME is unset.
     if os.environ.get('HOME', ''):
-        home_dir = os.environ.get('HOME')
+        return os.environ.get('HOME')
     else:
-        home_dir = os.path.expanduser('~%s' % os.environ.get('USER'))
+        return os.path.expanduser('~%s' % os.environ.get('USER', ''))
 
-    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(home_dir, '.config'))
+
+def get_keys_dir():
+    """Determine where to repository keys and cache"""
+
+    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(get_home_dir(), '.config'))
     keys_dir = os.environ.get('BORG_KEYS_DIR', os.path.join(xdg_config, 'borg', 'keys'))
     if not os.path.exists(keys_dir):
         os.makedirs(keys_dir)
@@ -235,7 +240,7 @@ def get_keys_dir():
 
 def get_cache_dir():
     """Determine where to repository keys and cache"""
-    xdg_cache = os.environ.get('XDG_CACHE_HOME', os.path.join(os.path.expanduser('~'), '.cache'))
+    xdg_cache = os.environ.get('XDG_CACHE_HOME', os.path.join(get_home_dir(), '.cache'))
     cache_dir = os.environ.get('BORG_CACHE_DIR', os.path.join(xdg_cache, 'borg'))
     if not os.path.exists(cache_dir):
         os.makedirs(cache_dir)

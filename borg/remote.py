@@ -10,7 +10,7 @@ import tempfile
 
 from . import __version__
 
-from .helpers import Error, IntegrityError, sysinfo
+from .helpers import Error, IntegrityError, get_home_dir, sysinfo
 from .repository import Repository
 
 import msgpack
@@ -108,8 +108,8 @@ class RepositoryServer:  # pragma: no cover
     def open(self, path, create=False, lock_wait=None, lock=True):
         path = os.fsdecode(path)
         if path.startswith('/~'):
-            path = path[1:]
-        path = os.path.realpath(os.path.expanduser(path))
+            path = os.path.join(get_home_dir(), path[2:])
+        path = os.path.realpath(path)
         if self.restrict_to_paths:
             for restrict_to_path in self.restrict_to_paths:
                 if path.startswith(os.path.realpath(restrict_to_path)):

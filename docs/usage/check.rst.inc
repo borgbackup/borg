@@ -4,10 +4,10 @@ borg check
 ----------
 ::
 
-    usage: borg check [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
-                      [--no-files-cache] [--umask M] [--remote-path PATH]
-                      [--repository-only] [--archives-only] [--repair]
-                      [--save-space] [--last N] [-P PREFIX]
+    usage: borg check [-h] [-v] [--debug] [--lock-wait N] [--show-version]
+                      [--show-rc] [--no-files-cache] [--umask M]
+                      [--remote-path PATH] [--repository-only] [--archives-only]
+                      [--repair] [--save-space] [--last N] [-P PREFIX]
                       [REPOSITORY_OR_ARCHIVE]
     
     Check repository consistency
@@ -23,6 +23,7 @@ borg check
                             INFO
       --debug               enable debug output, work on log level DEBUG
       --lock-wait N         wait for the lock, but max. N seconds (default: 1).
+      --show-version        show/log the borg version
       --show-rc             show/log the return code (rc)
       --no-files-cache      do not load/update the file metadata cache used to
                             detect unchanged files

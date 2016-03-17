@@ -6,7 +6,7 @@ import os
 import shutil
 import time
 
-from .helpers import get_keys_dir, get_cache_dir, ProgressIndicatorPercent
+from .helpers import get_home_dir, get_keys_dir, get_cache_dir, ProgressIndicatorPercent
 from .locking import UpgradableLock
 from .repository import Repository, MAGIC
 from .key import KeyfileKey, KeyfileNotFoundError
@@ -187,7 +187,7 @@ class AtticRepositoryUpgrader(Repository):
         """
         # copy of attic's get_cache_dir()
         attic_cache_dir = os.environ.get('ATTIC_CACHE_DIR',
-                                         os.path.join(os.path.expanduser('~'),
+                                         os.path.join(get_home_dir(),
                                                       '.cache', 'attic'))
         attic_cache_dir = os.path.join(attic_cache_dir, hexlify(self.id).decode('ascii'))
         borg_cache_dir = os.path.join(get_cache_dir(), hexlify(self.id).decode('ascii'))
@@ -248,7 +248,7 @@ class AtticKeyfileKey(KeyfileKey):
     def get_keys_dir():
         """Determine where to repository keys and cache"""
         return os.environ.get('ATTIC_KEYS_DIR',
-                              os.path.join(os.path.expanduser('~'), '.attic', 'keys'))
+                              os.path.join(get_home_dir(), '.attic', 'keys'))
 
     @classmethod
     def find_key_file(cls, repository):
@@ -308,7 +308,7 @@ class Borg0xxKeyfileKey(KeyfileKey):
     @staticmethod
     def get_keys_dir():
         return os.environ.get('BORG_KEYS_DIR',
-                              os.path.join(os.path.expanduser('~'), '.borg', 'keys'))
+                              os.path.join(get_home_dir(), '.borg', 'keys'))
 
     @classmethod
     def find_key_file(cls, repository):

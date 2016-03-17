@@ -4,11 +4,11 @@ borg prune
 ----------
 ::
 
-    usage: borg prune [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
-                      [--no-files-cache] [--umask M] [--remote-path PATH] [-n]
-                      [-s] [--list] [--keep-within WITHIN] [-H HOURLY] [-d DAILY]
-                      [-w WEEKLY] [-m MONTHLY] [-y YEARLY] [-P PREFIX]
-                      [--save-space]
+    usage: borg prune [-h] [-v] [--debug] [--lock-wait N] [--show-version]
+                      [--show-rc] [--no-files-cache] [--umask M]
+                      [--remote-path PATH] [-n] [-s] [--list]
+                      [--keep-within WITHIN] [-H HOURLY] [-d DAILY] [-w WEEKLY]
+                      [-m MONTHLY] [-y YEARLY] [-P PREFIX] [--save-space]
                       [REPOSITORY]
     
     Prune repository archives according to specified rules
@@ -23,6 +23,7 @@ borg prune
                             INFO
       --debug               enable debug output, work on log level DEBUG
       --lock-wait N         wait for the lock, but max. N seconds (default: 1).
+      --show-version        show/log the borg version
       --show-rc             show/log the return code (rc)
       --no-files-cache      do not load/update the file metadata cache used to
                             detect unchanged files

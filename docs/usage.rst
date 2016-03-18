@@ -374,6 +374,52 @@ Examples
     ...
 
 
+
+.. include:: usage/diff.rst.inc
+
+Examples
+~~~~~~~~
+::
+
+    $ borg init testrepo
+    $ mkdir testdir
+    $ cd testdir
+    $ echo asdf > file1
+    $ dd if=/dev/urandom bs=1M count=4 > file2
+    $ touch file3
+    $ borg create ../testrepo::archive1 .
+
+    $ chmod a+x file1
+    $ echo "something" >> file2
+    $ borg create ../testrepo::archive2 .
+
+    $ rm file3
+    $ touch file4
+    $ borg create ../testrepo::archive3 .
+
+    $ cd ..
+    $ borg diff testrepo::archive1 archive2
+    file1 different mode
+             archive1 -rw-r--r--
+             archive2 -rwxr-xr-x
+    file2 different contents
+             +28 B, -31 B, 4.19 MB, 4.19 MB
+
+    $ borg diff testrepo::archive2 archive3
+    file3 different contents
+             +0 B, -0 B, 0 B, <deleted>
+
+    $ borg diff testrepo::archive1 archive3
+    file1 different mode
+             archive1 -rw-r--r--
+             archive3 -rwxr-xr-x
+    file2 different contents
+             +28 B, -31 B, 4.19 MB, 4.19 MB
+    file3 different contents
+             +0 B, -0 B, 0 B, <deleted>
+    file4 different contents
+             +0 B, -0 B, <deleted>, 0 B
+
 .. include:: usage/delete.rst.inc
 
 Examples

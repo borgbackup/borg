@@ -121,14 +121,14 @@ class Archiver:
                 a = next(chunks1, end)
                 if a is end:
                     return not blen - bi and next(chunks2, end) is end
-                a = memoryview(a)
+                a = memoryview(a.data)
                 alen = len(a)
                 ai = 0
             if not blen - bi:
                 b = next(chunks2, end)
                 if b is end:
                     return not alen - ai and next(chunks1, end) is end
-                b = memoryview(b)
+                b = memoryview(b.data)
                 blen = len(b)
                 bi = 0
             slicelen = min(alen - ai, blen - bi)
@@ -868,7 +868,7 @@ class Archiver:
         """dump (decrypted, decompressed) archive items metadata (not: data)"""
         archive = Archive(repository, key, manifest, args.location.archive)
         for i, item_id in enumerate(archive.metadata[b'items']):
-            data = key.decrypt(item_id, repository.get(item_id))
+            _, data = key.decrypt(item_id, repository.get(item_id))
             filename = '%06d_%s.items' % (i, hexlify(item_id).decode('ascii'))
             print('Dumping', filename)
             with open(filename, 'wb') as fd:

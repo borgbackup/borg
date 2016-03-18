@@ -13,7 +13,7 @@ import time
 from ..helpers import Location, format_file_size, format_timedelta, make_path_safe, \
     prune_within, prune_split, get_cache_dir, get_keys_dir, Statistics, is_slow_msgpack, \
     yes, TRUISH, FALSISH, DEFAULTISH, \
-    StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
+    StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, Chunk, \
     ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
     PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, partial_format, ChunkIteratorFileWrapper
 from . import BaseTestCase, environment_variable, FakeInputs
@@ -902,7 +902,7 @@ def test_partial_format():
 
 
 def test_chunk_file_wrapper():
-    cfw = ChunkIteratorFileWrapper(iter([b'abc', b'def']))
+    cfw = ChunkIteratorFileWrapper(iter([Chunk(b'abc'), Chunk(b'def')]))
     assert cfw.read(2) == b'ab'
     assert cfw.read(50) == b'cdef'
     assert cfw.exhausted

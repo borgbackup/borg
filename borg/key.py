@@ -7,7 +7,7 @@ import textwrap
 from hmac import compare_digest
 from hashlib import sha256, pbkdf2_hmac
 
-from .helpers import IntegrityError, get_keys_dir, Error, yes
+from .helpers import Chunk, IntegrityError, get_keys_dir, Error, yes
 from .logger import create_logger
 logger = create_logger()
 
@@ -77,7 +77,7 @@ class KeyBase:
         """Return HMAC hash using the "id" HMAC key
         """
 
-    def encrypt(self, data):
+    def encrypt(self, chunk):
         pass
 
     def decrypt(self, id, data):
@@ -101,7 +101,8 @@ class PlaintextKey(KeyBase):
     def id_hash(self, data):
         return sha256(data).digest()
 
-    def encrypt(self, data):
+    def encrypt(self, chunk):
+        meta, data = chunk
         return b''.join([self.TYPE_STR, self.compressor.compress(data)])
 
     def decrypt(self, id, data):
@@ -110,7 +111,7 @@ class PlaintextKey(KeyBase):
         data = self.compressor.decompress(memoryview(data)[1:])
         if id and sha256(data).digest() != id:
             raise IntegrityError('Chunk id verification failed')
-        return data
+        return Chunk(data)
 
 
 class AESKeyBase(KeyBase):
@@ -133,8 +134,8 @@ class AESKeyBase(KeyBase):
         """
         return hmac_sha256(self.id_key, data)
 
-    def encrypt(self, data):
-        data = self.compressor.compress(data)
+    def encrypt(self, chunk):
+        data = self.compressor.compress(chunk.data)
         self.enc_cipher.reset()
         data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(data)))
         hmac = hmac_sha256(self.enc_hmac_key, data)
@@ -156,7 +157,7 @@ class AESKeyBase(KeyBase):
             hmac_computed = hmac_sha256(self.id_key, data)
             if not compare_digest(hmac_computed, hmac_given):
                 raise IntegrityError('Chunk id verification failed')
-        return data
+        return Chunk(data)
 
     def extract_nonce(self, payload):
         if not (payload[0] == self.TYPE or

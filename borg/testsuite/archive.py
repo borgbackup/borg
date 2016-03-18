@@ -14,9 +14,9 @@ class MockCache:
     def __init__(self):
         self.objects = {}
 
-    def add_chunk(self, id, data, stats=None):
-        self.objects[id] = data
-        return id, len(data), len(data)
+    def add_chunk(self, id, chunk, stats=None):
+        self.objects[id] = chunk.data
+        return id, len(chunk.data), len(chunk.data)
 
 
 class ArchiveTimestampTestCase(BaseTestCase):

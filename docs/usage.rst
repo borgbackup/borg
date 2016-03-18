@@ -381,40 +381,44 @@ Examples
 ~~~~~~~~
 ::
 
-    $ mkdir testdir
-    $ echo asdf > testdir/file1
-    $ dd if=/dev/urandom bs=1M count=4 > testdir/file2
-    $ touch testdir/file3
-
     $ borg init testrepo
-    $ borg create testrepo::archive1 testdir
+    $ mkdir testdir
+    $ cd testdir
+    $ echo asdf > file1
+    $ dd if=/dev/urandom bs=1M count=4 > file2
+    $ touch file3
+    $ borg create ../testrepo::archive1 .
 
-    $ chmod a+x testdir/file1
-    $ echo "something" >> testdir/file2
-    $ borg create testrepo::archive2 testdir
+    $ chmod a+x file1
+    $ echo "something" >> file2
+    $ borg create ../testrepo::archive2 .
 
-    $ rm testdir/file3
-    $ borg create testrepo::archive3 testdir
+    $ rm file3
+    $ touch file4
+    $ borg create ../testrepo::archive3 .
 
+    $ cd ..
     $ borg diff testrepo::archive1 archive2
-    testdir/file1 different mode
+    file1 different mode
              archive1 -rw-r--r--
              archive2 -rwxr-xr-x
-    testdir/file2 different contents
+    file2 different contents
              +28 B, -31 B, 4.19 MB, 4.19 MB
 
     $ borg diff testrepo::archive2 archive3
-    testdir/file3 different contents
+    file3 different contents
              +0 B, -0 B, 0 B, <deleted>
 
     $ borg diff testrepo::archive1 archive3
-    testdir/file1 different mode
+    file1 different mode
              archive1 -rw-r--r--
              archive3 -rwxr-xr-x
-    testdir/file2 different contents
+    file2 different contents
              +28 B, -31 B, 4.19 MB, 4.19 MB
-    testdir/file3 different contents
+    file3 different contents
              +0 B, -0 B, 0 B, <deleted>
+    file4 different contents
+             +0 B, -0 B, <deleted>, 0 B
 
 .. include:: usage/delete.rst.inc
 

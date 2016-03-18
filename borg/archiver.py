@@ -725,6 +725,20 @@ class Archiver:
             old_size = new_size = 0
             chunks_seen = chunks_recompressed = chunks_skipped = 0
 
+            def __str__(self):
+                if self.old_size:
+                    ratio = self.new_size / self.old_size * 100
+                else:
+                    ratio = 0
+                return textwrap.dedent("""
+                Chunks seen, recompressed, skipped: {0.chunks_seen}, {0.chunks_recompressed}, {0.chunks_skipped}
+                Old size: {old_size}
+                New size: {new_size}
+                Ratio: {ratio:.0f} %""").format(self,
+                                              old_size=format_file_size(self.old_size),
+                                              new_size=format_file_size(self.new_size),
+                                              ratio=ratio).strip()
+
             def seen(self, chunk):
                 self.chunks_seen += 1
                 self.old_size += len(chunk)
@@ -737,24 +751,6 @@ class Archiver:
                 self.chunks_recompressed += 1
                 self.new_size += len(chunk)
 
-            def print(self):
-                print("Chunks seen, recompressed, skipped: %d, %d, %d" %
-                      (self.chunks_seen, self.chunks_recompressed, self.chunks_skipped))
-                print("Old size:", format_file_size(self.old_size))
-                print("New size:", format_file_size(self.new_size))
-                if self.old_size:
-                    ratio = self.new_size / self.old_size
-                else:
-                    ratio = 0
-                print("Ratio: %d %%" % (ratio * 100))
-
-        def detect_compressor(compression_header):
-            for compressor in COMPRESSOR_LIST:
-                if compressor.detect(compression_header):
-                    return compressor
-            else:
-                raise ValueError('No decompressor for this data found: %r.', compression_header)
-
         def recompress_chunk(decompressor, compressed_chunk):
             decompressed_data = decompressor(buffer=decompress_buffer).decompress(compressed_chunk)
             key.assert_chunk_id(id_, decompressed_data)
@@ -763,10 +759,9 @@ class Archiver:
         def do_exit_soon(sig_num, stack_frame):
             nonlocal exit_soon
             if exit_soon:
-                sys.stderr.write("Received signal, again. I'm not deaf.\n")
+                print("Received signal, again. I'm not deaf.", file=sys.stderr)
             else:
-                sys.stderr.write("Received signal, will exit cleanly.\n")
-            sys.stderr.flush()
+                print("Received signal, will exit cleanly.\n", file=sys.stderr)
             exit_soon = True
 
         signal.signal(signal.SIGTERM, do_exit_soon)
@@ -802,8 +797,6 @@ class Archiver:
         for i, (segment_id, segment_filename) in enumerate(segments):
             chunks = {}
             if segment_id <= segment_pointer:
-                # commited segment files are never appended to, yes?
-                # if this is the case '<=' is correct.
                 if args.progress:
                     progress_indicator.show(i)
                 continue
@@ -811,8 +804,8 @@ class Archiver:
                 if tag != TAG_PUT or id_ == Manifest.MANIFEST_ID or id_ not in repository:
                     continue
                 stats.seen(data)
-                decrypted_data = key.decrypt(id_, data, no_decompress=True)
-                compressor = detect_compressor(decrypted_data[:2])
+                decrypted_data = key.decrypt(id_, data, decompress=False)
+                compressor = Compressor.detect(decrypted_data)
                 if not args.force_recompress and isinstance(key.compressor.compressor, compressor):
                     stats.skipped(data)
                     continue
@@ -837,13 +830,14 @@ class Archiver:
                 repository.config.set('repository', 'recompress_segment_pointer', str(segment_id))
                 repository.save_config(repository.path, repository.config)
         if args.stats:
-            print("Repositoy:", repository.path)
-            print("Old segment count:", len(segments))
-            print("New segment count:", sum(1 for _ in repository.io.segment_iterator()))
+            log_multi(
+                "Repositoy: " + repository.path,
+                "Old segment count: %d" % len(segments),
+                "New segment count: %d" % sum(1 for _ in repository.io.segment_iterator())
+            )
             if exit_soon or segment_pointer:
-                print("Note: size and chunk information is incomplete")
-            stats.print()
-
+                logger.info("Note: size and chunk information is incomplete")
+            logger.info(stats)
         repository.close()
         return self.exit_code
 

@@ -737,6 +737,17 @@ class Archiver:
                 self.chunks_recompressed += 1
                 self.new_size += len(chunk)
 
+            def print(self):
+                print("Chunks seen, recompressed, skipped: %d, %d, %d" %
+                      (self.chunks_seen, self.chunks_recompressed, self.chunks_skipped))
+                print("Old size:", format_file_size(self.old_size))
+                print("New size:", format_file_size(self.new_size))
+                if self.old_size:
+                    ratio = self.new_size / self.old_size
+                else:
+                    ratio = 0
+                print("Ratio: %d %%" % (ratio * 100))
+
         def detect_compressor(compression_header):
             for compressor in COMPRESSOR_LIST:
                 if compressor.detect(compression_header):
@@ -752,7 +763,7 @@ class Archiver:
         def do_exit_soon(sig_num, stack_frame):
             nonlocal exit_soon
             if exit_soon:
-                sys.stderr.write("Received signal, again. I'm not deaf.\n" )
+                sys.stderr.write("Received signal, again. I'm not deaf.\n")
             else:
                 sys.stderr.write("Received signal, will exit cleanly.\n")
             sys.stderr.flush()
@@ -767,6 +778,12 @@ class Archiver:
         dry_run = args.dry_run
         repository = self.open_repository(args, exclusive=True)
         manifest, key = Manifest.load(repository)
+        segment_pointer = 0
+        if args.segment_pointer:
+            if args.force_recompress:
+                repository.config.remove_option('repository', 'recompress_segment_pointer')
+            else:
+                segment_pointer = repository.config.getint('repository', 'recompress_segment_pointer', fallback=0)
         compr_args = dict(buffer=COMPR_BUFFER)
         compr_args.update(args.compression)
         key.compressor = Compressor(**compr_args)
@@ -774,18 +791,24 @@ class Archiver:
 
         last_segment_id = repository.io.get_latest_segment()
         segments = list(repository.io.segment_iterator())
-        progress_indicator = ProgressIndicatorPercent(len(segments), start=0, step=0.1, same_line=True,
-                                                      msg="%3.1f %% processed")
+        progress_indicator = ProgressIndicatorPercent(len(segments), start=0, step=0.01, same_line=True,
+                                                      msg="%3.2f %% processed")
 
         if not repository.io.is_committed_segment(segments[-1][1]):
             self.print_error('Last segment in repository is uncomitted. Repository corrupted. Try '
                              '"borg check --repair".')
             repository.close()
             return self.exit_code
-        for i, (segment_id, segment_filename) in enumerate(reversed(segments)):
+        for i, (segment_id, segment_filename) in enumerate(segments):
             chunks = {}
+            if segment_id <= segment_pointer:
+                # commited segment files are never appended to, yes?
+                # if this is the case '<=' is correct.
+                if args.progress:
+                    progress_indicator.show(i)
+                continue
             for tag, id_, offset, data in repository.io.iter_objects(segment_id, True):
-                if tag != TAG_PUT or id_ == Manifest.MANIFEST_ID:
+                if tag != TAG_PUT or id_ == Manifest.MANIFEST_ID or id_ not in repository:
                     continue
                 stats.seen(data)
                 decrypted_data = key.decrypt(id_, data, no_decompress=True)
@@ -799,8 +822,8 @@ class Archiver:
                     repository.put(id_, data)
                     stats.recompressed(data)
                 if repository.io.get_latest_segment() > last_segment_id + 10:
-                    last_segment_id = repository.io.get_latest_segment()
                     repository.commit()
+                    last_segment_id = repository.io.get_latest_segment()
                 if exit_soon:
                     break
             if args.progress:
@@ -810,17 +833,16 @@ class Archiver:
         if not dry_run:
             manifest.write()
             repository.commit()
+            if args.segment_pointer:
+                repository.config.set('repository', 'recompress_segment_pointer', str(segment_id))
+                repository.save_config(repository.path, repository.config)
         if args.stats:
             print("Repositoy:", repository.path)
-            print("Chunks seen, recompressed, skipped: %d, %d, %d" %
-                  (stats.chunks_seen, stats.chunks_recompressed, stats.chunks_skipped))
             print("Old segment count:", len(segments))
             print("New segment count:", sum(1 for _ in repository.io.segment_iterator()))
-            if exit_soon:
-                print("Note: below size information is incomplete due to exit by signal")
-            print("Old size:", format_file_size(stats.old_size))
-            print("New size:", format_file_size(stats.new_size))
-            print("Ratio: %d %%" % (stats.new_size / stats.old_size * 100))
+            if exit_soon or segment_pointer:
+                print("Note: size and chunk information is incomplete")
+            stats.print()
 
         repository.close()
         return self.exit_code
@@ -1601,6 +1623,15 @@ class Archiver:
 
         recompress_epilog = textwrap.dedent("""
         Recompress data in a repository.
+
+        This is SIGINT / SIGTERM safe and will exit cleanly for
+        both signals after a short time.
+
+        The --segment-pointer option stores the last recompressed
+        segment in the repository. If enabled recompress will resume
+        very quickly even for large archives.
+
+        Using both --segment-pointer and --force will reset it.
         """)
         subparser = subparsers.add_parser('recompress', parents=[common_parser],
                                           description=self.do_recompress.__doc__,
@@ -1630,6 +1661,9 @@ class Archiver:
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                action='store_true', default=False,
                                help='do not write any data')
+        subparser.add_argument('--segment-pointer', dest='segment_pointer',
+                               action='store_true', default=False,
+                               help='use segment pointer in repository to continue interrupted recompress')
         subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(),
                                help='repository to recompress')

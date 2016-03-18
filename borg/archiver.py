@@ -1,5 +1,4 @@
 from binascii import hexlify, unhexlify
-from collections import namedtuple
 from datetime import datetime
 from itertools import zip_longest
 from operator import attrgetter
@@ -25,9 +24,9 @@ from .helpers import Error, location_validator, archivename_validator, format_ti
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ItemFormatter, ProgressIndicatorPercent
 from .logger import create_logger, setup_logging
 logger = create_logger()
-from .compress import Compressor, COMPR_BUFFER
+from .compress import Compressor, COMPR_BUFFER, COMPRESSOR_LIST
 from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
-from .repository import Repository
+from .repository import Repository, TAG_COMMIT, TAG_DELETE, TAG_PUT
 from .cache import Cache
 from .key import key_creator, RepoKey, PassphraseKey
 from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
@@ -747,6 +746,7 @@ class Archiver:
 
         stats = Stats()
         exit_soon = False
+
         dry_run = args.dry_run
         repository = self.open_repository(args, exclusive=True)
         manifest, key = Manifest.load(repository)
@@ -755,24 +755,20 @@ class Archiver:
         key.compressor = Compressor(**compr_args)
         decompress_buffer = bytes(COMPR_BUFFER)
 
-        from borg.repository import TAG_PUT
-        from borg.compress import COMPRESSOR_LIST
-
-        segment_count = sum(1 for _ in repository.io.segment_iterator())
         last_segment_id = repository.io.get_latest_segment()
         segments = list(repository.io.segment_iterator())
-        progress_indicator = ProgressIndicatorPercent(len(segments), start=0, same_line=True, step=0.1,
+        progress_indicator = ProgressIndicatorPercent(len(segments), start=0, step=0.1, same_line=True,
                                                       msg="%3.1f %% processed")
+
+        if not repository.io.is_committed_segment(segments[-1][1]):
+            self.print_error('Last segment in repository is uncomitted. Repository corrupted. Try '
+                             '"borg check --repair".')
+            repository.close()
+            return self.exit_code
         for i, (segment_id, segment_filename) in enumerate(reversed(segments)):
-            # Work in reverse, so new chunks are processed first. In my mind these are likely the ones
-            # you want to recompress if you are using recompress like I do.
             chunks = {}
             for tag, id_, offset, data in repository.io.iter_objects(segment_id, True):
-                #if exit_soon: # hm, nah, we want to get rid of whole "old" segments
-                #    break
-                if tag != TAG_PUT:
-                    continue
-                if set(id_) == {0}:
+                if tag != TAG_PUT or set(id_) == {0}:
                     continue
                 stats.chunks_seen += 1
                 stats.old_size += len(data)
@@ -813,10 +809,10 @@ class Archiver:
             print("Repositoy:", repository.path)
             print("Chunks seen, recompressed, skipped: %d, %d, %d" %
                   (stats.chunks_seen, stats.chunks_recompressed, stats.chunks_skipped))
-            print("Old segment count:", segment_count)
+            print("Old segment count:", len(segments))
             print("New segment count:", sum(1 for _ in repository.io.segment_iterator()))
             if exit_soon:
-                print("Note: below size information is incomplete due to signal termination")
+                print("Note: below size information is incomplete due to exit by signal")
             print("Old size:", format_file_size(stats.old_size))
             print("New size:", format_file_size(stats.new_size))
             print("Ratio: %d %%" % (stats.new_size / stats.old_size * 100))

@@ -733,7 +733,20 @@ class Archiver:
             else:
                 raise ValueError('No decompressor for this data found: %r.', compression_header)
 
+        def do_exit_soon(sig_num, stack_frame):
+            nonlocal exit_soon
+            if exit_soon:
+                sys.stderr.write("Received signal, again. I'm not deaf.\n" )
+            else:
+                sys.stderr.write("Received signal, will exit cleanly.\n")
+            sys.stderr.flush()
+            exit_soon = True
+
+        signal.signal(signal.SIGTERM, do_exit_soon)
+        signal.signal(signal.SIGINT, do_exit_soon)
+
         stats = Stats()
+        exit_soon = False
         dry_run = args.dry_run
         repository = self.open_repository(args, exclusive=True)
         manifest, key = Manifest.load(repository)
@@ -748,7 +761,7 @@ class Archiver:
         segment_count = sum(1 for _ in repository.io.segment_iterator())
         last_segment_id = repository.io.get_latest_segment()
         print(segment_count, "segments in repository")
-        print("At most", format_file_size(segment_count * repository.max_segment_size), "on disk")
+        print("Approximately", format_file_size(segment_count * repository.max_segment_size), "on disk")
 
         for segment_id, segment_filename in repository.io.segment_iterator():
             if segment_id > last_segment_id:
@@ -756,6 +769,8 @@ class Archiver:
                 break
             chunks = {}
             for tag, id_, offset, data in repository.io.iter_objects(segment_id, True):
+                if exit_soon:
+                    break
                 if tag != TAG_PUT:
                     continue
                 if set(id_) == {0}:
@@ -779,11 +794,13 @@ class Archiver:
                     for id_, data in chunks.items():
                         repository.put(id_, data)
                         stats.chunks_recompressed += 1
-                    if repository.io.get_latest_segment() > last_segment_id + 10:
+                    if exit_soon or repository.io.get_latest_segment() > last_segment_id + 10:
                         last_segment_id = repository.io.get_latest_segment()
                         repository.commit()
                         sys.stdout.write('.')
                         sys.stdout.flush()
+                    if exit_soon:
+                        break
                 except Exception as e:  # too broad!
                     self.print_error("Exception while recompressing, rolling transaction back...")
                     repository.rollback()

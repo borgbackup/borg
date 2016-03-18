@@ -51,39 +51,44 @@ See the "borg help patterns" command for more help on exclude patterns.
 
 The following keys are available for --format when listing files:
 
- - archiveid
- - archivename
- - atime
- - bpath: verbatim POSIX path, can contain any character except NUL
- - csize: compressed size
- - ctime
- - extra
- - gid
- - group
- - isoatime
- - isoctime
- - isomtime
- - linktarget
- - md5
+ - type
  - mode
- - mtime
- - num_chunks: number of chunks in this file
+ - uid
+ - gid
+ - user
+ - group
  - path: path interpreted as text (might be missing non-text characters, see bpath)
+ - bpath: verbatim POSIX path, can contain any character except NUL
+ - source: link target for links (identical to linktarget)
+ - linktarget
+
+ - size
+ - csize: compressed size
+ - num_chunks: number of chunks in this file
+ - unique_chunks: number of unique chunks in this file
+
+ - mtime
+ - ctime
+ - atime
+ - isomtime
+ - isoctime
+ - isoatime
+
+ - md5
  - sha1
  - sha224
  - sha256
  - sha384
  - sha512
- - size
- - source: link target for links (identical to linktarget)
- - type
- - uid
- - unique_chunks: number of unique chunks in this file
- - user
- - CR
- - LF
+
+ - archiveid
+ - archivename
+ - extra: prepends {source} with " -> " for soft links and " link to " for hard links
+
  - NEWLINE: OS dependent line separator
  - NL: alias of NEWLINE
  - NUL: NUL character for creating print0 / xargs -0 like ouput, see bpath
  - SPACE
  - TAB
+ - CR
+ - LF

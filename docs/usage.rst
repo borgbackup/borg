@@ -549,6 +549,15 @@ Examples
     no key file found for repository
 
 
+
+.. include:: usage/recompress.rst.inc
+
+Examples
+~~~~~~~~
+::
+
+    TODO/later
+
 Miscellaneous Help
 ------------------
 

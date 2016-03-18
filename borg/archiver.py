@@ -1,4 +1,5 @@
 from binascii import hexlify, unhexlify
+from collections import namedtuple
 from datetime import datetime
 from itertools import zip_longest
 from operator import attrgetter
@@ -717,6 +718,91 @@ class Archiver:
             repo.upgrade(args.dry_run, inplace=args.inplace, progress=args.progress)
         except NotImplementedError as e:
             print("warning: %s" % e)
+        return self.exit_code
+
+    def do_recompress(self, args):
+        """Recompress data"""
+        class Stats:
+            old_size = new_size = 0
+            chunks_seen = chunks_recompressed = chunks_skipped = 0
+
+        def detect_compressor(compression_header):
+            for compressor in COMPRESSOR_LIST:
+                if compressor.detect(compression_header):
+                    return compressor
+            else:
+                raise ValueError('No decompressor for this data found: %r.', compression_header)
+
+        stats = Stats()
+        dry_run = args.dry_run
+        repository = self.open_repository(args, exclusive=True)
+        manifest, key = Manifest.load(repository)
+        compr_args = dict(buffer=COMPR_BUFFER)
+        compr_args.update(args.compression)
+        key.compressor = Compressor(**compr_args)
+        decompress_buffer = bytes(COMPR_BUFFER)
+
+        from borg.repository import TAG_PUT
+        from borg.compress import COMPRESSOR_LIST
+
+        segment_count = sum(1 for _ in repository.io.segment_iterator())
+        last_segment_id = repository.io.get_latest_segment()
+        print(segment_count, "segments in repository")
+        print("At most", format_file_size(segment_count * repository.max_segment_size), "on disk")
+
+        for segment_id, segment_filename in repository.io.segment_iterator():
+            if segment_id > last_segment_id:
+                print("Reached beginning of recompressed segments")
+                break
+            chunks = {}
+            for tag, id_, offset, data in repository.io.iter_objects(segment_id, True):
+                if tag != TAG_PUT:
+                    continue
+                if set(id_) == {0}:
+                    print("Seen manifest")
+                    continue
+                stats.chunks_seen += 1
+                stats.old_size += len(data)
+                decrypted_data = key.decrypt(id_, data, no_decompress=True)
+                compressor = detect_compressor(decrypted_data[:2])
+                if not args.force_recompress and isinstance(key.compressor.compressor, compressor):
+                    stats.chunks_skipped += 1
+                    stats.new_size += len(data)
+                    continue
+                decompressed_data = compressor(buffer=decompress_buffer).decompress(decrypted_data)
+                key.assert_chunk_id(id_, decompressed_data)
+                data = key.encrypt(decompressed_data)
+                stats.new_size += len(data)
+                chunks[id_] = data
+            if not dry_run:
+                try:
+                    for id_, data in chunks.items():
+                        repository.put(id_, data)
+                        stats.chunks_recompressed += 1
+                    if repository.io.get_latest_segment() > last_segment_id + 10:
+                        last_segment_id = repository.io.get_latest_segment()
+                        repository.commit()
+                        sys.stdout.write('.')
+                        sys.stdout.flush()
+                except Exception as e:  # too broad!
+                    self.print_error("Exception while recompressing, rolling transaction back...")
+                    repository.rollback()
+                    repository.close()
+                    raise
+        if not dry_run:
+            manifest.write()
+            repository.commit()
+        if args.stats:
+            print("\n")
+            print("Repositoy:", repository.path)
+            print("Old segment count:", segment_count)
+            print("New segment count:", sum(1 for _ in repository.io.segment_iterator()))
+            print("Old size:", format_file_size(stats.old_size))
+            print("New size:", format_file_size(stats.new_size))
+            print("Ratio: %d %%" % (stats.new_size / stats.old_size * 100))
+            print("Chunks seen, recompressed, skipped: %d, %d, %d" %
+                  (stats.chunks_seen, stats.chunks_recompressed, stats.chunks_skipped))
+        repository.close()
         return self.exit_code
 
     def do_debug_dump_archive_items(self, args):
@@ -1492,6 +1578,41 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')
+
+        recompress_epilog = textwrap.dedent("""
+        Recompress data in a repository.
+        """)
+        subparser = subparsers.add_parser('recompress', parents=[common_parser],
+                                          description=self.do_recompress.__doc__,
+                                          epilog=recompress_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='create backup')
+        subparser.set_defaults(func=self.do_recompress)
+        subparser.add_argument('-f', '--force', dest='force_recompress',
+                               action='store_true', default=False,
+                               help='even recompress chunks already compressed with the algorithm set with '
+                                    '--compression')
+        subparser.add_argument('-s', '--stats', dest='stats',
+                               action='store_true', default=False,
+                               help='print statistics at end')
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help='show progress, one dot is printed for each processed chunk')
+        subparser.add_argument('-C', '--compression', dest='compression',
+                               type=CompressionSpec, default=dict(name='none'), metavar='COMPRESSION',
+                               help='select compression algorithm (and level): '
+                                    'none == no compression (default), '
+                                    'lz4 == lz4, '
+                                    'zlib == zlib (default level 6), '
+                                    'zlib,0 .. zlib,9 == zlib (with level 0..9), '
+                                    'lzma == lzma (default level 6), '
+                                    'lzma,0 .. lzma,9 == lzma (with level 0..9).')
+        subparser.add_argument('-n', '--dry-run', dest='dry_run',
+                               action='store_true', default=False,
+                               help='do not write any data')
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(),
+                               help='repository to recompress')
 
         subparser = subparsers.add_parser('help', parents=[common_parser],
                                           description='Extra help')

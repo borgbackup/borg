@@ -49,8 +49,11 @@ Both archives need to be in the same repository, and a repository location may o
 be specified for ARCHIVE1.
 
 For archives created with Borg 1.1 or newer only chunks IDs
-are compared, which is very fast. For archives prior to Borg 1.1 chunk contents must be
-compared, unless you are sure they were created with the same chunker params
-(pass --same-chunker-params). Note that the chunker params changed from Borg 0.xx to 1.0.
+are compared, which is very fast.
+
+For archives prior to Borg 1.1 chunk contents are compared by default.
+If you did not create the archives with different chunker params,
+pass --same-chunker-params.
+Note that the chunker params changed from Borg 0.xx to 1.0.
 
 See the output of the "borg help patterns" command for more help on exclude patterns.

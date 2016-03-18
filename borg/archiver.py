@@ -1212,6 +1212,11 @@ class Archiver:
             Both archives need to be in the same repository, and a repository location may only
             be specified for ARCHIVE1.
 
+            For archives created with Borg 1.1 or newer only chunks IDs
+            are compared, which is very fast. For archives prior to Borg 1.1 chunk contents must be
+            compared, unless you are sure they were created with the same chunker params
+            (pass --same-chunker-params). Note that the chunker params changed from Borg 0.xx to 1.0.
+
             See the output of the "borg help patterns" command for more help on exclude patterns.
             """)
         subparser = subparsers.add_parser('diff', parents=[common_parser],
@@ -1289,7 +1294,7 @@ class Archiver:
 
         See the "borg help patterns" command for more help on exclude patterns.
 
-        The following keys are available for --format:
+        The following keys are available for --format when listing files:
 
         """) + ItemFormatter.keys_help()
         subparser = subparsers.add_parser('list', parents=[common_parser],
@@ -1316,7 +1321,7 @@ class Archiver:
                                type=location_validator(),
                                help='repository/archive to list contents of')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to extract; patterns are supported')
+                               help='paths to list; patterns are supported')
 
         mount_epilog = textwrap.dedent("""
         This command mounts an archive as a FUSE filesystem. This can be useful for

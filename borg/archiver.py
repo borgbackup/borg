@@ -725,12 +725,29 @@ class Archiver:
             old_size = new_size = 0
             chunks_seen = chunks_recompressed = chunks_skipped = 0
 
+            def seen(self, chunk):
+                self.chunks_seen += 1
+                self.old_size += len(chunk)
+
+            def skipped(self, chunk):
+                self.chunks_skipped += 1
+                self.new_size += len(chunk)
+
+            def recompressed(self, chunk):
+                self.chunks_recompressed += 1
+                self.new_size += len(chunk)
+
         def detect_compressor(compression_header):
             for compressor in COMPRESSOR_LIST:
                 if compressor.detect(compression_header):
                     return compressor
             else:
                 raise ValueError('No decompressor for this data found: %r.', compression_header)
+
+        def recompress_chunk(decompressor, compressed_chunk):
+            decompressed_data = decompressor(buffer=decompress_buffer).decompress(compressed_chunk)
+            key.assert_chunk_id(id_, decompressed_data)
+            return key.encrypt(decompressed_data)
 
         def do_exit_soon(sig_num, stack_frame):
             nonlocal exit_soon
@@ -768,36 +785,24 @@ class Archiver:
         for i, (segment_id, segment_filename) in enumerate(reversed(segments)):
             chunks = {}
             for tag, id_, offset, data in repository.io.iter_objects(segment_id, True):
-                if tag != TAG_PUT or set(id_) == {0}:
+                if tag != TAG_PUT or id_ == Manifest.MANIFEST_ID:
                     continue
-                stats.chunks_seen += 1
-                stats.old_size += len(data)
+                stats.seen(data)
                 decrypted_data = key.decrypt(id_, data, no_decompress=True)
                 compressor = detect_compressor(decrypted_data[:2])
                 if not args.force_recompress and isinstance(key.compressor.compressor, compressor):
-                    stats.chunks_skipped += 1
-                    stats.new_size += len(data)
+                    stats.skipped(data)
                     continue
-                decompressed_data = compressor(buffer=decompress_buffer).decompress(decrypted_data)
-                key.assert_chunk_id(id_, decompressed_data)
-                data = key.encrypt(decompressed_data)
-                stats.new_size += len(data)
-                chunks[id_] = data
+                chunks[id_] = recompress_chunk(compressor, decrypted_data)
             if not dry_run:
-                try:
-                    for id_, data in chunks.items():
-                        repository.put(id_, data)
-                        stats.chunks_recompressed += 1
-                    if exit_soon or repository.io.get_latest_segment() > last_segment_id + 10:
-                        last_segment_id = repository.io.get_latest_segment()
-                        repository.commit()
-                    if exit_soon:
-                        break
-                except Exception as e:  # too broad!
-                    self.print_error("Exception while recompressing, rolling transaction back...")
-                    repository.rollback()
-                    repository.close()
-                    raise
+                for id_, data in chunks.items():
+                    repository.put(id_, data)
+                    stats.recompressed(data)
+                if repository.io.get_latest_segment() > last_segment_id + 10:
+                    last_segment_id = repository.io.get_latest_segment()
+                    repository.commit()
+                if exit_soon:
+                    break
             if args.progress:
                 progress_indicator.show(i)
         if args.progress:

@@ -353,6 +353,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # the interesting parts of info_output2 and info_output should be same
         self.assert_equal(filter(info_output), filter(info_output2))
 
+    def test_symlink_extract(self):
+        self.create_test_files()
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+            assert os.readlink('input/link1') == 'somewhere'
+
     def test_atime(self):
         self.create_test_files()
         atime, mtime = 123456780, 234567890

@@ -22,7 +22,7 @@ from .helpers import Error, location_validator, archivename_validator, format_ti
     get_cache_dir, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
-    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ItemFormatter
+    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ItemFormatter, ProgressIndicatorPercent
 from .logger import create_logger, setup_logging
 logger = create_logger()
 from .compress import Compressor, COMPR_BUFFER
@@ -760,21 +760,19 @@ class Archiver:
 
         segment_count = sum(1 for _ in repository.io.segment_iterator())
         last_segment_id = repository.io.get_latest_segment()
-        print(segment_count, "segments in repository")
-        print("Approximately", format_file_size(segment_count * repository.max_segment_size), "on disk")
-
-        for segment_id, segment_filename in repository.io.segment_iterator():
-            if segment_id > last_segment_id:
-                print("Reached beginning of recompressed segments")
-                break
+        segments = list(repository.io.segment_iterator())
+        progress_indicator = ProgressIndicatorPercent(len(segments), start=0, same_line=True, step=0.1,
+                                                      msg="%3.1f %% processed")
+        for i, (segment_id, segment_filename) in enumerate(reversed(segments)):
+            # Work in reverse, so new chunks are processed first. In my mind these are likely the ones
+            # you want to recompress if you are using recompress like I do.
             chunks = {}
             for tag, id_, offset, data in repository.io.iter_objects(segment_id, True):
-                if exit_soon:
-                    break
+                #if exit_soon: # hm, nah, we want to get rid of whole "old" segments
+                #    break
                 if tag != TAG_PUT:
                     continue
                 if set(id_) == {0}:
-                    print("Seen manifest")
                     continue
                 stats.chunks_seen += 1
                 stats.old_size += len(data)
@@ -797,8 +795,6 @@ class Archiver:
                     if exit_soon or repository.io.get_latest_segment() > last_segment_id + 10:
                         last_segment_id = repository.io.get_latest_segment()
                         repository.commit()
-                        sys.stdout.write('.')
-                        sys.stdout.flush()
                     if exit_soon:
                         break
                 except Exception as e:  # too broad!
@@ -806,19 +802,25 @@ class Archiver:
                     repository.rollback()
                     repository.close()
                     raise
+            if args.progress:
+                progress_indicator.show(i)
+        if args.progress:
+            progress_indicator.finish()
         if not dry_run:
             manifest.write()
             repository.commit()
         if args.stats:
-            print("\n")
             print("Repositoy:", repository.path)
+            print("Chunks seen, recompressed, skipped: %d, %d, %d" %
+                  (stats.chunks_seen, stats.chunks_recompressed, stats.chunks_skipped))
             print("Old segment count:", segment_count)
             print("New segment count:", sum(1 for _ in repository.io.segment_iterator()))
+            if exit_soon:
+                print("Note: below size information is incomplete due to signal termination")
             print("Old size:", format_file_size(stats.old_size))
             print("New size:", format_file_size(stats.new_size))
             print("Ratio: %d %%" % (stats.new_size / stats.old_size * 100))
-            print("Chunks seen, recompressed, skipped: %d, %d, %d" %
-                  (stats.chunks_seen, stats.chunks_recompressed, stats.chunks_skipped))
+
         repository.close()
         return self.exit_code
 

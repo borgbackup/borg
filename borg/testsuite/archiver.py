@@ -233,9 +233,6 @@ class ArchiverTestCaseBase(BaseTestCase):
     def create_src_archive(self, name):
         self.cmd('create', self.repository_location + '::' + name, src_dir)
 
-
-class ArchiverTestCase(ArchiverTestCaseBase):
-
     def create_regular_file(self, name, size=0, contents=None):
         filename = os.path.join(self.input_path, name)
         if not os.path.exists(os.path.dirname(filename)):
@@ -274,7 +271,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # same for newer ubuntu and centos.
             # if this is supported just on specific platform, platform should be checked first,
             # so that the test setup for all tests using it does not fail here always for others.
-            # xattr.setxattr(os.path.join(self.input_path, 'link1'), 'user.foo_symlink', b'bar_symlink', follow_symlinks=False)
+            # xattr.setxattr(os.path.join(self.input_path, 'link1'), 'user.foo_symlink', b'bar_symlink',
+            # follow_symlinks=False)
         # FIFO node
         os.mkfifo(os.path.join(self.input_path, 'fifo1'))
         if has_lchflags:
@@ -293,6 +291,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             have_root = False
         return have_root
 
+
+class ArchiverTestCase(ArchiverTestCaseBase):
     def test_basic_functionality(self):
         have_root = self.create_test_files()
         self.cmd('init', self.repository_location)
@@ -1221,9 +1221,6 @@ class RemoteArchiverTestCase(ArchiverTestCase):
 
 
 class DiffArchiverTestCase(ArchiverTestCaseBase):
-    create_test_files = ArchiverTestCase.create_test_files
-    create_regular_file = ArchiverTestCase.create_regular_file
-
     def test_basic_functionality(self):
         self.create_test_files()
         self.cmd('init', self.repository_location)

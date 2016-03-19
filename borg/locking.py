@@ -34,7 +34,8 @@ class TimeoutTimer:
 
         :param timeout: time out interval [s] or None (no timeout)
         :param sleep: sleep interval [s] (>= 0: do sleep call, <0: don't call sleep)
-                      or None (autocompute: use 10% of timeout, or 1s for no timeout)
+                      or None (autocompute: use 10% of timeout [but not more than 60s],
+                      or 1s for no timeout)
         """
         if timeout is not None and timeout < 0:
             raise ValueError("timeout must be >= 0")
@@ -43,7 +44,7 @@ class TimeoutTimer:
             if timeout is None:
                 sleep = 1.0
             else:
-                sleep = timeout / 10.0
+                sleep = min(60.0, timeout / 10.0)
         self.sleep_interval = sleep
         self.start_time = None
         self.end_time = None

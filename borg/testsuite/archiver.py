@@ -1254,6 +1254,17 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1b', exit_code=1), '1b')
 
 
+class RecompressArchiverTestCase(ArchiverTestCaseBase):
+    def test_basic_functionality(self):
+        self.create_test_files()
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test0', 'input')
+        ref_hashlist = self.cmd('list', '--format', '{sha512} {path}{NL}', self.repository_location + '::test0')
+        self.cmd('recompress', self.repository_location, '-spC', 'lz4')
+        after_hashlist = self.cmd('list', '--format', '{sha512} {path}{NL}', self.repository_location + '::test0')
+        assert after_hashlist == ref_hashlist
+
+
 def test_get_args():
     archiver = Archiver()
     # everything normal:

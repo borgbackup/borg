@@ -198,7 +198,7 @@ Use the Cygwin installer to install the dependencies::
 
     python3 python3-setuptools
     python3-cython  # not needed for releases
-    binutils gcc-core
+    binutils gcc-g++
     libopenssl openssl-devel
     liblz4_1 liblz4-devel  # from cygwinports.org
     git make openssh

@@ -322,6 +322,12 @@ class Archiver:
         elif stat.S_ISSOCK(st.st_mode):
             # Ignore unix sockets
             return
+        elif stat.S_ISDOOR(st.st_mode):
+            # Ignore Solaris doors
+            return
+        elif stat.S_ISPORT(st.st_mode):
+            # Ignore Solaris event ports
+            return
         else:
             self.print_warning('Unknown file type: %s', path)
             return

@@ -293,6 +293,9 @@ class PatternMatcher:
         # Value to return from match function when none of the patterns match.
         self.fallback = fallback
 
+    def empty(self):
+        return not len(self._items)
+
     def add(self, patterns, value):
         """Add list of patterns to internal list. The given value is returned from the match function when one of the
         given patterns matches.
@@ -1125,16 +1128,27 @@ class ItemFormatter:
         'NL': os.linesep,
     }
     KEY_DESCRIPTIONS = {
-        'NEWLINE': 'OS dependent line separator',
-        'NL': 'alias of NEWLINE',
-        'NUL': 'NUL character for creating print0 / xargs -0 like ouput, see bpath',
-        'csize': 'compressed size',
         'bpath': 'verbatim POSIX path, can contain any character except NUL',
         'path': 'path interpreted as text (might be missing non-text characters, see bpath)',
         'source': 'link target for links (identical to linktarget)',
+        'extra': 'prepends {source} with " -> " for soft links and " link to " for hard links',
+
+        'csize': 'compressed size',
         'num_chunks': 'number of chunks in this file',
         'unique_chunks': 'number of unique chunks in this file',
+
+        'NEWLINE': 'OS dependent line separator',
+        'NL': 'alias of NEWLINE',
+        'NUL': 'NUL character for creating print0 / xargs -0 like ouput, see bpath',
     }
+    KEY_GROUPS = (
+        ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget'),
+        ('size', 'csize', 'num_chunks', 'unique_chunks'),
+        ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
+        tuple(sorted(hashlib.algorithms_guaranteed)),
+        ('archiveid', 'archivename', 'extra'),
+        ('NEWLINE', 'NL', 'NUL', 'SPACE', 'TAB', 'CR', 'LF'),
+    )
 
     @classmethod
     def available_keys(cls):
@@ -1149,16 +1163,21 @@ class ItemFormatter:
         keys = []
         keys.extend(formatter.call_keys.keys())
         keys.extend(formatter.get_item_data(fake_item).keys())
-        return sorted(keys, key=lambda s: (s.isupper(), s))
+        return keys
 
     @classmethod
     def keys_help(cls):
         help = []
-        for key in cls.available_keys():
-            text = " - " + key
-            if key in cls.KEY_DESCRIPTIONS:
-                text += ": " + cls.KEY_DESCRIPTIONS[key]
-            help.append(text)
+        keys = cls.available_keys()
+        for group in cls.KEY_GROUPS:
+            for key in group:
+                keys.remove(key)
+                text = " - " + key
+                if key in cls.KEY_DESCRIPTIONS:
+                    text += ": " + cls.KEY_DESCRIPTIONS[key]
+                help.append(text)
+            help.append("")
+        assert not keys, str(keys)
         return "\n".join(help)
 
     def __init__(self, archive, format):

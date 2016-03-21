@@ -359,8 +359,20 @@ class Archiver:
         sparse = args.sparse
         strip_components = args.strip_components
         dirs = []
-        for item in archive.iter_items(lambda item: matcher.match(item[b'path']), preload=True):
+        partial_extract = not matcher.empty() or strip_components
+        hardlink_masters = {} if partial_extract else None
+
+        def item_is_hardlink_master(item):
+            return (partial_extract and stat.S_ISREG(item[b'mode']) and
+                    item.get(b'hardlink_master', True) and b'source' not in item)
+
+        for item in archive.iter_items(preload=True,
+                filter=lambda item: item_is_hardlink_master(item) or matcher.match(item[b'path'])):
             orig_path = item[b'path']
+            if item_is_hardlink_master(item):
+                hardlink_masters[orig_path] = (item.get(b'chunks'), item.get(b'source'))
+            if not matcher.match(item[b'path']):
+                continue
             if strip_components:
                 item[b'path'] = os.sep.join(orig_path.split(os.sep)[strip_components:])
                 if not item[b'path']:
@@ -378,7 +390,8 @@ class Archiver:
                         dirs.append(item)
                         archive.extract_item(item, restore_attrs=False)
                     else:
-                        archive.extract_item(item, stdout=stdout, sparse=sparse)
+                        archive.extract_item(item, stdout=stdout, sparse=sparse, hardlink_masters=hardlink_masters,
+                                             original_path=orig_path)
             except OSError as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 
@@ -1205,6 +1218,15 @@ class Archiver:
             Both archives need to be in the same repository, and a repository location may only
             be specified for ARCHIVE1.
 
+            For archives created with Borg 1.1 or newer diff automatically detects whether
+            the archives are created with the same chunker params. If so, only chunk IDs
+            are compared, which is very fast.
+
+            For archives prior to Borg 1.1 chunk contents are compared by default.
+            If you did not create the archives with different chunker params,
+            pass --same-chunker-params.
+            Note that the chunker params changed from Borg 0.xx to 1.0.
+
             See the output of the "borg help patterns" command for more help on exclude patterns.
             """)
         subparser = subparsers.add_parser('diff', parents=[common_parser],
@@ -1282,7 +1304,7 @@ class Archiver:
 
         See the "borg help patterns" command for more help on exclude patterns.
 
-        The following keys are available for --format:
+        The following keys are available for --format when listing files:
 
         """) + ItemFormatter.keys_help()
         subparser = subparsers.add_parser('list', parents=[common_parser],
@@ -1309,7 +1331,7 @@ class Archiver:
                                type=location_validator(),
                                help='repository/archive to list contents of')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to extract; patterns are supported')
+                               help='paths to list; patterns are supported')
 
         mount_epilog = textwrap.dedent("""
         This command mounts an archive as a FUSE filesystem. This can be useful for

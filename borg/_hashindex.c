@@ -8,10 +8,14 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#if defined(BYTE_ORDER)&&(BYTE_ORDER == BIG_ENDIAN)
+#if defined (__SVR4) && defined (__sun)
+#include <sys/isa_defs.h>
+#endif
+
+#if (defined(BYTE_ORDER)&&(BYTE_ORDER == BIG_ENDIAN)) || defined(_BIG_ENDIAN)
 #define _le32toh(x) __builtin_bswap32(x)
 #define _htole32(x) __builtin_bswap32(x)
-#elif defined(BYTE_ORDER)&&(BYTE_ORDER == LITTLE_ENDIAN)
+#elif (defined(BYTE_ORDER)&&(BYTE_ORDER == LITTLE_ENDIAN)) || defined(_LITTLE_ENDIAN)
 #define _le32toh(x) (x)
 #define _htole32(x) (x)
 #else

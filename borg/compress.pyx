@@ -182,16 +182,20 @@ class Compressor:
         self.params = kwargs
         self.compressor = get_compressor(name, **self.params)
 
+    @staticmethod
+    def detect(data):
+        hdr = bytes(data[:2])  # detect() does not work with memoryview
+        for cls in COMPRESSOR_LIST:
+            if cls.detect(hdr):
+                return cls
+        else:
+            raise ValueError('No decompressor for this data found: %r.', data[:2])
+
     def compress(self, data):
         return self.compressor.compress(data)
 
     def decompress(self, data):
-        hdr = bytes(data[:2])  # detect() does not work with memoryview
-        for cls in COMPRESSOR_LIST:
-            if cls.detect(hdr):
-                return cls(**self.params).decompress(data)
-        else:
-            raise ValueError('No decompressor for this data found: %r.', data[:2])
+        return self.detect(data)(**self.params).decompress(data)
 
 
 # a buffer used for (de)compression result, which can be slightly bigger

@@ -1236,33 +1236,101 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
     create_regular_file = ArchiverTestCase.create_regular_file
 
     def test_basic_functionality(self):
+        # Initialize test folder
         self.create_test_files()
         self.cmd('init', self.repository_location)
-        os.chmod('input/dir2', stat.S_IFDIR | 0o755)
-        self.create_regular_file('file3', size=1024)
+
+        # Setup files for the first snapshot
+        self.create_regular_file('file_unchanged', size=128)
+        self.create_regular_file('file_removed', size=256)
+        self.create_regular_file('file_removed2', size=512)
+        self.create_regular_file('file_replaced', size=1024)
+        os.mkdir('input/dir_replaced_with_file')
+        os.chmod('input/dir_replaced_with_file', stat.S_IFDIR | 0o755)
+        os.mkdir('input/dir_removed')
+        os.symlink('input/dir_replaced_with_file', 'input/link_changed')
+        os.symlink('input/file_unchanged', 'input/link_removed')
+        os.symlink('input/file_removed2', 'input/link_target_removed')
+        os.symlink('input/empty', 'input/symlink')
+        os.link('input/empty', 'input/hardlink_contents_changed')
+        os.link('input/file_removed', 'input/hardlink_removed')
+        os.link('input/file_removed2', 'input/hardlink_target_removed')
+        os.link('input/file_replaced', 'input/hardlink_target_replaced')
+
+        # Create the first snapshot
         self.cmd('create', self.repository_location + '::test0', 'input')
-        # replace 'hardlink' with a file
-        os.unlink('input/hardlink')
-        self.create_regular_file('hardlink', size=1024 * 80)
-        # replace directory with a file
-        os.unlink('input/dir2/file2')
-        os.rmdir('input/dir2')
-        self.create_regular_file('dir2', size=1024 * 80)
-        os.chmod('input/dir2', stat.S_IFREG | 0o755)
-        self.create_regular_file('file3', size=1024, contents=b'0')
+
+        # Setup files for the second snapshot
+        self.create_regular_file('file_added', size=2048)
+        os.unlink('input/file_removed')
+        os.unlink('input/file_removed2')
+        os.unlink('input/file_replaced')
+        self.create_regular_file('file_replaced', size=4096, contents=b'0')
+        os.rmdir('input/dir_replaced_with_file')
+        self.create_regular_file('dir_replaced_with_file', size=8192 * 80)
+        os.chmod('input/dir_replaced_with_file', stat.S_IFREG | 0o755)
+        os.mkdir('input/dir_added')
+        os.rmdir('input/dir_removed')
+        os.unlink('input/link_changed')
+        os.symlink('input/dir_added', 'input/link_changed')
+        os.symlink('input/dir_added', 'input/link_added')
+        os.unlink('input/link_removed')
+        os.unlink('input/hardlink_removed')
+        os.link('input/file_added', 'input/hardlink_added')
+
+        with open('input/empty', 'ab') as fd:
+            fd.write(b'appended_data')
+
+        # Create the second snapshot
         self.cmd('create', self.repository_location + '::test1a', 'input')
         self.cmd('create', '--chunker-params', '16,18,17,4095', self.repository_location + '::test1b', 'input')
 
         def do_asserts(output, archive):
-            assert 'input/file3 different contents' in output
-            assert 'input/hardlink different mode' in output
-            assert ('input/hardlink different link\n'
-                    '	 test0 input/file1\n'
-                    '	 test%s <regular file>' % archive) in output
-            assert ('input/dir2 different mode\n'
-                    '	 test0 drwxr-xr-x\n'
-                    '	 test%s -rwxr-xr-x\n' % archive) in output
-            assert 'input/dir2/file2 different contents' in output
+            # File contents changed (deleted and replaced with a new file)
+            assert 'B input/file_replaced' in output
+
+            # File unchanged
+            assert 'input/file_unchanged' not in output
+
+            # Directory replaced with a regular file
+            assert '[drwxr-xr-x -> -rwxr-xr-x] input/dir_replaced_with_file' in output
+
+            # Basic directory cases
+            assert 'added directory     input/dir_added' in output
+            assert 'removed directory   input/dir_removed' in output
+
+            # Basic symlink cases
+            assert 'changed link        input/link_changed' in output
+            assert 'added link          input/link_added' in output
+            assert 'removed link        input/link_removed' in output
+
+            # Symlink target removed. Should not affect the symlink at all.
+            assert 'input/link_target_removed' not in output
+
+            # The inode has two links and the file contents changed. Borg
+            # should notice the changes in both links.
+            assert '0 B input/empty' in output
+            assert '0 B input/hardlink_contents_changed' in output
+
+            # Added a new file and a hard link to it. Both links to the same
+            # inode should appear as separate files.
+            assert 'added       2.05 kB input/file_added' in output
+            assert 'added       2.05 kB input/hardlink_added' in output
+
+            # The inode has two links and both of them are deleted. They should
+            # appear as two deleted files.
+            assert 'removed       256 B input/file_removed' in output
+            assert 'removed       256 B input/hardlink_removed' in output
+
+            # Another link (marked previously as the source in borg) to the
+            # same inode was removed. This should not change this link at all.
+            assert 'input/hardlink_target_removed' not in output
+
+            # Another link (marked previously as the source in borg) to the
+            # same inode was replaced with a new regular file. This should not
+            # change this link at all.
+            assert 'input/hardlink_target_replaced' not in output
+
         do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1a'), '1a')
         # We expect exit_code=1 due to the chunker params warning
         do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1b', exit_code=1), '1b')

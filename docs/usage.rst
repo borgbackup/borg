@@ -399,26 +399,18 @@ Examples
 
     $ cd ..
     $ borg diff testrepo::archive1 archive2
-    file1 different mode
-             archive1 -rw-r--r--
-             archive2 -rwxr-xr-x
-    file2 different contents
-             +28 B, -31 B, 4.19 MB, 4.19 MB
+    [-rw-r--r-- -> -rwxr-xr-x] file1
+       +135 B    -252 B file2
 
     $ borg diff testrepo::archive2 archive3
-    file3 different contents
-             +0 B, -0 B, 0 B, <deleted>
+    added           0 B file4
+    removed         0 B file3
 
     $ borg diff testrepo::archive1 archive3
-    file1 different mode
-             archive1 -rw-r--r--
-             archive3 -rwxr-xr-x
-    file2 different contents
-             +28 B, -31 B, 4.19 MB, 4.19 MB
-    file3 different contents
-             +0 B, -0 B, 0 B, <deleted>
-    file4 different contents
-             +0 B, -0 B, <deleted>, 0 B
+    [-rw-r--r-- -> -rwxr-xr-x] file1
+       +135 B    -252 B file2
+    added           0 B file4
+    removed         0 B file3
 
 .. include:: usage/delete.rst.inc
 

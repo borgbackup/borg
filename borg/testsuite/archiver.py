@@ -367,7 +367,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert sto.st_atime_ns == atime * 1e9
 
     def _extract_repository_id(self, path):
-        return Repository(self.repository_path).id
+        with Repository(self.repository_path) as repository:
+            return repository.id
 
     def _set_repository_id(self, path, id):
         config = ConfigParser(interpolation=None)
@@ -375,7 +376,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         config.set('repository', 'id', hexlify(id).decode('ascii'))
         with open(os.path.join(path, 'config'), 'w') as fd:
             config.write(fd)
-        return Repository(self.repository_path).id
+        with Repository(self.repository_path) as repository:
+            return repository.id
 
     def test_sparse_file(self):
         # no sparse file support on Mac OS X
@@ -745,8 +747,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('extract', '--dry-run', self.repository_location + '::test.3')
         self.cmd('extract', '--dry-run', self.repository_location + '::test.4')
         # Make sure both archives have been renamed
-        repository = Repository(self.repository_path)
-        manifest, key = Manifest.load(repository)
+        with Repository(self.repository_path) as repository:
+            manifest, key = Manifest.load(repository)
         self.assert_equal(len(manifest.archives), 2)
         self.assert_in('test.3', manifest.archives)
         self.assert_in('test.4', manifest.archives)
@@ -763,8 +765,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
         self.cmd('delete', '--stats', self.repository_location + '::test.2')
         # Make sure all data except the manifest has been deleted
-        repository = Repository(self.repository_path)
-        self.assert_equal(len(repository), 1)
+        with Repository(self.repository_path) as repository:
+            self.assert_equal(len(repository), 1)
 
     def test_delete_repo(self):
         self.create_regular_file('file1', size=1024 * 80)
@@ -772,6 +774,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
         self.cmd('create', self.repository_location + '::test.2', 'input')
+        os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'no'
+        self.cmd('delete', self.repository_location, exit_code=2)
+        self.archiver.exit_code = 0
+        assert os.path.exists(self.repository_path)
+        os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
         self.cmd('delete', self.repository_location)
         # Make sure the repo is gone
         self.assertFalse(os.path.exists(self.repository_path))
@@ -810,8 +817,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', self.repository_location)
         self.cmd('create', '--dry-run', self.repository_location + '::test', 'input')
         # Make sure no archive has been created
-        repository = Repository(self.repository_path)
-        manifest, key = Manifest.load(repository)
+        with Repository(self.repository_path) as repository:
+            manifest, key = Manifest.load(repository)
         self.assert_equal(len(manifest.archives), 0)
 
     def test_progress(self):
@@ -1045,17 +1052,17 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         used = set()  # counter values already used
 
         def verify_uniqueness():
-            repository = Repository(self.repository_path)
-            for key, _ in repository.open_index(repository.get_transaction_id()).iteritems():
-                data = repository.get(key)
-                hash = sha256(data).digest()
-                if hash not in seen:
-                    seen.add(hash)
-                    num_blocks = num_aes_blocks(len(data) - 41)
-                    nonce = bytes_to_long(data[33:41])
-                    for counter in range(nonce, nonce + num_blocks):
-                        self.assert_not_in(counter, used)
-                        used.add(counter)
+            with Repository(self.repository_path) as repository:
+                for key, _ in repository.open_index(repository.get_transaction_id()).iteritems():
+                    data = repository.get(key)
+                    hash = sha256(data).digest()
+                    if hash not in seen:
+                        seen.add(hash)
+                        num_blocks = num_aes_blocks(len(data) - 41)
+                        nonce = bytes_to_long(data[33:41])
+                        for counter in range(nonce, nonce + num_blocks):
+                            self.assert_not_in(counter, used)
+                            used.add(counter)
 
         self.create_test_files()
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
@@ -1122,8 +1129,9 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 
     def open_archive(self, name):
         repository = Repository(self.repository_path)
-        manifest, key = Manifest.load(repository)
-        archive = Archive(repository, key, manifest, name)
+        with repository:
+            manifest, key = Manifest.load(repository)
+            archive = Archive(repository, key, manifest, name)
         return archive, repository
 
     def test_check_usage(self):
@@ -1141,35 +1149,39 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 
     def test_missing_file_chunk(self):
         archive, repository = self.open_archive('archive1')
-        for item in archive.iter_items():
-            if item[b'path'].endswith('testsuite/archiver.py'):
-                repository.delete(item[b'chunks'][-1][0])
-                break
-        repository.commit()
+        with repository:
+            for item in archive.iter_items():
+                if item[b'path'].endswith('testsuite/archiver.py'):
+                    repository.delete(item[b'chunks'][-1][0])
+                    break
+            repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', '--repair', self.repository_location, exit_code=0)
         self.cmd('check', self.repository_location, exit_code=0)
 
     def test_missing_archive_item_chunk(self):
         archive, repository = self.open_archive('archive1')
-        repository.delete(archive.metadata[b'items'][-5])
-        repository.commit()
+        with repository:
+            repository.delete(archive.metadata[b'items'][-5])
+            repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', '--repair', self.repository_location, exit_code=0)
         self.cmd('check', self.repository_location, exit_code=0)
 
     def test_missing_archive_metadata(self):
         archive, repository = self.open_archive('archive1')
-        repository.delete(archive.id)
-        repository.commit()
+        with repository:
+            repository.delete(archive.id)
+            repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', '--repair', self.repository_location, exit_code=0)
         self.cmd('check', self.repository_location, exit_code=0)
 
     def test_missing_manifest(self):
         archive, repository = self.open_archive('archive1')
-        repository.delete(Manifest.MANIFEST_ID)
-        repository.commit()
+        with repository:
+            repository.delete(Manifest.MANIFEST_ID)
+            repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
         output = self.cmd('check', '-v', '--repair', self.repository_location, exit_code=0)
         self.assert_in('archive1', output)
@@ -1178,10 +1190,9 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 
     def test_extra_chunks(self):
         self.cmd('check', self.repository_location, exit_code=0)
-        repository = Repository(self.repository_location)
-        repository.put(b'01234567890123456789012345678901', b'xxxx')
-        repository.commit()
-        repository.close()
+        with Repository(self.repository_location) as repository:
+            repository.put(b'01234567890123456789012345678901', b'xxxx')
+            repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', '--repair', self.repository_location, exit_code=0)

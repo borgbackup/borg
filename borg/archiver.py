@@ -1646,6 +1646,8 @@ def setup_signal_handlers():  # pragma: no cover
     for sig in sigs:
         signal.signal(sig, sig_info_handler)
 
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
 
 def main():  # pragma: no cover
     # provide 'borg mount' behaviour when the main script/executable is named borgfs

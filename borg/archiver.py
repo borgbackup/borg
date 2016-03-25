@@ -3,6 +3,7 @@ from datetime import datetime
 from itertools import zip_longest
 from operator import attrgetter
 import argparse
+import collections
 import functools
 import hashlib
 import inspect
@@ -546,8 +547,8 @@ class Archiver:
                 print("{:<19} {}".format(' '.join(changes), remove_surrogates(path)))
 
         def compare_archives(archive1, archive2, matcher):
-            orphans_archive1 = {}
-            orphans_archive2 = {}
+            orphans_archive1 = collections.OrderedDict()
+            orphans_archive2 = collections.OrderedDict()
             hardlink_masters = {}
             for item1, item2 in zip_longest(
                     archive1.iter_items(lambda item: matcher.match(item[b'path'])),

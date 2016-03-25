@@ -34,6 +34,7 @@ Distribution Source                                        Command
 ============ ============================================= =======
 Arch Linux   `[community]`_                                ``pacman -S borg``
 Debian       `stretch`_, `unstable/sid`_                   ``apt install borgbackup``
+GNU Guix     `GNU Guix`_                                   ``guix package --install borg``
 NetBSD       `pkgsrc`_                                     ``pkg_add py-borgbackup``
 NixOS        `.nix file`_                                  N/A
 OS X         `Brew cask`_                                  ``brew cask install borgbackup``
@@ -50,6 +51,7 @@ Ubuntu       `Trusty 14.04 (backport PPA)`_                ``apt install borgbac
 .. _Trusty 14.04 (backport PPA): https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
 .. _.nix file: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/backup/borg/default.nix
 .. _Brew cask: http://caskroom.io/
+.. _GNU Guix: https://www.gnu.org/software/guix/package-list.html#borg
 
 Please ask package maintainers to build a package or, if you can package /
 submit it yourself, please help us with that! See :issue:`105` on

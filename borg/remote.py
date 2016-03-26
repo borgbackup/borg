@@ -77,6 +77,7 @@ class RepositoryServer:  # pragma: no cover
             if r:
                 data = os.read(stdin_fd, BUFSIZE)
                 if not data:
+                    self.repository.close()
                     return
                 unpacker.feed(data)
                 for unpacked in unpacker:
@@ -100,6 +101,7 @@ class RepositoryServer:  # pragma: no cover
                     else:
                         os.write(stdout_fd, msgpack.packb((1, msgid, None, res)))
             if es:
+                self.repository.close()
                 return
 
     def negotiate(self, versions):
@@ -117,6 +119,7 @@ class RepositoryServer:  # pragma: no cover
             else:
                 raise PathNotAllowed(path)
         self.repository = Repository(path, create, lock_wait=lock_wait, lock=lock)
+        self.repository.__enter__()  # clean exit handled by serve() method
         return self.repository.id
 
 
@@ -164,10 +167,20 @@ class RemoteRepository:
         self.id = self.call('open', location.path, create, lock_wait, lock)
 
     def __del__(self):
-        self.close()
+        if self.p:
+            self.close()
+            assert False, "cleanup happened in Repository.__del__"
 
     def __repr__(self):
         return '<%s %s>' % (self.__class__.__name__, self.location.canonical_path())
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.rollback()
+        self.close()
 
     def borg_cmd(self, args, testing):
         """return a borg serve command line"""
@@ -392,6 +405,7 @@ class RepositoryCache(RepositoryNoCache):
         super().__init__(repository)
         tmppath = tempfile.mkdtemp(prefix='borg-tmp')
         self.caching_repo = Repository(tmppath, create=True, exclusive=True)
+        self.caching_repo.__enter__()  # handled by context manager in base class
 
     def close(self):
         if self.caching_repo is not None:

@@ -692,6 +692,8 @@ def test_file_size():
         10**18: '1.00 EB',  # exabytes
         10**21: '1.00 ZB',  # zottabytes
         10**24: '1.00 YB',  # yottabytes
+        -1: '-1 B',  # negative value
+        -1010: '-1.01 kB',  # negative value with rounding
     }
     for size, fmt in si_size_map.items():
         assert format_file_size(size) == fmt
@@ -701,6 +703,18 @@ def test_file_size_precision():
     assert format_file_size(1234, precision=1) == '1.2 kB'  # rounded down
     assert format_file_size(1254, precision=1) == '1.3 kB'  # rounded up
     assert format_file_size(999990000, precision=1) == '1.0 GB'  # and not 999.9 MB or 1000.0 MB
+
+
+def test_file_size_sign():
+    si_size_map = {
+        0: '0 B',
+        1: '+1 B',
+        1234: '+1.23 kB',
+        -1: '-1 B',
+        -1234: '-1.23 kB',
+    }
+    for size, fmt in si_size_map.items():
+        assert format_file_size(size, sign=True) == fmt
 
 
 def test_is_slow_msgpack():

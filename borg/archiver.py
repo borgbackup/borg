@@ -3,6 +3,7 @@ from datetime import datetime
 from itertools import zip_longest
 from operator import attrgetter
 import argparse
+import collections
 import functools
 import hashlib
 import inspect
@@ -433,15 +434,16 @@ class Archiver:
     @with_archive
     def do_diff(self, args, repository, manifest, key, archive):
         """Diff contents of two archives"""
-        def format_bytes(count):
-            if count is None:
-                return "<deleted>"
-            return format_file_size(count)
-
         def fetch_and_compare_chunks(chunk_ids1, chunk_ids2, archive1, archive2):
             chunks1 = archive1.pipeline.fetch_many(chunk_ids1)
             chunks2 = archive2.pipeline.fetch_many(chunk_ids2)
             return self.compare_chunk_contents(chunks1, chunks2)
+
+        def sum_chunk_size(item):
+            if item.get(b'deleted'):
+                return None
+            else:
+                return sum(c[1] for c in item[b'chunks'])
 
         def get_owner(item):
             if args.numeric_owner:
@@ -449,70 +451,122 @@ class Archiver:
             else:
                 return item[b'user'], item[b'group']
 
-        def compare_items(path, item1, item2, deleted=False):
+        def get_mode(item):
+            if b'mode' in item:
+                return stat.filemode(item[b'mode'])
+            else:
+                return [None]
+
+        def has_hardlink_master(item, hardlink_masters):
+            return item.get(b'source') in hardlink_masters and get_mode(item)[0] != 'l'
+
+        def compare_link(item1, item2):
+            # These are the simple link cases. For special cases, e.g. if a
+            # regular file is replaced with a link or vice versa, it is
+            # indicated in compare_mode instead.
+            if item1.get(b'deleted'):
+                return 'added link'
+            elif item2.get(b'deleted'):
+                return 'removed link'
+            elif item1[b'source'] != item2[b'source']:
+                return 'changed link'
+
+        def contents_changed(item1, item2):
+            if can_compare_chunk_ids:
+                return item1[b'chunks'] != item2[b'chunks']
+            else:
+                if sum_chunk_size(item1) != sum_chunk_size(item2):
+                    return True
+                else:
+                    chunk_ids1 = [c[0] for c in item1[b'chunks']]
+                    chunk_ids2 = [c[0] for c in item2[b'chunks']]
+                    return not fetch_and_compare_chunks(chunk_ids1, chunk_ids2, archive1, archive2)
+
+        def compare_content(path, item1, item2):
+            if contents_changed(item1, item2):
+                if item1.get(b'deleted'):
+                    return ('added {:>13}'.format(format_file_size(sum_chunk_size(item2))))
+                elif item2.get(b'deleted'):
+                    return ('removed {:>11}'.format(format_file_size(sum_chunk_size(item1))))
+                else:
+                    chunk_id_set1 = {c[0] for c in item1[b'chunks']}
+                    chunk_id_set2 = {c[0] for c in item2[b'chunks']}
+                    added = sum(c[1] for c in (chunk_id_set2 - chunk_id_set1))
+                    removed = -sum(c[1] for c in (chunk_id_set1 - chunk_id_set2))
+
+                    return ('{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
+                                                 format_file_size(removed, precision=1, sign=True)))
+
+        def compare_directory(item1, item2):
+            if item2.get(b'deleted') and not item1.get(b'deleted'):
+                return 'removed directory'
+            elif item1.get(b'deleted') and not item2.get(b'deleted'):
+                return 'added directory'
+
+        def compare_owner(item1, item2):
+            user1, group1 = get_owner(item1)
+            user2, group2 = get_owner(item2)
+            if user1 != user2 or group1 != group2:
+                return '[{}:{} -> {}:{}]'.format(user1, group1, user2, group2)
+
+        def compare_mode(item1, item2):
+            if item1[b'mode'] != item2[b'mode']:
+                return '[{} -> {}]'.format(get_mode(item1), get_mode(item2))
+
+        def compare_items(path, item1, item2, hardlink_masters, deleted=False):
             """
             Compare two items with identical paths.
             :param deleted: Whether one of the items has been deleted
             """
+            changes = []
+
+            if item1.get(b'hardlink_master') or item2.get(b'hardlink_master'):
+                hardlink_masters[path] = (item1, item2)
+
+            if has_hardlink_master(item1, hardlink_masters):
+                item1 = hardlink_masters[item1[b'source']][0]
+
+            if has_hardlink_master(item2, hardlink_masters):
+                item2 = hardlink_masters[item2[b'source']][1]
+
+            if get_mode(item1)[0] == 'l' or get_mode(item2)[0] == 'l':
+                changes.append(compare_link(item1, item2))
+
+            if b'chunks' in item1 and b'chunks' in item2:
+                changes.append(compare_content(path, item1, item2))
+
+            if get_mode(item1)[0] == 'd' or get_mode(item2)[0] == 'd':
+                changes.append(compare_directory(item1, item2))
+
             if not deleted:
-                if item1[b'mode'] != item2[b'mode']:
-                    print(remove_surrogates(path), 'different mode')
-                    print('\t', args.location.archive, stat.filemode(item1[b'mode']))
-                    print('\t', args.archive2, stat.filemode(item2[b'mode']))
+                changes.append(compare_owner(item1, item2))
+                changes.append(compare_mode(item1, item2))
 
-                user1, group1 = get_owner(item1)
-                user2, group2 = get_owner(item2)
-                if user1 != user2 or group1 != group2:
-                    print(remove_surrogates(path), 'different owner')
-                    print('\t', args.location.archive, 'user=%s, group=%s' % (user1, group1))
-                    print('\t', args.archive2, 'user=%s, group=%s' % (user2, group2))
-
-                if not stat.S_ISREG(item1[b'mode']):
-                    return
-            if b'chunks' not in item1 or b'chunks' not in item2:
-                # At least one of the items is a link
-                if item1.get(b'source') != item2.get(b'source'):
-                    print(remove_surrogates(path), 'different link')
-                    print('\t', args.location.archive, item1.get(b'source', '<regular file>'))
-                    print('\t', args.archive2, item2.get(b'source', '<regular file>'))
-                return
-            if deleted or not can_compare_chunk_ids or item1[b'chunks'] != item2[b'chunks']:
-                # Contents are different
-                chunk_ids1 = [c[0] for c in item1[b'chunks']]
-                chunk_ids2 = [c[0] for c in item2[b'chunks']]
-                chunk_id_set1 = set(chunk_ids1)
-                chunk_id_set2 = set(chunk_ids2)
-                total1 = None if item1.get(b'deleted') else sum(c[1] for c in item1[b'chunks'])
-                total2 = None if item2.get(b'deleted') else sum(c[1] for c in item2[b'chunks'])
-                if (not can_compare_chunk_ids and total1 == total2 and not deleted and
-                        fetch_and_compare_chunks(chunk_ids1, chunk_ids2, archive1, archive2)):
-                    return
-                added = sum(c[1] for c in (chunk_id_set2 - chunk_id_set1))
-                removed = sum(c[1] for c in (chunk_id_set1 - chunk_id_set2))
-                print(remove_surrogates(path), 'different contents')
-                print('\t +%s, -%s, %s, %s' % (format_bytes(added), format_bytes(removed),
-                                               format_bytes(total1), format_bytes(total2)))
+            changes = [x for x in changes if x]
+            if changes:
+                print("{:<19} {}".format(' '.join(changes), remove_surrogates(path)))
 
         def compare_archives(archive1, archive2, matcher):
-            orphans_archive1 = {}
-            orphans_archive2 = {}
+            orphans_archive1 = collections.OrderedDict()
+            orphans_archive2 = collections.OrderedDict()
+            hardlink_masters = {}
             for item1, item2 in zip_longest(
                     archive1.iter_items(lambda item: matcher.match(item[b'path'])),
                     archive2.iter_items(lambda item: matcher.match(item[b'path'])),
             ):
                 if item1 and item2 and item1[b'path'] == item2[b'path']:
-                    compare_items(item1[b'path'], item1, item2)
+                    compare_items(item1[b'path'], item1, item2, hardlink_masters)
                     continue
                 if item1:
                     matching_orphan = orphans_archive2.pop(item1[b'path'], None)
                     if matching_orphan:
-                        compare_items(item1[b'path'], item1, matching_orphan)
+                        compare_items(item1[b'path'], item1, matching_orphan, hardlink_masters)
                     else:
                         orphans_archive1[item1[b'path']] = item1
                 if item2:
                     matching_orphan = orphans_archive1.pop(item2[b'path'], None)
                     if matching_orphan:
-                        compare_items(item2[b'path'], matching_orphan, item2)
+                        compare_items(item2[b'path'], matching_orphan, item2, hardlink_masters)
                     else:
                         orphans_archive2[item2[b'path']] = item2
             # At this point orphans_* contain items that had no matching partner in the other archive
@@ -520,12 +574,12 @@ class Archiver:
                 compare_items(added[b'path'], {
                     b'deleted': True,
                     b'chunks': [],
-                }, added, deleted=True)
+                }, added, hardlink_masters, deleted=True)
             for deleted in orphans_archive1.values():
                 compare_items(deleted[b'path'], deleted, {
                     b'deleted': True,
                     b'chunks': [],
-                }, deleted=True)
+                }, hardlink_masters, deleted=True)
 
         archive1 = archive
         archive2 = Archive(repository, key, manifest, args.archive2)

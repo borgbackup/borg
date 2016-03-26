@@ -535,7 +535,7 @@ Number of files: {0.stats.nfiles}'''.format(
         first_run = not cache.files
         ids = cache.file_known_and_unchanged(path_hash, st)
         if first_run:
-            logger.info('processing files')
+            logger.debug('Processing files ...')
         chunks = None
         if ids is not None:
             # Make sure all ids are available

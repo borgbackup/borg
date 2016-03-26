@@ -161,7 +161,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
     def _read_files(self):
         self.files = {}
         self._newest_mtime = 0
-        logger.info('reading files cache')
+        logger.debug('Reading files cache ...')
         with open(os.path.join(self.path, 'files'), 'rb') as fd:
             u = msgpack.Unpacker(use_list=True)
             while True:

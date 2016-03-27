@@ -1730,11 +1730,11 @@ def main():  # pragma: no cover
     except RemoteRepository.RPCError as e:
         msg = '%s\n%s' % (str(e), sysinfo())
         exit_code = EXIT_ERROR
+    except (KeyboardInterrupt, BrokenPipeError):
+        sys.stderr.close()
+        exit_code = EXIT_ERROR
     except Exception:
         msg = 'Local Exception.\n%s\n%s' % (traceback.format_exc(), sysinfo())
-        exit_code = EXIT_ERROR
-    except KeyboardInterrupt:
-        msg = 'Keyboard interrupt.\n%s\n%s' % (traceback.format_exc(), sysinfo())
         exit_code = EXIT_ERROR
     if msg:
         logger.error(msg)

@@ -850,6 +850,22 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # https://borgbackup.readthedocs.org/en/latest/faq.html#i-am-seeing-a-added-status-for-a-unchanged-file
         self.assert_in("A input/file2", output)
 
+    def test_file_status_excluded(self):
+        """test that excluded paths are listed"""
+
+        now = time.time()
+        self.create_regular_file('file1', size=1024 * 80)
+        os.utime('input/file1', (now - 5, now - 5))  # 5 seconds ago
+        self.create_regular_file('file2', size=1024 * 80)
+        self.cmd('init', self.repository_location)
+        output = self.cmd('create', '-v', '--list', self.repository_location + '::test', 'input')
+        self.assert_in("A input/file1", output)
+        self.assert_in("A input/file2", output)
+        # should find second file as excluded
+        output = self.cmd('create', '-v', '--list', self.repository_location + '::test1', 'input', '--exclude', '*/file2')
+        self.assert_in("U input/file1", output)
+        self.assert_in("x input/file2", output)
+
     def test_create_topical(self):
         now = time.time()
         self.create_regular_file('file1', size=1024 * 80)

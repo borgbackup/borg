@@ -694,3 +694,75 @@ Now, let's see how to restore some LVs from such a backup. ::
     $ # we assume that you created an empty root and home LV and overwrite it now:
     $ borg extract --stdout /mnt/backup::repo dev/vg0/root-snapshot > /dev/vg0/root
     $ borg extract --stdout /mnt/backup::repo dev/vg0/home-snapshot > /dev/vg0/home
+
+
+Append-only mode
+~~~~~~~~~~~~~~~~
+
+A repository can be made "append-only", which means that Borg will never overwrite or
+delete committed data. This is useful for scenarios where multiple machines back up to
+a central backup server using ``borg serve``, since a hacked machine cannot delete
+backups permanently.
+
+To activate append-only mode, edit the repository ``config`` file and add a line
+``append_only=1`` to the ``[repository]`` section (or edit the line if it exists).
+
+In append-only mode Borg will create a transaction log in the ``transactions`` file,
+where each line is a transaction and a UTC timestamp.
+
+Example
++++++++
+
+Suppose an attacker remotely deleted all backups, but your repository was in append-only
+mode. A transaction log in this situation might look like this: ::
+
+    transaction 1, UTC time 2016-03-31T15:53:27.383532
+    transaction 5, UTC time 2016-03-31T15:53:52.588922
+    transaction 11, UTC time 2016-03-31T15:54:23.887256
+    transaction 12, UTC time 2016-03-31T15:55:54.022540
+    transaction 13, UTC time 2016-03-31T15:55:55.472564
+
+From your security logs you conclude the attacker gained access at 15:54:00 and all
+the backups where deleted or replaced by compromised backups. From the log you know
+that transactions 11 and later are compromised. Note that the transaction ID is the
+name of the *last* file in the transaction. For example, transaction 11 spans files 6
+to 11.
+
+In a real attack you'll likely want to keep the compromised repository
+intact to analyze what the attacker tried to achieve. It's also a good idea to make this
+copy just in case something goes wrong during the recovery. Since recovery is done by
+deleting some files, a hard link copy (``cp -al``) is sufficient.
+
+The first step to reset the repository to transaction 5, the last uncompromised transaction,
+is to remove the ``hints.N`` and ``index.N`` files in the repository (these two files are
+always expendable). In this example N is 13.
+
+Then remove or move all segment files from the segment directories in ``data/`` starting
+with file 6::
+
+    rm data/**/{6..13}
+
+That's all to it.
+
+Drawbacks
++++++++++
+
+As data is only appended, and nothing deleted, commands like ``prune`` or ``delete``
+won't free disk space, they merely tag data as deleted in a new transaction.
+
+Note that you can go back-and-forth between normal and append-only operation by editing
+the configuration file, it's not a "one way trip".
+
+Further considerations
+++++++++++++++++++++++
+
+Append-only mode is not respected by tools other than Borg. ``rm`` still works on the
+repository. Make sure that backup client machines only get to access the repository via
+``borg serve``.
+
+Ensure that no remote access is possible if the repository is temporarily set to normal mode
+for e.g. regular pruning.
+
+Further protections can be implemented, but are outside of Borgs scope. For example,
+file system snapshots or wrapping ``borg serve`` to set special permissions or ACLs on
+new data files.

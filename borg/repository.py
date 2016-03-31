@@ -84,6 +84,7 @@ class Repository:
         config.set('repository', 'version', '1')
         config.set('repository', 'segments_per_dir', str(self.DEFAULT_SEGMENTS_PER_DIR))
         config.set('repository', 'max_segment_size', str(self.DEFAULT_MAX_SEGMENT_SIZE))
+        config.set('repository', 'append_only', '0')
         config.set('repository', 'id', hexlify(os.urandom(32)).decode('ascii'))
         self.save_config(path, config)
 
@@ -105,6 +106,8 @@ class Repository:
     def destroy(self):
         """Destroy the repository at `self.path`
         """
+        if self.append_only:
+            raise ValueError(self.path + " is in append-only mode")
         self.close()
         os.remove(os.path.join(self.path, 'config'))  # kill config first
         shutil.rmtree(self.path)
@@ -148,6 +151,7 @@ class Repository:
             raise self.InvalidRepository(path)
         self.max_segment_size = self.config.getint('repository', 'max_segment_size')
         self.segments_per_dir = self.config.getint('repository', 'segments_per_dir')
+        self.append_only = self.config.getboolean('repository', 'append_only', fallback=False)
         self.id = unhexlify(self.config.get('repository', 'id').strip())
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
 
@@ -163,7 +167,8 @@ class Repository:
         """Commit transaction
         """
         self.io.write_commit()
-        self.compact_segments(save_space=save_space)
+        if not self.append_only:
+            self.compact_segments(save_space=save_space)
         self.write_index()
         self.rollback()
 
@@ -211,6 +216,11 @@ class Repository:
         self.index.write(os.path.join(self.path, 'index.tmp'))
         os.rename(os.path.join(self.path, 'index.tmp'),
                   os.path.join(self.path, 'index.%d' % transaction_id))
+        if self.append_only:
+            transaction_log = os.path.join(self.path, 'transactions')
+            if not os.path.exists(transaction_log):
+                os.mkdir(transaction_log)
+            open(os.path.join(transaction_log, str(transaction_id)), 'w').close()
         # Remove old indices
         current = '.%d' % transaction_id
         for name in os.listdir(self.path):

@@ -1,5 +1,6 @@
 from configparser import ConfigParser
 from binascii import hexlify, unhexlify
+from datetime import datetime
 from itertools import islice
 import errno
 import logging
@@ -217,10 +218,8 @@ class Repository:
         os.rename(os.path.join(self.path, 'index.tmp'),
                   os.path.join(self.path, 'index.%d' % transaction_id))
         if self.append_only:
-            transaction_log = os.path.join(self.path, 'transactions')
-            if not os.path.exists(transaction_log):
-                os.mkdir(transaction_log)
-            open(os.path.join(transaction_log, str(transaction_id)), 'w').close()
+            with open(os.path.join(self.path, 'transactions'), 'a') as log:
+                print('transaction %d, UTC time %s' % (transaction_id, datetime.utcnow().isoformat()), file=log)
         # Remove old indices
         current = '.%d' % transaction_id
         for name in os.listdir(self.path):
@@ -333,6 +332,8 @@ class Repository:
         This method verifies all segment checksums and makes sure
         the index is consistent with the data stored in the segments.
         """
+        if self.append_only and repair:
+            raise ValueError(self.path + " is in append-only mode")
         error_found = False
 
         def report_error(msg):

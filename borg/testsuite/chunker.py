@@ -1,7 +1,7 @@
 from io import BytesIO
 
 from ..chunker import Chunker, buzhash, buzhash_update
-from ..archive import CHUNK_MAX_EXP
+from ..archive import CHUNK_MAX_EXP, CHUNKER_PARAMS
 from . import BaseTestCase
 
 
@@ -29,3 +29,14 @@ class ChunkerTestCase(BaseTestCase):
         self.assert_equal(buzhash(b'abcdefghijklmnop', 1), buzhash_update(buzhash(b'Xabcdefghijklmno', 1), ord('X'), ord('p'), 16, 1))
         # Test with more than 31 bytes to make sure our barrel_shift macro works correctly
         self.assert_equal(buzhash(b'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz', 0), 566521248)
+
+    def test_small_reads(self):
+        class SmallReadFile:
+            input = b'a' * (20 + 1)
+
+            def read(self, nbytes):
+                self.input = self.input[:-1]
+                return self.input[:1]
+
+        reconstructed = b''.join(Chunker(0, *CHUNKER_PARAMS).chunkify(SmallReadFile()))
+        assert reconstructed == b'a' * 20

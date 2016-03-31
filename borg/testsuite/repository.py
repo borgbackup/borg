@@ -193,6 +193,34 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
             self.assert_equal(len(self.repository), 3)
 
 
+class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
+    def test_destroy_append_only(self):
+        # Can't destroy append only repo (via the API)
+        self.repository.append_only = True
+        with self.assert_raises(ValueError):
+            self.repository.destroy()
+
+    def test_append_only(self):
+        def segments_in_repository():
+            return len(list(self.repository.io.segment_iterator()))
+        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.commit()
+
+        self.repository.append_only = False
+        assert segments_in_repository() == 1
+        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.commit()
+        # normal: compact squashes the data together, only one segment
+        assert segments_in_repository() == 1
+
+        self.repository.append_only = True
+        assert segments_in_repository() == 1
+        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.commit()
+        # append only: does not compact, only new segments written
+        assert segments_in_repository() == 2
+
+
 class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
     def list_indices(self):

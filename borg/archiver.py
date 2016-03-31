@@ -293,6 +293,7 @@ class Archiver:
                  keep_tag_files, skip_inodes, path, restrict_dev,
                  read_special=False, dry_run=False):
         if not matcher.match(path):
+            self.print_file_status('x', path)
             return
 
         try:

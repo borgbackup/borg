@@ -644,6 +644,7 @@ Other flags used include:
 
 - 'i' = backup data was read from standard input (stdin)
 - '-' = dry run, item was *not* backed up
+- 'x' = excluded, item was *not* backed up
 - '?' = missing status code (if you see this, please file a bug report!)
 
 

@@ -174,15 +174,15 @@ class FuseOperations(llfuse.Operations):
             else:
                 entry.st_ctime_ns = bigint_to_int(item[b'mtime'])
         else:
-            entry.st_mtime_ns = bigint_to_int(item[b'mtime']) / 1e9
+            entry.st_mtime = bigint_to_int(item[b'mtime']) / 1e9
             if b'atime' in item:
-                entry.st_atime_ns = bigint_to_int(item[b'atime']) / 1e9
+                entry.st_atime = bigint_to_int(item[b'atime']) / 1e9
             else:
-                entry.st_atime_ns = bigint_to_int(item[b'mtime']) / 1e9
+                entry.st_atime = bigint_to_int(item[b'mtime']) / 1e9
             if b'ctime' in item:
-                entry.st_ctime_ns = bigint_to_int(item[b'ctime']) / 1e9
+                entry.st_ctime = bigint_to_int(item[b'ctime']) / 1e9
             else:
-                entry.st_ctime_ns = bigint_to_int(item[b'mtime']) / 1e9
+                entry.st_ctime = bigint_to_int(item[b'mtime']) / 1e9
         return entry
 
     def listxattr(self, inode, ctx=None):

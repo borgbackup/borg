@@ -1,6 +1,17 @@
 Changelog
 =========
 
+Version 0.30.2 (not released yet)
+---------------------------------
+
+Bug fixes:
+
+- fix silently ignoring I/O errors
+- file stats are packed with 'int_to_bigint' in the archive. Unpack these
+  before passing to llfuse.
+- do not sleep for >60s while waiting for lock, #773
+
+
 Version 0.30.1
 --------------
 

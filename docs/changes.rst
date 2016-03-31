@@ -35,6 +35,7 @@ Other changes:
   - document how to debug / file filesystem issues, fixes #664
   - fix reproducible build of api docs
   - RTD theme: CSS !important overwrite. Fix borgbackup/borg#727
+  - Document logo font. Recreate logo png. Remove GIMP logo file.
 
 
 Version 1.0.0

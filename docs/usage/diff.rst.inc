@@ -8,7 +8,7 @@ borg diff
                      [--show-rc] [--no-files-cache] [--umask M]
                      [--remote-path PATH] [-e PATTERN]
                      [--exclude-from EXCLUDEFILE] [--numeric-owner]
-                     [--same-chunker-params]
+                     [--same-chunker-params] [--sort]
                      ARCHIVE1 ARCHIVE2 [PATH [PATH ...]]
     
     Diff contents of two archives
@@ -39,6 +39,7 @@ borg diff
       --numeric-owner       only consider numeric user and group identifiers
       --same-chunker-params
                             Override check of chunker parameters.
+      --sort                Sort the output lines by file path.
     
 Description
 ~~~~~~~~~~~

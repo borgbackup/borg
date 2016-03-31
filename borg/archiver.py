@@ -514,7 +514,7 @@ class Archiver:
             if item1[b'mode'] != item2[b'mode']:
                 return '[{} -> {}]'.format(get_mode(item1), get_mode(item2))
 
-        def compare_items(path, item1, item2, hardlink_masters, deleted=False):
+        def compare_items(output, path, item1, item2, hardlink_masters, deleted=False):
             """
             Compare two items with identical paths.
             :param deleted: Whether one of the items has been deleted
@@ -545,42 +545,55 @@ class Archiver:
 
             changes = [x for x in changes if x]
             if changes:
-                print("{:<19} {}".format(' '.join(changes), remove_surrogates(path)))
+                output_line = (remove_surrogates(path), ' '.join(changes))
+
+                if args.sort:
+                    output.append(output_line)
+                else:
+                    print_output(output_line)
+
+        def print_output(line):
+            print("{:<19} {}".format(line[1], line[0]))
 
         def compare_archives(archive1, archive2, matcher):
             orphans_archive1 = collections.OrderedDict()
             orphans_archive2 = collections.OrderedDict()
             hardlink_masters = {}
+            output = []
+
             for item1, item2 in zip_longest(
                     archive1.iter_items(lambda item: matcher.match(item[b'path'])),
                     archive2.iter_items(lambda item: matcher.match(item[b'path'])),
             ):
                 if item1 and item2 and item1[b'path'] == item2[b'path']:
-                    compare_items(item1[b'path'], item1, item2, hardlink_masters)
+                    compare_items(output, item1[b'path'], item1, item2, hardlink_masters)
                     continue
                 if item1:
                     matching_orphan = orphans_archive2.pop(item1[b'path'], None)
                     if matching_orphan:
-                        compare_items(item1[b'path'], item1, matching_orphan, hardlink_masters)
+                        compare_items(output, item1[b'path'], item1, matching_orphan, hardlink_masters)
                     else:
                         orphans_archive1[item1[b'path']] = item1
                 if item2:
                     matching_orphan = orphans_archive1.pop(item2[b'path'], None)
                     if matching_orphan:
-                        compare_items(item2[b'path'], matching_orphan, item2, hardlink_masters)
+                        compare_items(output, item2[b'path'], matching_orphan, item2, hardlink_masters)
                     else:
                         orphans_archive2[item2[b'path']] = item2
             # At this point orphans_* contain items that had no matching partner in the other archive
             for added in orphans_archive2.values():
-                compare_items(added[b'path'], {
+                compare_items(output, added[b'path'], {
                     b'deleted': True,
                     b'chunks': [],
                 }, added, hardlink_masters, deleted=True)
             for deleted in orphans_archive1.values():
-                compare_items(deleted[b'path'], deleted, {
+                compare_items(output, deleted[b'path'], deleted, {
                     b'deleted': True,
                     b'chunks': [],
                 }, hardlink_masters, deleted=True)
+
+            for line in sorted(output):
+                print_output(line)
 
         archive1 = archive
         archive2 = Archive(repository, key, manifest, args.archive2)
@@ -1308,6 +1321,9 @@ class Archiver:
         subparser.add_argument('--same-chunker-params', dest='same_chunker_params',
                                action='store_true', default=False,
                                help='Override check of chunker parameters.')
+        subparser.add_argument('--sort', dest='sort',
+                               action='store_true', default=False,
+                               help='Sort the output lines by file path.')
         subparser.add_argument('location', metavar='ARCHIVE1',
                                type=location_validator(archive=True),
                                help='archive')

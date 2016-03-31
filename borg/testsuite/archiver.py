@@ -1351,6 +1351,37 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         # We expect exit_code=1 due to the chunker params warning
         do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1b', exit_code=1), '1b')
 
+    def test_sort_option(self):
+        self.cmd('init', self.repository_location)
+
+        self.create_regular_file('a_file_removed', size=8)
+        self.create_regular_file('f_file_removed', size=16)
+        self.create_regular_file('c_file_changed', size=32)
+        self.create_regular_file('e_file_changed', size=64)
+        self.cmd('create', self.repository_location + '::test0', 'input')
+
+        os.unlink('input/a_file_removed')
+        os.unlink('input/f_file_removed')
+        os.unlink('input/c_file_changed')
+        os.unlink('input/e_file_changed')
+        self.create_regular_file('c_file_changed', size=512)
+        self.create_regular_file('e_file_changed', size=1024)
+        self.create_regular_file('b_file_added', size=128)
+        self.create_regular_file('d_file_added', size=256)
+        self.cmd('create', self.repository_location + '::test1', 'input')
+
+        output = self.cmd('diff', '--sort', self.repository_location + '::test0', 'test1')
+        expected = [
+            'a_file_removed',
+            'b_file_added',
+            'c_file_changed',
+            'd_file_added',
+            'e_file_changed',
+            'f_file_removed',
+        ]
+
+        assert all(x in line for x, line in zip(expected, output.splitlines()))
+
 
 def test_get_args():
     archiver = Archiver()

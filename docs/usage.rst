@@ -714,7 +714,7 @@ Example
 +++++++
 
 Suppose an attacker remotely deleted all backups, but your repository was in append-only
-mode. A transaction look in this situation might look like this: ::
+mode. A transaction log in this situation might look like this: ::
 
     transaction 1, UTC time 2016-03-31T15:53:27.383532
     transaction 5, UTC time 2016-03-31T15:53:52.588922
@@ -728,6 +728,11 @@ that transactions 11 and later are compromised. Note that the transaction ID is 
 name of the *last* file in the transaction. For example, transaction 11 spans files 6
 to 11.
 
+In a real attack you'll likely want to keep the compromised repository
+intact to analyze what the attacker tried to achieve. It's also a good idea to make this
+copy just in case something goes wrong during the recovery. Since recovery is done by
+deleting some files, a hard link copy (``cp -al``) is sufficient.
+
 The first step to reset the repository to transaction 5, the last uncompromised transaction,
 is to remove the ``hints.N`` and ``index.N`` files in the repository (these two files are
 always expendable). In this example N is 13.
@@ -737,9 +742,7 @@ with file 6::
 
     rm data/**/{6..13}
 
-That's all to it. In a real attack you'll likely want to keep the compromised repository
-intact to analyze what the attacker tried to achieve. It's also a good idea to make this
-copy just in case something goes wrong during the recovery.
+That's all to it.
 
 Drawbacks
 +++++++++
@@ -754,7 +757,8 @@ Further considerations
 ++++++++++++++++++++++
 
 Append-only mode is not respected by tools other than Borg. ``rm`` still works on the
-repository. Make sure that backup jobs only get to access the repository with ``borg serve``.
+repository. Make sure that backup client machines only get to access the repository via
+``borg serve``.
 
 Ensure that no remote access is possible if the repository is temporarily set to normal mode
 for e.g. regular pruning.

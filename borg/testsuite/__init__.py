@@ -8,6 +8,7 @@ import sysconfig
 import time
 import unittest
 from ..xattr import get_all
+from ..logger import setup_logging
 
 try:
     import llfuse
@@ -29,6 +30,9 @@ else:
 
 if sys.platform.startswith('netbsd'):
     st_mtime_ns_round = -4  # only >1 microsecond resolution here?
+
+# Ensure that the loggers exist for all tests
+setup_logging()
 
 
 class BaseTestCase(unittest.TestCase):

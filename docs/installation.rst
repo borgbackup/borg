@@ -33,7 +33,7 @@ yet.
 Distribution Source                                        Command
 ============ ============================================= =======
 Arch Linux   `[community]`_                                ``pacman -S borg``
-Debian       `stretch`_, `unstable/sid`_                   ``apt install borgbackup``
+Debian       `jessie-backports`_, `stretch`_, `sid`_       ``apt install borgbackup``
 Gentoo       `ebuild`_                                     ``emerge borgbackup``
 GNU Guix     `GNU Guix`_                                   ``guix package --install borg``
 NetBSD       `pkgsrc`_                                     ``pkg_add py-borgbackup``
@@ -44,6 +44,7 @@ Ubuntu       `Trusty 14.04 (backport PPA)`_                ``apt install borgbac
 ============ ============================================= =======
 
 .. _[community]: https://www.archlinux.org/packages/?name=borg
+.. _jessie-backports: https://packages.debian.org/jessie-backports/borgbackup
 .. _stretch: https://packages.debian.org/stretch/borgbackup
 .. _unstable/sid: https://packages.debian.org/sid/borgbackup
 .. _ebuild: https://packages.gentoo.org/packages/app-backup/borgbackup

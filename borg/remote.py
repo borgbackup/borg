@@ -82,6 +82,7 @@ class RepositoryServer:  # pragma: no cover
                 unpacker.feed(data)
                 for unpacked in unpacker:
                     if not (isinstance(unpacked, tuple) and len(unpacked) == 4):
+                        self.repository.close()
                         raise Exception("Unexpected RPC data format.")
                     type, msgid, method, args = unpacked
                     method = method.decode('ascii')
@@ -94,8 +95,11 @@ class RepositoryServer:  # pragma: no cover
                             f = getattr(self.repository, method)
                         res = f(*args)
                     except BaseException as e:
-                        logging.exception('Borg %s: exception in RPC call:', __version__)
-                        logging.error(sysinfo())
+                        if not isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, Repository.CheckNeeded,
+                                              IntegrityError, PathNotAllowed, Repository.ObjectNotFound,
+                                              InvalidRPCMethod)):
+                            logging.exception('Borg %s: exception in RPC call:', __version__)
+                            logging.error(sysinfo())
                         exc = "Remote Exception (see remote log for the traceback)"
                         os.write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc)))
                     else:
@@ -164,7 +168,11 @@ class RemoteRepository:
             raise ConnectionClosedWithHint('Is borg working on the server?') from None
         if version != RPC_PROTOCOL_VERSION:
             raise Exception('Server insisted on using unsupported protocol version %d' % version)
-        self.id = self.call('open', location.path, create, lock_wait, lock)
+        try:
+            self.id = self.call('open', self.location.path, create, lock_wait, lock)
+        except Exception:
+            self.close()
+            raise
 
     def __del__(self):
         if self.p:

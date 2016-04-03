@@ -93,8 +93,11 @@ class RepositoryServer:  # pragma: no cover
                             f = getattr(self.repository, method)
                         res = f(*args)
                     except BaseException as e:
-                        logging.exception('Borg %s: exception in RPC call:', __version__)
-                        logging.error(sysinfo())
+                        if not isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, Repository.CheckNeeded,
+                                              IntegrityError, PathNotAllowed, Repository.ObjectNotFound,
+                                              InvalidRPCMethod)):
+                            logging.exception('Borg %s: exception in RPC call:', __version__)
+                            logging.error(sysinfo())
                         exc = "Remote Exception (see remote log for the traceback)"
                         os.write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc)))
                     else:

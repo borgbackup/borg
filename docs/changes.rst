@@ -6,35 +6,32 @@ Version 1.0.1 (not released yet)
 
 New features:
 
-Usually there are no new features in a bugfix release, but these 2 were added
-to get them out quickly - as both positively affect your safety/security:
+Usually there are no new features in a bugfix release, but this one was added
+to get it out quickly as it can improve your repository safety/security:
 
-- append-only mode for repositories, #809, #36
-  (please read the docs about how this can improve your security)
-- implement password roundtrip, #695 (make sure the user can know/verify the
-  encryption key password/passphrase, to avoid double-typos, wrong keyboard
-  layout or locale/encoding issues)
+- append-only mode for repositories, #809, #36 (see docs)
 
 Bug fixes:
 
 - fix silently skipping EIO, #748
-- do not sleep for >60s while waiting for lock, fixes #773
+- add context manager for Repository (avoid orphan repository locks), #285
+- do not sleep for >60s while waiting for lock, #773
 - unpack file stats before passing to FUSE
 - fix build on illumos
 - don't try to backup doors or event ports (Solaris and derivates)
 - fix capitalization, add ellipses, change log level to debug for 2 messages, fixes #798
-- remove useless/misleading libc version display, fixes #738
+- remove useless/misleading libc version display, #738
 
 Other changes:
 
 - update llfuse requirement, llfuse 1.0 works
-- update OS / dist packages on build machines, fixes #717
+- update OS / dist packages on build machines, #717
 - docs:
 
   - fix cygwin requirements (gcc-g++)
-  - document how to debug / file filesystem issues, fixes #664
+  - document how to debug / file filesystem issues, #664
   - fix reproducible build of api docs
-  - RTD theme: CSS !important overwrite. Fix borgbackup/borg#727
+  - RTD theme: CSS !important overwrite, #727
   - Document logo font. Recreate logo png. Remove GIMP logo file.
 
 

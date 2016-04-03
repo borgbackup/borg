@@ -195,6 +195,10 @@ class RemoteRepository:
                 opts.append('--info')
             elif root_logger.isEnabledFor(logging.WARNING):
                 pass  # warning is default
+            elif root_logger.isEnabledFor(logging.ERROR):
+                opts.append('--error')
+            elif root_logger.isEnabledFor(logging.CRITICAL):
+                opts.append('--critical')
             else:
                 raise ValueError('log level missing, fix this code')
         if testing:

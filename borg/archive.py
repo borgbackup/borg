@@ -879,7 +879,7 @@ class ArchiveChecker:
                 for id_ in unused:
                     self.repository.delete(id_)
         else:
-            logger.warning('Orphaned objects check skipped (needs all archives checked).')
+            logger.info('Orphaned objects check skipped (needs all archives checked).')
 
     def finish(self, save_space=False):
         if self.repair:

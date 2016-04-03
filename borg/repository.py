@@ -60,15 +60,30 @@ class Repository:
         self.lock = None
         self.index = None
         self._active_txn = False
-        if create:
-            self.create(self.path)
-        self.open(self.path, exclusive, lock_wait=lock_wait, lock=lock)
+        self.lock_wait = lock_wait
+        self.do_lock = lock
+        self.do_create = create
+        self.exclusive = exclusive
 
     def __del__(self):
-        self.close()
+        if self.lock:
+            self.close()
+            assert False, "cleanup happened in Repository.__del__"
 
     def __repr__(self):
         return '<%s %s>' % (self.__class__.__name__, self.path)
+
+    def __enter__(self):
+        if self.do_create:
+            self.do_create = False
+            self.create(self.path)
+        self.open(self.path, self.exclusive, lock_wait=self.lock_wait, lock=self.do_lock)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.rollback()
+        self.close()
 
     def create(self, path):
         """Create a new empty repository at `path`

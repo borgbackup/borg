@@ -39,18 +39,56 @@ UMASK_DEFAULT = 0o077
 DASHES = '-' * 78
 
 
-class ToggleAction(argparse.Action):
-    """argparse action to handle "toggle" flags easily
+def argument(args, str_or_bool):
+    """If bool is passed, return it. If str is passed, retrieve named attribute from args."""
+    if isinstance(str_or_bool, str):
+        return getattr(args, str_or_bool)
+    return str_or_bool
 
-    toggle flags are in the form of ``--foo``, ``--no-foo``.
 
-    the ``--no-foo`` argument still needs to be passed to the
-    ``add_argument()`` call, but it simplifies the ``--no``
-    detection.
+def with_repository(fake=False, create=False, lock=True, exclusive=False, manifest=True, cache=False):
     """
-    def __call__(self, parser, ns, values, option):
-        """set the given flag to true unless ``--no`` is passed"""
-        setattr(ns, self.dest, not option.startswith('--no-'))
+    Method decorator for subcommand-handling methods: do_XYZ(self, args, repository, …)
+
+    If a parameter (where allowed) is a str the attribute named of args is used instead.
+    :param fake: (str or bool) use None instead of repository, don't do anything else
+    :param create: create repository
+    :param lock: lock repository
+    :param exclusive: (str or bool) lock repository exclusively (for writing)
+    :param manifest: load manifest and key, pass them as keyword arguments
+    :param cache: open cache, pass it as keyword argument (implies manifest)
+    """
+    def decorator(method):
+        @functools.wraps(method)
+        def wrapper(self, args, **kwargs):
+            location = args.location  # note: 'location' must be always present in args
+            if argument(args, fake):
+                return method(self, args, repository=None, **kwargs)
+            elif location.proto == 'ssh':
+                repository = RemoteRepository(location, create=create, lock_wait=self.lock_wait, lock=lock, args=args)
+            else:
+                repository = Repository(location.path, create=create, exclusive=argument(args, exclusive),
+                                        lock_wait=self.lock_wait, lock=lock)
+            with repository:
+                if manifest or cache:
+                    kwargs['manifest'], kwargs['key'] = Manifest.load(repository)
+                if cache:
+                    with Cache(repository, kwargs['key'], kwargs['manifest'],
+                               do_files=getattr(args, 'cache_files', False), lock_wait=self.lock_wait) as cache_:
+                        return method(self, args, repository=repository, cache=cache_, **kwargs)
+                else:
+                    return method(self, args, repository=repository, **kwargs)
+        return wrapper
+    return decorator
+
+
+def with_archive(method):
+    @functools.wraps(method)
+    def wrapper(self, args, repository, key, manifest, **kwargs):
+        archive = Archive(repository, key, manifest, args.location.archive,
+                          numeric_owner=getattr(args, 'numeric_owner', False), cache=kwargs.get('cache'))
+        return method(self, args, repository=repository, manifest=manifest, key=key, archive=archive, **kwargs)
+    return wrapper
 
 
 class Archiver:
@@ -58,14 +96,6 @@ class Archiver:
     def __init__(self, lock_wait=None):
         self.exit_code = EXIT_SUCCESS
         self.lock_wait = lock_wait
-
-    def open_repository(self, args, create=False, exclusive=False, lock=True):
-        location = args.location  # note: 'location' must be always present in args
-        if location.proto == 'ssh':
-            repository = RemoteRepository(location, create=create, lock_wait=self.lock_wait, lock=lock, args=args)
-        else:
-            repository = Repository(location.path, create=create, exclusive=exclusive, lock_wait=self.lock_wait, lock=lock)
-        return repository
 
     def print_error(self, msg, *args):
         msg = args and msg % args or msg
@@ -86,10 +116,10 @@ class Archiver:
         """
         return RepositoryServer(restrict_to_paths=args.restrict_to_paths).serve()
 
-    def do_init(self, args):
+    @with_repository(create=True, exclusive=True, manifest=False)
+    def do_init(self, args, repository):
         """Initialize an empty repository"""
         logger.info('Initializing repository at "%s"' % args.location.canonical_path())
-        repository = self.open_repository(args, create=True, exclusive=True)
         key = key_creator(repository, args)
         manifest = Manifest(key, repository)
         manifest.key = key
@@ -99,9 +129,9 @@ class Archiver:
             pass
         return self.exit_code
 
-    def do_check(self, args):
+    @with_repository(exclusive='repair', manifest=False)
+    def do_check(self, args, repository):
         """Check repository consistency"""
-        repository = self.open_repository(args, exclusive=args.repair)
         if args.repair:
             msg = ("'check --repair' is an experimental feature that might result in data loss." +
                    "\n" +
@@ -118,16 +148,15 @@ class Archiver:
             return EXIT_WARNING
         return EXIT_SUCCESS
 
-    def do_change_passphrase(self, args):
+    @with_repository()
+    def do_change_passphrase(self, args, repository, manifest, key):
         """Change repository key file passphrase"""
-        repository = self.open_repository(args)
-        manifest, key = Manifest.load(repository)
         key.change_passphrase()
         return EXIT_SUCCESS
 
-    def do_migrate_to_repokey(self, args):
+    @with_repository(manifest=False)
+    def do_migrate_to_repokey(self, args, repository):
         """Migrate passphrase -> repokey"""
-        repository = self.open_repository(args)
         manifest_data = repository.get(Manifest.MANIFEST_ID)
         key_old = PassphraseKey.detect(repository, manifest_data)
         key_new = RepoKey(repository)
@@ -140,7 +169,8 @@ class Archiver:
         key_new.change_passphrase()  # option to change key protection passphrase, save
         return EXIT_SUCCESS
 
-    def do_create(self, args):
+    @with_repository(fake='dry_run')
+    def do_create(self, args, repository, manifest=None, key=None):
         """Create new archive"""
         matcher = PatternMatcher(fallback=True)
         if args.excludes:
@@ -204,8 +234,6 @@ class Archiver:
         dry_run = args.dry_run
         t0 = datetime.utcnow()
         if not dry_run:
-            repository = self.open_repository(args, exclusive=True)
-            manifest, key = Manifest.load(repository)
             compr_args = dict(buffer=COMPR_BUFFER)
             compr_args.update(args.compression)
             key.compressor = Compressor(**compr_args)
@@ -298,17 +326,15 @@ class Archiver:
                 status = '-'  # dry run, item was not backed up
         self.print_file_status(status, path)
 
-    def do_extract(self, args):
+    @with_repository()
+    @with_archive
+    def do_extract(self, args, repository, manifest, key, archive):
         """Extract archive contents"""
         # be restrictive when restoring files, restore permissions later
         if sys.getfilesystemencoding() == 'ascii':
             logger.warning('Warning: File system encoding is "ascii", extracting non-ascii filenames will not be supported.')
             if sys.platform.startswith(('linux', 'freebsd', 'netbsd', 'openbsd', 'darwin', )):
                 logger.warning('Hint: You likely need to fix your locale setup. E.g. install locales and use: LANG=en_US.UTF-8')
-        repository = self.open_repository(args)
-        manifest, key = Manifest.load(repository)
-        archive = Archive(repository, key, manifest, args.location.archive,
-                          numeric_owner=args.numeric_owner)
 
         matcher = PatternMatcher()
         if args.excludes:
@@ -359,55 +385,52 @@ class Archiver:
                 self.print_warning("Include pattern '%s' never matched.", pattern)
         return self.exit_code
 
-    def do_rename(self, args):
+    @with_repository(exclusive=True, cache=True)
+    @with_archive
+    def do_rename(self, args, repository, manifest, key, cache, archive):
         """Rename an existing archive"""
-        repository = self.open_repository(args, exclusive=True)
-        manifest, key = Manifest.load(repository)
-        with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
-            archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
-            archive.rename(args.name)
-            manifest.write()
-            repository.commit()
-            cache.commit()
+        archive.rename(args.name)
+        manifest.write()
+        repository.commit()
+        cache.commit()
         return self.exit_code
 
-    def do_delete(self, args):
+    @with_repository(exclusive=True, cache=True)
+    def do_delete(self, args, repository, manifest, key, cache):
         """Delete an existing repository or archive"""
-        repository = self.open_repository(args, exclusive=True)
-        manifest, key = Manifest.load(repository)
-        with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
-            if args.location.archive:
-                archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
-                stats = Statistics()
-                archive.delete(stats, progress=args.progress)
-                manifest.write()
-                repository.commit(save_space=args.save_space)
-                cache.commit()
-                logger.info("Archive deleted.")
-                if args.stats:
-                    log_multi(DASHES,
-                              stats.summary.format(label='Deleted data:', stats=stats),
-                              str(cache),
-                              DASHES)
-            else:
-                if not args.cache_only:
-                    msg = []
-                    msg.append("You requested to completely DELETE the repository *including* all archives it contains:")
-                    for archive_info in manifest.list_archive_infos(sort_by='ts'):
-                        msg.append(format_archive(archive_info))
-                    msg.append("Type 'YES' if you understand this and want to continue: ")
-                    msg = '\n'.join(msg)
-                    if not yes(msg, false_msg="Aborting.", truish=('YES', ),
-                               env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'):
-                        self.exit_code = EXIT_ERROR
-                        return self.exit_code
-                    repository.destroy()
-                    logger.info("Repository deleted.")
-                cache.destroy()
-                logger.info("Cache deleted.")
+        if args.location.archive:
+            archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
+            stats = Statistics()
+            archive.delete(stats, progress=args.progress)
+            manifest.write()
+            repository.commit(save_space=args.save_space)
+            cache.commit()
+            logger.info("Archive deleted.")
+            if args.stats:
+                log_multi(DASHES,
+                          stats.summary.format(label='Deleted data:', stats=stats),
+                          str(cache),
+                          DASHES)
+        else:
+            if not args.cache_only:
+                msg = []
+                msg.append("You requested to completely DELETE the repository *including* all archives it contains:")
+                for archive_info in manifest.list_archive_infos(sort_by='ts'):
+                    msg.append(format_archive(archive_info))
+                msg.append("Type 'YES' if you understand this and want to continue: ")
+                msg = '\n'.join(msg)
+                if not yes(msg, false_msg="Aborting.", truish=('YES', ),
+                           env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'):
+                    self.exit_code = EXIT_ERROR
+                    return self.exit_code
+                repository.destroy()
+                logger.info("Repository deleted.")
+            cache.destroy()
+            logger.info("Cache deleted.")
         return self.exit_code
 
-    def do_mount(self, args):
+    @with_repository()
+    def do_mount(self, args, repository, manifest, key):
         """Mount archive or an entire repository as a FUSE fileystem"""
         try:
             from .fuse import FuseOperations
@@ -419,29 +442,23 @@ class Archiver:
             self.print_error('%s: Mountpoint must be a writable directory' % args.mountpoint)
             return self.exit_code
 
-        repository = self.open_repository(args)
-        try:
-            with cache_if_remote(repository) as cached_repo:
-                manifest, key = Manifest.load(repository)
-                if args.location.archive:
-                    archive = Archive(repository, key, manifest, args.location.archive)
-                else:
-                    archive = None
-                operations = FuseOperations(key, repository, manifest, archive, cached_repo)
-                logger.info("Mounting filesystem")
-                try:
-                    operations.mount(args.mountpoint, args.options, args.foreground)
-                except RuntimeError:
-                    # Relevant error message already printed to stderr by fuse
-                    self.exit_code = EXIT_ERROR
-        finally:
-            repository.close()
+        with cache_if_remote(repository) as cached_repo:
+            if args.location.archive:
+                archive = Archive(repository, key, manifest, args.location.archive)
+            else:
+                archive = None
+            operations = FuseOperations(key, repository, manifest, archive, cached_repo)
+            logger.info("Mounting filesystem")
+            try:
+                operations.mount(args.mountpoint, args.options, args.foreground)
+            except RuntimeError:
+                # Relevant error message already printed to stderr by fuse
+                self.exit_code = EXIT_ERROR
         return self.exit_code
 
-    def do_list(self, args):
+    @with_repository()
+    def do_list(self, args, repository, manifest, key):
         """List archive or repository contents"""
-        repository = self.open_repository(args)
-        manifest, key = Manifest.load(repository)
         if args.location.archive:
             archive = Archive(repository, key, manifest, args.location.archive)
             """use_user_format flag is used to speed up default listing.
@@ -515,7 +532,6 @@ class Archiver:
                 item_data['formatkeys'] = list(item_data.keys())
 
                 print(format_line(list_format, item_data), end='')
-
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 if args.prefix and not archive_info.name.startswith(args.prefix):
@@ -526,30 +542,27 @@ class Archiver:
                     print(format_archive(archive_info))
         return self.exit_code
 
-    def do_info(self, args):
+    @with_repository(cache=True)
+    @with_archive
+    def do_info(self, args, repository, manifest, key, archive, cache):
         """Show archive details such as disk space used"""
-        repository = self.open_repository(args)
-        manifest, key = Manifest.load(repository)
-        with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
-            archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
-            stats = archive.calc_stats(cache)
-            print('Name:', archive.name)
-            print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
-            print('Hostname:', archive.metadata[b'hostname'])
-            print('Username:', archive.metadata[b'username'])
-            print('Time (start): %s' % format_time(to_localtime(archive.ts)))
-            print('Time (end):   %s' % format_time(to_localtime(archive.ts_end)))
-            print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
-            print('Number of files: %d' % stats.nfiles)
-            print()
-            print(str(stats))
-            print(str(cache))
+        stats = archive.calc_stats(cache)
+        print('Name:', archive.name)
+        print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
+        print('Hostname:', archive.metadata[b'hostname'])
+        print('Username:', archive.metadata[b'username'])
+        print('Time (start): %s' % format_time(to_localtime(archive.ts)))
+        print('Time (end):   %s' % format_time(to_localtime(archive.ts_end)))
+        print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
+        print('Number of files: %d' % stats.nfiles)
+        print()
+        print(str(stats))
+        print(str(cache))
         return self.exit_code
 
-    def do_prune(self, args):
+    @with_repository()
+    def do_prune(self, args, repository, manifest, key):
         """Prune repository archives according to specified rules"""
-        repository = self.open_repository(args, exclusive=True)
-        manifest, key = Manifest.load(repository)
         archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
         if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0 and args.within is None:
             self.print_error('At least one of the "keep-within", "keep-hourly", "keep-daily", "keep-weekly", '
@@ -614,10 +627,9 @@ class Archiver:
             print("warning: %s" % e)
         return self.exit_code
 
-    def do_debug_dump_archive_items(self, args):
+    @with_repository()
+    def do_debug_dump_archive_items(self, args, repository, manifest, key):
         """dump (decrypted, decompressed) archive items metadata (not: data)"""
-        repository = self.open_repository(args)
-        manifest, key = Manifest.load(repository)
         archive = Archive(repository, key, manifest, args.location.archive)
         for i, item_id in enumerate(archive.metadata[b'items']):
             data = key.decrypt(item_id, repository.get(item_id))
@@ -628,10 +640,9 @@ class Archiver:
         print('Done.')
         return EXIT_SUCCESS
 
-    def do_debug_get_obj(self, args):
+    @with_repository(manifest=False)
+    def do_debug_get_obj(self, args, repository):
         """get object contents from the repository and write it into file"""
-        repository = self.open_repository(args)
-        manifest, key = Manifest.load(repository)
         hex_id = args.id
         try:
             id = unhexlify(hex_id)
@@ -648,10 +659,9 @@ class Archiver:
                 print("object %s fetched." % hex_id)
         return EXIT_SUCCESS
 
-    def do_debug_put_obj(self, args):
+    @with_repository(manifest=False)
+    def do_debug_put_obj(self, args, repository):
         """put file(s) contents into the repository"""
-        repository = self.open_repository(args)
-        manifest, key = Manifest.load(repository)
         for path in args.paths:
             with open(path, "rb") as f:
                 data = f.read()
@@ -661,10 +671,9 @@ class Archiver:
         repository.commit()
         return EXIT_SUCCESS
 
-    def do_debug_delete_obj(self, args):
+    @with_repository(manifest=False)
+    def do_debug_delete_obj(self, args, repository):
         """delete the objects with the given IDs from the repo"""
-        repository = self.open_repository(args)
-        manifest, key = Manifest.load(repository)
         modified = False
         for hex_id in args.ids:
             try:
@@ -683,14 +692,11 @@ class Archiver:
         print('Done.')
         return EXIT_SUCCESS
 
-    def do_break_lock(self, args):
+    @with_repository(lock=False, manifest=False)
+    def do_break_lock(self, args, repository):
         """Break the repository lock (e.g. in case it was left by a dead borg."""
-        repository = self.open_repository(args, lock=False)
-        try:
-            repository.break_lock()
-            Cache.break_lock(repository)
-        finally:
-            repository.close()
+        repository.break_lock()
+        Cache.break_lock(repository)
         return self.exit_code
 
     helptext = {}

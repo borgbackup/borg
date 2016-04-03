@@ -23,11 +23,9 @@ def repo_valid(path):
     :param path: the path to the repository
     :returns: if borg can check the repository
     """
-    repository = Repository(str(path), create=False)
-    # can't check raises() because check() handles the error
-    state = repository.check()
-    repository.close()
-    return state
+    with Repository(str(path), create=False) as repository:
+        # can't check raises() because check() handles the error
+        return repository.check()
 
 
 def key_valid(path):
@@ -79,11 +77,11 @@ def test_convert_segments(tmpdir, attic_repo, inplace):
     """
     # check should fail because of magic number
     assert not repo_valid(tmpdir)
-    repo = AtticRepositoryUpgrader(str(tmpdir), create=False)
-    segments = [filename for i, filename in repo.io.segment_iterator()]
-    repo.close()
-    repo.convert_segments(segments, dryrun=False, inplace=inplace)
-    repo.convert_cache(dryrun=False)
+    repository = AtticRepositoryUpgrader(str(tmpdir), create=False)
+    with repository:
+        segments = [filename for i, filename in repository.io.segment_iterator()]
+    repository.convert_segments(segments, dryrun=False, inplace=inplace)
+    repository.convert_cache(dryrun=False)
     assert repo_valid(tmpdir)
 
 
@@ -138,9 +136,9 @@ def test_keys(tmpdir, attic_repo, attic_key_file):
     define above)
     :param attic_key_file: an attic.key.KeyfileKey (fixture created above)
     """
-    repository = AtticRepositoryUpgrader(str(tmpdir), create=False)
-    keyfile = AtticKeyfileKey.find_key_file(repository)
-    AtticRepositoryUpgrader.convert_keyfiles(keyfile, dryrun=False)
+    with AtticRepositoryUpgrader(str(tmpdir), create=False) as repository:
+        keyfile = AtticKeyfileKey.find_key_file(repository)
+        AtticRepositoryUpgrader.convert_keyfiles(keyfile, dryrun=False)
     assert key_valid(attic_key_file.path)
 
 
@@ -167,19 +165,19 @@ def test_convert_all(tmpdir, attic_repo, attic_key_file, inplace):
         return stat_segment(path).st_ino
 
     orig_inode = first_inode(attic_repo.path)
-    repo = AtticRepositoryUpgrader(str(tmpdir), create=False)
-    # replicate command dispatch, partly
-    os.umask(UMASK_DEFAULT)
-    backup = repo.upgrade(dryrun=False, inplace=inplace)
-    if inplace:
-        assert backup is None
-        assert first_inode(repo.path) == orig_inode
-    else:
-        assert backup
-        assert first_inode(repo.path) != first_inode(backup)
-        # i have seen cases where the copied tree has world-readable
-        # permissions, which is wrong
-        assert stat_segment(backup).st_mode & UMASK_DEFAULT == 0
+    with AtticRepositoryUpgrader(str(tmpdir), create=False) as repository:
+        # replicate command dispatch, partly
+        os.umask(UMASK_DEFAULT)
+        backup = repository.upgrade(dryrun=False, inplace=inplace)
+        if inplace:
+            assert backup is None
+            assert first_inode(repository.path) == orig_inode
+        else:
+            assert backup
+            assert first_inode(repository.path) != first_inode(backup)
+            # i have seen cases where the copied tree has world-readable
+            # permissions, which is wrong
+            assert stat_segment(backup).st_mode & UMASK_DEFAULT == 0
 
     assert key_valid(attic_key_file.path)
     assert repo_valid(tmpdir)

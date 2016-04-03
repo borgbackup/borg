@@ -21,6 +21,7 @@ class RepositoryTestCaseBase(BaseTestCase):
     def setUp(self):
         self.tmppath = tempfile.mkdtemp()
         self.repository = self.open(create=True)
+        self.repository.__enter__()
 
     def tearDown(self):
         self.repository.close()
@@ -43,13 +44,12 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         self.assert_raises(Repository.ObjectNotFound, lambda: self.repository.get(key50))
         self.repository.commit()
         self.repository.close()
-        repository2 = self.open()
-        self.assert_raises(Repository.ObjectNotFound, lambda: repository2.get(key50))
-        for x in range(100):
-            if x == 50:
-                continue
-            self.assert_equal(repository2.get(('%-32d' % x).encode('ascii')), b'SOMEDATA')
-        repository2.close()
+        with self.open() as repository2:
+            self.assert_raises(Repository.ObjectNotFound, lambda: repository2.get(key50))
+            for x in range(100):
+                if x == 50:
+                    continue
+                self.assert_equal(repository2.get(('%-32d' % x).encode('ascii')), b'SOMEDATA')
 
     def test2(self):
         """Test multiple sequential transactions
@@ -100,13 +100,14 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         self.repository.close()
         # replace
         self.repository = self.open()
-        self.repository.put(b'00000000000000000000000000000000', b'bar')
-        self.repository.commit()
-        self.repository.close()
+        with self.repository:
+            self.repository.put(b'00000000000000000000000000000000', b'bar')
+            self.repository.commit()
         # delete
         self.repository = self.open()
-        self.repository.delete(b'00000000000000000000000000000000')
-        self.repository.commit()
+        with self.repository:
+            self.repository.delete(b'00000000000000000000000000000000')
+            self.repository.commit()
 
     def test_list(self):
         for x in range(100):
@@ -139,8 +140,9 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
             if name.startswith('index.'):
                 os.unlink(os.path.join(self.repository.path, name))
         self.reopen()
-        self.assert_equal(len(self.repository), 3)
-        self.assert_equal(self.repository.check(), True)
+        with self.repository:
+            self.assert_equal(len(self.repository), 3)
+            self.assert_equal(self.repository.check(), True)
 
     def test_crash_before_compact_segments(self):
         self.add_keys()
@@ -150,8 +152,9 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         except TypeError:
             pass
         self.reopen()
-        self.assert_equal(len(self.repository), 3)
-        self.assert_equal(self.repository.check(), True)
+        with self.repository:
+            self.assert_equal(len(self.repository), 3)
+            self.assert_equal(self.repository.check(), True)
 
     def test_replay_of_readonly_repository(self):
         self.add_keys()
@@ -160,8 +163,9 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
                 os.unlink(os.path.join(self.repository.path, name))
         with patch.object(UpgradableLock, 'upgrade', side_effect=LockFailed) as upgrade:
             self.reopen()
-            self.assert_raises(LockFailed, lambda: len(self.repository))
-            upgrade.assert_called_once_with()
+            with self.repository:
+                self.assert_raises(LockFailed, lambda: len(self.repository))
+                upgrade.assert_called_once_with()
 
     def test_crash_before_write_index(self):
         self.add_keys()
@@ -171,8 +175,9 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         except TypeError:
             pass
         self.reopen()
-        self.assert_equal(len(self.repository), 3)
-        self.assert_equal(self.repository.check(), True)
+        with self.repository:
+            self.assert_equal(len(self.repository), 3)
+            self.assert_equal(self.repository.check(), True)
 
     def test_crash_before_deleting_compacted_segments(self):
         self.add_keys()
@@ -182,9 +187,10 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         except TypeError:
             pass
         self.reopen()
-        self.assert_equal(len(self.repository), 3)
-        self.assert_equal(self.repository.check(), True)
-        self.assert_equal(len(self.repository), 3)
+        with self.repository:
+            self.assert_equal(len(self.repository), 3)
+            self.assert_equal(self.repository.check(), True)
+            self.assert_equal(len(self.repository), 3)
 
 
 class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
@@ -341,8 +347,9 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
             self.repository.commit()
             compact.assert_called_once_with(save_space=False)
         self.reopen()
-        self.check(repair=True)
-        self.assert_equal(self.repository.get(bytes(32)), b'data2')
+        with self.repository:
+            self.check(repair=True)
+            self.assert_equal(self.repository.get(bytes(32)), b'data2')
 
 
 class RemoteRepositoryTestCase(RepositoryTestCase):

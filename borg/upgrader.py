@@ -30,23 +30,23 @@ class AtticRepositoryUpgrader(Repository):
         we nevertheless do the order in reverse, as we prefer to do
         the fast stuff first, to improve interactivity.
         """
-        backup = None
-        if not inplace:
-            backup = '{}.upgrade-{:%Y-%m-%d-%H:%M:%S}'.format(self.path, datetime.datetime.now())
-            logger.info('making a hardlink copy in %s', backup)
-            if not dryrun:
-                shutil.copytree(self.path, backup, copy_function=os.link)
-        logger.info("opening attic repository with borg and converting")
-        # now lock the repo, after we have made the copy
-        self.lock = UpgradableLock(os.path.join(self.path, 'lock'), exclusive=True, timeout=1.0).acquire()
-        segments = [filename for i, filename in self.io.segment_iterator()]
-        try:
-            keyfile = self.find_attic_keyfile()
-        except KeyfileNotFoundError:
-            logger.warning("no key file found for repository")
-        else:
-            self.convert_keyfiles(keyfile, dryrun)
-        self.close()
+        with self:
+            backup = None
+            if not inplace:
+                backup = '{}.upgrade-{:%Y-%m-%d-%H:%M:%S}'.format(self.path, datetime.datetime.now())
+                logger.info('making a hardlink copy in %s', backup)
+                if not dryrun:
+                    shutil.copytree(self.path, backup, copy_function=os.link)
+            logger.info("opening attic repository with borg and converting")
+            # now lock the repo, after we have made the copy
+            self.lock = UpgradableLock(os.path.join(self.path, 'lock'), exclusive=True, timeout=1.0).acquire()
+            segments = [filename for i, filename in self.io.segment_iterator()]
+            try:
+                keyfile = self.find_attic_keyfile()
+            except KeyfileNotFoundError:
+                logger.warning("no key file found for repository")
+            else:
+                self.convert_keyfiles(keyfile, dryrun)
         # partial open: just hold on to the lock
         self.lock = UpgradableLock(os.path.join(self.path, 'lock'),
                                    exclusive=True).acquire()
@@ -282,12 +282,13 @@ class BorgRepositoryUpgrader(Repository):
         """convert an old borg repository to a current borg repository
         """
         logger.info("converting borg 0.xx to borg current")
-        try:
-            keyfile = self.find_borg0xx_keyfile()
-        except KeyfileNotFoundError:
-            logger.warning("no key file found for repository")
-        else:
-            self.move_keyfiles(keyfile, dryrun)
+        with self:
+            try:
+                keyfile = self.find_borg0xx_keyfile()
+            except KeyfileNotFoundError:
+                logger.warning("no key file found for repository")
+            else:
+                self.move_keyfiles(keyfile, dryrun)
 
     def find_borg0xx_keyfile(self):
         return Borg0xxKeyfileKey.find_key_file(self)

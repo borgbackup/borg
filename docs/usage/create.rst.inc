@@ -6,7 +6,7 @@ borg create
 
     usage: borg create [-h] [-v] [--debug] [--lock-wait N] [--show-version]
                        [--show-rc] [--no-files-cache] [--umask M]
-                       [--remote-path PATH] [-s] [-p] [--list]
+                       [--remote-path PATH] [--comment COMMENT] [-s] [-p] [--list]
                        [--filter STATUSCHARS] [-e PATTERN]
                        [--exclude-from EXCLUDEFILE] [--exclude-caches]
                        [--exclude-if-present FILENAME] [--keep-tag-files]
@@ -36,6 +36,7 @@ borg create
                             detect unchanged files
       --umask M             set umask to M (local and remote, default: 0077)
       --remote-path PATH    set remote path to executable (default: "borg")
+      --comment COMMENT     add a comment text to the archive
       -s, --stats           print statistics for the created archive
       -p, --progress        show progress display while creating the archive,
                             showing Original, Compressed and Deduplicated sizes,

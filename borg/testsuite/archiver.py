@@ -754,6 +754,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('test.3', manifest.archives)
         self.assert_in('test.4', manifest.archives)
 
+    def test_comment(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test1', 'input')
+        self.cmd('create', '--comment', 'this is the comment', self.repository_location + '::test2', 'input')
+        assert 'Comment: \n' in self.cmd('info', self.repository_location + '::test1')
+        assert 'Comment: this is the comment' in self.cmd('info', self.repository_location + '::test2')
+
+        self.cmd('comment', self.repository_location + '::test1', 'added comment')
+        self.cmd('comment', self.repository_location + '::test2', 'modified comment')
+        assert 'Comment: added comment' in self.cmd('info', self.repository_location + '::test1')
+        assert 'Comment: modified comment' in self.cmd('info', self.repository_location + '::test2')
+
     def test_delete(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('dir2/file2', size=1024 * 80)

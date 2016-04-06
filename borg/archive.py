@@ -180,7 +180,7 @@ class Archive:
     def load(self, id):
         self.id = id
         self.metadata = self._load_meta(self.id)
-        decode_dict(self.metadata, (b'name', b'hostname', b'username', b'time', b'time_end'))
+        decode_dict(self.metadata, (b'name', b'comment', b'hostname', b'username', b'time', b'time_end'))
         self.metadata[b'cmdline'] = [arg.decode('utf-8', 'surrogateescape') for arg in self.metadata[b'cmdline']]
         self.name = self.metadata[b'name']
 
@@ -240,7 +240,7 @@ Number of files: {0.stats.nfiles}'''.format(
         del self.manifest.archives[self.checkpoint_name]
         self.cache.chunk_decref(self.id, self.stats)
 
-    def save(self, name=None, timestamp=None):
+    def save(self, name=None, comment=None, timestamp=None):
         name = name or self.name
         if name in self.manifest.archives:
             raise self.AlreadyExists(name)
@@ -256,6 +256,7 @@ Number of files: {0.stats.nfiles}'''.format(
         metadata = StableDict({
             'version': 1,
             'name': name,
+            'comment': comment,
             'items': self.items_buffer.chunks,
             'cmdline': sys.argv,
             'hostname': socket.gethostname(),
@@ -884,7 +885,7 @@ class ArchiveChecker:
                 archive = StableDict(msgpack.unpackb(data))
                 if archive[b'version'] != 1:
                     raise Exception('Unknown archive metadata version')
-                decode_dict(archive, (b'name', b'hostname', b'username', b'time', b'time_end'))
+                decode_dict(archive, (b'name', b'comment', b'hostname', b'username', b'time', b'time_end'))
                 archive[b'cmdline'] = [arg.decode('utf-8', 'surrogateescape') for arg in archive[b'cmdline']]
                 items_buffer = ChunkBuffer(self.key)
                 items_buffer.write_chunk = add_callback

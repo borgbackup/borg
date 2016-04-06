@@ -262,7 +262,7 @@ class Archiver:
                               args.keep_tag_files, skip_inodes, path, restrict_dev,
                               read_special=args.read_special, dry_run=dry_run)
             if not dry_run:
-                archive.save(timestamp=args.timestamp)
+                archive.save(comment=args.comment, timestamp=args.timestamp)
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 if args.stats:
@@ -629,6 +629,16 @@ class Archiver:
         return self.exit_code
 
     @with_repository(exclusive=True, cache=True)
+    @with_archive
+    def do_comment(self, args, repository, manifest, key, cache, archive):
+        """Set the archive comment"""
+        archive.set_meta(b'comment', args.comment)
+        manifest.write()
+        repository.commit()
+        cache.commit()
+        return self.exit_code
+
+    @with_repository(exclusive=True, cache=True)
     def do_delete(self, args, repository, manifest, key, cache):
         """Delete an existing repository or archive"""
         if args.location.archive:
@@ -735,6 +745,7 @@ class Archiver:
         stats = archive.calc_stats(cache)
         print('Name:', archive.name)
         print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
+        print('Comment:', archive.metadata.get(b'comment', ''))
         print('Hostname:', archive.metadata[b'hostname'])
         print('Username:', archive.metadata[b'username'])
         print('Time (start): %s' % format_time(to_localtime(archive.ts)))
@@ -1179,6 +1190,8 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='create backup')
         subparser.set_defaults(func=self.do_create)
+        subparser.add_argument('--comment', dest='comment', metavar='COMMENT', default='',
+                               help='add a comment text to the archive')
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the created archive')
@@ -1355,6 +1368,21 @@ class Archiver:
         subparser.add_argument('name', metavar='NEWNAME',
                                type=archivename_validator(),
                                help='the new archive name to use')
+
+        comment_epilog = textwrap.dedent("""
+        This command sets the archive comment.
+        """)
+        subparser = subparsers.add_parser('comment', parents=[common_parser],
+                                          description=self.do_comment.__doc__,
+                                          epilog=comment_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='set the archive comment')
+        subparser.set_defaults(func=self.do_comment)
+        subparser.add_argument('location', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='archive to modify')
+        subparser.add_argument('comment', metavar='COMMENT',
+                               help='the new archive comment')
 
         delete_epilog = textwrap.dedent("""
         This command deletes an archive from the repository or the complete repository.

@@ -59,6 +59,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
             sys.stdout = sys.stderr = output = StringIO()
             if archiver is None:
                 archiver = Archiver()
+            archiver.exit_code = EXIT_SUCCESS
             args = archiver.parse_args(list(args))
             ret = archiver.run(args)
             return ret, output.getvalue()
@@ -733,7 +734,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test.2', 'input')
         os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'no'
         self.cmd('delete', self.repository_location, exit_code=2)
-        self.archiver.exit_code = 0
         assert os.path.exists(self.repository_path)
         os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
         self.cmd('delete', self.repository_location)

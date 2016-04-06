@@ -725,6 +725,9 @@ class Archiver:
     @with_archive
     def do_info(self, args, repository, manifest, key, archive, cache):
         """Show archive details such as disk space used"""
+        def format_cmdline(cmdline):
+            return remove_surrogates(' '.join(shlex.quote(x) for x in cmdline))
+
         stats = archive.calc_stats(cache)
         print('Name:', archive.name)
         print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
@@ -732,7 +735,7 @@ class Archiver:
         print('Username:', archive.metadata[b'username'])
         print('Time (start): %s' % format_time(to_localtime(archive.ts)))
         print('Time (end):   %s' % format_time(to_localtime(archive.ts_end)))
-        print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
+        print('Command line:', format_cmdline(archive.metadata[b'cmdline']))
         print('Number of files: %d' % stats.nfiles)
         print()
         print(str(stats))

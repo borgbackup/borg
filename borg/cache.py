@@ -394,7 +394,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             self.chunks[id] = (count - 1, size, csize)
             stats.update(-size, -csize, False)
 
-    def file_known_and_unchanged(self, path_hash, st):
+    def file_known_and_unchanged(self, path_hash, st, ignore_inode=False):
         if not (self.do_files and stat.S_ISREG(st.st_mode)):
             return None
         if self.files is None:
@@ -403,7 +403,8 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not entry:
             return None
         entry = msgpack.unpackb(entry)
-        if entry[2] == st.st_size and bigint_to_int(entry[3]) == st.st_mtime_ns and entry[1] == st.st_ino:
+        if (entry[2] == st.st_size and bigint_to_int(entry[3]) == st.st_mtime_ns and
+                (ignore_inode or entry[1] == st.st_ino)):
             # reset entry age
             entry[0] = 0
             self.files[path_hash] = msgpack.packb(entry)

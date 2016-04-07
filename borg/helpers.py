@@ -1,9 +1,10 @@
 import argparse
 from binascii import hexlify
-from collections import namedtuple
+from collections import namedtuple, deque
 from functools import wraps, partial
 import grp
 import hashlib
+from itertools import islice
 import os
 import stat
 import textwrap
@@ -15,8 +16,8 @@ from string import Formatter
 import platform
 import time
 import unicodedata
-
 import logging
+
 from .logger import create_logger
 logger = create_logger()
 
@@ -39,6 +40,8 @@ import socket
 EXIT_SUCCESS = 0  # everything done, no problems
 EXIT_WARNING = 1  # reached normal end of operation, but there were issues
 EXIT_ERROR = 2  # terminated abruptly, did not reach end of operation
+
+DASHES = '-' * 78
 
 
 class Error(Exception):
@@ -491,6 +494,9 @@ def timestamp(s):
 
 
 def ChunkerParams(s):
+    if s.strip().lower() == "default":
+        from .archive import CHUNKER_PARAMS
+        return CHUNKER_PARAMS
     chunk_min, chunk_max, chunk_mask, window_size = s.split(',')
     if int(chunk_max) > 23:
         # do not go beyond 2**23 (8MB) chunk size now,
@@ -1272,3 +1278,74 @@ class ItemFormatter:
 
     def time(self, key, item):
         return safe_timestamp(item.get(key) or item[b'mtime'])
+
+
+class ChunkIteratorFileWrapper:
+    """File-like wrapper for chunk iterators"""
+
+    def __init__(self, chunk_iterator):
+        self.chunk_iterator = chunk_iterator
+        self.chunk_offset = 0
+        self.chunk = b''
+        self.exhausted = False
+
+    def _refill(self):
+        remaining = len(self.chunk) - self.chunk_offset
+        if not remaining:
+            try:
+                self.chunk = memoryview(next(self.chunk_iterator))
+            except StopIteration:
+                self.exhausted = True
+                return 0  # EOF
+            self.chunk_offset = 0
+            remaining = len(self.chunk)
+        return remaining
+
+    def _read(self, nbytes):
+        if not nbytes:
+            return b''
+        remaining = self._refill()
+        will_read = min(remaining, nbytes)
+        self.chunk_offset += will_read
+        return self.chunk[self.chunk_offset - will_read:self.chunk_offset]
+
+    def read(self, nbytes):
+        parts = []
+        while nbytes and not self.exhausted:
+            read_data = self._read(nbytes)
+            nbytes -= len(read_data)
+            parts.append(read_data)
+        return b''.join(parts)
+
+
+def open_item(archive, item):
+    """Return file-like object for archived item (with chunks)."""
+    chunk_iterator = archive.pipeline.fetch_many([c[0] for c in item[b'chunks']])
+    return ChunkIteratorFileWrapper(chunk_iterator)
+
+
+def file_status(mode):
+    if stat.S_ISREG(mode):
+        return 'A'
+    elif stat.S_ISDIR(mode):
+        return 'd'
+    elif stat.S_ISBLK(mode):
+        return 'b'
+    elif stat.S_ISCHR(mode):
+        return 'c'
+    elif stat.S_ISLNK(mode):
+        return 's'
+    elif stat.S_ISFIFO(mode):
+        return 'f'
+    return '?'
+
+
+def consume(iterator, n=None):
+    """Advance the iterator n-steps ahead. If n is none, consume entirely."""
+    # Use functions that consume iterators at C speed.
+    if n is None:
+        # feed the entire iterator into a zero-length deque
+        deque(iterator, maxlen=0)
+    else:
+        # advance to the empty slice starting at position n
+        next(islice(iterator, n, n), None)

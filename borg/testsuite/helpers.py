@@ -15,7 +15,7 @@ from ..helpers import Location, format_file_size, format_timedelta, make_path_sa
     yes, TRUISH, FALSISH, DEFAULTISH, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
     ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
-    PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, partial_format
+    PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, partial_format, ChunkIteratorFileWrapper
 from . import BaseTestCase, environment_variable, FakeInputs
 
 
@@ -899,3 +899,14 @@ def test_partial_format():
     assert partial_format('{unknown_key}', {}) == '{unknown_key}'
     assert partial_format('{key}{{escaped_key}}', {}) == '{key}{{escaped_key}}'
     assert partial_format('{{escaped_key}}', {'escaped_key': 1234}) == '{{escaped_key}}'
+
+
+def test_chunk_file_wrapper():
+    cfw = ChunkIteratorFileWrapper(iter([b'abc', b'def']))
+    assert cfw.read(2) == b'ab'
+    assert cfw.read(50) == b'cdef'
+    assert cfw.exhausted
+
+    cfw = ChunkIteratorFileWrapper(iter([]))
+    assert cfw.read(2) == b''
+    assert cfw.exhausted

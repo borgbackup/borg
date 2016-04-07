@@ -22,7 +22,7 @@ from .helpers import Error, location_validator, archivename_validator, format_ti
     get_cache_dir, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
-    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ItemFormatter
+    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ItemFormatter, DASHES
 from .logger import create_logger, setup_logging
 logger = create_logger()
 from .compress import Compressor, COMPR_BUFFER
@@ -30,15 +30,13 @@ from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache
 from .key import key_creator, RepoKey, PassphraseKey
-from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
+from .archive import Archive, ArchiveChecker, ArchiveRecreater, CHUNKER_PARAMS
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 
 has_lchflags = hasattr(os, 'lchflags')
 
 # default umask, overriden by --umask, defaults to read/write only for owner
 UMASK_DEFAULT = 0o077
-
-DASHES = '-' * 78
 
 
 def argument(args, str_or_bool):
@@ -402,7 +400,7 @@ class Archiver:
                 filter=lambda item: item_is_hardlink_master(item) or matcher.match(item[b'path'])):
             orig_path = item[b'path']
             if item_is_hardlink_master(item):
-                hardlink_masters[orig_path] = (item.get(b'chunks'), item.get(b'source'))
+                hardlink_masters[orig_path] = (item.get(b'chunks'), None)
             if not matcher.match(item[b'path']):
                 continue
             if strip_components:
@@ -821,6 +819,50 @@ class Archiver:
             repo.upgrade(args.dry_run, inplace=args.inplace, progress=args.progress)
         except NotImplementedError as e:
             print("warning: %s" % e)
+        return self.exit_code
+
+    @with_repository(cache=True, exclusive=True)
+    def do_recreate(self, args, repository, manifest, key, cache):
+        """Re-create archives"""
+        def interrupt(signal_num, stack_frame):
+            if recreater.interrupt:
+                print("Received signal, again. I'm not deaf.\n", file=sys.stderr)
+            else:
+                print("Received signal, will exit cleanly.\n", file=sys.stderr)
+            recreater.interrupt = True
+
+        matcher, include_patterns = self.build_matcher(args.excludes, args.paths)
+        self.output_list = args.output_list
+        self.output_filter = args.output_filter
+
+        recreater = ArchiveRecreater(repository, manifest, key, cache, matcher,
+                                     exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
+                                     keep_tag_files=args.keep_tag_files,
+                                     compression=args.compression, chunker_params=args.chunker_params,
+                                     progress=args.progress, stats=args.stats,
+                                     file_status_printer=self.print_file_status,
+                                     dry_run=args.dry_run)
+
+        signal.signal(signal.SIGTERM, interrupt)
+        signal.signal(signal.SIGINT, interrupt)
+
+        if args.location.archive:
+            name = args.location.archive
+            if recreater.is_temporary_archive(name):
+                self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
+                return self.exit_code
+            recreater.recreate(name)
+        else:
+            for archive in manifest.list_archive_infos(sort_by='ts'):
+                name = archive.name
+                if recreater.is_temporary_archive(name):
+                    continue
+                print('Processing', name)
+                if not recreater.recreate(name):
+                    break
+        manifest.write()
+        repository.commit()
+        cache.commit()
         return self.exit_code
 
     @with_repository()
@@ -1644,6 +1686,100 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')
+
+        recreate_epilog = textwrap.dedent("""
+        Recreate the contents of existing archives.
+
+        --exclude, --exclude-from and PATH have the exact same semantics
+        as in "borg create". If a PATH is specified the resulting archive
+        will only contain files under PATH.
+
+        --compression: all chunks seen will be stored using the given method.
+        Due to how Borg stores compressed size information this might display
+        incorrect information for archives that were not rewritten at the same time.
+        There is no risk of data loss by this.
+
+        --chunker-params will re-chunk all files in the archive, this can be
+        used to have upgraded Borg 0.xx or Attic archives deduplicate with
+        Borg 1.x archives.
+
+        borg recreate is signal safe. Send either SIGINT (Ctrl-C on most terminals) or
+        SIGTERM to request termination.
+
+        Use the *exact same* command line to resume the operation later - changing excludes
+        or paths will lead to inconsistencies (changed excludes will only apply to newly
+        processed files/dirs). Changing compression leads to incorrect size information
+        (which does not cause any data loss, but can be misleading).
+        Changing chunker params between invocations might lead to data loss.
+
+        USE WITH CAUTION.
+        Permanent data loss by specifying incorrect patterns or PATHS is possible.
+        When in doubt, use "--dry-run --verbose --list" to see how patterns/PATHS are
+        interpreted.
+
+        The archive being recreated is only removed after the operation completes. The
+        archive that is built during the operation exists at the same time at
+        "<ARCHIVE>.recreate". The new archive will have a different archive ID.
+
+        When rechunking space usage can be substantial, expect at least the entire
+        deduplicated size of the archives using the older chunker params.
+        When recompressing approximately 1 % of the repository size or 512 MB
+        (whichever is greater) of additional space is used.
+        """)
+        subparser = subparsers.add_parser('recreate', parents=[common_parser], add_help=False,
+                                          description=self.do_recreate.__doc__,
+                                          epilog=recreate_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help=self.do_recreate.__doc__)
+        subparser.set_defaults(func=self.do_recreate)
+        subparser.add_argument('--list', dest='output_list',
+                               action='store_true', default=False,
+                               help='output verbose list of items (files, dirs, ...)')
+        subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
+                               help='only display items with the given status characters')
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help='show progress display while rewriting archives')
+        subparser.add_argument('-n', '--dry-run', dest='dry_run',
+                               action='store_true', default=False,
+                               help='do not change anything')
+        subparser.add_argument('-s', '--stats', dest='stats',
+                               action='store_true', default=False,
+                               help='print statistics at end')
+        subparser.add_argument('-e', '--exclude', dest='excludes',
+                               type=parse_pattern, action='append',
+                               metavar="PATTERN", help='exclude paths matching PATTERN')
+        subparser.add_argument('--exclude-from', dest='exclude_files',
+                               type=argparse.FileType('r'), action='append',
+                               metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
+        subparser.add_argument('--exclude-caches', dest='exclude_caches',
+                               action='store_true', default=False,
+                               help='exclude directories that contain a CACHEDIR.TAG file ('
+                                    'http://www.brynosaurus.com/cachedir/spec.html)')
+        subparser.add_argument('--exclude-if-present', dest='exclude_if_present',
+                               metavar='FILENAME', action='append', type=str,
+                               help='exclude directories that contain the specified file')
+        subparser.add_argument('--keep-tag-files', dest='keep_tag_files',
+                               action='store_true', default=False,
+                               help='keep tag files of excluded caches/directories')
+        archive_group.add_argument('-C', '--compression', dest='compression',
+                                   type=CompressionSpec, default=None, metavar='COMPRESSION',
+                                   help='select compression algorithm (and level):\n'
+                                        'none == no compression (default),\n'
+                                        'lz4 == lz4,\n'
+                                        'zlib == zlib (default level 6),\n'
+                                        'zlib,0 .. zlib,9 == zlib (with level 0..9),\n'
+                                        'lzma == lzma (default level 6),\n'
+                                        'lzma,0 .. lzma,9 == lzma (with level 0..9).')
+        subparser.add_argument('--chunker-params', dest='chunker_params',
+                               type=ChunkerParams, default=None,
+                               metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
+                               help='specify the chunker parameters (or "default").')
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
+                               type=location_validator(),
+                               help='repository/archive to recreate')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to recreate; patterns are supported')
 
         subparser = subparsers.add_parser('help', parents=[common_parser], add_help=False,
                                           description='Extra help')

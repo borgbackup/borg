@@ -828,7 +828,7 @@ class Archiver:
         common_parser.add_argument('--warning', dest='log_level',
                                    action='store_const', const='warning', default='warning',
                                    help='work on log level WARNING (default)')
-        common_parser.add_argument('-v', '--verbose', '--info', dest='log_level',
+        common_parser.add_argument('--info', '-v', '--verbose', dest='log_level',
                                    action='store_const', const='info', default='warning',
                                    help='work on log level INFO')
         common_parser.add_argument('--debug', dest='log_level',

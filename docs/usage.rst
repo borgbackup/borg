@@ -335,6 +335,26 @@ Examples
     newname                              Mon, 2016-02-15 19:50:19
 
 
+.. include:: usage/comment.rst.inc
+
+Examples
+~~~~~~~~
+::
+
+    $ borg create --comment "This is a comment" /mnt/backup::archivename ~
+    $ borg info /mnt/backup::archivename
+    Name: archivename
+    Fingerprint: ...
+    Comment: This is a comment
+    ...
+    $ borg comment /mnt/backup::archivename "This is a better comment"
+    $ borg info /mnt/backup::archivename
+    Name: archivename
+    Fingerprint: ...
+    Comment: This is a better comment
+    ...
+
+
 .. include:: usage/list.rst.inc
 
 Examples

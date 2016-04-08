@@ -161,7 +161,11 @@ class Archiver:
     def do_init(self, args, repository):
         """Initialize an empty repository"""
         logger.info('Initializing repository at "%s"' % args.location.canonical_path())
-        key = key_creator(repository, args)
+        try:
+            key = key_creator(repository, args)
+        except (EOFError, KeyboardInterrupt):
+            repository.destroy()
+            return EXIT_WARNING
         manifest = Manifest(key, repository)
         manifest.key = key
         manifest.write()

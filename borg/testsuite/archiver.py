@@ -22,6 +22,7 @@ from ..archiver import Archiver
 from ..cache import Cache
 from ..crypto import bytes_to_long, num_aes_blocks
 from ..helpers import Manifest, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
+from ..key import KeyfileKeyBase
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import BaseTestCase, changedir, environment_variable
@@ -1127,11 +1128,23 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('debug-delete-obj', self.repository_location, 'invalid')
         assert "is invalid" in output
 
+    def test_init_interrupt(self):
+        def raise_eof(*args):
+            raise EOFError
+
+        with patch.object(KeyfileKeyBase, 'create', raise_eof):
+            self.cmd('init', self.repository_location, exit_code=1)
+        assert not os.path.exists(self.repository_location)
+
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
 class ArchiverTestCaseBinary(ArchiverTestCase):
     EXE = 'borg.exe'
     FORK_DEFAULT = True
+
+    @unittest.skip('patches objects')
+    def test_init_interrupt(self):
+        pass
 
 
 class ArchiverCheckTestCase(ArchiverTestCaseBase):

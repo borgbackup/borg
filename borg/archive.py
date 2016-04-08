@@ -447,17 +447,22 @@ Number of files: {0.stats.nfiles}'''.format(
             except OSError:
                 pass
 
-    def rename(self, name):
-        if name in self.manifest.archives:
-            raise self.AlreadyExists(name)
+    def set_meta(self, key, value):
         metadata = StableDict(self._load_meta(self.id))
-        metadata[b'name'] = name
+        metadata[key] = value
         data = msgpack.packb(metadata, unicode_errors='surrogateescape')
         new_id = self.key.id_hash(data)
         self.cache.add_chunk(new_id, data, self.stats)
-        self.manifest.archives[name] = {'id': new_id, 'time': metadata[b'time']}
+        self.manifest.archives[self.name] = {'id': new_id, 'time': metadata[b'time']}
         self.cache.chunk_decref(self.id, self.stats)
-        del self.manifest.archives[self.name]
+
+    def rename(self, name):
+        if name in self.manifest.archives:
+            raise self.AlreadyExists(name)
+        oldname = self.name
+        self.name = name
+        self.set_meta(b'name', name)
+        del self.manifest.archives[oldname]
 
     def delete(self, stats, progress=False):
         unpacker = msgpack.Unpacker(use_list=False)

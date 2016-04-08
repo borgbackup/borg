@@ -63,7 +63,7 @@ cdef class IndexBase:
             path = os.fsencode(path)
             self.index = hashindex_read(path)
             if not self.index:
-                raise Exception('hashindex_read failed')
+                raise RuntimeError('hashindex_read failed')
         else:
             self.index = hashindex_init(capacity, self.key_size, self.value_size)
             if not self.index:

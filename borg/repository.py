@@ -15,7 +15,8 @@ from zlib import crc32
 
 import msgpack
 from .constants import *  # NOQA
-from .helpers import Error, ErrorWithTraceback, IntegrityError, Location, ProgressIndicatorPercent, bin_to_hex
+from .helpers import Error, ErrorWithTraceback, IntegrityError, InternalOSError, Location, ProgressIndicatorPercent, \
+    bin_to_hex
 from .hashindex import NSIndex
 from .locking import UpgradableLock, LockError, LockErrorT
 from .lrucache import LRUCache
@@ -178,7 +179,7 @@ class Repository:
         else:
             return None
 
-    def get_transaction_id(self):
+    def check_transaction(self):
         index_transaction_id = self.get_index_transaction_id()
         segments_transaction_id = self.io.get_segments_transaction_id()
         if index_transaction_id is not None and segments_transaction_id is None:
@@ -191,6 +192,9 @@ class Repository:
             else:
                 replay_from = index_transaction_id
             self.replay_segments(replay_from, segments_transaction_id)
+
+    def get_transaction_id(self):
+        self.check_transaction()
         return self.get_index_transaction_id()
 
     def break_lock(self):
@@ -231,10 +235,23 @@ class Repository:
         self.write_index()
         self.rollback()
 
-    def open_index(self, transaction_id):
+    def open_index(self, transaction_id, auto_recover=True):
         if transaction_id is None:
             return NSIndex()
-        return NSIndex.read((os.path.join(self.path, 'index.%d') % transaction_id).encode('utf-8'))
+        index_path = (os.path.join(self.path, 'index.%d') % transaction_id).encode('utf-8')
+        try:
+            return NSIndex.read(index_path)
+        except RuntimeError as re:
+            assert str(re) == 'hashindex_read failed'  # everything else means we're in *deep* trouble
+            # corrupted index file, need to replay segments
+            os.unlink(os.path.join(self.path, 'hints.%d' % transaction_id))
+            os.unlink(os.path.join(self.path, 'index.%d' % transaction_id))
+            if not auto_recover:
+                raise
+            self.prepare_txn(self.get_transaction_id())
+            # don't leave an open transaction around
+            self.commit()
+            return self.open_index(self.get_transaction_id())
 
     def prepare_txn(self, transaction_id, do_cleanup=True):
         self._active_txn = True
@@ -247,15 +264,31 @@ class Repository:
             self._active_txn = False
             raise
         if not self.index or transaction_id is None:
-            self.index = self.open_index(transaction_id)
+            try:
+                self.index = self.open_index(transaction_id, False)
+            except RuntimeError:
+                self.check_transaction()
+                self.index = self.open_index(transaction_id, False)
         if transaction_id is None:
             self.segments = {}  # XXX bad name: usage_count_of_segment_x = self.segments[x]
             self.compact = FreeSpace()  # XXX bad name: freeable_space_of_segment_x = self.compact[x]
         else:
             if do_cleanup:
                 self.io.cleanup(transaction_id)
-            with open(os.path.join(self.path, 'hints.%d' % transaction_id), 'rb') as fd:
-                hints = msgpack.unpack(fd)
+            try:
+                with open(os.path.join(self.path, 'hints.%d' % transaction_id), 'rb') as fd:
+                    hints = msgpack.unpack(fd)
+            except (msgpack.UnpackException, msgpack.ExtraData, FileNotFoundError) as e:
+                # corrupted or deleted hints file, need to replay segments
+                if not isinstance(e, FileNotFoundError):
+                    os.unlink(os.path.join(self.path, 'hints.%d' % transaction_id))
+                # index must exist at this point
+                os.unlink(os.path.join(self.path, 'index.%d' % transaction_id))
+                self.check_transaction()
+                self.prepare_txn(transaction_id)
+                return
+            except OSError as os_error:
+                raise InternalOSError from os_error
             if hints[b'version'] == 1:
                 logger.debug('Upgrading from v1 hints.%d', transaction_id)
                 self.segments = hints[b'segments']

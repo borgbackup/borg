@@ -7,7 +7,7 @@ import tempfile
 from unittest.mock import patch
 
 from ..hashindex import NSIndex
-from ..helpers import Location, IntegrityError
+from ..helpers import Location, IntegrityError, InternalOSError
 from ..locking import UpgradableLock, LockFailed
 from ..remote import RemoteRepository, InvalidRPCMethod, ConnectionClosedWithHint
 from ..repository import Repository, LoggedIO, MAGIC
@@ -268,6 +268,46 @@ class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
         self.repository.commit()
         # append only: does not compact, only new segments written
         assert segments_in_repository() == 6
+
+
+class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
+    def setUp(self):
+        super().setUp()
+        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.commit()
+        self.repository.close()
+
+    def do_commit(self):
+        with self.repository:
+            self.repository.put(b'00000000000000000000000000000000', b'fox')
+            self.repository.commit()
+
+    def test_corrupted_hints(self):
+        with open(os.path.join(self.repository.path, 'hints.0'), 'ab') as fp:
+            fp.write(b'123456789')
+        self.do_commit()
+
+    def test_deleted_hints(self):
+        os.unlink(os.path.join(self.repository.path, 'hints.0'))
+        self.do_commit()
+
+    def test_unreadable_hints(self):
+        hints = os.path.join(self.repository.path, 'hints.0')
+        os.unlink(hints)
+        os.mkdir(hints)
+        with self.assert_raises(InternalOSError):
+            self.do_commit()
+
+    def test_index(self):
+        with open(os.path.join(self.repository.path, 'index.0'), 'wb') as fp:
+            fp.write(b'123456789')
+        self.do_commit()
+
+    def test_index_outside_transaction(self):
+        with open(os.path.join(self.repository.path, 'index.0'), 'wb') as fp:
+            fp.write(b'123456789')
+        with self.repository:
+            assert len(self.repository) == 1
 
 
 class RepositoryCheckTestCase(RepositoryTestCaseBase):

@@ -6,10 +6,20 @@ Version 1.0.1 (not released yet)
 
 New features:
 
-Usually there are no new features in a bugfix release, but this one was added
-to get it out quickly as it can improve your repository safety/security:
+Usually there are no new features in a bugfix release, but these were added
+due to their high impact on security/safety/speed or because they are fixes
+also:
 
 - append-only mode for repositories, #809, #36 (see docs)
+- borg create: add --ignore-inode option to make borg detect unmodified files
+  even if your filesystem does not have stable inode numbers (like sshfs and
+  possibly CIFS).
+- add options --warning, --error, --critical for missing log levels, #826.
+  it's not recommended to suppress warnings or errors, but the user may decide
+  this on his own.
+  note: --warning is not given to borg serve so a <= 1.0.0 borg will still
+  work as server (it is not needed as it is the default).
+  do not use --error or --critical when using a <= 1.0.0 borg server.
 
 Bug fixes:
 
@@ -19,8 +29,15 @@ Bug fixes:
 - unpack file stats before passing to FUSE
 - fix build on illumos
 - don't try to backup doors or event ports (Solaris and derivates)
-- fix capitalization, add ellipses, change log level to debug for 2 messages, fixes #798
 - remove useless/misleading libc version display, #738
+- test suite: reset exit code of persistent archiver, #844
+- RemoteRepository: clean up pipe if remote open() fails
+- Remote: don't print tracebacks for Error exceptions handled downstream, #792
+- if BORG_PASSPHRASE is present but wrong, don't prompt for password, but fail
+  instead, #791
+- ArchiveChecker: move "orphaned objects check skipped" to INFO log level, #826
+- fix capitalization, add ellipses, change log level to debug for 2 messages,
+  #798
 
 Other changes:
 

@@ -1,8 +1,8 @@
 Changelog
 =========
 
-Version 1.0.1 (not released yet)
---------------------------------
+Version 1.0.1
+-------------
 
 New features:
 
@@ -43,6 +43,7 @@ Other changes:
 
 - update llfuse requirement, llfuse 1.0 works
 - update OS / dist packages on build machines, #717
+- prefer showing --info over -v in usage help, #859
 - docs:
 
   - fix cygwin requirements (gcc-g++)

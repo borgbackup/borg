@@ -4,9 +4,9 @@ borg delete
 -----------
 ::
 
-    usage: borg delete [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
-                       [--no-files-cache] [--umask M] [--remote-path PATH] [-p]
-                       [-s] [-c] [--save-space]
+    usage: borg delete [-h] [--critical] [--error] [--warning] [--info] [--debug]
+                       [--lock-wait N] [--show-rc] [--no-files-cache] [--umask M]
+                       [--remote-path PATH] [-p] [-s] [-c] [--save-space]
                        [TARGET]
     
     Delete an existing repository or archive
@@ -16,10 +16,12 @@ borg delete
     
     optional arguments:
       -h, --help            show this help message and exit
-      -v, --verbose, --info
-                            enable informative (verbose) output, work on log level
-                            INFO
-      --debug               enable debug output, work on log level DEBUG
+      --critical            work on log level CRITICAL
+      --error               work on log level ERROR
+      --warning             work on log level WARNING (default)
+      --info, -v, --verbose
+                            work on log level INFO
+      --debug               work on log level DEBUG
       --lock-wait N         wait for the lock, but max. N seconds (default: 1).
       --show-rc             show/log the return code (rc)
       --no-files-cache      do not load/update the file metadata cache used to

@@ -4,15 +4,16 @@ borg create
 -----------
 ::
 
-    usage: borg create [-h] [-v] [--debug] [--lock-wait N] [--show-rc]
-                       [--no-files-cache] [--umask M] [--remote-path PATH] [-s]
-                       [-p] [--list] [--filter STATUSCHARS] [-e PATTERN]
+    usage: borg create [-h] [--critical] [--error] [--warning] [--info] [--debug]
+                       [--lock-wait N] [--show-rc] [--no-files-cache] [--umask M]
+                       [--remote-path PATH] [-s] [-p] [--list]
+                       [--filter STATUSCHARS] [-e PATTERN]
                        [--exclude-from EXCLUDEFILE] [--exclude-caches]
                        [--exclude-if-present FILENAME] [--keep-tag-files]
                        [-c SECONDS] [-x] [--numeric-owner]
                        [--timestamp yyyy-mm-ddThh:mm:ss]
                        [--chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE]
-                       [-C COMPRESSION] [--read-special] [-n]
+                       [--ignore-inode] [-C COMPRESSION] [--read-special] [-n]
                        ARCHIVE PATH [PATH ...]
     
     Create new archive
@@ -24,10 +25,12 @@ borg create
     
     optional arguments:
       -h, --help            show this help message and exit
-      -v, --verbose, --info
-                            enable informative (verbose) output, work on log level
-                            INFO
-      --debug               enable debug output, work on log level DEBUG
+      --critical            work on log level CRITICAL
+      --error               work on log level ERROR
+      --warning             work on log level WARNING (default)
+      --info, -v, --verbose
+                            work on log level INFO
+      --debug               work on log level DEBUG
       --lock-wait N         wait for the lock, but max. N seconds (default: 1).
       --show-rc             show/log the return code (rc)
       --no-files-cache      do not load/update the file metadata cache used to
@@ -60,6 +63,8 @@ borg create
                             alternatively, give a reference file/directory.
       --chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE
                             specify the chunker parameters. default: 19,23,21,4095
+      --ignore-inode        ignore inode data in the file metadata cache used to
+                            detect unchanged files.
       -C COMPRESSION, --compression COMPRESSION
                             select compression algorithm (and level): none == no
                             compression (default), lz4 == lz4, zlib == zlib
@@ -76,5 +81,11 @@ Description
 This command creates a backup archive containing all files found while recursively
 traversing all paths specified. The archive will consume almost no disk space for
 files or parts of files that have already been stored in other archives.
+
+
+To speed up pulling backups over sshfs and similar network file systems which do
+not provide correct inode information the --ignore-inode flag can be used. This
+potentially decreases reliability of change detection, while avoiding always reading
+all files on these file systems.
 
 See the output of the "borg help patterns" command for more help on exclude patterns.

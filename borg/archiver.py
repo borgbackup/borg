@@ -1015,43 +1015,46 @@ class Archiver:
 
     def build_parser(self, args=None, prog=None):
         common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
-        common_parser.add_argument('--critical', dest='log_level',
-                                   action='store_const', const='critical', default='warning',
-                                   help='work on log level CRITICAL')
-        common_parser.add_argument('--error', dest='log_level',
-                                   action='store_const', const='error', default='warning',
-                                   help='work on log level ERROR')
-        common_parser.add_argument('--warning', dest='log_level',
-                                   action='store_const', const='warning', default='warning',
-                                   help='work on log level WARNING (default)')
-        common_parser.add_argument('--info', '-v', '--verbose', dest='log_level',
-                                   action='store_const', const='info', default='warning',
-                                   help='work on log level INFO')
-        common_parser.add_argument('--debug', dest='log_level',
-                                   action='store_const', const='debug', default='warning',
-                                   help='work on log level DEBUG')
-        common_parser.add_argument('--lock-wait', dest='lock_wait', type=int, metavar='N', default=1,
-                                   help='wait for the lock, but max. N seconds (default: %(default)d).')
-        common_parser.add_argument('--show-version', dest='show_version', action='store_true', default=False,
-                                   help='show/log the borg version')
-        common_parser.add_argument('--show-rc', dest='show_rc', action='store_true', default=False,
-                                   help='show/log the return code (rc)')
-        common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
-                                   help='do not load/update the file metadata cache used to detect unchanged files')
-        common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=UMASK_DEFAULT, metavar='M',
-                                   help='set umask to M (local and remote, default: %(default)04o)')
-        common_parser.add_argument('--remote-path', dest='remote_path', default='borg', metavar='PATH',
-                                   help='set remote path to executable (default: "%(default)s")')
+
+        common_group = common_parser.add_argument_group('Common options')
+        common_group.add_argument('-h', '--help', action='help', help='show this help message and exit')
+        common_group.add_argument('--critical', dest='log_level',
+                                  action='store_const', const='critical', default='warning',
+                                  help='work on log level CRITICAL')
+        common_group.add_argument('--error', dest='log_level',
+                                  action='store_const', const='error', default='warning',
+                                  help='work on log level ERROR')
+        common_group.add_argument('--warning', dest='log_level',
+                                  action='store_const', const='warning', default='warning',
+                                  help='work on log level WARNING (default)')
+        common_group.add_argument('--info', '-v', '--verbose', dest='log_level',
+                                  action='store_const', const='info', default='warning',
+                                  help='work on log level INFO')
+        common_group.add_argument('--debug', dest='log_level',
+                                  action='store_const', const='debug', default='warning',
+                                  help='enable debug output, work on log level DEBUG')
+        common_group.add_argument('--lock-wait', dest='lock_wait', type=int, metavar='N', default=1,
+                                  help='wait for the lock, but max. N seconds (default: %(default)d).')
+        common_group.add_argument('--show-version', dest='show_version', action='store_true', default=False,
+                                  help='show/log the borg version')
+        common_group.add_argument('--show-rc', dest='show_rc', action='store_true', default=False,
+                                  help='show/log the return code (rc)')
+        common_group.add_argument('--no-files-cache', dest='cache_files', action='store_false',
+                                  help='do not load/update the file metadata cache used to detect unchanged files')
+        common_group.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=UMASK_DEFAULT, metavar='M',
+                                  help='set umask to M (local and remote, default: %(default)04o)')
+        common_group.add_argument('--remote-path', dest='remote_path', default='borg', metavar='PATH',
+                                  help='set remote path to executable (default: "%(default)s")')
 
         parser = argparse.ArgumentParser(prog=prog, description='Borg - Deduplicated Backups')
         parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,
-                                   help='show version number and exit')
+                            help='show version number and exit')
         subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
 
         serve_epilog = textwrap.dedent("""
         This command starts a repository server process. This command is usually not used manually.
         """)
-        subparser = subparsers.add_parser('serve', parents=[common_parser],
+        subparser = subparsers.add_parser('serve', parents=[common_parser], add_help=False,
                                           description=self.do_serve.__doc__, epilog=serve_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='start repository server process')
@@ -1063,7 +1066,7 @@ class Archiver:
         directory containing the deduplicated data from zero or more archives.
         Encryption can be enabled at repository init time.
         """)
-        subparser = subparsers.add_parser('init', parents=[common_parser],
+        subparser = subparsers.add_parser('init', parents=[common_parser], add_help=False,
                                           description=self.do_init.__doc__, epilog=init_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='initialize empty repository')
@@ -1111,7 +1114,7 @@ class Archiver:
         - The archive checks can be time consuming, they can be skipped using the
           --repository-only option.
         """)
-        subparser = subparsers.add_parser('check', parents=[common_parser],
+        subparser = subparsers.add_parser('check', parents=[common_parser], add_help=False,
                                           description=self.do_check.__doc__,
                                           epilog=check_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1142,7 +1145,7 @@ class Archiver:
         The key files used for repository encryption are optionally passphrase
         protected. This command can be used to change this passphrase.
         """)
-        subparser = subparsers.add_parser('change-passphrase', parents=[common_parser],
+        subparser = subparsers.add_parser('change-passphrase', parents=[common_parser], add_help=False,
                                           description=self.do_change_passphrase.__doc__,
                                           epilog=change_passphrase_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1169,7 +1172,7 @@ class Archiver:
         But please note: the secrets will always stay the same and they could always
         be derived from your (old) passphrase-mode passphrase.
         """)
-        subparser = subparsers.add_parser('migrate-to-repokey', parents=[common_parser],
+        subparser = subparsers.add_parser('migrate-to-repokey', parents=[common_parser], add_help=False,
                                           description=self.do_migrate_to_repokey.__doc__,
                                           epilog=migrate_to_repokey_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1192,78 +1195,88 @@ class Archiver:
         See the output of the "borg help patterns" command for more help on exclude patterns.
         """)
 
-        subparser = subparsers.add_parser('create', parents=[common_parser],
+        subparser = subparsers.add_parser('create', parents=[common_parser], add_help=False,
                                           description=self.do_create.__doc__,
                                           epilog=create_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='create backup')
         subparser.set_defaults(func=self.do_create)
-        subparser.add_argument('--comment', dest='comment', metavar='COMMENT', default='',
-                               help='add a comment text to the archive')
+
+        subparser.add_argument('-n', '--dry-run', dest='dry_run',
+                               action='store_true', default=False,
+                               help='do not create a backup archive')
+
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the created archive')
         subparser.add_argument('-p', '--progress', dest='progress',
                                action='store_true', default=False,
-                               help="""show progress display while creating the archive, showing Original,
-                               Compressed and Deduplicated sizes, followed by the Number of files seen
-                               and the path being processed, default: %(default)s""")
+                               help='show progress display while creating the archive, showing Original, '
+                                    'Compressed and Deduplicated sizes, followed by the Number of files seen '
+                                    'and the path being processed, default: %(default)s')
         subparser.add_argument('--list', dest='output_list',
                                action='store_true', default=False,
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
                                help='only display items with the given status characters')
-        subparser.add_argument('-e', '--exclude', dest='excludes',
-                               type=parse_pattern, action='append',
-                               metavar="PATTERN", help='exclude paths matching PATTERN')
-        subparser.add_argument('--exclude-from', dest='exclude_files',
-                               type=argparse.FileType('r'), action='append',
-                               metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
-        subparser.add_argument('--exclude-caches', dest='exclude_caches',
-                               action='store_true', default=False,
-                               help='exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)')
-        subparser.add_argument('--exclude-if-present', dest='exclude_if_present',
-                               metavar='FILENAME', action='append', type=str,
-                               help='exclude directories that contain the specified file')
-        subparser.add_argument('--keep-tag-files', dest='keep_tag_files',
-                               action='store_true', default=False,
-                               help='keep tag files of excluded caches/directories')
-        subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
-                               type=int, default=300, metavar='SECONDS',
-                               help='write checkpoint every SECONDS seconds (Default: 300)')
-        subparser.add_argument('-x', '--one-file-system', dest='one_file_system',
-                               action='store_true', default=False,
-                               help='stay in same file system, do not cross mount points')
-        subparser.add_argument('--numeric-owner', dest='numeric_owner',
-                               action='store_true', default=False,
-                               help='only store numeric user and group identifiers')
-        subparser.add_argument('--timestamp', dest='timestamp',
-                               type=timestamp, default=None,
-                               metavar='yyyy-mm-ddThh:mm:ss',
-                               help='manually specify the archive creation date/time (UTC). '
-                                    'alternatively, give a reference file/directory.')
-        subparser.add_argument('--chunker-params', dest='chunker_params',
-                               type=ChunkerParams, default=CHUNKER_PARAMS,
-                               metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
-                               help='specify the chunker parameters. default: %d,%d,%d,%d' % CHUNKER_PARAMS)
-        subparser.add_argument('--ignore-inode', dest='ignore_inode',
-                               action='store_true', default=False,
-                               help='ignore inode data in the file metadata cache used to detect unchanged files.')
-        subparser.add_argument('-C', '--compression', dest='compression',
-                               type=CompressionSpec, default=dict(name='none'), metavar='COMPRESSION',
-                               help='select compression algorithm (and level): '
-                                    'none == no compression (default), '
-                                    'lz4 == lz4, '
-                                    'zlib == zlib (default level 6), '
-                                    'zlib,0 .. zlib,9 == zlib (with level 0..9), '
-                                    'lzma == lzma (default level 6), '
-                                    'lzma,0 .. lzma,9 == lzma (with level 0..9).')
-        subparser.add_argument('--read-special', dest='read_special',
-                               action='store_true', default=False,
-                               help='open and read special files as if they were regular files')
-        subparser.add_argument('-n', '--dry-run', dest='dry_run',
-                               action='store_true', default=False,
-                               help='do not create a backup archive')
+
+        exclude_group = subparser.add_argument_group('Exclusion options')
+        exclude_group.add_argument('-e', '--exclude', dest='excludes',
+                                   type=parse_pattern, action='append',
+                                   metavar="PATTERN", help='exclude paths matching PATTERN')
+        exclude_group.add_argument('--exclude-from', dest='exclude_files',
+                                   type=argparse.FileType('r'), action='append',
+                                   metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
+        exclude_group.add_argument('--exclude-caches', dest='exclude_caches',
+                                   action='store_true', default=False,
+                                   help='exclude directories that contain a CACHEDIR.TAG file ('
+                                        'http://www.brynosaurus.com/cachedir/spec.html)')
+        exclude_group.add_argument('--exclude-if-present', dest='exclude_if_present',
+                                   metavar='FILENAME', action='append', type=str,
+                                   help='exclude directories that contain the specified file')
+        exclude_group.add_argument('--keep-tag-files', dest='keep_tag_files',
+                                   action='store_true', default=False,
+                                   help='keep tag files of excluded caches/directories')
+
+        fs_group = subparser.add_argument_group('Filesystem options')
+        fs_group.add_argument('-x', '--one-file-system', dest='one_file_system',
+                              action='store_true', default=False,
+                              help='stay in same file system, do not cross mount points')
+        fs_group.add_argument('--numeric-owner', dest='numeric_owner',
+                              action='store_true', default=False,
+                              help='only store numeric user and group identifiers')
+        fs_group.add_argument('--ignore-inode', dest='ignore_inode',
+                              action='store_true', default=False,
+                              help='ignore inode data in the file metadata cache used to detect unchanged files.')
+        fs_group.add_argument('--read-special', dest='read_special',
+                              action='store_true', default=False,
+                              help='open and read special files as if they were regular files')
+
+        archive_group = subparser.add_argument_group('Archive options')
+        archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default='',
+                                   help='add a comment text to the archive')
+        archive_group.add_argument('--timestamp', dest='timestamp',
+                                   type=timestamp, default=None,
+                                   metavar='yyyy-mm-ddThh:mm:ss',
+                                   help='manually specify the archive creation date/time (UTC). '
+                                        'alternatively, give a reference file/directory.')
+        archive_group.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
+                                   type=int, default=300, metavar='SECONDS',
+                                   help='write checkpoint every SECONDS seconds (Default: 300)')
+        archive_group.add_argument('--chunker-params', dest='chunker_params',
+                                   type=ChunkerParams, default=CHUNKER_PARAMS,
+                                   metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
+                                   help='specify the chunker parameters. default: %d,%d,%d,%d' % CHUNKER_PARAMS)
+        archive_group.add_argument('-C', '--compression', dest='compression',
+                                   type=CompressionSpec, default=dict(name='none'), metavar='COMPRESSION',
+                                   help='select compression algorithm (and level):\n'
+                                        'none == no compression (default),\n'
+                                        'lz4 == lz4,\n'
+                                        'zlib == zlib (default level 6),\n'
+                                        'zlib,0 .. zlib,9 == zlib (with level 0..9),\n'
+                                        'lzma == lzma (default level 6),\n'
+                                        'lzma,0 .. lzma,9 == lzma (with level 0..9).')
+
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='name of archive to create (must be also a valid directory name)')
@@ -1278,7 +1291,7 @@ class Archiver:
 
         See the output of the "borg help patterns" command for more help on exclude patterns.
         """)
-        subparser = subparsers.add_parser('extract', parents=[common_parser],
+        subparser = subparsers.add_parser('extract', parents=[common_parser], add_help=False,
                                           description=self.do_extract.__doc__,
                                           epilog=extract_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1331,7 +1344,7 @@ class Archiver:
 
             See the output of the "borg help patterns" command for more help on exclude patterns.
             """)
-        subparser = subparsers.add_parser('diff', parents=[common_parser],
+        subparser = subparsers.add_parser('diff', parents=[common_parser], add_help=False,
                                           description=self.do_diff.__doc__,
                                           epilog=diff_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1363,8 +1376,10 @@ class Archiver:
 
         rename_epilog = textwrap.dedent("""
         This command renames an archive in the repository.
+
+        This results in a different archive ID.
         """)
-        subparser = subparsers.add_parser('rename', parents=[common_parser],
+        subparser = subparsers.add_parser('rename', parents=[common_parser], add_help=False,
                                           description=self.do_rename.__doc__,
                                           epilog=rename_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1379,8 +1394,10 @@ class Archiver:
 
         comment_epilog = textwrap.dedent("""
         This command sets the archive comment.
+
+        This results in a different archive ID.
         """)
-        subparser = subparsers.add_parser('comment', parents=[common_parser],
+        subparser = subparsers.add_parser('comment', parents=[common_parser], add_help=False,
                                           description=self.do_comment.__doc__,
                                           epilog=comment_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1397,7 +1414,7 @@ class Archiver:
         Disk space is reclaimed accordingly. If you delete the complete repository, the
         local cache for it (if any) is also deleted.
         """)
-        subparser = subparsers.add_parser('delete', parents=[common_parser],
+        subparser = subparsers.add_parser('delete', parents=[common_parser], add_help=False,
                                           description=self.do_delete.__doc__,
                                           epilog=delete_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1427,7 +1444,7 @@ class Archiver:
         The following keys are available for --format when listing files:
 
         """) + ItemFormatter.keys_help()
-        subparser = subparsers.add_parser('list', parents=[common_parser],
+        subparser = subparsers.add_parser('list', parents=[common_parser], add_help=False,
                                           description=self.do_list.__doc__,
                                           epilog=list_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1466,7 +1483,7 @@ class Archiver:
         To allow a regular user to use fstab entries, add the ``user`` option:
         ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto,user 0 0``
         """)
-        subparser = subparsers.add_parser('mount', parents=[common_parser],
+        subparser = subparsers.add_parser('mount', parents=[common_parser], add_help=False,
                                           description=self.do_mount.__doc__,
                                           epilog=mount_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1485,7 +1502,7 @@ class Archiver:
         info_epilog = textwrap.dedent("""
         This command displays some detailed information about the specified archive.
         """)
-        subparser = subparsers.add_parser('info', parents=[common_parser],
+        subparser = subparsers.add_parser('info', parents=[common_parser], add_help=False,
                                           description=self.do_info.__doc__,
                                           epilog=info_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1500,7 +1517,7 @@ class Archiver:
         Please use carefully and only while no borg process (on any machine) is
         trying to access the Cache or the Repository.
         """)
-        subparser = subparsers.add_parser('break-lock', parents=[common_parser],
+        subparser = subparsers.add_parser('break-lock', parents=[common_parser], add_help=False,
                                           description=self.do_break_lock.__doc__,
                                           epilog=break_lock_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1534,7 +1551,7 @@ class Archiver:
         specified by the rules.
         Otherwise, *all* archives in the repository are candidates for deletion!
         """)
-        subparser = subparsers.add_parser('prune', parents=[common_parser],
+        subparser = subparsers.add_parser('prune', parents=[common_parser], add_help=False,
                                           description=self.do_prune.__doc__,
                                           epilog=prune_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1608,7 +1625,7 @@ class Archiver:
         to previous versions. This can PERMANENTLY DAMAGE YOUR
         REPOSITORY!  Attic CAN NOT READ BORG REPOSITORIES, as the
         magic strings have changed. You have been warned.""")
-        subparser = subparsers.add_parser('upgrade', parents=[common_parser],
+        subparser = subparsers.add_parser('upgrade', parents=[common_parser], add_help=False,
                                           description=self.do_upgrade.__doc__,
                                           epilog=upgrade_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1628,7 +1645,7 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')
 
-        subparser = subparsers.add_parser('help', parents=[common_parser],
+        subparser = subparsers.add_parser('help', parents=[common_parser], add_help=False,
                                           description='Extra help')
         subparser.add_argument('--epilog-only', dest='epilog_only',
                                action='store_true', default=False)
@@ -1641,7 +1658,7 @@ class Archiver:
         debug_dump_archive_items_epilog = textwrap.dedent("""
         This command dumps raw (but decrypted and decompressed) archive items (only metadata) to files.
         """)
-        subparser = subparsers.add_parser('debug-dump-archive-items', parents=[common_parser],
+        subparser = subparsers.add_parser('debug-dump-archive-items', parents=[common_parser], add_help=False,
                                           description=self.do_debug_dump_archive_items.__doc__,
                                           epilog=debug_dump_archive_items_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1654,7 +1671,7 @@ class Archiver:
         debug_get_obj_epilog = textwrap.dedent("""
         This command gets an object from the repository.
         """)
-        subparser = subparsers.add_parser('debug-get-obj', parents=[common_parser],
+        subparser = subparsers.add_parser('debug-get-obj', parents=[common_parser], add_help=False,
                                           description=self.do_debug_get_obj.__doc__,
                                           epilog=debug_get_obj_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1671,7 +1688,7 @@ class Archiver:
         debug_put_obj_epilog = textwrap.dedent("""
         This command puts objects into the repository.
         """)
-        subparser = subparsers.add_parser('debug-put-obj', parents=[common_parser],
+        subparser = subparsers.add_parser('debug-put-obj', parents=[common_parser], add_help=False,
                                           description=self.do_debug_put_obj.__doc__,
                                           epilog=debug_put_obj_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1686,7 +1703,7 @@ class Archiver:
         debug_delete_obj_epilog = textwrap.dedent("""
         This command deletes objects from the repository.
         """)
-        subparser = subparsers.add_parser('debug-delete-obj', parents=[common_parser],
+        subparser = subparsers.add_parser('debug-delete-obj', parents=[common_parser], add_help=False,
                                           description=self.do_debug_delete_obj.__doc__,
                                           epilog=debug_delete_obj_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,

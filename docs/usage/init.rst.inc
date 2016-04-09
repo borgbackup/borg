@@ -4,35 +4,19 @@ borg init
 ---------
 ::
 
-    usage: borg init [-h] [--critical] [--error] [--warning] [--info] [--debug]
-                     [--lock-wait N] [--show-version] [--show-rc]
-                     [--no-files-cache] [--umask M] [--remote-path PATH]
-                     [-e {none,keyfile,repokey}]
-                     [REPOSITORY]
-    
-    Initialize an empty repository
-    
-    positional arguments:
-      REPOSITORY            repository to create
-    
-    optional arguments:
-      -h, --help            show this help message and exit
-      --critical            work on log level CRITICAL
-      --error               work on log level ERROR
-      --warning             work on log level WARNING (default)
-      --info, -v, --verbose
-                            work on log level INFO
-      --debug               work on log level DEBUG
-      --lock-wait N         wait for the lock, but max. N seconds (default: 1).
-      --show-version        show/log the borg version
-      --show-rc             show/log the return code (rc)
-      --no-files-cache      do not load/update the file metadata cache used to
-                            detect unchanged files
-      --umask M             set umask to M (local and remote, default: 0077)
-      --remote-path PATH    set remote path to executable (default: "borg")
-      -e {none,keyfile,repokey}, --encryption {none,keyfile,repokey}
-                            select encryption key mode (default: "repokey")
-    
+    borg init <options> REPOSITORY
+
+positional arguments
+    REPOSITORY
+        repository to create
+
+optional arguments
+    ``-e``, ``--encryption``
+        | select encryption key mode (default: "repokey")
+
+`Common options`_
+    |
+
 Description
 ~~~~~~~~~~~
 

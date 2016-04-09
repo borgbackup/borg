@@ -7,6 +7,8 @@ from glob import glob
 from distutils.command.build import build
 from distutils.core import Command
 
+import textwrap
+
 min_python = (3, 4)
 my_python = sys.version_info
 
@@ -168,12 +170,72 @@ class build_usage(Command):
                     params = {"command": command,
                               "underline": '-' * len('borg ' + command)}
                     doc.write(".. _borg_{command}:\n\n".format(**params))
-                    doc.write("borg {command}\n{underline}\n::\n\n".format(**params))
+                    doc.write("borg {command}\n{underline}\n::\n\n    borg {command}".format(**params))
+                    self.write_usage(parser, doc)
                     epilog = parser.epilog
                     parser.epilog = None
-                    doc.write(re.sub("^", "    ", parser.format_help(), flags=re.M))
-                    doc.write("\nDescription\n~~~~~~~~~~~\n")
+                    self.write_options(parser, doc)
+                    doc.write("\n\nDescription\n~~~~~~~~~~~\n")
                     doc.write(epilog)
+        common_options = [group for group in choices['create']._action_groups if group.title == 'Common options'][0]
+        with open('docs/usage/common-options.rst.inc', 'w') as doc:
+            self.write_options_group(common_options, doc, False)
+
+    def write_usage(self, parser, fp):
+        if any(len(o.option_strings) for o in parser._actions):
+            fp.write(' <options>')
+        for option in parser._actions:
+            if option.option_strings:
+                continue
+            fp.write(' ' + option.metavar)
+
+    def write_options(self, parser, fp):
+        for group in parser._action_groups:
+            if group.title == 'Common options':
+                fp.write('\n\n`Common options`_\n')
+                fp.write('    |')
+            else:
+                self.write_options_group(group, fp)
+
+    def write_options_group(self, group, fp, with_title=True):
+        def is_positional_group(group):
+            return any(not o.option_strings for o in group._group_actions)
+
+        def get_help(option):
+            text = textwrap.dedent((option.help or '') % option.__dict__)
+            return '\n'.join('| ' + line for line in text.splitlines())
+
+        def shipout(text):
+            fp.write(textwrap.indent('\n'.join(text), ' ' * 4))
+
+        if not group._group_actions:
+            return
+
+        if with_title:
+            fp.write('\n\n')
+            fp.write(group.title + '\n')
+        text = []
+
+        if is_positional_group(group):
+            for option in group._group_actions:
+                text.append(option.metavar)
+                text.append(textwrap.indent(option.help or '', ' ' * 4))
+            shipout(text)
+            return
+
+        options = []
+        for option in group._group_actions:
+            if option.metavar:
+                option_fmt = '``%%s %s``' % option.metavar
+            else:
+                option_fmt = '``%s``'
+            option_str = ', '.join(option_fmt % s for s in option.option_strings)
+            options.append((option_str, option))
+        for option_str, option in options:
+            help = textwrap.indent(get_help(option), ' ' * 4)
+            text.append(option_str)
+            text.append(help)
+        shipout(text)
 
 
 class build_api(Command):

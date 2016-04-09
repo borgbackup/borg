@@ -191,6 +191,12 @@ For more information about that, see: https://xkcd.com/1179/
 Unless otherwise noted, we display local date and time.
 Internally, we store and process date and time as UTC.
 
+Common options
+~~~~~~~~~~~~~~
+
+All |project_name| commands share these options:
+
+.. include:: usage/common-options.rst.inc
 
 .. include:: usage/init.rst.inc
 
@@ -327,8 +333,11 @@ Examples
     # Restore a raw device (must not be active/in use/mounted at that time)
     $ borg extract --stdout /mnt/backup::my-sdx | dd of=/dev/sdx bs=10M
 
-Note: currently, extract always writes into the current working directory ("."),
-      so make sure you ``cd`` to the right place before calling ``borg extract``.
+
+.. Note::
+
+    Currently, extract always writes into the current working directory ("."),
+    so make sure you ``cd`` to the right place before calling ``borg extract``.
 
 .. include:: usage/check.rst.inc
 

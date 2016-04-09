@@ -16,3 +16,7 @@
 .wy-side-nav-search > div.version {
     color: rgba(255, 255, 255, 0.5);
 }
+
+#usage dt code {
+    font-weight: normal;
+}

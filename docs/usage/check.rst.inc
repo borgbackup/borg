@@ -4,42 +4,29 @@ borg check
 ----------
 ::
 
-    usage: borg check [-h] [--critical] [--error] [--warning] [--info] [--debug]
-                      [--lock-wait N] [--show-version] [--show-rc]
-                      [--no-files-cache] [--umask M] [--remote-path PATH]
-                      [--repository-only] [--archives-only] [--repair]
-                      [--save-space] [--last N] [-P PREFIX]
-                      [REPOSITORY_OR_ARCHIVE]
-    
-    Check repository consistency
-    
-    positional arguments:
-      REPOSITORY_OR_ARCHIVE
-                            repository or archive to check consistency of
-    
-    optional arguments:
-      -h, --help            show this help message and exit
-      --critical            work on log level CRITICAL
-      --error               work on log level ERROR
-      --warning             work on log level WARNING (default)
-      --info, -v, --verbose
-                            work on log level INFO
-      --debug               work on log level DEBUG
-      --lock-wait N         wait for the lock, but max. N seconds (default: 1).
-      --show-version        show/log the borg version
-      --show-rc             show/log the return code (rc)
-      --no-files-cache      do not load/update the file metadata cache used to
-                            detect unchanged files
-      --umask M             set umask to M (local and remote, default: 0077)
-      --remote-path PATH    set remote path to executable (default: "borg")
-      --repository-only     only perform repository checks
-      --archives-only       only perform archives checks
-      --repair              attempt to repair any inconsistencies found
-      --save-space          work slower, but using less space
-      --last N              only check last N archives (Default: all)
-      -P PREFIX, --prefix PREFIX
-                            only consider archive names starting with this prefix
-    
+    borg check <options> REPOSITORY_OR_ARCHIVE
+
+positional arguments
+    REPOSITORY_OR_ARCHIVE
+        repository or archive to check consistency of
+
+optional arguments
+    ``--repository-only``
+        | only perform repository checks
+    ``--archives-only``
+        | only perform archives checks
+    ``--repair``
+        | attempt to repair any inconsistencies found
+    ``--save-space``
+        | work slower, but using less space
+    ``--last N``
+        | only check last N archives (Default: all)
+    ``-P``, ``--prefix``
+        | only consider archive names starting with this prefix
+
+`Common options`_
+    |
+
 Description
 ~~~~~~~~~~~
 

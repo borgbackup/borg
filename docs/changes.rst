@@ -1,40 +1,55 @@
 Changelog
 =========
 
-Version 1.0.1 (not released yet)
---------------------------------
+Version 1.0.1
+-------------
 
 New features:
 
-Usually there are no new features in a bugfix release, but these 2 were added
-to get them out quickly - as both positively affect your safety/security:
+Usually there are no new features in a bugfix release, but these were added
+due to their high impact on security/safety/speed or because they are fixes
+also:
 
-- append-only mode for repositories, #809, #36
-  (please read the docs about how this can improve your security)
-- implement password roundtrip, #695 (make sure the user can know/verify the
-  encryption key password/passphrase, to avoid double-typos, wrong keyboard
-  layout or locale/encoding issues)
+- append-only mode for repositories, #809, #36 (see docs)
+- borg create: add --ignore-inode option to make borg detect unmodified files
+  even if your filesystem does not have stable inode numbers (like sshfs and
+  possibly CIFS).
+- add options --warning, --error, --critical for missing log levels, #826.
+  it's not recommended to suppress warnings or errors, but the user may decide
+  this on his own.
+  note: --warning is not given to borg serve so a <= 1.0.0 borg will still
+  work as server (it is not needed as it is the default).
+  do not use --error or --critical when using a <= 1.0.0 borg server.
 
 Bug fixes:
 
 - fix silently skipping EIO, #748
-- do not sleep for >60s while waiting for lock, fixes #773
+- add context manager for Repository (avoid orphan repository locks), #285
+- do not sleep for >60s while waiting for lock, #773
 - unpack file stats before passing to FUSE
 - fix build on illumos
 - don't try to backup doors or event ports (Solaris and derivates)
-- fix capitalization, add ellipses, change log level to debug for 2 messages, fixes #798
-- remove useless/misleading libc version display, fixes #738
+- remove useless/misleading libc version display, #738
+- test suite: reset exit code of persistent archiver, #844
+- RemoteRepository: clean up pipe if remote open() fails
+- Remote: don't print tracebacks for Error exceptions handled downstream, #792
+- if BORG_PASSPHRASE is present but wrong, don't prompt for password, but fail
+  instead, #791
+- ArchiveChecker: move "orphaned objects check skipped" to INFO log level, #826
+- fix capitalization, add ellipses, change log level to debug for 2 messages,
+  #798
 
 Other changes:
 
 - update llfuse requirement, llfuse 1.0 works
-- update OS / dist packages on build machines, fixes #717
+- update OS / dist packages on build machines, #717
+- prefer showing --info over -v in usage help, #859
 - docs:
 
   - fix cygwin requirements (gcc-g++)
-  - document how to debug / file filesystem issues, fixes #664
+  - document how to debug / file filesystem issues, #664
   - fix reproducible build of api docs
-  - RTD theme: CSS !important overwrite. Fix borgbackup/borg#727
+  - RTD theme: CSS !important overwrite, #727
   - Document logo font. Recreate logo png. Remove GIMP logo file.
 
 

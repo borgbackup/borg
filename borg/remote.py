@@ -82,6 +82,7 @@ class RepositoryServer:  # pragma: no cover
                 unpacker.feed(data)
                 for unpacked in unpacker:
                     if not (isinstance(unpacked, tuple) and len(unpacked) == 4):
+                        self.repository.close()
                         raise Exception("Unexpected RPC data format.")
                     type, msgid, method, args = unpacked
                     method = method.decode('ascii')
@@ -94,8 +95,12 @@ class RepositoryServer:  # pragma: no cover
                             f = getattr(self.repository, method)
                         res = f(*args)
                     except BaseException as e:
-                        logging.exception('Borg %s: exception in RPC call:', __version__)
-                        logging.error(sysinfo())
+                        # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
+                        # and will be handled just like locally raised exceptions. Suppress the remote traceback
+                        # for these, except ErrorWithTraceback, which should always display a traceback.
+                        if not isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
+                            logging.exception('Borg %s: exception in RPC call:', __version__)
+                            logging.error(sysinfo())
                         exc = "Remote Exception (see remote log for the traceback)"
                         os.write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc)))
                     else:
@@ -164,7 +169,11 @@ class RemoteRepository:
             raise ConnectionClosedWithHint('Is borg working on the server?') from None
         if version != RPC_PROTOCOL_VERSION:
             raise Exception('Server insisted on using unsupported protocol version %d' % version)
-        self.id = self.call('open', location.path, create, lock_wait, lock)
+        try:
+            self.id = self.call('open', self.location.path, create, lock_wait, lock)
+        except Exception:
+            self.close()
+            raise
 
     def __del__(self):
         if self.p:
@@ -195,6 +204,10 @@ class RemoteRepository:
                 opts.append('--info')
             elif root_logger.isEnabledFor(logging.WARNING):
                 pass  # warning is default
+            elif root_logger.isEnabledFor(logging.ERROR):
+                opts.append('--error')
+            elif root_logger.isEnabledFor(logging.CRITICAL):
+                opts.append('--critical')
             else:
                 raise ValueError('log level missing, fix this code')
         if testing:

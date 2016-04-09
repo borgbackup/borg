@@ -16,18 +16,30 @@ Type of log output
 
 The log level of the builtin logging configuration defaults to WARNING.
 This is because we want |project_name| to be mostly silent and only output
-warnings (plus errors and critical messages).
-
-Use ``--verbose`` or ``--info`` to set INFO (you will get informative output then
-additionally to warnings, errors, critical messages).
-Use ``--debug`` to set DEBUG to get output made for debugging.
-
-All log messages created with at least the set level will be output.
+warnings, errors and critical messages.
 
 Log levels: DEBUG < INFO < WARNING < ERROR < CRITICAL
 
+Use ``--debug`` to set DEBUG log level -
+to get debug, info, warning, error and critical level output.
+
+Use ``--info`` (or ``-v`` or ``--verbose``) to set INFO log level -
+to get info, warning, error and critical level output.
+
+Use ``--warning`` (default) to set WARNING log level -
+to get warning, error and critical level output.
+
+Use ``--error`` to set ERROR log level -
+to get error and critical level output.
+
+Use ``--critical`` to set CRITICAL log level -
+to get critical level output.
+
 While you can set misc. log levels, do not expect that every command will
 give different output on different log levels - it's just a possibility.
+
+.. warning:: Options --critical and --error are provided for completeness,
+             their usage is not recommended as you might miss important information.
 
 .. warning:: While some options (like ``--stats`` or ``--list``) will emit more
              informational messages, you have to use INFO (or lower) log level to make

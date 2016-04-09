@@ -704,7 +704,6 @@ class Archiver:
         """List archive or repository contents"""
         if args.location.archive:
             matcher, _ = self.build_matcher(args.excludes, args.paths)
-
             with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
 
@@ -1016,12 +1015,21 @@ class Archiver:
 
     def build_parser(self, args=None, prog=None):
         common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
-        common_parser.add_argument('-v', '--verbose', '--info', dest='log_level',
+        common_parser.add_argument('--critical', dest='log_level',
+                                   action='store_const', const='critical', default='warning',
+                                   help='work on log level CRITICAL')
+        common_parser.add_argument('--error', dest='log_level',
+                                   action='store_const', const='error', default='warning',
+                                   help='work on log level ERROR')
+        common_parser.add_argument('--warning', dest='log_level',
+                                   action='store_const', const='warning', default='warning',
+                                   help='work on log level WARNING (default)')
+        common_parser.add_argument('--info', '-v', '--verbose', dest='log_level',
                                    action='store_const', const='info', default='warning',
-                                   help='enable informative (verbose) output, work on log level INFO')
+                                   help='work on log level INFO')
         common_parser.add_argument('--debug', dest='log_level',
                                    action='store_const', const='debug', default='warning',
-                                   help='enable debug output, work on log level DEBUG')
+                                   help='work on log level DEBUG')
         common_parser.add_argument('--lock-wait', dest='lock_wait', type=int, metavar='N', default=1,
                                    help='wait for the lock, but max. N seconds (default: %(default)d).')
         common_parser.add_argument('--show-version', dest='show_version', action='store_true', default=False,

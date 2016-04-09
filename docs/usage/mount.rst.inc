@@ -4,9 +4,10 @@ borg mount
 ----------
 ::
 
-    usage: borg mount [-h] [-v] [--debug] [--lock-wait N] [--show-version]
-                      [--show-rc] [--no-files-cache] [--umask M]
-                      [--remote-path PATH] [-f] [-o OPTIONS]
+    usage: borg mount [-h] [--critical] [--error] [--warning] [--info] [--debug]
+                      [--lock-wait N] [--show-version] [--show-rc]
+                      [--no-files-cache] [--umask M] [--remote-path PATH] [-f]
+                      [-o OPTIONS]
                       REPOSITORY_OR_ARCHIVE MOUNTPOINT
     
     Mount archive or an entire repository as a FUSE fileystem
@@ -18,10 +19,12 @@ borg mount
     
     optional arguments:
       -h, --help            show this help message and exit
-      -v, --verbose, --info
-                            enable informative (verbose) output, work on log level
-                            INFO
-      --debug               enable debug output, work on log level DEBUG
+      --critical            work on log level CRITICAL
+      --error               work on log level ERROR
+      --warning             work on log level WARNING (default)
+      --info, -v, --verbose
+                            work on log level INFO
+      --debug               work on log level DEBUG
       --lock-wait N         wait for the lock, but max. N seconds (default: 1).
       --show-version        show/log the borg version
       --show-rc             show/log the return code (rc)

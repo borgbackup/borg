@@ -18,6 +18,10 @@ import msgpack
 PREFIX = b'\0' * 8
 
 
+class PassphraseWrong(Error):
+    """passphrase supplied in BORG_PASSPHRASE is incorrect"""
+
+
 class PasswordRetriesExceeded(Error):
     """exceeded the maximum password retries"""
 
@@ -285,13 +289,19 @@ class KeyfileKeyBase(AESKeyBase):
         key = cls(repository)
         target = key.find_key()
         prompt = 'Enter passphrase for key %s: ' % target
-        passphrase = Passphrase.env_passphrase(default='')
-        for retry in range(1, 4):
-            if key.load(target, passphrase):
-                break
-            passphrase = Passphrase.getpass(prompt)
+        passphrase = Passphrase.env_passphrase()
+        if passphrase is None:
+            passphrase = Passphrase()
+            if not key.load(target, passphrase):
+                for retry in range(0, 3):
+                    passphrase = Passphrase.getpass(prompt)
+                    if key.load(target, passphrase):
+                        break
+                else:
+                    raise PasswordRetriesExceeded
         else:
-            raise PasswordRetriesExceeded
+            if not key.load(target, passphrase):
+                raise PassphraseWrong
         num_blocks = num_aes_blocks(len(manifest_data) - 41)
         key.init_ciphers(PREFIX + long_to_bytes(key.extract_nonce(manifest_data) + num_blocks))
         return key

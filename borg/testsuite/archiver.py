@@ -1517,11 +1517,13 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file_replaced', size=1024)
         os.mkdir('input/dir_replaced_with_file')
         os.chmod('input/dir_replaced_with_file', stat.S_IFDIR | 0o755)
+        os.mkdir('input/dir_replaced_with_link')
         os.mkdir('input/dir_removed')
         os.symlink('input/dir_replaced_with_file', 'input/link_changed')
         os.symlink('input/file_unchanged', 'input/link_removed')
         os.symlink('input/file_removed2', 'input/link_target_removed')
-        os.symlink('input/empty', 'input/symlink')
+        os.symlink('input/empty', 'input/link_target_contents_changed')
+        os.symlink('input/empty', 'input/link_replaced_by_file')
         os.link('input/empty', 'input/hardlink_contents_changed')
         os.link('input/file_removed', 'input/hardlink_removed')
         os.link('input/file_removed2', 'input/hardlink_target_removed')
@@ -1537,14 +1539,18 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         os.unlink('input/file_replaced')
         self.create_regular_file('file_replaced', size=4096, contents=b'0')
         os.rmdir('input/dir_replaced_with_file')
-        self.create_regular_file('dir_replaced_with_file', size=8192 * 80)
+        self.create_regular_file('dir_replaced_with_file', size=8192)
         os.chmod('input/dir_replaced_with_file', stat.S_IFREG | 0o755)
         os.mkdir('input/dir_added')
         os.rmdir('input/dir_removed')
+        os.rmdir('input/dir_replaced_with_link')
+        os.symlink('input/dir_added', 'input/dir_replaced_with_link')
         os.unlink('input/link_changed')
         os.symlink('input/dir_added', 'input/link_changed')
         os.symlink('input/dir_added', 'input/link_added')
         os.unlink('input/link_removed')
+        os.unlink('input/link_replaced_by_file')
+        self.create_regular_file('link_replaced_by_file', size=16384)
         os.unlink('input/hardlink_removed')
         os.link('input/file_added', 'input/hardlink_added')
 
@@ -1574,13 +1580,19 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             assert 'added link          input/link_added' in output
             assert 'removed link        input/link_removed' in output
 
+            # Symlink replacing or being replaced
+            assert '] input/dir_replaced_with_link' in output
+            assert '] input/link_replaced_by_file' in output
+
             # Symlink target removed. Should not affect the symlink at all.
             assert 'input/link_target_removed' not in output
 
             # The inode has two links and the file contents changed. Borg
-            # should notice the changes in both links.
+            # should notice the changes in both links. However, the symlink
+            # pointing to the file is not changed.
             assert '0 B input/empty' in output
             assert '0 B input/hardlink_contents_changed' in output
+            assert 'input/link_target_contents_changed' not in output
 
             # Added a new file and a hard link to it. Both links to the same
             # inode should appear as separate files.

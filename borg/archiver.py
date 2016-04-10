@@ -262,7 +262,7 @@ class Archiver:
         if (st.st_ino, st.st_dev) in skip_inodes:
             return
         # Entering a new filesystem?
-        if restrict_dev and st.st_dev != restrict_dev:
+        if restrict_dev is not None and st.st_dev != restrict_dev:
             return
         status = None
         # Ignore if nodump flag is set

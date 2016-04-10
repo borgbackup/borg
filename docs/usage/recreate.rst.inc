@@ -4,58 +4,59 @@ borg recreate
 -------------
 ::
 
-    usage: borg recreate [-h] [-v] [--debug] [--lock-wait N] [--show-version]
-                         [--show-rc] [--no-files-cache] [--umask M]
-                         [--remote-path PATH] [--list] [--filter STATUSCHARS] [-p]
-                         [-n] [-s] [-e PATTERN] [--exclude-from EXCLUDEFILE]
-                         [--exclude-caches] [--exclude-if-present FILENAME]
-                         [--keep-tag-files] [-C COMPRESSION]
-                         [--chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE]
-                         [REPOSITORY_OR_ARCHIVE] [PATH [PATH ...]]
-    
-    Re-create archives
-    
-    positional arguments:
-      REPOSITORY_OR_ARCHIVE
-                            repository/archive to recreate
-      PATH                  paths to recreate; patterns are supported
-    
-    optional arguments:
-      -h, --help            show this help message and exit
-      -v, --verbose, --info
-                            enable informative (verbose) output, work on log level
-                            INFO
-      --debug               enable debug output, work on log level DEBUG
-      --lock-wait N         wait for the lock, but max. N seconds (default: 1).
-      --show-version        show/log the borg version
-      --show-rc             show/log the return code (rc)
-      --no-files-cache      do not load/update the file metadata cache used to
-                            detect unchanged files
-      --umask M             set umask to M (local and remote, default: 0077)
-      --remote-path PATH    set remote path to executable (default: "borg")
-      --list                output verbose list of items (files, dirs, ...)
-      --filter STATUSCHARS  only display items with the given status characters
-      -p, --progress        show progress display while rewriting archives
-      -n, --dry-run         do not change anything
-      -s, --stats           print statistics at end
-      -e PATTERN, --exclude PATTERN
-                            exclude paths matching PATTERN
-      --exclude-from EXCLUDEFILE
-                            read exclude patterns from EXCLUDEFILE, one per line
-      --exclude-caches      exclude directories that contain a CACHEDIR.TAG file
-                            (http://www.brynosaurus.com/cachedir/spec.html)
-      --exclude-if-present FILENAME
-                            exclude directories that contain the specified file
-      --keep-tag-files      keep tag files of excluded caches/directories
-      -C COMPRESSION, --compression COMPRESSION
-                            select compression algorithm (and level): none == no
-                            compression (default), lz4 == lz4, zlib == zlib
-                            (default level 6), zlib,0 .. zlib,9 == zlib (with
-                            level 0..9), lzma == lzma (default level 6), lzma,0 ..
-                            lzma,9 == lzma (with level 0..9).
-      --chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE
-                            specify the chunker parameters (or "default").
-    
+    borg recreate <options> REPOSITORY_OR_ARCHIVE PATH
+
+positional arguments
+    REPOSITORY_OR_ARCHIVE
+        repository/archive to recreate
+    PATH
+        paths to recreate; patterns are supported
+
+optional arguments
+    ``--list``
+        | output verbose list of items (files, dirs, ...)
+    ``--filter STATUSCHARS``
+        | only display items with the given status characters
+    ``-p``, ``--progress``
+        | show progress display while rewriting archives
+    ``-n``, ``--dry-run``
+        | do not change anything
+    ``-s``, ``--stats``
+        | print statistics at end
+
+`Common options`_
+    |
+
+Exclusion options
+    ``-e PATTERN``, ``--exclude PATTERN``
+        | exclude paths matching PATTERN
+    ``--exclude-from EXCLUDEFILE``
+        | read exclude patterns from EXCLUDEFILE, one per line
+    ``--exclude-caches``
+        | exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)
+    ``--exclude-if-present FILENAME``
+        | exclude directories that contain the specified file
+    ``--keep-tag-files``
+        | keep tag files of excluded caches/directories
+
+Archive options
+    ``--comment COMMENT``
+        | add a comment text to the archive
+    ``--timestamp yyyy-mm-ddThh:mm:ss``
+        | manually specify the archive creation date/time (UTC). alternatively, give a reference file/directory.
+    ``-c SECONDS``, ``--checkpoint-interval SECONDS``
+        | write checkpoint every SECONDS seconds (Default: 300)
+    ``-C COMPRESSION``, ``--compression COMPRESSION``
+        | select compression algorithm (and level):
+        | none == no compression (default),
+        | lz4 == lz4,
+        | zlib == zlib (default level 6),
+        | zlib,0 .. zlib,9 == zlib (with level 0..9),
+        | lzma == lzma (default level 6),
+        | lzma,0 .. lzma,9 == lzma (with level 0..9).
+    ``--chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE``
+        | specify the chunker parameters (or "default").
+
 Description
 ~~~~~~~~~~~
 

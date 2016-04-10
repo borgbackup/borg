@@ -627,16 +627,6 @@ class Archiver:
         return self.exit_code
 
     @with_repository(exclusive=True, cache=True)
-    @with_archive
-    def do_comment(self, args, repository, manifest, key, cache, archive):
-        """Set the archive comment"""
-        archive.set_meta(b'comment', args.comment)
-        manifest.write()
-        repository.commit()
-        cache.commit()
-        return self.exit_code
-
-    @with_repository(exclusive=True, cache=True)
     def do_delete(self, args, repository, manifest, key, cache):
         """Delete an existing repository or archive"""
         if args.location.archive:
@@ -851,14 +841,14 @@ class Archiver:
             if recreater.is_temporary_archive(name):
                 self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
                 return self.exit_code
-            recreater.recreate(name)
+            recreater.recreate(name, args.comment)
         else:
             for archive in manifest.list_archive_infos(sort_by='ts'):
                 name = archive.name
                 if recreater.is_temporary_archive(name):
                     continue
                 print('Processing', name)
-                if not recreater.recreate(name):
+                if not recreater.recreate(name, args.comment):
                     break
         manifest.write()
         repository.commit()
@@ -1434,23 +1424,6 @@ class Archiver:
                                type=archivename_validator(),
                                help='the new archive name to use')
 
-        comment_epilog = textwrap.dedent("""
-        This command sets the archive comment.
-
-        This results in a different archive ID.
-        """)
-        subparser = subparsers.add_parser('comment', parents=[common_parser], add_help=False,
-                                          description=self.do_comment.__doc__,
-                                          epilog=comment_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='set the archive comment')
-        subparser.set_defaults(func=self.do_comment)
-        subparser.add_argument('location', metavar='ARCHIVE',
-                               type=location_validator(archive=True),
-                               help='archive to modify')
-        subparser.add_argument('comment', metavar='COMMENT',
-                               help='the new archive comment')
-
         delete_epilog = textwrap.dedent("""
         This command deletes an archive from the repository or the complete repository.
         Disk space is reclaimed accordingly. If you delete the complete repository, the
@@ -1746,22 +1719,36 @@ class Archiver:
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics at end')
-        subparser.add_argument('-e', '--exclude', dest='excludes',
-                               type=parse_pattern, action='append',
-                               metavar="PATTERN", help='exclude paths matching PATTERN')
-        subparser.add_argument('--exclude-from', dest='exclude_files',
-                               type=argparse.FileType('r'), action='append',
-                               metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
-        subparser.add_argument('--exclude-caches', dest='exclude_caches',
-                               action='store_true', default=False,
-                               help='exclude directories that contain a CACHEDIR.TAG file ('
-                                    'http://www.brynosaurus.com/cachedir/spec.html)')
-        subparser.add_argument('--exclude-if-present', dest='exclude_if_present',
-                               metavar='FILENAME', action='append', type=str,
-                               help='exclude directories that contain the specified file')
-        subparser.add_argument('--keep-tag-files', dest='keep_tag_files',
-                               action='store_true', default=False,
-                               help='keep tag files of excluded caches/directories')
+
+        exclude_group = subparser.add_argument_group('Exclusion options')
+        exclude_group.add_argument('-e', '--exclude', dest='excludes',
+                                   type=parse_pattern, action='append',
+                                   metavar="PATTERN", help='exclude paths matching PATTERN')
+        exclude_group.add_argument('--exclude-from', dest='exclude_files',
+                                   type=argparse.FileType('r'), action='append',
+                                   metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
+        exclude_group.add_argument('--exclude-caches', dest='exclude_caches',
+                                   action='store_true', default=False,
+                                   help='exclude directories that contain a CACHEDIR.TAG file ('
+                                        'http://www.brynosaurus.com/cachedir/spec.html)')
+        exclude_group.add_argument('--exclude-if-present', dest='exclude_if_present',
+                                   metavar='FILENAME', action='append', type=str,
+                                   help='exclude directories that contain the specified file')
+        exclude_group.add_argument('--keep-tag-files', dest='keep_tag_files',
+                                   action='store_true', default=False,
+                                   help='keep tag files of excluded caches/directories')
+
+        archive_group = subparser.add_argument_group('Archive options')
+        archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default=None,
+                                   help='add a comment text to the archive')
+        archive_group.add_argument('--timestamp', dest='timestamp',
+                                   type=timestamp, default=None,
+                                   metavar='yyyy-mm-ddThh:mm:ss',
+                                   help='manually specify the archive creation date/time (UTC). '
+                                        'alternatively, give a reference file/directory.')
+        archive_group.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
+                                   type=int, default=300, metavar='SECONDS',
+                                   help='write checkpoint every SECONDS seconds (Default: 300)')
         archive_group.add_argument('-C', '--compression', dest='compression',
                                    type=CompressionSpec, default=None, metavar='COMPRESSION',
                                    help='select compression algorithm (and level):\n'
@@ -1771,10 +1758,11 @@ class Archiver:
                                         'zlib,0 .. zlib,9 == zlib (with level 0..9),\n'
                                         'lzma == lzma (default level 6),\n'
                                         'lzma,0 .. lzma,9 == lzma (with level 0..9).')
-        subparser.add_argument('--chunker-params', dest='chunker_params',
-                               type=ChunkerParams, default=None,
-                               metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
-                               help='specify the chunker parameters (or "default").')
+        archive_group.add_argument('--chunker-params', dest='chunker_params',
+                                   type=ChunkerParams, default=None,
+                                   metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
+                                   help='specify the chunker parameters (or "default").')
+
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='repository/archive to recreate')

@@ -800,13 +800,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test1', 'input')
         self.cmd('create', '--comment', 'this is the comment', self.repository_location + '::test2', 'input')
+        self.cmd('create', '--comment', '"deleted" comment', self.repository_location + '::test3', 'input')
+        self.cmd('create', '--comment', 'preserved comment', self.repository_location + '::test4', 'input')
         assert 'Comment: \n' in self.cmd('info', self.repository_location + '::test1')
         assert 'Comment: this is the comment' in self.cmd('info', self.repository_location + '::test2')
 
-        self.cmd('comment', self.repository_location + '::test1', 'added comment')
-        self.cmd('comment', self.repository_location + '::test2', 'modified comment')
+        self.cmd('recreate', self.repository_location + '::test1', '--comment', 'added comment')
+        self.cmd('recreate', self.repository_location + '::test2', '--comment', 'modified comment')
+        self.cmd('recreate', self.repository_location + '::test3', '--comment', '')
+        self.cmd('recreate', self.repository_location + '::test4', '12345')
         assert 'Comment: added comment' in self.cmd('info', self.repository_location + '::test1')
         assert 'Comment: modified comment' in self.cmd('info', self.repository_location + '::test2')
+        assert 'Comment: \n' in self.cmd('info', self.repository_location + '::test3')
+        assert 'Comment: preserved comment' in self.cmd('info', self.repository_location + '::test4')
 
     def test_delete(self):
         self.create_regular_file('file1', size=1024 * 80)

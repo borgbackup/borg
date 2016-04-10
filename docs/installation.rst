@@ -40,6 +40,7 @@ NetBSD       `pkgsrc`_                                     ``pkg_add py-borgback
 NixOS        `.nix file`_                                  N/A
 OpenBSD      `OpenBSD ports`_                              ``pkg_add borgbackup``
 openSUSE     `openSUSE official repository`_               ``zypper in python3-borgbackup``
+Fedora       `Fedora official repository`_                 ``dnf install borgbackup``
 OS X         `Brew cask`_                                  ``brew cask install borgbackup``
 Ubuntu       `16.04`_, backports (PPA): `15.10`_, `14.04`_ ``apt install borgbackup``
 ============ ============================================= =======
@@ -56,6 +57,7 @@ Ubuntu       `16.04`_, backports (PPA): `15.10`_, `14.04`_ ``apt install borgbac
 .. _.nix file: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/backup/borg/default.nix
 .. _OpenBSD ports: http://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/sysutils/borgbackup/
 .. _openSUSE official repository: http://software.opensuse.org/package/python3-borgbackup
+.. _Fedora official repository: https://apps.fedoraproject.org/packages/borgbackup
 .. _Brew cask: http://caskroom.io/
 .. _GNU Guix: https://www.gnu.org/software/guix/package-list.html#borg
 

@@ -94,6 +94,8 @@ Some automatic "answerers" (if set, they automatically answer confirmation quest
         For "Warning: 'check --repair' is an experimental feature that might result in data loss."
     BORG_DELETE_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
         For "You requested to completely DELETE the repository *including* all archives it contains:"
+    BORG_RECREATE_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
+        For "recreate is an experimental feature."
 
     Note: answers are case sensitive. setting an invalid answer value might either give the default
     answer or ask you interactively, depending on whether retries are allowed (they by default are
@@ -356,26 +358,6 @@ Examples
     newname                              Mon, 2016-02-15 19:50:19
 
 
-.. include:: usage/comment.rst.inc
-
-Examples
-~~~~~~~~
-::
-
-    $ borg create --comment "This is a comment" /mnt/backup::archivename ~
-    $ borg info /mnt/backup::archivename
-    Name: archivename
-    Fingerprint: ...
-    Comment: This is a comment
-    ...
-    $ borg comment /mnt/backup::archivename "This is a better comment"
-    $ borg info /mnt/backup::archivename
-    Name: archivename
-    Fingerprint: ...
-    Comment: This is a better comment
-    ...
-
-
 .. include:: usage/list.rst.inc
 
 Examples
@@ -626,6 +608,41 @@ Examples
     converting 1 segments...
     converting borg 0.xx to borg current
     no key file found for repository
+
+
+.. include:: usage/recreate.rst.inc
+
+Examples
+~~~~~~~~
+::
+
+    # Make old (Attic / Borg 0.xx) archives deduplicate with Borg 1.x archives
+    # Archives created with Borg 1.1+ and the default chunker params are skipped (archive ID stays the same)
+    $ borg recreate /mnt/backup --chunker-params default --progress
+
+    # Create a backup with little but fast compression
+    $ borg create /mnt/backup::archive /some/files --compression lz4
+    # Then compress it - this might take longer, but the backup has already completed, so no inconsistencies
+    # from a long-running backup job.
+    $ borg recreate /mnt/backup::archive --compression zlib,9
+
+    # Remove unwanted files from all archives in a repository
+    $ borg recreate /mnt/backup -e /home/icke/Pictures/drunk_photos
+
+
+    # Change archive comment
+    $ borg create --comment "This is a comment" /mnt/backup::archivename ~
+    $ borg info /mnt/backup::archivename
+    Name: archivename
+    Fingerprint: ...
+    Comment: This is a comment
+    ...
+    $ borg recreate --comment "This is a better comment" /mnt/backup::archivename
+    $ borg info /mnt/backup::archivename
+    Name: archivename
+    Fingerprint: ...
+    Comment: This is a better comment
+    ...
 
 
 Miscellaneous Help

@@ -2,6 +2,7 @@ from binascii import hexlify
 from configparser import ConfigParser
 import errno
 import os
+import inspect
 from io import StringIO
 import random
 import stat
@@ -17,7 +18,7 @@ from hashlib import sha256
 import pytest
 
 from .. import xattr
-from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP
+from ..archive import Archive, ChunkBuffer, ArchiveRecreater, CHUNK_MAX_EXP
 from ..archiver import Archiver
 from ..cache import Cache
 from ..crypto import bytes_to_long, num_aes_blocks
@@ -196,6 +197,7 @@ class ArchiverTestCaseBase(BaseTestCase):
     def setUp(self):
         os.environ['BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
         os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
+        os.environ['BORG_RECREATE_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
         os.environ['BORG_PASSPHRASE'] = 'waytooeasyonlyfortests'
         self.archiver = not self.FORK_DEFAULT and Archiver() or None
         self.tmpdir = tempfile.mkdtemp()
@@ -234,9 +236,6 @@ class ArchiverTestCaseBase(BaseTestCase):
 
     def create_src_archive(self, name):
         self.cmd('create', self.repository_location + '::' + name, src_dir)
-
-
-class ArchiverTestCase(ArchiverTestCaseBase):
 
     def create_regular_file(self, name, size=0, contents=None):
         filename = os.path.join(self.input_path, name)
@@ -295,6 +294,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             have_root = False
         return have_root
 
+
+class ArchiverTestCase(ArchiverTestCaseBase):
     def test_basic_functionality(self):
         have_root = self.create_test_files()
         self.cmd('init', self.repository_location)
@@ -637,29 +638,56 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd("extract", self.repository_location + "::test", "fm:input/file1", "fm:*file33*", "input/file2")
         self.assert_equal(sorted(os.listdir("output/input")), ["file1", "file2", "file333"])
 
-    def test_exclude_caches(self):
+    def _create_test_caches(self):
         self.cmd('init', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('cache1/CACHEDIR.TAG', contents=b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
         self.create_regular_file('cache2/CACHEDIR.TAG', contents=b'invalid signature')
-        self.cmd('create', '--exclude-caches', self.repository_location + '::test', 'input')
+        os.mkdir('input/cache3')
+        os.link('input/cache1/CACHEDIR.TAG', 'input/cache3/CACHEDIR.TAG')
+
+    def _assert_test_caches(self):
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['cache2', 'file1'])
         self.assert_equal(sorted(os.listdir('output/input/cache2')), ['CACHEDIR.TAG'])
 
-    def test_exclude_tagged(self):
+    def test_exclude_caches(self):
+        self._create_test_caches()
+        self.cmd('create', '--exclude-caches', self.repository_location + '::test', 'input')
+        self._assert_test_caches()
+
+    def test_recreate_exclude_caches(self):
+        self._create_test_caches()
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('recreate', '--exclude-caches', self.repository_location + '::test')
+        self._assert_test_caches()
+
+    def _create_test_tagged(self):
         self.cmd('init', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('tagged1/.NOBACKUP')
         self.create_regular_file('tagged2/00-NOBACKUP')
         self.create_regular_file('tagged3/.NOBACKUP/file2')
-        self.cmd('create', '--exclude-if-present', '.NOBACKUP', '--exclude-if-present', '00-NOBACKUP', self.repository_location + '::test', 'input')
+
+    def _assert_test_tagged(self):
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'tagged3'])
 
-    def test_exclude_keep_tagged(self):
+    def test_exclude_tagged(self):
+        self._create_test_tagged()
+        self.cmd('create', '--exclude-if-present', '.NOBACKUP', '--exclude-if-present', '00-NOBACKUP', self.repository_location + '::test', 'input')
+        self._assert_test_tagged()
+
+    def test_recreate_exclude_tagged(self):
+        self._create_test_tagged()
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('recreate', '--exclude-if-present', '.NOBACKUP', '--exclude-if-present', '00-NOBACKUP',
+                 self.repository_location + '::test')
+        self._assert_test_tagged()
+
+    def _create_test_keep_tagged(self):
         self.cmd('init', self.repository_location)
         self.create_regular_file('file0', size=1024)
         self.create_regular_file('tagged1/.NOBACKUP1')
@@ -672,8 +700,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('taggedall/.NOBACKUP2')
         self.create_regular_file('taggedall/CACHEDIR.TAG', contents=b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
         self.create_regular_file('taggedall/file4', size=1024)
-        self.cmd('create', '--exclude-if-present', '.NOBACKUP1', '--exclude-if-present', '.NOBACKUP2',
-                 '--exclude-caches', '--keep-tag-files', self.repository_location + '::test', 'input')
+
+    def _assert_test_keep_tagged(self):
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file0', 'tagged1', 'tagged2', 'tagged3', 'taggedall'])
@@ -682,6 +710,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_equal(os.listdir('output/input/tagged3'), ['CACHEDIR.TAG'])
         self.assert_equal(sorted(os.listdir('output/input/taggedall')),
                           ['.NOBACKUP1', '.NOBACKUP2', 'CACHEDIR.TAG', ])
+
+    def test_exclude_keep_tagged(self):
+        self._create_test_keep_tagged()
+        self.cmd('create', '--exclude-if-present', '.NOBACKUP1', '--exclude-if-present', '.NOBACKUP2',
+                 '--exclude-caches', '--keep-tag-files', self.repository_location + '::test', 'input')
+        self._assert_test_keep_tagged()
+
+    def test_recreate_exclude_keep_tagged(self):
+        self._create_test_keep_tagged()
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('recreate', '--exclude-if-present', '.NOBACKUP1', '--exclude-if-present', '.NOBACKUP2',
+                 '--exclude-caches', '--keep-tag-files', self.repository_location + '::test')
+        self._assert_test_keep_tagged()
 
     def test_path_normalization(self):
         self.cmd('init', self.repository_location)
@@ -760,13 +801,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test1', 'input')
         self.cmd('create', '--comment', 'this is the comment', self.repository_location + '::test2', 'input')
+        self.cmd('create', '--comment', '"deleted" comment', self.repository_location + '::test3', 'input')
+        self.cmd('create', '--comment', 'preserved comment', self.repository_location + '::test4', 'input')
         assert 'Comment: \n' in self.cmd('info', self.repository_location + '::test1')
         assert 'Comment: this is the comment' in self.cmd('info', self.repository_location + '::test2')
 
-        self.cmd('comment', self.repository_location + '::test1', 'added comment')
-        self.cmd('comment', self.repository_location + '::test2', 'modified comment')
+        self.cmd('recreate', self.repository_location + '::test1', '--comment', 'added comment')
+        self.cmd('recreate', self.repository_location + '::test2', '--comment', 'modified comment')
+        self.cmd('recreate', self.repository_location + '::test3', '--comment', '')
+        self.cmd('recreate', self.repository_location + '::test4', '12345')
         assert 'Comment: added comment' in self.cmd('info', self.repository_location + '::test1')
         assert 'Comment: modified comment' in self.cmd('info', self.repository_location + '::test2')
+        assert 'Comment: \n' in self.cmd('info', self.repository_location + '::test3')
+        assert 'Comment: preserved comment' in self.cmd('info', self.repository_location + '::test4')
 
     def test_delete(self):
         self.create_regular_file('file1', size=1024 * 80)
@@ -1149,6 +1196,178 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('init', self.repository_location, exit_code=1)
         assert not os.path.exists(self.repository_location)
 
+    def test_recreate_basic(self):
+        self.create_test_files()
+        self.create_regular_file('dir2/file3', size=1024 * 80)
+        self.cmd('init', self.repository_location)
+        archive = self.repository_location + '::test0'
+        self.cmd('create', archive, 'input')
+        self.cmd('recreate', archive, 'input/dir2', '-e', 'input/dir2/file3')
+        listing = self.cmd('list', '--short', archive)
+        assert 'file1' not in listing
+        assert 'dir2/file2' in listing
+        assert 'dir2/file3' not in listing
+
+    def test_recreate_subtree_hardlinks(self):
+        # This is essentially the same problem set as in test_extract_hardlinks
+        self._extract_hardlinks_setup()
+        self.cmd('create', self.repository_location + '::test2', 'input')
+        self.cmd('recreate', self.repository_location + '::test', 'input/dir1')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+            assert os.stat('input/dir1/hardlink').st_nlink == 2
+            assert os.stat('input/dir1/subdir/hardlink').st_nlink == 2
+            assert os.stat('input/dir1/aaaa').st_nlink == 2
+            assert os.stat('input/dir1/source2').st_nlink == 2
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test2')
+            assert os.stat('input/dir1/hardlink').st_nlink == 4
+
+    def test_recreate_rechunkify(self):
+        with open(os.path.join(self.input_path, 'large_file'), 'wb') as fd:
+            fd.write(b'a' * 280)
+            fd.write(b'b' * 280)
+        self.cmd('init', self.repository_location)
+        self.cmd('create', '--chunker-params', '7,9,8,128', self.repository_location + '::test1', 'input')
+        self.cmd('create', self.repository_location + '::test2', 'input', '--no-files-cache')
+        list = self.cmd('list', self.repository_location + '::test1', 'input/large_file',
+                        '--format', '{num_chunks} {unique_chunks}')
+        num_chunks, unique_chunks = map(int, list.split(' '))
+        # test1 and test2 do not deduplicate
+        assert num_chunks == unique_chunks
+        self.cmd('recreate', self.repository_location, '--chunker-params', 'default')
+        # test1 and test2 do deduplicate after recreate
+        assert not int(self.cmd('list', self.repository_location + '::test1', 'input/large_file',
+                                '--format', '{unique_chunks}'))
+
+    def test_recreate_recompress(self):
+        self.create_regular_file('compressible', size=10000)
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input', '-C', 'none')
+        file_list = self.cmd('list', self.repository_location + '::test', 'input/compressible',
+                             '--format', '{size} {csize} {sha256}')
+        size, csize, sha256_before = file_list.split(' ')
+        assert int(csize) >= int(size)  # >= due to metadata overhead
+        self.cmd('recreate', self.repository_location, '-C', 'lz4')
+        file_list = self.cmd('list', self.repository_location + '::test', 'input/compressible',
+                             '--format', '{size} {csize} {sha256}')
+        size, csize, sha256_after = file_list.split(' ')
+        assert int(csize) < int(size)
+        assert sha256_before == sha256_after
+
+    def test_recreate_dry_run(self):
+        self.create_regular_file('compressible', size=10000)
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        archives_before = self.cmd('list', self.repository_location + '::test')
+        self.cmd('recreate', self.repository_location, '-n', '-e', 'input/compressible')
+        archives_after = self.cmd('list', self.repository_location + '::test')
+        assert archives_after == archives_before
+
+    def _recreate_interrupt_patch(self, interrupt_after_n_1_files):
+        def interrupt(self, *args):
+            if interrupt_after_n_1_files:
+                self.interrupt = True
+                pi_save(self, *args)
+            else:
+                raise ArchiveRecreater.Interrupted
+
+        def process_item_patch(*args):
+            return pi_call.pop(0)(*args)
+
+        pi_save = ArchiveRecreater.process_item
+        pi_call = [pi_save] * interrupt_after_n_1_files + [interrupt]
+        return process_item_patch
+
+    def _test_recreate_interrupt(self, change_args, interrupt_early):
+        self.create_test_files()
+        self.create_regular_file('dir2/abcdef', size=1024 * 80)
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        process_files = 1
+        if interrupt_early:
+            process_files = 0
+        with patch.object(ArchiveRecreater, 'process_item', self._recreate_interrupt_patch(process_files)):
+            self.cmd('recreate', '-sv', '--list', self.repository_location, 'input/dir2')
+        assert 'test.recreate' in self.cmd('list', self.repository_location)
+        if change_args:
+            with patch.object(sys, 'argv', sys.argv + ['non-forking tests don\'t use sys.argv']):
+                output = self.cmd('recreate', '-sv', '--list', '-pC', 'lz4', self.repository_location, 'input/dir2')
+        else:
+            output = self.cmd('recreate', '-sv', '--list', self.repository_location, 'input/dir2')
+        assert 'Found test.recreate, will resume' in output
+        assert change_args == ('Command line changed' in output)
+        if not interrupt_early:
+            assert 'Fast-forwarded to input/dir2/abcdef' in output
+            assert 'A input/dir2/abcdef' not in output
+        assert 'A input/dir2/file2' in output
+        archives = self.cmd('list', self.repository_location)
+        assert 'test.recreate' not in archives
+        assert 'test' in archives
+        files = self.cmd('list', self.repository_location + '::test')
+        assert 'dir2/file2' in files
+        assert 'dir2/abcdef' in files
+        assert 'file1' not in files
+
+    def test_recreate_interrupt(self):
+        self._test_recreate_interrupt(False, True)
+
+    def test_recreate_interrupt2(self):
+        self._test_recreate_interrupt(True, False)
+
+    def _test_recreate_chunker_interrupt_patch(self):
+        real_add_chunk = Cache.add_chunk
+
+        def add_chunk(*args, **kwargs):
+            frame = inspect.stack()[2]
+            try:
+                caller_self = frame[0].f_locals['self']
+                if isinstance(caller_self, ArchiveRecreater):
+                    caller_self.interrupt = True
+            finally:
+                del frame
+            return real_add_chunk(*args, **kwargs)
+        return add_chunk
+
+    def test_recreate_rechunkify_interrupt(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        archive_before = self.cmd('list', self.repository_location + '::test', '--format', '{sha512}')
+        with patch.object(Cache, 'add_chunk', self._test_recreate_chunker_interrupt_patch()):
+            self.cmd('recreate', '-pv', '--chunker-params', '10,12,11,4095', self.repository_location)
+        assert 'test.recreate' in self.cmd('list', self.repository_location)
+        output = self.cmd('recreate', '-svp', '--debug', '--chunker-params', '10,12,11,4095', self.repository_location)
+        assert 'Found test.recreate, will resume' in output
+        assert 'Copied 1 chunks from a partially processed item' in output
+        archive_after = self.cmd('list', self.repository_location + '::test', '--format', '{sha512}')
+        assert archive_after == archive_before
+
+    def test_recreate_changed_source(self):
+        self.create_test_files()
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with patch.object(ArchiveRecreater, 'process_item', self._recreate_interrupt_patch(1)):
+            self.cmd('recreate', self.repository_location, 'input/dir2')
+        assert 'test.recreate' in self.cmd('list', self.repository_location)
+        self.cmd('delete', self.repository_location + '::test')
+        self.cmd('create', self.repository_location + '::test', 'input')
+        output = self.cmd('recreate', self.repository_location, 'input/dir2')
+        assert 'Source archive changed, will discard test.recreate and start over' in output
+
+    def test_recreate_refuses_temporary(self):
+        self.cmd('init', self.repository_location)
+        self.cmd('recreate', self.repository_location + '::cba.recreate', exit_code=2)
+
+    def test_recreate_skips_nothing_to_do(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        info_before = self.cmd('info', self.repository_location + '::test')
+        self.cmd('recreate', self.repository_location, '--chunker-params', 'default')
+        info_after = self.cmd('info', self.repository_location + '::test')
+        assert info_before == info_after  # includes archive ID
+
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
 class ArchiverTestCaseBinary(ArchiverTestCase):
@@ -1157,6 +1376,18 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
 
     @unittest.skip('patches objects')
     def test_init_interrupt(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_recreate_rechunkify_interrupt(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_recreate_interrupt(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_recreate_changed_source(self):
         pass
 
 
@@ -1274,9 +1505,6 @@ class RemoteArchiverTestCase(ArchiverTestCase):
 
 
 class DiffArchiverTestCase(ArchiverTestCaseBase):
-    create_test_files = ArchiverTestCase.create_test_files
-    create_regular_file = ArchiverTestCase.create_regular_file
-
     def test_basic_functionality(self):
         # Initialize test folder
         self.create_test_files()

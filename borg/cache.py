@@ -108,6 +108,11 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             stats[field] = format_file_size(stats[field])
         return Summary(**stats)
 
+    def chunks_stored_size(self):
+        Summary = namedtuple('Summary', ['total_size', 'total_csize', 'unique_size', 'unique_csize', 'total_unique_chunks', 'total_chunks'])
+        stats = Summary(*self.chunks.summarize())
+        return stats.unique_csize
+
     def create(self):
         """Create a new empty cache at `self.path`
         """
@@ -358,16 +363,17 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             self.do_cache = os.path.isdir(archive_path)
             self.chunks = create_master_idx(self.chunks)
 
-    def add_chunk(self, id, data, stats):
+    def add_chunk(self, id, data, stats, overwrite=False):
         if not self.txn_active:
             self.begin_txn()
         size = len(data)
-        if self.seen_chunk(id, size):
+        refcount = self.seen_chunk(id, size)
+        if refcount and not overwrite:
             return self.chunk_incref(id, stats)
         data = self.key.encrypt(data)
         csize = len(data)
         self.repository.put(id, data, wait=False)
-        self.chunks[id] = (1, size, csize)
+        self.chunks[id] = (refcount + 1, size, csize)
         stats.update(size, csize, True)
         return id, size, csize
 

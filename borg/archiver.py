@@ -821,6 +821,12 @@ class Archiver:
                 print("\nReceived signal, will exit cleanly.", file=sys.stderr)
             recreater.interrupt = True
 
+        msg = ("recreate is an experimental feature.\n"
+               "Type 'YES' if you understand this and want to continue: ")
+        if not yes(msg, false_msg="Aborting.", truish=('YES',),
+                   env_var_override='BORG_RECREATE_I_KNOW_WHAT_I_AM_DOING'):
+            return EXIT_ERROR
+
         matcher, include_patterns = self.build_matcher(args.excludes, args.paths)
         self.output_list = args.output_list
         self.output_filter = args.output_filter

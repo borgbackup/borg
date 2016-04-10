@@ -816,9 +816,9 @@ class Archiver:
         """Re-create archives"""
         def interrupt(signal_num, stack_frame):
             if recreater.interrupt:
-                print("Received signal, again. I'm not deaf.\n", file=sys.stderr)
+                print("\nReceived signal, again. I'm not deaf.", file=sys.stderr)
             else:
-                print("Received signal, will exit cleanly.\n", file=sys.stderr)
+                print("\nReceived signal, will exit cleanly.", file=sys.stderr)
             recreater.interrupt = True
 
         matcher, include_patterns = self.build_matcher(args.excludes, args.paths)
@@ -1664,12 +1664,12 @@ class Archiver:
         Recreate the contents of existing archives.
 
         --exclude, --exclude-from and PATH have the exact same semantics
-        as in "borg create". If a PATH is specified the resulting archive
-        will only contain files under PATH.
+        as in "borg create". If PATHs are specified the resulting archive
+        will only contain files from these PATHs.
 
         --compression: all chunks seen will be stored using the given method.
         Due to how Borg stores compressed size information this might display
-        incorrect information for archives that were not rewritten at the same time.
+        incorrect information for archives that were not recreated at the same time.
         There is no risk of data loss by this.
 
         --chunker-params will re-chunk all files in the archive, this can be
@@ -1686,7 +1686,8 @@ class Archiver:
         Changing chunker params between invocations might lead to data loss.
 
         USE WITH CAUTION.
-        Permanent data loss by specifying incorrect patterns or PATHS is possible.
+        Depending on the PATHs and patterns given, recreate can be used to permanently
+        delete files from archives.
         When in doubt, use "--dry-run --verbose --list" to see how patterns/PATHS are
         interpreted.
 
@@ -1695,7 +1696,7 @@ class Archiver:
         "<ARCHIVE>.recreate". The new archive will have a different archive ID.
 
         When rechunking space usage can be substantial, expect at least the entire
-        deduplicated size of the archives using the older chunker params.
+        deduplicated size of the archives using the previous chunker params.
         When recompressing approximately 1 % of the repository size or 512 MB
         (whichever is greater) of additional space is used.
         """)
@@ -1712,7 +1713,7 @@ class Archiver:
                                help='only display items with the given status characters')
         subparser.add_argument('-p', '--progress', dest='progress',
                                action='store_true', default=False,
-                               help='show progress display while rewriting archives')
+                               help='show progress display while recreating archives')
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                action='store_true', default=False,
                                help='do not change anything')
@@ -1746,9 +1747,6 @@ class Archiver:
                                    metavar='yyyy-mm-ddThh:mm:ss',
                                    help='manually specify the archive creation date/time (UTC). '
                                         'alternatively, give a reference file/directory.')
-        archive_group.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
-                                   type=int, default=300, metavar='SECONDS',
-                                   help='write checkpoint every SECONDS seconds (Default: 300)')
         archive_group.add_argument('-C', '--compression', dest='compression',
                                    type=CompressionSpec, default=None, metavar='COMPRESSION',
                                    help='select compression algorithm (and level):\n'

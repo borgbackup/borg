@@ -18,7 +18,7 @@ optional arguments
     ``--filter STATUSCHARS``
         | only display items with the given status characters
     ``-p``, ``--progress``
-        | show progress display while rewriting archives
+        | show progress display while recreating archives
     ``-n``, ``--dry-run``
         | do not change anything
     ``-s``, ``--stats``
@@ -44,8 +44,6 @@ Archive options
         | add a comment text to the archive
     ``--timestamp yyyy-mm-ddThh:mm:ss``
         | manually specify the archive creation date/time (UTC). alternatively, give a reference file/directory.
-    ``-c SECONDS``, ``--checkpoint-interval SECONDS``
-        | write checkpoint every SECONDS seconds (Default: 300)
     ``-C COMPRESSION``, ``--compression COMPRESSION``
         | select compression algorithm (and level):
         | none == no compression (default),
@@ -63,12 +61,12 @@ Description
 Recreate the contents of existing archives.
 
 --exclude, --exclude-from and PATH have the exact same semantics
-as in "borg create". If a PATH is specified the resulting archive
-will only contain files under PATH.
+as in "borg create". If PATHs are specified the resulting archive
+will only contain files from these PATHs.
 
 --compression: all chunks seen will be stored using the given method.
 Due to how Borg stores compressed size information this might display
-incorrect information for archives that were not rewritten at the same time.
+incorrect information for archives that were not recreated at the same time.
 There is no risk of data loss by this.
 
 --chunker-params will re-chunk all files in the archive, this can be
@@ -85,7 +83,8 @@ processed files/dirs). Changing compression leads to incorrect size information
 Changing chunker params between invocations might lead to data loss.
 
 USE WITH CAUTION.
-Permanent data loss by specifying incorrect patterns or PATHS is possible.
+Depending on the PATHs and patterns given, recreate can be used to permanently
+delete files from archives.
 When in doubt, use "--dry-run --verbose --list" to see how patterns/PATHS are
 interpreted.
 
@@ -94,6 +93,6 @@ archive that is built during the operation exists at the same time at
 "<ARCHIVE>.recreate". The new archive will have a different archive ID.
 
 When rechunking space usage can be substantial, expect at least the entire
-deduplicated size of the archives using the older chunker params.
+deduplicated size of the archives using the previous chunker params.
 When recompressing approximately 1 % of the repository size or 512 MB
 (whichever is greater) of additional space is used.

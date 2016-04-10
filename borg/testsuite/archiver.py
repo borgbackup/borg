@@ -926,13 +926,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in("U input/file1", output)
         self.assert_in("x input/file2", output)
 
-    def test_create_delete_inbetween(self):
-        self.create_test_files()
-        self.cmd('init', self.repository_location)
-        self.cmd('create', self.repository_location + '::test1', 'input')
-        self.cmd('delete', self.repository_location + '::test1')
-        self.cmd('create', self.repository_location + '::test2', 'input')
-
     def test_create_topical(self):
         now = time.time()
         self.create_regular_file('file1', size=1024 * 80)
@@ -1231,8 +1224,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_recreate_rechunkify(self):
         with open(os.path.join(self.input_path, 'large_file'), 'wb') as fd:
-            fd.write(b'a' * 250)
-            fd.write(b'b' * 250)
+            fd.write(b'a' * 280)
+            fd.write(b'b' * 280)
         self.cmd('init', self.repository_location)
         self.cmd('create', '--chunker-params', '7,9,8,128', self.repository_location + '::test1', 'input')
         self.cmd('create', self.repository_location + '::test2', 'input', '--no-files-cache')
@@ -1249,16 +1242,17 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_recreate_recompress(self):
         self.create_regular_file('compressible', size=10000)
         self.cmd('init', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        list = self.cmd('list', self.repository_location + '::test', 'input/compressible',
-                        '--format', '{size} {csize}')
-        size, csize = map(int, list.split(' '))
-        assert csize >= size
+        self.cmd('create', self.repository_location + '::test', 'input', '-C', 'none')
+        file_list = self.cmd('list', self.repository_location + '::test', 'input/compressible',
+                             '--format', '{size} {csize} {sha256}')
+        size, csize, sha256_before = file_list.split(' ')
+        assert int(csize) >= int(size)  # >= due to metadata overhead
         self.cmd('recreate', self.repository_location, '-C', 'lz4')
-        list = self.cmd('list', self.repository_location + '::test', 'input/compressible',
-                        '--format', '{size} {csize}')
-        size, csize = map(int, list.split(' '))
-        assert csize < size
+        file_list = self.cmd('list', self.repository_location + '::test', 'input/compressible',
+                             '--format', '{size} {csize} {sha256}')
+        size, csize, sha256_after = file_list.split(' ')
+        assert int(csize) < int(size)
+        assert sha256_before == sha256_after
 
     def test_recreate_dry_run(self):
         self.create_regular_file('compressible', size=10000)
@@ -1327,7 +1321,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             frame = inspect.stack()[2]
             try:
                 caller_self = frame[0].f_locals['self']
-                caller_self.interrupt = True
+                if isinstance(caller_self, ArchiveRecreater):
+                    caller_self.interrupt = True
             finally:
                 del frame
             return real_add_chunk(*args, **kwargs)
@@ -1339,9 +1334,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test', 'input')
         archive_before = self.cmd('list', self.repository_location + '::test', '--format', '{sha512}')
         with patch.object(Cache, 'add_chunk', self._test_recreate_chunker_interrupt_patch()):
-            self.cmd('recreate', '-p', '--chunker-params', '16,18,17,4095', self.repository_location)
+            self.cmd('recreate', '-pv', '--chunker-params', '10,12,11,4095', self.repository_location)
         assert 'test.recreate' in self.cmd('list', self.repository_location)
-        output = self.cmd('recreate', '-svp', '--debug', '--chunker-params', '16,18,17,4095', self.repository_location)
+        output = self.cmd('recreate', '-svp', '--debug', '--chunker-params', '10,12,11,4095', self.repository_location)
         assert 'Found test.recreate, will resume' in output
         assert 'Copied 1 chunks from a partially processed item' in output
         archive_after = self.cmd('list', self.repository_location + '::test', '--format', '{sha512}')

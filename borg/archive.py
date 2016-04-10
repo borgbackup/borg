@@ -20,8 +20,9 @@ from .compress import Compressor, COMPR_BUFFER
 from .helpers import Error, uid2user, user2uid, gid2group, group2gid, \
     parse_timestamp, to_localtime, format_time, format_timedelta, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
-    ProgressIndicatorPercent, ChunkIteratorFileWrapper, remove_surrogates, log_multi, DASHES, PatternMatcher, \
+    ProgressIndicatorPercent, ChunkIteratorFileWrapper, remove_surrogates, log_multi, DASHES, \
     PathPrefixPattern, FnmatchPattern, open_item, file_status, format_file_size, consume
+from .repository import Repository
 from .platform import acl_get, acl_set
 from .chunker import Chunker
 from .hashindex import ChunkIndex
@@ -1221,7 +1222,19 @@ class ArchiveRecreater:
         if self.progress:
             old_target.stats.show_progress(final=True)
         target.recreate_partial_chunks = old_target.metadata.get(b'recreate_partial_chunks', [])
-        for chunk_id, _, _ in target.recreate_partial_chunks:
+        for chunk_id, size, csize in target.recreate_partial_chunks:
+            if not self.cache.seen_chunk(chunk_id):
+                try:
+                    # Repository has __contains__, RemoteRepository doesn't
+                    self.repository.get(chunk_id)
+                except Repository.ObjectNotFound:
+                    # delete/prune/check between invocations: these chunks are gone.
+                    target.recreate_partial_chunks = None
+                    break
+                # fast-lane insert into chunks cache
+                self.cache.chunks[chunk_id] = (1, size, csize)
+                target.stats.update(size, csize, True)
+                continue
             # incref now, otherwise old_target.delete() might delete these chunks
             self.cache.chunk_incref(chunk_id, target.stats)
         old_target.delete(Statistics(), progress=self.progress)

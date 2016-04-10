@@ -471,7 +471,7 @@ class Archiver:
                 return 'added link'
             elif item2.get(b'deleted'):
                 return 'removed link'
-            elif item1[b'source'] != item2[b'source']:
+            elif b'source' in item1 and b'source' in item2 and item1[b'source'] != item2[b'source']:
                 return 'changed link'
 
         def contents_changed(item1, item2):

@@ -11,9 +11,6 @@ cdef extern from "_hashindex.c":
     HashIndex *hashindex_read(char *path)
     HashIndex *hashindex_init(int capacity, int key_size, int value_size)
     void hashindex_free(HashIndex *index)
-    void hashindex_summarize(HashIndex *index, long long *total_size, long long *total_csize,
-                             long long *unique_size, long long *unique_csize,
-                             long long *total_unique_chunks, long long *total_chunks)
     void hashindex_merge(HashIndex *index, HashIndex *other)
     void hashindex_add(HashIndex *index, void *key, void *value)
     int hashindex_get_size(HashIndex *index)
@@ -191,11 +188,23 @@ cdef class ChunkIndex(IndexBase):
         return iter
 
     def summarize(self):
-        cdef long long total_size, total_csize, unique_size, unique_csize, total_unique_chunks, total_chunks
-        hashindex_summarize(self.index, &total_size, &total_csize,
-                            &unique_size, &unique_csize,
-                            &total_unique_chunks, &total_chunks)
-        return total_size, total_csize, unique_size, unique_csize, total_unique_chunks, total_chunks
+        cdef long long size = 0, csize = 0, unique_size = 0, unique_csize = 0, chunks = 0, unique_chunks = 0
+        cdef int *values
+        cdef void *key = NULL
+
+        while True:
+            key = hashindex_next_key(self.index, key)
+            if not key:
+                break
+            unique_chunks += 1
+            values = <int*> (key + self.key_size)
+            chunks += _le32toh(values[0])
+            unique_size += _le32toh(values[1])
+            unique_csize += _le32toh(values[2])
+            size += <long long> _le32toh(values[1]) * _le32toh(values[0])
+            csize += <long long> _le32toh(values[2]) *  _le32toh(values[0])
+
+        return size, csize, unique_size, unique_csize, unique_chunks, chunks
 
     def add(self, key, refs, size, csize):
         assert len(key) == self.key_size

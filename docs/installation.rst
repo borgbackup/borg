@@ -56,7 +56,7 @@ Ubuntu       `16.04`_, backports (PPA): `15.10`_, `14.04`_ ``apt install borgbac
 .. _14.04: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
 .. _.nix file: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/backup/borg/default.nix
 .. _OpenBSD ports: http://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/sysutils/borgbackup/
-.. _openSUSE official repository: http://software.opensuse.org/package/python3-borgbackup
+.. _openSUSE official repository: http://software.opensuse.org/package/borgbackup
 .. _Fedora official repository: https://apps.fedoraproject.org/packages/borgbackup
 .. _Brew cask: http://caskroom.io/
 .. _GNU Guix: https://www.gnu.org/software/guix/package-list.html#borg

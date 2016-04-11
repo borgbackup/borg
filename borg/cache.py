@@ -37,6 +37,15 @@ class Cache:
         path = path or os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
         UpgradableLock(os.path.join(path, 'lock'), exclusive=True).break_lock()
 
+    @staticmethod
+    def destroy(repository, path=None):
+        """destroy the cache for ``repository`` or at ``path``"""
+        path = path or os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
+        config = os.path.join(path, 'config')
+        if os.path.exists(config):
+            os.remove(config)  # kill config first
+            shutil.rmtree(path)
+
     def __init__(self, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True,
                  lock_wait=None):
         """
@@ -130,13 +139,6 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         os.makedirs(os.path.join(self.path, 'chunks.archive.d'))
         with open(os.path.join(self.path, 'files'), 'wb') as fd:
             pass  # empty file
-
-    def destroy(self):
-        """destroy the cache at `self.path`
-        """
-        self.close()
-        os.remove(os.path.join(self.path, 'config'))  # kill config first
-        shutil.rmtree(self.path)
 
     def _do_open(self):
         self.config = configparser.ConfigParser(interpolation=None)

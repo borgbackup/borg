@@ -441,39 +441,13 @@ hashindex_get_size(HashIndex *index)
 }
 
 static void
-hashindex_summarize(HashIndex *index, long long *total_size, long long *total_csize,
-                    long long *total_unique_size, long long *total_unique_csize,
-                    long long *total_unique_chunks, long long *total_chunks)
-{
-    int64_t size = 0, csize = 0, unique_size = 0, unique_csize = 0, chunks = 0, unique_chunks = 0;
-    const int32_t *values;
-    void *key = NULL;
-
-    while((key = hashindex_next_key(index, key))) {
-        values = key + index->key_size;
-        unique_chunks++;
-        chunks += values[0];
-        unique_size += values[1];
-        unique_csize += values[2];
-        size += (int64_t) values[0] * values[1];
-        csize += (int64_t) values[0] * values[2];
-    }
-    *total_size = size;
-    *total_csize = csize;
-    *total_unique_size = unique_size;
-    *total_unique_csize = unique_csize;
-    *total_unique_chunks = unique_chunks;
-    *total_chunks = chunks;
-}
-
-static void
 hashindex_add(HashIndex *index, const void *key, int32_t *other_values)
 {
     int32_t *my_values = (int32_t *)hashindex_get(index, key);
     if(my_values == NULL) {
         hashindex_set(index, key, other_values);
     } else {
-        *my_values += *other_values;
+        my_values[0] = _htole32(_le32toh(my_values[0]) + _le32toh(other_values[0]));
     }
 }
 

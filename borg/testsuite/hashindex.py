@@ -100,3 +100,17 @@ class HashIndexTestCase(BaseTestCase):
         assert idx1[H(2)] == (7, 200, 200)
         assert idx1[H(3)] == (3, 300, 300)
         assert idx1[H(4)] == (6, 400, 400)
+
+    def test_chunkindex_summarize(self):
+        idx = ChunkIndex()
+        idx[H(1)] = 1, 1000, 100
+        idx[H(2)] = 2, 2000, 200
+        idx[H(3)] = 3, 3000, 300
+
+        size, csize, unique_size, unique_csize, unique_chunks, chunks = idx.summarize()
+        assert size == 1000 + 2 * 2000 + 3 * 3000
+        assert csize == 100 + 2 * 200 + 3 * 300
+        assert unique_size == 1000 + 2000 + 3000
+        assert unique_csize == 100 + 200 + 300
+        assert chunks == 1 + 2 + 3
+        assert unique_chunks == 3

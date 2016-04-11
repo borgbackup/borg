@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 import os
 
+cimport cython
+from libc.stdint cimport int32_t
+
 API_VERSION = 2
 
 
@@ -19,13 +22,12 @@ cdef extern from "_hashindex.c":
     void *hashindex_next_key(HashIndex *index, void *key)
     int hashindex_delete(HashIndex *index, void *key)
     int hashindex_set(HashIndex *index, void *key, void *value)
-    int _htole32(int v)
-    int _le32toh(int v)
+    int _htole32(int32_t v)
+    int _le32toh(int32_t v)
 
 
 cdef _NoDefault = object()
 
-cimport cython
 
 @cython.internal
 cdef class IndexBase:
@@ -98,14 +100,14 @@ cdef class NSIndex(IndexBase):
 
     def __getitem__(self, key):
         assert len(key) == self.key_size
-        data = <int *>hashindex_get(self.index, <char *>key)
+        data = <int32_t *>hashindex_get(self.index, <char *>key)
         if not data:
             raise KeyError
         return _le32toh(data[0]), _le32toh(data[1])
 
     def __setitem__(self, key, value):
         assert len(key) == self.key_size
-        cdef int[2] data
+        cdef int32_t[2] data
         data[0] = _htole32(value[0])
         data[1] = _htole32(value[1])
         if not hashindex_set(self.index, <char *>key, data):
@@ -113,7 +115,7 @@ cdef class NSIndex(IndexBase):
 
     def __contains__(self, key):
         assert len(key) == self.key_size
-        data = <int *>hashindex_get(self.index, <char *>key)
+        data = <int32_t *>hashindex_get(self.index, <char *>key)
         return data != NULL
 
     def iteritems(self, marker=None):
@@ -146,7 +148,7 @@ cdef class NSKeyIterator:
         self.key = hashindex_next_key(self.index, <char *>self.key)
         if not self.key:
             raise StopIteration
-        cdef int *value = <int *>(self.key + self.key_size)
+        cdef int32_t *value = <int32_t *>(self.key + self.key_size)
         return (<char *>self.key)[:self.key_size], (_le32toh(value[0]), _le32toh(value[1]))
 
 
@@ -156,14 +158,14 @@ cdef class ChunkIndex(IndexBase):
 
     def __getitem__(self, key):
         assert len(key) == self.key_size
-        data = <int *>hashindex_get(self.index, <char *>key)
+        data = <int32_t *>hashindex_get(self.index, <char *>key)
         if not data:
             raise KeyError
         return _le32toh(data[0]), _le32toh(data[1]), _le32toh(data[2])
 
     def __setitem__(self, key, value):
         assert len(key) == self.key_size
-        cdef int[3] data
+        cdef int32_t[3] data
         data[0] = _htole32(value[0])
         data[1] = _htole32(value[1])
         data[2] = _htole32(value[2])
@@ -172,7 +174,7 @@ cdef class ChunkIndex(IndexBase):
 
     def __contains__(self, key):
         assert len(key) == self.key_size
-        data = <int *>hashindex_get(self.index, <char *>key)
+        data = <int32_t *>hashindex_get(self.index, <char *>key)
         return data != NULL
 
     def iteritems(self, marker=None):
@@ -189,7 +191,7 @@ cdef class ChunkIndex(IndexBase):
 
     def summarize(self):
         cdef long long size = 0, csize = 0, unique_size = 0, unique_csize = 0, chunks = 0, unique_chunks = 0
-        cdef int *values
+        cdef int32_t *values
         cdef void *key = NULL
 
         while True:
@@ -197,7 +199,7 @@ cdef class ChunkIndex(IndexBase):
             if not key:
                 break
             unique_chunks += 1
-            values = <int*> (key + self.key_size)
+            values = <int32_t*> (key + self.key_size)
             chunks += _le32toh(values[0])
             unique_size += _le32toh(values[1])
             unique_csize += _le32toh(values[2])
@@ -208,7 +210,7 @@ cdef class ChunkIndex(IndexBase):
 
     def add(self, key, refs, size, csize):
         assert len(key) == self.key_size
-        cdef int[3] data
+        cdef int32_t[3] data
         data[0] = _htole32(refs)
         data[1] = _htole32(size)
         data[2] = _htole32(csize)
@@ -235,5 +237,5 @@ cdef class ChunkKeyIterator:
         self.key = hashindex_next_key(self.index, <char *>self.key)
         if not self.key:
             raise StopIteration
-        cdef int *value = <int *>(self.key + self.key_size)
+        cdef int32_t *value = <int32_t *>(self.key + self.key_size)
         return (<char *>self.key)[:self.key_size], (_le32toh(value[0]), _le32toh(value[1]), _le32toh(value[2]))

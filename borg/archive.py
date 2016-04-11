@@ -21,7 +21,7 @@ from .helpers import Error, uid2user, user2uid, gid2group, group2gid, \
     parse_timestamp, to_localtime, format_time, format_timedelta, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
     ProgressIndicatorPercent, ChunkIteratorFileWrapper, remove_surrogates, log_multi, DASHES, \
-    PathPrefixPattern, FnmatchPattern, open_item, file_status, format_file_size, consume
+    PathPrefixPattern, FnmatchPattern, open_item, file_status, format_file_size, consume, IntegrityError
 from .repository import Repository
 from .platform import acl_get, acl_set
 from .chunker import Chunker
@@ -304,7 +304,7 @@ Number of files: {0.stats.nfiles}'''.format(
         return stats
 
     def extract_item(self, item, restore_attrs=True, dry_run=False, stdout=False, sparse=False,
-                     hardlink_masters=None, original_path=None):
+                     hardlink_masters=None, original_path=None, skip_integrity_errors=False):
         """
         Extract archive item.
 
@@ -315,7 +315,10 @@ Number of files: {0.stats.nfiles}'''.format(
         :param sparse: write sparse files (chunk-granularity, independent of the original being sparse)
         :param hardlink_masters: maps paths to (chunks, link_target) for extracting subtrees with hardlinks correctly
         :param original_path: b'path' key as stored in archive
+        :param skip_integrity_errors: skip over corrupted chunks instead of raising IntegrityError (ignored for
+        dry_run and stdout)
         """
+
         if dry_run or stdout:
             if b'chunks' in item:
                 for data in self.pipeline.fetch_many([c[0] for c in item[b'chunks']], is_preloaded=True):
@@ -323,7 +326,7 @@ Number of files: {0.stats.nfiles}'''.format(
                         sys.stdout.buffer.write(data)
                 if stdout:
                     sys.stdout.buffer.flush()
-            return
+            return True
 
         original_path = original_path or item[b'path']
         dest = self.cwd
@@ -353,16 +356,32 @@ Number of files: {0.stats.nfiles}'''.format(
                     os.unlink(path)
                 if not hardlink_masters:
                     os.link(source, path)
-                    return
+                    return True
                 item[b'chunks'], link_target = hardlink_masters[item[b'source']]
                 if link_target:
                     # Hard link was extracted previously, just link
                     os.link(link_target, path)
-                    return
+                    return True
                 # Extract chunks, since the item which had the chunks was not extracted
             with open(path, 'wb') as fd:
                 ids = [c[0] for c in item[b'chunks']]
-                for data in self.pipeline.fetch_many(ids, is_preloaded=True):
+                chunk_meta_iterator = iter(item[b'chunks'])
+                chunk_iterator = self.pipeline.fetch_many(ids, is_preloaded=True)
+                skipped_errors = False
+                while True:
+                    try:
+                        chunk_id, size, _ = next(chunk_meta_iterator)
+                        data = next(chunk_iterator)
+                    except StopIteration:
+                        break
+                    except IntegrityError as ie:
+                        if not skip_integrity_errors:
+                            raise
+                        chunk_id = hexlify(chunk_id).decode('ascii')
+                        logger.warning('%s: chunk %s: %s', remove_surrogates(item[b'path']), chunk_id, ie)
+                        fd.seek(size, 1)
+                        skipped_errors = True
+                        continue
                     if sparse and self.zeros.startswith(data):
                         # all-zero chunk: create a hole in a sparse file
                         fd.seek(len(data), 1)
@@ -375,6 +394,7 @@ Number of files: {0.stats.nfiles}'''.format(
             if hardlink_masters:
                 # Update master entry with extracted file path, so that following hardlinks don't extract twice.
                 hardlink_masters[item.get(b'source') or original_path] = (None, path)
+            return not skipped_errors
         elif stat.S_ISDIR(mode):
             if not os.path.exists(path):
                 os.makedirs(path)
@@ -401,6 +421,7 @@ Number of files: {0.stats.nfiles}'''.format(
             self.restore_attrs(path, item)
         else:
             raise Exception('Unknown archive item type %r' % item[b'mode'])
+        return True
 
     def restore_attrs(self, path, item, symlink=False, fd=None):
         xattrs = item.get(b'xattrs', {})

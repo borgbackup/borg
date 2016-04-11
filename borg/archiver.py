@@ -385,6 +385,7 @@ class Archiver:
 
         output_list = args.output_list
         dry_run = args.dry_run
+        skip_errors = args.skip_errors
         stdout = args.stdout
         sparse = args.sparse
         strip_components = args.strip_components
@@ -420,8 +421,10 @@ class Archiver:
                         dirs.append(item)
                         archive.extract_item(item, restore_attrs=False)
                     else:
-                        archive.extract_item(item, stdout=stdout, sparse=sparse, hardlink_masters=hardlink_masters,
-                                             original_path=orig_path)
+                        if not archive.extract_item(item, stdout=stdout, sparse=sparse,
+                                                    hardlink_masters=hardlink_masters, original_path=orig_path,
+                                                    skip_integrity_errors=skip_errors):
+                            self.exit_code = EXIT_WARNING
             except OSError as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 
@@ -1359,6 +1362,10 @@ class Archiver:
         subparser.add_argument('--sparse', dest='sparse',
                                action='store_true', default=False,
                                help='create holes in output sparse file from all-zero chunks')
+        subparser.add_argument('--skip-errors', dest='skip_errors',
+                               action='store_true', default=False,
+                               help='skip corrupted chunks with a log message (exit 1) instead of aborting (no effect '
+                                    'for --dry-run and --stdout)')
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to extract')

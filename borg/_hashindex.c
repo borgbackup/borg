@@ -447,7 +447,7 @@ hashindex_add(HashIndex *index, const void *key, int32_t *other_values)
     if(my_values == NULL) {
         hashindex_set(index, key, other_values);
     } else {
-        *my_values += *other_values;
+        my_values[0] = _htole32(_le32toh(my_values[0]) + _le32toh(other_values[0]));
     }
 }
 

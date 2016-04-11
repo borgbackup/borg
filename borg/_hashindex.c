@@ -439,25 +439,3 @@ hashindex_get_size(HashIndex *index)
 {
     return index->num_entries;
 }
-
-static void
-hashindex_add(HashIndex *index, const void *key, int32_t *other_values)
-{
-    int32_t *my_values = (int32_t *)hashindex_get(index, key);
-    if(my_values == NULL) {
-        hashindex_set(index, key, other_values);
-    } else {
-        *my_values += *other_values;
-    }
-}
-
-static void
-hashindex_merge(HashIndex *index, HashIndex *other)
-{
-    int32_t key_size = index->key_size;
-    void *key = NULL;
-
-    while((key = hashindex_next_key(other, key))) {
-        hashindex_add(index, key, key + key_size);
-    }
-}

@@ -452,11 +452,11 @@ hashindex_summarize(HashIndex *index, long long *total_size, long long *total_cs
     while((key = hashindex_next_key(index, key))) {
         values = key + index->key_size;
         unique_chunks++;
-        chunks += values[0];
-        unique_size += values[1];
-        unique_csize += values[2];
-        size += (int64_t) values[0] * values[1];
-        csize += (int64_t) values[0] * values[2];
+        chunks += _le32toh(values[0]);
+        unique_size += _le32toh(values[1]);
+        unique_csize += _le32toh(values[2]);
+        size += (int64_t) _le32toh(values[0]) * _le32toh(values[1]);
+        csize += (int64_t) _le32toh(values[0]) * _le32toh(values[2]);
     }
     *total_size = size;
     *total_csize = csize;

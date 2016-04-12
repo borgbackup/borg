@@ -442,11 +442,12 @@ class Archiver:
             chunks2 = archive2.pipeline.fetch_many(chunk_ids2)
             return self.compare_chunk_contents(chunks1, chunks2)
 
-        def sum_chunk_size(item):
+        def sum_chunk_size(item, consider_ids=None):
             if item.get(b'deleted'):
                 return None
             else:
-                return sum(c[1] for c in item[b'chunks'])
+                return sum(c[1] for c in item[b'chunks']
+                           if consider_ids is None or c[0] in consider_ids)
 
         def get_owner(item):
             if args.numeric_owner:
@@ -492,13 +493,14 @@ class Archiver:
                 elif item2.get(b'deleted'):
                     return ('removed {:>11}'.format(format_file_size(sum_chunk_size(item1))))
                 else:
-                    chunk_id_set1 = {c[0] for c in item1[b'chunks']}
-                    chunk_id_set2 = {c[0] for c in item2[b'chunks']}
-                    added = sum(c[1] for c in (chunk_id_set2 - chunk_id_set1))
-                    removed = -sum(c[1] for c in (chunk_id_set1 - chunk_id_set2))
-
+                    chunk_ids1 = {c[0] for c in item1[b'chunks']}
+                    chunk_ids2 = {c[0] for c in item2[b'chunks']}
+                    added_ids = chunk_ids2 - chunk_ids1
+                    removed_ids = chunk_ids1 - chunk_ids2
+                    added = sum_chunk_size(item2, added_ids)
+                    removed = sum_chunk_size(item1, removed_ids)
                     return ('{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
-                                                 format_file_size(removed, precision=1, sign=True)))
+                                                 format_file_size(-removed, precision=1, sign=True)))
 
         def compare_directory(item1, item2):
             if item2.get(b'deleted') and not item1.get(b'deleted'):

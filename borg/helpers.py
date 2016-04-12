@@ -1257,19 +1257,19 @@ class ItemFormatter:
 
     def calculate_unique_chunks(self, item):
         chunk_index = self.archive.cache.chunks
-        return sum(1 for chunk_id, _, _ in item.get(b'chunks', []) if chunk_index[chunk_id][0] == 1)
+        return sum(1 for c in item.get(b'chunks', []) if chunk_index[c.id].refcount == 1)
 
     def calculate_size(self, item):
-        return sum(size for _, size, _ in item.get(b'chunks', []))
+        return sum(c.size for c in item.get(b'chunks', []))
 
     def calculate_csize(self, item):
-        return sum(csize for _, _, csize in item.get(b'chunks', []))
+        return sum(c.csize for c in item.get(b'chunks', []))
 
     def hash_item(self, hash_function, item):
         if b'chunks' not in item:
             return ""
         hash = hashlib.new(hash_function)
-        for chunk in self.archive.pipeline.fetch_many([c[0] for c in item[b'chunks']]):
+        for chunk in self.archive.pipeline.fetch_many([c.id for c in item[b'chunks']]):
             hash.update(chunk)
         return hash.hexdigest()
 
@@ -1320,7 +1320,7 @@ class ChunkIteratorFileWrapper:
 
 def open_item(archive, item):
     """Return file-like object for archived item (with chunks)."""
-    chunk_iterator = archive.pipeline.fetch_many([c[0] for c in item[b'chunks']])
+    chunk_iterator = archive.pipeline.fetch_many([c.id for c in item[b'chunks']])
     return ChunkIteratorFileWrapper(chunk_iterator)
 
 

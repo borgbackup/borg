@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from collections import namedtuple
 import os
 
 API_VERSION = 2
@@ -153,6 +154,9 @@ cdef class NSKeyIterator:
         return (<char *>self.key)[:self.key_size], (_le32toh(value[0]), _le32toh(value[1]))
 
 
+ChunkIndexEntry = namedtuple('ChunkIndexEntry', 'refcount size csize')
+
+
 cdef class ChunkIndex(IndexBase):
 
     value_size = 12
@@ -162,7 +166,7 @@ cdef class ChunkIndex(IndexBase):
         data = <int *>hashindex_get(self.index, <char *>key)
         if not data:
             raise KeyError
-        return _le32toh(data[0]), _le32toh(data[1]), _le32toh(data[2])
+        return ChunkIndexEntry(_le32toh(data[0]), _le32toh(data[1]), _le32toh(data[2]))
 
     def __setitem__(self, key, value):
         assert len(key) == self.key_size
@@ -227,4 +231,4 @@ cdef class ChunkKeyIterator:
         if not self.key:
             raise StopIteration
         cdef int *value = <int *>(self.key + self.key_size)
-        return (<char *>self.key)[:self.key_size], (_le32toh(value[0]), _le32toh(value[1]), _le32toh(value[2]))
+        return (<char *>self.key)[:self.key_size], ChunkIndexEntry(_le32toh(value[0]), _le32toh(value[1]), _le32toh(value[2]))

@@ -25,7 +25,8 @@ from .helpers import Error, uid2user, user2uid, gid2group, group2gid, \
 from .repository import Repository
 from .platform import acl_get, acl_set
 from .chunker import Chunker
-from .hashindex import ChunkIndex
+from .hashindex import ChunkIndex, ChunkIndexEntry
+from .cache import ChunkListEntry
 import msgpack
 
 ITEMS_BUFFER = 1024 * 1024
@@ -61,10 +62,13 @@ class DownloadPipeline:
             items = [decode_dict(item, (b'path', b'source', b'user', b'group')) for item in unpacker]
             if filter:
                 items = [item for item in items if filter(item)]
+            for item in items:
+                if b'chunks' in item:
+                    item[b'chunks'] = [ChunkListEntry(*e) for e in item[b'chunks']]
             if preload:
                 for item in items:
                     if b'chunks' in item:
-                        self.repository.preload([c[0] for c in item[b'chunks']])
+                        self.repository.preload([c.id for c in item[b'chunks']])
             for item in items:
                 yield item
 
@@ -318,7 +322,7 @@ Number of files: {0.stats.nfiles}'''.format(
         """
         if dry_run or stdout:
             if b'chunks' in item:
-                for data in self.pipeline.fetch_many([c[0] for c in item[b'chunks']], is_preloaded=True):
+                for data in self.pipeline.fetch_many([c.id for c in item[b'chunks']], is_preloaded=True):
                     if stdout:
                         sys.stdout.buffer.write(data)
                 if stdout:
@@ -361,7 +365,7 @@ Number of files: {0.stats.nfiles}'''.format(
                     return
                 # Extract chunks, since the item which had the chunks was not extracted
             with open(path, 'wb') as fd:
-                ids = [c[0] for c in item[b'chunks']]
+                ids = [c.id for c in item[b'chunks']]
                 for data in self.pipeline.fetch_many(ids, is_preloaded=True):
                     if sparse and self.zeros.startswith(data):
                         # all-zero chunk: create a hole in a sparse file
@@ -600,7 +604,7 @@ Number of files: {0.stats.nfiles}'''.format(
                     chunks.append(cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats))
                     if self.show_progress:
                         self.stats.show_progress(item=item, dt=0.2)
-            cache.memorize_file(path_hash, st, [c[0] for c in chunks])
+            cache.memorize_file(path_hash, st, [c.id for c in chunks])
             status = status or 'M'  # regular file, modified (if not 'A' already)
         item[b'chunks'] = chunks
         item.update(self.stat_attrs(st, path))
@@ -732,8 +736,9 @@ class ArchiveChecker:
             if not result:
                 break
             marker = result[-1]
+            init_entry = ChunkIndexEntry(refcount=0, size=0, csize=0)
             for id_ in result:
-                self.chunks[id_] = (0, 0, 0)
+                self.chunks[id_] = init_entry
 
     def identify_key(self, repository):
         cdata = repository.get(next(self.chunks.iteritems())[0])
@@ -775,7 +780,7 @@ class ArchiveChecker:
         del self.chunks[Manifest.MANIFEST_ID]
 
         def mark_as_possibly_superseded(id_):
-            if self.chunks.get(id_, (0,))[0] == 0:
+            if self.chunks.get(id_, ChunkIndexEntry(0, 0, 0)).refcount == 0:
                 self.possibly_superseded.add(id_)
 
         def add_callback(chunk):
@@ -786,11 +791,11 @@ class ArchiveChecker:
 
         def add_reference(id_, size, csize, cdata=None):
             try:
-                count, _, _ = self.chunks[id_]
-                self.chunks[id_] = count + 1, size, csize
+                entry = self.chunks[id_]
+                self.chunks[id_] = entry._replace(refcount=entry.refcount + 1, size=size, csize=csize)
             except KeyError:
                 assert cdata is not None
-                self.chunks[id_] = 1, size, csize
+                self.chunks[id_] = ChunkIndexEntry(refcount=1, size=size, csize=csize)
                 if self.repair:
                     self.repository.put(id_, cdata)
 
@@ -910,10 +915,7 @@ class ArchiveChecker:
 
     def orphan_chunks_check(self):
         if self.check_all:
-            unused = set()
-            for id_, (count, size, csize) in self.chunks.iteritems():
-                if count == 0:
-                    unused.add(id_)
+            unused = {id_ for id_, entry in self.chunks.iteritems() if entry.refcount == 0}
             orphaned = unused - self.possibly_superseded
             if orphaned:
                 logger.error('{} orphaned objects found!'.format(len(orphaned)))
@@ -1212,7 +1214,7 @@ class ArchiveRecreater:
         for item in old_target.iter_items():
             if b'chunks' in item:
                 for chunk in item[b'chunks']:
-                    self.cache.chunk_incref(chunk[0], target.stats)
+                    self.cache.chunk_incref(chunk.id, target.stats)
                 target.stats.nfiles += 1
             target.add_item(item)
         if item:

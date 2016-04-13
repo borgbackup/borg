@@ -915,10 +915,7 @@ class ArchiveChecker:
 
     def orphan_chunks_check(self):
         if self.check_all:
-            unused = set()
-            for id_, entry in self.chunks.iteritems():
-                if entry.refcount == 0:
-                    unused.add(id_)
+            unused = {id_ for id_, entry in self.chunks.iteritems() if entry.refcount == 0}
             orphaned = unused - self.possibly_superseded
             if orphaned:
                 logger.error('{} orphaned objects found!'.format(len(orphaned)))

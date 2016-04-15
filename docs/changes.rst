@@ -1,6 +1,33 @@
 Changelog
 =========
 
+Version 1.0.2
+-------------
+
+Bug fixes:
+
+- fix malfunction and potential corruption on (nowadays rather rare) big-endian
+  architectures or bi-endian archs in (rare) BE mode. #886, #889
+  cache resync / index merge was malfunctioning due to this, potentially
+  leading to data loss. borg info had cosmetic issues (displayed wrong values).
+  note: all (widespread) little-endian archs (like x86/x64) or bi-endian archs
+  in (widespread) LE mode (like ARMEL, MIPSEL, ...) were NOT affected.
+- add overflow and range checks for 1st (special) uint32 of the hashindex
+  values, switch from int32 to uint32.
+- fix so that refcount will never overflow, but just stick to max. value after
+  a overflow would have occured.
+- borg delete: fix --cache-only for broken caches, #874
+  Makes --cache-only idempotent: it won't fail if the cache is already deleted.
+- fixed borg create --one-file-system erroneously traversing into other
+  filesystems (if starting fs device number was 0), #873
+
+Other changes:
+
+- better test coverage for hashindex, incl. overflow testing, checking correct
+  computations so endianness issues would be discovered.
+- reproducible doc for ProgressIndicator*,  make the build reproducible.
+
+
 Version 1.0.1
 -------------
 

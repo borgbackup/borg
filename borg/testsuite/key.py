@@ -6,8 +6,8 @@ from binascii import hexlify, unhexlify
 
 from ..crypto import bytes_to_long, num_aes_blocks
 from ..key import PlaintextKey, PassphraseKey, KeyfileKey
-from ..helpers import Location, Chunk, bin_to_hex
-from . import BaseTestCase, environment_variable
+from ..helpers import Location, IntegrityError, Chunk, bin_to_hex
+from . import environment_variable
 
 
 class KeyTestCase(BaseTestCase):
@@ -126,3 +126,32 @@ class KeyTestCase(BaseTestCase):
         chunk = Chunk(b'foo')
         self.assert_equal(hexlify(key.id_hash(chunk.data)), b'818217cf07d37efad3860766dcdf1d21e401650fed2d76ed1d797d3aae925990')
         self.assert_equal(chunk, key2.decrypt(key2.id_hash(chunk.data), key.encrypt(chunk)))
+
+    def test_decrypt_integrity(self):
+        with open(os.path.join(os.environ['BORG_KEYS_DIR'], 'keyfile'), 'w') as fd:
+            fd.write(self.keyfile2_key_file)
+        os.environ['BORG_PASSPHRASE'] = 'passphrase'
+        key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
+        with self.assert_raises_regex(IntegrityError, 'Invalid encryption envelope'):
+            data = bytearray(self.keyfile2_cdata)
+            data[0] += 5  # wrong TYPE
+            key.decrypt("", data)
+        with self.assert_raises_regex(IntegrityError, 'Encryption envelope checksum mismatch'):
+            data = bytearray(self.keyfile2_cdata)
+            data[5] += 5  # corrupt HMAC
+            key.decrypt("", data)
+        with self.assert_raises_regex(IntegrityError, 'Encryption envelope checksum mismatch'):
+            data = bytearray(self.keyfile2_cdata)
+            id = key.id_hash(data)
+            data[36] += 123  # this in the IV/CTR
+            key.decrypt(id, data)
+        with self.assert_raises_regex(IntegrityError, 'Encryption envelope checksum mismatch'):
+            data = bytearray(self.keyfile2_cdata)
+            id = key.id_hash(data)
+            data[50] += 1  # corrupt data
+            key.decrypt(id, data)
+        with self.assert_raises_regex(IntegrityError, 'Chunk id verification failed'):
+            data = bytearray(self.keyfile2_cdata)
+            id = bytearray(key.id_hash(data))  # corrupt chunk id
+            id[12] = 0
+            key.decrypt(id, data)

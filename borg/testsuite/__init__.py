@@ -45,6 +45,8 @@ class BaseTestCase(unittest.TestCase):
     assert_not_in = unittest.TestCase.assertNotIn
     assert_equal = unittest.TestCase.assertEqual
     assert_not_equal = unittest.TestCase.assertNotEqual
+    assert_raises = unittest.TestCase.assertRaises
+    assert_raises_regex = unittest.TestCase.assertRaisesRegex
     assert_true = unittest.TestCase.assertTrue
 
     if raises:

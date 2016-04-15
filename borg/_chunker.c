@@ -41,6 +41,7 @@ static uint32_t table_base[] =
 
 #define BARREL_SHIFT(v, shift) ( ((v) << shift) | ((v) >> (32 - shift)) )
 
+size_t pagemask;
 
 static uint32_t *
 buzhash_init_table(uint32_t seed)
@@ -130,6 +131,7 @@ chunker_fill(Chunker *c)
 {
     ssize_t n;
     off_t offset, length;
+    int overshoot;
     PyObject *data;
     memmove(c->data, c->data + c->last, c->position + c->remaining - c->last);
     c->position -= c->last;
@@ -157,14 +159,33 @@ chunker_fill(Chunker *c)
         }
         length = c->bytes_read - offset;
         #if ( ( _XOPEN_SOURCE >= 600 || _POSIX_C_SOURCE >= 200112L ) && defined(POSIX_FADV_DONTNEED) )
+
+	// Only do it once per run.
+	if (pagemask == 0)
+		pagemask = getpagesize() - 1;
+
         // We tell the OS that we do not need the data that we just have read any
         // more (that it maybe has in the cache). This avoids that we spoil the
         // complete cache with data that we only read once and (due to cache
         // size limit) kick out data from the cache that might be still useful
         // for the OS or other processes.
+        // We rollback the initial offset back to the start of the page,
+        // to avoid it not being truncated as a partial page request.
         if (length > 0) {
-            posix_fadvise(c->fh, offset, length, POSIX_FADV_DONTNEED);
-        }
+            // Linux kernels prior to 4.7 have a bug where they truncate
+            // last partial page of POSIX_FADV_DONTNEED request, so we need
+            // to page-align it ourselves. We'll need the rest of this page
+            // on the next read (assuming this was not EOF)
+            overshoot = (offset + length) & pagemask;
+        } else {
+            // For length == 0 we set overshoot 0, so the below
+            // length - overshoot is 0, which means till end of file for
+            // fadvise. This will cancel the final page and is not part
+            // of the above workaround.
+            overshoot = 0;
+	}
+
+        posix_fadvise(c->fh, offset & ~pagemask, length - overshoot, POSIX_FADV_DONTNEED);
         #endif
     }
     else {

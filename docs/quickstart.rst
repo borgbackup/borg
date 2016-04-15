@@ -37,16 +37,16 @@ A step by step example
 
 1. Before a backup can be made a repository has to be initialized::
 
-    $ borg init /mnt/backup
+    $ borg init /path/to/repo
 
 2. Backup the ``~/src`` and ``~/Documents`` directories into an archive called
    *Monday*::
 
-    $ borg create /mnt/backup::Monday ~/src ~/Documents
+    $ borg create /path/to/repo::Monday ~/src ~/Documents
 
 3. The next day create a new archive called *Tuesday*::
 
-    $ borg create -v --stats /mnt/backup::Tuesday ~/src ~/Documents
+    $ borg create -v --stats /path/to/repo::Tuesday ~/src ~/Documents
 
    This backup will be a lot quicker and a lot smaller since only new never
    before seen data is stored. The ``--stats`` option causes |project_name| to
@@ -72,24 +72,24 @@ A step by step example
 
 4. List all archives in the repository::
 
-    $ borg list /mnt/backup
+    $ borg list /path/to/repo
     Monday                               Mon, 2016-02-15 19:14:44
     Tuesday                              Tue, 2016-02-16 19:15:11
 
 5. List the contents of the *Monday* archive::
 
-    $ borg list /mnt/backup::Monday
+    $ borg list /path/to/repo::Monday
     drwxr-xr-x user   group          0 Mon, 2016-02-15 18:22:30 home/user/Documents
     -rw-r--r-- user   group       7961 Mon, 2016-02-15 18:22:30 home/user/Documents/Important.doc
     ...
 
 6. Restore the *Monday* archive::
 
-    $ borg extract /mnt/backup::Monday
+    $ borg extract /path/to/repo::Monday
 
 7. Recover disk space by manually deleting the *Monday* archive::
 
-    $ borg delete /mnt/backup::Monday
+    $ borg delete /path/to/repo::Monday
 
 .. Note::
     Borg is quiet by default (it works on WARNING log level).
@@ -134,17 +134,17 @@ or high compression:
 
 If you have a fast repo storage and you want some compression: ::
 
-    $ borg create --compression lz4 /mnt/backup::repo ~
+    $ borg create --compression lz4 /path/to/repo::arch ~
 
 If you have a less fast repo storage and you want a bit more compression (N=0..9,
 0 means no compression, 9 means high compression): ::
 
-    $ borg create --compression zlib,N /mnt/backup::repo ~
+    $ borg create --compression zlib,N /path/to/repo::arch ~
 
 If you have a very slow repo storage and you want high compression (N=0..9, 0 means
 low compression, 9 means high compression): ::
 
-    $ borg create --compression lzma,N /mnt/backup::repo ~
+    $ borg create --compression lzma,N /path/to/repo::arch ~
 
 You'll need to experiment a bit to find the best compression for your use case.
 Keep an eye on CPU load and throughput.
@@ -208,23 +208,23 @@ Remote repositories
 host is accessible using SSH.  This is fastest and easiest when |project_name|
 is installed on the remote host, in which case the following syntax is used::
 
-  $ borg init user@hostname:/mnt/backup
+  $ borg init user@hostname:/path/to/repo
 
 or::
 
-  $ borg init ssh://user@hostname:port//mnt/backup
+  $ borg init ssh://user@hostname:port//path/to/repo
 
 Remote operations over SSH can be automated with SSH keys. You can restrict the
 use of the SSH keypair by prepending a forced command to the SSH public key in
 the remote server's `authorized_keys` file. This example will start |project_name|
 in server mode and limit it to a specific filesystem path::
 
-  command="borg serve --restrict-to-path /mnt/backup",no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-user-rc ssh-rsa AAAAB3[...]
+  command="borg serve --restrict-to-path /path/to/repo",no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-user-rc ssh-rsa AAAAB3[...]
 
 If it is not possible to install |project_name| on the remote host,
 it is still possible to use the remote host to store a repository by
 mounting the remote filesystem, for example, using sshfs::
 
-  $ sshfs user@hostname:/mnt /mnt
-  $ borg init /mnt/backup
-  $ fusermount -u /mnt
+  $ sshfs user@hostname:/path/to /path/to
+  $ borg init /path/to/repo
+  $ fusermount -u /path/to

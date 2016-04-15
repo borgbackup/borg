@@ -290,16 +290,16 @@ Examples
     $ dd if=/dev/sdx bs=10M | borg create /path/to/repo::my-sdx -
 
     # No compression (default)
-    $ borg create /path/to/repo::repo ~
+    $ borg create /path/to/repo::arch ~
 
     # Super fast, low compression
-    $ borg create --compression lz4 /path/to/repo::repo ~
+    $ borg create --compression lz4 /path/to/repo::arch ~
 
     # Less fast, higher compression (N = 0..9)
-    $ borg create --compression zlib,N /path/to/repo::repo ~
+    $ borg create --compression zlib,N /path/to/repo::arch ~
 
     # Even slower, even higher compression (N = 0..9)
-    $ borg create --compression lzma,N /path/to/repo::repo ~
+    $ borg create --compression lzma,N /path/to/repo::arch ~
 
     # Format tags available for archive name:
     # {now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}
@@ -696,16 +696,16 @@ After the backup has completed, you remove the snapshots again. ::
 
     $ # create snapshots here
     $ lvdisplay > lvdisplay.txt
-    $ borg create --read-special /path/to/repo::repo lvdisplay.txt /dev/vg0/*-snapshot
+    $ borg create --read-special /path/to/repo::arch lvdisplay.txt /dev/vg0/*-snapshot
     $ # remove snapshots here
 
 Now, let's see how to restore some LVs from such a backup. ::
 
-    $ borg extract /path/to/repo::repo lvdisplay.txt
+    $ borg extract /path/to/repo::arch lvdisplay.txt
     $ # create empty LVs with correct sizes here (look into lvdisplay.txt).
     $ # we assume that you created an empty root and home LV and overwrite it now:
-    $ borg extract --stdout /path/to/repo::repo dev/vg0/root-snapshot > /dev/vg0/root
-    $ borg extract --stdout /path/to/repo::repo dev/vg0/home-snapshot > /dev/vg0/home
+    $ borg extract --stdout /path/to/repo::arch dev/vg0/root-snapshot > /dev/vg0/root
+    $ borg extract --stdout /path/to/repo::arch dev/vg0/home-snapshot > /dev/vg0/home
 
 
 Append-only mode

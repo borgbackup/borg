@@ -134,17 +134,17 @@ or high compression:
 
 If you have a fast repo storage and you want some compression: ::
 
-    $ borg create --compression lz4 /path/to/repo::repo ~
+    $ borg create --compression lz4 /path/to/repo::arch ~
 
 If you have a less fast repo storage and you want a bit more compression (N=0..9,
 0 means no compression, 9 means high compression): ::
 
-    $ borg create --compression zlib,N /path/to/repo::repo ~
+    $ borg create --compression zlib,N /path/to/repo::arch ~
 
 If you have a very slow repo storage and you want high compression (N=0..9, 0 means
 low compression, 9 means high compression): ::
 
-    $ borg create --compression lzma,N /path/to/repo::repo ~
+    $ borg create --compression lzma,N /path/to/repo::arch ~
 
 You'll need to experiment a bit to find the best compression for your use case.
 Keep an eye on CPU load and throughput.

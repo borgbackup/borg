@@ -1,7 +1,31 @@
 #include <Python.h>
 #include <fcntl.h>
 
-/* Cyclic polynomial / buzhash: https://en.wikipedia.org/wiki/Rolling_hash */
+/* Cyclic polynomial / buzhash
+
+https://en.wikipedia.org/wiki/Rolling_hash
+
+http://www.serve.net/buz/Notes.1st.year/HTML/C6/rand.012.html (by "BUZ", the inventor)
+
+http://www.dcs.gla.ac.uk/~hamer/cakes-talk.pdf (see buzhash slide)
+
+Some properties of buzhash / of this implementation:
+
+(1) the hash is designed for inputs <= 32 bytes, but the chunker uses it on a 4095 byte window;
+    any repeating bytes at distance 32 within those 4095 bytes can cause cancellation within
+    the hash function, e.g. in "X <any 31 bytes> X", the last X would cancel out the influence
+    of the first X on the hash value.
+
+(2) the hash table is supposed to have (according to the BUZ) exactly a 50% distribution of
+    0/1 bit values per position, but the hard coded table below doesn't fit that property.
+
+(3) if you would use a window size divisible by 64, the seed would cancel itself out completely.
+    this is why we use a window size of 4095 bytes.
+
+Another quirk is that, even with the 4095 byte window, XORing the entire table by a constant
+is equivalent to XORing the hash output with a different constant. but since the seed is stored
+encrypted, i think it still serves its purpose.
+*/
 
 static uint32_t table_base[] =
 {

@@ -23,6 +23,7 @@ Bug fixes:
   Makes --cache-only idempotent: it won't fail if the cache is already deleted.
 - fixed borg create --one-file-system erroneously traversing into other
   filesystems (if starting fs device number was 0), #873
+- workround a bug in Linux fadvise FADV_DONTNEED, #907
 
 Other changes:
 

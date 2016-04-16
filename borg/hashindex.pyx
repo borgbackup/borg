@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from collections import namedtuple
 import os
 
 cimport cython
@@ -184,6 +185,9 @@ cdef class NSKeyIterator:
         return (<char *>self.key)[:self.key_size], (segment, _le32toh(value[1]))
 
 
+ChunkIndexEntry = namedtuple('ChunkIndexEntry', 'refcount size csize')
+
+
 cdef class ChunkIndex(IndexBase):
     """
     Mapping of 32 byte keys to (refcount, size, csize), which are all 32-bit unsigned.
@@ -210,7 +214,7 @@ cdef class ChunkIndex(IndexBase):
             raise KeyError(key)
         cdef uint32_t refcount = _le32toh(data[0])
         assert refcount <= _MAX_VALUE
-        return refcount, _le32toh(data[1]), _le32toh(data[2])
+        return ChunkIndexEntry(refcount, _le32toh(data[1]), _le32toh(data[2]))
 
     def __setitem__(self, key, value):
         assert len(key) == self.key_size
@@ -342,4 +346,4 @@ cdef class ChunkKeyIterator:
         cdef uint32_t *value = <uint32_t *>(self.key + self.key_size)
         cdef uint32_t refcount = _le32toh(value[0])
         assert refcount <= MAX_VALUE, "invalid reference count"
-        return (<char *>self.key)[:self.key_size], (refcount, _le32toh(value[1]), _le32toh(value[2]))
+        return (<char *>self.key)[:self.key_size], ChunkIndexEntry(refcount, _le32toh(value[1]), _le32toh(value[2]))

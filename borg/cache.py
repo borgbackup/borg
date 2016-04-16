@@ -12,9 +12,12 @@ logger = create_logger()
 from .helpers import Error, get_cache_dir, decode_dict, int_to_bigint, \
     bigint_to_int, format_file_size, yes
 from .locking import UpgradableLock
-from .hashindex import ChunkIndex
+from .hashindex import ChunkIndex, ChunkIndexEntry
 
 import msgpack
+
+ChunkListEntry = namedtuple('ChunkListEntry', 'id size csize')
+FileCacheEntry = namedtuple('FileCacheEntry', 'age inode size mtime chunk_ids')
 
 
 class Cache:
@@ -183,9 +186,9 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     break
                 u.feed(data)
                 for path_hash, item in u:
-                    item[0] += 1
+                    entry = FileCacheEntry(*item)
                     # in the end, this takes about 240 Bytes per file
-                    self.files[path_hash] = msgpack.packb(item)
+                    self.files[path_hash] = msgpack.packb(entry._replace(age=entry.age + 1))
 
     def begin_txn(self):
         # Initialize transaction snapshot
@@ -208,9 +211,9 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 for path_hash, item in self.files.items():
                     # Discard cached files with the newest mtime to avoid
                     # issues with filesystem snapshots and mtime precision
-                    item = msgpack.unpackb(item)
-                    if item[0] < 10 and bigint_to_int(item[3]) < self._newest_mtime:
-                        msgpack.pack((path_hash, item), fd)
+                    entry = FileCacheEntry(*msgpack.unpackb(item))
+                    if entry.age < 10 and bigint_to_int(entry.mtime) < self._newest_mtime:
+                        msgpack.pack((path_hash, entry), fd)
         self.config.set('cache', 'manifest', hexlify(self.manifest.id).decode('ascii'))
         self.config.set('cache', 'timestamp', self.manifest.timestamp)
         self.config.set('cache', 'key_type', str(self.key.TYPE))
@@ -375,12 +378,12 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         data = self.key.encrypt(data)
         csize = len(data)
         self.repository.put(id, data, wait=False)
-        self.chunks[id] = (refcount + 1, size, csize)
+        self.chunks[id] = ChunkIndexEntry(refcount + 1, size, csize)
         stats.update(size, csize, True)
-        return id, size, csize
+        return ChunkListEntry(id, size, csize)
 
     def seen_chunk(self, id, size=None):
-        refcount, stored_size, _ = self.chunks.get(id, (0, None, None))
+        refcount, stored_size, _ = self.chunks.get(id, ChunkIndexEntry(0, None, None))
         if size is not None and stored_size is not None and size != stored_size:
             # we already have a chunk with that id, but different size.
             # this is either a hash collision (unlikely) or corruption or a bug.
@@ -393,7 +396,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             self.begin_txn()
         count, size, csize = self.chunks.incref(id)
         stats.update(size, csize, False)
-        return id, size, csize
+        return ChunkListEntry(id, size, csize)
 
     def chunk_decref(self, id, stats):
         if not self.txn_active:
@@ -414,20 +417,17 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         entry = self.files.get(path_hash)
         if not entry:
             return None
-        entry = msgpack.unpackb(entry)
-        if (entry[2] == st.st_size and bigint_to_int(entry[3]) == st.st_mtime_ns and
-                (ignore_inode or entry[1] == st.st_ino)):
-            # reset entry age
-            entry[0] = 0
-            self.files[path_hash] = msgpack.packb(entry)
-            return entry[4]
+        entry = FileCacheEntry(*msgpack.unpackb(entry))
+        if (entry.size == st.st_size and bigint_to_int(entry.mtime) == st.st_mtime_ns and
+                (ignore_inode or entry.inode == st.st_ino)):
+            self.files[path_hash] = msgpack.packb(entry._replace(age=0))
+            return entry.chunk_ids
         else:
             return None
 
     def memorize_file(self, path_hash, st, ids):
         if not (self.do_files and stat.S_ISREG(st.st_mode)):
             return
-        # Entry: Age, inode, size, mtime, chunk ids
-        mtime_ns = st.st_mtime_ns
-        self.files[path_hash] = msgpack.packb((0, st.st_ino, st.st_size, int_to_bigint(mtime_ns), ids))
-        self._newest_mtime = max(self._newest_mtime, mtime_ns)
+        entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, mtime=int_to_bigint(st.st_mtime_ns), chunk_ids=ids)
+        self.files[path_hash] = msgpack.packb(entry)
+        self._newest_mtime = max(self._newest_mtime, st.st_mtime_ns)

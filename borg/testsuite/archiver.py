@@ -1425,7 +1425,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         with repository:
             for item in archive.iter_items():
                 if item[b'path'].endswith('testsuite/archiver.py'):
-                    repository.delete(item[b'chunks'][-1][0])
+                    repository.delete(item[b'chunks'][-1].id)
                     break
             repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)

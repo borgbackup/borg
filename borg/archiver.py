@@ -32,6 +32,7 @@ from .cache import Cache
 from .key import key_creator, RepoKey, PassphraseKey
 from .archive import Archive, ArchiveChecker, ArchiveRecreater, CHUNKER_PARAMS
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
+from .hashindex import ChunkIndexEntry
 
 has_lchflags = hasattr(os, 'lchflags')
 
@@ -446,8 +447,8 @@ class Archiver:
             if item.get(b'deleted'):
                 return None
             else:
-                return sum(c[1] for c in item[b'chunks']
-                           if consider_ids is None or c[0] in consider_ids)
+                return sum(c.size for c in item[b'chunks']
+                           if consider_ids is None or c.id in consider_ids)
 
         def get_owner(item):
             if args.numeric_owner:
@@ -482,8 +483,8 @@ class Archiver:
                 if sum_chunk_size(item1) != sum_chunk_size(item2):
                     return True
                 else:
-                    chunk_ids1 = [c[0] for c in item1[b'chunks']]
-                    chunk_ids2 = [c[0] for c in item2[b'chunks']]
+                    chunk_ids1 = [c.id for c in item1[b'chunks']]
+                    chunk_ids2 = [c.id for c in item2[b'chunks']]
                     return not fetch_and_compare_chunks(chunk_ids1, chunk_ids2, archive1, archive2)
 
         def compare_content(path, item1, item2):
@@ -493,8 +494,8 @@ class Archiver:
                 elif item2.get(b'deleted'):
                     return ('removed {:>11}'.format(format_file_size(sum_chunk_size(item1))))
                 else:
-                    chunk_ids1 = {c[0] for c in item1[b'chunks']}
-                    chunk_ids2 = {c[0] for c in item2[b'chunks']}
+                    chunk_ids1 = {c.id for c in item1[b'chunks']}
+                    chunk_ids2 = {c.id for c in item2[b'chunks']}
                     added_ids = chunk_ids2 - chunk_ids1
                     removed_ids = chunk_ids1 - chunk_ids2
                     added = sum_chunk_size(item2, added_ids)

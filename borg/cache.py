@@ -378,8 +378,8 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         data = self.key.encrypt(data)
         csize = len(data)
         self.repository.put(id, data, wait=False)
-        self.chunks[id] = ChunkIndexEntry(refcount + 1, size, csize)
-        stats.update(size, csize, True)
+        self.chunks.add(id, 1, size, csize)
+        stats.update(size, csize, not refcount)
         return ChunkListEntry(id, size, csize)
 
     def seen_chunk(self, id, size=None):

@@ -313,6 +313,8 @@ cdef class ChunkIndex(IndexBase):
             assert refcount2 <= _MAX_VALUE
             result64 = refcount1 + refcount2
             values[0] = _htole32(min(result64, _MAX_VALUE))
+            values[1] = data[1]
+            values[2] = data[2]
         else:
             hashindex_set(self.index, key, data)
 

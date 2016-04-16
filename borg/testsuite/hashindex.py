@@ -174,8 +174,8 @@ class HashIndexRefcountingTestCase(BaseTestCase):
         idx1 = ChunkIndex()
         idx1.add(H(1), 5, 6, 7)
         assert idx1[H(1)] == (5, 6, 7)
-        idx1.add(H(1), 1, 0, 0)
-        assert idx1[H(1)] == (6, 6, 7)
+        idx1.add(H(1), 1, 2, 3)
+        assert idx1[H(1)] == (6, 2, 3)
 
     def test_incref_limit(self):
         idx1 = ChunkIndex()
@@ -266,7 +266,7 @@ class HashIndexDataTestCase(BaseTestCase):
         idx2 = ChunkIndex()
         idx2[H(3)] = 2**32 - 123456, 6, 7
         idx1.merge(idx2)
-        assert idx1[H(3)] == (hashindex.MAX_VALUE, 0, 0)
+        assert idx1[H(3)] == (hashindex.MAX_VALUE, 6, 7)
 
 
 def test_nsindex_segment_limit():

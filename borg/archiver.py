@@ -306,7 +306,7 @@ class Archiver:
         if (st.st_ino, st.st_dev) in skip_inodes:
             return
         # Entering a new filesystem?
-        if restrict_dev and st.st_dev != restrict_dev:
+        if restrict_dev is not None and st.st_dev != restrict_dev:
             return
         status = None
         # Ignore if nodump flag is set
@@ -628,22 +628,23 @@ class Archiver:
         cache.commit()
         return self.exit_code
 
-    @with_repository(exclusive=True, cache=True)
-    def do_delete(self, args, repository, manifest, key, cache):
+    @with_repository(exclusive=True)
+    def do_delete(self, args, repository, manifest, key):
         """Delete an existing repository or archive"""
         if args.location.archive:
-            archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
-            stats = Statistics()
-            archive.delete(stats, progress=args.progress)
-            manifest.write()
-            repository.commit(save_space=args.save_space)
-            cache.commit()
-            logger.info("Archive deleted.")
-            if args.stats:
-                log_multi(DASHES,
-                          stats.summary.format(label='Deleted data:', stats=stats),
-                          str(cache),
-                          DASHES)
+            with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
+                archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
+                stats = Statistics()
+                archive.delete(stats, progress=args.progress)
+                manifest.write()
+                repository.commit(save_space=args.save_space)
+                cache.commit()
+                logger.info("Archive deleted.")
+                if args.stats:
+                    log_multi(DASHES,
+                              stats.summary.format(label='Deleted data:', stats=stats),
+                              str(cache),
+                              DASHES)
         else:
             if not args.cache_only:
                 msg = []
@@ -658,7 +659,7 @@ class Archiver:
                     return self.exit_code
                 repository.destroy()
                 logger.info("Repository deleted.")
-            cache.destroy()
+            Cache.destroy(repository)
             logger.info("Cache deleted.")
         return self.exit_code
 

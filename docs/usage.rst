@@ -207,10 +207,10 @@ Examples
 ::
 
     # Local repository (default is to use encryption in repokey mode)
-    $ borg init /mnt/backup
+    $ borg init /path/to/repo
 
     # Local repository (no encryption)
-    $ borg init --encryption=none /mnt/backup
+    $ borg init --encryption=none /path/to/repo
 
     # Remote repository (accesses a remote borg via ssh)
     $ borg init user@hostname:backup
@@ -265,54 +265,54 @@ Examples
 ::
 
     # Backup ~/Documents into an archive named "my-documents"
-    $ borg create /mnt/backup::my-documents ~/Documents
+    $ borg create /path/to/repo::my-documents ~/Documents
 
     # same, but verbosely list all files as we process them
-    $ borg create -v --list /mnt/backup::my-documents ~/Documents
+    $ borg create -v --list /path/to/repo::my-documents ~/Documents
 
     # Backup ~/Documents and ~/src but exclude pyc files
-    $ borg create /mnt/backup::my-files   \
+    $ borg create /path/to/repo::my-files \
         ~/Documents                       \
         ~/src                             \
         --exclude '*.pyc'
 
     # Backup home directories excluding image thumbnails (i.e. only
     # /home/*/.thumbnails is excluded, not /home/*/*/.thumbnails)
-    $ borg create /mnt/backup::my-files /home \
+    $ borg create /path/to/repo::my-files /home \
         --exclude 're:^/home/[^/]+/\.thumbnails/'
 
     # Do the same using a shell-style pattern
-    $ borg create /mnt/backup::my-files /home \
+    $ borg create /path/to/repo::my-files /home \
         --exclude 'sh:/home/*/.thumbnails'
 
     # Backup the root filesystem into an archive named "root-YYYY-MM-DD"
     # use zlib compression (good, but slow) - default is no compression
-    $ borg create -C zlib,6 /mnt/backup::root-{now:%Y-%m-%d} / --one-file-system
+    $ borg create -C zlib,6 /path/to/repo::root-{now:%Y-%m-%d} / --one-file-system
 
     # Make a big effort in fine granular deduplication (big chunk management
     # overhead, needs a lot of RAM and disk space, see formula in internals
     # docs - same parameters as borg < 1.0 or attic):
-    $ borg create --chunker-params 10,23,16,4095 /mnt/backup::small /smallstuff
+    $ borg create --chunker-params 10,23,16,4095 /path/to/repo::small /smallstuff
 
     # Backup a raw device (must not be active/in use/mounted at that time)
-    $ dd if=/dev/sdx bs=10M | borg create /mnt/backup::my-sdx -
+    $ dd if=/dev/sdx bs=10M | borg create /path/to/repo::my-sdx -
 
     # No compression (default)
-    $ borg create /mnt/backup::repo ~
+    $ borg create /path/to/repo::arch ~
 
     # Super fast, low compression
-    $ borg create --compression lz4 /mnt/backup::repo ~
+    $ borg create --compression lz4 /path/to/repo::arch ~
 
     # Less fast, higher compression (N = 0..9)
-    $ borg create --compression zlib,N /mnt/backup::repo ~
+    $ borg create --compression zlib,N /path/to/repo::arch ~
 
     # Even slower, even higher compression (N = 0..9)
-    $ borg create --compression lzma,N /mnt/backup::repo ~
+    $ borg create --compression lzma,N /path/to/repo::arch ~
 
     # Format tags available for archive name:
     # {now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}
     # add short hostname, backup username and current unixtime (seconds from epoch)
-    $ borg create  /mnt/backup::{hostname}-{user}-{now:%s} ~
+    $ borg create  /path/to/repo::{hostname}-{user}-{now:%s} ~
 
 .. include:: usage/extract.rst.inc
 
@@ -321,19 +321,19 @@ Examples
 ::
 
     # Extract entire archive
-    $ borg extract /mnt/backup::my-files
+    $ borg extract /path/to/repo::my-files
 
     # Extract entire archive and list files while processing
-    $ borg extract -v --list /mnt/backup::my-files
+    $ borg extract -v --list /path/to/repo::my-files
 
     # Extract the "src" directory
-    $ borg extract /mnt/backup::my-files home/USERNAME/src
+    $ borg extract /path/to/repo::my-files home/USERNAME/src
 
     # Extract the "src" directory but exclude object files
-    $ borg extract /mnt/backup::my-files home/USERNAME/src --exclude '*.o'
+    $ borg extract /path/to/repo::my-files home/USERNAME/src --exclude '*.o'
 
     # Restore a raw device (must not be active/in use/mounted at that time)
-    $ borg extract --stdout /mnt/backup::my-sdx | dd of=/dev/sdx bs=10M
+    $ borg extract --stdout /path/to/repo::my-sdx | dd of=/dev/sdx bs=10M
 
 
 .. Note::
@@ -349,12 +349,12 @@ Examples
 ~~~~~~~~
 ::
 
-    $ borg create /mnt/backup::archivename ~
-    $ borg list /mnt/backup
+    $ borg create /path/to/repo::archivename ~
+    $ borg list /path/to/repo
     archivename                          Mon, 2016-02-15 19:50:19
 
-    $ borg rename /mnt/backup::archivename newname
-    $ borg list /mnt/backup
+    $ borg rename /path/to/repo::archivename newname
+    $ borg list /path/to/repo
     newname                              Mon, 2016-02-15 19:50:19
 
 
@@ -364,14 +364,14 @@ Examples
 ~~~~~~~~
 ::
 
-    $ borg list /mnt/backup
+    $ borg list /path/to/repo
     Monday                               Mon, 2016-02-15 19:15:11
     repo                                 Mon, 2016-02-15 19:26:54
     root-2016-02-15                      Mon, 2016-02-15 19:36:29
     newname                              Mon, 2016-02-15 19:50:19
     ...
 
-    $ borg list /mnt/backup::root-2016-02-15
+    $ borg list /path/to/repo::root-2016-02-15
     drwxr-xr-x root   root          0 Mon, 2016-02-15 17:44:27 .
     drwxrwxr-x root   root          0 Mon, 2016-02-15 19:04:49 bin
     -rwxr-xr-x root   root    1029624 Thu, 2014-11-13 00:08:51 bin/bash
@@ -379,7 +379,7 @@ Examples
     -rwxr-xr-x root   root       2140 Fri, 2015-03-27 20:24:22 bin/bzdiff
     ...
 
-    $ borg list /mnt/backup::archiveA --list-format="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}"
+    $ borg list /path/to/repo::archiveA --list-format="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}"
     drwxrwxr-x user   user          0 Sun, 2015-02-01 11:00:00 .
     drwxrwxr-x user   user          0 Sun, 2015-02-01 11:00:00 code
     drwxrwxr-x user   user          0 Sun, 2015-02-01 11:00:00 code/myproject
@@ -387,8 +387,8 @@ Examples
     ...
 
     # see what is changed between archives, based on file modification time, size and file path
-    $ borg list /mnt/backup::archiveA --list-format="{mtime:%s}{TAB}{size}{TAB}{path}{LF}" |sort -n > /tmp/list.archiveA
-    $ borg list /mnt/backup::archiveB --list-format="{mtime:%s}{TAB}{size}{TAB}{path}{LF}" |sort -n > /tmp/list.archiveB
+    $ borg list /path/to/repo::archiveA --list-format="{mtime:%s}{TAB}{size}{TAB}{path}{LF}" |sort -n > /tmp/list.archiveA
+    $ borg list /path/to/repo::archiveB --list-format="{mtime:%s}{TAB}{size}{TAB}{path}{LF}" |sort -n > /tmp/list.archiveB
     $ diff -y /tmp/list.archiveA /tmp/list.archiveB
     1422781200      0       .                                       1422781200      0       .
     1422781200      0       code                                    1422781200      0       code
@@ -442,10 +442,10 @@ Examples
 ::
 
     # delete a single backup archive:
-    $ borg delete /mnt/backup::Monday
+    $ borg delete /path/to/repo::Monday
 
     # delete the whole repository and the related local cache:
-    $ borg delete /mnt/backup
+    $ borg delete /path/to/repo
     You requested to completely DELETE the repository *including* all archives it contains:
     repo                                 Mon, 2016-02-15 19:26:54
     root-2016-02-15                      Mon, 2016-02-15 19:36:29
@@ -473,18 +473,18 @@ will see what it would do without it actually doing anything.
 
     # Keep 7 end of day and 4 additional end of week archives.
     # Do a dry-run without actually deleting anything.
-    $ borg prune --dry-run --keep-daily=7 --keep-weekly=4 /mnt/backup
+    $ borg prune --dry-run --keep-daily=7 --keep-weekly=4 /path/to/repo
 
     # Same as above but only apply to archive names starting with "foo":
-    $ borg prune --keep-daily=7 --keep-weekly=4 --prefix=foo /mnt/backup
+    $ borg prune --keep-daily=7 --keep-weekly=4 --prefix=foo /path/to/repo
 
     # Keep 7 end of day, 4 additional end of week archives,
     # and an end of month archive for every month:
-    $ borg prune --keep-daily=7 --keep-weekly=4 --keep-monthly=-1 /mnt/backup
+    $ borg prune --keep-daily=7 --keep-weekly=4 --keep-monthly=-1 /path/to/repo
 
     # Keep all backups in the last 10 days, 4 additional end of week archives,
     # and an end of month archive for every month:
-    $ borg prune --keep-within=10d --keep-weekly=4 --keep-monthly=-1 /mnt/backup
+    $ borg prune --keep-within=10d --keep-weekly=4 --keep-monthly=-1 /path/to/repo
 
 
 .. include:: usage/info.rst.inc
@@ -493,14 +493,14 @@ Examples
 ~~~~~~~~
 ::
 
-    $ borg info /mnt/backup::root-2016-02-15
+    $ borg info /path/to/repo::root-2016-02-15
     Name: root-2016-02-15
     Fingerprint: 57c827621f21b000a8d363c1e163cc55983822b3afff3a96df595077a660be50
     Hostname: myhostname
     Username: root
     Time (start): Mon, 2016-02-15 19:36:29
     Time (end):   Mon, 2016-02-15 19:39:26
-    Command line: /usr/local/bin/borg create -v --list -C zlib,6 /mnt/backup::root-2016-02-15 / --one-file-system
+    Command line: /usr/local/bin/borg create -v --list -C zlib,6 /path/to/repo::root-2016-02-15 / --one-file-system
     Number of files: 38100
 
                            Original size      Compressed size    Deduplicated size
@@ -519,7 +519,7 @@ borg mount/borgfs
 +++++++++++++++++
 ::
 
-    $ borg mount /mnt/backup::root-2016-02-15 /tmp/mymountpoint
+    $ borg mount /path/to/repo::root-2016-02-15 /tmp/mymountpoint
     $ ls /tmp/mymountpoint
     bin  boot  etc	home  lib  lib64  lost+found  media  mnt  opt  root  sbin  srv  tmp  usr  var
     $ fusermount -u /tmp/mymountpoint
@@ -551,8 +551,8 @@ Examples
 ::
 
     # Create a key file protected repository
-    $ borg init --encryption=keyfile -v /mnt/backup
-    Initializing repository at "/mnt/backup"
+    $ borg init --encryption=keyfile -v /path/to/repo
+    Initializing repository at "/path/to/repo"
     Enter new passphrase:
     Enter same passphrase again:
     Remember your passphrase. Your data will be inaccessible without it.
@@ -563,7 +563,7 @@ Examples
     Done.
 
     # Change key file passphrase
-    $ borg change-passphrase -v /mnt/backup
+    $ borg change-passphrase -v /path/to/repo
     Enter passphrase for key /root/.config/borg/keys/mnt_backup:
     Enter new passphrase:
     Enter same passphrase again:
@@ -586,11 +586,11 @@ forced command. That way, other options given by the client (like ``--info`` or
 
 ::
 
-    # Allow an SSH keypair to only run borg, and only have access to /mnt/backup.
+    # Allow an SSH keypair to only run borg, and only have access to /path/to/repo.
     # Use key options to disable unneeded and potentially dangerous SSH functionality.
     # This will help to secure an automated remote backup system.
     $ cat ~/.ssh/authorized_keys
-    command="borg serve --restrict-to-path /mnt/backup",no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-user-rc ssh-rsa AAAAB3[...]
+    command="borg serve --restrict-to-path /path/to/repo",no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-user-rc ssh-rsa AAAAB3[...]
 
 
 .. include:: usage/upgrade.rst.inc
@@ -600,11 +600,11 @@ Examples
 ::
 
     # Upgrade the borg repository to the most recent version.
-    $ borg upgrade -v /mnt/backup
-    making a hardlink copy in /mnt/backup.upgrade-2016-02-15-20:51:55
+    $ borg upgrade -v /path/to/repo
+    making a hardlink copy in /path/to/repo.upgrade-2016-02-15-20:51:55
     opening attic repository with borg and converting
     no key file found for repository
-    converting repo index /mnt/backup/index.0
+    converting repo index /path/to/repo/index.0
     converting 1 segments...
     converting borg 0.xx to borg current
     no key file found for repository
@@ -802,16 +802,16 @@ After the backup has completed, you remove the snapshots again. ::
 
     $ # create snapshots here
     $ lvdisplay > lvdisplay.txt
-    $ borg create --read-special /mnt/backup::repo lvdisplay.txt /dev/vg0/*-snapshot
+    $ borg create --read-special /path/to/repo::arch lvdisplay.txt /dev/vg0/*-snapshot
     $ # remove snapshots here
 
 Now, let's see how to restore some LVs from such a backup. ::
 
-    $ borg extract /mnt/backup::repo lvdisplay.txt
+    $ borg extract /path/to/repo::arch lvdisplay.txt
     $ # create empty LVs with correct sizes here (look into lvdisplay.txt).
     $ # we assume that you created an empty root and home LV and overwrite it now:
-    $ borg extract --stdout /mnt/backup::repo dev/vg0/root-snapshot > /dev/vg0/root
-    $ borg extract --stdout /mnt/backup::repo dev/vg0/home-snapshot > /dev/vg0/home
+    $ borg extract --stdout /path/to/repo::arch dev/vg0/root-snapshot > /dev/vg0/root
+    $ borg extract --stdout /path/to/repo::arch dev/vg0/home-snapshot > /dev/vg0/home
 
 
 Append-only mode

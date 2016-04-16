@@ -37,6 +37,15 @@ class Cache:
         path = path or os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
         UpgradableLock(os.path.join(path, 'lock'), exclusive=True).break_lock()
 
+    @staticmethod
+    def destroy(repository, path=None):
+        """destroy the cache for ``repository`` or at ``path``"""
+        path = path or os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
+        config = os.path.join(path, 'config')
+        if os.path.exists(config):
+            os.remove(config)  # kill config first
+            shutil.rmtree(path)
+
     def __init__(self, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True,
                  lock_wait=None):
         """
@@ -130,13 +139,6 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         os.makedirs(os.path.join(self.path, 'chunks.archive.d'))
         with open(os.path.join(self.path, 'files'), 'wb') as fd:
             pass  # empty file
-
-    def destroy(self):
-        """destroy the cache at `self.path`
-        """
-        self.close()
-        os.remove(os.path.join(self.path, 'config'))  # kill config first
-        shutil.rmtree(self.path)
 
     def _do_open(self):
         self.config = configparser.ConfigParser(interpolation=None)
@@ -389,21 +391,19 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
     def chunk_incref(self, id, stats):
         if not self.txn_active:
             self.begin_txn()
-        count, size, csize = self.chunks[id]
-        self.chunks[id] = (count + 1, size, csize)
+        count, size, csize = self.chunks.incref(id)
         stats.update(size, csize, False)
         return id, size, csize
 
     def chunk_decref(self, id, stats):
         if not self.txn_active:
             self.begin_txn()
-        count, size, csize = self.chunks[id]
-        if count == 1:
+        count, size, csize = self.chunks.decref(id)
+        if count == 0:
             del self.chunks[id]
             self.repository.delete(id, wait=False)
             stats.update(-size, -csize, True)
         else:
-            self.chunks[id] = (count - 1, size, csize)
             stats.update(-size, -csize, False)
 
     def file_known_and_unchanged(self, path_hash, st, ignore_inode=False):

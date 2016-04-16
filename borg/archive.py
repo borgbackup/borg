@@ -786,8 +786,7 @@ class ArchiveChecker:
 
         def add_reference(id_, size, csize, cdata=None):
             try:
-                count, _, _ = self.chunks[id_]
-                self.chunks[id_] = count + 1, size, csize
+                self.chunks.incref(id_)
             except KeyError:
                 assert cdata is not None
                 self.chunks[id_] = 1, size, csize

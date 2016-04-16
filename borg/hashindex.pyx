@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 import os
 
+cimport cython
+from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
+
 API_VERSION = 2
 
 
@@ -11,9 +14,6 @@ cdef extern from "_hashindex.c":
     HashIndex *hashindex_read(char *path)
     HashIndex *hashindex_init(int capacity, int key_size, int value_size)
     void hashindex_free(HashIndex *index)
-    void hashindex_summarize(HashIndex *index, long long *total_size, long long *total_csize,
-                             long long *unique_size, long long *unique_csize,
-                             long long *total_unique_chunks, long long *total_chunks)
     void hashindex_merge(HashIndex *index, HashIndex *other)
     void hashindex_add(HashIndex *index, void *key, void *value)
     int hashindex_get_size(HashIndex *index)
@@ -22,13 +22,34 @@ cdef extern from "_hashindex.c":
     void *hashindex_next_key(HashIndex *index, void *key)
     int hashindex_delete(HashIndex *index, void *key)
     int hashindex_set(HashIndex *index, void *key, void *value)
-    int _htole32(int v)
-    int _le32toh(int v)
+    uint32_t _htole32(uint32_t v)
+    uint32_t _le32toh(uint32_t v)
 
 
 cdef _NoDefault = object()
 
-cimport cython
+"""
+The HashIndex is *not* a general purpose data structure. The value size must be at least 4 bytes, and these
+first bytes are used for in-band signalling in the data structure itself.
+
+The constant MAX_VALUE defines the valid range for these 4 bytes when interpreted as an uint32_t from 0
+to MAX_VALUE (inclusive). The following reserved values beyond MAX_VALUE are currently in use
+(byte order is LE)::
+
+    0xffffffff marks empty entries in the hashtable
+    0xfffffffe marks deleted entries in the hashtable
+
+None of the publicly available classes in this module will accept nor return a reserved value;
+AssertionError is raised instead.
+"""
+
+assert UINT32_MAX == 2**32-1
+
+# module-level constant because cdef's in classes can't have default values
+cdef uint32_t _MAX_VALUE = 2**32-1025
+MAX_VALUE = _MAX_VALUE
+
+assert _MAX_VALUE % 2 == 1
 
 @cython.internal
 cdef class IndexBase:
@@ -101,22 +122,30 @@ cdef class NSIndex(IndexBase):
 
     def __getitem__(self, key):
         assert len(key) == self.key_size
-        data = <int *>hashindex_get(self.index, <char *>key)
+        data = <uint32_t *>hashindex_get(self.index, <char *>key)
         if not data:
-            raise KeyError
-        return _le32toh(data[0]), _le32toh(data[1])
+            raise KeyError(key)
+        cdef uint32_t segment = _le32toh(data[0])
+        assert segment <= _MAX_VALUE, "maximum number of segments reached"
+        return segment, _le32toh(data[1])
 
     def __setitem__(self, key, value):
         assert len(key) == self.key_size
-        cdef int[2] data
-        data[0] = _htole32(value[0])
+        cdef uint32_t[2] data
+        cdef uint32_t segment = value[0]
+        assert segment <= _MAX_VALUE, "maximum number of segments reached"
+        data[0] = _htole32(segment)
         data[1] = _htole32(value[1])
         if not hashindex_set(self.index, <char *>key, data):
             raise Exception('hashindex_set failed')
 
     def __contains__(self, key):
+        cdef uint32_t segment
         assert len(key) == self.key_size
-        data = <int *>hashindex_get(self.index, <char *>key)
+        data = <uint32_t *>hashindex_get(self.index, <char *>key)
+        if data != NULL:
+            segment = _le32toh(data[0])
+            assert segment <= _MAX_VALUE, "maximum number of segments reached"
         return data != NULL
 
     def iteritems(self, marker=None):
@@ -149,25 +178,46 @@ cdef class NSKeyIterator:
         self.key = hashindex_next_key(self.index, <char *>self.key)
         if not self.key:
             raise StopIteration
-        cdef int *value = <int *>(self.key + self.key_size)
-        return (<char *>self.key)[:self.key_size], (_le32toh(value[0]), _le32toh(value[1]))
+        cdef uint32_t *value = <uint32_t *>(self.key + self.key_size)
+        cdef uint32_t segment = _le32toh(value[0])
+        assert segment <= _MAX_VALUE, "maximum number of segments reached"
+        return (<char *>self.key)[:self.key_size], (segment, _le32toh(value[1]))
 
 
 cdef class ChunkIndex(IndexBase):
+    """
+    Mapping of 32 byte keys to (refcount, size, csize), which are all 32-bit unsigned.
+
+    The reference count cannot overflow. If an overflow would occur, the refcount
+    is fixed to MAX_VALUE and will neither increase nor decrease by incref(), decref()
+    or add().
+
+    Prior signed 32-bit overflow is handled correctly for most cases: All values
+    from UINT32_MAX (2**32-1, inclusive) to MAX_VALUE (exclusive) are reserved and either
+    cause silent data loss (-1, -2) or will raise an AssertionError when accessed.
+    Other values are handled correctly. Note that previously the refcount could also reach
+    0 by *increasing* it.
+
+    Assigning refcounts in this reserved range is an invalid operation and raises AssertionError.
+    """
 
     value_size = 12
 
     def __getitem__(self, key):
         assert len(key) == self.key_size
-        data = <int *>hashindex_get(self.index, <char *>key)
+        data = <uint32_t *>hashindex_get(self.index, <char *>key)
         if not data:
-            raise KeyError
-        return _le32toh(data[0]), _le32toh(data[1]), _le32toh(data[2])
+            raise KeyError(key)
+        cdef uint32_t refcount = _le32toh(data[0])
+        assert refcount <= _MAX_VALUE
+        return refcount, _le32toh(data[1]), _le32toh(data[2])
 
     def __setitem__(self, key, value):
         assert len(key) == self.key_size
-        cdef int[3] data
-        data[0] = _htole32(value[0])
+        cdef uint32_t[3] data
+        cdef uint32_t refcount = value[0]
+        assert refcount <= _MAX_VALUE, "invalid reference count"
+        data[0] = _htole32(refcount)
         data[1] = _htole32(value[1])
         data[2] = _htole32(value[2])
         if not hashindex_set(self.index, <char *>key, data):
@@ -175,8 +225,37 @@ cdef class ChunkIndex(IndexBase):
 
     def __contains__(self, key):
         assert len(key) == self.key_size
-        data = <int *>hashindex_get(self.index, <char *>key)
+        data = <uint32_t *>hashindex_get(self.index, <char *>key)
+        if data != NULL:
+            assert data[0] <= _MAX_VALUE
         return data != NULL
+
+    def incref(self, key):
+        """Increase refcount for 'key', return (refcount, size, csize)"""
+        assert len(key) == self.key_size
+        data = <uint32_t *>hashindex_get(self.index, <char *>key)
+        if not data:
+            raise KeyError(key)
+        cdef uint32_t refcount = _le32toh(data[0])
+        assert refcount <= _MAX_VALUE, "invalid reference count"
+        if refcount != _MAX_VALUE:
+            refcount += 1
+        data[0] = _htole32(refcount)
+        return refcount, _le32toh(data[1]), _le32toh(data[2])
+
+    def decref(self, key):
+        """Decrease refcount for 'key', return (refcount, size, csize)"""
+        assert len(key) == self.key_size
+        data = <uint32_t *>hashindex_get(self.index, <char *>key)
+        if not data:
+            raise KeyError(key)
+        cdef uint32_t refcount = _le32toh(data[0])
+        # Never decrease a reference count of zero
+        assert 0 < refcount <= _MAX_VALUE, "invalid reference count"
+        if refcount != _MAX_VALUE:
+            refcount -= 1
+        data[0] = _htole32(refcount)
+        return refcount, _le32toh(data[1]), _le32toh(data[2])
 
     def iteritems(self, marker=None):
         cdef const void *key
@@ -191,22 +270,56 @@ cdef class ChunkIndex(IndexBase):
         return iter
 
     def summarize(self):
-        cdef long long total_size, total_csize, unique_size, unique_csize, total_unique_chunks, total_chunks
-        hashindex_summarize(self.index, &total_size, &total_csize,
-                            &unique_size, &unique_csize,
-                            &total_unique_chunks, &total_chunks)
-        return total_size, total_csize, unique_size, unique_csize, total_unique_chunks, total_chunks
+        cdef uint64_t size = 0, csize = 0, unique_size = 0, unique_csize = 0, chunks = 0, unique_chunks = 0
+        cdef uint32_t *values
+        cdef uint32_t refcount
+        cdef void *key = NULL
+
+        while True:
+            key = hashindex_next_key(self.index, key)
+            if not key:
+                break
+            unique_chunks += 1
+            values = <uint32_t*> (key + self.key_size)
+            refcount = _le32toh(values[0])
+            assert refcount <= MAX_VALUE, "invalid reference count"
+            chunks += refcount
+            unique_size += _le32toh(values[1])
+            unique_csize += _le32toh(values[2])
+            size += <uint64_t> _le32toh(values[1]) * _le32toh(values[0])
+            csize += <uint64_t> _le32toh(values[2]) * _le32toh(values[0])
+
+        return size, csize, unique_size, unique_csize, unique_chunks, chunks
 
     def add(self, key, refs, size, csize):
         assert len(key) == self.key_size
-        cdef int[3] data
+        cdef uint32_t[3] data
         data[0] = _htole32(refs)
         data[1] = _htole32(size)
         data[2] = _htole32(csize)
-        hashindex_add(self.index, <char *>key, data)
+        self._add(<char*> key, data)
+
+    cdef _add(self, void *key, uint32_t *data):
+        cdef uint64_t refcount1, refcount2, result64
+        values = <uint32_t*> hashindex_get(self.index, key)
+        if values:
+            refcount1 = _le32toh(values[0])
+            refcount2 = _le32toh(data[0])
+            assert refcount1 <= _MAX_VALUE
+            assert refcount2 <= _MAX_VALUE
+            result64 = refcount1 + refcount2
+            values[0] = _htole32(min(result64, _MAX_VALUE))
+        else:
+            hashindex_set(self.index, key, data)
 
     def merge(self, ChunkIndex other):
-        hashindex_merge(self.index, other.index)
+        cdef void *key = NULL
+
+        while True:
+            key = hashindex_next_key(other.index, key)
+            if not key:
+                break
+            self._add(key, <uint32_t*> (key + self.key_size))
 
 
 cdef class ChunkKeyIterator:
@@ -226,5 +339,7 @@ cdef class ChunkKeyIterator:
         self.key = hashindex_next_key(self.index, <char *>self.key)
         if not self.key:
             raise StopIteration
-        cdef int *value = <int *>(self.key + self.key_size)
-        return (<char *>self.key)[:self.key_size], (_le32toh(value[0]), _le32toh(value[1]), _le32toh(value[2]))
+        cdef uint32_t *value = <uint32_t *>(self.key + self.key_size)
+        cdef uint32_t refcount = _le32toh(value[0])
+        assert refcount <= MAX_VALUE, "invalid reference count"
+        return (<char *>self.key)[:self.key_size], (refcount, _le32toh(value[1]), _le32toh(value[2]))

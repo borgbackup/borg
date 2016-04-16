@@ -84,12 +84,12 @@ Easy to use
 
 Initialize a new backup repository and create a backup archive::
 
-    $ borg init /mnt/backup
-    $ borg create /mnt/backup::Saturday1 ~/Documents
+    $ borg init /path/to/repo
+    $ borg create /path/to/repo::Saturday1 ~/Documents
 
 Now doing another backup, just to show off the great deduplication::
 
-    $ borg create -v --stats /mnt/backup::Saturday2 ~/Documents
+    $ borg create -v --stats /path/to/repo::Saturday2 ~/Documents
     -----------------------------------------------------------------------------
     Archive name: Saturday2
     Archive fingerprint: 622b7c53c...

@@ -2,10 +2,12 @@
 """
 import errno
 import os
+import subprocess
 import sys
 import tempfile
 from ctypes import CDLL, create_string_buffer, c_ssize_t, c_size_t, c_char_p, c_int, c_uint32, get_errno
 from ctypes.util import find_library
+from distutils.version import LooseVersion
 
 from .logger import create_logger
 logger = create_logger()
@@ -45,6 +47,22 @@ if libc_name is None:
         msg = "Can't find C library. No fallback known. Try installing ldconfig, gcc/cc or objdump."
         logger.error(msg)
         raise Exception(msg)
+
+# If we are running with fakeroot on Linux, then use the xattr functions of fakeroot. This is needed by
+# the 'test_extract_capabilities' test, but also allows xattrs to work with fakeroot on Linux in normal use.
+# TODO: Check whether fakeroot supports xattrs on all platforms supported below.
+# TODO: If that's the case then we can make Borg fakeroot-xattr-compatible on these as well.
+LD_PRELOAD = os.environ.get('LD_PRELOAD', '')
+XATTR_FAKEROOT = False
+if sys.platform.startswith('linux') and 'fakeroot' in LD_PRELOAD:
+    fakeroot_version = LooseVersion(subprocess.check_output(['fakeroot', '-v']).decode('ascii').split()[-1])
+    if fakeroot_version >= LooseVersion("1.20.2"):
+        # 1.20.2 has been confirmed to have xattr support
+        # 1.18.2 has been confirmed not to have xattr support
+        # Versions in-between are unknown
+        libc_name = LD_PRELOAD
+        XATTR_FAKEROOT = True
+
 
 try:
     libc = CDLL(libc_name, use_errno=True)

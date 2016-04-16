@@ -1526,6 +1526,10 @@ class Archiver:
 
         info_epilog = textwrap.dedent("""
         This command displays some detailed information about the specified archive.
+
+        The "This archive" line refers exclusively to this archive:
+        "Deduplicated size" is the size of the unique chunks stored only for this
+        archive. Non-unique / common chunks show up under "All archives".
         """)
         subparser = subparsers.add_parser('info', parents=[common_parser], add_help=False,
                                           description=self.do_info.__doc__,

@@ -666,7 +666,7 @@ class Archiver:
 
     @with_repository()
     def do_mount(self, args, repository, manifest, key):
-        """Mount archive or an entire repository as a FUSE fileystem"""
+        """Mount archive or an entire repository as a FUSE filesystem"""
         try:
             from .fuse import FuseOperations
         except ImportError as e:

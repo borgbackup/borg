@@ -28,20 +28,13 @@ from operator import attrgetter
 from . import __version__ as borg_version
 from . import hashindex
 from . import chunker
+from .constants import *  # NOQA
 from . import crypto
 from . import shellpattern
 import msgpack
 import msgpack.fallback
 
 import socket
-
-# return codes returned by borg command
-# when borg is killed by signal N, rc = 128 + N
-EXIT_SUCCESS = 0  # everything done, no problems
-EXIT_WARNING = 1  # reached normal end of operation, but there were issues
-EXIT_ERROR = 2  # terminated abruptly, did not reach end of operation
-
-DASHES = '-' * 78
 
 
 class Error(Exception):
@@ -248,13 +241,13 @@ def get_cache_dir():
     if not os.path.exists(cache_dir):
         os.makedirs(cache_dir)
         os.chmod(cache_dir, stat.S_IRWXU)
-        with open(os.path.join(cache_dir, 'CACHEDIR.TAG'), 'w') as fd:
+        with open(os.path.join(cache_dir, CACHE_TAG_NAME), 'wb') as fd:
+            fd.write(CACHE_TAG_CONTENTS)
             fd.write(textwrap.dedent("""
-                Signature: 8a477f597d28d172789f06886806bc55
                 # This file is a cache directory tag created by Borg.
                 # For information about cache directory tags, see:
                 #       http://www.brynosaurus.com/cachedir/
-                """).lstrip())
+                """).encode('ascii'))
     return cache_dir
 
 
@@ -495,7 +488,6 @@ def timestamp(s):
 
 def ChunkerParams(s):
     if s.strip().lower() == "default":
-        from .archive import CHUNKER_PARAMS
         return CHUNKER_PARAMS
     chunk_min, chunk_max, chunk_mask, window_size = s.split(',')
     if int(chunk_max) > 23:
@@ -534,13 +526,12 @@ def dir_is_cachedir(path):
     (http://www.brynosaurus.com/cachedir/spec.html).
     """
 
-    tag_contents = b'Signature: 8a477f597d28d172789f06886806bc55'
-    tag_path = os.path.join(path, 'CACHEDIR.TAG')
+    tag_path = os.path.join(path, CACHE_TAG_NAME)
     try:
         if os.path.exists(tag_path):
             with open(tag_path, 'rb') as tag_file:
-                tag_data = tag_file.read(len(tag_contents))
-                if tag_data == tag_contents:
+                tag_data = tag_file.read(len(CACHE_TAG_CONTENTS))
+                if tag_data == CACHE_TAG_CONTENTS:
                     return True
     except OSError:
         pass
@@ -555,7 +546,7 @@ def dir_is_tagged(path, exclude_caches, exclude_if_present):
     """
     tag_paths = []
     if exclude_caches and dir_is_cachedir(path):
-        tag_paths.append(os.path.join(path, 'CACHEDIR.TAG'))
+        tag_paths.append(os.path.join(path, CACHE_TAG_NAME))
     if exclude_if_present is not None:
         for tag in exclude_if_present:
             tag_path = os.path.join(path, tag)

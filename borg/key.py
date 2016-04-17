@@ -11,6 +11,7 @@ from .helpers import IntegrityError, get_keys_dir, Error, yes
 from .logger import create_logger
 logger = create_logger()
 
+from .constants import *  # NOQA
 from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks, hmac_sha256
 from .compress import Compressor, COMPR_BUFFER
 import msgpack
@@ -338,7 +339,7 @@ class KeyfileKeyBase(AESKeyBase):
 
     def encrypt_key_file(self, data, passphrase):
         salt = os.urandom(32)
-        iterations = 100000
+        iterations = PBKDF2_ITERATIONS
         key = passphrase.kdf(salt, iterations, 32)
         hash = hmac_sha256(key, data)
         cdata = AES(is_encrypt=True, key=key).encrypt(data)

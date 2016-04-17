@@ -18,11 +18,12 @@ from hashlib import sha256
 import pytest
 
 from .. import xattr
-from ..archive import Archive, ChunkBuffer, ArchiveRecreater, CHUNK_MAX_EXP
+from ..archive import Archive, ChunkBuffer, ArchiveRecreater
 from ..archiver import Archiver
 from ..cache import Cache
+from ..constants import *  # NOQA
 from ..crypto import bytes_to_long, num_aes_blocks
-from ..helpers import Manifest, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
+from ..helpers import Manifest
 from ..key import KeyfileKeyBase
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
@@ -641,16 +642,18 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def _create_test_caches(self):
         self.cmd('init', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)
-        self.create_regular_file('cache1/CACHEDIR.TAG', contents=b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
-        self.create_regular_file('cache2/CACHEDIR.TAG', contents=b'invalid signature')
+        self.create_regular_file('cache1/%s' % CACHE_TAG_NAME,
+                                 contents=CACHE_TAG_CONTENTS + b' extra stuff')
+        self.create_regular_file('cache2/%s' % CACHE_TAG_NAME,
+                                 contents=b'invalid signature')
         os.mkdir('input/cache3')
-        os.link('input/cache1/CACHEDIR.TAG', 'input/cache3/CACHEDIR.TAG')
+        os.link('input/cache1/%s' % CACHE_TAG_NAME, 'input/cache3/%s' % CACHE_TAG_NAME)
 
     def _assert_test_caches(self):
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['cache2', 'file1'])
-        self.assert_equal(sorted(os.listdir('output/input/cache2')), ['CACHEDIR.TAG'])
+        self.assert_equal(sorted(os.listdir('output/input/cache2')), [CACHE_TAG_NAME])
 
     def test_exclude_caches(self):
         self._create_test_caches()
@@ -694,11 +697,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('tagged1/file1', size=1024)
         self.create_regular_file('tagged2/.NOBACKUP2')
         self.create_regular_file('tagged2/file2', size=1024)
-        self.create_regular_file('tagged3/CACHEDIR.TAG', contents=b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
+        self.create_regular_file('tagged3/%s' % CACHE_TAG_NAME,
+                                 contents=CACHE_TAG_CONTENTS + b' extra stuff')
         self.create_regular_file('tagged3/file3', size=1024)
         self.create_regular_file('taggedall/.NOBACKUP1')
         self.create_regular_file('taggedall/.NOBACKUP2')
-        self.create_regular_file('taggedall/CACHEDIR.TAG', contents=b'Signature: 8a477f597d28d172789f06886806bc55 extra stuff')
+        self.create_regular_file('taggedall/%s' % CACHE_TAG_NAME,
+                                 contents=CACHE_TAG_CONTENTS + b' extra stuff')
         self.create_regular_file('taggedall/file4', size=1024)
 
     def _assert_test_keep_tagged(self):
@@ -707,9 +712,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_equal(sorted(os.listdir('output/input')), ['file0', 'tagged1', 'tagged2', 'tagged3', 'taggedall'])
         self.assert_equal(os.listdir('output/input/tagged1'), ['.NOBACKUP1'])
         self.assert_equal(os.listdir('output/input/tagged2'), ['.NOBACKUP2'])
-        self.assert_equal(os.listdir('output/input/tagged3'), ['CACHEDIR.TAG'])
+        self.assert_equal(os.listdir('output/input/tagged3'), [CACHE_TAG_NAME])
         self.assert_equal(sorted(os.listdir('output/input/taggedall')),
-                          ['.NOBACKUP1', '.NOBACKUP2', 'CACHEDIR.TAG', ])
+                          ['.NOBACKUP1', '.NOBACKUP2', CACHE_TAG_NAME, ])
 
     def test_exclude_keep_tagged(self):
         self._create_test_keep_tagged()

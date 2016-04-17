@@ -9,10 +9,10 @@ try:
 except ImportError:
     attic = None
 
+from ..constants import *  # NOQA
 from ..upgrader import AtticRepositoryUpgrader, AtticKeyfileKey
 from ..helpers import get_keys_dir
 from ..key import KeyfileKey
-from ..archiver import UMASK_DEFAULT
 from ..repository import Repository
 
 

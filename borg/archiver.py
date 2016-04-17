@@ -22,22 +22,20 @@ from .helpers import Error, location_validator, archivename_validator, format_ti
     get_cache_dir, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
-    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ItemFormatter, DASHES
+    log_multi, PatternMatcher, ItemFormatter
 from .logger import create_logger, setup_logging
 logger = create_logger()
 from .compress import Compressor, COMPR_BUFFER
 from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache
+from .constants import *  # NOQA
 from .key import key_creator, RepoKey, PassphraseKey
-from .archive import Archive, ArchiveChecker, ArchiveRecreater, CHUNKER_PARAMS
+from .archive import Archive, ArchiveChecker, ArchiveRecreater
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 from .hashindex import ChunkIndexEntry
 
 has_lchflags = hasattr(os, 'lchflags')
-
-# default umask, overriden by --umask, defaults to read/write only for owner
-UMASK_DEFAULT = 0o077
 
 
 def argument(args, str_or_bool):
@@ -1956,7 +1954,6 @@ def main():  # pragma: no cover
         elif exit_code == EXIT_ERROR:
             logger.error(exit_msg % ('error', exit_code))
         else:
-            # if you see 666 in output, it usually means exit_code was None
             logger.error(exit_msg % ('abnormal', exit_code or 666))
     sys.exit(exit_code)
 

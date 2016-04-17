@@ -17,10 +17,11 @@ import time
 from io import BytesIO
 from . import xattr
 from .compress import Compressor, COMPR_BUFFER
+from .constants import *  # NOQA
 from .helpers import Error, uid2user, user2uid, gid2group, group2gid, \
     parse_timestamp, to_localtime, format_time, format_timedelta, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
-    ProgressIndicatorPercent, ChunkIteratorFileWrapper, remove_surrogates, log_multi, DASHES, \
+    ProgressIndicatorPercent, ChunkIteratorFileWrapper, remove_surrogates, log_multi, \
     PathPrefixPattern, FnmatchPattern, open_item, file_status, format_file_size, consume
 from .repository import Repository
 from .platform import acl_get, acl_set
@@ -28,19 +29,6 @@ from .chunker import Chunker
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .cache import ChunkListEntry
 import msgpack
-
-ITEMS_BUFFER = 1024 * 1024
-
-CHUNK_MIN_EXP = 19  # 2**19 == 512kiB
-CHUNK_MAX_EXP = 23  # 2**23 == 8MiB
-HASH_WINDOW_SIZE = 0xfff  # 4095B
-HASH_MASK_BITS = 21  # results in ~2MiB chunks statistically
-
-# defaults, use --chunker-params to override
-CHUNKER_PARAMS = (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
-
-# chunker params for the items metadata stream, finer granularity
-ITEMS_CHUNKER_PARAMS = (12, 16, 14, HASH_WINDOW_SIZE)
 
 has_lchmod = hasattr(os, 'lchmod')
 has_lchflags = hasattr(os, 'lchflags')
@@ -59,7 +47,7 @@ class DownloadPipeline:
         unpacker = msgpack.Unpacker(use_list=False)
         for data in self.fetch_many(ids):
             unpacker.feed(data)
-            items = [decode_dict(item, (b'path', b'source', b'user', b'group')) for item in unpacker]
+            items = [decode_dict(item, ITEM_TEXT_KEYS) for item in unpacker]
             if filter:
                 items = [item for item in items if filter(item)]
             for item in items:
@@ -187,7 +175,7 @@ class Archive:
     def load(self, id):
         self.id = id
         self.metadata = self._load_meta(self.id)
-        decode_dict(self.metadata, (b'name', b'comment', b'hostname', b'username', b'time', b'time_end'))
+        decode_dict(self.metadata, ARCHIVE_TEXT_KEYS)
         self.metadata[b'cmdline'] = [arg.decode('utf-8', 'surrogateescape') for arg in self.metadata[b'cmdline']]
         self.name = self.metadata[b'name']
 
@@ -233,7 +221,7 @@ Number of files: {0.stats.nfiles}'''.format(
 
     def add_item(self, item):
         unknown_keys = set(item) - ITEM_KEYS
-        assert not unknown_keys, ('unknown item metadata keys detected, please update ITEM_KEYS: %s',
+        assert not unknown_keys, ('unknown item metadata keys detected, please update constants.ITEM_KEYS: %s',
                                   ','.join(k.decode('ascii') for k in unknown_keys))
         if self.show_progress:
             self.stats.show_progress(item=item, dt=0.2)
@@ -631,12 +619,6 @@ Number of files: {0.stats.nfiles}'''.format(
             return os.open(path, flags_normal)
 
 
-# this set must be kept complete, otherwise the RobustUnpacker might malfunction:
-ITEM_KEYS = set([b'path', b'source', b'rdev', b'chunks', b'hardlink_master',
-                 b'mode', b'user', b'group', b'uid', b'gid', b'mtime', b'atime', b'ctime',
-                 b'xattrs', b'bsdflags', b'acl_nfs4', b'acl_access', b'acl_default', b'acl_extended', ])
-
-
 class RobustUnpacker:
     """A restartable/robust version of the streaming msgpack unpacker
     """
@@ -894,7 +876,7 @@ class ArchiveChecker:
                 archive = StableDict(msgpack.unpackb(data))
                 if archive[b'version'] != 1:
                     raise Exception('Unknown archive metadata version')
-                decode_dict(archive, (b'name', b'comment', b'hostname', b'username', b'time', b'time_end'))
+                decode_dict(archive, ARCHIVE_TEXT_KEYS)
                 archive[b'cmdline'] = [arg.decode('utf-8', 'surrogateescape') for arg in archive[b'cmdline']]
                 items_buffer = ChunkBuffer(self.key)
                 items_buffer.write_chunk = add_callback
@@ -1154,24 +1136,23 @@ class ArchiveRecreater:
         matcher = self.matcher
         tag_files = []
         tagged_dirs = []
-        # build hardlink masters, but only for paths ending in CACHEDIR.TAG, so we can read hard-linked CACHEDIR.TAGs
+        # build hardlink masters, but only for paths ending in CACHE_TAG_NAME, so we can read hard-linked TAGs
         cachedir_masters = {}
 
         for item in archive.iter_items(
-                filter=lambda item: item[b'path'].endswith('CACHEDIR.TAG') or matcher.match(item[b'path'])):
-            if item[b'path'].endswith('CACHEDIR.TAG'):
+                filter=lambda item: item[b'path'].endswith(CACHE_TAG_NAME) or matcher.match(item[b'path'])):
+            if item[b'path'].endswith(CACHE_TAG_NAME):
                 cachedir_masters[item[b'path']] = item
             if stat.S_ISREG(item[b'mode']):
                 dir, tag_file = os.path.split(item[b'path'])
                 if tag_file in self.exclude_if_present:
                     exclude(dir, item)
-                if self.exclude_caches and tag_file == 'CACHEDIR.TAG':
-                    tag_contents = b'Signature: 8a477f597d28d172789f06886806bc55'
+                if self.exclude_caches and tag_file == CACHE_TAG_NAME:
                     if b'chunks' in item:
                         file = open_item(archive, item)
                     else:
                         file = open_item(archive, cachedir_masters[item[b'source']])
-                    if file.read(len(tag_contents)).startswith(tag_contents):
+                    if file.read(len(CACHE_TAG_CONTENTS)).startswith(CACHE_TAG_CONTENTS):
                         exclude(dir, item)
         matcher.add(tag_files, True)
         matcher.add(tagged_dirs, False)

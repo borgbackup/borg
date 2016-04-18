@@ -729,6 +729,27 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                  '--exclude-caches', '--keep-tag-files', self.repository_location + '::test')
         self._assert_test_keep_tagged()
 
+    @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='Linux capabilities test, requires fakeroot >= 1.20.2')
+    def test_extract_capabilities(self):
+        fchown = os.fchown
+
+        # We need to manually patch chown to get the behaviour Linux has, since fakeroot does not
+        # accurately model the interaction of chown(2) and Linux capabilities, i.e. it does not remove them.
+        def patched_fchown(fd, uid, gid):
+            xattr.setxattr(fd, 'security.capability', None, follow_symlinks=False)
+            fchown(fd, uid, gid)
+
+        # The capability descriptor used here is valid and taken from a /usr/bin/ping
+        capabilities = b'\x01\x00\x00\x02\x00 \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+        self.create_regular_file('file')
+        xattr.setxattr('input/file', 'security.capability', capabilities)
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            with patch.object(os, 'fchown', patched_fchown):
+                self.cmd('extract', self.repository_location + '::test')
+            assert xattr.getxattr('input/file', 'security.capability') == capabilities
+
     def test_path_normalization(self):
         self.cmd('init', self.repository_location)
         self.create_regular_file('dir1/dir2/file', size=1024 * 80)

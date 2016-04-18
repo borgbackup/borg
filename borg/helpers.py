@@ -39,6 +39,7 @@ import msgpack.fallback
 
 import socket
 
+
 class Error(Exception):
     """Error base class"""
 
@@ -682,7 +683,7 @@ def uid2user(uid, default=None):
 @memoize
 def user2uid(user, default=None):
     try:
-        return user and pwd.getpwnam(user).pw_uid
+        return user and 0
     except KeyError:
         return default
 
@@ -704,6 +705,7 @@ def group2gid(group, default=None):
         return group and grp.getgrnam(group).gr_gid
     except KeyError:
         return default
+
 
 def getuid():
     if sys.platform != 'win32':

@@ -413,36 +413,37 @@ Number of files: {0.stats.nfiles}'''.format(
         uid = item[b'uid'] if uid is None else uid
         gid = item[b'gid'] if gid is None else gid
         # This code is a bit of a mess due to os specific differences
-        try:
-            if fd:
-                os.fchown(fd, uid, gid)
-            else:
-                os.lchown(path, uid, gid)
-        except OSError:
-            pass
-        if fd:
-            os.fchmod(fd, item[b'mode'])
-        elif not symlink:
-            os.chmod(path, item[b'mode'])
-        elif has_lchmod:  # Not available on Linux
-            os.lchmod(path, item[b'mode'])
-        mtime = bigint_to_int(item[b'mtime'])
-        if b'atime' in item:
-            atime = bigint_to_int(item[b'atime'])
-        else:
-            # old archives only had mtime in item metadata
-            atime = mtime
-        if fd:
-            os.utime(fd, None, ns=(atime, mtime))
-        else:
-            os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
-        acl_set(path, item, self.numeric_owner)
-        # Only available on OS X and FreeBSD
-        if has_lchflags and b'bsdflags' in item:
+        if sys.platform != 'win32':
             try:
-                os.lchflags(path, item[b'bsdflags'])
+                if fd:
+                    os.fchown(fd, uid, gid)
+                else:
+                    os.lchown(path, uid, gid)
             except OSError:
                 pass
+            if fd:
+                os.fchmod(fd, item[b'mode'])
+            elif not symlink:
+                os.chmod(path, item[b'mode'])
+            elif has_lchmod:  # Not available on Linux
+                os.lchmod(path, item[b'mode'])
+            mtime = bigint_to_int(item[b'mtime'])
+            if b'atime' in item:
+                atime = bigint_to_int(item[b'atime'])
+            else:
+                # old archives only had mtime in item metadata
+                atime = mtime
+            if fd:
+                os.utime(fd, None, ns=(atime, mtime))
+            else:
+                os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
+            acl_set(path, item, self.numeric_owner)
+            # Only available on OS X and FreeBSD
+            if has_lchflags and b'bsdflags' in item:
+                try:
+                    os.lchflags(path, item[b'bsdflags'])
+                except OSError:
+                    pass
 
     def set_meta(self, key, value):
         metadata = StableDict(self._load_meta(self.id))

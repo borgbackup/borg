@@ -115,7 +115,7 @@ if sys.platform == 'win32':
             gccpath = p
     windowsIncludeDirs.append(os.path.abspath(gccpath + "/.."))
     windowsIncludeDirs.append(os.path.abspath(gccpath + "/../.."))
-    
+
 
 possible_openssl_prefixes = None
 if sys.platform == 'win32':
@@ -309,8 +309,7 @@ if not on_rtd:
     elif sys.platform == 'darwin':
         ext_modules.append(Extension('borg.platform_darwin', [platform_darwin_source]))
 
-        
-        
+
 def parse(root, describe_command=None):
     return subprocess.check_output("git describe --tags --long").decode().strip()
 

@@ -323,7 +323,7 @@ Number of files: {0.stats.nfiles}'''.format(
 
         original_path = original_path or item[b'path']
         dest = self.cwd
-        if item[b'path'].startswith('/') or item[b'path'].startswith('..'):
+        if item[b'path'].startswith('/') or item[b'path'].startswith('..') or (sys.platform == 'win32' and item[b'path'][1] == ':'):
             raise Exception('Path should be relative and local')
         path = os.path.join(dest, item[b'path'])
         # Attempt to remove existing files, ignore errors on failure
@@ -367,7 +367,12 @@ Number of files: {0.stats.nfiles}'''.format(
                 pos = fd.tell()
                 fd.truncate(pos)
                 fd.flush()
-                self.restore_attrs(path, item, fd=fd.fileno())
+                if sys.platform != 'win32':
+                    self.restore_attrs(path, item, fd=fd.fileno())
+                else:
+                    # File needs to be closed or timestamps are rewritten at close
+                    fd.close()
+                    self.restore_attrs(path, item)
             if hardlink_masters:
                 # Update master entry with extracted file path, so that following hardlinks don't extract twice.
                 hardlink_masters[item.get(b'source') or original_path] = (None, path)
@@ -406,26 +411,30 @@ Number of files: {0.stats.nfiles}'''.format(
         uid = item[b'uid'] if uid is None else uid
         gid = item[b'gid'] if gid is None else gid
         # This code is a bit of a mess due to os specific differences
-        try:
+        if sys.platform != 'win32':
+            try:
+                if fd:
+                    os.fchown(fd, uid, gid)
+                else:
+                    os.lchown(path, uid, gid)
+            except OSError:
+                pass
+        if sys.platform != 'win32':
             if fd:
-                os.fchown(fd, uid, gid)
-            else:
-                os.lchown(path, uid, gid)
-        except OSError:
-            pass
-        if fd:
-            os.fchmod(fd, item[b'mode'])
-        elif not symlink:
-            os.chmod(path, item[b'mode'])
-        elif has_lchmod:  # Not available on Linux
-            os.lchmod(path, item[b'mode'])
+                os.fchmod(fd, item[b'mode'])
+            elif not symlink:
+                os.chmod(path, item[b'mode'])
+            elif has_lchmod:  # Not available on Linux
+                os.lchmod(path, item[b'mode'])
         mtime = bigint_to_int(item[b'mtime'])
         if b'atime' in item:
             atime = bigint_to_int(item[b'atime'])
         else:
             # old archives only had mtime in item metadata
             atime = mtime
-        if fd:
+        if sys.platform == 'win32':
+            os.utime(path, ns=(atime, mtime))
+        elif fd:
             os.utime(fd, None, ns=(atime, mtime))
         else:
             os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)

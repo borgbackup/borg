@@ -697,7 +697,7 @@ def gid2group(gid, default=None):
         if sys.platform != 'win32':
             return grp.getgrgid(gid).gr_name
         else:
-            ''
+            return ''
     except KeyError:
         return default
 
@@ -801,56 +801,39 @@ class Location:
         return True
 
     def _parse(self, text):
-        if sys.platform != 'win32':
-            m = self.ssh_re.match(text)
-            if m:
-                self.proto = m.group('proto')
-                self.user = m.group('user')
-                self.host = m.group('host')
-                self.port = m.group('port') and int(m.group('port')) or None
-                self.path = os.path.normpath(m.group('path'))
-                self.archive = m.group('archive')
-                return True
-            m = self.file_re.match(text)
-            if m:
-                self.proto = m.group('proto')
-                self.path = os.path.normpath(m.group('path'))
-                self.archive = m.group('archive')
-                return True
-            m = self.scp_re.match(text)
-            if m:
-                self.user = m.group('user')
-                self.host = m.group('host')
-                self.path = os.path.normpath(m.group('path'))
-                self.archive = m.group('archive')
-                self.proto = self.host and 'ssh' or 'file'
-                return True
-            return False
-        else:
+        if sys.platform == 'win32':
             m = self.file_re.match(text)
             if m:
                 self.proto = m.group('proto')
                 self.path = os.path.normpath(m.group('drive') + ":\\" + m.group('path'))
                 self.archive = m.group('archive')
                 return True
-            m = self.ssh_re.match(text)
+
+        m = self.ssh_re.match(text)
+        if m:
+            self.proto = m.group('proto')
+            self.user = m.group('user')
+            self.host = m.group('host')
+            self.port = m.group('port') and int(m.group('port')) or None
+            self.path = os.path.normpath(m.group('path'))
+            self.archive = m.group('archive')
+            return True
+        if sys.platform != 'win32':
+            m = self.file_re.match(text)
             if m:
                 self.proto = m.group('proto')
-                self.user = m.group('user')
-                self.host = m.group('host')
-                self.port = m.group('port') and int(m.group('port')) or None
                 self.path = os.path.normpath(m.group('path'))
                 self.archive = m.group('archive')
                 return True
-            m = self.scp_re.match(text)
-            if m:
-                self.user = m.group('user')
-                self.host = m.group('host')
-                self.path = os.path.normpath(m.group('path'))
-                self.archive = m.group('archive')
-                self.proto = self.host and 'ssh' or 'file'
-                return True
-            return False
+        m = self.scp_re.match(text)
+        if m:
+            self.user = m.group('user')
+            self.host = m.group('host')
+            self.path = os.path.normpath(m.group('path'))
+            self.archive = m.group('archive')
+            self.proto = self.host and 'ssh' or 'file'
+            return True
+        return False
 
     def __str__(self):
         items = [

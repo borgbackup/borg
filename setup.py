@@ -115,7 +115,7 @@ if sys.platform == 'win32':
             gccpath = p
             break
     windowsIncludeDirs.append(os.path.abspath(os.path.join(gccpath, "..")))
-    windowsIncludeDirs.append(os.path.abspath(os.path.join(os.path.join(gccpath, ".."), "..")))
+    windowsIncludeDirs.append(os.path.abspath(os.path.join(gccpath, "..", "..")))
 
 
 possible_openssl_prefixes = None
@@ -314,15 +314,13 @@ if not on_rtd:
 def parse(root, describe_command=None):
     return subprocess.check_output("git describe --tags --long").decode().strip()
 
-parsefunction = None
-if sys.platform == 'win32':
-    parsefunction = parse
+parse_function = parse if sys.platform == 'win32' else None
 
 setup(
     name='borgbackup',
     use_scm_version={
         'write_to': 'borg/_version.py',
-        'parse': parsefunction,
+        'parse': parse_function,
     },
     author='The Borg Collective (see AUTHORS file)',
     author_email='borgbackup@python.org',

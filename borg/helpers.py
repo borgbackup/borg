@@ -37,6 +37,14 @@ import msgpack.fallback
 import socket
 
 
+# meta dict, data bytes
+_Chunk = namedtuple('_Chunk', 'meta data')
+
+
+def Chunk(data, **meta):
+    return _Chunk(meta, data)
+
+
 class Error(Exception):
     """Error base class"""
 
@@ -93,7 +101,7 @@ class Manifest:
         if not key:
             key = key_factory(repository, cdata)
         manifest = cls(key, repository)
-        data = key.decrypt(None, cdata)
+        _, data = key.decrypt(None, cdata)
         manifest.id = key.id_hash(data)
         m = msgpack.unpackb(data)
         if not m.get(b'version') == 1:
@@ -114,7 +122,7 @@ class Manifest:
             'config': self.config,
         }))
         self.id = self.key.id_hash(data)
-        self.repository.put(self.MANIFEST_ID, self.key.encrypt(data))
+        self.repository.put(self.MANIFEST_ID, self.key.encrypt(Chunk(data)))
 
     def list_archive_infos(self, sort_by=None, reverse=False):
         # inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
@@ -1260,8 +1268,8 @@ class ItemFormatter:
         if b'chunks' not in item:
             return ""
         hash = hashlib.new(hash_function)
-        for chunk in self.archive.pipeline.fetch_many([c.id for c in item[b'chunks']]):
-            hash.update(chunk)
+        for _, data in self.archive.pipeline.fetch_many([c.id for c in item[b'chunks']]):
+            hash.update(data)
         return hash.hexdigest()
 
     def format_time(self, key, item):
@@ -1284,7 +1292,8 @@ class ChunkIteratorFileWrapper:
         remaining = len(self.chunk) - self.chunk_offset
         if not remaining:
             try:
-                self.chunk = memoryview(next(self.chunk_iterator))
+                chunk = next(self.chunk_iterator)
+                self.chunk = memoryview(chunk.data)
             except StopIteration:
                 self.exhausted = True
                 return 0  # EOF

@@ -6,7 +6,7 @@ from binascii import hexlify, unhexlify
 
 from ..crypto import bytes_to_long, num_aes_blocks
 from ..key import PlaintextKey, PassphraseKey, KeyfileKey
-from ..helpers import Location
+from ..helpers import Location, Chunk
 from . import BaseTestCase
 
 
@@ -47,17 +47,17 @@ class KeyTestCase(BaseTestCase):
 
     def test_plaintext(self):
         key = PlaintextKey.create(None, None)
-        data = b'foo'
-        self.assert_equal(hexlify(key.id_hash(data)), b'2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae')
-        self.assert_equal(data, key.decrypt(key.id_hash(data), key.encrypt(data)))
+        chunk = Chunk(b'foo')
+        self.assert_equal(hexlify(key.id_hash(chunk.data)), b'2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae')
+        self.assert_equal(chunk, key.decrypt(key.id_hash(chunk.data), key.encrypt(chunk)))
 
     def test_keyfile(self):
         os.environ['BORG_PASSPHRASE'] = 'test'
         key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
         self.assert_equal(bytes_to_long(key.enc_cipher.iv, 8), 0)
-        manifest = key.encrypt(b'XXX')
+        manifest = key.encrypt(Chunk(b'XXX'))
         self.assert_equal(key.extract_nonce(manifest), 0)
-        manifest2 = key.encrypt(b'XXX')
+        manifest2 = key.encrypt(Chunk(b'XXX'))
         self.assert_not_equal(manifest, manifest2)
         self.assert_equal(key.decrypt(None, manifest), key.decrypt(None, manifest2))
         self.assert_equal(key.extract_nonce(manifest2), 1)
@@ -67,15 +67,15 @@ class KeyTestCase(BaseTestCase):
         # Key data sanity check
         self.assert_equal(len(set([key2.id_key, key2.enc_key, key2.enc_hmac_key])), 3)
         self.assert_equal(key2.chunk_seed == 0, False)
-        data = b'foo'
-        self.assert_equal(data, key2.decrypt(key.id_hash(data), key.encrypt(data)))
+        chunk = Chunk(b'foo')
+        self.assert_equal(chunk, key2.decrypt(key.id_hash(chunk.data), key.encrypt(chunk)))
 
     def test_keyfile2(self):
         with open(os.path.join(os.environ['BORG_KEYS_DIR'], 'keyfile'), 'w') as fd:
             fd.write(self.keyfile2_key_file)
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
         key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
-        self.assert_equal(key.decrypt(self.keyfile2_id, self.keyfile2_cdata), b'payload')
+        self.assert_equal(key.decrypt(self.keyfile2_id, self.keyfile2_cdata).data, b'payload')
 
     def test_passphrase(self):
         os.environ['BORG_PASSPHRASE'] = 'test'
@@ -85,9 +85,9 @@ class KeyTestCase(BaseTestCase):
         self.assert_equal(hexlify(key.enc_hmac_key), b'b885a05d329a086627412a6142aaeb9f6c54ab7950f996dd65587251f6bc0901')
         self.assert_equal(hexlify(key.enc_key), b'2ff3654c6daf7381dbbe718d2b20b4f1ea1e34caa6cc65f6bb3ac376b93fed2a')
         self.assert_equal(key.chunk_seed, -775740477)
-        manifest = key.encrypt(b'XXX')
+        manifest = key.encrypt(Chunk(b'XXX'))
         self.assert_equal(key.extract_nonce(manifest), 0)
-        manifest2 = key.encrypt(b'XXX')
+        manifest2 = key.encrypt(Chunk(b'XXX'))
         self.assert_not_equal(manifest, manifest2)
         self.assert_equal(key.decrypt(None, manifest), key.decrypt(None, manifest2))
         self.assert_equal(key.extract_nonce(manifest2), 1)
@@ -98,6 +98,6 @@ class KeyTestCase(BaseTestCase):
         self.assert_equal(key.enc_hmac_key, key2.enc_hmac_key)
         self.assert_equal(key.enc_key, key2.enc_key)
         self.assert_equal(key.chunk_seed, key2.chunk_seed)
-        data = b'foo'
-        self.assert_equal(hexlify(key.id_hash(data)), b'818217cf07d37efad3860766dcdf1d21e401650fed2d76ed1d797d3aae925990')
-        self.assert_equal(data, key2.decrypt(key2.id_hash(data), key.encrypt(data)))
+        chunk = Chunk(b'foo')
+        self.assert_equal(hexlify(key.id_hash(chunk.data)), b'818217cf07d37efad3860766dcdf1d21e401650fed2d76ed1d797d3aae925990')
+        self.assert_equal(chunk, key2.decrypt(key2.id_hash(chunk.data), key.encrypt(chunk)))

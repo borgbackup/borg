@@ -73,7 +73,7 @@ class FuseOperations(llfuse.Operations):
         """
         unpacker = msgpack.Unpacker()
         for key, chunk in zip(archive.metadata[b'items'], self.repository.get_many(archive.metadata[b'items'])):
-            data = self.key.decrypt(key, chunk)
+            _, data = self.key.decrypt(key, chunk)
             unpacker.feed(data)
             for item in unpacker:
                 segments = prefix + os.fsencode(os.path.normpath(item[b'path'])).split(b'/')
@@ -229,8 +229,8 @@ class FuseOperations(llfuse.Operations):
                 offset -= s
                 continue
             n = min(size, s - offset)
-            chunk = self.key.decrypt(id, self.repository.get(id))
-            parts.append(chunk[offset:offset + n])
+            _, data = self.key.decrypt(id, self.repository.get(id))
+            parts.append(data[offset:offset + n])
             offset = 0
             size -= n
             if not size:

@@ -279,7 +279,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         def fetch_and_build_idx(archive_id, repository, key):
             chunk_idx = ChunkIndex()
             cdata = repository.get(archive_id)
-            data = key.decrypt(archive_id, cdata)
+            _, data = key.decrypt(archive_id, cdata)
             chunk_idx.add(archive_id, 1, len(data), len(cdata))
             archive = msgpack.unpackb(data)
             if archive[b'version'] != 1:
@@ -287,7 +287,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             decode_dict(archive, (b'name',))
             unpacker = msgpack.Unpacker()
             for item_id, chunk in zip(archive[b'items'], repository.get_many(archive[b'items'])):
-                data = key.decrypt(item_id, chunk)
+                _, data = key.decrypt(item_id, chunk)
                 chunk_idx.add(item_id, 1, len(data), len(chunk))
                 unpacker.feed(data)
                 for item in unpacker:
@@ -368,14 +368,14 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             self.do_cache = os.path.isdir(archive_path)
             self.chunks = create_master_idx(self.chunks)
 
-    def add_chunk(self, id, data, stats, overwrite=False):
+    def add_chunk(self, id, chunk, stats, overwrite=False):
         if not self.txn_active:
             self.begin_txn()
-        size = len(data)
+        size = len(chunk.data)
         refcount = self.seen_chunk(id, size)
         if refcount and not overwrite:
             return self.chunk_incref(id, stats)
-        data = self.key.encrypt(data)
+        data = self.key.encrypt(chunk)
         csize = len(data)
         self.repository.put(id, data, wait=False)
         self.chunks.add(id, 1, size, csize)

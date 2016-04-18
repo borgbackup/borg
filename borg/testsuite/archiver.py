@@ -17,7 +17,7 @@ from hashlib import sha256
 
 import pytest
 
-from .. import xattr
+from .. import xattr, helpers
 from ..archive import Archive, ChunkBuffer, ArchiveRecreater
 from ..archiver import Archiver
 from ..cache import Cache
@@ -1314,11 +1314,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert 'dir2/abcdef' in files
         assert 'file1' not in files
 
+    # The _test_create_interrupt requires a deterministic (alphabetic) order of the files to easily check if
+    # resumption works correctly. Patch scandir_inorder to work in alphabetic order.
+
     def test_recreate_interrupt(self):
-        self._test_recreate_interrupt(False, True)
+        with patch.object(helpers, 'scandir_inorder', helpers.scandir_generic):
+            self._test_recreate_interrupt(False, True)
 
     def test_recreate_interrupt2(self):
-        self._test_recreate_interrupt(True, False)
+        with patch.object(helpers, 'scandir_inorder', helpers.scandir_generic):
+            self._test_recreate_interrupt(True, False)
 
     def _test_recreate_chunker_interrupt_patch(self):
         real_add_chunk = Cache.add_chunk

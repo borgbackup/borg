@@ -25,6 +25,7 @@ from .helpers import Error, location_validator, archivename_validator, format_ti
     log_multi, PatternMatcher, ItemFormatter
 from .logger import create_logger, setup_logging
 logger = create_logger()
+from . import helpers
 from .compress import Compressor, COMPR_BUFFER
 from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 from .repository import Repository
@@ -247,17 +248,18 @@ class Archiver:
                     self.print_file_status(status, path)
                     continue
                 path = os.path.normpath(path)
+                try:
+                    st = os.lstat(path)
+                except OSError as e:
+                    self.print_warning('%s: %s', path, e)
+                    continue
                 if args.one_file_system:
-                    try:
-                        restrict_dev = os.lstat(path).st_dev
-                    except OSError as e:
-                        self.print_warning('%s: %s', path, e)
-                        continue
+                    restrict_dev = st.st_dev
                 else:
                     restrict_dev = None
                 self._process(archive, cache, matcher, args.exclude_caches, args.exclude_if_present,
                               args.keep_tag_files, skip_inodes, path, restrict_dev,
-                              read_special=args.read_special, dry_run=dry_run)
+                              read_special=args.read_special, dry_run=dry_run, st=st)
             if not dry_run:
                 archive.save(comment=args.comment, timestamp=args.timestamp)
                 if args.progress:
@@ -292,16 +294,16 @@ class Archiver:
 
     def _process(self, archive, cache, matcher, exclude_caches, exclude_if_present,
                  keep_tag_files, skip_inodes, path, restrict_dev,
-                 read_special=False, dry_run=False):
+                 read_special=False, dry_run=False, st=None):
         if not matcher.match(path):
             self.print_file_status('x', path)
             return
-
-        try:
-            st = os.lstat(path)
-        except OSError as e:
-            self.print_warning('%s: %s', path, e)
-            return
+        if st is None:
+            try:
+                st = os.lstat(path)
+            except OSError as e:
+                self.print_warning('%s: %s', path, e)
+                return
         if (st.st_ino, st.st_dev) in skip_inodes:
             return
         # Entering a new filesystem?
@@ -331,15 +333,15 @@ class Archiver:
             if not dry_run:
                 status = archive.process_dir(path, st)
             try:
-                entries = os.listdir(path)
+                entries = helpers.scandir_inorder(path)
             except OSError as e:
                 status = 'E'
                 self.print_warning('%s: %s', path, e)
             else:
-                for filename in sorted(entries):
-                    entry_path = os.path.normpath(os.path.join(path, filename))
+                for dirent in entries:
+                    normpath = os.path.normpath(dirent.path)
                     self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
-                                  keep_tag_files, skip_inodes, entry_path, restrict_dev,
+                                  keep_tag_files, skip_inodes, normpath, restrict_dev,
                                   read_special=read_special, dry_run=dry_run)
         elif stat.S_ISLNK(st.st_mode):
             if not dry_run:
@@ -461,7 +463,7 @@ class Archiver:
                 return [None]
 
         def has_hardlink_master(item, hardlink_masters):
-            return item.get(b'source') in hardlink_masters and get_mode(item)[0] != 'l'
+            return stat.S_ISREG(item[b'mode']) and item.get(b'source') in hardlink_masters
 
         def compare_link(item1, item2):
             # These are the simple link cases. For special cases, e.g. if a
@@ -524,9 +526,6 @@ class Archiver:
             """
             changes = []
 
-            if item1.get(b'hardlink_master') or item2.get(b'hardlink_master'):
-                hardlink_masters[path] = (item1, item2)
-
             if has_hardlink_master(item1, hardlink_masters):
                 item1 = hardlink_masters[item1[b'source']][0]
 
@@ -559,8 +558,26 @@ class Archiver:
             print("{:<19} {}".format(line[1], line[0]))
 
         def compare_archives(archive1, archive2, matcher):
+            def hardlink_master_seen(item):
+                return b'source' not in item or not stat.S_ISREG(item[b'mode']) or item[b'source'] in hardlink_masters
+
+            def is_hardlink_master(item):
+                return item.get(b'hardlink_master', True) and b'source' not in item
+
+            def update_hardlink_masters(item1, item2):
+                if is_hardlink_master(item1) or is_hardlink_master(item2):
+                    hardlink_masters[item1[b'path']] = (item1, item2)
+
+            def compare_or_defer(item1, item2):
+                update_hardlink_masters(item1, item2)
+                if not hardlink_master_seen(item1) or not hardlink_master_seen(item2):
+                    deferred.append((item1, item2))
+                else:
+                    compare_items(output, item1[b'path'], item1, item2, hardlink_masters)
+
             orphans_archive1 = collections.OrderedDict()
             orphans_archive2 = collections.OrderedDict()
+            deferred = []
             hardlink_masters = {}
             output = []
 
@@ -569,31 +586,40 @@ class Archiver:
                     archive2.iter_items(lambda item: matcher.match(item[b'path'])),
             ):
                 if item1 and item2 and item1[b'path'] == item2[b'path']:
-                    compare_items(output, item1[b'path'], item1, item2, hardlink_masters)
+                    compare_or_defer(item1, item2)
                     continue
                 if item1:
                     matching_orphan = orphans_archive2.pop(item1[b'path'], None)
                     if matching_orphan:
-                        compare_items(output, item1[b'path'], item1, matching_orphan, hardlink_masters)
+                        compare_or_defer(item1, matching_orphan)
                     else:
                         orphans_archive1[item1[b'path']] = item1
                 if item2:
                     matching_orphan = orphans_archive1.pop(item2[b'path'], None)
                     if matching_orphan:
-                        compare_items(output, item2[b'path'], matching_orphan, item2, hardlink_masters)
+                        compare_or_defer(matching_orphan, item2)
                     else:
                         orphans_archive2[item2[b'path']] = item2
             # At this point orphans_* contain items that had no matching partner in the other archive
+            deleted_item = {
+                b'deleted': True,
+                b'chunks': [],
+                b'mode': 0,
+            }
             for added in orphans_archive2.values():
-                compare_items(output, added[b'path'], {
-                    b'deleted': True,
-                    b'chunks': [],
-                }, added, hardlink_masters, deleted=True)
+                path = added[b'path']
+                deleted_item[b'path'] = path
+                update_hardlink_masters(deleted_item, added)
+                compare_items(output, path, deleted_item, added, hardlink_masters, deleted=True)
             for deleted in orphans_archive1.values():
-                compare_items(output, deleted[b'path'], deleted, {
-                    b'deleted': True,
-                    b'chunks': [],
-                }, hardlink_masters, deleted=True)
+                path = deleted[b'path']
+                deleted_item[b'path'] = path
+                update_hardlink_masters(deleted, deleted_item)
+                compare_items(output, path, deleted, deleted_item, hardlink_masters, deleted=True)
+            for item1, item2 in deferred:
+                assert hardlink_master_seen(item1)
+                assert hardlink_master_seen(item2)
+                compare_items(output, item1[b'path'], item1, item2, hardlink_masters)
 
             for line in sorted(output):
                 print_output(line)

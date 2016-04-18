@@ -113,8 +113,9 @@ if sys.platform == 'win32':
     for p in os.environ["PATH"].split(";"):
         if os.path.exists(p + "/gcc.exe"):
             gccpath = p
-    windowsIncludeDirs.append(os.path.abspath(gccpath + "/.."))
-    windowsIncludeDirs.append(os.path.abspath(gccpath + "/../.."))
+            break
+    windowsIncludeDirs.append(os.path.abspath(os.path.join(gccpath, "..")))
+    windowsIncludeDirs.append(os.path.abspath(os.path.join(os.path.join(gccpath, ".."), "..")))
 
 
 possible_openssl_prefixes = None

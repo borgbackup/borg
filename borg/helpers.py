@@ -683,7 +683,10 @@ def uid2user(uid, default=None):
 @memoize
 def user2uid(user, default=None):
     try:
-        return user and 0
+        if sys.platform != 'win32':
+            return user and pwd.getpwnam(user).pw_uid
+        else:
+            return user and 0
     except KeyError:
         return default
 
@@ -694,7 +697,7 @@ def gid2group(gid, default=None):
         if sys.platform != 'win32':
             return grp.getgrgid(gid).gr_name
         else:
-            ""
+            ''
     except KeyError:
         return default
 
@@ -926,7 +929,10 @@ _safe_re = re.compile(r'^((\.\.)?/+)+')
 def make_path_safe(path):
     """Make path safe by making it relative and local
     """
-    return _safe_re.sub('', path) or '.'
+    if sys.platform != 'win32':
+        return _safe_re.sub('', path) or '.'
+    else:
+        return os.path.relpath(path)
 
 
 def daemonize():

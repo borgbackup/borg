@@ -12,6 +12,10 @@
 #include <sys/isa_defs.h>
 #endif
 
+#if defined __MINGW32__ && defined _WIN32
+    #define BYTE_ORDER LITTLE_ENDIAN
+#endif // __MINGW32__
+
 #if (defined(BYTE_ORDER)&&(BYTE_ORDER == BIG_ENDIAN)) ||  \
     (defined(_BIG_ENDIAN)&&defined(__SVR4)&&defined(__sun))
 #define _le32toh(x) __builtin_bswap32(x)

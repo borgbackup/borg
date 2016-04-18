@@ -2,6 +2,7 @@
 import os
 import re
 import sys
+import subprocess
 from glob import glob
 
 from distutils.command.build import build
@@ -106,7 +107,21 @@ def detect_lz4(prefixes):
 include_dirs = []
 library_dirs = []
 
-possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl', '/usr/local/borg', '/opt/local']
+windowsIncludeDirs = []
+if sys.platform == 'win32':
+    gccpath = ""
+    for p in os.environ["PATH"].split(";"):
+        if os.path.exists(p + "/gcc.exe"):
+            gccpath = p
+    windowsIncludeDirs.append(os.path.abspath(gccpath + "/.."))
+    windowsIncludeDirs.append(os.path.abspath(gccpath + "/../.."))
+    
+
+possible_openssl_prefixes = None
+if sys.platform == 'win32':
+    possible_openssl_prefixes = windowsIncludeDirs
+else:
+    possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl', '/usr/local/borg', '/opt/local']
 if os.environ.get('BORG_OPENSSL_PREFIX'):
     possible_openssl_prefixes.insert(0, os.environ.get('BORG_OPENSSL_PREFIX'))
 ssl_prefix = detect_openssl(possible_openssl_prefixes)
@@ -115,8 +130,11 @@ if not ssl_prefix:
 include_dirs.append(os.path.join(ssl_prefix, 'include'))
 library_dirs.append(os.path.join(ssl_prefix, 'lib'))
 
-
-possible_lz4_prefixes = ['/usr', '/usr/local', '/usr/local/opt/lz4', '/usr/local/lz4', '/usr/local/borg', '/opt/local']
+possible_lz4_prefixes = None
+if sys.platform == 'win32':
+    possible_lz4_prefixes = windowsIncludeDirs
+else:
+    possible_lz4_prefixes = ['/usr', '/usr/local', '/usr/local/opt/lz4', '/usr/local/lz4', '/usr/local/borg', '/opt/local']
 if os.environ.get('BORG_LZ4_PREFIX'):
     possible_lz4_prefixes.insert(0, os.environ.get('BORG_LZ4_PREFIX'))
 lz4_prefix = detect_lz4(possible_lz4_prefixes)
@@ -291,10 +309,20 @@ if not on_rtd:
     elif sys.platform == 'darwin':
         ext_modules.append(Extension('borg.platform_darwin', [platform_darwin_source]))
 
+        
+        
+def parse(root, describe_command=None):
+    return subprocess.check_output("git describe --tags --long").decode().strip()
+
+parsefunction = None
+if sys.platform == 'win32':
+    parsefunction = parse
+
 setup(
     name='borgbackup',
     use_scm_version={
         'write_to': 'borg/_version.py',
+        'parse': parsefunction,
     },
     author='The Borg Collective (see AUTHORS file)',
     author_email='borgbackup@python.org',

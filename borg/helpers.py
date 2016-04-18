@@ -932,7 +932,10 @@ def make_path_safe(path):
     if sys.platform != 'win32':
         return _safe_re.sub('', path) or '.'
     else:
-        return os.path.relpath(path)
+        tail = path
+        if path[0:2] == '//' or path[0:2] == '\\\\' or path[1] == ':':
+            drive, tail = os.path.splitdrive(path)
+        return _safe_re.sub('', tail) or '.'
 
 
 def daemonize():

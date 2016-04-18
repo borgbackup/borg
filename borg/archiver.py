@@ -776,15 +776,21 @@ class Archiver:
     def do_prune(self, args, repository, manifest, key):
         """Prune repository archives according to specified rules"""
         archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
-        if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0 and args.within is None:
-            self.print_error('At least one of the "keep-within", "keep-hourly", "keep-daily", "keep-weekly", '
-                             '"keep-monthly" or "keep-yearly" settings must be specified')
+        if (args.secondly + args.minutely + args.hourly + args.daily +
+            args.weekly + args.monthly + args.yearly) == 0 and args.within is None:
+            self.print_error('At least one of the "keep-within", "keep-last", '
+                             '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
+                             '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified')
             return self.exit_code
         if args.prefix:
             archives = [archive for archive in archives if archive.name.startswith(args.prefix)]
         keep = []
         if args.within:
             keep += prune_within(archives, args.within)
+        if args.secondly:
+            keep += prune_split(archives, '%Y-%m-%d %H:%M:%S', args.secondly, keep)
+        if args.minutely:
+            keep += prune_split(archives, '%Y-%m-%d %H:%M', args.minutely, keep)
         if args.hourly:
             keep += prune_split(archives, '%Y-%m-%d %H', args.hourly, keep)
         if args.daily:
@@ -1587,7 +1593,7 @@ class Archiver:
 
         As an example, "-d 7" means to keep the latest backup on each day, up to 7
         most recent days with backups (days without backups do not count).
-        The rules are applied from hourly to yearly, and backups selected by previous
+        The rules are applied from secondly to yearly, and backups selected by previous
         rules do not count towards those of later rules. The time that each backup
         completes is used for pruning purposes. Dates and times are interpreted in
         the local timezone, and weeks go from Monday to Sunday. Specifying a
@@ -1598,6 +1604,10 @@ class Archiver:
         to keep all archives that were created within the past 48 hours.
         "1m" is taken to mean "31d". The archives kept with this option do not
         count towards the totals specified by any other options.
+
+        The "--keep-last N" option is doing the same as "--keep-secondly N" (and it will
+        keep the last N archives under the assumption that you do not create more than one
+        backup archive in the same second).
 
         If a prefix is set with -P, then only archives that start with the prefix are
         considered for deletion and only those archives count towards the totals
@@ -1621,6 +1631,10 @@ class Archiver:
                                help='output verbose list of archives it keeps/prunes')
         subparser.add_argument('--keep-within', dest='within', type=str, metavar='WITHIN',
                                help='keep all archives within this time interval')
+        subparser.add_argument('--keep-last', '--keep-secondly', dest='secondly', type=int, default=0,
+                               help='number of secondly archives to keep')
+        subparser.add_argument('--keep-minutely', dest='minutely', type=int, default=0,
+                               help='number of minutely archives to keep')
         subparser.add_argument('-H', '--keep-hourly', dest='hourly', type=int, default=0,
                                help='number of hourly archives to keep')
         subparser.add_argument('-d', '--keep-daily', dest='daily', type=int, default=0,

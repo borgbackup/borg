@@ -1,11 +1,12 @@
 import errno
-import fcntl
+import sys
+if sys.platform != 'win32':
+    import fcntl
 import logging
 import os
 import select
 import shlex
 from subprocess import Popen, PIPE
-import sys
 import tempfile
 
 from . import __version__
@@ -157,9 +158,10 @@ class RemoteRepository:
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()
         self.stderr_fd = self.p.stderr.fileno()
-        fcntl.fcntl(self.stdin_fd, fcntl.F_SETFL, fcntl.fcntl(self.stdin_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
-        fcntl.fcntl(self.stdout_fd, fcntl.F_SETFL, fcntl.fcntl(self.stdout_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
-        fcntl.fcntl(self.stderr_fd, fcntl.F_SETFL, fcntl.fcntl(self.stderr_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
+        if sys.platform != 'win32':
+            fcntl.fcntl(self.stdin_fd, fcntl.F_SETFL, fcntl.fcntl(self.stdin_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
+            fcntl.fcntl(self.stdout_fd, fcntl.F_SETFL, fcntl.fcntl(self.stdout_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
+            fcntl.fcntl(self.stderr_fd, fcntl.F_SETFL, fcntl.fcntl(self.stderr_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
         self.r_fds = [self.stdout_fd, self.stderr_fd]
         self.x_fds = [self.stdin_fd, self.stdout_fd, self.stderr_fd]
 

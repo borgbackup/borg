@@ -775,13 +775,13 @@ class Archiver:
     @with_repository()
     def do_prune(self, args, repository, manifest, key):
         """Prune repository archives according to specified rules"""
-        archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
         if (args.secondly + args.minutely + args.hourly + args.daily +
             args.weekly + args.monthly + args.yearly) == 0 and args.within is None:
             self.print_error('At least one of the "keep-within", "keep-last", '
                              '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
                              '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified')
             return self.exit_code
+        archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
         if args.prefix:
             archives = [archive for archive in archives if archive.name.startswith(args.prefix)]
         keep = []
@@ -802,21 +802,21 @@ class Archiver:
         if args.yearly:
             keep += prune_split(archives, '%Y', args.yearly, keep)
 
-        keep.sort(key=attrgetter('ts'), reverse=True)
-        to_delete = [a for a in archives if a not in keep]
+        to_delete = set(archives) - set(keep)
         stats = Statistics()
         with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
-            for archive in keep:
-                if args.output_list:
-                    logger.info('Keeping archive: %s' % format_archive(archive))
-            for archive in to_delete:
-                if args.dry_run:
-                    if args.output_list:
-                        logger.info('Would prune:     %s' % format_archive(archive))
+            for archive in archives:
+                if archive in to_delete:
+                    if args.dry_run:
+                        if args.output_list:
+                            logger.info('Would prune:     %s' % format_archive(archive))
+                    else:
+                        if args.output_list:
+                            logger.info('Pruning archive: %s' % format_archive(archive))
+                        Archive(repository, key, manifest, archive.name, cache).delete(stats)
                 else:
                     if args.output_list:
-                        logger.info('Pruning archive: %s' % format_archive(archive))
-                    Archive(repository, key, manifest, archive.name, cache).delete(stats)
+                        logger.info('Keeping archive: %s' % format_archive(archive))
             if to_delete and not args.dry_run:
                 manifest.write()
                 repository.commit(save_space=args.save_space)

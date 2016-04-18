@@ -775,11 +775,13 @@ class Archiver:
     @with_repository()
     def do_prune(self, args, repository, manifest, key):
         """Prune repository archives according to specified rules"""
-        archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
-        if args.hourly + args.daily + args.weekly + args.monthly + args.yearly == 0 and args.within is None:
-            self.print_error('At least one of the "keep-within", "keep-hourly", "keep-daily", "keep-weekly", '
-                             '"keep-monthly" or "keep-yearly" settings must be specified')
+        if not any((args.hourly, args.daily,
+                    args.weekly, args.monthly, args.yearly, args.within)):
+            self.print_error('At least one of the "keep-within", "keep-last", '
+                             '"keep-hourly", "keep-daily", '
+                             '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.')
             return self.exit_code
+        archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
         if args.prefix:
             archives = [archive for archive in archives if archive.name.startswith(args.prefix)]
         keep = []

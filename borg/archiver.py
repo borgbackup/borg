@@ -1591,13 +1591,10 @@ class Archiver:
         any of the specified retention options. This command is normally used by
         automated backup scripts wanting to keep a certain number of historic backups.
 
-        As an example, "-d 7" means to keep the latest backup on each day, up to 7
-        most recent days with backups (days without backups do not count).
-        The rules are applied from secondly to yearly, and backups selected by previous
-        rules do not count towards those of later rules. The time that each backup
-        completes is used for pruning purposes. Dates and times are interpreted in
-        the local timezone, and weeks go from Monday to Sunday. Specifying a
-        negative number of archives to keep means that there is no limit.
+        If a prefix is set with -P, then only archives that start with the prefix are
+        considered for deletion and only those archives count towards the totals
+        specified by the rules.
+        Otherwise, *all* archives in the repository are candidates for deletion!
 
         The "--keep-within" option takes an argument of the form "<int><char>",
         where char is "H", "d", "w", "m", "y". For example, "--keep-within 2d" means
@@ -1605,14 +1602,18 @@ class Archiver:
         "1m" is taken to mean "31d". The archives kept with this option do not
         count towards the totals specified by any other options.
 
+        A good procedure is to thin out more and more the older your backups get.
+        As an example, "--keep-daily 7" means to keep the latest backup on each day,
+        up to 7 most recent days with backups (days without backups do not count).
+        The rules are applied from secondly to yearly, and backups selected by previous
+        rules do not count towards those of later rules. The time that each backup
+        completes is used for pruning purposes. Dates and times are interpreted in
+        the local timezone, and weeks go from Monday to Sunday. Specifying a
+        negative number of archives to keep means that there is no limit.
+
         The "--keep-last N" option is doing the same as "--keep-secondly N" (and it will
         keep the last N archives under the assumption that you do not create more than one
         backup archive in the same second).
-
-        If a prefix is set with -P, then only archives that start with the prefix are
-        considered for deletion and only those archives count towards the totals
-        specified by the rules.
-        Otherwise, *all* archives in the repository are candidates for deletion!
         """)
         subparser = subparsers.add_parser('prune', parents=[common_parser], add_help=False,
                                           description=self.do_prune.__doc__,

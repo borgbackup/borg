@@ -15,13 +15,14 @@ import sys
 import time
 from io import BytesIO
 from . import xattr
-from .compress import Compressor, COMPR_BUFFER
+from .compress import COMPR_BUFFER
 from .constants import *  # NOQA
 from .helpers import Chunk, Error, uid2user, user2uid, gid2group, group2gid, \
     parse_timestamp, to_localtime, format_time, format_timedelta, safe_encode, safe_decode, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, bin_to_hex, \
     ProgressIndicatorPercent, ChunkIteratorFileWrapper, remove_surrogates, log_multi, \
-    PathPrefixPattern, FnmatchPattern, open_item, file_status, format_file_size, consume
+    PathPrefixPattern, FnmatchPattern, open_item, file_status, format_file_size, consume, \
+    CompressionDecider1, CompressionDecider2, CompressionSpec
 from .repository import Repository
 from .platform import acl_get, acl_set
 from .chunker import Chunker
@@ -125,7 +126,7 @@ class Archive:
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False, progress=False,
-                 chunker_params=CHUNKER_PARAMS, start=None, end=None):
+                 chunker_params=CHUNKER_PARAMS, start=None, end=None, compression=None, compression_files=None):
         self.cwd = os.getcwd()
         self.key = key
         self.repository = repository
@@ -148,6 +149,9 @@ class Archive:
         if create:
             self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
             self.chunker = Chunker(self.key.chunk_seed, *chunker_params)
+            self.compression_decider1 = CompressionDecider1(compression or CompressionSpec('none'),
+                                                            compression_files or [])
+            key.compression_decider2 = CompressionDecider2(compression or CompressionSpec('none'))
             if name in manifest.archives:
                 raise self.AlreadyExists(name)
             self.last_checkpoint = time.time()
@@ -592,11 +596,15 @@ Number of files: {0.stats.nfiles}'''.format(
         }
         # Only chunkify the file if needed
         if chunks is None:
+            compress = self.compression_decider1.decide(path)
+            logger.debug('%s -> compression %s', path, compress['name'])
             fh = Archive._open_rb(path)
             with os.fdopen(fh, 'rb') as fd:
                 chunks = []
                 for data in self.chunker.chunkify(fd, fh):
-                    chunks.append(cache.add_chunk(self.key.id_hash(data), Chunk(data), self.stats))
+                    chunks.append(cache.add_chunk(self.key.id_hash(data),
+                                                  Chunk(data, compress=compress),
+                                                  self.stats))
                     if self.show_progress:
                         self.stats.show_progress(item=item, dt=0.2)
             cache.memorize_file(path_hash, st, [c.id for c in chunks])
@@ -939,7 +947,7 @@ class ArchiveRecreater:
 
     def __init__(self, repository, manifest, key, cache, matcher,
                  exclude_caches=False, exclude_if_present=None, keep_tag_files=False,
-                 chunker_params=None, compression=None,
+                 chunker_params=None, compression=None, compression_files=None,
                  dry_run=False, stats=False, progress=False, file_status_printer=None):
         self.repository = repository
         self.key = key
@@ -952,12 +960,12 @@ class ArchiveRecreater:
         self.keep_tag_files = keep_tag_files
 
         self.chunker_params = chunker_params or CHUNKER_PARAMS
-        self.compression = compression or dict(name='none')
-        self.seen_chunks = set()
         self.recompress = bool(compression)
-        compr_args = dict(buffer=COMPR_BUFFER)
-        compr_args.update(self.compression)
-        key.compressor = Compressor(**compr_args)
+        self.compression = compression or CompressionSpec('none')
+        self.seen_chunks = set()
+        self.compression_decider1 = CompressionDecider1(compression or CompressionSpec('none'),
+                                                            compression_files or [])
+        key.compression_decider2 = CompressionDecider2(compression or CompressionSpec('none'))
 
         self.autocommit_threshold = max(self.AUTOCOMMIT_THRESHOLD, self.cache.chunks_stored_size() / 100)
         logger.debug("Autocommit threshold: %s", format_file_size(self.autocommit_threshold))
@@ -1045,6 +1053,7 @@ class ArchiveRecreater:
 
     def process_chunks(self, archive, target, item):
         """Return new chunk ID list for 'item'."""
+        # TODO: support --compression-from
         if not self.recompress and not target.recreate_rechunkify:
             for chunk_id, size, csize in item[b'chunks']:
                 self.cache.chunk_incref(chunk_id, target.stats)
@@ -1239,7 +1248,7 @@ class ArchiveRecreater:
     def create_target_archive(self, name):
         target = Archive(self.repository, self.key, self.manifest, name, create=True,
                           progress=self.progress, chunker_params=self.chunker_params, cache=self.cache,
-                          checkpoint_interval=0)
+                          checkpoint_interval=0, compression=self.compression)
         target.recreate_partial_chunks = None
         target.recreate_uncomitted_bytes = 0
         return target

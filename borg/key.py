@@ -7,13 +7,13 @@ import textwrap
 from hmac import compare_digest
 from hashlib import sha256, pbkdf2_hmac
 
-from .helpers import Chunk, IntegrityError, get_keys_dir, Error, yes, bin_to_hex
+from .helpers import Chunk, IntegrityError, get_keys_dir, Error, yes, bin_to_hex, CompressionDecider2, CompressionSpec
 from .logger import create_logger
 logger = create_logger()
 
 from .constants import *  # NOQA
 from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks, hmac_sha256
-from .compress import Compressor, COMPR_BUFFER
+from .compress import Compressor, COMPR_BUFFER, get_compressor
 import msgpack
 
 PREFIX = b'\0' * 8
@@ -71,11 +71,19 @@ class KeyBase:
         self.TYPE_STR = bytes([self.TYPE])
         self.repository = repository
         self.target = None  # key location file path / repo obj
-        self.compressor = Compressor('none', buffer=COMPR_BUFFER)
+        self.compression_decider2 = CompressionDecider2(CompressionSpec('none'))
+        self.compressor = Compressor('none', buffer=COMPR_BUFFER)  # for decompression
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
         """
+
+    def compress(self, chunk):
+        compr_args, chunk = self.compression_decider2.decide(chunk)
+        compressor = Compressor(**compr_args)
+        meta, data = chunk
+        data = compressor.compress(data)
+        return Chunk(data, **meta)
 
     def encrypt(self, chunk):
         pass
@@ -102,8 +110,8 @@ class PlaintextKey(KeyBase):
         return sha256(data).digest()
 
     def encrypt(self, chunk):
-        meta, data = chunk
-        return b''.join([self.TYPE_STR, self.compressor.compress(data)])
+        chunk = self.compress(chunk)
+        return b''.join([self.TYPE_STR, chunk.data])
 
     def decrypt(self, id, data):
         if data[0] != self.TYPE:
@@ -135,9 +143,9 @@ class AESKeyBase(KeyBase):
         return hmac_sha256(self.id_key, data)
 
     def encrypt(self, chunk):
-        data = self.compressor.compress(chunk.data)
+        chunk = self.compress(chunk)
         self.enc_cipher.reset()
-        data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(data)))
+        data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(chunk.data)))
         hmac = hmac_sha256(self.enc_hmac_key, data)
         return b''.join((self.TYPE_STR, hmac, data))
 

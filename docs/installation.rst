@@ -197,6 +197,32 @@ and commands to make fuse work for using the mount command.
      sysctl vfs.usermount=1
     
 
+Windows (MSYS2)
++++++++++++++++
+
+Download MSYS from https://msys2.github.io/ and follow install instructions. This guide assumes 64bit version.
+
+Use pacman to install following packages::
+
+    mingw-w64-x86_64-python3
+    git
+    mingw-w64-x86_64-lz4
+    mingw-w64-x86_64-python3-pip
+    mingw-w64-x86_64-cython
+    mingw-w64-x86_64-gcc
+
+Close msys. Navigate msys install directory and open mingw64_shell.bat
+
+Clone borg from github
+
+Run these commands in the borg source directory::
+
+    pip3 install -e .fake
+    echo "version = '$(git describe --tags)'" > borg/_version.py
+
+To run from windows commandline add msysdir\\mingw64\\bin to windows path enviroment variable and use python3 as python command
+
+
 Cygwin
 ++++++
 

@@ -2,17 +2,20 @@ import argparse
 from binascii import hexlify
 from collections import namedtuple, deque
 from functools import wraps, partial
-import grp
+import sys
+if sys.platform != 'win32':
+    import grp
+    import pwd
 import hashlib
 from itertools import islice
 import os
 import os.path
 import stat
 import textwrap
-import pwd
+
 import re
 from shutil import get_terminal_size
-import sys
+
 from string import Formatter
 import platform
 import time
@@ -678,7 +681,10 @@ def memoize(function):
 @memoize
 def uid2user(uid, default=None):
     try:
-        return pwd.getpwuid(uid).pw_name
+        if sys.platform != 'win32':
+            return pwd.getpwuid(uid).pw_name
+        else:
+            return os.getlogin()
     except KeyError:
         return default
 
@@ -686,7 +692,10 @@ def uid2user(uid, default=None):
 @memoize
 def user2uid(user, default=None):
     try:
-        return user and pwd.getpwnam(user).pw_uid
+        if sys.platform != 'win32':
+            return user and pwd.getpwnam(user).pw_uid
+        else:
+            return user and 0
     except KeyError:
         return default
 
@@ -694,7 +703,10 @@ def user2uid(user, default=None):
 @memoize
 def gid2group(gid, default=None):
     try:
-        return grp.getgrgid(gid).gr_name
+        if sys.platform != 'win32':
+            return grp.getgrgid(gid).gr_name
+        else:
+            return ''
     except KeyError:
         return default
 
@@ -705,6 +717,13 @@ def group2gid(group, default=None):
         return group and grp.getgrnam(group).gr_gid
     except KeyError:
         return default
+
+
+def getuid():
+    if sys.platform != 'win32':
+        return os.getuid()
+    else:
+        return 0
 
 
 def posix_acl_use_stored_uid_gid(acl):
@@ -740,8 +759,13 @@ class Location:
     ssh_re = re.compile(r'(?P<proto>ssh)://(?:(?P<user>[^@]+)@)?'
                         r'(?P<host>[^:/#]+)(?::(?P<port>\d+))?'
                         r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
-    file_re = re.compile(r'(?P<proto>file)://'
-                         r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
+    file_re = None
+    if sys.platform != 'win32':
+        file_re = re.compile(r'(?P<proto>file)://'
+                            r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
+    else:
+        file_re = re.compile(r'((?P<proto>file)://)?'
+                            r'(?P<drive>[a-zA-Z]):[\\/](?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
     scp_re = re.compile(r'((?:(?P<user>[^@]+)@)?(?P<host>[^:/]+):)?'
                         r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
     # get the repo from BORG_RE env and the optional archive from param.
@@ -764,7 +788,7 @@ class Location:
             'hostname': socket.gethostname(),
             'now': current_time.now(),
             'utcnow': current_time.utcnow(),
-            'user': uid2user(os.getuid(), os.getuid())
+            'user': uid2user(getuid(), getuid())
             }
         return format_line(text, data)
 
@@ -786,6 +810,14 @@ class Location:
         return True
 
     def _parse(self, text):
+        if sys.platform == 'win32':
+            m = self.file_re.match(text)
+            if m:
+                self.proto = m.group('proto')
+                self.path = os.path.normpath(m.group('drive') + ":\\" + m.group('path'))
+                self.archive = m.group('archive')
+                return True
+
         m = self.ssh_re.match(text)
         if m:
             self.proto = m.group('proto')
@@ -795,12 +827,13 @@ class Location:
             self.path = os.path.normpath(m.group('path'))
             self.archive = m.group('archive')
             return True
-        m = self.file_re.match(text)
-        if m:
-            self.proto = m.group('proto')
-            self.path = os.path.normpath(m.group('path'))
-            self.archive = m.group('archive')
-            return True
+        if sys.platform != 'win32':
+            m = self.file_re.match(text)
+            if m:
+                self.proto = m.group('proto')
+                self.path = os.path.normpath(m.group('path'))
+                self.archive = m.group('archive')
+                return True
         m = self.scp_re.match(text)
         if m:
             self.user = m.group('user')
@@ -888,7 +921,13 @@ _safe_re = re.compile(r'^((\.\.)?/+)+')
 def make_path_safe(path):
     """Make path safe by making it relative and local
     """
-    return _safe_re.sub('', path) or '.'
+    if sys.platform != 'win32':
+        return _safe_re.sub('', path) or '.'
+    else:
+        tail = path
+        if path[0:2] == '//' or path[0:2] == '\\\\' or path[1] == ':':
+            drive, tail = os.path.splitdrive(path)
+        return _safe_re.sub('', tail) or '.'
 
 
 def daemonize():

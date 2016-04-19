@@ -396,17 +396,6 @@ Number of files: {0.stats.nfiles}'''.format(
             raise Exception('Unknown archive item type %r' % item[b'mode'])
 
     def restore_attrs(self, path, item, symlink=False, fd=None):
-        xattrs = item.get(b'xattrs', {})
-        for k, v in xattrs.items():
-            try:
-                xattr.setxattr(fd or path, k, v, follow_symlinks=False)
-            except OSError as e:
-                if e.errno not in (errno.ENOTSUP, errno.EACCES, ):
-                    # only raise if the errno is not on our ignore list:
-                    # ENOTSUP == xattrs not supported here
-                    # EACCES == permission denied to set this specific xattr
-                    #           (this may happen related to security.* keys)
-                    raise
         uid = gid = None
         if not self.numeric_owner:
             uid = user2uid(item[b'user'])
@@ -444,6 +433,19 @@ Number of files: {0.stats.nfiles}'''.format(
                 os.lchflags(path, item[b'bsdflags'])
             except OSError:
                 pass
+        # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
+        # the Linux capabilities in the "security.capability" attribute.
+        xattrs = item.get(b'xattrs', {})
+        for k, v in xattrs.items():
+            try:
+                xattr.setxattr(fd or path, k, v, follow_symlinks=False)
+            except OSError as e:
+                if e.errno not in (errno.ENOTSUP, errno.EACCES):
+                    # only raise if the errno is not on our ignore list:
+                    # ENOTSUP == xattrs not supported here
+                    # EACCES == permission denied to set this specific xattr
+                    #           (this may happen related to security.* keys)
+                    raise
 
     def set_meta(self, key, value):
         metadata = StableDict(self._load_meta(self.id))

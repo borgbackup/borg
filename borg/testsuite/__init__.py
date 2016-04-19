@@ -1,9 +1,10 @@
 from contextlib import contextmanager
 import filecmp
 import os
-import posix
-import stat
 import sys
+if sys.platform != 'win32':
+    import posix
+import stat
 import sysconfig
 import time
 import unittest
@@ -21,7 +22,7 @@ has_lchflags = hasattr(os, 'lchflags')
 
 
 # The mtime get/set precision varies on different OS and Python versions
-if 'HAVE_FUTIMENS' in getattr(posix, '_have_functions', []):
+if sys.platform != 'win32' and 'HAVE_FUTIMENS' in getattr(posix, '_have_functions', []):
     st_mtime_ns_round = 0
 elif 'HAVE_UTIMES' in sysconfig.get_config_vars():
     st_mtime_ns_round = -6

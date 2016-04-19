@@ -213,14 +213,14 @@ Use pacman to install following packages::
 
 Close msys. Navigate msys install directory and open mingw64_shell.bat
 
-Clone borg from github
+Clone borg from github.
 
 Run these commands in the borg source directory::
 
-    pip3 install -e .fake
+    pip3 install -e .
     echo "version = '$(git describe --tags)'" > borg/_version.py
 
-To run from windows commandline add msysdir\\mingw64\\bin to windows path enviroment variable and use python3 as python command
+To run from windows commandline add msysdir\\mingw64\\bin to windows path environment variable and use python3 as python command.
 
 
 Cygwin

@@ -95,7 +95,7 @@ class ChunkBuffer:
         for chunk in chunks[:end]:
             self.chunks.append(self.write_chunk(chunk))
         if end == -1:
-            self.buffer.write(chunks[-1])
+            self.buffer.write(chunks[-1].data)
 
     def is_full(self):
         return self.buffer.tell() > self.BUFFER_SIZE

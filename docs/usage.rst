@@ -75,6 +75,11 @@ General:
         can either leave it away or abbreviate as `::`, if a positional parameter is required.
     BORG_PASSPHRASE
         When set, use the value to answer the passphrase question for encrypted repositories.
+    BORG_ASKPASS
+        When set, behaves like SSH_ASKPASS. The value will be interpreted as the path of a command
+        to execute. The password prompt will be passed as the only command-line argument, and stdout
+        will be interpreted as the password (once stripped of leading and trailing whitespace). The
+        command will be executed in lieu of the ordinary command-line password prompt.
     BORG_DISPLAY_PASSPHRASE
         When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
     BORG_LOGGING_CONF

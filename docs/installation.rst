@@ -202,16 +202,9 @@ Windows (MSYS2)
 
 Download MSYS from https://msys2.github.io/ and follow install instructions. This guide assumes 64bit version.
 
-Use pacman to install following packages::
+Run `pacman -S mingw-w64-x86_64-python3 git mingw-w64-x86_64-lz4 mingw-w64-x86_64-python3-pip mingw-w64-x86_64-cython mingw-w64-x86_64-gcc mingw-w64-x86_64-python3-pytest` to install required packages.
 
-    mingw-w64-x86_64-python3
-    git
-    mingw-w64-x86_64-lz4
-    mingw-w64-x86_64-python3-pip
-    mingw-w64-x86_64-cython
-    mingw-w64-x86_64-gcc
-
-Close msys. Navigate msys install directory and open mingw64_shell.bat
+Close msys. Open `Mingw64-w64 64bit Shell` from startmenu.
 
 Clone borg from github.
 
@@ -221,6 +214,11 @@ Run these commands in the borg source directory::
     echo "version = '$(git describe --tags)'" > borg/_version.py
 
 To run from windows commandline add msysdir\\mingw64\\bin to windows path environment variable and use python3 as python command.
+
+To run tests::
+
+    cd borg
+    py.test --cov=borg --cov-config=../.coveragerc --benchmark-skip --pyargs testsuite
 
 
 Cygwin

@@ -765,7 +765,7 @@ class Location:
                             r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
     else:
         file_re = re.compile(r'((?P<proto>file)://)?'
-                            r'(?P<drive>[a-zA-Z]):[\\/](?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
+                            r'(?P<drive>[a-zA-Z])?:[\\/](?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
     scp_re = re.compile(r'((?:(?P<user>[^@]+)@)?(?P<host>[^:/]+):)?'
                         r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
     # get the repo from BORG_RE env and the optional archive from param.
@@ -914,8 +914,11 @@ def remove_surrogates(s, errors='replace'):
     """
     return s.encode('utf-8', errors).decode('utf-8')
 
-
-_safe_re = re.compile(r'^((\.\.)?/+)+')
+_safe_re = None
+if sys.platform != 'win32':
+    _safe_re = re.compile(r'^((\.\.)?/+)+')
+else:
+    _safe_re = re.compile(r'^((\.\.)?[/\\]+)+')
 
 
 def make_path_safe(path):

@@ -154,6 +154,7 @@ This is a configuration similar to the one above, configured to be deployed with
 Salt running on a Debian system.
 
 ::
+
   Install borg backup from pip:
     pkg.installed: 
       - pkgs:

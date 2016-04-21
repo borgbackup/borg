@@ -202,7 +202,10 @@ Windows (MSYS2)
 
 Download MSYS from https://msys2.github.io/ and follow install instructions. This guide assumes 64bit version.
 
-Run `pacman -S mingw-w64-x86_64-python3 git mingw-w64-x86_64-lz4 mingw-w64-x86_64-python3-pip mingw-w64-x86_64-cython mingw-w64-x86_64-gcc mingw-w64-x86_64-python3-pytest` to install required packages.
+Install the dependencies:
+
+    pacman -S mingw-w64-x86_64-python3 git mingw-w64-x86_64-lz4 mingw-w64-x86_64-python3-pip mingw-w64-x86_64-cython \
+    mingw-w64-x86_64-gcc mingw-w64-x86_64-python3-pytest mingw-w64-x86_64-ntldd-git
 
 Close msys. Open `Mingw64-w64 64bit Shell` from startmenu.
 
@@ -219,6 +222,8 @@ To run tests::
 
     cd borg
     py.test --cov=borg --cov-config=../.coveragerc --benchmark-skip --pyargs testsuite
+
+To build standalone windows executable run `python3 buildwin32.py`
 
 
 Cygwin

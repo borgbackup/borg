@@ -40,6 +40,7 @@ import msgpack.fallback
 
 import socket
 
+import encodings.idna
 
 # meta dict, data bytes
 _Chunk = namedtuple('_Chunk', 'meta data')

@@ -57,6 +57,27 @@ class ChunkBufferTestCase(BaseTestCase):
             unpacker.feed(cache.objects[id])
         self.assert_equal(data, list(unpacker))
 
+    def test_partial(self):
+        big = b"0123456789" * 10000
+        data = [{b'full': 1, b'data': big}, {b'partial': 2, b'data': big}]
+        cache = MockCache()
+        key = PlaintextKey(None)
+        chunks = CacheChunkBuffer(cache, key, None)
+        for d in data:
+            chunks.add(d)
+        chunks.flush(flush=False)
+        # the code is expected to leave the last partial chunk in the buffer
+        self.assert_equal(len(chunks.chunks), 3)
+        self.assert_true(chunks.buffer.tell() > 0)
+        # now really flush
+        chunks.flush(flush=True)
+        self.assert_equal(len(chunks.chunks), 4)
+        self.assert_true(chunks.buffer.tell() == 0)
+        unpacker = msgpack.Unpacker()
+        for id in chunks.chunks:
+            unpacker.feed(cache.objects[id])
+        self.assert_equal(data, list(unpacker))
+
 
 class RobustUnpackerTestCase(BaseTestCase):
 

@@ -94,6 +94,8 @@ Some automatic "answerers" (if set, they automatically answer confirmation quest
         For "Warning: 'check --repair' is an experimental feature that might result in data loss."
     BORG_DELETE_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
         For "You requested to completely DELETE the repository *including* all archives it contains:"
+    BORG_RECREATE_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
+        For "recreate is an experimental feature."
 
     Note: answers are case sensitive. setting an invalid answer value might either give the default
     answer or ask you interactively, depending on whether retries are allowed (they by default are
@@ -191,6 +193,12 @@ For more information about that, see: https://xkcd.com/1179/
 Unless otherwise noted, we display local date and time.
 Internally, we store and process date and time as UTC.
 
+Common options
+~~~~~~~~~~~~~~
+
+All |project_name| commands share these options:
+
+.. include:: usage/common-options.rst.inc
 
 .. include:: usage/init.rst.inc
 
@@ -327,8 +335,11 @@ Examples
     # Restore a raw device (must not be active/in use/mounted at that time)
     $ borg extract --stdout /path/to/repo::my-sdx | dd of=/dev/sdx bs=10M
 
-Note: currently, extract always writes into the current working directory ("."),
-      so make sure you ``cd`` to the right place before calling ``borg extract``.
+
+.. Note::
+
+    Currently, extract always writes into the current working directory ("."),
+    so make sure you ``cd`` to the right place before calling ``borg extract``.
 
 .. include:: usage/check.rst.inc
 
@@ -385,6 +396,44 @@ Examples
     1422781200      1416192 code/myproject/file.ext               | 1454664653      1416192 code/myproject/file.ext
     ...
 
+
+
+.. include:: usage/diff.rst.inc
+
+Examples
+~~~~~~~~
+::
+
+    $ borg init testrepo
+    $ mkdir testdir
+    $ cd testdir
+    $ echo asdf > file1
+    $ dd if=/dev/urandom bs=1M count=4 > file2
+    $ touch file3
+    $ borg create ../testrepo::archive1 .
+
+    $ chmod a+x file1
+    $ echo "something" >> file2
+    $ borg create ../testrepo::archive2 .
+
+    $ rm file3
+    $ touch file4
+    $ borg create ../testrepo::archive3 .
+
+    $ cd ..
+    $ borg diff testrepo::archive1 archive2
+    [-rw-r--r-- -> -rwxr-xr-x] file1
+       +135 B    -252 B file2
+
+    $ borg diff testrepo::archive2 archive3
+    added           0 B file4
+    removed         0 B file3
+
+    $ borg diff testrepo::archive1 archive3
+    [-rw-r--r-- -> -rwxr-xr-x] file1
+       +135 B    -252 B file2
+    added           0 B file4
+    removed         0 B file3
 
 .. include:: usage/delete.rst.inc
 
@@ -466,6 +515,8 @@ Examples
 
 Examples
 ~~~~~~~~
+borg mount/borgfs
++++++++++++++++++
 ::
 
     $ borg mount /path/to/repo::root-2016-02-15 /tmp/mymountpoint
@@ -473,6 +524,25 @@ Examples
     bin  boot  etc	home  lib  lib64  lost+found  media  mnt  opt  root  sbin  srv  tmp  usr  var
     $ fusermount -u /tmp/mymountpoint
 
+borgfs
+++++++
+::
+
+    $ echo '/mnt/backup /tmp/myrepo fuse.borgfs defaults,noauto 0 0' >> /etc/fstab
+    $ echo '/mnt/backup::root-2016-02-15 /tmp/myarchive fuse.borgfs defaults,noauto 0 0' >> /etc/fstab
+    $ mount /tmp/myrepo
+    $ mount /tmp/myarchive
+    $ ls /tmp/myrepo
+    root-2016-02-01 root-2016-02-2015
+    $ ls /tmp/myarchive
+    bin  boot  etc	home  lib  lib64  lost+found  media  mnt  opt  root  sbin  srv  tmp  usr  var
+
+.. Note::
+
+    ``borgfs`` will be automatically provided if you used a distribution
+    package, ``pip`` or ``setup.py`` to install |project_name|. Users of the
+    standalone binary will have to manually create a symlink (see
+    :ref:`pyinstaller-binary`).
 
 .. include:: usage/change-passphrase.rst.inc
 
@@ -540,6 +610,41 @@ Examples
     no key file found for repository
 
 
+.. include:: usage/recreate.rst.inc
+
+Examples
+~~~~~~~~
+::
+
+    # Make old (Attic / Borg 0.xx) archives deduplicate with Borg 1.x archives
+    # Archives created with Borg 1.1+ and the default chunker params are skipped (archive ID stays the same)
+    $ borg recreate /mnt/backup --chunker-params default --progress
+
+    # Create a backup with little but fast compression
+    $ borg create /mnt/backup::archive /some/files --compression lz4
+    # Then compress it - this might take longer, but the backup has already completed, so no inconsistencies
+    # from a long-running backup job.
+    $ borg recreate /mnt/backup::archive --compression zlib,9
+
+    # Remove unwanted files from all archives in a repository
+    $ borg recreate /mnt/backup -e /home/icke/Pictures/drunk_photos
+
+
+    # Change archive comment
+    $ borg create --comment "This is a comment" /mnt/backup::archivename ~
+    $ borg info /mnt/backup::archivename
+    Name: archivename
+    Fingerprint: ...
+    Comment: This is a comment
+    ...
+    $ borg recreate --comment "This is a better comment" /mnt/backup::archivename
+    $ borg info /mnt/backup::archivename
+    Name: archivename
+    Fingerprint: ...
+    Comment: This is a better comment
+    ...
+
+
 Miscellaneous Help
 ------------------
 
@@ -597,6 +702,7 @@ Other flags used include:
 
 - 'i' = backup data was read from standard input (stdin)
 - '-' = dry run, item was *not* backed up
+- 'x' = excluded, item was *not* backed up
 - '?' = missing status code (if you see this, please file a bug report!)
 
 

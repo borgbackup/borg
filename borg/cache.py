@@ -12,9 +12,12 @@ logger = create_logger()
 from .helpers import Error, get_cache_dir, decode_dict, int_to_bigint, \
     bigint_to_int, format_file_size, yes
 from .locking import UpgradableLock
-from .hashindex import ChunkIndex
+from .hashindex import ChunkIndex, ChunkIndexEntry
 
 import msgpack
+
+ChunkListEntry = namedtuple('ChunkListEntry', 'id size csize')
+FileCacheEntry = namedtuple('FileCacheEntry', 'age inode size mtime chunk_ids')
 
 
 class Cache:
@@ -48,6 +51,12 @@ class Cache:
 
     def __init__(self, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True,
                  lock_wait=None):
+        """
+        :param do_files: use file metadata cache
+        :param warn_if_unencrypted: print warning if accessing unknown unencrypted repository
+        :param lock_wait: timeout for lock acquisition (None: return immediately if lock unavailable)
+        :param sync: do :meth:`.sync`
+        """
         self.lock = None
         self.timestamp = None
         self.lock = None
@@ -111,6 +120,11 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             stats[field] = format_file_size(stats[field])
         return Summary(**stats)
 
+    def chunks_stored_size(self):
+        Summary = namedtuple('Summary', ['total_size', 'total_csize', 'unique_size', 'unique_csize', 'total_unique_chunks', 'total_chunks'])
+        stats = Summary(*self.chunks.summarize())
+        return stats.unique_csize
+
     def create(self):
         """Create a new empty cache at `self.path`
         """
@@ -172,9 +186,9 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     break
                 u.feed(data)
                 for path_hash, item in u:
-                    item[0] += 1
+                    entry = FileCacheEntry(*item)
                     # in the end, this takes about 240 Bytes per file
-                    self.files[path_hash] = msgpack.packb(item)
+                    self.files[path_hash] = msgpack.packb(entry._replace(age=entry.age + 1))
 
     def begin_txn(self):
         # Initialize transaction snapshot
@@ -197,9 +211,9 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 for path_hash, item in self.files.items():
                     # Discard cached files with the newest mtime to avoid
                     # issues with filesystem snapshots and mtime precision
-                    item = msgpack.unpackb(item)
-                    if item[0] < 10 and bigint_to_int(item[3]) < self._newest_mtime:
-                        msgpack.pack((path_hash, item), fd)
+                    entry = FileCacheEntry(*msgpack.unpackb(item))
+                    if entry.age < 10 and bigint_to_int(entry.mtime) < self._newest_mtime:
+                        msgpack.pack((path_hash, entry), fd)
         self.config.set('cache', 'manifest', hexlify(self.manifest.id).decode('ascii'))
         self.config.set('cache', 'timestamp', self.manifest.timestamp)
         self.config.set('cache', 'key_type', str(self.key.TYPE))
@@ -265,7 +279,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         def fetch_and_build_idx(archive_id, repository, key):
             chunk_idx = ChunkIndex()
             cdata = repository.get(archive_id)
-            data = key.decrypt(archive_id, cdata)
+            _, data = key.decrypt(archive_id, cdata)
             chunk_idx.add(archive_id, 1, len(data), len(cdata))
             archive = msgpack.unpackb(data)
             if archive[b'version'] != 1:
@@ -273,7 +287,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             decode_dict(archive, (b'name',))
             unpacker = msgpack.Unpacker()
             for item_id, chunk in zip(archive[b'items'], repository.get_many(archive[b'items'])):
-                data = key.decrypt(item_id, chunk)
+                _, data = key.decrypt(item_id, chunk)
                 chunk_idx.add(item_id, 1, len(data), len(chunk))
                 unpacker.feed(data)
                 for item in unpacker:
@@ -354,21 +368,22 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             self.do_cache = os.path.isdir(archive_path)
             self.chunks = create_master_idx(self.chunks)
 
-    def add_chunk(self, id, data, stats):
+    def add_chunk(self, id, chunk, stats, overwrite=False):
         if not self.txn_active:
             self.begin_txn()
-        size = len(data)
-        if self.seen_chunk(id, size):
+        size = len(chunk.data)
+        refcount = self.seen_chunk(id, size)
+        if refcount and not overwrite:
             return self.chunk_incref(id, stats)
-        data = self.key.encrypt(data)
+        data = self.key.encrypt(chunk)
         csize = len(data)
         self.repository.put(id, data, wait=False)
-        self.chunks[id] = (1, size, csize)
-        stats.update(size, csize, True)
-        return id, size, csize
+        self.chunks.add(id, 1, size, csize)
+        stats.update(size, csize, not refcount)
+        return ChunkListEntry(id, size, csize)
 
     def seen_chunk(self, id, size=None):
-        refcount, stored_size, _ = self.chunks.get(id, (0, None, None))
+        refcount, stored_size, _ = self.chunks.get(id, ChunkIndexEntry(0, None, None))
         if size is not None and stored_size is not None and size != stored_size:
             # we already have a chunk with that id, but different size.
             # this is either a hash collision (unlikely) or corruption or a bug.
@@ -381,7 +396,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             self.begin_txn()
         count, size, csize = self.chunks.incref(id)
         stats.update(size, csize, False)
-        return id, size, csize
+        return ChunkListEntry(id, size, csize)
 
     def chunk_decref(self, id, stats):
         if not self.txn_active:
@@ -402,20 +417,17 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         entry = self.files.get(path_hash)
         if not entry:
             return None
-        entry = msgpack.unpackb(entry)
-        if (entry[2] == st.st_size and bigint_to_int(entry[3]) == st.st_mtime_ns and
-                (ignore_inode or entry[1] == st.st_ino)):
-            # reset entry age
-            entry[0] = 0
-            self.files[path_hash] = msgpack.packb(entry)
-            return entry[4]
+        entry = FileCacheEntry(*msgpack.unpackb(entry))
+        if (entry.size == st.st_size and bigint_to_int(entry.mtime) == st.st_mtime_ns and
+                (ignore_inode or entry.inode == st.st_ino)):
+            self.files[path_hash] = msgpack.packb(entry._replace(age=0))
+            return entry.chunk_ids
         else:
             return None
 
     def memorize_file(self, path_hash, st, ids):
         if not (self.do_files and stat.S_ISREG(st.st_mode)):
             return
-        # Entry: Age, inode, size, mtime, chunk ids
-        mtime_ns = st.st_mtime_ns
-        self.files[path_hash] = msgpack.packb((0, st.st_ino, st.st_size, int_to_bigint(mtime_ns), ids))
-        self._newest_mtime = max(self._newest_mtime, mtime_ns)
+        entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, mtime=int_to_bigint(st.st_mtime_ns), chunk_ids=ids)
+        self.files[path_hash] = msgpack.packb(entry)
+        self._newest_mtime = max(self._newest_mtime, st.st_mtime_ns)

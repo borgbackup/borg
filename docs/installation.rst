@@ -33,23 +33,33 @@ yet.
 Distribution Source                                        Command
 ============ ============================================= =======
 Arch Linux   `[community]`_                                ``pacman -S borg``
-Debian       `stretch`_, `unstable/sid`_                   ``apt install borgbackup``
+Debian       `jessie-backports`_, `stretch`_, `sid`_       ``apt install borgbackup``
+Gentoo       `ebuild`_                                     ``emerge borgbackup``
+GNU Guix     `GNU Guix`_                                   ``guix package --install borg``
 NetBSD       `pkgsrc`_                                     ``pkg_add py-borgbackup``
 NixOS        `.nix file`_                                  N/A
+OpenBSD      `OpenBSD ports`_                              ``pkg_add borgbackup``
+openSUSE     `openSUSE official repository`_               ``zypper in python3-borgbackup``
+Fedora       `Fedora official repository`_                 ``dnf install borgbackup``
 OS X         `Brew cask`_                                  ``brew cask install borgbackup``
-Ubuntu       `Xenial 16.04`_, `Wily 15.10 (backport PPA)`_ ``apt install borgbackup``
-Ubuntu       `Trusty 14.04 (backport PPA)`_                ``apt install borgbackup``
+Ubuntu       `16.04`_, backports (PPA): `15.10`_, `14.04`_ ``apt install borgbackup``
 ============ ============================================= =======
 
 .. _[community]: https://www.archlinux.org/packages/?name=borg
+.. _jessie-backports: https://packages.debian.org/jessie-backports/borgbackup
 .. _stretch: https://packages.debian.org/stretch/borgbackup
 .. _unstable/sid: https://packages.debian.org/sid/borgbackup
+.. _ebuild: https://packages.gentoo.org/packages/app-backup/borgbackup
 .. _pkgsrc: http://pkgsrc.se/sysutils/py-borgbackup
-.. _Xenial 16.04: https://launchpad.net/ubuntu/xenial/+source/borgbackup
-.. _Wily 15.10 (backport PPA): https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
-.. _Trusty 14.04 (backport PPA): https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
+.. _16.04: https://launchpad.net/ubuntu/xenial/+source/borgbackup
+.. _15.10: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
+.. _14.04: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
 .. _.nix file: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/backup/borg/default.nix
+.. _OpenBSD ports: http://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/sysutils/borgbackup/
+.. _openSUSE official repository: http://software.opensuse.org/package/borgbackup
+.. _Fedora official repository: https://apps.fedoraproject.org/packages/borgbackup
 .. _Brew cask: http://caskroom.io/
+.. _GNU Guix: https://www.gnu.org/software/guix/package-list.html#borg
 
 Please ask package maintainers to build a package or, if you can package /
 submit it yourself, please help us with that! See :issue:`105` on
@@ -77,6 +87,11 @@ make borg readable and executable for its users and then you can run ``borg``::
     sudo cp borg-linux64 /usr/local/bin/borg
     sudo chown root:root /usr/local/bin/borg
     sudo chmod 755 /usr/local/bin/borg
+
+Optionally you can create a symlink to have ``borgfs`` available, which is an
+alias for ``borg mount``::
+
+    ln -s /usr/local/bin/borg /usr/local/bin/borgfs
 
 Note that the binary uses /tmp to unpack |project_name| with all dependencies.
 It will fail if /tmp has not enough free space or is mounted with the ``noexec`` option.
@@ -147,6 +162,7 @@ Install the dependencies with development headers::
     sudo dnf install libacl-devel libacl
     sudo dnf install lz4-devel
     sudo dnf install gcc gcc-c++
+    sudo dnf install redhat-rpm-config
     sudo dnf install fuse-devel fuse pkgconfig         # optional, for FUSE support
 
 

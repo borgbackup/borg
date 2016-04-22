@@ -1,19 +1,24 @@
 import argparse
-from collections import namedtuple
-from functools import wraps
+from binascii import hexlify
+from collections import namedtuple, deque
+from functools import wraps, partial
 import grp
+import hashlib
+from itertools import islice
 import os
+import os.path
 import stat
 import textwrap
 import pwd
 import re
 from shutil import get_terminal_size
 import sys
+from string import Formatter
 import platform
 import time
 import unicodedata
-
 import logging
+
 from .logger import create_logger
 logger = create_logger()
 
@@ -24,6 +29,7 @@ from operator import attrgetter
 from . import __version__ as borg_version
 from . import hashindex
 from . import chunker
+from .constants import *  # NOQA
 from . import crypto
 from . import shellpattern
 import msgpack
@@ -31,11 +37,13 @@ import msgpack.fallback
 
 import socket
 
-# return codes returned by borg command
-# when borg is killed by signal N, rc = 128 + N
-EXIT_SUCCESS = 0  # everything done, no problems
-EXIT_WARNING = 1  # reached normal end of operation, but there were issues
-EXIT_ERROR = 2  # terminated abruptly, did not reach end of operation
+
+# meta dict, data bytes
+_Chunk = namedtuple('_Chunk', 'meta data')
+
+
+def Chunk(data, **meta):
+    return _Chunk(meta, data)
 
 
 class Error(Exception):
@@ -94,7 +102,7 @@ class Manifest:
         if not key:
             key = key_factory(repository, cdata)
         manifest = cls(key, repository)
-        data = key.decrypt(None, cdata)
+        _, data = key.decrypt(None, cdata)
         manifest.id = key.id_hash(data)
         m = msgpack.unpackb(data)
         if not m.get(b'version') == 1:
@@ -115,7 +123,7 @@ class Manifest:
             'config': self.config,
         }))
         self.id = self.key.id_hash(data)
-        self.repository.put(self.MANIFEST_ID, self.key.encrypt(data))
+        self.repository.put(self.MANIFEST_ID, self.key.encrypt(Chunk(data)))
 
     def list_archive_infos(self, sort_by=None, reverse=False):
         # inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
@@ -210,9 +218,24 @@ class Statistics:
             print(msg, file=stream or sys.stderr, end="\r", flush=True)
 
 
+def get_home_dir():
+    """Get user's home directory while preferring a possibly set HOME
+    environment variable
+    """
+    # os.path.expanduser() behaves differently for '~' and '~someuser' as
+    # parameters: when called with an explicit username, the possibly set
+    # environment variable HOME is no longer respected. So we have to check if
+    # it is set and only expand the user's home directory if HOME is unset.
+    if os.environ.get('HOME', ''):
+        return os.environ.get('HOME')
+    else:
+        return os.path.expanduser('~%s' % os.environ.get('USER', ''))
+
+
 def get_keys_dir():
     """Determine where to repository keys and cache"""
-    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(os.path.expanduser('~'), '.config'))
+
+    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(get_home_dir(), '.config'))
     keys_dir = os.environ.get('BORG_KEYS_DIR', os.path.join(xdg_config, 'borg', 'keys'))
     if not os.path.exists(keys_dir):
         os.makedirs(keys_dir)
@@ -222,18 +245,18 @@ def get_keys_dir():
 
 def get_cache_dir():
     """Determine where to repository keys and cache"""
-    xdg_cache = os.environ.get('XDG_CACHE_HOME', os.path.join(os.path.expanduser('~'), '.cache'))
+    xdg_cache = os.environ.get('XDG_CACHE_HOME', os.path.join(get_home_dir(), '.cache'))
     cache_dir = os.environ.get('BORG_CACHE_DIR', os.path.join(xdg_cache, 'borg'))
     if not os.path.exists(cache_dir):
         os.makedirs(cache_dir)
         os.chmod(cache_dir, stat.S_IRWXU)
-        with open(os.path.join(cache_dir, 'CACHEDIR.TAG'), 'w') as fd:
+        with open(os.path.join(cache_dir, CACHE_TAG_NAME), 'wb') as fd:
+            fd.write(CACHE_TAG_CONTENTS)
             fd.write(textwrap.dedent("""
-                Signature: 8a477f597d28d172789f06886806bc55
                 # This file is a cache directory tag created by Borg.
                 # For information about cache directory tags, see:
                 #       http://www.brynosaurus.com/cachedir/
-                """).lstrip())
+                """).encode('ascii'))
     return cache_dir
 
 
@@ -274,6 +297,9 @@ class PatternMatcher:
 
         # Value to return from match function when none of the patterns match.
         self.fallback = fallback
+
+    def empty(self):
+        return not len(self._items)
 
     def add(self, patterns, value):
         """Add list of patterns to internal list. The given value is returned from the match function when one of the
@@ -470,6 +496,8 @@ def timestamp(s):
 
 
 def ChunkerParams(s):
+    if s.strip().lower() == "default":
+        return CHUNKER_PARAMS
     chunk_min, chunk_max, chunk_mask, window_size = s.split(',')
     if int(chunk_max) > 23:
         # do not go beyond 2**23 (8MB) chunk size now,
@@ -507,13 +535,12 @@ def dir_is_cachedir(path):
     (http://www.brynosaurus.com/cachedir/spec.html).
     """
 
-    tag_contents = b'Signature: 8a477f597d28d172789f06886806bc55'
-    tag_path = os.path.join(path, 'CACHEDIR.TAG')
+    tag_path = os.path.join(path, CACHE_TAG_NAME)
     try:
         if os.path.exists(tag_path):
             with open(tag_path, 'rb') as tag_file:
-                tag_data = tag_file.read(len(tag_contents))
-                if tag_data == tag_contents:
+                tag_data = tag_file.read(len(CACHE_TAG_CONTENTS))
+                if tag_data == CACHE_TAG_CONTENTS:
                     return True
     except OSError:
         pass
@@ -528,13 +555,27 @@ def dir_is_tagged(path, exclude_caches, exclude_if_present):
     """
     tag_paths = []
     if exclude_caches and dir_is_cachedir(path):
-        tag_paths.append(os.path.join(path, 'CACHEDIR.TAG'))
+        tag_paths.append(os.path.join(path, CACHE_TAG_NAME))
     if exclude_if_present is not None:
         for tag in exclude_if_present:
             tag_path = os.path.join(path, tag)
             if os.path.isfile(tag_path):
                 tag_paths.append(tag_path)
     return tag_paths
+
+
+def partial_format(format, mapping):
+    """
+    Apply format.format_map(mapping) while preserving unknown keys
+
+    Does not support attribute access, indexing and ![rsa] conversions
+    """
+    for key, value in mapping.items():
+        key = re.escape(key)
+        format = re.sub(r'(?<!\{)((\{%s\})|(\{%s:[^\}]*\}))' % (key, key),
+                        lambda match: match.group(1).format_map(mapping),
+                        format)
+    return format
 
 
 def format_line(format, data):
@@ -545,7 +586,7 @@ def format_line(format, data):
     except (KeyError, ValueError) as e:
         # this should catch format errors
         print('Error in lineformat: "{}" - reason "{}"'.format(format, str(e)))
-    except:
+    except Exception as e:
         # something unexpected, print error and raise exception
         print('Error in lineformat: "{}" - reason "{}"'.format(format, str(e)))
         raise
@@ -584,33 +625,41 @@ def format_timedelta(td):
     return txt
 
 
-def format_file_size(v, precision=2):
+def format_file_size(v, precision=2, sign=False):
     """Format file size into a human friendly format
     """
-    return sizeof_fmt_decimal(v, suffix='B', sep=' ', precision=precision)
+    return sizeof_fmt_decimal(v, suffix='B', sep=' ', precision=precision, sign=sign)
 
 
-def sizeof_fmt(num, suffix='B', units=None, power=None, sep='', precision=2):
+def sizeof_fmt(num, suffix='B', units=None, power=None, sep='', precision=2, sign=False):
+    prefix = '+' if sign and num > 0 else ''
+
     for unit in units[:-1]:
         if abs(round(num, precision)) < power:
             if isinstance(num, int):
-                return "{}{}{}{}".format(num, sep, unit, suffix)
+                return "{}{}{}{}{}".format(prefix, num, sep, unit, suffix)
             else:
-                return "{:3.{}f}{}{}{}".format(num, precision, sep, unit, suffix)
+                return "{}{:3.{}f}{}{}{}".format(prefix, num, precision, sep, unit, suffix)
         num /= float(power)
-    return "{:.{}f}{}{}{}".format(num, precision, sep, units[-1], suffix)
+    return "{}{:.{}f}{}{}{}".format(prefix, num, precision, sep, units[-1], suffix)
 
 
-def sizeof_fmt_iec(num, suffix='B', sep='', precision=2):
-    return sizeof_fmt(num, suffix=suffix, sep=sep, precision=precision, units=['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi', 'Yi'], power=1024)
+def sizeof_fmt_iec(num, suffix='B', sep='', precision=2, sign=False):
+    return sizeof_fmt(num, suffix=suffix, sep=sep, precision=precision, sign=sign,
+                      units=['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi', 'Yi'], power=1024)
 
 
-def sizeof_fmt_decimal(num, suffix='B', sep='', precision=2):
-    return sizeof_fmt(num, suffix=suffix, sep=sep, precision=precision, units=['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'], power=1000)
+def sizeof_fmt_decimal(num, suffix='B', sep='', precision=2, sign=False):
+    return sizeof_fmt(num, suffix=suffix, sep=sep, precision=precision, sign=sign,
+                      units=['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'], power=1000)
 
 
 def format_archive(archive):
-    return '%-36s %s' % (archive.name, format_time(to_localtime(archive.ts)))
+    return '%-36s %s [%s]' % (
+        archive.name,
+        format_time(to_localtime(archive.ts)),
+        hexlify(archive.id).decode('ascii'),
+    )
 
 
 def memoize(function):
@@ -1075,3 +1124,294 @@ def log_multi(*msgs, level=logging.INFO):
         lines.extend(msg.splitlines())
     for line in lines:
         logger.log(level, line)
+
+
+class ItemFormatter:
+    FIXED_KEYS = {
+        # Formatting aids
+        'LF': '\n',
+        'SPACE': ' ',
+        'TAB': '\t',
+        'CR': '\r',
+        'NUL': '\0',
+        'NEWLINE': os.linesep,
+        'NL': os.linesep,
+    }
+    KEY_DESCRIPTIONS = {
+        'bpath': 'verbatim POSIX path, can contain any character except NUL',
+        'path': 'path interpreted as text (might be missing non-text characters, see bpath)',
+        'source': 'link target for links (identical to linktarget)',
+        'extra': 'prepends {source} with " -> " for soft links and " link to " for hard links',
+
+        'csize': 'compressed size',
+        'num_chunks': 'number of chunks in this file',
+        'unique_chunks': 'number of unique chunks in this file',
+
+        'NEWLINE': 'OS dependent line separator',
+        'NL': 'alias of NEWLINE',
+        'NUL': 'NUL character for creating print0 / xargs -0 like ouput, see bpath',
+    }
+    KEY_GROUPS = (
+        ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget'),
+        ('size', 'csize', 'num_chunks', 'unique_chunks'),
+        ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
+        tuple(sorted(hashlib.algorithms_guaranteed)),
+        ('archiveid', 'archivename', 'extra'),
+        ('NEWLINE', 'NL', 'NUL', 'SPACE', 'TAB', 'CR', 'LF'),
+    )
+
+    @classmethod
+    def available_keys(cls):
+        class FakeArchive:
+            fpr = name = ""
+
+        fake_item = {
+            b'mode': 0, b'path': '', b'user': '', b'group': '', b'mtime': 0,
+            b'uid': 0, b'gid': 0,
+        }
+        formatter = cls(FakeArchive, "")
+        keys = []
+        keys.extend(formatter.call_keys.keys())
+        keys.extend(formatter.get_item_data(fake_item).keys())
+        return keys
+
+    @classmethod
+    def keys_help(cls):
+        help = []
+        keys = cls.available_keys()
+        for group in cls.KEY_GROUPS:
+            for key in group:
+                keys.remove(key)
+                text = " - " + key
+                if key in cls.KEY_DESCRIPTIONS:
+                    text += ": " + cls.KEY_DESCRIPTIONS[key]
+                help.append(text)
+            help.append("")
+        assert not keys, str(keys)
+        return "\n".join(help)
+
+    def __init__(self, archive, format):
+        self.archive = archive
+        static_keys = {
+            'archivename': archive.name,
+            'archiveid': archive.fpr,
+        }
+        static_keys.update(self.FIXED_KEYS)
+        self.format = partial_format(format, static_keys)
+        self.format_keys = {f[1] for f in Formatter().parse(format)}
+        self.call_keys = {
+            'size': self.calculate_size,
+            'csize': self.calculate_csize,
+            'num_chunks': self.calculate_num_chunks,
+            'unique_chunks': self.calculate_unique_chunks,
+            'isomtime': partial(self.format_time, b'mtime'),
+            'isoctime': partial(self.format_time, b'ctime'),
+            'isoatime': partial(self.format_time, b'atime'),
+            'mtime': partial(self.time, b'mtime'),
+            'ctime': partial(self.time, b'ctime'),
+            'atime': partial(self.time, b'atime'),
+        }
+        for hash_function in hashlib.algorithms_guaranteed:
+            self.add_key(hash_function, partial(self.hash_item, hash_function))
+        self.used_call_keys = set(self.call_keys) & self.format_keys
+        self.item_data = static_keys
+
+    def add_key(self, key, callable_with_item):
+        self.call_keys[key] = callable_with_item
+        self.used_call_keys = set(self.call_keys) & self.format_keys
+
+    def get_item_data(self, item):
+        mode = stat.filemode(item[b'mode'])
+        item_type = mode[0]
+        item_data = self.item_data
+
+        source = item.get(b'source', '')
+        extra = ''
+        if source:
+            source = remove_surrogates(source)
+            if item_type == 'l':
+                extra = ' -> %s' % source
+            else:
+                mode = 'h' + mode[1:]
+                extra = ' link to %s' % source
+        item_data['type'] = item_type
+        item_data['mode'] = mode
+        item_data['user'] = item[b'user'] or item[b'uid']
+        item_data['group'] = item[b'group'] or item[b'gid']
+        item_data['uid'] = item[b'uid']
+        item_data['gid'] = item[b'gid']
+        item_data['path'] = remove_surrogates(item[b'path'])
+        item_data['bpath'] = item[b'path']
+        item_data['source'] = source
+        item_data['linktarget'] = source
+        item_data['extra'] = extra
+        for key in self.used_call_keys:
+            item_data[key] = self.call_keys[key](item)
+        return item_data
+
+    def format_item(self, item):
+        return self.format.format_map(self.get_item_data(item))
+
+    def calculate_num_chunks(self, item):
+        return len(item.get(b'chunks', []))
+
+    def calculate_unique_chunks(self, item):
+        chunk_index = self.archive.cache.chunks
+        return sum(1 for c in item.get(b'chunks', []) if chunk_index[c.id].refcount == 1)
+
+    def calculate_size(self, item):
+        return sum(c.size for c in item.get(b'chunks', []))
+
+    def calculate_csize(self, item):
+        return sum(c.csize for c in item.get(b'chunks', []))
+
+    def hash_item(self, hash_function, item):
+        if b'chunks' not in item:
+            return ""
+        hash = hashlib.new(hash_function)
+        for _, data in self.archive.pipeline.fetch_many([c.id for c in item[b'chunks']]):
+            hash.update(data)
+        return hash.hexdigest()
+
+    def format_time(self, key, item):
+        return format_time(safe_timestamp(item.get(key) or item[b'mtime']))
+
+    def time(self, key, item):
+        return safe_timestamp(item.get(key) or item[b'mtime'])
+
+
+class ChunkIteratorFileWrapper:
+    """File-like wrapper for chunk iterators"""
+
+    def __init__(self, chunk_iterator):
+        self.chunk_iterator = chunk_iterator
+        self.chunk_offset = 0
+        self.chunk = b''
+        self.exhausted = False
+
+    def _refill(self):
+        remaining = len(self.chunk) - self.chunk_offset
+        if not remaining:
+            try:
+                chunk = next(self.chunk_iterator)
+                self.chunk = memoryview(chunk.data)
+            except StopIteration:
+                self.exhausted = True
+                return 0  # EOF
+            self.chunk_offset = 0
+            remaining = len(self.chunk)
+        return remaining
+
+    def _read(self, nbytes):
+        if not nbytes:
+            return b''
+        remaining = self._refill()
+        will_read = min(remaining, nbytes)
+        self.chunk_offset += will_read
+        return self.chunk[self.chunk_offset - will_read:self.chunk_offset]
+
+    def read(self, nbytes):
+        parts = []
+        while nbytes and not self.exhausted:
+            read_data = self._read(nbytes)
+            nbytes -= len(read_data)
+            parts.append(read_data)
+        return b''.join(parts)
+
+
+def open_item(archive, item):
+    """Return file-like object for archived item (with chunks)."""
+    chunk_iterator = archive.pipeline.fetch_many([c.id for c in item[b'chunks']])
+    return ChunkIteratorFileWrapper(chunk_iterator)
+
+
+def file_status(mode):
+    if stat.S_ISREG(mode):
+        return 'A'
+    elif stat.S_ISDIR(mode):
+        return 'd'
+    elif stat.S_ISBLK(mode):
+        return 'b'
+    elif stat.S_ISCHR(mode):
+        return 'c'
+    elif stat.S_ISLNK(mode):
+        return 's'
+    elif stat.S_ISFIFO(mode):
+        return 'f'
+    return '?'
+
+
+def consume(iterator, n=None):
+    """Advance the iterator n-steps ahead. If n is none, consume entirely."""
+    # Use functions that consume iterators at C speed.
+    if n is None:
+        # feed the entire iterator into a zero-length deque
+        deque(iterator, maxlen=0)
+    else:
+        # advance to the empty slice starting at position n
+        next(islice(iterator, n, n), None)
+
+# GenericDirEntry, scandir_generic (c) 2012 Ben Hoyt
+# from the python-scandir package (3-clause BSD license, just like us, so no troubles here)
+# note: simplified version
+
+
+class GenericDirEntry:
+    __slots__ = ('name', '_scandir_path', '_path')
+
+    def __init__(self, scandir_path, name):
+        self._scandir_path = scandir_path
+        self.name = name
+        self._path = None
+
+    @property
+    def path(self):
+        if self._path is None:
+            self._path = os.path.join(self._scandir_path, self.name)
+        return self._path
+
+    def stat(self, follow_symlinks=True):
+        assert not follow_symlinks
+        return os.lstat(self.path)
+
+    def _check_type(self, type):
+        st = self.stat(False)
+        return stat.S_IFMT(st.st_mode) == type
+
+    def is_dir(self, follow_symlinks=True):
+        assert not follow_symlinks
+        return self._check_type(stat.S_IFDIR)
+
+    def is_file(self, follow_symlinks=True):
+        assert not follow_symlinks
+        return self._check_type(stat.S_IFREG)
+
+    def is_symlink(self):
+        return self._check_type(stat.S_IFLNK)
+
+    def inode(self):
+        st = self.stat(False)
+        return st.st_ino
+
+    def __repr__(self):
+        return '<{0}: {1!r}>'.format(self.__class__.__name__, self.path)
+
+
+def scandir_generic(path='.'):
+    """Like os.listdir(), but yield DirEntry objects instead of returning a list of names."""
+    for name in sorted(os.listdir(path)):
+        yield GenericDirEntry(path, name)
+
+try:
+    from os import scandir
+except ImportError:
+    try:
+        # Try python-scandir on Python 3.4
+        from scandir import scandir
+    except ImportError:
+        # If python-scandir is not installed, then use a version that is just as slow as listdir.
+        scandir = scandir_generic
+
+
+def scandir_inorder(path='.'):
+    return sorted(scandir(path), key=lambda dirent: dirent.inode())

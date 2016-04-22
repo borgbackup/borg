@@ -1,7 +1,7 @@
 from io import BytesIO
 
 from ..chunker import Chunker, buzhash, buzhash_update
-from ..archive import CHUNK_MAX_EXP, CHUNKER_PARAMS
+from ..constants import *  # NOQA
 from . import BaseTestCase
 
 

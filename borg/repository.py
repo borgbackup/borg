@@ -12,6 +12,7 @@ import struct
 from zlib import crc32
 
 import msgpack
+from .constants import *  # NOQA
 from .helpers import Error, ErrorWithTraceback, IntegrityError, Location, ProgressIndicatorPercent
 from .hashindex import NSIndex
 from .locking import UpgradableLock, LockError, LockErrorT
@@ -35,9 +36,6 @@ class Repository:
     dir/index.X
     dir/hints.X
     """
-    DEFAULT_MAX_SEGMENT_SIZE = 5 * 1024 * 1024
-    DEFAULT_SEGMENTS_PER_DIR = 10000
-
     class DoesNotExist(Error):
         """Repository {} does not exist."""
 
@@ -98,8 +96,8 @@ class Repository:
         config = ConfigParser(interpolation=None)
         config.add_section('repository')
         config.set('repository', 'version', '1')
-        config.set('repository', 'segments_per_dir', str(self.DEFAULT_SEGMENTS_PER_DIR))
-        config.set('repository', 'max_segment_size', str(self.DEFAULT_MAX_SEGMENT_SIZE))
+        config.set('repository', 'segments_per_dir', str(DEFAULT_SEGMENTS_PER_DIR))
+        config.set('repository', 'max_segment_size', str(DEFAULT_MAX_SEGMENT_SIZE))
         config.set('repository', 'append_only', '0')
         config.set('repository', 'id', hexlify(os.urandom(32)).decode('ascii'))
         self.save_config(path, config)

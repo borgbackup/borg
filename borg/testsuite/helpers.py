@@ -13,9 +13,9 @@ import time
 from ..helpers import Location, format_file_size, format_timedelta, make_path_safe, \
     prune_within, prune_split, get_cache_dir, get_keys_dir, Statistics, is_slow_msgpack, \
     yes, TRUISH, FALSISH, DEFAULTISH, \
-    StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
+    StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, Chunk, \
     ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
-    PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern
+    PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, partial_format, ChunkIteratorFileWrapper
 from . import BaseTestCase, environment_variable, FakeInputs
 
 
@@ -692,6 +692,8 @@ def test_file_size():
         10**18: '1.00 EB',  # exabytes
         10**21: '1.00 ZB',  # zottabytes
         10**24: '1.00 YB',  # yottabytes
+        -1: '-1 B',  # negative value
+        -1010: '-1.01 kB',  # negative value with rounding
     }
     for size, fmt in si_size_map.items():
         assert format_file_size(size) == fmt
@@ -701,6 +703,18 @@ def test_file_size_precision():
     assert format_file_size(1234, precision=1) == '1.2 kB'  # rounded down
     assert format_file_size(1254, precision=1) == '1.3 kB'  # rounded up
     assert format_file_size(999990000, precision=1) == '1.0 GB'  # and not 999.9 MB or 1000.0 MB
+
+
+def test_file_size_sign():
+    si_size_map = {
+        0: '0 B',
+        1: '+1 B',
+        1234: '+1.23 kB',
+        -1: '-1 B',
+        -1234: '-1.23 kB',
+    }
+    for size, fmt in si_size_map.items():
+        assert format_file_size(size, sign=True) == fmt
 
 
 def test_is_slow_msgpack():
@@ -877,3 +891,22 @@ def test_progress_endless_step(capfd):
     pi.show()
     out, err = capfd.readouterr()
     assert err == '.'
+
+
+def test_partial_format():
+    assert partial_format('{space:10}', {'space': ' '}) == ' ' * 10
+    assert partial_format('{foobar}', {'bar': 'wrong', 'foobar': 'correct'}) == 'correct'
+    assert partial_format('{unknown_key}', {}) == '{unknown_key}'
+    assert partial_format('{key}{{escaped_key}}', {}) == '{key}{{escaped_key}}'
+    assert partial_format('{{escaped_key}}', {'escaped_key': 1234}) == '{{escaped_key}}'
+
+
+def test_chunk_file_wrapper():
+    cfw = ChunkIteratorFileWrapper(iter([Chunk(b'abc'), Chunk(b'def')]))
+    assert cfw.read(2) == b'ab'
+    assert cfw.read(50) == b'cdef'
+    assert cfw.exhausted
+
+    cfw = ChunkIteratorFileWrapper(iter([]))
+    assert cfw.read(2) == b''
+    assert cfw.exhausted

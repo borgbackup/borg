@@ -326,6 +326,17 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos6_64")
   end
 
+  config.vm.define "xenial64" do |b|
+    b.vm.box = "ubuntu/xenial64"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 768
+    end
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("trusty64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("trusty64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("trusty64")
+  end
+
   config.vm.define "trusty64" do |b|
     b.vm.box = "ubuntu/trusty64"
     b.vm.provider :virtualbox do |v|

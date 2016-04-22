@@ -1,9 +1,11 @@
 from binascii import hexlify, unhexlify
 from datetime import datetime
-from hashlib import sha256
+from itertools import zip_longest
 from operator import attrgetter
 import argparse
+import collections
 import functools
+import hashlib
 import inspect
 import io
 import os
@@ -15,28 +17,26 @@ import textwrap
 import traceback
 
 from . import __version__
-from .helpers import Error, location_validator, archivename_validator, format_line, format_time, format_file_size, \
-    parse_pattern, PathPrefixPattern, to_localtime, timestamp, safe_timestamp, \
+from .helpers import Error, location_validator, archivename_validator, format_time, format_file_size, \
+    parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
     get_cache_dir, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
-    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher
+    dir_is_tagged, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
+    log_multi, PatternMatcher, ItemFormatter
 from .logger import create_logger, setup_logging
 logger = create_logger()
+from . import helpers
 from .compress import Compressor, COMPR_BUFFER
 from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache
+from .constants import *  # NOQA
 from .key import key_creator, RepoKey, PassphraseKey
-from .archive import Archive, ArchiveChecker, CHUNKER_PARAMS
+from .archive import Archive, ArchiveChecker, ArchiveRecreater
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
+from .hashindex import ChunkIndexEntry
 
 has_lchflags = hasattr(os, 'lchflags')
-
-# default umask, overriden by --umask, defaults to read/write only for owner
-UMASK_DEFAULT = 0o077
-
-DASHES = '-' * 78
 
 
 def argument(args, str_or_bool):
@@ -111,6 +111,45 @@ class Archiver:
         if self.output_list and (self.output_filter is None or status in self.output_filter):
             logger.info("%1s %s", status, remove_surrogates(path))
 
+    @staticmethod
+    def compare_chunk_contents(chunks1, chunks2):
+        """Compare two chunk iterators (like returned by :meth:`.DownloadPipeline.fetch_many`)"""
+        end = object()
+        alen = ai = 0
+        blen = bi = 0
+        while True:
+            if not alen - ai:
+                a = next(chunks1, end)
+                if a is end:
+                    return not blen - bi and next(chunks2, end) is end
+                a = memoryview(a.data)
+                alen = len(a)
+                ai = 0
+            if not blen - bi:
+                b = next(chunks2, end)
+                if b is end:
+                    return not alen - ai and next(chunks1, end) is end
+                b = memoryview(b.data)
+                blen = len(b)
+                bi = 0
+            slicelen = min(alen - ai, blen - bi)
+            if a[ai:ai + slicelen] != b[bi:bi + slicelen]:
+                return False
+            ai += slicelen
+            bi += slicelen
+
+    @staticmethod
+    def build_matcher(excludes, paths):
+        matcher = PatternMatcher()
+        if excludes:
+            matcher.add(excludes, False)
+        include_patterns = []
+        if paths:
+            include_patterns.extend(parse_pattern(i, PathPrefixPattern) for i in paths)
+            matcher.add(include_patterns, True)
+        matcher.fallback = not include_patterns
+        return matcher, include_patterns
+
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
         """
@@ -120,7 +159,11 @@ class Archiver:
     def do_init(self, args, repository):
         """Initialize an empty repository"""
         logger.info('Initializing repository at "%s"' % args.location.canonical_path())
-        key = key_creator(repository, args)
+        try:
+            key = key_creator(repository, args)
+        except (EOFError, KeyboardInterrupt):
+            repository.destroy()
+            return EXIT_WARNING
         manifest = Manifest(key, repository)
         manifest.key = key
         manifest.write()
@@ -205,19 +248,20 @@ class Archiver:
                     self.print_file_status(status, path)
                     continue
                 path = os.path.normpath(path)
+                try:
+                    st = os.lstat(path)
+                except OSError as e:
+                    self.print_warning('%s: %s', path, e)
+                    continue
                 if args.one_file_system:
-                    try:
-                        restrict_dev = os.lstat(path).st_dev
-                    except OSError as e:
-                        self.print_warning('%s: %s', path, e)
-                        continue
+                    restrict_dev = st.st_dev
                 else:
                     restrict_dev = None
                 self._process(archive, cache, matcher, args.exclude_caches, args.exclude_if_present,
                               args.keep_tag_files, skip_inodes, path, restrict_dev,
-                              read_special=args.read_special, dry_run=dry_run)
+                              read_special=args.read_special, dry_run=dry_run, st=st)
             if not dry_run:
-                archive.save(timestamp=args.timestamp)
+                archive.save(comment=args.comment, timestamp=args.timestamp)
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 if args.stats:
@@ -250,15 +294,16 @@ class Archiver:
 
     def _process(self, archive, cache, matcher, exclude_caches, exclude_if_present,
                  keep_tag_files, skip_inodes, path, restrict_dev,
-                 read_special=False, dry_run=False):
+                 read_special=False, dry_run=False, st=None):
         if not matcher.match(path):
+            self.print_file_status('x', path)
             return
-
-        try:
-            st = os.lstat(path)
-        except OSError as e:
-            self.print_warning('%s: %s', path, e)
-            return
+        if st is None:
+            try:
+                st = os.lstat(path)
+            except OSError as e:
+                self.print_warning('%s: %s', path, e)
+                return
         if (st.st_ino, st.st_dev) in skip_inodes:
             return
         # Entering a new filesystem?
@@ -288,15 +333,15 @@ class Archiver:
             if not dry_run:
                 status = archive.process_dir(path, st)
             try:
-                entries = os.listdir(path)
+                entries = helpers.scandir_inorder(path)
             except OSError as e:
                 status = 'E'
                 self.print_warning('%s: %s', path, e)
             else:
-                for filename in sorted(entries):
-                    entry_path = os.path.normpath(os.path.join(path, filename))
+                for dirent in entries:
+                    normpath = os.path.normpath(dirent.path)
                     self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
-                                  keep_tag_files, skip_inodes, entry_path, restrict_dev,
+                                  keep_tag_files, skip_inodes, normpath, restrict_dev,
                                   read_special=read_special, dry_run=dry_run)
         elif stat.S_ISLNK(st.st_mode):
             if not dry_run:
@@ -337,17 +382,7 @@ class Archiver:
             if sys.platform.startswith(('linux', 'freebsd', 'netbsd', 'openbsd', 'darwin', )):
                 logger.warning('Hint: You likely need to fix your locale setup. E.g. install locales and use: LANG=en_US.UTF-8')
 
-        matcher = PatternMatcher()
-        if args.excludes:
-            matcher.add(args.excludes, False)
-
-        include_patterns = []
-
-        if args.paths:
-            include_patterns.extend(parse_pattern(i, PathPrefixPattern) for i in args.paths)
-            matcher.add(include_patterns, True)
-
-        matcher.fallback = not include_patterns
+        matcher, include_patterns = self.build_matcher(args.excludes, args.paths)
 
         output_list = args.output_list
         dry_run = args.dry_run
@@ -355,8 +390,20 @@ class Archiver:
         sparse = args.sparse
         strip_components = args.strip_components
         dirs = []
-        for item in archive.iter_items(lambda item: matcher.match(item[b'path']), preload=True):
+        partial_extract = not matcher.empty() or strip_components
+        hardlink_masters = {} if partial_extract else None
+
+        def item_is_hardlink_master(item):
+            return (partial_extract and stat.S_ISREG(item[b'mode']) and
+                    item.get(b'hardlink_master', True) and b'source' not in item)
+
+        for item in archive.iter_items(preload=True,
+                filter=lambda item: item_is_hardlink_master(item) or matcher.match(item[b'path'])):
             orig_path = item[b'path']
+            if item_is_hardlink_master(item):
+                hardlink_masters[orig_path] = (item.get(b'chunks'), None)
+            if not matcher.match(item[b'path']):
+                continue
             if strip_components:
                 item[b'path'] = os.sep.join(orig_path.split(os.sep)[strip_components:])
                 if not item[b'path']:
@@ -374,13 +421,223 @@ class Archiver:
                         dirs.append(item)
                         archive.extract_item(item, restore_attrs=False)
                     else:
-                        archive.extract_item(item, stdout=stdout, sparse=sparse)
+                        archive.extract_item(item, stdout=stdout, sparse=sparse, hardlink_masters=hardlink_masters,
+                                             original_path=orig_path)
             except OSError as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 
         if not args.dry_run:
             while dirs:
                 archive.extract_item(dirs.pop(-1))
+        for pattern in include_patterns:
+            if pattern.match_count == 0:
+                self.print_warning("Include pattern '%s' never matched.", pattern)
+        return self.exit_code
+
+    @with_repository()
+    @with_archive
+    def do_diff(self, args, repository, manifest, key, archive):
+        """Diff contents of two archives"""
+        def fetch_and_compare_chunks(chunk_ids1, chunk_ids2, archive1, archive2):
+            chunks1 = archive1.pipeline.fetch_many(chunk_ids1)
+            chunks2 = archive2.pipeline.fetch_many(chunk_ids2)
+            return self.compare_chunk_contents(chunks1, chunks2)
+
+        def sum_chunk_size(item, consider_ids=None):
+            if item.get(b'deleted'):
+                return None
+            else:
+                return sum(c.size for c in item[b'chunks']
+                           if consider_ids is None or c.id in consider_ids)
+
+        def get_owner(item):
+            if args.numeric_owner:
+                return item[b'uid'], item[b'gid']
+            else:
+                return item[b'user'], item[b'group']
+
+        def get_mode(item):
+            if b'mode' in item:
+                return stat.filemode(item[b'mode'])
+            else:
+                return [None]
+
+        def has_hardlink_master(item, hardlink_masters):
+            return stat.S_ISREG(item[b'mode']) and item.get(b'source') in hardlink_masters
+
+        def compare_link(item1, item2):
+            # These are the simple link cases. For special cases, e.g. if a
+            # regular file is replaced with a link or vice versa, it is
+            # indicated in compare_mode instead.
+            if item1.get(b'deleted'):
+                return 'added link'
+            elif item2.get(b'deleted'):
+                return 'removed link'
+            elif b'source' in item1 and b'source' in item2 and item1[b'source'] != item2[b'source']:
+                return 'changed link'
+
+        def contents_changed(item1, item2):
+            if can_compare_chunk_ids:
+                return item1[b'chunks'] != item2[b'chunks']
+            else:
+                if sum_chunk_size(item1) != sum_chunk_size(item2):
+                    return True
+                else:
+                    chunk_ids1 = [c.id for c in item1[b'chunks']]
+                    chunk_ids2 = [c.id for c in item2[b'chunks']]
+                    return not fetch_and_compare_chunks(chunk_ids1, chunk_ids2, archive1, archive2)
+
+        def compare_content(path, item1, item2):
+            if contents_changed(item1, item2):
+                if item1.get(b'deleted'):
+                    return ('added {:>13}'.format(format_file_size(sum_chunk_size(item2))))
+                elif item2.get(b'deleted'):
+                    return ('removed {:>11}'.format(format_file_size(sum_chunk_size(item1))))
+                else:
+                    chunk_ids1 = {c.id for c in item1[b'chunks']}
+                    chunk_ids2 = {c.id for c in item2[b'chunks']}
+                    added_ids = chunk_ids2 - chunk_ids1
+                    removed_ids = chunk_ids1 - chunk_ids2
+                    added = sum_chunk_size(item2, added_ids)
+                    removed = sum_chunk_size(item1, removed_ids)
+                    return ('{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
+                                                 format_file_size(-removed, precision=1, sign=True)))
+
+        def compare_directory(item1, item2):
+            if item2.get(b'deleted') and not item1.get(b'deleted'):
+                return 'removed directory'
+            elif item1.get(b'deleted') and not item2.get(b'deleted'):
+                return 'added directory'
+
+        def compare_owner(item1, item2):
+            user1, group1 = get_owner(item1)
+            user2, group2 = get_owner(item2)
+            if user1 != user2 or group1 != group2:
+                return '[{}:{} -> {}:{}]'.format(user1, group1, user2, group2)
+
+        def compare_mode(item1, item2):
+            if item1[b'mode'] != item2[b'mode']:
+                return '[{} -> {}]'.format(get_mode(item1), get_mode(item2))
+
+        def compare_items(output, path, item1, item2, hardlink_masters, deleted=False):
+            """
+            Compare two items with identical paths.
+            :param deleted: Whether one of the items has been deleted
+            """
+            changes = []
+
+            if has_hardlink_master(item1, hardlink_masters):
+                item1 = hardlink_masters[item1[b'source']][0]
+
+            if has_hardlink_master(item2, hardlink_masters):
+                item2 = hardlink_masters[item2[b'source']][1]
+
+            if get_mode(item1)[0] == 'l' or get_mode(item2)[0] == 'l':
+                changes.append(compare_link(item1, item2))
+
+            if b'chunks' in item1 and b'chunks' in item2:
+                changes.append(compare_content(path, item1, item2))
+
+            if get_mode(item1)[0] == 'd' or get_mode(item2)[0] == 'd':
+                changes.append(compare_directory(item1, item2))
+
+            if not deleted:
+                changes.append(compare_owner(item1, item2))
+                changes.append(compare_mode(item1, item2))
+
+            changes = [x for x in changes if x]
+            if changes:
+                output_line = (remove_surrogates(path), ' '.join(changes))
+
+                if args.sort:
+                    output.append(output_line)
+                else:
+                    print_output(output_line)
+
+        def print_output(line):
+            print("{:<19} {}".format(line[1], line[0]))
+
+        def compare_archives(archive1, archive2, matcher):
+            def hardlink_master_seen(item):
+                return b'source' not in item or not stat.S_ISREG(item[b'mode']) or item[b'source'] in hardlink_masters
+
+            def is_hardlink_master(item):
+                return item.get(b'hardlink_master', True) and b'source' not in item
+
+            def update_hardlink_masters(item1, item2):
+                if is_hardlink_master(item1) or is_hardlink_master(item2):
+                    hardlink_masters[item1[b'path']] = (item1, item2)
+
+            def compare_or_defer(item1, item2):
+                update_hardlink_masters(item1, item2)
+                if not hardlink_master_seen(item1) or not hardlink_master_seen(item2):
+                    deferred.append((item1, item2))
+                else:
+                    compare_items(output, item1[b'path'], item1, item2, hardlink_masters)
+
+            orphans_archive1 = collections.OrderedDict()
+            orphans_archive2 = collections.OrderedDict()
+            deferred = []
+            hardlink_masters = {}
+            output = []
+
+            for item1, item2 in zip_longest(
+                    archive1.iter_items(lambda item: matcher.match(item[b'path'])),
+                    archive2.iter_items(lambda item: matcher.match(item[b'path'])),
+            ):
+                if item1 and item2 and item1[b'path'] == item2[b'path']:
+                    compare_or_defer(item1, item2)
+                    continue
+                if item1:
+                    matching_orphan = orphans_archive2.pop(item1[b'path'], None)
+                    if matching_orphan:
+                        compare_or_defer(item1, matching_orphan)
+                    else:
+                        orphans_archive1[item1[b'path']] = item1
+                if item2:
+                    matching_orphan = orphans_archive1.pop(item2[b'path'], None)
+                    if matching_orphan:
+                        compare_or_defer(matching_orphan, item2)
+                    else:
+                        orphans_archive2[item2[b'path']] = item2
+            # At this point orphans_* contain items that had no matching partner in the other archive
+            deleted_item = {
+                b'deleted': True,
+                b'chunks': [],
+                b'mode': 0,
+            }
+            for added in orphans_archive2.values():
+                path = added[b'path']
+                deleted_item[b'path'] = path
+                update_hardlink_masters(deleted_item, added)
+                compare_items(output, path, deleted_item, added, hardlink_masters, deleted=True)
+            for deleted in orphans_archive1.values():
+                path = deleted[b'path']
+                deleted_item[b'path'] = path
+                update_hardlink_masters(deleted, deleted_item)
+                compare_items(output, path, deleted, deleted_item, hardlink_masters, deleted=True)
+            for item1, item2 in deferred:
+                assert hardlink_master_seen(item1)
+                assert hardlink_master_seen(item2)
+                compare_items(output, item1[b'path'], item1, item2, hardlink_masters)
+
+            for line in sorted(output):
+                print_output(line)
+
+        archive1 = archive
+        archive2 = Archive(repository, key, manifest, args.archive2)
+
+        can_compare_chunk_ids = archive1.metadata.get(b'chunker_params', False) == archive2.metadata.get(
+            b'chunker_params', True) or args.same_chunker_params
+        if not can_compare_chunk_ids:
+            self.print_warning('--chunker-params might be different between archives, diff will be slow.\n'
+                               'If you know for certain that they are the same, pass --same-chunker-params '
+                               'to override this check.')
+
+        matcher, include_patterns = self.build_matcher(args.excludes, args.paths)
+
+        compare_archives(archive1, archive2, matcher)
+
         for pattern in include_patterns:
             if pattern.match_count == 0:
                 self.print_warning("Include pattern '%s' never matched.", pattern)
@@ -433,7 +690,7 @@ class Archiver:
 
     @with_repository()
     def do_mount(self, args, repository, manifest, key):
-        """Mount archive or an entire repository as a FUSE fileystem"""
+        """Mount archive or an entire repository as a FUSE filesystem"""
         try:
             from .fuse import FuseOperations
         except ImportError as e:
@@ -462,78 +719,27 @@ class Archiver:
     def do_list(self, args, repository, manifest, key):
         """List archive or repository contents"""
         if args.location.archive:
-            archive = Archive(repository, key, manifest, args.location.archive)
-            """use_user_format flag is used to speed up default listing.
-            When user issues format options, listing is a bit slower, but more keys are available and
-            precalculated.
-            """
-            use_user_format = args.listformat is not None
-            if use_user_format:
-                list_format = args.listformat
-            elif args.short:
-                list_format = "{path}{LF}"
-            else:
-                list_format = "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{LF}"
+            matcher, _ = self.build_matcher(args.excludes, args.paths)
+            with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
+                archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
 
-            for item in archive.iter_items():
-                mode = stat.filemode(item[b'mode'])
-                type = mode[0]
-                size = 0
-                if type == '-':
-                    try:
-                        size = sum(size for _, size, _ in item[b'chunks'])
-                    except KeyError:
-                        pass
-
-                mtime = safe_timestamp(item[b'mtime'])
-                if use_user_format:
-                    atime = safe_timestamp(item.get(b'atime') or item[b'mtime'])
-                    ctime = safe_timestamp(item.get(b'ctime') or item[b'mtime'])
-
-                if b'source' in item:
-                    source = item[b'source']
-                    if type == 'l':
-                        extra = ' -> %s' % item[b'source']
-                    else:
-                        mode = 'h' + mode[1:]
-                        extra = ' link to %s' % item[b'source']
+                if args.format:
+                    format = args.format
+                elif args.short:
+                    format = "{path}{NL}"
                 else:
-                    extra = ''
-                    source = ''
+                    format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
+                formatter = ItemFormatter(archive, format)
 
-                item_data = {
-                        'mode': mode,
-                        'user': item[b'user'] or item[b'uid'],
-                        'group': item[b'group'] or item[b'gid'],
-                        'size': size,
-                        'isomtime': format_time(mtime),
-                        'path': remove_surrogates(item[b'path']),
-                        'extra': extra,
-                        'LF': '\n',
-                        }
-                if use_user_format:
-                    item_data_advanced = {
-                        'bmode': item[b'mode'],
-                        'type': type,
-                        'source': source,
-                        'linktarget': source,
-                        'uid': item[b'uid'],
-                        'gid': item[b'gid'],
-                        'mtime': mtime,
-                        'isoctime': format_time(ctime),
-                        'ctime': ctime,
-                        'isoatime': format_time(atime),
-                        'atime': atime,
-                        'archivename': archive.name,
-                        'SPACE': ' ',
-                        'TAB': '\t',
-                        'CR': '\r',
-                        'NEWLINE': os.linesep,
-                        }
-                    item_data.update(item_data_advanced)
-                item_data['formatkeys'] = list(item_data.keys())
-
-                print(format_line(list_format, item_data), end='')
+                if not hasattr(sys.stdout, 'buffer'):
+                    # This is a shim for supporting unit tests replacing sys.stdout with e.g. StringIO,
+                    # which doesn't have an underlying buffer (= lower file object).
+                    def write(bytestring):
+                        sys.stdout.write(bytestring.decode('utf-8', errors='replace'))
+                else:
+                    write = sys.stdout.buffer.write
+                for item in archive.iter_items(lambda item: matcher.match(item[b'path'])):
+                    write(formatter.format_item(item).encode('utf-8', errors='surrogateescape'))
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 if args.prefix and not archive_info.name.startswith(args.prefix):
@@ -548,14 +754,18 @@ class Archiver:
     @with_archive
     def do_info(self, args, repository, manifest, key, archive, cache):
         """Show archive details such as disk space used"""
+        def format_cmdline(cmdline):
+            return remove_surrogates(' '.join(shlex.quote(x) for x in cmdline))
+
         stats = archive.calc_stats(cache)
         print('Name:', archive.name)
         print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
+        print('Comment:', archive.metadata.get(b'comment', ''))
         print('Hostname:', archive.metadata[b'hostname'])
         print('Username:', archive.metadata[b'username'])
         print('Time (start): %s' % format_time(to_localtime(archive.ts)))
         print('Time (end):   %s' % format_time(to_localtime(archive.ts_end)))
-        print('Command line:', remove_surrogates(' '.join(archive.metadata[b'cmdline'])))
+        print('Command line:', format_cmdline(archive.metadata[b'cmdline']))
         print('Number of files: %d' % stats.nfiles)
         print()
         print(str(stats))
@@ -631,12 +841,62 @@ class Archiver:
             print("warning: %s" % e)
         return self.exit_code
 
+    @with_repository(cache=True, exclusive=True)
+    def do_recreate(self, args, repository, manifest, key, cache):
+        """Re-create archives"""
+        def interrupt(signal_num, stack_frame):
+            if recreater.interrupt:
+                print("\nReceived signal, again. I'm not deaf.", file=sys.stderr)
+            else:
+                print("\nReceived signal, will exit cleanly.", file=sys.stderr)
+            recreater.interrupt = True
+
+        msg = ("recreate is an experimental feature.\n"
+               "Type 'YES' if you understand this and want to continue: ")
+        if not yes(msg, false_msg="Aborting.", truish=('YES',),
+                   env_var_override='BORG_RECREATE_I_KNOW_WHAT_I_AM_DOING'):
+            return EXIT_ERROR
+
+        matcher, include_patterns = self.build_matcher(args.excludes, args.paths)
+        self.output_list = args.output_list
+        self.output_filter = args.output_filter
+
+        recreater = ArchiveRecreater(repository, manifest, key, cache, matcher,
+                                     exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
+                                     keep_tag_files=args.keep_tag_files,
+                                     compression=args.compression, chunker_params=args.chunker_params,
+                                     progress=args.progress, stats=args.stats,
+                                     file_status_printer=self.print_file_status,
+                                     dry_run=args.dry_run)
+
+        signal.signal(signal.SIGTERM, interrupt)
+        signal.signal(signal.SIGINT, interrupt)
+
+        if args.location.archive:
+            name = args.location.archive
+            if recreater.is_temporary_archive(name):
+                self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
+                return self.exit_code
+            recreater.recreate(name, args.comment)
+        else:
+            for archive in manifest.list_archive_infos(sort_by='ts'):
+                name = archive.name
+                if recreater.is_temporary_archive(name):
+                    continue
+                print('Processing', name)
+                if not recreater.recreate(name, args.comment):
+                    break
+        manifest.write()
+        repository.commit()
+        cache.commit()
+        return self.exit_code
+
     @with_repository()
     def do_debug_dump_archive_items(self, args, repository, manifest, key):
         """dump (decrypted, decompressed) archive items metadata (not: data)"""
         archive = Archive(repository, key, manifest, args.location.archive)
         for i, item_id in enumerate(archive.metadata[b'items']):
-            data = key.decrypt(item_id, repository.get(item_id))
+            _, data = key.decrypt(item_id, repository.get(item_id))
             filename = '%06d_%s.items' % (i, hexlify(item_id).decode('ascii'))
             print('Dumping', filename)
             with open(filename, 'wb') as fd:
@@ -669,7 +929,7 @@ class Archiver:
         for path in args.paths:
             with open(path, "rb") as f:
                 data = f.read()
-            h = sha256(data)  # XXX hardcoded
+            h = hashlib.sha256(data)  # XXX hardcoded
             repository.put(h.digest(), data)
             print("object %s put." % h.hexdigest())
         repository.commit()
@@ -812,51 +1072,57 @@ class Archiver:
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new', 'Warning: "--old" has been deprecated. Use "--new" instead.'),
+            ('--list-format', '--format', 'Warning: "--list-format" has been deprecated. Use "--format" instead.'),
         ]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
                 if arg.startswith(old_name):
                     args[i] = arg.replace(old_name, new_name)
-                    print(warning)
+                    self.print_warning(warning)
         return args
 
     def build_parser(self, args=None, prog=None):
         common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
-        common_parser.add_argument('--critical', dest='log_level',
-                                   action='store_const', const='critical', default='warning',
-                                   help='work on log level CRITICAL')
-        common_parser.add_argument('--error', dest='log_level',
-                                   action='store_const', const='error', default='warning',
-                                   help='work on log level ERROR')
-        common_parser.add_argument('--warning', dest='log_level',
-                                   action='store_const', const='warning', default='warning',
-                                   help='work on log level WARNING (default)')
-        common_parser.add_argument('--info', '-v', '--verbose', dest='log_level',
-                                   action='store_const', const='info', default='warning',
-                                   help='work on log level INFO')
-        common_parser.add_argument('--debug', dest='log_level',
-                                   action='store_const', const='debug', default='warning',
-                                   help='work on log level DEBUG')
-        common_parser.add_argument('--lock-wait', dest='lock_wait', type=int, metavar='N', default=1,
-                                   help='wait for the lock, but max. N seconds (default: %(default)d).')
-        common_parser.add_argument('--show-rc', dest='show_rc', action='store_true', default=False,
-                                   help='show/log the return code (rc)')
-        common_parser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
-                                   help='do not load/update the file metadata cache used to detect unchanged files')
-        common_parser.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=UMASK_DEFAULT, metavar='M',
-                                   help='set umask to M (local and remote, default: %(default)04o)')
-        common_parser.add_argument('--remote-path', dest='remote_path', default='borg', metavar='PATH',
-                                   help='set remote path to executable (default: "%(default)s")')
+
+        common_group = common_parser.add_argument_group('Common options')
+        common_group.add_argument('-h', '--help', action='help', help='show this help message and exit')
+        common_group.add_argument('--critical', dest='log_level',
+                                  action='store_const', const='critical', default='warning',
+                                  help='work on log level CRITICAL')
+        common_group.add_argument('--error', dest='log_level',
+                                  action='store_const', const='error', default='warning',
+                                  help='work on log level ERROR')
+        common_group.add_argument('--warning', dest='log_level',
+                                  action='store_const', const='warning', default='warning',
+                                  help='work on log level WARNING (default)')
+        common_group.add_argument('--info', '-v', '--verbose', dest='log_level',
+                                  action='store_const', const='info', default='warning',
+                                  help='work on log level INFO')
+        common_group.add_argument('--debug', dest='log_level',
+                                  action='store_const', const='debug', default='warning',
+                                  help='enable debug output, work on log level DEBUG')
+        common_group.add_argument('--lock-wait', dest='lock_wait', type=int, metavar='N', default=1,
+                                  help='wait for the lock, but max. N seconds (default: %(default)d).')
+        common_group.add_argument('--show-version', dest='show_version', action='store_true', default=False,
+                                  help='show/log the borg version')
+        common_group.add_argument('--show-rc', dest='show_rc', action='store_true', default=False,
+                                  help='show/log the return code (rc)')
+        common_group.add_argument('--no-files-cache', dest='cache_files', action='store_false',
+                                  help='do not load/update the file metadata cache used to detect unchanged files')
+        common_group.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=UMASK_DEFAULT, metavar='M',
+                                  help='set umask to M (local and remote, default: %(default)04o)')
+        common_group.add_argument('--remote-path', dest='remote_path', default='borg', metavar='PATH',
+                                  help='set remote path to executable (default: "%(default)s")')
 
         parser = argparse.ArgumentParser(prog=prog, description='Borg - Deduplicated Backups')
         parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,
-                                   help='show version number and exit')
+                            help='show version number and exit')
         subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
 
         serve_epilog = textwrap.dedent("""
         This command starts a repository server process. This command is usually not used manually.
         """)
-        subparser = subparsers.add_parser('serve', parents=[common_parser],
+        subparser = subparsers.add_parser('serve', parents=[common_parser], add_help=False,
                                           description=self.do_serve.__doc__, epilog=serve_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='start repository server process')
@@ -868,7 +1134,7 @@ class Archiver:
         directory containing the deduplicated data from zero or more archives.
         Encryption can be enabled at repository init time.
         """)
-        subparser = subparsers.add_parser('init', parents=[common_parser],
+        subparser = subparsers.add_parser('init', parents=[common_parser], add_help=False,
                                           description=self.do_init.__doc__, epilog=init_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='initialize empty repository')
@@ -916,7 +1182,7 @@ class Archiver:
         - The archive checks can be time consuming, they can be skipped using the
           --repository-only option.
         """)
-        subparser = subparsers.add_parser('check', parents=[common_parser],
+        subparser = subparsers.add_parser('check', parents=[common_parser], add_help=False,
                                           description=self.do_check.__doc__,
                                           epilog=check_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -947,7 +1213,7 @@ class Archiver:
         The key files used for repository encryption are optionally passphrase
         protected. This command can be used to change this passphrase.
         """)
-        subparser = subparsers.add_parser('change-passphrase', parents=[common_parser],
+        subparser = subparsers.add_parser('change-passphrase', parents=[common_parser], add_help=False,
                                           description=self.do_change_passphrase.__doc__,
                                           epilog=change_passphrase_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -974,7 +1240,7 @@ class Archiver:
         But please note: the secrets will always stay the same and they could always
         be derived from your (old) passphrase-mode passphrase.
         """)
-        subparser = subparsers.add_parser('migrate-to-repokey', parents=[common_parser],
+        subparser = subparsers.add_parser('migrate-to-repokey', parents=[common_parser], add_help=False,
                                           description=self.do_migrate_to_repokey.__doc__,
                                           epilog=migrate_to_repokey_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -997,76 +1263,88 @@ class Archiver:
         See the output of the "borg help patterns" command for more help on exclude patterns.
         """)
 
-        subparser = subparsers.add_parser('create', parents=[common_parser],
+        subparser = subparsers.add_parser('create', parents=[common_parser], add_help=False,
                                           description=self.do_create.__doc__,
                                           epilog=create_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='create backup')
         subparser.set_defaults(func=self.do_create)
+
+        subparser.add_argument('-n', '--dry-run', dest='dry_run',
+                               action='store_true', default=False,
+                               help='do not create a backup archive')
+
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the created archive')
         subparser.add_argument('-p', '--progress', dest='progress',
                                action='store_true', default=False,
-                               help="""show progress display while creating the archive, showing Original,
-                               Compressed and Deduplicated sizes, followed by the Number of files seen
-                               and the path being processed, default: %(default)s""")
+                               help='show progress display while creating the archive, showing Original, '
+                                    'Compressed and Deduplicated sizes, followed by the Number of files seen '
+                                    'and the path being processed, default: %(default)s')
         subparser.add_argument('--list', dest='output_list',
                                action='store_true', default=False,
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
                                help='only display items with the given status characters')
-        subparser.add_argument('-e', '--exclude', dest='excludes',
-                               type=parse_pattern, action='append',
-                               metavar="PATTERN", help='exclude paths matching PATTERN')
-        subparser.add_argument('--exclude-from', dest='exclude_files',
-                               type=argparse.FileType('r'), action='append',
-                               metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
-        subparser.add_argument('--exclude-caches', dest='exclude_caches',
-                               action='store_true', default=False,
-                               help='exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)')
-        subparser.add_argument('--exclude-if-present', dest='exclude_if_present',
-                               metavar='FILENAME', action='append', type=str,
-                               help='exclude directories that contain the specified file')
-        subparser.add_argument('--keep-tag-files', dest='keep_tag_files',
-                               action='store_true', default=False,
-                               help='keep tag files of excluded caches/directories')
-        subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
-                               type=int, default=300, metavar='SECONDS',
-                               help='write checkpoint every SECONDS seconds (Default: 300)')
-        subparser.add_argument('-x', '--one-file-system', dest='one_file_system',
-                               action='store_true', default=False,
-                               help='stay in same file system, do not cross mount points')
-        subparser.add_argument('--numeric-owner', dest='numeric_owner',
-                               action='store_true', default=False,
-                               help='only store numeric user and group identifiers')
-        subparser.add_argument('--timestamp', dest='timestamp',
-                               type=timestamp, default=None,
-                               metavar='yyyy-mm-ddThh:mm:ss',
-                               help='manually specify the archive creation date/time (UTC). '
-                                    'alternatively, give a reference file/directory.')
-        subparser.add_argument('--chunker-params', dest='chunker_params',
-                               type=ChunkerParams, default=CHUNKER_PARAMS,
-                               metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
-                               help='specify the chunker parameters. default: %d,%d,%d,%d' % CHUNKER_PARAMS)
-        subparser.add_argument('--ignore-inode', dest='ignore_inode',
-                               action='store_true', default=False,
-                               help='ignore inode data in the file metadata cache used to detect unchanged files.')
-        subparser.add_argument('-C', '--compression', dest='compression',
-                               type=CompressionSpec, default=dict(name='none'), metavar='COMPRESSION',
-                               help='select compression algorithm (and level): '
-                                    'none == no compression (default), '
-                                    'lz4 == lz4, '
-                                    'zlib == zlib (default level 6), '
-                                    'zlib,0 .. zlib,9 == zlib (with level 0..9), '
-                                    'lzma == lzma (default level 6), '
-                                    'lzma,0 .. lzma,9 == lzma (with level 0..9).')
-        subparser.add_argument('--read-special', dest='read_special',
-                               action='store_true', default=False,
-                               help='open and read special files as if they were regular files')
-        subparser.add_argument('-n', '--dry-run', dest='dry_run',
-                               action='store_true', default=False,
-                               help='do not create a backup archive')
+
+        exclude_group = subparser.add_argument_group('Exclusion options')
+        exclude_group.add_argument('-e', '--exclude', dest='excludes',
+                                   type=parse_pattern, action='append',
+                                   metavar="PATTERN", help='exclude paths matching PATTERN')
+        exclude_group.add_argument('--exclude-from', dest='exclude_files',
+                                   type=argparse.FileType('r'), action='append',
+                                   metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
+        exclude_group.add_argument('--exclude-caches', dest='exclude_caches',
+                                   action='store_true', default=False,
+                                   help='exclude directories that contain a CACHEDIR.TAG file ('
+                                        'http://www.brynosaurus.com/cachedir/spec.html)')
+        exclude_group.add_argument('--exclude-if-present', dest='exclude_if_present',
+                                   metavar='FILENAME', action='append', type=str,
+                                   help='exclude directories that contain the specified file')
+        exclude_group.add_argument('--keep-tag-files', dest='keep_tag_files',
+                                   action='store_true', default=False,
+                                   help='keep tag files of excluded caches/directories')
+
+        fs_group = subparser.add_argument_group('Filesystem options')
+        fs_group.add_argument('-x', '--one-file-system', dest='one_file_system',
+                              action='store_true', default=False,
+                              help='stay in same file system, do not cross mount points')
+        fs_group.add_argument('--numeric-owner', dest='numeric_owner',
+                              action='store_true', default=False,
+                              help='only store numeric user and group identifiers')
+        fs_group.add_argument('--ignore-inode', dest='ignore_inode',
+                              action='store_true', default=False,
+                              help='ignore inode data in the file metadata cache used to detect unchanged files.')
+        fs_group.add_argument('--read-special', dest='read_special',
+                              action='store_true', default=False,
+                              help='open and read special files as if they were regular files')
+
+        archive_group = subparser.add_argument_group('Archive options')
+        archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default='',
+                                   help='add a comment text to the archive')
+        archive_group.add_argument('--timestamp', dest='timestamp',
+                                   type=timestamp, default=None,
+                                   metavar='yyyy-mm-ddThh:mm:ss',
+                                   help='manually specify the archive creation date/time (UTC). '
+                                        'alternatively, give a reference file/directory.')
+        archive_group.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
+                                   type=int, default=300, metavar='SECONDS',
+                                   help='write checkpoint every SECONDS seconds (Default: 300)')
+        archive_group.add_argument('--chunker-params', dest='chunker_params',
+                                   type=ChunkerParams, default=CHUNKER_PARAMS,
+                                   metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
+                                   help='specify the chunker parameters. default: %d,%d,%d,%d' % CHUNKER_PARAMS)
+        archive_group.add_argument('-C', '--compression', dest='compression',
+                                   type=CompressionSpec, default=dict(name='none'), metavar='COMPRESSION',
+                                   help='select compression algorithm (and level):\n'
+                                        'none == no compression (default),\n'
+                                        'lz4 == lz4,\n'
+                                        'zlib == zlib (default level 6),\n'
+                                        'zlib,0 .. zlib,9 == zlib (with level 0..9),\n'
+                                        'lzma == lzma (default level 6),\n'
+                                        'lzma,0 .. lzma,9 == lzma (with level 0..9).')
+
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='name of archive to create (must be also a valid directory name)')
@@ -1081,7 +1359,7 @@ class Archiver:
 
         See the output of the "borg help patterns" command for more help on exclude patterns.
         """)
-        subparser = subparsers.add_parser('extract', parents=[common_parser],
+        subparser = subparsers.add_parser('extract', parents=[common_parser], add_help=False,
                                           description=self.do_extract.__doc__,
                                           epilog=extract_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1117,10 +1395,59 @@ class Archiver:
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to extract; patterns are supported')
 
+        diff_epilog = textwrap.dedent("""
+            This command finds differences in files (contents, user, group, mode) between archives.
+
+            Both archives need to be in the same repository, and a repository location may only
+            be specified for ARCHIVE1.
+
+            For archives created with Borg 1.1 or newer diff automatically detects whether
+            the archives are created with the same chunker params. If so, only chunk IDs
+            are compared, which is very fast.
+
+            For archives prior to Borg 1.1 chunk contents are compared by default.
+            If you did not create the archives with different chunker params,
+            pass --same-chunker-params.
+            Note that the chunker params changed from Borg 0.xx to 1.0.
+
+            See the output of the "borg help patterns" command for more help on exclude patterns.
+            """)
+        subparser = subparsers.add_parser('diff', parents=[common_parser], add_help=False,
+                                          description=self.do_diff.__doc__,
+                                          epilog=diff_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='find differences in archive contents')
+        subparser.set_defaults(func=self.do_diff)
+        subparser.add_argument('-e', '--exclude', dest='excludes',
+                               type=parse_pattern, action='append',
+                               metavar="PATTERN", help='exclude paths matching PATTERN')
+        subparser.add_argument('--exclude-from', dest='exclude_files',
+                               type=argparse.FileType('r'), action='append',
+                               metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
+        subparser.add_argument('--numeric-owner', dest='numeric_owner',
+                               action='store_true', default=False,
+                               help='only consider numeric user and group identifiers')
+        subparser.add_argument('--same-chunker-params', dest='same_chunker_params',
+                               action='store_true', default=False,
+                               help='Override check of chunker parameters.')
+        subparser.add_argument('--sort', dest='sort',
+                               action='store_true', default=False,
+                               help='Sort the output lines by file path.')
+        subparser.add_argument('location', metavar='ARCHIVE1',
+                               type=location_validator(archive=True),
+                               help='archive')
+        subparser.add_argument('archive2', metavar='ARCHIVE2',
+                               type=archivename_validator(),
+                               help='archive to compare with ARCHIVE1 (no repository location)')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to compare; patterns are supported')
+
         rename_epilog = textwrap.dedent("""
         This command renames an archive in the repository.
+
+        This results in a different archive ID.
         """)
-        subparser = subparsers.add_parser('rename', parents=[common_parser],
+        subparser = subparsers.add_parser('rename', parents=[common_parser], add_help=False,
                                           description=self.do_rename.__doc__,
                                           epilog=rename_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1138,7 +1465,7 @@ class Archiver:
         Disk space is reclaimed accordingly. If you delete the complete repository, the
         local cache for it (if any) is also deleted.
         """)
-        subparser = subparsers.add_parser('delete', parents=[common_parser],
+        subparser = subparsers.add_parser('delete', parents=[common_parser], add_help=False,
                                           description=self.do_delete.__doc__,
                                           epilog=delete_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1162,8 +1489,13 @@ class Archiver:
 
         list_epilog = textwrap.dedent("""
         This command lists the contents of a repository or an archive.
-        """)
-        subparser = subparsers.add_parser('list', parents=[common_parser],
+
+        See the "borg help patterns" command for more help on exclude patterns.
+
+        The following keys are available for --format when listing files:
+
+        """) + ItemFormatter.keys_help()
+        subparser = subparsers.add_parser('list', parents=[common_parser], add_help=False,
                                           description=self.do_list.__doc__,
                                           epilog=list_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1172,23 +1504,37 @@ class Archiver:
         subparser.add_argument('--short', dest='short',
                                action='store_true', default=False,
                                help='only print file/directory names, nothing else')
-        subparser.add_argument('--list-format', dest='listformat', type=str,
-                               help="""specify format for archive file listing
-                                (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}")
-                                Special "{formatkeys}" exists to list available keys""")
+        subparser.add_argument('--format', '--list-format', dest='format', type=str,
+                               help="""specify format for file listing
+                                (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")""")
         subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')
+        subparser.add_argument('-e', '--exclude', dest='excludes',
+                               type=parse_pattern, action='append',
+                               metavar="PATTERN", help='exclude paths matching PATTERN')
+        subparser.add_argument('--exclude-from', dest='exclude_files',
+                               type=argparse.FileType('r'), action='append',
+                               metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='repository/archive to list contents of')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to list; patterns are supported')
 
         mount_epilog = textwrap.dedent("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
         browsing an archive or restoring individual files. Unless the ``--foreground``
         option is given the command will run in the background until the filesystem
         is ``umounted``.
+
+        The command ``borgfs`` provides a wrapper for ``borg mount``. This can also be
+        used in fstab entries:
+        ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto 0 0``
+
+        To allow a regular user to use fstab entries, add the ``user`` option:
+        ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto,user 0 0``
         """)
-        subparser = subparsers.add_parser('mount', parents=[common_parser],
+        subparser = subparsers.add_parser('mount', parents=[common_parser], add_help=False,
                                           description=self.do_mount.__doc__,
                                           epilog=mount_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1206,8 +1552,12 @@ class Archiver:
 
         info_epilog = textwrap.dedent("""
         This command displays some detailed information about the specified archive.
+
+        The "This archive" line refers exclusively to this archive:
+        "Deduplicated size" is the size of the unique chunks stored only for this
+        archive. Non-unique / common chunks show up under "All archives".
         """)
-        subparser = subparsers.add_parser('info', parents=[common_parser],
+        subparser = subparsers.add_parser('info', parents=[common_parser], add_help=False,
                                           description=self.do_info.__doc__,
                                           epilog=info_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1222,7 +1572,7 @@ class Archiver:
         Please use carefully and only while no borg process (on any machine) is
         trying to access the Cache or the Repository.
         """)
-        subparser = subparsers.add_parser('break-lock', parents=[common_parser],
+        subparser = subparsers.add_parser('break-lock', parents=[common_parser], add_help=False,
                                           description=self.do_break_lock.__doc__,
                                           epilog=break_lock_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1256,7 +1606,7 @@ class Archiver:
         specified by the rules.
         Otherwise, *all* archives in the repository are candidates for deletion!
         """)
-        subparser = subparsers.add_parser('prune', parents=[common_parser],
+        subparser = subparsers.add_parser('prune', parents=[common_parser], add_help=False,
                                           description=self.do_prune.__doc__,
                                           epilog=prune_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1330,7 +1680,7 @@ class Archiver:
         to previous versions. This can PERMANENTLY DAMAGE YOUR
         REPOSITORY!  Attic CAN NOT READ BORG REPOSITORIES, as the
         magic strings have changed. You have been warned.""")
-        subparser = subparsers.add_parser('upgrade', parents=[common_parser],
+        subparser = subparsers.add_parser('upgrade', parents=[common_parser], add_help=False,
                                           description=self.do_upgrade.__doc__,
                                           epilog=upgrade_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1350,7 +1700,114 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')
 
-        subparser = subparsers.add_parser('help', parents=[common_parser],
+        recreate_epilog = textwrap.dedent("""
+        Recreate the contents of existing archives.
+
+        --exclude, --exclude-from and PATH have the exact same semantics
+        as in "borg create". If PATHs are specified the resulting archive
+        will only contain files from these PATHs.
+
+        --compression: all chunks seen will be stored using the given method.
+        Due to how Borg stores compressed size information this might display
+        incorrect information for archives that were not recreated at the same time.
+        There is no risk of data loss by this.
+
+        --chunker-params will re-chunk all files in the archive, this can be
+        used to have upgraded Borg 0.xx or Attic archives deduplicate with
+        Borg 1.x archives.
+
+        borg recreate is signal safe. Send either SIGINT (Ctrl-C on most terminals) or
+        SIGTERM to request termination.
+
+        Use the *exact same* command line to resume the operation later - changing excludes
+        or paths will lead to inconsistencies (changed excludes will only apply to newly
+        processed files/dirs). Changing compression leads to incorrect size information
+        (which does not cause any data loss, but can be misleading).
+        Changing chunker params between invocations might lead to data loss.
+
+        USE WITH CAUTION.
+        Depending on the PATHs and patterns given, recreate can be used to permanently
+        delete files from archives.
+        When in doubt, use "--dry-run --verbose --list" to see how patterns/PATHS are
+        interpreted.
+
+        The archive being recreated is only removed after the operation completes. The
+        archive that is built during the operation exists at the same time at
+        "<ARCHIVE>.recreate". The new archive will have a different archive ID.
+
+        When rechunking space usage can be substantial, expect at least the entire
+        deduplicated size of the archives using the previous chunker params.
+        When recompressing approximately 1 % of the repository size or 512 MB
+        (whichever is greater) of additional space is used.
+        """)
+        subparser = subparsers.add_parser('recreate', parents=[common_parser], add_help=False,
+                                          description=self.do_recreate.__doc__,
+                                          epilog=recreate_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help=self.do_recreate.__doc__)
+        subparser.set_defaults(func=self.do_recreate)
+        subparser.add_argument('--list', dest='output_list',
+                               action='store_true', default=False,
+                               help='output verbose list of items (files, dirs, ...)')
+        subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
+                               help='only display items with the given status characters')
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help='show progress display while recreating archives')
+        subparser.add_argument('-n', '--dry-run', dest='dry_run',
+                               action='store_true', default=False,
+                               help='do not change anything')
+        subparser.add_argument('-s', '--stats', dest='stats',
+                               action='store_true', default=False,
+                               help='print statistics at end')
+
+        exclude_group = subparser.add_argument_group('Exclusion options')
+        exclude_group.add_argument('-e', '--exclude', dest='excludes',
+                                   type=parse_pattern, action='append',
+                                   metavar="PATTERN", help='exclude paths matching PATTERN')
+        exclude_group.add_argument('--exclude-from', dest='exclude_files',
+                                   type=argparse.FileType('r'), action='append',
+                                   metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
+        exclude_group.add_argument('--exclude-caches', dest='exclude_caches',
+                                   action='store_true', default=False,
+                                   help='exclude directories that contain a CACHEDIR.TAG file ('
+                                        'http://www.brynosaurus.com/cachedir/spec.html)')
+        exclude_group.add_argument('--exclude-if-present', dest='exclude_if_present',
+                                   metavar='FILENAME', action='append', type=str,
+                                   help='exclude directories that contain the specified file')
+        exclude_group.add_argument('--keep-tag-files', dest='keep_tag_files',
+                                   action='store_true', default=False,
+                                   help='keep tag files of excluded caches/directories')
+
+        archive_group = subparser.add_argument_group('Archive options')
+        archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default=None,
+                                   help='add a comment text to the archive')
+        archive_group.add_argument('--timestamp', dest='timestamp',
+                                   type=timestamp, default=None,
+                                   metavar='yyyy-mm-ddThh:mm:ss',
+                                   help='manually specify the archive creation date/time (UTC). '
+                                        'alternatively, give a reference file/directory.')
+        archive_group.add_argument('-C', '--compression', dest='compression',
+                                   type=CompressionSpec, default=None, metavar='COMPRESSION',
+                                   help='select compression algorithm (and level):\n'
+                                        'none == no compression (default),\n'
+                                        'lz4 == lz4,\n'
+                                        'zlib == zlib (default level 6),\n'
+                                        'zlib,0 .. zlib,9 == zlib (with level 0..9),\n'
+                                        'lzma == lzma (default level 6),\n'
+                                        'lzma,0 .. lzma,9 == lzma (with level 0..9).')
+        archive_group.add_argument('--chunker-params', dest='chunker_params',
+                                   type=ChunkerParams, default=None,
+                                   metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
+                                   help='specify the chunker parameters (or "default").')
+
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
+                               type=location_validator(),
+                               help='repository/archive to recreate')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to recreate; patterns are supported')
+
+        subparser = subparsers.add_parser('help', parents=[common_parser], add_help=False,
                                           description='Extra help')
         subparser.add_argument('--epilog-only', dest='epilog_only',
                                action='store_true', default=False)
@@ -1363,7 +1820,7 @@ class Archiver:
         debug_dump_archive_items_epilog = textwrap.dedent("""
         This command dumps raw (but decrypted and decompressed) archive items (only metadata) to files.
         """)
-        subparser = subparsers.add_parser('debug-dump-archive-items', parents=[common_parser],
+        subparser = subparsers.add_parser('debug-dump-archive-items', parents=[common_parser], add_help=False,
                                           description=self.do_debug_dump_archive_items.__doc__,
                                           epilog=debug_dump_archive_items_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1376,7 +1833,7 @@ class Archiver:
         debug_get_obj_epilog = textwrap.dedent("""
         This command gets an object from the repository.
         """)
-        subparser = subparsers.add_parser('debug-get-obj', parents=[common_parser],
+        subparser = subparsers.add_parser('debug-get-obj', parents=[common_parser], add_help=False,
                                           description=self.do_debug_get_obj.__doc__,
                                           epilog=debug_get_obj_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1393,7 +1850,7 @@ class Archiver:
         debug_put_obj_epilog = textwrap.dedent("""
         This command puts objects into the repository.
         """)
-        subparser = subparsers.add_parser('debug-put-obj', parents=[common_parser],
+        subparser = subparsers.add_parser('debug-put-obj', parents=[common_parser], add_help=False,
                                           description=self.do_debug_put_obj.__doc__,
                                           epilog=debug_put_obj_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1408,7 +1865,7 @@ class Archiver:
         debug_delete_obj_epilog = textwrap.dedent("""
         This command deletes objects from the repository.
         """)
-        subparser = subparsers.add_parser('debug-delete-obj', parents=[common_parser],
+        subparser = subparsers.add_parser('debug-delete-obj', parents=[common_parser], add_help=False,
                                           description=self.do_debug_delete_obj.__doc__,
                                           epilog=debug_delete_obj_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1448,6 +1905,8 @@ class Archiver:
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
         setup_logging(level=args.log_level, is_serve=args.func == self.do_serve)  # do not use loggers before this!
+        if args.show_version:
+            logger.info('borgbackup version %s' % __version__)
         check_extension_modules()
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
@@ -1488,6 +1947,10 @@ def setup_signal_handlers():  # pragma: no cover
 
 
 def main():  # pragma: no cover
+    # provide 'borg mount' behaviour when the main script/executable is named borgfs
+    if os.path.basename(sys.argv[0]) == "borgfs":
+        sys.argv.insert(1, "mount")
+
     # Make sure stdout and stderr have errors='replace') to avoid unicode
     # issues when print()-ing unicode file names
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=True)
@@ -1523,7 +1986,6 @@ def main():  # pragma: no cover
         elif exit_code == EXIT_ERROR:
             logger.error(exit_msg % ('error', exit_code))
         else:
-            # if you see 666 in output, it usually means exit_code was None
             logger.error(exit_msg % ('abnormal', exit_code or 666))
     sys.exit(exit_code)
 

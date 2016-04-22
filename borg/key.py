@@ -4,14 +4,15 @@ import getpass
 import os
 import sys
 import textwrap
-from hmac import HMAC, compare_digest
+from hmac import compare_digest
 from hashlib import sha256, pbkdf2_hmac
 
-from .helpers import IntegrityError, get_keys_dir, Error, yes
+from .helpers import Chunk, IntegrityError, get_keys_dir, Error, yes
 from .logger import create_logger
 logger = create_logger()
 
-from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
+from .constants import *  # NOQA
+from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks, hmac_sha256
 from .compress import Compressor, COMPR_BUFFER
 import msgpack
 
@@ -76,7 +77,7 @@ class KeyBase:
         """Return HMAC hash using the "id" HMAC key
         """
 
-    def encrypt(self, data):
+    def encrypt(self, chunk):
         pass
 
     def decrypt(self, id, data):
@@ -100,7 +101,8 @@ class PlaintextKey(KeyBase):
     def id_hash(self, data):
         return sha256(data).digest()
 
-    def encrypt(self, data):
+    def encrypt(self, chunk):
+        meta, data = chunk
         return b''.join([self.TYPE_STR, self.compressor.compress(data)])
 
     def decrypt(self, id, data):
@@ -109,7 +111,7 @@ class PlaintextKey(KeyBase):
         data = self.compressor.decompress(memoryview(data)[1:])
         if id and sha256(data).digest() != id:
             raise IntegrityError('Chunk id verification failed')
-        return data
+        return Chunk(data)
 
 
 class AESKeyBase(KeyBase):
@@ -130,31 +132,32 @@ class AESKeyBase(KeyBase):
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
         """
-        return HMAC(self.id_key, data, sha256).digest()
+        return hmac_sha256(self.id_key, data)
 
-    def encrypt(self, data):
-        data = self.compressor.compress(data)
+    def encrypt(self, chunk):
+        data = self.compressor.compress(chunk.data)
         self.enc_cipher.reset()
         data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(data)))
-        hmac = HMAC(self.enc_hmac_key, data, sha256).digest()
+        hmac = hmac_sha256(self.enc_hmac_key, data)
         return b''.join((self.TYPE_STR, hmac, data))
 
     def decrypt(self, id, data):
         if not (data[0] == self.TYPE or
             data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             raise IntegrityError('Invalid encryption envelope')
-        hmac_given = memoryview(data)[1:33]
-        hmac_computed = memoryview(HMAC(self.enc_hmac_key, memoryview(data)[33:], sha256).digest())
+        data_view = memoryview(data)
+        hmac_given = data_view[1:33]
+        hmac_computed = memoryview(hmac_sha256(self.enc_hmac_key, data_view[33:]))
         if not compare_digest(hmac_computed, hmac_given):
             raise IntegrityError('Encryption envelope checksum mismatch')
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
-        data = self.compressor.decompress(self.dec_cipher.decrypt(data[41:]))
+        data = self.compressor.decompress(self.dec_cipher.decrypt(data_view[41:]))
         if id:
             hmac_given = id
-            hmac_computed = HMAC(self.id_key, data, sha256).digest()
+            hmac_computed = hmac_sha256(self.id_key, data)
             if not compare_digest(hmac_computed, hmac_given):
                 raise IntegrityError('Chunk id verification failed')
-        return data
+        return Chunk(data)
 
     def extract_nonce(self, payload):
         if not (payload[0] == self.TYPE or
@@ -332,14 +335,14 @@ class KeyfileKeyBase(AESKeyBase):
         assert d[b'algorithm'] == b'sha256'
         key = passphrase.kdf(d[b'salt'], d[b'iterations'], 32)
         data = AES(is_encrypt=False, key=key).decrypt(d[b'data'])
-        if HMAC(key, data, sha256).digest() == d[b'hash']:
+        if hmac_sha256(key, data) == d[b'hash']:
             return data
 
     def encrypt_key_file(self, data, passphrase):
         salt = os.urandom(32)
-        iterations = 100000
+        iterations = PBKDF2_ITERATIONS
         key = passphrase.kdf(salt, iterations, 32)
-        hash = HMAC(key, data, sha256).digest()
+        hash = hmac_sha256(key, data)
         cdata = AES(is_encrypt=True, key=key).encrypt(data)
         d = {
             'version': 1,

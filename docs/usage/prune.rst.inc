@@ -4,50 +4,39 @@ borg prune
 ----------
 ::
 
-    usage: borg prune [-h] [--critical] [--error] [--warning] [--info] [--debug]
-                      [--lock-wait N] [--show-rc] [--no-files-cache] [--umask M]
-                      [--remote-path PATH] [-n] [-s] [--list]
-                      [--keep-within WITHIN] [-H HOURLY] [-d DAILY] [-w WEEKLY]
-                      [-m MONTHLY] [-y YEARLY] [-P PREFIX] [--save-space]
-                      [REPOSITORY]
-    
-    Prune repository archives according to specified rules
-    
-    positional arguments:
-      REPOSITORY            repository to prune
-    
-    optional arguments:
-      -h, --help            show this help message and exit
-      --critical            work on log level CRITICAL
-      --error               work on log level ERROR
-      --warning             work on log level WARNING (default)
-      --info, -v, --verbose
-                            work on log level INFO
-      --debug               work on log level DEBUG
-      --lock-wait N         wait for the lock, but max. N seconds (default: 1).
-      --show-rc             show/log the return code (rc)
-      --no-files-cache      do not load/update the file metadata cache used to
-                            detect unchanged files
-      --umask M             set umask to M (local and remote, default: 0077)
-      --remote-path PATH    set remote path to executable (default: "borg")
-      -n, --dry-run         do not change repository
-      -s, --stats           print statistics for the deleted archive
-      --list                output verbose list of archives it keeps/prunes
-      --keep-within WITHIN  keep all archives within this time interval
-      -H HOURLY, --keep-hourly HOURLY
-                            number of hourly archives to keep
-      -d DAILY, --keep-daily DAILY
-                            number of daily archives to keep
-      -w WEEKLY, --keep-weekly WEEKLY
-                            number of weekly archives to keep
-      -m MONTHLY, --keep-monthly MONTHLY
-                            number of monthly archives to keep
-      -y YEARLY, --keep-yearly YEARLY
-                            number of yearly archives to keep
-      -P PREFIX, --prefix PREFIX
-                            only consider archive names starting with this prefix
-      --save-space          work slower, but using less space
-    
+    borg prune <options> REPOSITORY
+
+positional arguments
+    REPOSITORY
+        repository to prune
+
+optional arguments
+    ``-n``, ``--dry-run``
+        | do not change repository
+    ``-s``, ``--stats``
+        | print statistics for the deleted archive
+    ``--list``
+        | output verbose list of archives it keeps/prunes
+    ``--keep-within WITHIN``
+        | keep all archives within this time interval
+    ``-H``, ``--keep-hourly``
+        | number of hourly archives to keep
+    ``-d``, ``--keep-daily``
+        | number of daily archives to keep
+    ``-w``, ``--keep-weekly``
+        | number of weekly archives to keep
+    ``-m``, ``--keep-monthly``
+        | number of monthly archives to keep
+    ``-y``, ``--keep-yearly``
+        | number of yearly archives to keep
+    ``-P``, ``--prefix``
+        | only consider archive names starting with this prefix
+    ``--save-space``
+        | work slower, but using less space
+
+`Common options`_
+    |
+
 Description
 ~~~~~~~~~~~
 

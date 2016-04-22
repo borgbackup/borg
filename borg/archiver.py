@@ -775,10 +775,10 @@ class Archiver:
     @with_repository()
     def do_prune(self, args, repository, manifest, key):
         """Prune repository archives according to specified rules"""
-        if not any((args.hourly, args.daily,
+        if not any((args.secondly, args.minutely, args.hourly, args.daily,
                     args.weekly, args.monthly, args.yearly, args.within)):
             self.print_error('At least one of the "keep-within", "keep-last", '
-                             '"keep-hourly", "keep-daily", '
+                             '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
                              '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.')
             return self.exit_code
         archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
@@ -787,6 +787,10 @@ class Archiver:
         keep = []
         if args.within:
             keep += prune_within(archives, args.within)
+        if args.secondly:
+            keep += prune_split(archives, '%Y-%m-%d %H:%M:%S', args.secondly, keep)
+        if args.minutely:
+            keep += prune_split(archives, '%Y-%m-%d %H:%M', args.minutely, keep)
         if args.hourly:
             keep += prune_split(archives, '%Y-%m-%d %H', args.hourly, keep)
         if args.daily:
@@ -798,21 +802,21 @@ class Archiver:
         if args.yearly:
             keep += prune_split(archives, '%Y', args.yearly, keep)
 
-        keep.sort(key=attrgetter('ts'), reverse=True)
-        to_delete = [a for a in archives if a not in keep]
+        to_delete = set(archives) - set(keep)
         stats = Statistics()
         with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
-            for archive in keep:
-                if args.output_list:
-                    logger.info('Keeping archive: %s' % format_archive(archive))
-            for archive in to_delete:
-                if args.dry_run:
-                    if args.output_list:
-                        logger.info('Would prune:     %s' % format_archive(archive))
+            for archive in archives:
+                if archive in to_delete:
+                    if args.dry_run:
+                        if args.output_list:
+                            logger.info('Would prune:     %s' % format_archive(archive))
+                    else:
+                        if args.output_list:
+                            logger.info('Pruning archive: %s' % format_archive(archive))
+                        Archive(repository, key, manifest, archive.name, cache).delete(stats)
                 else:
                     if args.output_list:
-                        logger.info('Pruning archive: %s' % format_archive(archive))
-                    Archive(repository, key, manifest, archive.name, cache).delete(stats)
+                        logger.info('Keeping archive: %s' % format_archive(archive))
             if to_delete and not args.dry_run:
                 manifest.write()
                 repository.commit(save_space=args.save_space)
@@ -1587,13 +1591,10 @@ class Archiver:
         any of the specified retention options. This command is normally used by
         automated backup scripts wanting to keep a certain number of historic backups.
 
-        As an example, "-d 7" means to keep the latest backup on each day, up to 7
-        most recent days with backups (days without backups do not count).
-        The rules are applied from hourly to yearly, and backups selected by previous
-        rules do not count towards those of later rules. The time that each backup
-        completes is used for pruning purposes. Dates and times are interpreted in
-        the local timezone, and weeks go from Monday to Sunday. Specifying a
-        negative number of archives to keep means that there is no limit.
+        If a prefix is set with -P, then only archives that start with the prefix are
+        considered for deletion and only those archives count towards the totals
+        specified by the rules.
+        Otherwise, *all* archives in the repository are candidates for deletion!
 
         The "--keep-within" option takes an argument of the form "<int><char>",
         where char is "H", "d", "w", "m", "y". For example, "--keep-within 2d" means
@@ -1601,10 +1602,18 @@ class Archiver:
         "1m" is taken to mean "31d". The archives kept with this option do not
         count towards the totals specified by any other options.
 
-        If a prefix is set with -P, then only archives that start with the prefix are
-        considered for deletion and only those archives count towards the totals
-        specified by the rules.
-        Otherwise, *all* archives in the repository are candidates for deletion!
+        A good procedure is to thin out more and more the older your backups get.
+        As an example, "--keep-daily 7" means to keep the latest backup on each day,
+        up to 7 most recent days with backups (days without backups do not count).
+        The rules are applied from secondly to yearly, and backups selected by previous
+        rules do not count towards those of later rules. The time that each backup
+        completes is used for pruning purposes. Dates and times are interpreted in
+        the local timezone, and weeks go from Monday to Sunday. Specifying a
+        negative number of archives to keep means that there is no limit.
+
+        The "--keep-last N" option is doing the same as "--keep-secondly N" (and it will
+        keep the last N archives under the assumption that you do not create more than one
+        backup archive in the same second).
         """)
         subparser = subparsers.add_parser('prune', parents=[common_parser], add_help=False,
                                           description=self.do_prune.__doc__,
@@ -1623,6 +1632,10 @@ class Archiver:
                                help='output verbose list of archives it keeps/prunes')
         subparser.add_argument('--keep-within', dest='within', type=str, metavar='WITHIN',
                                help='keep all archives within this time interval')
+        subparser.add_argument('--keep-last', '--keep-secondly', dest='secondly', type=int, default=0,
+                               help='number of secondly archives to keep')
+        subparser.add_argument('--keep-minutely', dest='minutely', type=int, default=0,
+                               help='number of minutely archives to keep')
         subparser.add_argument('-H', '--keep-hourly', dest='hourly', type=int, default=0,
                                help='number of hourly archives to keep')
         subparser.add_argument('-d', '--keep-daily', dest='daily', type=int, default=0,

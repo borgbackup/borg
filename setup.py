@@ -312,7 +312,10 @@ if not on_rtd:
 
 
 def parse(root, describe_command=None):
-    return subprocess.check_output("git describe --tags --long").decode().strip()
+    file = open('borg/_version.py', 'w')
+    output = subprocess.check_output("git describe --tags --long").decode().strip()
+    file.write('version = "' + output + '"')
+    return output
 
 parse_function = parse if sys.platform == 'win32' else None
 

@@ -105,3 +105,8 @@ for dll in finddlls(os.path.join(builddir, "bin/borg.exe")):
     if not builddir in dll:
         shutil.copyfile(dll, os.path.join(builddir, 'bin', os.path.split(dll)[1]))
 shutil.copyfile('borg/__main__.py', os.path.join(builddir, 'bin/borg/__main__.py'))
+
+for extmodule in ['borg/chunker-cpython-35m.dll', 'borg/compress-cpython-35m.dll', 'borg/crypto-cpython-35m.dll', 'borg/hashindex-cpython-35m.dll']:
+    for dll in finddlls(extmodule):
+        if not builddir in dll:
+            shutil.copyfile(dll, os.path.join(builddir, 'bin', os.path.split(dll)[1]))

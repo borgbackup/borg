@@ -35,6 +35,10 @@ class KeyfileNotFoundError(Error):
     """No key file for repository {} found in {}."""
 
 
+class KeyfileInvalidError(Error):
+    """Invalid key file for repository {} found in {}."""
+
+
 class RepoKeyNotFoundError(Error):
     """No key entry found in the config of repository {}."""
 
@@ -396,19 +400,30 @@ class KeyfileKey(KeyfileKeyBase):
     TYPE = 0x00
     FILE_ID = 'BORG_KEY'
 
+    def sanity_check(self, filename):
+        with open(filename, 'r') as fd:
+            line = fd.readline().strip()
+            if line.startswith(self.FILE_ID) and line[len(self.FILE_ID) + 1:] == id:
+                return filename
+            else:
+                return None
+
     def find_key(self):
         keyfile = os.environ.get('BORG_KEY_FILENAME')
         if keyfile:
-            return keyfile
+            sfilename = sanity_check(keyfile)
+            if sfilename:
+                return sfilename
+            else:
+                raise KeyfileInvalidError(self.repository._location.canonical_path(), keyfile)
         else:
             id = hexlify(self.repository.id).decode('ascii')
             keys_dir = get_keys_dir()
             for name in os.listdir(keys_dir):
                 filename = os.path.join(keys_dir, name)
-                with open(filename, 'r') as fd:
-                    line = fd.readline().strip()
-                    if line.startswith(self.FILE_ID) and line[len(self.FILE_ID) + 1:] == id:
-                        return filename
+                sfilename = sanity_check(filename)
+                if sfilename:
+                    return sfilename
             raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
 
     def get_new_target(self, args):

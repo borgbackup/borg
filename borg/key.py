@@ -397,24 +397,32 @@ class KeyfileKey(KeyfileKeyBase):
     FILE_ID = 'BORG_KEY'
 
     def find_key(self):
-        id = hexlify(self.repository.id).decode('ascii')
-        keys_dir = get_keys_dir()
-        for name in os.listdir(keys_dir):
-            filename = os.path.join(keys_dir, name)
-            with open(filename, 'r') as fd:
-                line = fd.readline().strip()
-                if line.startswith(self.FILE_ID) and line[len(self.FILE_ID) + 1:] == id:
-                    return filename
-        raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
+        keyfile = os.environ.get('BORG_KEY_FILENAME')
+        if keyfile:
+            return keyfile
+        else:
+            id = hexlify(self.repository.id).decode('ascii')
+            keys_dir = get_keys_dir()
+            for name in os.listdir(keys_dir):
+                filename = os.path.join(keys_dir, name)
+                with open(filename, 'r') as fd:
+                    line = fd.readline().strip()
+                    if line.startswith(self.FILE_ID) and line[len(self.FILE_ID) + 1:] == id:
+                        return filename
+            raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
 
     def get_new_target(self, args):
-        filename = args.location.to_key_filename()
-        path = filename
-        i = 1
-        while os.path.exists(path):
-            i += 1
-            path = filename + '.%d' % i
-        return path
+        keyfile = os.environ.get('BORG_KEY_FILENAME')
+        if keyfile:
+            return keyfile
+        else:
+            filename = args.location.to_key_filename()
+            path = filename
+            i = 1
+            while os.path.exists(path):
+                i += 1
+                path = filename + '.%d' % i
+            return path
 
     def load(self, target, passphrase):
         with open(target, 'r') as fd:

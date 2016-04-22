@@ -27,6 +27,14 @@ cdef extern from "_hashindex.c":
     uint32_t _le32toh(uint32_t v)
 
 
+cdef extern from "errno.h":
+    int errno
+
+
+cdef extern from "string.h":
+    char *strerror(int errnum)
+
+
 cdef _NoDefault = object()
 
 """
@@ -63,6 +71,8 @@ cdef class IndexBase:
             path = os.fsencode(path)
             self.index = hashindex_read(path)
             if not self.index:
+                if errno:
+                    raise OSError(errno, strerror(errno), path)
                 raise RuntimeError('hashindex_read failed')
         else:
             self.index = hashindex_init(capacity, self.key_size, self.value_size)

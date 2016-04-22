@@ -238,20 +238,24 @@ class Repository:
     def open_index(self, transaction_id, auto_recover=True):
         if transaction_id is None:
             return NSIndex()
-        index_path = (os.path.join(self.path, 'index.%d') % transaction_id).encode('utf-8')
+        index_path = os.path.join(self.path, 'index.%d' % transaction_id).encode('utf-8')
         try:
             return NSIndex.read(index_path)
-        except RuntimeError as re:
-            assert str(re) == 'hashindex_read failed'  # everything else means we're in *deep* trouble
+        except RuntimeError as error:
+            assert str(error) == 'hashindex_read failed'  # everything else means we're in *deep* trouble
             # corrupted index file, need to replay segments
-            os.unlink(os.path.join(self.path, 'hints.%d' % transaction_id))
-            os.unlink(os.path.join(self.path, 'index.%d' % transaction_id))
+            try:
+                os.unlink(index_path)
+            except OSError as e:
+                raise InternalOSError from e
             if not auto_recover:
                 raise
             self.prepare_txn(self.get_transaction_id())
             # don't leave an open transaction around
             self.commit()
             return self.open_index(self.get_transaction_id())
+        except OSError as e:
+            raise InternalOSError from e
 
     def prepare_txn(self, transaction_id, do_cleanup=True):
         self._active_txn = True
@@ -275,15 +279,17 @@ class Repository:
         else:
             if do_cleanup:
                 self.io.cleanup(transaction_id)
+            hints_path = os.path.join(self.path, 'hints.%d' % transaction_id)
+            index_path = os.path.join(self.path, 'index.%d' % transaction_id)
             try:
-                with open(os.path.join(self.path, 'hints.%d' % transaction_id), 'rb') as fd:
+                with open(hints_path, 'rb') as fd:
                     hints = msgpack.unpack(fd)
             except (msgpack.UnpackException, msgpack.ExtraData, FileNotFoundError) as e:
                 # corrupted or deleted hints file, need to replay segments
                 if not isinstance(e, FileNotFoundError):
-                    os.unlink(os.path.join(self.path, 'hints.%d' % transaction_id))
+                    os.unlink(hints_path)
                 # index must exist at this point
-                os.unlink(os.path.join(self.path, 'index.%d' % transaction_id))
+                os.unlink(index_path)
                 self.check_transaction()
                 self.prepare_txn(transaction_id)
                 return

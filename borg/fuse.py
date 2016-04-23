@@ -9,7 +9,7 @@ import time
 from .archive import Archive
 from .helpers import daemonize, bigint_to_int
 from distutils.version import LooseVersion
-import msgpack
+from . import msg_pack
 
 # Does this version of llfuse support ns precision?
 have_fuse_xtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
@@ -31,12 +31,12 @@ class ItemCache:
 
     def add(self, item):
         pos = self.fd.seek(0, io.SEEK_END)
-        self.fd.write(msgpack.packb(item))
+        self.fd.write(msg_pack.packb(item))
         return pos + self.offset
 
     def get(self, inode):
         self.fd.seek(inode - self.offset, io.SEEK_SET)
-        return next(msgpack.Unpacker(self.fd, read_size=1024))
+        return next(msg_pack.Unpacker(self.fd, read_size=1024))
 
 
 class FuseOperations(llfuse.Operations):
@@ -71,8 +71,8 @@ class FuseOperations(llfuse.Operations):
     def process_archive(self, archive, prefix=[]):
         """Build fuse inode hierarchy from archive metadata
         """
-        unpacker = msgpack.Unpacker()
-        for key, chunk in zip(archive.metadata[b'items'], self.repository.get_many(archive.metadata[b'items'])):
+        unpacker = msg_pack.Unpacker()
+        for key, chunk in zip(archive.metadata['items'], self.repository.get_many(archive.metadata['items'])):
             _, data = self.key.decrypt(key, chunk)
             unpacker.feed(data)
             for item in unpacker:

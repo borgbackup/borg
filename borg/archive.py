@@ -24,11 +24,11 @@ from .helpers import Chunk, Error, uid2user, user2uid, gid2group, group2gid, \
     ProgressIndicatorPercent, ChunkIteratorFileWrapper, remove_surrogates, log_multi, \
     PathPrefixPattern, FnmatchPattern, open_item, file_status, format_file_size, consume
 from .repository import Repository
+from . import msg_pack
 from .platform import acl_get, acl_set
 from .chunker import Chunker
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .cache import ChunkListEntry
-import msgpack
 
 has_lchmod = hasattr(os, 'lchmod')
 has_lchflags = hasattr(os, 'lchflags')
@@ -44,19 +44,19 @@ class DownloadPipeline:
         self.key = key
 
     def unpack_many(self, ids, filter=None, preload=False):
-        unpacker = msgpack.Unpacker(use_list=False)
+        unpacker = msg_pack.Unpacker(use_list=False)
         for _, data in self.fetch_many(ids):
             unpacker.feed(data)
             items = [decode_dict(item, ITEM_TEXT_KEYS) for item in unpacker]
             if filter:
                 items = [item for item in items if filter(item)]
             for item in items:
-                if b'chunks' in item:
-                    item[b'chunks'] = [ChunkListEntry(*e) for e in item[b'chunks']]
+                if 'chunks' in item:
+                    item['chunks'] = [ChunkListEntry(*e) for e in item['chunks']]
             if preload:
                 for item in items:
-                    if b'chunks' in item:
-                        self.repository.preload([c.id for c in item[b'chunks']])
+                    if 'chunks' in item:
+                        self.repository.preload([c.id for c in item['chunks']])
             for item in items:
                 yield item
 
@@ -70,7 +70,7 @@ class ChunkBuffer:
 
     def __init__(self, key, chunker_params=ITEMS_CHUNKER_PARAMS):
         self.buffer = BytesIO()
-        self.packer = msgpack.Packer(unicode_errors='surrogateescape')
+        self.packer = msg_pack.Packer(unicode_errors='surrogateescape')
         self.chunks = []
         self.key = key
         self.chunker = Chunker(self.key.chunk_seed, *chunker_params)
@@ -162,13 +162,13 @@ class Archive:
             if name not in self.manifest.archives:
                 raise self.DoesNotExist(name)
             info = self.manifest.archives[name]
-            self.load(info[b'id'])
+            self.load(info['id'])
             self.zeros = b'\0' * (1 << chunker_params[1])
 
     def _load_meta(self, id):
         _, data = self.key.decrypt(id, self.repository.get(id))
-        metadata = msgpack.unpackb(data)
-        if metadata[b'version'] != 1:
+        metadata = msg_pack.unpackb(data)
+        if metadata['version'] != 1:
             raise Exception('Unknown archive metadata version')
         return metadata
 
@@ -176,20 +176,19 @@ class Archive:
         self.id = id
         self.metadata = self._load_meta(self.id)
         decode_dict(self.metadata, ARCHIVE_TEXT_KEYS)
-        self.metadata[b'cmdline'] = [arg.decode('utf-8', 'surrogateescape') for arg in self.metadata[b'cmdline']]
-        self.name = self.metadata[b'name']
+        self.name = self.metadata['name']
 
     @property
     def ts(self):
         """Timestamp of archive creation (start) in UTC"""
-        ts = self.metadata[b'time']
+        ts = self.metadata['time']
         return parse_timestamp(ts)
 
     @property
     def ts_end(self):
         """Timestamp of archive creation (end) in UTC"""
         # fall back to time if there is no time_end present in metadata
-        ts = self.metadata.get(b'time_end') or self.metadata[b'time']
+        ts = self.metadata.get('time_end') or self.metadata['time']
         return parse_timestamp(ts)
 
     @property
@@ -216,7 +215,7 @@ Number of files: {0.stats.nfiles}'''.format(
         return 'Archive(%r)' % self.name
 
     def iter_items(self, filter=None, preload=False):
-        for item in self.pipeline.unpack_many(self.metadata[b'items'], filter=filter, preload=preload):
+        for item in self.pipeline.unpack_many(self.metadata['items'], filter=filter, preload=preload):
             yield item
 
     def add_item(self, item):
@@ -261,7 +260,7 @@ Number of files: {0.stats.nfiles}'''.format(
             'chunker_params': self.chunker_params,
         }
         metadata.update(additional_metadata or {})
-        data = msgpack.packb(StableDict(metadata), unicode_errors='surrogateescape')
+        data = msg_pack.packb(StableDict(metadata), unicode_errors='surrogateescape')
         self.id = self.key.id_hash(data)
         self.cache.add_chunk(self.id, Chunk(data), self.stats)
         self.manifest.archives[name] = {'id': self.id, 'time': metadata['time']}
@@ -281,18 +280,18 @@ Number of files: {0.stats.nfiles}'''.format(
 
         # This function is a bit evil since it abuses the cache to calculate
         # the stats. The cache transaction must be rolled back afterwards
-        unpacker = msgpack.Unpacker(use_list=False)
+        unpacker = msg_pack.Unpacker(use_list=False)
         cache.begin_txn()
         stats = Statistics()
         add(self.id)
-        for id, chunk in zip(self.metadata[b'items'], self.repository.get_many(self.metadata[b'items'])):
+        for id, chunk in zip(self.metadata['items'], self.repository.get_many(self.metadata['items'])):
             add(id)
             _, data = self.key.decrypt(id, chunk)
             unpacker.feed(data)
             for item in unpacker:
-                if b'chunks' in item:
+                if 'chunks' in item:
                     stats.nfiles += 1
-                    add_file_chunks(item[b'chunks'])
+                    add_file_chunks(item['chunks'])
         cache.rollback()
         return stats
 
@@ -307,22 +306,22 @@ Number of files: {0.stats.nfiles}'''.format(
         :param stdout: write extracted data to stdout
         :param sparse: write sparse files (chunk-granularity, independent of the original being sparse)
         :param hardlink_masters: maps paths to (chunks, link_target) for extracting subtrees with hardlinks correctly
-        :param original_path: b'path' key as stored in archive
+        :param original_path: 'path' key as stored in archive
         """
         if dry_run or stdout:
-            if b'chunks' in item:
-                for data in self.pipeline.fetch_many([c.id for c in item[b'chunks']], is_preloaded=True):
+            if 'chunks' in item:
+                for data in self.pipeline.fetch_many([c.id for c in item['chunks']], is_preloaded=True):
                     if stdout:
                         sys.stdout.buffer.write(data)
                 if stdout:
                     sys.stdout.buffer.flush()
             return
 
-        original_path = original_path or item[b'path']
+        original_path = original_path or item['path']
         dest = self.cwd
-        if item[b'path'].startswith('/') or item[b'path'].startswith('..'):
+        if item['path'].startswith('/') or item['path'].startswith('..'):
             raise Exception('Path should be relative and local')
-        path = os.path.join(dest, item[b'path'])
+        path = os.path.join(dest, item['path'])
         # Attempt to remove existing files, ignore errors on failure
         try:
             st = os.lstat(path)
@@ -334,27 +333,27 @@ Number of files: {0.stats.nfiles}'''.format(
             raise self.IncompatibleFilesystemEncodingError(path, sys.getfilesystemencoding()) from None
         except OSError:
             pass
-        mode = item[b'mode']
+        mode = item['mode']
         if stat.S_ISREG(mode):
             if not os.path.exists(os.path.dirname(path)):
                 os.makedirs(os.path.dirname(path))
 
             # Hard link?
-            if b'source' in item:
-                source = os.path.join(dest, item[b'source'])
+            if 'source' in item:
+                source = os.path.join(dest, item['source'])
                 if os.path.exists(path):
                     os.unlink(path)
                 if not hardlink_masters:
                     os.link(source, path)
                     return
-                item[b'chunks'], link_target = hardlink_masters[item[b'source']]
+                item['chunks'], link_target = hardlink_masters[item['source']]
                 if link_target:
                     # Hard link was extracted previously, just link
                     os.link(link_target, path)
                     return
                 # Extract chunks, since the item which had the chunks was not extracted
             with open(path, 'wb') as fd:
-                ids = [c.id for c in item[b'chunks']]
+                ids = [c.id for c in item['chunks']]
                 for _, data in self.pipeline.fetch_many(ids, is_preloaded=True):
                     if sparse and self.zeros.startswith(data):
                         # all-zero chunk: create a hole in a sparse file
@@ -367,7 +366,7 @@ Number of files: {0.stats.nfiles}'''.format(
                 self.restore_attrs(path, item, fd=fd.fileno())
             if hardlink_masters:
                 # Update master entry with extracted file path, so that following hardlinks don't extract twice.
-                hardlink_masters[item.get(b'source') or original_path] = (None, path)
+                hardlink_masters[item.get('source') or original_path] = (None, path)
         elif stat.S_ISDIR(mode):
             if not os.path.exists(path):
                 os.makedirs(path)
@@ -376,7 +375,7 @@ Number of files: {0.stats.nfiles}'''.format(
         elif stat.S_ISLNK(mode):
             if not os.path.exists(os.path.dirname(path)):
                 os.makedirs(os.path.dirname(path))
-            source = item[b'source']
+            source = item['source']
             if os.path.exists(path):
                 os.unlink(path)
             try:
@@ -390,18 +389,18 @@ Number of files: {0.stats.nfiles}'''.format(
             os.mkfifo(path)
             self.restore_attrs(path, item)
         elif stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
-            os.mknod(path, item[b'mode'], item[b'rdev'])
+            os.mknod(path, item['mode'], item['rdev'])
             self.restore_attrs(path, item)
         else:
-            raise Exception('Unknown archive item type %r' % item[b'mode'])
+            raise Exception('Unknown archive item type %r' % item['mode'])
 
     def restore_attrs(self, path, item, symlink=False, fd=None):
         uid = gid = None
         if not self.numeric_owner:
-            uid = user2uid(item[b'user'])
-            gid = group2gid(item[b'group'])
-        uid = item[b'uid'] if uid is None else uid
-        gid = item[b'gid'] if gid is None else gid
+            uid = user2uid(item['user'])
+            gid = group2gid(item['group'])
+        uid = item['uid'] if uid is None else uid
+        gid = item['gid'] if gid is None else gid
         # This code is a bit of a mess due to os specific differences
         try:
             if fd:
@@ -411,14 +410,14 @@ Number of files: {0.stats.nfiles}'''.format(
         except OSError:
             pass
         if fd:
-            os.fchmod(fd, item[b'mode'])
+            os.fchmod(fd, item['mode'])
         elif not symlink:
-            os.chmod(path, item[b'mode'])
+            os.chmod(path, item['mode'])
         elif has_lchmod:  # Not available on Linux
-            os.lchmod(path, item[b'mode'])
-        mtime = bigint_to_int(item[b'mtime'])
-        if b'atime' in item:
-            atime = bigint_to_int(item[b'atime'])
+            os.lchmod(path, item['mode'])
+        mtime = bigint_to_int(item['mtime'])
+        if 'atime' in item:
+            atime = bigint_to_int(item['atime'])
         else:
             # old archives only had mtime in item metadata
             atime = mtime
@@ -428,14 +427,14 @@ Number of files: {0.stats.nfiles}'''.format(
             os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
         acl_set(path, item, self.numeric_owner)
         # Only available on OS X and FreeBSD
-        if has_lchflags and b'bsdflags' in item:
+        if has_lchflags and 'bsdflags' in item:
             try:
-                os.lchflags(path, item[b'bsdflags'])
+                os.lchflags(path, item['bsdflags'])
             except OSError:
                 pass
         # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
         # the Linux capabilities in the "security.capability" attribute.
-        xattrs = item.get(b'xattrs', {})
+        xattrs = item.get('xattrs', {})
         for k, v in xattrs.items():
             try:
                 xattr.setxattr(fd or path, k, v, follow_symlinks=False)
@@ -450,10 +449,10 @@ Number of files: {0.stats.nfiles}'''.format(
     def set_meta(self, key, value):
         metadata = StableDict(self._load_meta(self.id))
         metadata[key] = value
-        data = msgpack.packb(metadata, unicode_errors='surrogateescape')
+        data = msg_pack.packb(metadata, unicode_errors='surrogateescape')
         new_id = self.key.id_hash(data)
         self.cache.add_chunk(new_id, Chunk(data), self.stats)
-        self.manifest.archives[self.name] = {'id': new_id, 'time': metadata[b'time']}
+        self.manifest.archives[self.name] = {'id': new_id, 'time': metadata['time']}
         self.cache.chunk_decref(self.id, self.stats)
         self.id = new_id
 
@@ -462,12 +461,12 @@ Number of files: {0.stats.nfiles}'''.format(
             raise self.AlreadyExists(name)
         oldname = self.name
         self.name = name
-        self.set_meta(b'name', name)
+        self.set_meta('name', name)
         del self.manifest.archives[oldname]
 
     def delete(self, stats, progress=False):
-        unpacker = msgpack.Unpacker(use_list=False)
-        items_ids = self.metadata[b'items']
+        unpacker = msg_pack.Unpacker(use_list=False)
+        items_ids = self.metadata['items']
         pi = ProgressIndicatorPercent(total=len(items_ids), msg="Decrementing references %3.0f%%", same_line=True)
         for (i, (items_id, data)) in enumerate(zip(items_ids, self.repository.get_many(items_ids))):
             if progress:
@@ -476,8 +475,8 @@ Number of files: {0.stats.nfiles}'''.format(
             unpacker.feed(data)
             self.cache.chunk_decref(items_id, stats)
             for item in unpacker:
-                if b'chunks' in item:
-                    for chunk_id, size, csize in item[b'chunks']:
+                if 'chunks' in item:
+                    for chunk_id, size, csize in item['chunks']:
                         self.cache.chunk_decref(chunk_id, stats)
         if progress:
             pi.finish()
@@ -486,37 +485,37 @@ Number of files: {0.stats.nfiles}'''.format(
 
     def stat_attrs(self, st, path):
         item = {
-            b'mode': st.st_mode,
-            b'uid': st.st_uid, b'user': uid2user(st.st_uid),
-            b'gid': st.st_gid, b'group': gid2group(st.st_gid),
-            b'atime': int_to_bigint(st.st_atime_ns),
-            b'ctime': int_to_bigint(st.st_ctime_ns),
-            b'mtime': int_to_bigint(st.st_mtime_ns),
+            'mode': st.st_mode,
+            'uid': st.st_uid, 'user': uid2user(st.st_uid),
+            'gid': st.st_gid, 'group': gid2group(st.st_gid),
+            'atime': int_to_bigint(st.st_atime_ns),
+            'ctime': int_to_bigint(st.st_ctime_ns),
+            'mtime': int_to_bigint(st.st_mtime_ns),
         }
         if self.numeric_owner:
-            item[b'user'] = item[b'group'] = None
+            item['user'] = item['group'] = None
         xattrs = xattr.get_all(path, follow_symlinks=False)
         if xattrs:
-            item[b'xattrs'] = StableDict(xattrs)
+            item['xattrs'] = StableDict(xattrs)
         if has_lchflags and st.st_flags:
-            item[b'bsdflags'] = st.st_flags
+            item['bsdflags'] = st.st_flags
         acl_get(path, item, st, self.numeric_owner)
         return item
 
     def process_dir(self, path, st):
-        item = {b'path': make_path_safe(path)}
+        item = {'path': make_path_safe(path)}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
         return 'd'  # directory
 
     def process_fifo(self, path, st):
-        item = {b'path': make_path_safe(path)}
+        item = {'path': make_path_safe(path)}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
         return 'f'  # fifo
 
     def process_dev(self, path, st):
-        item = {b'path': make_path_safe(path), b'rdev': st.st_rdev}
+        item = {'path': make_path_safe(path), 'rdev': st.st_rdev}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
         if stat.S_ISCHR(st.st_mode):
@@ -526,7 +525,7 @@ Number of files: {0.stats.nfiles}'''.format(
 
     def process_symlink(self, path, st):
         source = os.readlink(path)
-        item = {b'path': make_path_safe(path), b'source': source}
+        item = {'path': make_path_safe(path), 'source': source}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
         return 's'  # symlink
@@ -540,12 +539,12 @@ Number of files: {0.stats.nfiles}'''.format(
         self.stats.nfiles += 1
         t = int_to_bigint(int(time.time()) * 1000000000)
         item = {
-            b'path': path,
-            b'chunks': chunks,
-            b'mode': 0o100660,  # regular file, ug=rw
-            b'uid': uid, b'user': uid2user(uid),
-            b'gid': gid, b'group': gid2group(gid),
-            b'mtime': t, b'atime': t, b'ctime': t,
+            'path': path,
+            'chunks': chunks,
+            'mode': 0o100660,  # regular file, ug=rw
+            'uid': uid, 'user': uid2user(uid),
+            'gid': gid, 'group': gid2group(gid),
+            'mtime': t, 'atime': t, 'ctime': t,
         }
         self.add_item(item)
         return 'i'  # stdin
@@ -559,8 +558,8 @@ Number of files: {0.stats.nfiles}'''.format(
             if (st.st_ino, st.st_dev) in self.hard_links:
                 item = self.stat_attrs(st, path)
                 item.update({
-                    b'path': safe_path,
-                    b'source': source,
+                    'path': safe_path,
+                    'source': source,
                 })
                 self.add_item(item)
                 status = 'h'  # regular file, hardlink (to already seen inodes)
@@ -584,8 +583,8 @@ Number of files: {0.stats.nfiles}'''.format(
         else:
             status = 'A'  # regular file, added
         item = {
-            b'path': safe_path,
-            b'hardlink_master': st.st_nlink > 1,  # item is a hard link and has the chunks
+            'path': safe_path,
+            'hardlink_master': st.st_nlink > 1,  # item is a hard link and has the chunks
         }
         # Only chunkify the file if needed
         if chunks is None:
@@ -598,7 +597,7 @@ Number of files: {0.stats.nfiles}'''.format(
                         self.stats.show_progress(item=item, dt=0.2)
             cache.memorize_file(path_hash, st, [c.id for c in chunks])
             status = status or 'M'  # regular file, modified (if not 'A' already)
-        item[b'chunks'] = chunks
+        item['chunks'] = chunks
         item.update(self.stat_attrs(st, path))
         self.stats.nfiles += 1
         self.add_item(item)
@@ -628,11 +627,11 @@ class RobustUnpacker:
     """
     def __init__(self, validator):
         super().__init__()
-        self.item_keys = [msgpack.packb(name) for name in ITEM_KEYS]
+        self.item_keys = [msg_pack.packb(name) for name in ITEM_KEYS]
         self.validator = validator
         self._buffered_data = []
         self._resync = False
-        self._unpacker = msgpack.Unpacker(object_hook=StableDict)
+        self._unpacker = msg_pack.Unpacker(object_hook=StableDict)
 
     def resync(self):
         self._buffered_data = []
@@ -665,7 +664,7 @@ class RobustUnpacker:
                     data = data[1:]
                     continue
 
-                self._unpacker = msgpack.Unpacker(object_hook=StableDict)
+                self._unpacker = msg_pack.Unpacker(object_hook=StableDict)
                 self._unpacker.feed(data)
                 try:
                     item = next(self._unpacker)
@@ -746,14 +745,14 @@ class ArchiveChecker:
             if b'cmdline' not in data or b'\xa7version\x01' not in data:
                 continue
             try:
-                archive = msgpack.unpackb(data)
+                archive = msg_pack.unpackb(data)
             # Ignore exceptions that might be raised when feeding
             # msgpack with invalid data
             except (TypeError, ValueError, StopIteration):
                 continue
-            if isinstance(archive, dict) and b'items' in archive and b'cmdline' in archive:
-                logger.info('Found archive %s', archive[b'name'].decode('utf-8'))
-                manifest.archives[archive[b'name'].decode('utf-8')] = {b'id': chunk_id, b'time': archive[b'time']}
+            if isinstance(archive, dict) and 'items' in archive and 'cmdline' in archive:
+                logger.info('Found archive %s', archive['name'])
+                manifest.archives[archive['name']] = {'id': chunk_id, 'time': archive['time']}
         logger.info('Manifest rebuild complete.')
         return manifest
 
@@ -792,10 +791,10 @@ class ArchiveChecker:
             """
             offset = 0
             chunk_list = []
-            for chunk_id, size, csize in item[b'chunks']:
+            for chunk_id, size, csize in item['chunks']:
                 if chunk_id not in self.chunks:
                     # If a file chunk is missing, create an all empty replacement chunk
-                    logger.error('{}: Missing file chunk detected (Byte {}-{})'.format(item[b'path'].decode('utf-8', 'surrogateescape'), offset, offset + size))
+                    logger.error('{}: Missing file chunk detected (Byte {}-{})'.format(item['path'], offset, offset + size))
                     self.error_found = True
                     data = bytes(size)
                     chunk_id = self.key.id_hash(data)
@@ -806,14 +805,14 @@ class ArchiveChecker:
                     add_reference(chunk_id, size, csize)
                 chunk_list.append((chunk_id, size, csize))
                 offset += size
-            item[b'chunks'] = chunk_list
+            item['chunks'] = chunk_list
 
         def robust_iterator(archive):
             """Iterates through all archive items
 
             Missing item chunks will be skipped and the msgpack stream will be restarted
             """
-            unpacker = RobustUnpacker(lambda item: isinstance(item, dict) and b'path' in item)
+            unpacker = RobustUnpacker(lambda item: isinstance(item, dict) and 'path' in item)
             _state = 0
 
             def missing_chunk_detector(chunk_id):
@@ -829,7 +828,7 @@ class ArchiveChecker:
                 logger.error(msg)
 
             i = 0
-            for state, items in groupby(archive[b'items'], missing_chunk_detector):
+            for state, items in groupby(archive['items'], missing_chunk_detector):
                 items = list(items)
                 if state % 2:
                     for chunk_id in items:
@@ -855,7 +854,7 @@ class ArchiveChecker:
         if archive is None:
             # we need last N or all archives
             archive_items = sorted(self.manifest.archives.items(), reverse=True,
-                                   key=lambda name_info: name_info[1][b'time'])
+                                   key=lambda name_info: name_info[1]['time'])
             if prefix is not None:
                 archive_items = [item for item in archive_items if item[0].startswith(prefix)]
             num_archives = len(archive_items)
@@ -869,7 +868,7 @@ class ArchiveChecker:
         with cache_if_remote(self.repository) as repository:
             for i, (name, info) in enumerate(archive_items[:end]):
                 logger.info('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
-                archive_id = info[b'id']
+                archive_id = info['id']
                 if archive_id not in self.chunks:
                     logger.error('Archive metadata block is missing!')
                     self.error_found = True
@@ -878,26 +877,25 @@ class ArchiveChecker:
                 mark_as_possibly_superseded(archive_id)
                 cdata = self.repository.get(archive_id)
                 _, data = self.key.decrypt(archive_id, cdata)
-                archive = StableDict(msgpack.unpackb(data))
-                if archive[b'version'] != 1:
+                archive = StableDict(msg_pack.unpackb(data))
+                if archive['version'] != 1:
                     raise Exception('Unknown archive metadata version')
                 decode_dict(archive, ARCHIVE_TEXT_KEYS)
-                archive[b'cmdline'] = [arg.decode('utf-8', 'surrogateescape') for arg in archive[b'cmdline']]
                 items_buffer = ChunkBuffer(self.key)
                 items_buffer.write_chunk = add_callback
                 for item in robust_iterator(archive):
-                    if b'chunks' in item:
+                    if 'chunks' in item:
                         verify_file_chunks(item)
                     items_buffer.add(item)
                 items_buffer.flush(flush=True)
-                for previous_item_id in archive[b'items']:
+                for previous_item_id in archive['items']:
                     mark_as_possibly_superseded(previous_item_id)
-                archive[b'items'] = items_buffer.chunks
-                data = msgpack.packb(archive, unicode_errors='surrogateescape')
+                archive['items'] = items_buffer.chunks
+                data = msg_pack.packb(archive, unicode_errors='surrogateescape')
                 new_archive_id = self.key.id_hash(data)
                 cdata = self.key.encrypt(Chunk(data))
                 add_reference(new_archive_id, len(data), len(cdata), cdata)
-                info[b'id'] = new_archive_id
+                info['id'] = new_archive_id
 
     def orphan_chunks_check(self):
         if self.check_all:
@@ -989,38 +987,38 @@ class ArchiveRecreater:
 
         def item_is_hardlink_master(item):
             return (target_is_subset and
-                    stat.S_ISREG(item[b'mode']) and
-                    item.get(b'hardlink_master', True) and
-                    b'source' not in item and
-                    not matcher.match(item[b'path']))
+                    stat.S_ISREG(item['mode']) and
+                    item.get('hardlink_master', True) and
+                    'source' not in item and
+                    not matcher.match(item['path']))
 
         for item in archive.iter_items():
             if item_is_hardlink_master(item):
                 # Re-visit all of these items in the archive even when fast-forwarding to rebuild hardlink_masters
-                hardlink_masters[item[b'path']] = (item.get(b'chunks'), None)
+                hardlink_masters[item['path']] = (item.get('chunks'), None)
                 continue
             if resume_from:
                 # Fast forward to after the last processed file
-                if item[b'path'] == resume_from:
-                    logger.info('Fast-forwarded to %s', remove_surrogates(item[b'path']))
+                if item['path'] == resume_from:
+                    logger.info('Fast-forwarded to %s', remove_surrogates(item['path']))
                     resume_from = None
                 continue
-            if not matcher.match(item[b'path']):
-                self.print_file_status('x', item[b'path'])
+            if not matcher.match(item['path']):
+                self.print_file_status('x', item['path'])
                 continue
-            if target_is_subset and stat.S_ISREG(item[b'mode']) and item.get(b'source') in hardlink_masters:
+            if target_is_subset and stat.S_ISREG(item['mode']) and item.get('source') in hardlink_masters:
                 # master of this hard link is outside the target subset
-                chunks, new_source = hardlink_masters[item[b'source']]
+                chunks, new_source = hardlink_masters[item['source']]
                 if new_source is None:
                     # First item to use this master, move the chunks
-                    item[b'chunks'] = chunks
-                    hardlink_masters[item[b'source']] = (None, item[b'path'])
-                    del item[b'source']
+                    item['chunks'] = chunks
+                    hardlink_masters[item['source']] = (None, item['path'])
+                    del item['source']
                 else:
                     # Master was already moved, only update this item's source
-                    item[b'source'] = new_source
+                    item['source'] = new_source
             if self.dry_run:
-                self.print_file_status('-', item[b'path'])
+                self.print_file_status('-', item['path'])
             else:
                 try:
                     self.process_item(archive, target, item)
@@ -1032,20 +1030,20 @@ class ArchiveRecreater:
             target.stats.show_progress(final=True)
 
     def process_item(self, archive, target, item):
-        if b'chunks' in item:
-            item[b'chunks'] = self.process_chunks(archive, target, item)
+        if 'chunks' in item:
+            item['chunks'] = self.process_chunks(archive, target, item)
             target.stats.nfiles += 1
         target.add_item(item)
-        self.print_file_status(file_status(item[b'mode']), item[b'path'])
+        self.print_file_status(file_status(item['mode']), item['path'])
         if self.interrupt:
             raise self.Interrupted
 
     def process_chunks(self, archive, target, item):
         """Return new chunk ID list for 'item'."""
         if not self.recompress and not target.recreate_rechunkify:
-            for chunk_id, size, csize in item[b'chunks']:
+            for chunk_id, size, csize in item['chunks']:
                 self.cache.chunk_incref(chunk_id, target.stats)
-            return item[b'chunks']
+            return item['chunks']
         new_chunks = self.process_partial_chunks(target)
         chunk_iterator = self.create_chunk_iterator(archive, target, item)
         consume(chunk_iterator, len(new_chunks))
@@ -1076,7 +1074,7 @@ class ArchiveRecreater:
 
     def create_chunk_iterator(self, archive, target, item):
         """Return iterator of chunks to store for 'item' from 'archive' in 'target'."""
-        chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _, _ in item[b'chunks']])
+        chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _, _ in item['chunks']])
         if target.recreate_rechunkify:
             # The target.chunker will read the file contents through ChunkIteratorFileWrapper chunk-by-chunk
             # (does not load the entire file into memory)
@@ -1109,9 +1107,9 @@ class ArchiveRecreater:
         if completed:
             timestamp = archive.ts.replace(tzinfo=None)
             if comment is None:
-                comment = archive.metadata.get(b'comment', '')
+                comment = archive.metadata.get('comment', '')
             target.save(timestamp=timestamp, comment=comment, additional_metadata={
-                'cmdline': archive.metadata[b'cmdline'],
+                'cmdline': archive.metadata['cmdline'],
                 'recreate_cmdline': sys.argv,
             })
             archive.delete(Statistics(), progress=self.progress)
@@ -1138,7 +1136,7 @@ class ArchiveRecreater:
         """Add excludes to the matcher created by exclude_cache and exclude_if_present."""
         def exclude(dir, tag_item):
             if self.keep_tag_files:
-                tag_files.append(PathPrefixPattern(tag_item[b'path']))
+                tag_files.append(PathPrefixPattern(tag_item['path']))
                 tagged_dirs.append(FnmatchPattern(dir + '/'))
             else:
                 tagged_dirs.append(PathPrefixPattern(dir))
@@ -1150,18 +1148,18 @@ class ArchiveRecreater:
         cachedir_masters = {}
 
         for item in archive.iter_items(
-                filter=lambda item: item[b'path'].endswith(CACHE_TAG_NAME) or matcher.match(item[b'path'])):
-            if item[b'path'].endswith(CACHE_TAG_NAME):
-                cachedir_masters[item[b'path']] = item
-            if stat.S_ISREG(item[b'mode']):
-                dir, tag_file = os.path.split(item[b'path'])
+                filter=lambda item: item['path'].endswith(CACHE_TAG_NAME) or matcher.match(item['path'])):
+            if item['path'].endswith(CACHE_TAG_NAME):
+                cachedir_masters[item['path']] = item
+            if stat.S_ISREG(item['mode']):
+                dir, tag_file = os.path.split(item['path'])
                 if tag_file in self.exclude_if_present:
                     exclude(dir, item)
                 if self.exclude_caches and tag_file == CACHE_TAG_NAME:
-                    if b'chunks' in item:
+                    if 'chunks' in item:
                         file = open_item(archive, item)
                     else:
-                        file = open_item(archive, cachedir_masters[item[b'source']])
+                        file = open_item(archive, cachedir_masters[item['source']])
                     if file.read(len(CACHE_TAG_CONTENTS)).startswith(CACHE_TAG_CONTENTS):
                         exclude(dir, item)
         matcher.add(tag_files, True)
@@ -1179,15 +1177,15 @@ class ArchiveRecreater:
         if not target:
             target = self.create_target_archive(target_name)
         # If the archives use the same chunker params, then don't rechunkify
-        target.recreate_rechunkify = tuple(archive.metadata.get(b'chunker_params')) != self.chunker_params
+        target.recreate_rechunkify = tuple(archive.metadata.get('chunker_params')) != self.chunker_params
         return target, resume_from
 
     def try_resume(self, archive, target_name):
         """Try to resume from temporary archive. Return (target archive, resume from path) if successful."""
         logger.info('Found %s, will resume interrupted operation', target_name)
         old_target = self.open_archive(target_name)
-        resume_id = old_target.metadata[b'recreate_source_id']
-        resume_args = [arg.decode('utf-8', 'surrogateescape') for arg in old_target.metadata[b'recreate_args']]
+        resume_id = old_target.metadata['recreate_source_id']
+        resume_args = old_target.metadata['recreate_args']
         if resume_id != archive.id:
             logger.warning('Source archive changed, will discard %s and start over', target_name)
             logger.warning('Saved fingerprint:   %s', hexlify(resume_id).decode('ascii'))
@@ -1202,18 +1200,18 @@ class ArchiveRecreater:
         logger.info('Replaying items from interrupted operation...')
         item = None
         for item in old_target.iter_items():
-            if b'chunks' in item:
-                for chunk in item[b'chunks']:
+            if 'chunks' in item:
+                for chunk in item['chunks']:
                     self.cache.chunk_incref(chunk.id, target.stats)
                 target.stats.nfiles += 1
             target.add_item(item)
         if item:
-            resume_from = item[b'path']
+            resume_from = item['path']
         else:
             resume_from = None
         if self.progress:
             old_target.stats.show_progress(final=True)
-        target.recreate_partial_chunks = old_target.metadata.get(b'recreate_partial_chunks', [])
+        target.recreate_partial_chunks = old_target.metadata.get('recreate_partial_chunks', [])
         for chunk_id, size, csize in target.recreate_partial_chunks:
             if not self.cache.seen_chunk(chunk_id):
                 try:

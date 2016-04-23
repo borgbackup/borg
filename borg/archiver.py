@@ -21,11 +21,12 @@ from .helpers import Error, location_validator, archivename_validator, format_ti
     parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
     get_cache_dir, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    dir_is_tagged, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
+    dir_is_tagged, ChunkerParams, CompressionSpec, yes, sysinfo, \
     log_multi, PatternMatcher, ItemFormatter
 from .logger import create_logger, setup_logging
 logger = create_logger()
 from . import helpers
+from . import msg_pack
 from .compress import Compressor, COMPR_BUFFER
 from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 from .repository import Repository
@@ -394,22 +395,22 @@ class Archiver:
         hardlink_masters = {} if partial_extract else None
 
         def item_is_hardlink_master(item):
-            return (partial_extract and stat.S_ISREG(item[b'mode']) and
-                    item.get(b'hardlink_master', True) and b'source' not in item)
+            return (partial_extract and stat.S_ISREG(item['mode']) and
+                    item.get('hardlink_master', True) and 'source' not in item)
 
         for item in archive.iter_items(preload=True,
-                filter=lambda item: item_is_hardlink_master(item) or matcher.match(item[b'path'])):
-            orig_path = item[b'path']
+                filter=lambda item: item_is_hardlink_master(item) or matcher.match(item['path'])):
+            orig_path = item['path']
             if item_is_hardlink_master(item):
-                hardlink_masters[orig_path] = (item.get(b'chunks'), None)
-            if not matcher.match(item[b'path']):
+                hardlink_masters[orig_path] = (item.get('chunks'), None)
+            if not matcher.match(item['path']):
                 continue
             if strip_components:
-                item[b'path'] = os.sep.join(orig_path.split(os.sep)[strip_components:])
-                if not item[b'path']:
+                item['path'] = os.sep.join(orig_path.split(os.sep)[strip_components:])
+                if not item['path']:
                     continue
             if not args.dry_run:
-                while dirs and not item[b'path'].startswith(dirs[-1][b'path']):
+                while dirs and not item['path'].startswith(dirs[-1]['path']):
                     archive.extract_item(dirs.pop(-1), stdout=stdout)
             if output_list:
                 logger.info(remove_surrogates(orig_path))
@@ -417,7 +418,7 @@ class Archiver:
                 if dry_run:
                     archive.extract_item(item, dry_run=True)
                 else:
-                    if stat.S_ISDIR(item[b'mode']):
+                    if stat.S_ISDIR(item['mode']):
                         dirs.append(item)
                         archive.extract_item(item, restore_attrs=False)
                     else:
@@ -444,58 +445,58 @@ class Archiver:
             return self.compare_chunk_contents(chunks1, chunks2)
 
         def sum_chunk_size(item, consider_ids=None):
-            if item.get(b'deleted'):
+            if item.get('deleted'):
                 return None
             else:
-                return sum(c.size for c in item[b'chunks']
+                return sum(c.size for c in item['chunks']
                            if consider_ids is None or c.id in consider_ids)
 
         def get_owner(item):
             if args.numeric_owner:
-                return item[b'uid'], item[b'gid']
+                return item['uid'], item['gid']
             else:
-                return item[b'user'], item[b'group']
+                return item['user'], item['group']
 
         def get_mode(item):
-            if b'mode' in item:
-                return stat.filemode(item[b'mode'])
+            if 'mode' in item:
+                return stat.filemode(item['mode'])
             else:
                 return [None]
 
         def has_hardlink_master(item, hardlink_masters):
-            return stat.S_ISREG(item[b'mode']) and item.get(b'source') in hardlink_masters
+            return stat.S_ISREG(item['mode']) and item.get('source') in hardlink_masters
 
         def compare_link(item1, item2):
             # These are the simple link cases. For special cases, e.g. if a
             # regular file is replaced with a link or vice versa, it is
             # indicated in compare_mode instead.
-            if item1.get(b'deleted'):
+            if item1.get('deleted'):
                 return 'added link'
-            elif item2.get(b'deleted'):
+            elif item2.get('deleted'):
                 return 'removed link'
-            elif b'source' in item1 and b'source' in item2 and item1[b'source'] != item2[b'source']:
+            elif 'source' in item1 and 'source' in item2 and item1['source'] != item2['source']:
                 return 'changed link'
 
         def contents_changed(item1, item2):
             if can_compare_chunk_ids:
-                return item1[b'chunks'] != item2[b'chunks']
+                return item1['chunks'] != item2['chunks']
             else:
                 if sum_chunk_size(item1) != sum_chunk_size(item2):
                     return True
                 else:
-                    chunk_ids1 = [c.id for c in item1[b'chunks']]
-                    chunk_ids2 = [c.id for c in item2[b'chunks']]
+                    chunk_ids1 = [c.id for c in item1['chunks']]
+                    chunk_ids2 = [c.id for c in item2['chunks']]
                     return not fetch_and_compare_chunks(chunk_ids1, chunk_ids2, archive1, archive2)
 
         def compare_content(path, item1, item2):
             if contents_changed(item1, item2):
-                if item1.get(b'deleted'):
+                if item1.get('deleted'):
                     return ('added {:>13}'.format(format_file_size(sum_chunk_size(item2))))
-                elif item2.get(b'deleted'):
+                elif item2.get('deleted'):
                     return ('removed {:>11}'.format(format_file_size(sum_chunk_size(item1))))
                 else:
-                    chunk_ids1 = {c.id for c in item1[b'chunks']}
-                    chunk_ids2 = {c.id for c in item2[b'chunks']}
+                    chunk_ids1 = {c.id for c in item1['chunks']}
+                    chunk_ids2 = {c.id for c in item2['chunks']}
                     added_ids = chunk_ids2 - chunk_ids1
                     removed_ids = chunk_ids1 - chunk_ids2
                     added = sum_chunk_size(item2, added_ids)
@@ -504,9 +505,9 @@ class Archiver:
                                                  format_file_size(-removed, precision=1, sign=True)))
 
         def compare_directory(item1, item2):
-            if item2.get(b'deleted') and not item1.get(b'deleted'):
+            if item2.get('deleted') and not item1.get('deleted'):
                 return 'removed directory'
-            elif item1.get(b'deleted') and not item2.get(b'deleted'):
+            elif item1.get('deleted') and not item2.get('deleted'):
                 return 'added directory'
 
         def compare_owner(item1, item2):
@@ -516,7 +517,7 @@ class Archiver:
                 return '[{}:{} -> {}:{}]'.format(user1, group1, user2, group2)
 
         def compare_mode(item1, item2):
-            if item1[b'mode'] != item2[b'mode']:
+            if item1['mode'] != item2['mode']:
                 return '[{} -> {}]'.format(get_mode(item1), get_mode(item2))
 
         def compare_items(output, path, item1, item2, hardlink_masters, deleted=False):
@@ -527,15 +528,15 @@ class Archiver:
             changes = []
 
             if has_hardlink_master(item1, hardlink_masters):
-                item1 = hardlink_masters[item1[b'source']][0]
+                item1 = hardlink_masters[item1['source']][0]
 
             if has_hardlink_master(item2, hardlink_masters):
-                item2 = hardlink_masters[item2[b'source']][1]
+                item2 = hardlink_masters[item2['source']][1]
 
             if get_mode(item1)[0] == 'l' or get_mode(item2)[0] == 'l':
                 changes.append(compare_link(item1, item2))
 
-            if b'chunks' in item1 and b'chunks' in item2:
+            if 'chunks' in item1 and 'chunks' in item2:
                 changes.append(compare_content(path, item1, item2))
 
             if get_mode(item1)[0] == 'd' or get_mode(item2)[0] == 'd':
@@ -559,21 +560,21 @@ class Archiver:
 
         def compare_archives(archive1, archive2, matcher):
             def hardlink_master_seen(item):
-                return b'source' not in item or not stat.S_ISREG(item[b'mode']) or item[b'source'] in hardlink_masters
+                return 'source' not in item or not stat.S_ISREG(item['mode']) or item['source'] in hardlink_masters
 
             def is_hardlink_master(item):
-                return item.get(b'hardlink_master', True) and b'source' not in item
+                return item.get('hardlink_master', True) and 'source' not in item
 
             def update_hardlink_masters(item1, item2):
                 if is_hardlink_master(item1) or is_hardlink_master(item2):
-                    hardlink_masters[item1[b'path']] = (item1, item2)
+                    hardlink_masters[item1['path']] = (item1, item2)
 
             def compare_or_defer(item1, item2):
                 update_hardlink_masters(item1, item2)
                 if not hardlink_master_seen(item1) or not hardlink_master_seen(item2):
                     deferred.append((item1, item2))
                 else:
-                    compare_items(output, item1[b'path'], item1, item2, hardlink_masters)
+                    compare_items(output, item1['path'], item1, item2, hardlink_masters)
 
             orphans_archive1 = collections.OrderedDict()
             orphans_archive2 = collections.OrderedDict()
@@ -582,44 +583,44 @@ class Archiver:
             output = []
 
             for item1, item2 in zip_longest(
-                    archive1.iter_items(lambda item: matcher.match(item[b'path'])),
-                    archive2.iter_items(lambda item: matcher.match(item[b'path'])),
+                    archive1.iter_items(lambda item: matcher.match(item['path'])),
+                    archive2.iter_items(lambda item: matcher.match(item['path'])),
             ):
-                if item1 and item2 and item1[b'path'] == item2[b'path']:
+                if item1 and item2 and item1['path'] == item2['path']:
                     compare_or_defer(item1, item2)
                     continue
                 if item1:
-                    matching_orphan = orphans_archive2.pop(item1[b'path'], None)
+                    matching_orphan = orphans_archive2.pop(item1['path'], None)
                     if matching_orphan:
                         compare_or_defer(item1, matching_orphan)
                     else:
-                        orphans_archive1[item1[b'path']] = item1
+                        orphans_archive1[item1['path']] = item1
                 if item2:
-                    matching_orphan = orphans_archive1.pop(item2[b'path'], None)
+                    matching_orphan = orphans_archive1.pop(item2['path'], None)
                     if matching_orphan:
                         compare_or_defer(matching_orphan, item2)
                     else:
-                        orphans_archive2[item2[b'path']] = item2
+                        orphans_archive2[item2['path']] = item2
             # At this point orphans_* contain items that had no matching partner in the other archive
             deleted_item = {
-                b'deleted': True,
-                b'chunks': [],
-                b'mode': 0,
+                'deleted': True,
+                'chunks': [],
+                'mode': 0,
             }
             for added in orphans_archive2.values():
-                path = added[b'path']
-                deleted_item[b'path'] = path
+                path = added['path']
+                deleted_item['path'] = path
                 update_hardlink_masters(deleted_item, added)
                 compare_items(output, path, deleted_item, added, hardlink_masters, deleted=True)
             for deleted in orphans_archive1.values():
-                path = deleted[b'path']
-                deleted_item[b'path'] = path
+                path = deleted['path']
+                deleted_item['path'] = path
                 update_hardlink_masters(deleted, deleted_item)
                 compare_items(output, path, deleted, deleted_item, hardlink_masters, deleted=True)
             for item1, item2 in deferred:
                 assert hardlink_master_seen(item1)
                 assert hardlink_master_seen(item2)
-                compare_items(output, item1[b'path'], item1, item2, hardlink_masters)
+                compare_items(output, item1['path'], item1, item2, hardlink_masters)
 
             for line in sorted(output):
                 print_output(line)
@@ -627,8 +628,8 @@ class Archiver:
         archive1 = archive
         archive2 = Archive(repository, key, manifest, args.archive2)
 
-        can_compare_chunk_ids = archive1.metadata.get(b'chunker_params', False) == archive2.metadata.get(
-            b'chunker_params', True) or args.same_chunker_params
+        can_compare_chunk_ids = archive1.metadata.get('chunker_params', False) == archive2.metadata.get(
+            'chunker_params', True) or args.same_chunker_params
         if not can_compare_chunk_ids:
             self.print_warning('--chunker-params might be different between archives, diff will be slow.\n'
                                'If you know for certain that they are the same, pass --same-chunker-params '
@@ -738,7 +739,7 @@ class Archiver:
                         sys.stdout.write(bytestring.decode('utf-8', errors='replace'))
                 else:
                     write = sys.stdout.buffer.write
-                for item in archive.iter_items(lambda item: matcher.match(item[b'path'])):
+                for item in archive.iter_items(lambda item: matcher.match(item['path'])):
                     write(formatter.format_item(item).encode('utf-8', errors='surrogateescape'))
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
@@ -760,12 +761,12 @@ class Archiver:
         stats = archive.calc_stats(cache)
         print('Name:', archive.name)
         print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
-        print('Comment:', archive.metadata.get(b'comment', ''))
-        print('Hostname:', archive.metadata[b'hostname'])
-        print('Username:', archive.metadata[b'username'])
+        print('Comment:', archive.metadata.get('comment', ''))
+        print('Hostname:', archive.metadata['hostname'])
+        print('Username:', archive.metadata['username'])
         print('Time (start): %s' % format_time(to_localtime(archive.ts)))
         print('Time (end):   %s' % format_time(to_localtime(archive.ts_end)))
-        print('Command line:', format_cmdline(archive.metadata[b'cmdline']))
+        print('Command line:', format_cmdline(archive.metadata['cmdline']))
         print('Number of files: %d' % stats.nfiles)
         print()
         print(str(stats))
@@ -899,7 +900,7 @@ class Archiver:
     def do_debug_dump_archive_items(self, args, repository, manifest, key):
         """dump (decrypted, decompressed) archive items metadata (not: data)"""
         archive = Archive(repository, key, manifest, args.location.archive)
-        for i, item_id in enumerate(archive.metadata[b'items']):
+        for i, item_id in enumerate(archive.metadata['items']):
             _, data = key.decrypt(item_id, repository.get(item_id))
             filename = '%06d_%s.items' % (i, hexlify(item_id).decode('ascii'))
             print('Dumping', filename)
@@ -1921,7 +1922,7 @@ class Archiver:
         if args.show_version:
             logger.info('borgbackup version %s' % __version__)
         check_extension_modules()
-        if is_slow_msgpack():
+        if msg_pack.is_slow():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
         return args.func(args)
 
@@ -1940,7 +1941,7 @@ def sig_info_handler(signum, stack):  # pragma: no cover
             logger.info("{0} {1}/{2}".format(path, format_file_size(pos), format_file_size(total)))
             break
         if func in ('extract_item', ):  # extract op
-            path = loc['item'][b'path']
+            path = loc['item']['path']
             try:
                 pos = loc['fd'].tell()
             except Exception:

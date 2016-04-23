@@ -31,9 +31,8 @@ from . import hashindex
 from . import chunker
 from .constants import *  # NOQA
 from . import crypto
+from . import msg_pack
 from . import shellpattern
-import msgpack
-import msgpack.fallback
 
 import socket
 
@@ -104,19 +103,17 @@ class Manifest:
         manifest = cls(key, repository)
         _, data = key.decrypt(None, cdata)
         manifest.id = key.id_hash(data)
-        m = msgpack.unpackb(data)
-        if not m.get(b'version') == 1:
+        m = msg_pack.unpackb(data)
+        if not m.get('version') == 1:
             raise ValueError('Invalid manifest version')
-        manifest.archives = dict((k.decode('utf-8'), v) for k, v in m[b'archives'].items())
-        manifest.timestamp = m.get(b'timestamp')
-        if manifest.timestamp:
-            manifest.timestamp = manifest.timestamp.decode('ascii')
-        manifest.config = m[b'config']
+        manifest.archives = dict(m['archives'].items())
+        manifest.timestamp = m.get('timestamp')
+        manifest.config = m['config']
         return manifest, key
 
     def write(self):
         self.timestamp = datetime.utcnow().isoformat()
-        data = msgpack.packb(StableDict({
+        data = msg_pack.packb(StableDict({
             'version': 1,
             'archives': self.archives,
             'timestamp': self.timestamp,
@@ -130,8 +127,8 @@ class Manifest:
         ArchiveInfo = namedtuple('ArchiveInfo', 'name id ts')
         archives = []
         for name, values in self.archives.items():
-            ts = parse_timestamp(values[b'time'].decode('utf-8'))
-            id = values[b'id']
+            ts = parse_timestamp(values['time'])
+            id = values['id']
             archives.append(ArchiveInfo(name=name, id=id, ts=ts))
         if sort_by is not None:
             archives = sorted(archives, key=attrgetter(sort_by), reverse=reverse)
@@ -208,7 +205,7 @@ class Statistics:
             columns, lines = get_terminal_size()
             if not final:
                 msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
-                path = remove_surrogates(item[b'path']) if item else ''
+                path = remove_surrogates(item['path']) if item else ''
                 space = columns - len(msg)
                 if space < len('...') + len(path):
                     path = '%s...%s' % (path[:(space // 2) - len('...')], path[-space // 2:])
@@ -935,10 +932,6 @@ def int_to_bigint(value):
     return value
 
 
-def is_slow_msgpack():
-    return msgpack.Packer is msgpack.fallback.Packer
-
-
 FALSISH = ('No', 'NO', 'no', 'N', 'n', '0', )
 TRUISH = ('Yes', 'YES', 'yes', 'Y', 'y', '1', )
 DEFAULTISH = ('Default', 'DEFAULT', 'default', 'D', 'd', '', )
@@ -1166,8 +1159,8 @@ class ItemFormatter:
             fpr = name = ""
 
         fake_item = {
-            b'mode': 0, b'path': '', b'user': '', b'group': '', b'mtime': 0,
-            b'uid': 0, b'gid': 0,
+            'mode': 0, 'path': '', 'user': '', 'group': '', 'mtime': 0,
+            'uid': 0, 'gid': 0,
         }
         formatter = cls(FakeArchive, "")
         keys = []
@@ -1204,12 +1197,12 @@ class ItemFormatter:
             'csize': self.calculate_csize,
             'num_chunks': self.calculate_num_chunks,
             'unique_chunks': self.calculate_unique_chunks,
-            'isomtime': partial(self.format_time, b'mtime'),
-            'isoctime': partial(self.format_time, b'ctime'),
-            'isoatime': partial(self.format_time, b'atime'),
-            'mtime': partial(self.time, b'mtime'),
-            'ctime': partial(self.time, b'ctime'),
-            'atime': partial(self.time, b'atime'),
+            'isomtime': partial(self.format_time, 'mtime'),
+            'isoctime': partial(self.format_time, 'ctime'),
+            'isoatime': partial(self.format_time, 'atime'),
+            'mtime': partial(self.time, 'mtime'),
+            'ctime': partial(self.time, 'ctime'),
+            'atime': partial(self.time, 'atime'),
         }
         for hash_function in hashlib.algorithms_guaranteed:
             self.add_key(hash_function, partial(self.hash_item, hash_function))
@@ -1221,11 +1214,11 @@ class ItemFormatter:
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
     def get_item_data(self, item):
-        mode = stat.filemode(item[b'mode'])
+        mode = stat.filemode(item['mode'])
         item_type = mode[0]
         item_data = self.item_data
 
-        source = item.get(b'source', '')
+        source = item.get('source', '')
         extra = ''
         if source:
             source = remove_surrogates(source)
@@ -1236,12 +1229,12 @@ class ItemFormatter:
                 extra = ' link to %s' % source
         item_data['type'] = item_type
         item_data['mode'] = mode
-        item_data['user'] = item[b'user'] or item[b'uid']
-        item_data['group'] = item[b'group'] or item[b'gid']
-        item_data['uid'] = item[b'uid']
-        item_data['gid'] = item[b'gid']
-        item_data['path'] = remove_surrogates(item[b'path'])
-        item_data['bpath'] = item[b'path']
+        item_data['user'] = item['user'] or item['uid']
+        item_data['group'] = item['group'] or item['gid']
+        item_data['uid'] = item['uid']
+        item_data['gid'] = item['gid']
+        item_data['path'] = remove_surrogates(item['path'])
+        item_data['bpath'] = item['path']
         item_data['source'] = source
         item_data['linktarget'] = source
         item_data['extra'] = extra
@@ -1253,31 +1246,31 @@ class ItemFormatter:
         return self.format.format_map(self.get_item_data(item))
 
     def calculate_num_chunks(self, item):
-        return len(item.get(b'chunks', []))
+        return len(item.get('chunks', []))
 
     def calculate_unique_chunks(self, item):
         chunk_index = self.archive.cache.chunks
-        return sum(1 for c in item.get(b'chunks', []) if chunk_index[c.id].refcount == 1)
+        return sum(1 for c in item.get('chunks', []) if chunk_index[c.id].refcount == 1)
 
     def calculate_size(self, item):
-        return sum(c.size for c in item.get(b'chunks', []))
+        return sum(c.size for c in item.get('chunks', []))
 
     def calculate_csize(self, item):
-        return sum(c.csize for c in item.get(b'chunks', []))
+        return sum(c.csize for c in item.get('chunks', []))
 
     def hash_item(self, hash_function, item):
-        if b'chunks' not in item:
+        if 'chunks' not in item:
             return ""
         hash = hashlib.new(hash_function)
-        for _, data in self.archive.pipeline.fetch_many([c.id for c in item[b'chunks']]):
+        for _, data in self.archive.pipeline.fetch_many([c.id for c in item['chunks']]):
             hash.update(data)
         return hash.hexdigest()
 
     def format_time(self, key, item):
-        return format_time(safe_timestamp(item.get(key) or item[b'mtime']))
+        return format_time(safe_timestamp(item.get(key) or item['mtime']))
 
     def time(self, key, item):
-        return safe_timestamp(item.get(key) or item[b'mtime'])
+        return safe_timestamp(item.get(key) or item['mtime'])
 
 
 class ChunkIteratorFileWrapper:
@@ -1321,7 +1314,7 @@ class ChunkIteratorFileWrapper:
 
 def open_item(archive, item):
     """Return file-like object for archived item (with chunks)."""
-    chunk_iterator = archive.pipeline.fetch_many([c.id for c in item[b'chunks']])
+    chunk_iterator = archive.pipeline.fetch_many([c.id for c in item['chunks']])
     return ChunkIteratorFileWrapper(chunk_iterator)
 
 

@@ -12,9 +12,8 @@ logger = create_logger()
 from .helpers import Error, get_cache_dir, decode_dict, int_to_bigint, \
     bigint_to_int, format_file_size, yes
 from .locking import UpgradableLock
+from . import msg_pack
 from .hashindex import ChunkIndex, ChunkIndexEntry
-
-import msgpack
 
 ChunkListEntry = namedtuple('ChunkListEntry', 'id size csize')
 FileCacheEntry = namedtuple('FileCacheEntry', 'age inode size mtime chunk_ids')
@@ -179,7 +178,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         self._newest_mtime = 0
         logger.debug('Reading files cache ...')
         with open(os.path.join(self.path, 'files'), 'rb') as fd:
-            u = msgpack.Unpacker(use_list=True)
+            u = msg_pack.Unpacker(use_list=True)
             while True:
                 data = fd.read(64 * 1024)
                 if not data:
@@ -188,7 +187,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 for path_hash, item in u:
                     entry = FileCacheEntry(*item)
                     # in the end, this takes about 240 Bytes per file
-                    self.files[path_hash] = msgpack.packb(entry._replace(age=entry.age + 1))
+                    self.files[path_hash] = msg_pack.packb(entry._replace(age=entry.age + 1))
 
     def begin_txn(self):
         # Initialize transaction snapshot
@@ -211,9 +210,10 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 for path_hash, item in self.files.items():
                     # Discard cached files with the newest mtime to avoid
                     # issues with filesystem snapshots and mtime precision
-                    entry = FileCacheEntry(*msgpack.unpackb(item))
+                    entry = FileCacheEntry(*msg_pack.unpackb(item))
                     if entry.age < 10 and bigint_to_int(entry.mtime) < self._newest_mtime:
-                        msgpack.pack((path_hash, entry), fd)
+                        data = msg_pack.packb((path_hash, entry))
+                        fd.write(data)
         self.config.set('cache', 'manifest', hexlify(self.manifest.id).decode('ascii'))
         self.config.set('cache', 'timestamp', self.manifest.timestamp)
         self.config.set('cache', 'key_type', str(self.key.TYPE))
@@ -270,7 +270,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 return set()
 
         def repo_archives():
-            return set(info[b'id'] for info in self.manifest.archives.values())
+            return set(info['id'] for info in self.manifest.archives.values())
 
         def cleanup_outdated(ids):
             for id in ids:
@@ -281,12 +281,12 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             cdata = repository.get(archive_id)
             _, data = key.decrypt(archive_id, cdata)
             chunk_idx.add(archive_id, 1, len(data), len(cdata))
-            archive = msgpack.unpackb(data)
-            if archive[b'version'] != 1:
+            archive = msg_pack.unpackb(data)
+            if archive['version'] != 1:
                 raise Exception('Unknown archive metadata version')
-            decode_dict(archive, (b'name',))
-            unpacker = msgpack.Unpacker()
-            for item_id, chunk in zip(archive[b'items'], repository.get_many(archive[b'items'])):
+            decode_dict(archive, ('name', ))
+            unpacker = msg_pack.Unpacker()
+            for item_id, chunk in zip(archive['items'], repository.get_many(archive['items'])):
                 _, data = key.decrypt(item_id, chunk)
                 chunk_idx.add(item_id, 1, len(data), len(chunk))
                 unpacker.feed(data)
@@ -294,8 +294,8 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     if not isinstance(item, dict):
                         logger.error('Error: Did not get expected metadata dict - archive corrupted!')
                         continue
-                    if b'chunks' in item:
-                        for chunk_id, size, csize in item[b'chunks']:
+                    if 'chunks' in item:
+                        for chunk_id, size, csize in item['chunks']:
                             chunk_idx.add(chunk_id, 1, size, csize)
             if self.do_cache:
                 fn = mkpath(archive_id)
@@ -310,7 +310,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
 
         def lookup_name(archive_id):
             for name, info in self.manifest.archives.items():
-                if info[b'id'] == archive_id:
+                if info['id'] == archive_id:
                     return name
 
         def create_master_idx(chunk_idx):
@@ -417,10 +417,10 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         entry = self.files.get(path_hash)
         if not entry:
             return None
-        entry = FileCacheEntry(*msgpack.unpackb(entry))
+        entry = FileCacheEntry(*msg_pack.unpackb(entry))
         if (entry.size == st.st_size and bigint_to_int(entry.mtime) == st.st_mtime_ns and
                 (ignore_inode or entry.inode == st.st_ino)):
-            self.files[path_hash] = msgpack.packb(entry._replace(age=0))
+            self.files[path_hash] = msg_pack.packb(entry._replace(age=0))
             return entry.chunk_ids
         else:
             return None
@@ -429,5 +429,5 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not (self.do_files and stat.S_ISREG(st.st_mode)):
             return
         entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, mtime=int_to_bigint(st.st_mtime_ns), chunk_ids=ids)
-        self.files[path_hash] = msgpack.packb(entry)
+        self.files[path_hash] = msg_pack.packb(entry)
         self._newest_mtime = max(self._newest_mtime, st.st_mtime_ns)

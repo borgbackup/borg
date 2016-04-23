@@ -18,7 +18,7 @@ from . import xattr
 from .compress import Compressor, COMPR_BUFFER
 from .constants import *  # NOQA
 from .helpers import Chunk, Error, uid2user, user2uid, gid2group, group2gid, \
-    parse_timestamp, to_localtime, format_time, format_timedelta, \
+    parse_timestamp, to_localtime, format_time, format_timedelta, safe_encode, safe_decode, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, bin_to_hex, \
     ProgressIndicatorPercent, ChunkIteratorFileWrapper, remove_surrogates, log_multi, \
     PathPrefixPattern, FnmatchPattern, open_item, file_status, format_file_size, consume
@@ -175,7 +175,7 @@ class Archive:
         self.id = id
         self.metadata = self._load_meta(self.id)
         decode_dict(self.metadata, ARCHIVE_TEXT_KEYS)
-        self.metadata[b'cmdline'] = [arg.decode('utf-8', 'surrogateescape') for arg in self.metadata[b'cmdline']]
+        self.metadata[b'cmdline'] = [safe_decode(arg) for arg in self.metadata[b'cmdline']]
         self.name = self.metadata[b'name']
 
     @property
@@ -566,7 +566,7 @@ Number of files: {0.stats.nfiles}'''.format(
                 return status
             else:
                 self.hard_links[st.st_ino, st.st_dev] = safe_path
-        path_hash = self.key.id_hash(os.path.join(self.cwd, path).encode('utf-8', 'surrogateescape'))
+        path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
         first_run = not cache.files
         ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode)
         if first_run:
@@ -794,7 +794,7 @@ class ArchiveChecker:
             for chunk_id, size, csize in item[b'chunks']:
                 if chunk_id not in self.chunks:
                     # If a file chunk is missing, create an all empty replacement chunk
-                    logger.error('{}: Missing file chunk detected (Byte {}-{})'.format(item[b'path'].decode('utf-8', 'surrogateescape'), offset, offset + size))
+                    logger.error('{}: Missing file chunk detected (Byte {}-{})'.format(safe_decode(item[b'path']), offset, offset + size))
                     self.error_found = True
                     data = bytes(size)
                     chunk_id = self.key.id_hash(data)
@@ -881,7 +881,7 @@ class ArchiveChecker:
                 if archive[b'version'] != 1:
                     raise Exception('Unknown archive metadata version')
                 decode_dict(archive, ARCHIVE_TEXT_KEYS)
-                archive[b'cmdline'] = [arg.decode('utf-8', 'surrogateescape') for arg in archive[b'cmdline']]
+                archive[b'cmdline'] = [safe_decode(arg) for arg in archive[b'cmdline']]
                 items_buffer = ChunkBuffer(self.key)
                 items_buffer.write_chunk = add_callback
                 for item in robust_iterator(archive):
@@ -1186,7 +1186,7 @@ class ArchiveRecreater:
         logger.info('Found %s, will resume interrupted operation', target_name)
         old_target = self.open_archive(target_name)
         resume_id = old_target.metadata[b'recreate_source_id']
-        resume_args = [arg.decode('utf-8', 'surrogateescape') for arg in old_target.metadata[b'recreate_args']]
+        resume_args = [safe_decode(arg) for arg in old_target.metadata[b'recreate_args']]
         if resume_id != archive.id:
             logger.warning('Source archive changed, will discard %s and start over', target_name)
             logger.warning('Saved fingerprint:   %s', bin_to_hex(resume_id))

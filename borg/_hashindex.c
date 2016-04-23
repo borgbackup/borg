@@ -11,17 +11,27 @@
 #if defined (__SVR4) && defined (__sun)
 #include <sys/isa_defs.h>
 #endif
+#if (defined(_BIG_ENDIAN)&&defined(__SVR4)&&defined(__sun))
+#define BIG_ENDIAN_DETECTED
+#endif
 
-#if defined __MINGW32__ && defined _WIN32
-    #define BYTE_ORDER LITTLE_ENDIAN
+#if (defined(__MINGW32__) && defined(_WIN32)) || \
+    (defined(_LITTLE_ENDIAN)&&defined(__SVR4)&&defined(__sun))
+#define LITTLE_ENDIAN_DETECTED
 #endif // __MINGW32__
 
-#if (defined(BYTE_ORDER)&&(BYTE_ORDER == BIG_ENDIAN)) ||  \
-    (defined(_BIG_ENDIAN)&&defined(__SVR4)&&defined(__sun))
+#if !defined(BIG_ENDIAN_DETECTED) && !defined(LITTLE_ENDIAN_DETECTED)
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define LITTLE_ENDIAN_DETECTED
+#else
+#define BIG_ENDIAN_DETECTED
+#endif
+#endif
+
+#ifdef BIG_ENDIAN_DETECTED
 #define _le32toh(x) __builtin_bswap32(x)
 #define _htole32(x) __builtin_bswap32(x)
-#elif (defined(BYTE_ORDER)&&(BYTE_ORDER == LITTLE_ENDIAN)) || \
-      (defined(_LITTLE_ENDIAN)&&defined(__SVR4)&&defined(__sun))
+#elif defined(LITTLE_ENDIAN_DETECTED)
 #define _le32toh(x) (x)
 #define _htole32(x) (x)
 #else

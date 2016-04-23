@@ -715,10 +715,13 @@ def gid2group(gid, default=None):
 
 @memoize
 def group2gid(group, default=None):
-    try:
-        return group and grp.getgrnam(group).gr_gid
-    except KeyError:
-        return default
+    if sys.platform != 'win32':
+        try:
+            return group and grp.getgrnam(group).gr_gid
+        except KeyError:
+            return default
+    else:
+        return 0
 
 
 def getuid():

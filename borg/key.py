@@ -39,6 +39,10 @@ class KeyfileInvalidError(Error):
     """Invalid key file for repository {} found in {}."""
 
 
+class KeyfileMismatchError(Error):
+    """Mismatch between repository {} and key file {}."""
+
+
 class RepoKeyNotFoundError(Error):
     """No key entry found in the config of repository {}."""
 
@@ -406,7 +410,7 @@ class KeyfileKey(KeyfileKeyBase):
             if not line.startswith(self.FILE_ID):
                 raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)
             elif line[len(self.FILE_ID) + 1:] != id:
-                return None
+                return KeyfileMismatchError(self.repository._location.canonical_path(), filename)
             else:
                 return filename
 
@@ -414,18 +418,15 @@ class KeyfileKey(KeyfileKeyBase):
         keyfile = os.environ.get('BORG_KEY_FILENAME')
         id = hexlify(self.repository.id).decode('ascii')
         if keyfile:
-            sfilename = sanity_check(keyfile, id)
-            if sfilename:
-                return sfilename
-            else:
-                raise KeyfileInvalidError(self.repository._location.canonical_path(), keyfile)
+            return satiny_check(keyfile, id)
         else:
             keys_dir = get_keys_dir()
             for name in os.listdir(keys_dir):
                 filename = os.path.join(keys_dir, name)
-                sfilename = sanity_check(filename, id)
-                if sfilename:
-                    return sfilename
+                try:
+                    return sanity_check(filename, id)
+                except:
+                    pass
             raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
 
     def get_new_target(self, args):

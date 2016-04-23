@@ -403,10 +403,12 @@ class KeyfileKey(KeyfileKeyBase):
     def sanity_check(self, filename, id):
         with open(filename, 'r') as fd:
             line = fd.readline().strip()
-            if line.startswith(self.FILE_ID) and line[len(self.FILE_ID) + 1:] == id:
-                return filename
-            else:
+            if not line.startswith(self.FILE_ID):
+                raise KeyfileInvalidError(self.repository._location.canonical_path(), keyfile)
+            elif line[len(self.FILE_ID) + 1:] != id:
                 return None
+            else:
+                return filename
 
     def find_key(self):
         keyfile = os.environ.get('BORG_KEY_FILENAME')

@@ -1537,6 +1537,11 @@ class Archiver:
 
         To allow a regular user to use fstab entries, add the ``user`` option:
         ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto,user 0 0``
+
+        The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
+        to tweak the performance. It sets the number of cached data chunks; additional
+        memory usage can be up to ~8 MiB times this number. The default is the number
+        of CPU cores.
         """)
         subparser = subparsers.add_parser('mount', parents=[common_parser], add_help=False,
                                           description=self.do_mount.__doc__,

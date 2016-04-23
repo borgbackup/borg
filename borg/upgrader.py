@@ -1,4 +1,3 @@
-from binascii import hexlify
 import datetime
 import logging
 logger = logging.getLogger(__name__)
@@ -189,8 +188,8 @@ class AtticRepositoryUpgrader(Repository):
         attic_cache_dir = os.environ.get('ATTIC_CACHE_DIR',
                                          os.path.join(get_home_dir(),
                                                       '.cache', 'attic'))
-        attic_cache_dir = os.path.join(attic_cache_dir, hexlify(self.id).decode('ascii'))
-        borg_cache_dir = os.path.join(get_cache_dir(), hexlify(self.id).decode('ascii'))
+        attic_cache_dir = os.path.join(attic_cache_dir, self.id_str)
+        borg_cache_dir = os.path.join(get_cache_dir(), self.id_str)
 
         def copy_cache_file(path):
             """copy the given attic cache path into the borg directory
@@ -264,7 +263,6 @@ class AtticKeyfileKey(KeyfileKey):
            assume the repository has been opened by the archiver yet
         """
         get_keys_dir = cls.get_keys_dir
-        id = hexlify(repository.id).decode('ascii')
         keys_dir = get_keys_dir()
         if not os.path.exists(keys_dir):
             raise KeyfileNotFoundError(repository.path, keys_dir)
@@ -272,7 +270,7 @@ class AtticKeyfileKey(KeyfileKey):
             filename = os.path.join(keys_dir, name)
             with open(filename, 'r') as fd:
                 line = fd.readline().strip()
-                if line and line.startswith(cls.FILE_ID) and line[10:] == id:
+                if line and line.startswith(cls.FILE_ID) and line[10:] == repository.id_str:
                     return filename
         raise KeyfileNotFoundError(repository.path, keys_dir)
 
@@ -314,7 +312,6 @@ class Borg0xxKeyfileKey(KeyfileKey):
     @classmethod
     def find_key_file(cls, repository):
         get_keys_dir = cls.get_keys_dir
-        id = hexlify(repository.id).decode('ascii')
         keys_dir = get_keys_dir()
         if not os.path.exists(keys_dir):
             raise KeyfileNotFoundError(repository.path, keys_dir)
@@ -322,6 +319,6 @@ class Borg0xxKeyfileKey(KeyfileKey):
             filename = os.path.join(keys_dir, name)
             with open(filename, 'r') as fd:
                 line = fd.readline().strip()
-                if line and line.startswith(cls.FILE_ID) and line[len(cls.FILE_ID) + 1:] == id:
+                if line and line.startswith(cls.FILE_ID) and line[len(cls.FILE_ID) + 1:] == repository.id_str:
                     return filename
         raise KeyfileNotFoundError(repository.path, keys_dir)

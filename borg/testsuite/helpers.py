@@ -13,7 +13,7 @@ import time
 from ..helpers import Location, format_file_size, format_timedelta, make_path_safe, \
     prune_within, prune_split, get_cache_dir, get_keys_dir, Statistics, is_slow_msgpack, \
     yes, TRUISH, FALSISH, DEFAULTISH, \
-    StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, Chunk, \
+    StableDict, int_to_bigint, bigint_to_int, bin_to_hex, parse_timestamp, CompressionSpec, ChunkerParams, Chunk, \
     ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
     PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, partial_format, ChunkIteratorFileWrapper
 from . import BaseTestCase, environment_variable, FakeInputs
@@ -29,6 +29,11 @@ class BigIntTestCase(BaseTestCase):
         self.assert_equal(int_to_bigint(-2**63), b'\x00\x00\x00\x00\x00\x00\x00\x80\xff')
         self.assert_equal(bigint_to_int(int_to_bigint(-2**70)), -2**70)
         self.assert_equal(bigint_to_int(int_to_bigint(2**70)), 2**70)
+
+
+def test_bin_to_hex():
+    assert bin_to_hex(b'') == ''
+    assert bin_to_hex(b'\x00\x01\xff') == '0001ff'
 
 
 class TestLocationWithoutEnv:

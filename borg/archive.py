@@ -1,4 +1,3 @@
-from binascii import hexlify
 from datetime import datetime, timezone
 from getpass import getuser
 from itertools import groupby
@@ -20,7 +19,7 @@ from .compress import Compressor, COMPR_BUFFER
 from .constants import *  # NOQA
 from .helpers import Chunk, Error, uid2user, user2uid, gid2group, group2gid, \
     parse_timestamp, to_localtime, format_time, format_timedelta, \
-    Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
+    Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, bin_to_hex, \
     ProgressIndicatorPercent, ChunkIteratorFileWrapper, remove_surrogates, log_multi, \
     PathPrefixPattern, FnmatchPattern, open_item, file_status, format_file_size, consume
 from .repository import Repository
@@ -194,7 +193,7 @@ class Archive:
 
     @property
     def fpr(self):
-        return hexlify(self.id).decode('ascii')
+        return bin_to_hex(self.id)
 
     @property
     def duration(self):
@@ -823,7 +822,7 @@ class ArchiveChecker:
                 return _state
 
             def report(msg, chunk_id, chunk_no):
-                cid = hexlify(chunk_id).decode('ascii')
+                cid = bin_to_hex(chunk_id)
                 msg += ' [chunk: %06d_%s]' % (chunk_no, cid)  # see debug-dump-archive-items
                 self.error_found = True
                 logger.error(msg)
@@ -1190,7 +1189,7 @@ class ArchiveRecreater:
         resume_args = [arg.decode('utf-8', 'surrogateescape') for arg in old_target.metadata[b'recreate_args']]
         if resume_id != archive.id:
             logger.warning('Source archive changed, will discard %s and start over', target_name)
-            logger.warning('Saved fingerprint:   %s', hexlify(resume_id).decode('ascii'))
+            logger.warning('Saved fingerprint:   %s', bin_to_hex(resume_id))
             logger.warning('Current fingerprint: %s', archive.fpr)
             old_target.delete(Statistics(), progress=self.progress)
             return None, None  # can't resume

@@ -1,4 +1,4 @@
-from binascii import hexlify, a2b_base64, b2a_base64
+from binascii import a2b_base64, b2a_base64
 import configparser
 import getpass
 import os
@@ -7,7 +7,7 @@ import textwrap
 from hmac import compare_digest
 from hashlib import sha256, pbkdf2_hmac
 
-from .helpers import Chunk, IntegrityError, get_keys_dir, Error, yes
+from .helpers import Chunk, IntegrityError, get_keys_dir, Error, yes, bin_to_hex
 from .logger import create_logger
 logger = create_logger()
 
@@ -203,7 +203,7 @@ class Passphrase(str):
                 passphrase.encode('ascii')
             except UnicodeEncodeError:
                 print('Your passphrase (UTF-8 encoding in hex): %s' %
-                      hexlify(passphrase.encode('utf-8')).decode('ascii'),
+                      bin_to_hex(passphrase.encode('utf-8')),
                       file=sys.stderr)
                 print('As you have a non-ASCII passphrase, it is recommended to keep the UTF-8 encoding in hex together with the passphrase at a safe place.',
                       file=sys.stderr)
@@ -397,13 +397,12 @@ class KeyfileKey(KeyfileKeyBase):
     FILE_ID = 'BORG_KEY'
 
     def find_key(self):
-        id = hexlify(self.repository.id).decode('ascii')
         keys_dir = get_keys_dir()
         for name in os.listdir(keys_dir):
             filename = os.path.join(keys_dir, name)
             with open(filename, 'r') as fd:
                 line = fd.readline().strip()
-                if line.startswith(self.FILE_ID) and line[len(self.FILE_ID) + 1:] == id:
+                if line.startswith(self.FILE_ID) and line[len(self.FILE_ID) + 1:] == self.repository.id_str:
                     return filename
         raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
 
@@ -427,7 +426,7 @@ class KeyfileKey(KeyfileKeyBase):
     def save(self, target, passphrase):
         key_data = self._save(passphrase)
         with open(target, 'w') as fd:
-            fd.write('%s %s\n' % (self.FILE_ID, hexlify(self.repository_id).decode('ascii')))
+            fd.write('%s %s\n' % (self.FILE_ID, bin_to_hex(self.repository_id)))
             fd.write(key_data)
             fd.write('\n')
         self.target = target

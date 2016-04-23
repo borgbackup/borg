@@ -6,7 +6,7 @@ from binascii import hexlify, unhexlify
 
 from ..crypto import bytes_to_long, num_aes_blocks
 from ..key import PlaintextKey, PassphraseKey, KeyfileKey
-from ..helpers import Location, Chunk
+from ..helpers import Location, Chunk, bin_to_hex
 from . import BaseTestCase
 
 
@@ -44,6 +44,7 @@ class KeyTestCase(BaseTestCase):
 
         _location = _Location()
         id = bytes(32)
+        id_str = bin_to_hex(id)
 
     def test_plaintext(self):
         key = PlaintextKey.create(None, None)

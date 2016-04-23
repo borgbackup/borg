@@ -400,7 +400,7 @@ class KeyfileKey(KeyfileKeyBase):
     TYPE = 0x00
     FILE_ID = 'BORG_KEY'
 
-    def sanity_check(self, filename):
+    def sanity_check(self, filename, id):
         with open(filename, 'r') as fd:
             line = fd.readline().strip()
             if line.startswith(self.FILE_ID) and line[len(self.FILE_ID) + 1:] == id:
@@ -410,18 +410,18 @@ class KeyfileKey(KeyfileKeyBase):
 
     def find_key(self):
         keyfile = os.environ.get('BORG_KEY_FILENAME')
+        id = hexlify(self.repository.id).decode('ascii')
         if keyfile:
-            sfilename = sanity_check(keyfile)
+            sfilename = sanity_check(keyfile, id)
             if sfilename:
                 return sfilename
             else:
                 raise KeyfileInvalidError(self.repository._location.canonical_path(), keyfile)
         else:
-            id = hexlify(self.repository.id).decode('ascii')
             keys_dir = get_keys_dir()
             for name in os.listdir(keys_dir):
                 filename = os.path.join(keys_dir, name)
-                sfilename = sanity_check(filename)
+                sfilename = sanity_check(filename, id)
                 if sfilename:
                     return sfilename
             raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())

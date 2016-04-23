@@ -13,6 +13,7 @@ from . import __version__
 from .helpers import Error, IntegrityError, get_home_dir, sysinfo
 from .repository import Repository
 
+# NOTE: this is still using msgpack (not msg_pack) for RPC to stay compatible with old remotes
 import msgpack
 
 RPC_PROTOCOL_VERSION = 2

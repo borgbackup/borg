@@ -14,6 +14,8 @@ logger = create_logger()
 from .constants import *  # NOQA
 from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks, hmac_sha256
 from .compress import Compressor, COMPR_BUFFER
+
+# NOTE: this is still using msgpack (not msg_pack) for key files to stay compatible with old key files
 import msgpack
 
 PREFIX = b'\0' * 8

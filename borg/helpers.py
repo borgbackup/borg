@@ -6,6 +6,9 @@ import sys
 if sys.platform != 'win32':
     import grp
     import pwd
+else:
+    import encodings.idna
+    import posixpath
 import hashlib
 from itertools import islice
 import os
@@ -39,9 +42,6 @@ import msgpack
 import msgpack.fallback
 
 import socket
-
-if sys.platform == 'win32':
-    import encodings.idna
 
 # meta dict, data bytes
 _Chunk = namedtuple('_Chunk', 'meta data')
@@ -829,7 +829,10 @@ class Location:
             self.user = m.group('user')
             self.host = m.group('host')
             self.port = m.group('port') and int(m.group('port')) or None
-            self.path = os.path.normpath(m.group('path'))
+            if sys.platform != 'win32':
+                self.path = os.path.normpath(m.group('path'))
+            else:
+                self.path = posixpath.normpath(m.group('path'))
             self.archive = m.group('archive')
             return True
         if sys.platform != 'win32':
@@ -843,7 +846,10 @@ class Location:
         if m:
             self.user = m.group('user')
             self.host = m.group('host')
-            self.path = os.path.normpath(m.group('path'))
+            if sys.platform != 'win32':
+                self.path = os.path.normpath(m.group('path'))
+            else:
+                self.path = posixpath.normpath(m.group('path'))
             self.archive = m.group('archive')
             self.proto = self.host and 'ssh' or 'file'
             return True
@@ -932,12 +938,10 @@ def make_path_safe(path):
     if sys.platform != 'win32':
         return _safe_re.sub('', path) or '.'
     else:
-        if len(path) <= 2:
-            return path
         tail = path
-        if path[0:2] == '//' or path[0:2] == '\\\\' or path[1] == ':':
+        if len(path) > 2 and (path[0:2] == '//' or path[0:2] == '\\\\' or path[1] == ':'):
             drive, tail = os.path.splitdrive(path)
-        return _safe_re.sub('', tail) or '.'
+        return os.path.normpath(_safe_re.sub('', tail) or '.')
 
 
 def daemonize():

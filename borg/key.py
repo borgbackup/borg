@@ -404,7 +404,7 @@ class KeyfileKey(KeyfileKeyBase):
         with open(filename, 'r') as fd:
             line = fd.readline().strip()
             if not line.startswith(self.FILE_ID):
-                raise KeyfileInvalidError(self.repository._location.canonical_path(), keyfile)
+                raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)
             elif line[len(self.FILE_ID) + 1:] != id:
                 return None
             else:

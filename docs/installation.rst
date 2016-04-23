@@ -162,6 +162,7 @@ Install the dependencies with development headers::
     sudo dnf install libacl-devel libacl
     sudo dnf install lz4-devel
     sudo dnf install gcc gcc-c++
+    sudo dnf install redhat-rpm-config                 # not needed in Korora
     sudo dnf install fuse-devel fuse pkgconfig         # optional, for FUSE support
 
 

@@ -1,10 +1,9 @@
 from datetime import datetime, timezone
 from unittest.mock import Mock
 
-import msgpack
-
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker
 from ..key import PlaintextKey
+from .. import msg_pack
 from ..helpers import Manifest
 from . import BaseTestCase
 
@@ -26,7 +25,7 @@ class ArchiveTimestampTestCase(BaseTestCase):
         key = PlaintextKey(repository)
         manifest = Manifest(repository, key)
         a = Archive(repository, key, manifest, 'test', create=True)
-        a.metadata = {b'time': isoformat}
+        a.metadata = {'time': isoformat}
         self.assert_equal(a.ts, expected)
 
     def test_with_microseconds(self):
@@ -52,7 +51,7 @@ class ChunkBufferTestCase(BaseTestCase):
             chunks.flush()
         chunks.flush(flush=True)
         self.assert_equal(len(chunks.chunks), 2)
-        unpacker = msgpack.Unpacker()
+        unpacker = msg_pack.Unpacker()
         for id in chunks.chunks:
             unpacker.feed(cache.objects[id])
         self.assert_equal(data, list(unpacker))
@@ -73,7 +72,7 @@ class ChunkBufferTestCase(BaseTestCase):
         chunks.flush(flush=True)
         self.assert_equal(len(chunks.chunks), 4)
         self.assert_true(chunks.buffer.tell() == 0)
-        unpacker = msgpack.Unpacker()
+        unpacker = msg_pack.Unpacker()
         for id in chunks.chunks:
             unpacker.feed(cache.objects[id])
         self.assert_equal(data, list(unpacker))
@@ -82,10 +81,10 @@ class ChunkBufferTestCase(BaseTestCase):
 class RobustUnpackerTestCase(BaseTestCase):
 
     def make_chunks(self, items):
-        return b''.join(msgpack.packb({'path': item}) for item in items)
+        return b''.join(msg_pack.packb({'path': item}) for item in items)
 
     def _validator(self, value):
-        return isinstance(value, dict) and value.get(b'path') in (b'foo', b'bar', b'boo', b'baz')
+        return isinstance(value, dict) and value.get('path') in (b'foo', b'bar', b'boo', b'baz')
 
     def process(self, input):
         unpacker = RobustUnpacker(validator=self._validator)
@@ -104,10 +103,10 @@ class RobustUnpackerTestCase(BaseTestCase):
                   (False, [b'garbage'] + [self.make_chunks([b'boo', b'baz'])])]
         result = self.process(chunks)
         self.assert_equal(result, [
-            {b'path': b'foo'}, {b'path': b'bar'},
+            {'path': b'foo'}, {'path': b'bar'},
             103, 97, 114, 98, 97, 103, 101,
-            {b'path': b'boo'},
-            {b'path': b'baz'}])
+            {'path': b'boo'},
+            {'path': b'baz'}])
 
     def split(self, left, length):
         parts = []
@@ -120,16 +119,16 @@ class RobustUnpackerTestCase(BaseTestCase):
         chunks = self.split(self.make_chunks([b'foo', b'bar', b'boo', b'baz']), 2)
         input = [(False, chunks)]
         result = self.process(input)
-        self.assert_equal(result, [{b'path': b'foo'}, {b'path': b'bar'}, {b'path': b'boo'}, {b'path': b'baz'}])
+        self.assert_equal(result, [{'path': b'foo'}, {'path': b'bar'}, {'path': b'boo'}, {'path': b'baz'}])
 
     def test_missing_chunk(self):
         chunks = self.split(self.make_chunks([b'foo', b'bar', b'boo', b'baz']), 4)
         input = [(False, chunks[:3]), (True, chunks[4:])]
         result = self.process(input)
-        self.assert_equal(result, [{b'path': b'foo'}, {b'path': b'boo'}, {b'path': b'baz'}])
+        self.assert_equal(result, [{'path': b'foo'}, {'path': b'boo'}, {'path': b'baz'}])
 
     def test_corrupt_chunk(self):
         chunks = self.split(self.make_chunks([b'foo', b'bar', b'boo', b'baz']), 4)
         input = [(False, chunks[:3]), (True, [b'gar', b'bage'] + chunks[3:])]
         result = self.process(input)
-        self.assert_equal(result, [{b'path': b'foo'}, {b'path': b'boo'}, {b'path': b'baz'}])
+        self.assert_equal(result, [{'path': b'foo'}, {'path': b'boo'}, {'path': b'baz'}])

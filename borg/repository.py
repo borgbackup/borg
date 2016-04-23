@@ -11,12 +11,12 @@ import shutil
 import struct
 from zlib import crc32
 
-import msgpack
 from .constants import *  # NOQA
 from .helpers import Error, ErrorWithTraceback, IntegrityError, Location, ProgressIndicatorPercent
 from .hashindex import NSIndex
 from .locking import UpgradableLock, LockError, LockErrorT
 from .lrucache import LRUCache
+from . import msg_pack
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
 MAGIC = b'BORG_SEG'
@@ -210,20 +210,22 @@ class Repository:
             if do_cleanup:
                 self.io.cleanup(transaction_id)
             with open(os.path.join(self.path, 'hints.%d' % transaction_id), 'rb') as fd:
-                hints = msgpack.unpack(fd)
-            if hints[b'version'] != 1:
+                data = fd.read()
+                hints = msg_pack.unpackb(data)
+            if hints['version'] != 1:
                 raise ValueError('Unknown hints file version: %d' % hints['version'])
-            self.segments = hints[b'segments']
-            self.compact = set(hints[b'compact'])
+            self.segments = hints['segments']
+            self.compact = set(hints['compact'])
 
     def write_index(self):
-        hints = {b'version': 1,
-                 b'segments': self.segments,
-                 b'compact': list(self.compact)}
+        hints = {'version': 1,
+                 'segments': self.segments,
+                 'compact': list(self.compact)}
         transaction_id = self.io.get_segments_transaction_id()
         hints_file = os.path.join(self.path, 'hints.%d' % transaction_id)
         with open(hints_file + '.tmp', 'wb') as fd:
-            msgpack.pack(hints, fd)
+            data = msg_pack.packb(hints)
+            fd.write(data)
             fd.flush()
             os.fsync(fd.fileno())
         os.rename(hints_file + '.tmp', hints_file)

@@ -6,16 +6,15 @@ import os
 
 import pytest
 import sys
-import msgpack
-import msgpack.fallback
 import time
 
 from ..helpers import Location, format_file_size, format_timedelta, make_path_safe, \
-    prune_within, prune_split, get_cache_dir, get_keys_dir, Statistics, is_slow_msgpack, \
+    prune_within, prune_split, get_cache_dir, get_keys_dir, Statistics, \
     yes, TRUISH, FALSISH, DEFAULTISH, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, Chunk, \
     ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
     PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, partial_format, ChunkIteratorFileWrapper
+from .. import msg_pack
 from . import BaseTestCase, environment_variable, FakeInputs
 
 
@@ -573,13 +572,12 @@ class PruneWithinTestCase(BaseTestCase):
         dotest(test_archives, '1m', [0, 1, 2, 3, 4, 5])
         dotest(test_archives, '1y', [0, 1, 2, 3, 4, 5])
 
-
 class StableDictTestCase(BaseTestCase):
 
     def test(self):
         d = StableDict(foo=1, bar=2, boo=3, baz=4)
         self.assert_equal(list(d.items()), [('bar', 2), ('baz', 4), ('boo', 3), ('foo', 1)])
-        self.assert_equal(hashlib.md5(msgpack.packb(d)).hexdigest(), 'fc78df42cd60691b3ac3dd2a2b39903f')
+        self.assert_equal(hashlib.md5(msg_pack.packb(d)).hexdigest(), 'fc78df42cd60691b3ac3dd2a2b39903f')
 
 
 class TestParseTimestamp(BaseTestCase):
@@ -649,12 +647,12 @@ def tests_stats_progress(stats, columns=80):
 
     out = StringIO()
     stats.update(10**3, 0, unique=False)
-    stats.show_progress(item={b'path': 'foo'}, final=False, stream=out)
+    stats.show_progress(item={'path': 'foo'}, final=False, stream=out)
     s = '1.02 kB O 10 B C 10 B D 0 N foo'
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
     out = StringIO()
-    stats.show_progress(item={b'path': 'foo'*40}, final=False, stream=out)
+    stats.show_progress(item={'path': 'foo'*40}, final=False, stream=out)
     s = '1.02 kB O 10 B C 10 B D 0 N foofoofoofoofoofoofoofo...oofoofoofoofoofoofoofoofoo'
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
@@ -715,17 +713,6 @@ def test_file_size_sign():
     }
     for size, fmt in si_size_map.items():
         assert format_file_size(size, sign=True) == fmt
-
-
-def test_is_slow_msgpack():
-    saved_packer = msgpack.Packer
-    try:
-        msgpack.Packer = msgpack.fallback.Packer
-        assert is_slow_msgpack()
-    finally:
-        msgpack.Packer = saved_packer
-    # this assumes that we have fast msgpack on test platform:
-    assert not is_slow_msgpack()
 
 
 def test_yes_input():

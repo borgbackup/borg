@@ -1455,8 +1455,8 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         archive, repository = self.open_archive('archive1')
         with repository:
             for item in archive.iter_items():
-                if item[b'path'].endswith('testsuite/archiver.py'):
-                    repository.delete(item[b'chunks'][-1].id)
+                if item['path'].endswith('testsuite/archiver.py'):
+                    repository.delete(item['chunks'][-1].id)
                     break
             repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
@@ -1466,7 +1466,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
     def test_missing_archive_item_chunk(self):
         archive, repository = self.open_archive('archive1')
         with repository:
-            repository.delete(archive.metadata[b'items'][-5])
+            repository.delete(archive.metadata['items'][-5])
             repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', '--repair', self.repository_location, exit_code=0)

@@ -36,6 +36,7 @@ Arch Linux   `[community]`_                                ``pacman -S borg``
 Debian       `jessie-backports`_, `stretch`_, `sid`_       ``apt install borgbackup``
 Gentoo       `ebuild`_                                     ``emerge borgbackup``
 GNU Guix     `GNU Guix`_                                   ``guix package --install borg``
+FreeBSD      `Ports-Tree`_                                 ``cd /usr/ports/archivers/py-borgbackup && make install clean``
 NetBSD       `pkgsrc`_                                     ``pkg_add py-borgbackup``
 NixOS        `.nix file`_                                  N/A
 OpenBSD      `OpenBSD ports`_                              ``pkg_add borgbackup``
@@ -50,6 +51,7 @@ Ubuntu       `16.04`_, backports (PPA): `15.10`_, `14.04`_ ``apt install borgbac
 .. _stretch: https://packages.debian.org/stretch/borgbackup
 .. _unstable/sid: https://packages.debian.org/sid/borgbackup
 .. _ebuild: https://packages.gentoo.org/packages/app-backup/borgbackup
+.. _Ports-Tree: http://www.freshports.org/archivers/py-borgbackup/
 .. _pkgsrc: http://pkgsrc.se/sysutils/py-borgbackup
 .. _16.04: https://launchpad.net/ubuntu/xenial/+source/borgbackup
 .. _15.10: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup

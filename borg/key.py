@@ -415,8 +415,8 @@ class KeyfileKey(KeyfileKeyBase):
                 return filename
 
     def find_key(self):
-        keyfile = os.environ.get('BORG_KEY_FILENAME')
         id = hexlify(self.repository.id).decode('ascii')
+        keyfile = os.environ.get('BORG_KEY_FILENAME')
         if keyfile:
             return satiny_check(keyfile, id)
         else:

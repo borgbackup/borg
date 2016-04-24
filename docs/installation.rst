@@ -80,6 +80,7 @@ on the releases_ page for the following platforms:
   glibc versions also work, if they are compatible to 2.13.
 * **Mac OS X**: 10.10 (does not work with older OS X releases)
 * **FreeBSD**: 10.2 (unknown whether it works for older releases)
+* **Windows**: Tested on Windows10. (Should work on Vista and up)
 
 To install such a binary, just drop it into a directory in your ``PATH``,
 make borg readable and executable for its users and then you can run ``borg``::
@@ -99,6 +100,8 @@ You can change the temporary directory by setting the ``TEMP`` environment varia
 
 If a new version is released, you will have to manually download it and replace
 the old version using the same steps as shown above.
+
+To install on Windows just extract the zip anywhere and add the bin directory to your ``PATH`` environment variable
 
 .. _pyinstaller: http://www.pyinstaller.org
 .. _releases: https://github.com/borgbackup/borg/releases
@@ -197,33 +200,12 @@ and commands to make fuse work for using the mount command.
      sysctl vfs.usermount=1
     
 
-Windows (MSYS2)
-+++++++++++++++
+Windows
++++++++
 
-Download MSYS from https://msys2.github.io/ and follow install instructions. This guide assumes 64bit version.
-
-Install the dependencies:
-
-    pacman -S mingw-w64-x86_64-python3 git mingw-w64-x86_64-lz4 mingw-w64-x86_64-python3-pip mingw-w64-x86_64-cython \
-    mingw-w64-x86_64-gcc mingw-w64-x86_64-python3-pytest mingw-w64-x86_64-ntldd-git
-
-Close msys. Open `Mingw64-w64 64bit Shell` from startmenu.
-
-Clone borg from github.
-
-Run these commands in the borg source directory::
-
-    pip3 install -e .
-    echo "version = '$(git describe --tags)'" > borg/_version.py
-
-To run from windows commandline add msysdir\\mingw64\\bin to windows path environment variable and use python3 as python command.
-
-To run tests::
-
-    cd borg
-    py.test --cov=borg --cov-config=../.coveragerc --benchmark-skip --pyargs testsuite
-
-To build standalone windows executable run `python3 buildwin32.py`
+See development_ on how to build on windows.
+run `python3 buildwin32.py` to create standalone windows executable in `win32exe`.
+You can rename or move that folder. Add the bin folder to your ``PATH`` and you can run ``borg``
 
 
 Cygwin

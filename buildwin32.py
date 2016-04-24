@@ -72,7 +72,7 @@ def finddlls(exe):
     for line in output.decode('utf-8').split('\n'):
         if 'not found' in line:
             continue
-        if 'WINDOWS' in line or 'windows' in line:
+        if 'windows' in line.lower():
             continue
         words = line.split()
         if len(words) < 3:

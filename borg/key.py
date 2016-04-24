@@ -409,38 +409,35 @@ class KeyfileKey(KeyfileKeyBase):
             line = fd.readline().strip()
             if not line.startswith(self.FILE_ID):
                 raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)
-            elif line[len(self.FILE_ID) + 1:] != id:
-                return KeyfileMismatchError(self.repository._location.canonical_path(), filename)
-            else:
-                return filename
+            if line[len(self.FILE_ID) + 1:] != id:
+                raise KeyfileMismatchError(self.repository._location.canonical_path(), filename)
+            return filename
 
     def find_key(self):
         id = hexlify(self.repository.id).decode('ascii')
         keyfile = os.environ.get('BORG_KEY_FILENAME')
         if keyfile:
-            return satiny_check(keyfile, id)
-        else:
-            keys_dir = get_keys_dir()
-            for name in os.listdir(keys_dir):
-                filename = os.path.join(keys_dir, name)
-                try:
-                    return sanity_check(filename, id)
-                except:
-                    pass
-            raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
+            return sanity_check(keyfile, id)
+        keys_dir = get_keys_dir()
+        for name in os.listdir(keys_dir):
+            filename = os.path.join(keys_dir, name)
+            try:
+                return sanity_check(filename, id)
+            except (KeyfileInvalidError, KeyfileMismatchError):
+                pass
+        raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
 
     def get_new_target(self, args):
         keyfile = os.environ.get('BORG_KEY_FILENAME')
         if keyfile:
             return keyfile
-        else:
-            filename = args.location.to_key_filename()
-            path = filename
-            i = 1
-            while os.path.exists(path):
-                i += 1
-                path = filename + '.%d' % i
-            return path
+        filename = args.location.to_key_filename()
+        path = filename
+        i = 1
+        while os.path.exists(path):
+            i += 1
+            path = filename + '.%d' % i
+        return path
 
     def load(self, target, passphrase):
         with open(target, 'r') as fd:

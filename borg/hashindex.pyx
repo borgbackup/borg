@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from collections import namedtuple
+import locale
 import os
 
 cimport cython
@@ -60,6 +61,11 @@ MAX_VALUE = _MAX_VALUE
 
 assert _MAX_VALUE % 2 == 1
 
+
+def decoded_strerror(errno):
+    return strerror(errno).decode(locale.getpreferredencoding(), 'surrogateescape')
+
+
 @cython.internal
 cdef class IndexBase:
     cdef HashIndex *index
@@ -72,7 +78,7 @@ cdef class IndexBase:
             self.index = hashindex_read(path)
             if not self.index:
                 if errno:
-                    raise OSError(errno, strerror(errno), path)
+                    raise OSError(errno, decoded_strerror(errno), os.fsdecode(path))
                 raise RuntimeError('hashindex_read failed')
         else:
             self.index = hashindex_init(capacity, self.key_size, self.value_size)

@@ -243,11 +243,11 @@ class Repository:
             return NSIndex.read(index_path)
         except RuntimeError as error:
             assert str(error) == 'hashindex_read failed'  # everything else means we're in *deep* trouble
-            # corrupted index file, need to replay segments
+            logger.warning('Repository index missing or corrupted, trying to recover')
             try:
                 os.unlink(index_path)
             except OSError as e:
-                raise InternalOSError from e
+                raise InternalOSError(e) from None
             if not auto_recover:
                 raise
             self.prepare_txn(self.get_transaction_id())
@@ -255,7 +255,7 @@ class Repository:
             self.commit()
             return self.open_index(self.get_transaction_id())
         except OSError as e:
-            raise InternalOSError from e
+            raise InternalOSError(e) from None
 
     def prepare_txn(self, transaction_id, do_cleanup=True):
         self._active_txn = True
@@ -285,7 +285,7 @@ class Repository:
                 with open(hints_path, 'rb') as fd:
                     hints = msgpack.unpack(fd)
             except (msgpack.UnpackException, msgpack.ExtraData, FileNotFoundError) as e:
-                # corrupted or deleted hints file, need to replay segments
+                logger.warning('Repository hints file missing or corrupted, trying to recover')
                 if not isinstance(e, FileNotFoundError):
                     os.unlink(hints_path)
                 # index must exist at this point
@@ -294,7 +294,7 @@ class Repository:
                 self.prepare_txn(transaction_id)
                 return
             except OSError as os_error:
-                raise InternalOSError from os_error
+                raise InternalOSError(os_error) from None
             if hints[b'version'] == 1:
                 logger.debug('Upgrading from v1 hints.%d', transaction_id)
                 self.segments = hints[b'segments']

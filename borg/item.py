@@ -1,27 +1,21 @@
 from .constants import ITEM_KEYS
 from .helpers import safe_encode, safe_decode, StableDict
 
-# we want str keys for this code
-ITEM_KEYS = set(key.decode() for key in ITEM_KEYS)
 
-
-class Item:
+class PropDict:
     """
-    Item abstraction that deals with validation and the low-level details internally:
+    Manage a dictionary via properties.
 
-    - msgpack gives us a dict with bytes-typed keys - but we do not want to have the ugly
-      bytes-typed keys and the hard-to-type dict item access all over the place (like: item[b'keyname']),
-      so we define properties (and use it like: item.keyname)
-    - msgpack gives us byte-typed values for stuff that should be str, we need to decode/encode them here.
-    - we want to be safe against typos in keys and badly typed values, so we check them.
-
-    Items are created either from msgpack unpacker output, from another dict or
-    built step-by-step by setting attributes.
-
-    If an Item shall be serialized, give as_dict() method output to msgpack packer.
+    - initialization by giving a dict or kw args
+    - on initialization, normalize dict keys to be str type
+    - access dict via properties, like: x.key_name
+    - membership check via: 'key_name' in x
+    - optionally, encode when setting a value
+    - optionally, decode when getting a value
+    - be safe against typos in key names: check against VALID_KEYS
+    - when setting a value: check type of value
     """
-
-    VALID_KEYS = ITEM_KEYS
+    VALID_KEYS = None  # override with <set of str> in child class
 
     def __init__(self, data_dict=None, **kw):
         if data_dict is None:
@@ -52,7 +46,7 @@ class Item:
         if not isinstance(key, str):
             raise TypeError("key must be str")
         if key not in self.VALID_KEYS:
-            raise ValueError("key '%s' unknown" % key)
+            raise ValueError("key '%s' is not a valid key" % key)
         return key
 
     def __contains__(self, key):
@@ -63,14 +57,9 @@ class Item:
         """get value for key, return default if key does not exist"""
         return getattr(self, self._check_key(key), default)
 
+    @staticmethod
     def _make_property(key, value_type, value_type_name=None, encode=None, decode=None):
-        """return a property that deals with self._dict[key]:
-
-           - sets the value (checking type and optionally encoding it)
-           - gets the value (optionally decoding it)
-           - deletes the entry from the internal dict
-           - creates reasonable docstring and exceptions / exception messages
-        """
+        """return a property that deals with self._dict[key]"""
         assert isinstance(key, str)
         if value_type_name is None:
             value_type_name = value_type.__name__
@@ -102,28 +91,45 @@ class Item:
 
         return property(_get, _set, _del, doc=doc)
 
+
+class Item(PropDict):
+    """
+    Item abstraction that deals with validation and the low-level details internally:
+
+    Items are created either from msgpack unpacker output, from another dict, from kwargs or
+    built step-by-step by setting attributes.
+
+    msgpack gives us a dict with bytes-typed keys, just give it to Item(d) and use item.key_name later.
+    msgpack gives us byte-typed values for stuff that should be str, we automatically decode when getting
+    such a property and encode when setting it.
+
+    If an Item shall be serialized, give as_dict() method output to msgpack packer.
+    """
+
+    VALID_KEYS = set(key.decode() for key in ITEM_KEYS)  # we want str-typed keys
+
     # properties statically defined, so that IDEs can know their names:
 
-    path = _make_property('path', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    source = _make_property('source', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    user = _make_property('user', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    group = _make_property('group', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    acl_access = _make_property('acl_access', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    acl_default = _make_property('acl_default', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    acl_extended = _make_property('acl_extended', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    acl_nfs4 = _make_property('acl_nfs4', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    path = PropDict._make_property('path', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    source = PropDict._make_property('source', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    user = PropDict._make_property('user', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    group = PropDict._make_property('group', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    acl_access = PropDict._make_property('acl_access', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    acl_default = PropDict._make_property('acl_default', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    acl_extended = PropDict._make_property('acl_extended', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    acl_nfs4 = PropDict._make_property('acl_nfs4', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
 
-    mode = _make_property('mode', int)
-    uid = _make_property('uid', int)
-    gid = _make_property('gid', int)
-    atime = _make_property('atime', int)
-    ctime = _make_property('ctime', int)
-    mtime = _make_property('mtime', int)
-    rdev = _make_property('rdev', int)
-    bsdflags = _make_property('bsdflags', int)
+    mode = PropDict._make_property('mode', int)
+    uid = PropDict._make_property('uid', int)
+    gid = PropDict._make_property('gid', int)
+    atime = PropDict._make_property('atime', int)
+    ctime = PropDict._make_property('ctime', int)
+    mtime = PropDict._make_property('mtime', int)
+    rdev = PropDict._make_property('rdev', int)
+    bsdflags = PropDict._make_property('bsdflags', int)
 
-    hardlink_master = _make_property('hardlink_master', bool)
+    hardlink_master = PropDict._make_property('hardlink_master', bool)
 
-    chunks = _make_property('chunks', list)
+    chunks = PropDict._make_property('chunks', list)
 
-    xattrs = _make_property('xattrs', StableDict)
+    xattrs = PropDict._make_property('xattrs', StableDict)

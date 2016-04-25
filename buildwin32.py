@@ -36,22 +36,22 @@ source.write(
 int wmain(int argc , wchar_t *argv[] )
 {
 
-	wchar_t *program = argv[0];
-	Py_SetProgramName(program);
-	Py_Initialize();
+    wchar_t *program = argv[0];
+    Py_SetProgramName(program);
+    Py_Initialize();
 
-	PySys_SetArgv(argc, argv);
+    PySys_SetArgv(argc, argv);
 
     wchar_t path[MAX_PATH];
     GetModuleFileNameW(NULL, path, MAX_PATH);
     PathRemoveFileSpecW(path);
-    
-	FILE* file_1 = _wfopen(wcsncat(path, L"/borg/__main__.py", 17), L"r");
-	PyRun_AnyFile(file_1, "borg/__main__.py");
 
-	Py_Finalize();
-	PyMem_RawFree(program);
-	return 0;
+    FILE* file_1 = _wfopen(wcsncat(path, L"/borg/__main__.py", 17), L"r");
+    PyRun_AnyFile(file_1, "borg/__main__.py");
+
+    Py_Finalize();
+    PyMem_RawFree(program);
+    return 0;
 }
 """)
 source.close()
@@ -60,7 +60,7 @@ os.remove('wrapper.c')
 
 print('Searching modules')
 
-modulepath=os.path.abspath(os.path.join(gccpath, '../lib/python3.5/'))
+modulepath = os.path.abspath(os.path.join(gccpath, '../lib/python3.5/'))
 
 shutil.copytree(os.path.join(modulepath, 'encodings'), os.path.join(builddir, 'lib/python3.5/encodings'))
 
@@ -72,6 +72,7 @@ for module in extramodules:
     finder.run_script(module)
 
 print('Copying files')
+
 
 def finddlls(exe):
     re = []
@@ -106,14 +107,14 @@ for name, mod in items:
     shutil.copyfile(file, os.path.join(builddir, 'lib', relativepath))
     if file[-4:] == '.dll' or file[-4:] == '.DLL':
         for dll in finddlls(file):
-            if not builddir in dll:
+            if builddir not in dll:
                 shutil.copyfile(dll, os.path.join(builddir, 'bin', os.path.split(dll)[1]))
 for dll in finddlls(os.path.join(builddir, "bin/borg.exe")):
-    if not builddir in dll:
+    if builddir not in dll:
         shutil.copyfile(dll, os.path.join(builddir, 'bin', os.path.split(dll)[1]))
 shutil.copyfile('borg/__main__.py', os.path.join(builddir, 'bin/borg/__main__.py'))
 
 for extmodule in ['borg/chunker-cpython-35m.dll', 'borg/compress-cpython-35m.dll', 'borg/crypto-cpython-35m.dll', 'borg/hashindex-cpython-35m.dll']:
     for dll in finddlls(extmodule):
-        if not builddir in dll:
+        if builddir not in dll:
             shutil.copyfile(dll, os.path.join(builddir, 'bin', os.path.split(dll)[1]))

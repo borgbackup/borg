@@ -388,10 +388,16 @@ class PathPrefixPattern(PatternBase):
     PREFIX = "pp"
 
     def _prepare(self, pattern):
-        self.pattern = os.path.normpath(pattern).rstrip(os.path.sep) + os.path.sep
+        if sys.platform != 'win32':
+            self.pattern = posixpath.normpath(pattern).rstrip(posixpath.sep) + posixpath.sep
+        else:
+            self.pattern = posixpath.normpath(pattern).rstrip(posixpath.sep) + posixpath.sep
 
     def _match(self, path):
-        return (path + os.path.sep).startswith(self.pattern)
+        if sys.platform != 'win32':
+            return (path + os.path.sep).startswith(self.pattern)
+        else:
+            return (path + posixpath.sep).startswith(self.pattern)
 
 
 class FnmatchPattern(PatternBase):
@@ -716,6 +722,8 @@ def gid2group(gid, default=None):
 @memoize
 def group2gid(group, default=None):
     if sys.platform != 'win32':
+        if group == '':
+            return 0 #From windows
         try:
             return group and grp.getgrnam(group).gr_gid
         except KeyError:
@@ -819,7 +827,7 @@ class Location:
             m = self.file_re.match(text)
             if m:
                 self.proto = m.group('proto')
-                self.path = os.path.normpath(m.group('drive') + ":\\" + m.group('path'))
+                self.path = posixpath.normpath(m.group('drive') + ":\\" + m.group('path'))
                 self.archive = m.group('archive')
                 return True
 
@@ -941,7 +949,8 @@ def make_path_safe(path):
         tail = path
         if len(path) > 2 and (path[0:2] == '//' or path[0:2] == '\\\\' or path[1] == ':'):
             drive, tail = os.path.splitdrive(path)
-        return os.path.normpath(_safe_re.sub('', tail) or '.')
+        tail = tail.replace('\\', '/')
+        return posixpath.normpath(_safe_re.sub('', tail) or '.')
 
 
 def daemonize():

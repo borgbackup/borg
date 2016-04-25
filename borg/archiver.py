@@ -38,6 +38,8 @@ from .hashindex import ChunkIndexEntry
 
 has_lchflags = hasattr(os, 'lchflags')
 
+if sys.platform == 'win32':
+    import posixpath
 
 def argument(args, str_or_bool):
     """If bool is passed, return it. If str is passed, retrieve named attribute from args."""
@@ -247,7 +249,7 @@ class Archiver:
                         status = '-'
                     self.print_file_status(status, path)
                     continue
-                path = os.path.normpath(path)
+                path = posixpath.normpath(path.replace('\\', '/'))
                 try:
                     st = os.lstat(path)
                 except OSError as e:

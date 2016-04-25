@@ -253,7 +253,7 @@ class Archiver:
                 if sys.platform == 'win32':
                     path = posixpath.normpath(path.replace('\\', '/'))
                 else:
-                    os.path.normpath(path)
+                    path = os.path.normpath(path)
                 try:
                     st = os.lstat(path)
                 except OSError as e:

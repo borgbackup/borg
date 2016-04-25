@@ -80,7 +80,6 @@ on the releases_ page for the following platforms:
   glibc versions also work, if they are compatible to 2.13.
 * **Mac OS X**: 10.10 (does not work with older OS X releases)
 * **FreeBSD**: 10.2 (unknown whether it works for older releases)
-* **Windows**: Tested on Windows10. (Should work on Vista and up)
 
 To install such a binary, just drop it into a directory in your ``PATH``,
 make borg readable and executable for its users and then you can run ``borg``::
@@ -100,6 +99,10 @@ You can change the temporary directory by setting the ``TEMP`` environment varia
 
 If a new version is released, you will have to manually download it and replace
 the old version using the same steps as shown above.
+
+Windows zip
++++++++++++
+Tested on Windows10. (Should work on Vista and up)
 
 To install on Windows just extract the zip anywhere and add the bin directory to your ``PATH`` environment variable
 

@@ -95,6 +95,10 @@ class Manifest:
         self.key = key
         self.repository = repository
 
+    @property
+    def id_str(self):
+        return bin_to_hex(self.id)
+
     @classmethod
     def load(cls, repository, key=None):
         from .key import key_factory
@@ -658,7 +662,7 @@ def format_archive(archive):
     return '%-36s %s [%s]' % (
         archive.name,
         format_time(to_localtime(archive.ts)),
-        hexlify(archive.id).decode('ascii'),
+        bin_to_hex(archive.id),
     )
 
 
@@ -729,6 +733,10 @@ def safe_decode(s, coding='utf-8', errors='surrogateescape'):
 def safe_encode(s, coding='utf-8', errors='surrogateescape'):
     """encode str to bytes, with round-tripping "invalid" bytes"""
     return s.encode(coding, errors)
+
+
+def bin_to_hex(binary):
+    return hexlify(binary).decode('ascii')
 
 
 class Location:

@@ -1,4 +1,4 @@
-from binascii import hexlify, unhexlify
+from binascii import unhexlify
 from datetime import datetime
 from itertools import zip_longest
 from operator import attrgetter
@@ -19,7 +19,7 @@ import traceback
 from . import __version__
 from .helpers import Error, location_validator, archivename_validator, format_time, format_file_size, \
     parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
-    get_cache_dir, prune_within, prune_split, \
+    get_cache_dir, prune_within, prune_split, bin_to_hex, safe_encode, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
     log_multi, PatternMatcher, ItemFormatter
@@ -739,7 +739,7 @@ class Archiver:
                 else:
                     write = sys.stdout.buffer.write
                 for item in archive.iter_items(lambda item: matcher.match(item[b'path'])):
-                    write(formatter.format_item(item).encode('utf-8', errors='surrogateescape'))
+                    write(safe_encode(formatter.format_item(item)))
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 if args.prefix and not archive_info.name.startswith(args.prefix):
@@ -759,7 +759,7 @@ class Archiver:
 
         stats = archive.calc_stats(cache)
         print('Name:', archive.name)
-        print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
+        print('Fingerprint: %s' % archive.fpr)
         print('Comment:', archive.metadata.get(b'comment', ''))
         print('Hostname:', archive.metadata[b'hostname'])
         print('Username:', archive.metadata[b'username'])
@@ -901,7 +901,7 @@ class Archiver:
         archive = Archive(repository, key, manifest, args.location.archive)
         for i, item_id in enumerate(archive.metadata[b'items']):
             _, data = key.decrypt(item_id, repository.get(item_id))
-            filename = '%06d_%s.items' % (i, hexlify(item_id).decode('ascii'))
+            filename = '%06d_%s.items' % (i, bin_to_hex(item_id))
             print('Dumping', filename)
             with open(filename, 'wb') as fd:
                 fd.write(data)

@@ -10,7 +10,7 @@ import tempfile
 
 from . import __version__
 
-from .helpers import Error, IntegrityError, get_home_dir, sysinfo
+from .helpers import Error, IntegrityError, get_home_dir, sysinfo, bin_to_hex
 from .repository import Repository
 
 import msgpack
@@ -190,6 +190,10 @@ class RemoteRepository:
         if exc_type is not None:
             self.rollback()
         self.close()
+
+    @property
+    def id_str(self):
+        return bin_to_hex(self.id)
 
     def borg_cmd(self, args, testing):
         """return a borg serve command line"""

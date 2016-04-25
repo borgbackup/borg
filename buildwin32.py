@@ -29,6 +29,9 @@ source = open('wrapper.c', 'w')
 source.write(
 """
 #include <python3.5m/python.h>
+#include <windows.h>
+#include <wchar.h>
+#include "Shlwapi.h"
 
 int wmain(int argc , wchar_t *argv[] )
 {
@@ -39,7 +42,11 @@ int wmain(int argc , wchar_t *argv[] )
 
 	PySys_SetArgv(argc, argv);
 
-	FILE* file_1 = fopen("borg/__main__.py", "r");
+    wchar_t path[MAX_PATH];
+    GetModuleFileNameW(NULL, path, MAX_PATH);
+    PathRemoveFileSpecW(path);
+    
+	FILE* file_1 = _wfopen(wcsncat(path, L"/borg/__main__.py", 17), L"r");
 	PyRun_AnyFile(file_1, "borg/__main__.py");
 
 	Py_Finalize();
@@ -48,7 +55,7 @@ int wmain(int argc , wchar_t *argv[] )
 }
 """)
 source.close()
-subprocess.run('gcc wrapper.c -lpython3.5m -municode -o ' + builddir + '/bin/borg.exe')
+subprocess.run('gcc wrapper.c -lpython3.5m -lshlwapi -municode -o ' + builddir + '/bin/borg.exe')
 os.remove('wrapper.c')
 
 print('Searching modules')

@@ -681,11 +681,15 @@ def posix_acl_use_stored_uid_gid(acl):
 
 def safe_decode(s, coding='utf-8', errors='surrogateescape'):
     """decode bytes to str, with round-tripping "invalid" bytes"""
+    if s is None:
+        return None
     return s.decode(coding, errors)
 
 
 def safe_encode(s, coding='utf-8', errors='surrogateescape'):
     """encode str to bytes, with round-tripping "invalid" bytes"""
+    if s is None:
+        return None
     return s.encode(coding, errors)
 
 

@@ -1,5 +1,5 @@
 from .constants import ITEM_KEYS
-from .helpers import safe_encode, safe_decode, StableDict
+from .helpers import safe_encode, safe_decode, bigint_to_int, int_to_bigint, StableDict
 
 
 class PropDict:
@@ -112,21 +112,23 @@ class Item(PropDict):
 
     path = PropDict._make_property('path', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
     source = PropDict._make_property('source', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    user = PropDict._make_property('user', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    group = PropDict._make_property('group', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
     acl_access = PropDict._make_property('acl_access', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
     acl_default = PropDict._make_property('acl_default', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
     acl_extended = PropDict._make_property('acl_extended', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
     acl_nfs4 = PropDict._make_property('acl_nfs4', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
 
+    user = PropDict._make_property('user', (str, type(None)), 'surrogate-escaped str or None', encode=safe_encode, decode=safe_decode)
+    group = PropDict._make_property('group', (str, type(None)), 'surrogate-escaped str or None', encode=safe_encode, decode=safe_decode)
+
     mode = PropDict._make_property('mode', int)
     uid = PropDict._make_property('uid', int)
     gid = PropDict._make_property('gid', int)
-    atime = PropDict._make_property('atime', int)
-    ctime = PropDict._make_property('ctime', int)
-    mtime = PropDict._make_property('mtime', int)
     rdev = PropDict._make_property('rdev', int)
     bsdflags = PropDict._make_property('bsdflags', int)
+
+    atime = PropDict._make_property('atime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
+    ctime = PropDict._make_property('ctime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
+    mtime = PropDict._make_property('mtime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
 
     hardlink_master = PropDict._make_property('hardlink_master', bool)
 

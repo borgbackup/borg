@@ -63,6 +63,25 @@ def test_item_int_property():
         item.mode = "invalid"
 
 
+def test_item_bigint_property():
+    item = Item()
+    small, big = 42, 2 ** 65
+    item.atime = small
+    assert item.atime == small
+    assert item.as_dict() == {'atime': small}
+    item.atime = big
+    assert item.atime == big
+    assert item.as_dict() == {'atime': b'\0' * 8 + b'\x02'}
+
+
+def test_item_user_group_none():
+    item = Item()
+    item.user = None
+    assert item.user is None
+    item.group = None
+    assert item.group is None
+
+
 def test_item_se_str_property():
     # start simple
     item = Item()

@@ -199,6 +199,10 @@ class Archive:
     def duration(self):
         return format_timedelta(self.end - self.start)
 
+    @property
+    def duration_from_meta(self):
+        return format_timedelta(self.ts_end - self.ts)
+
     def __str__(self):
         return '''\
 Archive name: {0.name}

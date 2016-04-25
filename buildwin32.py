@@ -3,8 +3,8 @@ import os
 import subprocess
 from modulefinder import ModuleFinder
 
-#Creates standalone Windows executable
-#First build by following instructions from installation.rst
+# Creates standalone Windows executable
+# First build by following instructions from installation.rst
 
 builddir = 'win32exe'
 
@@ -16,7 +16,7 @@ os.mkdir(builddir + '/lib')
 
 print('Compiling wrapper')
 
-gccpath = '' # check for compiler, path needed later
+gccpath = ''  # check for compiler, path needed later
 for p in os.environ['PATH'].split(';'):
     if os.path.exists(os.path.join(p, 'gcc.exe')):
         gccpath = p

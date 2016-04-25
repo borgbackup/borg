@@ -389,7 +389,7 @@ class PathPrefixPattern(PatternBase):
 
     def _prepare(self, pattern):
         if sys.platform != 'win32':
-            self.pattern = posixpath.normpath(pattern).rstrip(posixpath.sep) + posixpath.sep
+            self.pattern = os.path.normpath(pattern).rstrip(os.path.sep) + os.path.sep
         else:
             self.pattern = posixpath.normpath(pattern).rstrip(posixpath.sep) + posixpath.sep
 
@@ -723,7 +723,7 @@ def gid2group(gid, default=None):
 def group2gid(group, default=None):
     if sys.platform != 'win32':
         if group == '':
-            return 0 #From windows
+            return 0  # From windows
         try:
             return group and grp.getgrnam(group).gr_gid
         except KeyError:

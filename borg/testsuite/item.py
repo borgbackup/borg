@@ -40,10 +40,23 @@ def test_item_from_dict():
     assert item.mode == 0o666
     assert 'path' in item
 
+    # does not matter whether we get str or bytes keys
     item = Item({'path': b'/a/b/c', 'mode': 0o666})
     assert item.path == '/a/b/c'
     assert item.mode == 0o666
     assert 'mode' in item
+
+    # invalid - no dict
+    with pytest.raises(TypeError):
+        Item(42)
+
+    # invalid - no bytes/str key
+    with pytest.raises(TypeError):
+        Item({42: 23})
+
+    # invalid - unknown key
+    with pytest.raises(ValueError):
+        Item({'foobar': 'baz'})
 
 
 def test_item_from_kw():

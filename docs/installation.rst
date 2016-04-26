@@ -49,7 +49,7 @@ Ubuntu       `16.04`_, backports (PPA): `15.10`_, `14.04`_ ``apt install borgbac
 .. _[community]: https://www.archlinux.org/packages/?name=borg
 .. _jessie-backports: https://packages.debian.org/jessie-backports/borgbackup
 .. _stretch: https://packages.debian.org/stretch/borgbackup
-.. _unstable/sid: https://packages.debian.org/sid/borgbackup
+.. _sid: https://packages.debian.org/sid/borgbackup
 .. _ebuild: https://packages.gentoo.org/packages/app-backup/borgbackup
 .. _Ports-Tree: http://www.freshports.org/archivers/py-borgbackup/
 .. _pkgsrc: http://pkgsrc.se/sysutils/py-borgbackup

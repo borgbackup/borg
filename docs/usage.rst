@@ -647,6 +647,9 @@ Examples
     ...
 
 
+.. include:: usage/with-lock.rst.inc
+
+
 .. include:: usage/break-lock.rst.inc
 
 

@@ -1399,6 +1399,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         info_after = self.cmd('info', self.repository_location + '::test')
         assert info_before == info_after  # includes archive ID
 
+    def test_with_lock(self):
+        self.cmd('init', self.repository_location)
+        lock_path = os.path.join(self.repository_path, 'lock.exclusive')
+        cmd = 'python3', '-c', 'import os, sys; sys.exit(42 if os.path.exists("%s") else 23)' % lock_path
+        self.cmd('with-lock', self.repository_location, *cmd, fork=True, exit_code=42)
+
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
 class ArchiverTestCaseBinary(ArchiverTestCase):

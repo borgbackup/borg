@@ -12,6 +12,7 @@ import os
 import shlex
 import signal
 import stat
+import subprocess
 import sys
 import textwrap
 import traceback
@@ -894,6 +895,21 @@ class Archiver:
         repository.commit()
         cache.commit()
         return self.exit_code
+
+    @with_repository(manifest=False)
+    def do_with_lock(self, args, repository):
+        """run a user specified command with the repository lock held"""
+        # re-write manifest to start a repository transaction - this causes a
+        # lock upgrade to exclusive for remote (and also for local) repositories.
+        # by using manifest=False in the decorator, we avoid having to require
+        # the encryption key (and can operate just with encrypted data).
+        data = repository.get(Manifest.MANIFEST_ID)
+        repository.put(Manifest.MANIFEST_ID, data)
+        try:
+            # we exit with the return code we get from the subprocess
+            return subprocess.call([args.command] + args.args)
+        finally:
+            repository.rollback()
 
     @with_repository()
     def do_debug_dump_archive_items(self, args, repository, manifest, key):
@@ -1830,6 +1846,32 @@ class Archiver:
                                help='repository/archive to recreate')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to recreate; patterns are supported')
+
+        with_lock_epilog = textwrap.dedent("""
+        This command runs a user-specified command while the repository lock is held.
+
+        It will first try to acquire the lock (make sure that no other operation is
+        running in the repo), then execute the given command as a subprocess and wait
+        for its termination, release the lock and return the user command's return
+        code as borg's return code.
+
+        Note: if you copy a repository with the lock held, the lock will be present in
+              the copy, obviously. Thus, before using borg on the copy, you need to
+              use "borg break-lock" on it.
+        """)
+        subparser = subparsers.add_parser('with-lock', parents=[common_parser], add_help=False,
+                                          description=self.do_with_lock.__doc__,
+                                          epilog=with_lock_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='run user command with lock held')
+        subparser.set_defaults(func=self.do_with_lock)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repository to lock')
+        subparser.add_argument('command', metavar='COMMAND',
+                               help='command to run')
+        subparser.add_argument('args', metavar='ARGS', nargs=argparse.REMAINDER,
+                               help='command arguments')
 
         subparser = subparsers.add_parser('help', parents=[common_parser], add_help=False,
                                           description='Extra help')

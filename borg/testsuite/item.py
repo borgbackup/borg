@@ -136,3 +136,12 @@ def test_item_dict_property():
     item.xattrs['bar'] = 'baz'
     assert item.xattrs == StableDict({'foo': 'bar', 'bar': 'baz'})
     assert item.as_dict() == {'xattrs': {'foo': 'bar', 'bar': 'baz'}}
+
+
+def test_unknown_property():
+    # we do not want the user to be able to set unknown attributes -
+    # they won't get into the .as_dict() result dictionary.
+    # also they might be just typos of known attributes.
+    item = Item()
+    with pytest.raises(AttributeError):
+        item.unknown_attribute = None

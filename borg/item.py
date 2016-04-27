@@ -17,6 +17,8 @@ class PropDict:
     """
     VALID_KEYS = None  # override with <set of str> in child class
 
+    __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
+
     def __init__(self, data_dict=None, **kw):
         if data_dict is None:
             data = kw
@@ -39,7 +41,7 @@ class PropDict:
 
     def as_dict(self):
         """return the internal dictionary"""
-        return self._dict  # XXX use StableDict?
+        return StableDict(self._dict)
 
     def _check_key(self, key):
         """make sure key is of type str and known"""
@@ -107,6 +109,8 @@ class Item(PropDict):
     """
 
     VALID_KEYS = set(key.decode() for key in ITEM_KEYS)  # we want str-typed keys
+
+    __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 
     # properties statically defined, so that IDEs can know their names:
 

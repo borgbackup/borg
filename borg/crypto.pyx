@@ -5,7 +5,7 @@ This could be replaced by PyCrypto maybe?
 from libc.stdlib cimport malloc, free
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 
-API_VERSION = 2
+API_VERSION = 3
 
 
 cdef extern from "openssl/rand.h":

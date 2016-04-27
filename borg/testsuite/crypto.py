@@ -3,6 +3,9 @@ from binascii import hexlify, unhexlify
 from ..crypto import AES, bytes_to_long, bytes_to_int, long_to_bytes, hmac_sha256
 from . import BaseTestCase
 
+# Note: these tests are part of the self test, do not use or import py.test functionality here.
+#       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT
+
 
 class CryptoTestCase(BaseTestCase):
 

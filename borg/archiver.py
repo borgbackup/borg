@@ -34,6 +34,7 @@ from .constants import *  # NOQA
 from .key import key_creator, RepoKey, PassphraseKey
 from .archive import Archive, ArchiveChecker, ArchiveRecreater
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
+from .selftest import selftest
 from .hashindex import ChunkIndexEntry
 
 has_lchflags = hasattr(os, 'lchflags')
@@ -1901,13 +1902,17 @@ class Archiver:
         update_excludes(args)
         return args
 
+    def prerun_checks(self, logger):
+        check_extension_modules()
+        selftest(logger)
+
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
         setup_logging(level=args.log_level, is_serve=args.func == self.do_serve)  # do not use loggers before this!
         if args.show_version:
             logger.info('borgbackup version %s' % __version__)
-        check_extension_modules()
+        self.prerun_checks(logger)
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
         return args.func(args)

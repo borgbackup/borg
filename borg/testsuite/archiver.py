@@ -62,6 +62,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
             sys.stdout = sys.stderr = output = StringIO()
             if archiver is None:
                 archiver = Archiver()
+            archiver.prerun_checks = lambda *args: None
             archiver.exit_code = EXIT_SUCCESS
             args = archiver.parse_args(list(args))
             ret = archiver.run(args)

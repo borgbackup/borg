@@ -40,6 +40,20 @@ virtual env and run::
 
   pip install -r requirements.d/development.txt
 
+Building on Windows
++++++++++++++++++++
+
+Download and install MSYS from https://msys2.github.io/
+
+Use `Mingw64-w64 64bit Shell`::
+
+  pacman -S mingw-w64-x86_64-python3 git mingw-w64-x86_64-lz4 mingw-w64-x86_64-python3-pip \
+  mingw-w64-x86_64-cython mingw-w64-x86_64-gcc mingw-w64-x86_64-ntldd-git
+
+Use git to get the source and checkout `windows` branch then::
+
+  pip3 install -r requirements.d/development.txt
+  pip3 install -e .
 
 Running the tests
 -----------------
@@ -71,6 +85,9 @@ Important notes:
 
 - When using ``--`` to give options to py.test, you MUST also give ``borg.testsuite[.module]``.
 
+As tox doesn't run on Windows you have to manually run command::
+
+  py.test --cov=borg --cov-config=.coveragerc --benchmark-skip --pyargs borg/testsuite
 
 Regenerate usage files
 ----------------------
@@ -148,6 +165,9 @@ If you encounter issues, see also our `Vagrantfile` for details.
 .. note:: Standalone binaries built with pyinstaller are supposed to
           work on same OS, same architecture (x86 32bit, amd64 64bit)
           without external dependencies.
+
+On Windows use `python buildwin32.py` to build standalone executable in `win32exe` directory
+with all necessary files to run.
 
 
 Creating a new release

@@ -102,6 +102,12 @@ You can change the temporary directory by setting the ``TEMP`` environment varia
 If a new version is released, you will have to manually download it and replace
 the old version using the same steps as shown above.
 
+Windows zip
++++++++++++
+Tested on Windows10. (Should work on Vista and up)
+
+To install on Windows just extract the zip anywhere and add the bin directory to your ``PATH`` environment variable.
+
 .. _pyinstaller: http://www.pyinstaller.org
 .. _releases: https://github.com/borgbackup/borg/releases
 
@@ -199,6 +205,14 @@ and commands to make fuse work for using the mount command.
      kldload fuse
      sysctl vfs.usermount=1
     
+
+Windows
++++++++
+
+See development_ on how to build on windows.
+run `python3 buildwin32.py` to create standalone windows executable in `win32exe`.
+You can rename or move that folder. Add the bin folder to your ``PATH`` and you can run ``borg``.
+
 
 Cygwin
 ++++++

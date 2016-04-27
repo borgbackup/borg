@@ -21,5 +21,6 @@ borg/_version.py
 borg.build/
 borg.dist/
 borg.exe
+*.dll
 .coverage
 .vagrant

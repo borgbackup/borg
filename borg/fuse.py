@@ -8,8 +8,12 @@ import tempfile
 import time
 from .archive import Archive
 from .helpers import daemonize, bigint_to_int
+from .logger import create_logger
+from .lrucache import LRUCache
 from distutils.version import LooseVersion
 import msgpack
+
+logger = create_logger()
 
 # Does this version of llfuse support ns precision?
 have_fuse_xtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
@@ -54,6 +58,9 @@ class FuseOperations(llfuse.Operations):
         self.pending_archives = {}
         self.accounted_chunks = {}
         self.cache = ItemCache()
+        data_cache_capacity = int(os.environ.get('BORG_MOUNT_DATA_CACHE_ENTRIES', os.cpu_count() or 1))
+        logger.debug('mount data cache capacity: %d chunks', data_cache_capacity)
+        self.data_cache = LRUCache(capacity=data_cache_capacity, dispose=lambda _: None)
         if archive:
             self.process_archive(archive)
         else:
@@ -229,7 +236,16 @@ class FuseOperations(llfuse.Operations):
                 offset -= s
                 continue
             n = min(size, s - offset)
-            _, data = self.key.decrypt(id, self.repository.get(id))
+            if id in self.data_cache:
+                data = self.data_cache[id]
+                if offset + n == len(data):
+                    # evict fully read chunk from cache
+                    del self.data_cache[id]
+            else:
+                _, data = self.key.decrypt(id, self.repository.get(id))
+                if offset + n < len(data):
+                    # chunk was only partially read, cache it
+                    self.data_cache[id] = data
             parts.append(data[offset:offset + n])
             offset = 0
             size -= n

@@ -1,4 +1,3 @@
-from binascii import hexlify
 from configparser import ConfigParser
 import errno
 import os
@@ -23,7 +22,7 @@ from ..archiver import Archiver
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto import bytes_to_long, num_aes_blocks
-from ..helpers import Chunk, Manifest, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
+from ..helpers import Chunk, Manifest, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, bin_to_hex
 from ..key import KeyfileKeyBase
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
@@ -62,6 +61,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
             sys.stdout = sys.stderr = output = StringIO()
             if archiver is None:
                 archiver = Archiver()
+            archiver.prerun_checks = lambda *args: None
             archiver.exit_code = EXIT_SUCCESS
             args = archiver.parse_args(list(args))
             ret = archiver.run(args)
@@ -377,7 +377,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def _set_repository_id(self, path, id):
         config = ConfigParser(interpolation=None)
         config.read(os.path.join(path, 'config'))
-        config.set('repository', 'id', hexlify(id).decode('ascii'))
+        config.set('repository', 'id', bin_to_hex(id))
         with open(os.path.join(path, 'config'), 'w') as fd:
             config.write(fd)
         with Repository(self.repository_path) as repository:

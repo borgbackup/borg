@@ -1,6 +1,75 @@
 Changelog
 =========
 
+Version 1.1.0 (not released yet)
+--------------------------------
+
+New features:
+
+- borg recreate: re-create existing archives, #787 #686 #630 #70, also see
+  #757, #770.
+
+  - selectively remove files/dirs from old archives
+  - re-compress data
+  - re-chunkify data, e.g. to have upgraded Attic / Borg 0.xx archives
+    deduplicate with Borg 1.x archives or to experiment with chunker-params.
+- create: visit files in inode order (better speed, esp. for large directories
+  and rotating disks)
+- borg diff: show differences between archives
+- borg list improved:
+
+  - removed {formatkeys}, see "borg list --help"
+  - --list-format is deprecated, use --format instead
+  - now supports the usual [PATH [PATHS…]] syntax and excludes
+  - new keys: csize, num_chunks, unique_chunks, NUL
+  - supports guaranteed_available hashlib hashes
+    (to avoid varying functionality depending on environment)
+- prune:
+
+  - to better visualize the "thinning out", we now list all archives in
+    reverse time order. rephrase and reorder help text.
+  - implement --keep-last N via --keep-secondly N, also --keep-minutely.
+    assuming that there is not more than 1 backup archive made in 1s,
+    --keep-last N and --keep-secondly N are equivalent, #537
+- borg comment: add archive comments, #842
+- provide "borgfs" wrapper for borg mount, enables usage via fstab, #743
+- create: add 'x' status for excluded paths, #814
+- --show-version: shows/logs the borg version (use -v), #725
+- borg list/prune/delete: also output archive id, #731
+
+Bug fixes:
+
+- init: clean up partial repo if passphrase input is aborted, #850
+- info: quote cmdline arguments that have spaces in them
+- failing hashindex tests on netbsd, #804
+- fix links failing for extracting subtrees, #761
+
+Other changes:
+
+- replace stdlib hmac with OpenSSL, zero-copy decrypt (10-15% increase in
+  performance of hash-lists and extract).
+- Source:
+
+  - pass meta-data around, #765
+  - move some constants to new constants module
+  - better readability and less errors with namedtuples, #823
+- Docs:
+
+  - better help texts and sphinx reproduction of usage help:
+
+    - Group options
+    - Nicer list of options in Sphinx
+    - Deduplicate 'Common options' (including --help)
+  - chunker: added some insights by "Voltara", #903
+  - clarify what "deduplicated size" means
+  - fix / update / add package list entries
+  - new contributors in AUTHORS!
+- Tests:
+
+  - vagrant: add ubuntu/xenial 64bit - this box has still some issues
+  - ChunkBuffer: add test for leaving partial chunk in buffer, fixes #945
+
+
 Version 1.0.2
 -------------
 

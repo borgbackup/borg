@@ -1,4 +1,4 @@
-from binascii import hexlify, a2b_base64, b2a_base64
+from binascii import a2b_base64, b2a_base64
 import configparser
 import getpass
 import os
@@ -7,13 +7,13 @@ import textwrap
 from hmac import compare_digest
 from hashlib import sha256, pbkdf2_hmac
 
-from .helpers import Chunk, IntegrityError, get_keys_dir, Error, yes
+from .helpers import Chunk, IntegrityError, get_keys_dir, Error, yes, bin_to_hex, CompressionDecider2, CompressionSpec
 from .logger import create_logger
 logger = create_logger()
 
 from .constants import *  # NOQA
 from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks, hmac_sha256
-from .compress import Compressor, COMPR_BUFFER
+from .compress import Compressor, COMPR_BUFFER, get_compressor
 import msgpack
 
 PREFIX = b'\0' * 8
@@ -79,11 +79,19 @@ class KeyBase:
         self.TYPE_STR = bytes([self.TYPE])
         self.repository = repository
         self.target = None  # key location file path / repo obj
-        self.compressor = Compressor('none', buffer=COMPR_BUFFER)
+        self.compression_decider2 = CompressionDecider2(CompressionSpec('none'))
+        self.compressor = Compressor('none', buffer=COMPR_BUFFER)  # for decompression
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
         """
+
+    def compress(self, chunk):
+        compr_args, chunk = self.compression_decider2.decide(chunk)
+        compressor = Compressor(**compr_args)
+        meta, data = chunk
+        data = compressor.compress(data)
+        return Chunk(data, **meta)
 
     def encrypt(self, chunk):
         pass
@@ -110,8 +118,8 @@ class PlaintextKey(KeyBase):
         return sha256(data).digest()
 
     def encrypt(self, chunk):
-        meta, data = chunk
-        return b''.join([self.TYPE_STR, self.compressor.compress(data)])
+        chunk = self.compress(chunk)
+        return b''.join([self.TYPE_STR, chunk.data])
 
     def decrypt(self, id, data):
         if data[0] != self.TYPE:
@@ -143,9 +151,9 @@ class AESKeyBase(KeyBase):
         return hmac_sha256(self.id_key, data)
 
     def encrypt(self, chunk):
-        data = self.compressor.compress(chunk.data)
+        chunk = self.compress(chunk)
         self.enc_cipher.reset()
-        data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(data)))
+        data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(chunk.data)))
         hmac = hmac_sha256(self.enc_hmac_key, data)
         return b''.join((self.TYPE_STR, hmac, data))
 
@@ -211,7 +219,7 @@ class Passphrase(str):
                 passphrase.encode('ascii')
             except UnicodeEncodeError:
                 print('Your passphrase (UTF-8 encoding in hex): %s' %
-                      hexlify(passphrase.encode('utf-8')).decode('ascii'),
+                      bin_to_hex(passphrase.encode('utf-8')),
                       file=sys.stderr)
                 print('As you have a non-ASCII passphrase, it is recommended to keep the UTF-8 encoding in hex together with the passphrase at a safe place.',
                       file=sys.stderr)
@@ -414,15 +422,14 @@ class KeyfileKey(KeyfileKeyBase):
             return filename
 
     def find_key(self):
-        id = hexlify(self.repository.id).decode('ascii')
         keyfile = os.environ.get('BORG_KEY_FILENAME')
         if keyfile:
-            return self.sanity_check(keyfile, id)
+            return self.sanity_check(keyfile, self.repository.id_str)
         keys_dir = get_keys_dir()
         for name in os.listdir(keys_dir):
             filename = os.path.join(keys_dir, name)
             try:
-                return self.sanity_check(filename, id)
+                return self.sanity_check(filename, self.repository.id_str)
             except (KeyfileInvalidError, KeyfileMismatchError):
                 pass
         raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
@@ -450,7 +457,7 @@ class KeyfileKey(KeyfileKeyBase):
     def save(self, target, passphrase):
         key_data = self._save(passphrase)
         with open(target, 'w') as fd:
-            fd.write('%s %s\n' % (self.FILE_ID, hexlify(self.repository_id).decode('ascii')))
+            fd.write('%s %s\n' % (self.FILE_ID, bin_to_hex(self.repository_id)))
             fd.write(key_data)
             fd.write('\n')
         self.target = target

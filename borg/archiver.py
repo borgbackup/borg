@@ -1,4 +1,4 @@
-from binascii import hexlify, unhexlify
+from binascii import unhexlify
 from datetime import datetime
 from itertools import zip_longest
 from operator import attrgetter
@@ -19,7 +19,7 @@ import traceback
 from . import __version__
 from .helpers import Error, location_validator, archivename_validator, format_time, format_file_size, \
     parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
-    get_cache_dir, prune_within, prune_split, \
+    get_cache_dir, prune_within, prune_split, bin_to_hex, safe_encode, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
     log_multi, PatternMatcher, ItemFormatter
@@ -34,6 +34,7 @@ from .constants import *  # NOQA
 from .key import key_creator, RepoKey, PassphraseKey
 from .archive import Archive, ArchiveChecker, ArchiveRecreater
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
+from .selftest import selftest
 from .hashindex import ChunkIndexEntry
 
 has_lchflags = hasattr(os, 'lchflags')
@@ -279,14 +280,12 @@ class Archiver:
         dry_run = args.dry_run
         t0 = datetime.utcnow()
         if not dry_run:
-            compr_args = dict(buffer=COMPR_BUFFER)
-            compr_args.update(args.compression)
-            key.compressor = Compressor(**compr_args)
             with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
                                   numeric_owner=args.numeric_owner, progress=args.progress,
-                                  chunker_params=args.chunker_params, start=t0)
+                                  chunker_params=args.chunker_params, start=t0,
+                                  compression=args.compression, compression_files=args.compression_files)
                 create_inner(archive, cache)
         else:
             create_inner(None, None)
@@ -739,7 +738,7 @@ class Archiver:
                 else:
                     write = sys.stdout.buffer.write
                 for item in archive.iter_items(lambda item: matcher.match(item[b'path'])):
-                    write(formatter.format_item(item).encode('utf-8', errors='surrogateescape'))
+                    write(safe_encode(formatter.format_item(item)))
         else:
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 if args.prefix and not archive_info.name.startswith(args.prefix):
@@ -758,16 +757,17 @@ class Archiver:
             return remove_surrogates(' '.join(shlex.quote(x) for x in cmdline))
 
         stats = archive.calc_stats(cache)
-        print('Name:', archive.name)
-        print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
-        print('Comment:', archive.metadata.get(b'comment', ''))
-        print('Hostname:', archive.metadata[b'hostname'])
-        print('Username:', archive.metadata[b'username'])
+        print('Archive name: %s' % archive.name)
+        print('Archive fingerprint: %s' % archive.fpr)
+        print('Comment: %s' % archive.metadata.get(b'comment', ''))
+        print('Hostname: %s' % archive.metadata[b'hostname'])
+        print('Username: %s' % archive.metadata[b'username'])
         print('Time (start): %s' % format_time(to_localtime(archive.ts)))
         print('Time (end):   %s' % format_time(to_localtime(archive.ts_end)))
-        print('Command line:', format_cmdline(archive.metadata[b'cmdline']))
+        print('Duration: %s' % archive.duration_from_meta)
         print('Number of files: %d' % stats.nfiles)
-        print()
+        print('Command line: %s' % format_cmdline(archive.metadata[b'cmdline']))
+        print(DASHES)
         print(str(stats))
         print(str(cache))
         return self.exit_code
@@ -867,8 +867,8 @@ class Archiver:
 
         recreater = ArchiveRecreater(repository, manifest, key, cache, matcher,
                                      exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
-                                     keep_tag_files=args.keep_tag_files,
-                                     compression=args.compression, chunker_params=args.chunker_params,
+                                     keep_tag_files=args.keep_tag_files, chunker_params=args.chunker_params,
+                                     compression=args.compression, compression_files=args.compression_files,
                                      progress=args.progress, stats=args.stats,
                                      file_status_printer=self.print_file_status,
                                      dry_run=args.dry_run)
@@ -901,7 +901,7 @@ class Archiver:
         archive = Archive(repository, key, manifest, args.location.archive)
         for i, item_id in enumerate(archive.metadata[b'items']):
             _, data = key.decrypt(item_id, repository.get(item_id))
-            filename = '%06d_%s.items' % (i, hexlify(item_id).decode('ascii'))
+            filename = '%06d_%s.items' % (i, bin_to_hex(item_id))
             print('Dumping', filename)
             with open(filename, 'wb') as fd:
                 fd.write(data)
@@ -1348,6 +1348,9 @@ class Archiver:
                                         'zlib,0 .. zlib,9 == zlib (with level 0..9),\n'
                                         'lzma == lzma (default level 6),\n'
                                         'lzma,0 .. lzma,9 == lzma (with level 0..9).')
+        archive_group.add_argument('--compression-from', dest='compression_files',
+                                   type=argparse.FileType('r'), action='append',
+                                   metavar='COMPRESSIONCONFIG', help='read compression patterns from COMPRESSIONCONFIG, one per line')
 
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
@@ -1537,6 +1540,11 @@ class Archiver:
 
         To allow a regular user to use fstab entries, add the ``user`` option:
         ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto,user 0 0``
+
+        The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
+        to tweak the performance. It sets the number of cached data chunks; additional
+        memory usage can be up to ~8 MiB times this number. The default is the number
+        of CPU cores.
         """)
         subparser = subparsers.add_parser('mount', parents=[common_parser], add_help=False,
                                           description=self.do_mount.__doc__,
@@ -1809,6 +1817,9 @@ class Archiver:
                                         'zlib,0 .. zlib,9 == zlib (with level 0..9),\n'
                                         'lzma == lzma (default level 6),\n'
                                         'lzma,0 .. lzma,9 == lzma (with level 0..9).')
+        archive_group.add_argument('--compression-from', dest='compression_files',
+                                   type=argparse.FileType('r'), action='append',
+                                   metavar='COMPRESSIONCONFIG', help='read compression patterns from COMPRESSIONCONFIG, one per line')
         archive_group.add_argument('--chunker-params', dest='chunker_params',
                                    type=ChunkerParams, default=None,
                                    metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
@@ -1914,13 +1925,17 @@ class Archiver:
         update_excludes(args)
         return args
 
+    def prerun_checks(self, logger):
+        check_extension_modules()
+        selftest(logger)
+
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
         setup_logging(level=args.log_level, is_serve=args.func == self.do_serve)  # do not use loggers before this!
         if args.show_version:
             logger.info('borgbackup version %s' % __version__)
-        check_extension_modules()
+        self.prerun_checks(logger)
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
         return args.func(args)

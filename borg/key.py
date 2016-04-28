@@ -417,12 +417,12 @@ class KeyfileKey(KeyfileKeyBase):
         id = hexlify(self.repository.id).decode('ascii')
         keyfile = os.environ.get('BORG_KEY_FILENAME')
         if keyfile:
-            return sanity_check(keyfile, id)
+            return self.sanity_check(keyfile, id)
         keys_dir = get_keys_dir()
         for name in os.listdir(keys_dir):
             filename = os.path.join(keys_dir, name)
             try:
-                return sanity_check(filename, id)
+                return self.sanity_check(filename, id)
             except (KeyfileInvalidError, KeyfileMismatchError):
                 pass
         raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())

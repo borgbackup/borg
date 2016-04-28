@@ -422,7 +422,7 @@ class KeyfileKey(KeyfileKeyBase):
             return filename
 
     def find_key(self):
-        keyfile = os.environ.get('BORG_KEY_FILENAME')
+        keyfile = os.environ.get('BORG_KEY_FILE')
         if keyfile:
             return self.sanity_check(keyfile, self.repository.id_str)
         keys_dir = get_keys_dir()
@@ -435,7 +435,7 @@ class KeyfileKey(KeyfileKeyBase):
         raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
 
     def get_new_target(self, args):
-        keyfile = os.environ.get('BORG_KEY_FILENAME')
+        keyfile = os.environ.get('BORG_KEY_FILE')
         if keyfile:
             return keyfile
         filename = args.location.to_key_filename()

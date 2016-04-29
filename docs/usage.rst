@@ -540,6 +540,9 @@ Examples
     no key file found for repository
 
 
+.. include:: usage/break-lock.rst.inc
+
+
 Miscellaneous Help
 ------------------
 

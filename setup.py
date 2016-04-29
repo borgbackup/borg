@@ -236,7 +236,7 @@ setup(
     },
     author='The Borg Collective (see AUTHORS file)',
     author_email='borgbackup@python.org',
-    url='https://borgbackup.readthedocs.org/',
+    url='https://borgbackup.readthedocs.io/',
     description='Deduplicated, encrypted, authenticated and compressed backups',
     long_description=long_description,
     license='BSD',

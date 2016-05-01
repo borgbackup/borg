@@ -645,6 +645,9 @@ Examples
     ...
 
 
+.. include:: usage/break-lock.rst.inc
+
+
 Miscellaneous Help
 ------------------
 

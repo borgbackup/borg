@@ -122,7 +122,9 @@ Usage::
    # To create and provision the VM:
    vagrant up OS
    # To create an ssh session to the VM:
-   vagrant ssh OS command
+   vagrant ssh OS
+   # To execute a command via ssh in the VM:
+   vagrant ssh OS -c "command args"
    # To shut down the VM:
    vagrant halt OS
    # To shut down and destroy the VM:

@@ -863,15 +863,22 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test1', src_dir)
         self.cmd('create', self.repository_location + '::test2', src_dir)
+        # these are not really a checkpoints, but they look like some:
+        self.cmd('create', self.repository_location + '::test3.checkpoint', src_dir)
+        self.cmd('create', self.repository_location + '::test3.checkpoint.1', src_dir)
         output = self.cmd('prune', '-v', '--list', '--dry-run', self.repository_location, '--keep-daily=2')
-        self.assert_in('Keeping archive: test2', output)
         self.assert_in('Would prune:     test1', output)
+        # must keep the latest non-checkpoint archive:
+        self.assert_in('Keeping archive: test2', output)
         output = self.cmd('list', self.repository_location)
         self.assert_in('test1', output)
         self.assert_in('test2', output)
+        self.assert_in('test3.checkpoint', output)
+        self.assert_in('test3.checkpoint.1', output)
         self.cmd('prune', self.repository_location, '--keep-daily=2')
         output = self.cmd('list', self.repository_location)
         self.assert_not_in('test1', output)
+        # the latest non-checkpoint archive must be still there:
         self.assert_in('test2', output)
 
     def test_prune_repository_save_space(self):

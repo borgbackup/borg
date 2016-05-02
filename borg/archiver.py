@@ -1359,6 +1359,8 @@ class Archiver:
                                    type=CompressionSpec, default=dict(name='none'), metavar='COMPRESSION',
                                    help='select compression algorithm (and level):\n'
                                         'none == no compression (default),\n'
+                                        'auto,C[,L] == built-in heuristic decides between none or C[,L] - with C[,L]\n'
+                                        '              being any valid compression algorithm (and optional level),\n'
                                         'lz4 == lz4,\n'
                                         'zlib == zlib (default level 6),\n'
                                         'zlib,0 .. zlib,9 == zlib (with level 0..9),\n'
@@ -1828,6 +1830,8 @@ class Archiver:
                                    type=CompressionSpec, default=None, metavar='COMPRESSION',
                                    help='select compression algorithm (and level):\n'
                                         'none == no compression (default),\n'
+                                        'auto,C[,L] == built-in heuristic decides between none or C[,L] - with C[,L]\n'
+                                        '              being any valid compression algorithm (and optional level),\n'
                                         'lz4 == lz4,\n'
                                         'zlib == zlib (default level 6),\n'
                                         'zlib,0 .. zlib,9 == zlib (with level 0..9),\n'

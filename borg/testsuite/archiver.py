@@ -1089,6 +1089,64 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         size, csize, path = output.split("\n")[1].split(" ")
         assert int(csize) < int(size)
 
+    def _get_sizes(self, compression, compressible, size=10000):
+        if compressible:
+            contents = b'X' * size
+        else:
+            contents = os.urandom(size)
+        self.create_regular_file('file', contents=contents)
+        self.cmd('init', '--encryption=none', self.repository_location)
+        archive = self.repository_location + '::test'
+        self.cmd('create', '-C', compression, archive, 'input')
+        output = self.cmd('list', '--format', '{size} {csize} {path}{NL}', archive)
+        size, csize, path = output.split("\n")[1].split(" ")
+        return int(size), int(csize)
+
+    def test_compression_none_compressible(self):
+        size, csize = self._get_sizes('none', compressible=True)
+        assert csize >= size
+        assert csize == size + 3
+
+    def test_compression_none_uncompressible(self):
+        size, csize = self._get_sizes('none', compressible=False)
+        assert csize >= size
+        assert csize == size + 3
+
+    def test_compression_zlib_compressible(self):
+        size, csize = self._get_sizes('zlib', compressible=True)
+        assert csize < size * 0.1
+        assert csize == 35
+
+    def test_compression_zlib_uncompressible(self):
+        size, csize = self._get_sizes('zlib', compressible=False)
+        assert csize >= size
+
+    def test_compression_auto_compressible(self):
+        size, csize = self._get_sizes('auto,zlib', compressible=True)
+        assert csize < size * 0.1
+        assert csize == 35  # same as compression 'zlib'
+
+    def test_compression_auto_uncompressible(self):
+        size, csize = self._get_sizes('auto,zlib', compressible=False)
+        assert csize >= size
+        assert csize == size + 3  # same as compression 'none'
+
+    def test_compression_lz4_compressible(self):
+        size, csize = self._get_sizes('lz4', compressible=True)
+        assert csize < size * 0.1
+
+    def test_compression_lz4_uncompressible(self):
+        size, csize = self._get_sizes('lz4', compressible=False)
+        assert csize >= size
+
+    def test_compression_lzma_compressible(self):
+        size, csize = self._get_sizes('lzma', compressible=True)
+        assert csize < size * 0.1
+
+    def test_compression_lzma_uncompressible(self):
+        size, csize = self._get_sizes('lzma', compressible=False)
+        assert csize >= size
+
     def test_break_lock(self):
         self.cmd('init', self.repository_location)
         self.cmd('break-lock', self.repository_location)

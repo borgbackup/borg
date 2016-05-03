@@ -991,20 +991,36 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # these are not really a checkpoints, but they look like some:
         self.cmd('create', self.repository_location + '::test3.checkpoint', src_dir)
         self.cmd('create', self.repository_location + '::test3.checkpoint.1', src_dir)
+        self.cmd('create', self.repository_location + '::test4.checkpoint', src_dir)
         output = self.cmd('prune', '-v', '--list', '--dry-run', self.repository_location, '--keep-daily=2')
         self.assert_in('Would prune:     test1', output)
         # must keep the latest non-checkpoint archive:
         self.assert_in('Keeping archive: test2', output)
+        # must keep the latest checkpoint archive:
+        self.assert_in('Keeping archive: test4.checkpoint', output)
         output = self.cmd('list', self.repository_location)
         self.assert_in('test1', output)
         self.assert_in('test2', output)
         self.assert_in('test3.checkpoint', output)
         self.assert_in('test3.checkpoint.1', output)
+        self.assert_in('test4.checkpoint', output)
         self.cmd('prune', self.repository_location, '--keep-daily=2')
         output = self.cmd('list', self.repository_location)
         self.assert_not_in('test1', output)
         # the latest non-checkpoint archive must be still there:
         self.assert_in('test2', output)
+        # only the latest checkpoint archive must still be there:
+        self.assert_not_in('test3.checkpoint', output)
+        self.assert_not_in('test3.checkpoint.1', output)
+        self.assert_in('test4.checkpoint', output)
+        # now we supercede the latest checkpoint by a successful backup:
+        self.cmd('create', self.repository_location + '::test5', src_dir)
+        self.cmd('prune', self.repository_location, '--keep-daily=2')
+        output = self.cmd('list', self.repository_location)
+        # all checkpoints should be gone now:
+        self.assert_not_in('checkpoint', output)
+        # the latest archive must be still there
+        self.assert_in('test5', output)
 
     def test_prune_repository_save_space(self):
         self.cmd('init', self.repository_location)

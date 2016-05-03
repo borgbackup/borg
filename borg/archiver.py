@@ -9,6 +9,7 @@ import hashlib
 import inspect
 import io
 import os
+import re
 import shlex
 import signal
 import stat
@@ -785,6 +786,10 @@ class Archiver:
         archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
         if args.prefix:
             archives = [archive for archive in archives if archive.name.startswith(args.prefix)]
+        # ignore all checkpoint archives to avoid keeping one (which is an incomplete backup)
+        # that is newer than a successfully completed backup - and killing the successful backup.
+        is_checkpoint = re.compile(r'\.checkpoint(\.\d+)?$').search
+        archives = [archive for archive in archives if not is_checkpoint(archive.name)]
         keep = []
         if args.within:
             keep += prune_within(archives, args.within)
@@ -1274,6 +1279,9 @@ class Archiver:
         traversing all paths specified. The archive will consume almost no disk space for
         files or parts of files that have already been stored in other archives.
 
+        The archive name needs to be unique. It must not end in '.checkpoint' or
+        '.checkpoint.N' (with N being a number), because these names are used for
+        checkpoints and treated in special ways.
 
         To speed up pulling backups over sshfs and similar network file systems which do
         not provide correct inode information the --ignore-inode flag can be used. This

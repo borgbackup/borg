@@ -31,7 +31,7 @@ from . import hashindex
 from . import chunker
 from .constants import *  # NOQA
 from . import crypto
-from .compress import COMPR_BUFFER
+from .compress import COMPR_BUFFER, get_compressor
 from . import shellpattern
 import msgpack
 import msgpack.fallback
@@ -530,6 +530,12 @@ def CompressionSpec(s):
         else:
             raise ValueError
         return dict(name=name, level=level)
+    if name == 'auto':
+        if 2 <= count <= 3:
+            compression = ','.join(values[1:])
+        else:
+            raise ValueError
+        return dict(name=name, spec=CompressionSpec(compression))
     raise ValueError
 
 
@@ -1497,4 +1503,23 @@ class CompressionDecider2:
         compr_spec = chunk.meta.get('compress', self.compression)
         compr_args = dict(buffer=COMPR_BUFFER)
         compr_args.update(compr_spec)
+        if compr_args['name'] == 'auto':
+            # we did not decide yet, use heuristic:
+            compr_args, chunk = self.heuristic_lz4(compr_args, chunk)
         return compr_args, chunk
+
+    def heuristic_lz4(self, compr_args, chunk):
+        meta, data = chunk
+        lz4 = get_compressor('lz4', buffer=compr_args['buffer'])
+        cdata = lz4.compress(data)
+        data_len = len(data)
+        cdata_len = len(cdata)
+        if cdata_len < data_len:
+            compr_spec = compr_args['spec']
+        else:
+            # uncompressible - we could have a special "uncompressible compressor"
+            # that marks such data as uncompressible via compression-type metadata.
+            compr_spec = CompressionSpec('none')
+        compr_args.update(compr_spec)
+        logger.debug("len(data) == %d, len(lz4(data)) == %d, choosing %s", data_len, cdata_len, compr_spec)
+        return compr_args, Chunk(data, **meta)

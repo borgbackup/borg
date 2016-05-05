@@ -223,12 +223,25 @@ Yes, |project_name| supports resuming backups.
 
 During a backup a special checkpoint archive named ``<archive-name>.checkpoint``
 is saved every checkpoint interval (the default value for this is 5
-minutes) containing all the data backed-up until that point. This means
+minutes) containing all the data backed-up until that point. This checkpoint
+archive is a valid archive, but it is only a partial backup. Having it
+in the repo until a successful, full backup is completed is useful because it
+references all the transmitted chunks up to the checkpoint time. This means
 that at most <checkpoint interval> worth of data needs to be retransmitted
-if a backup needs to be restarted.
+if you restart the backup.
+
+If a backup was interrupted, you do not need to do any special considerations,
+just invoke ``borg create`` as you always do. You may use the same archive name
+as in previous attempt or a different one (e.g. if you always include the current
+datetime), it does not matter.
+|project_name| always does full single-pass backups, so it will start again
+from the beginning - but it will be much faster, because some of the data was
+already stored into the repo (and is still referenced by the checkpoint
+archive), so it does not need to get transmitted and stored again.
 
 Once your backup has finished successfully, you can delete all
-``<archive-name>.checkpoint`` archives.
+``<archive-name>.checkpoint`` archives. If you run ``borg prune``, it will
+also care for deleting unneeded checkpoints.
 
 If it crashes with a UnicodeError, what can I do?
 -------------------------------------------------

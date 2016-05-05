@@ -783,13 +783,21 @@ class Archiver:
                              '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
                              '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.')
             return self.exit_code
-        archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
+        archives_checkpoints = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
         if args.prefix:
-            archives = [archive for archive in archives if archive.name.startswith(args.prefix)]
+            archives_checkpoints = [arch for arch in archives_checkpoints if arch.name.startswith(args.prefix)]
+        is_checkpoint = re.compile(r'\.checkpoint(\.\d+)?$').search
+        checkpoints = [arch for arch in archives_checkpoints if is_checkpoint(arch.name)]
+        # keep the latest checkpoint, if there is no later non-checkpoint archive
+        latest_checkpoint = checkpoints[0] if checkpoints else None
+        if archives_checkpoints[0] is latest_checkpoint:
+            keep_checkpoints = [latest_checkpoint, ]
+        else:
+            keep_checkpoints = []
+        checkpoints = set(checkpoints)
         # ignore all checkpoint archives to avoid keeping one (which is an incomplete backup)
         # that is newer than a successfully completed backup - and killing the successful backup.
-        is_checkpoint = re.compile(r'\.checkpoint(\.\d+)?$').search
-        archives = [archive for archive in archives if not is_checkpoint(archive.name)]
+        archives = [arch for arch in archives_checkpoints if arch not in checkpoints]
         keep = []
         if args.within:
             keep += prune_within(archives, args.within)
@@ -807,11 +815,10 @@ class Archiver:
             keep += prune_split(archives, '%Y-%m', args.monthly, keep)
         if args.yearly:
             keep += prune_split(archives, '%Y', args.yearly, keep)
-
-        to_delete = set(archives) - set(keep)
+        to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
         stats = Statistics()
         with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
-            for archive in archives:
+            for archive in archives_checkpoints:
                 if archive in to_delete:
                     if args.dry_run:
                         if args.output_list:
@@ -1628,10 +1635,19 @@ class Archiver:
         any of the specified retention options. This command is normally used by
         automated backup scripts wanting to keep a certain number of historic backups.
 
+        Also, prune automatically removes checkpoint archives (incomplete archives left
+        behind by interrupted backup runs) except if the checkpoint is the latest
+        archive (and thus still needed). Checkpoint archives are not considered when
+        comparing archive counts against the retention limits (--keep-*).
+
         If a prefix is set with -P, then only archives that start with the prefix are
         considered for deletion and only those archives count towards the totals
         specified by the rules.
         Otherwise, *all* archives in the repository are candidates for deletion!
+
+        If you have multiple sequences of archives with different data sets (e.g.
+        from different machines) in one shared repository, use one prune call per
+        data set that matches only the respective archives using the -P option.
 
         The "--keep-within" option takes an argument of the form "<int><char>",
         where char is "H", "d", "w", "m", "y". For example, "--keep-within 2d" means

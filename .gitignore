@@ -17,7 +17,7 @@ platform_linux.c
 *.so
 .idea/
 .cache/
-borg/_version.py
+src/borg/_version.py
 borg.build/
 borg.dist/
 borg.exe

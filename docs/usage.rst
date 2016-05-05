@@ -821,13 +821,16 @@ Now, let's see how to restore some LVs from such a backup. ::
     $ borg extract --stdout /path/to/repo::arch dev/vg0/home-snapshot > /dev/vg0/home
 
 
+.. _append-only-mode:
+
 Append-only mode
 ~~~~~~~~~~~~~~~~
 
 A repository can be made "append-only", which means that Borg will never overwrite or
-delete committed data. This is useful for scenarios where multiple machines back up to
-a central backup server using ``borg serve``, since a hacked machine cannot delete
-backups permanently.
+delete committed data (append-only refers to the segment files, but borg will also
+reject to delete the repository completely). This is useful for scenarios where a
+backup client machine backups remotely to a backup server using ``borg serve``, since
+a hacked client machine cannot delete backups on the server permanently.
 
 To activate append-only mode, edit the repository ``config`` file and add a line
 ``append_only=1`` to the ``[repository]`` section (or edit the line if it exists).
@@ -888,6 +891,6 @@ repository. Make sure that backup client machines only get to access the reposit
 Ensure that no remote access is possible if the repository is temporarily set to normal mode
 for e.g. regular pruning.
 
-Further protections can be implemented, but are outside of Borgs scope. For example,
+Further protections can be implemented, but are outside of Borg's scope. For example,
 file system snapshots or wrapping ``borg serve`` to set special permissions or ACLs on
 new data files.

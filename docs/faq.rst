@@ -184,8 +184,7 @@ When doing a backup to a remote server (using a ssh: repo URL), it sometimes
 stops after a while (some minutes, hours, ... - not immediately) with
 "connection closed by remote" error message. Why?
 
-That's a good question and we are trying to find a good answer in
-`ticket 636 <https://github.com/borgbackup/borg/issues/636>`_.
+That's a good question and we are trying to find a good answer in :issue:`636`.
 
 The borg cache eats way too much disk space, what can I do?
 -----------------------------------------------------------
@@ -261,7 +260,7 @@ control which we do not have (and also can't get, even if we wanted).
 So, if you need that, consider RAID or a filesystem that offers redundant
 storage or just make backups to different locations / different hardware.
 
-See also `ticket 225 <https://github.com/borgbackup/borg/issues/225>`_.
+See also :issue:`225`.
 
 Can |project_name| verify data integrity of a backup archive?
 -------------------------------------------------------------

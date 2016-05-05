@@ -311,10 +311,9 @@ Examples
     # Even slower, even higher compression (N = 0..9)
     $ borg create --compression lzma,N /path/to/repo::arch ~
 
-    # Format tags available for archive name:
-    # {now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}
-    # add short hostname, backup username and current unixtime (seconds from epoch)
-    $ borg create  /path/to/repo::{hostname}-{user}-{now:%s} ~
+    # Use short hostname, user name and current time in archive name
+    $ borg create /path/to/repo::{hostname}-{user}-{now} ~
+    $ borg create /path/to/repo::{hostname}-{user}-{now:%Y-%m-%d_%H:%M:%S} ~
 
 .. include:: usage/extract.rst.inc
 

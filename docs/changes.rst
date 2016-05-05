@@ -70,6 +70,24 @@ Other changes:
   - ChunkBuffer: add test for leaving partial chunk in buffer, fixes #945
 
 
+Version 1.0.3 (not released yet)
+--------------------------------
+
+Bug fixes:
+
+- prune: ignore checkpoints, #997
+- prune: fix bad validator, #942
+- fix capabilities extraction on Linux (set xattrs last, after chown())
+
+Other changes:
+
+- update readthedocs URLs, #991
+- add missing docs for "borg break-lock", #992
+- borg create help: add some words to about the archive name
+- borg create help: document format tags, #894
+- Vagrantfile: OS X: update osxfuse / install lzma package, #933
+
+
 Version 1.0.2
 -------------
 

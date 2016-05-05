@@ -1283,6 +1283,9 @@ class Archiver:
         '.checkpoint.N' (with N being a number), because these names are used for
         checkpoints and treated in special ways.
 
+        In the archive name, you may use the following format tags:
+        {now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}
+
         To speed up pulling backups over sshfs and similar network file systems which do
         not provide correct inode information the --ignore-inode flag can be used. This
         potentially decreases reliability of change detection, while avoiding always reading

@@ -105,23 +105,27 @@ server. The script also uses the :ref:`borg_prune` subcommand to maintain a
 certain number of old archives::
 
     #!/bin/sh
-    REPOSITORY=username@remoteserver.com:backup
 
-    # Backup all of /home and /var/www except a few
-    # excluded directories
-    borg create -v --stats                          \
-        $REPOSITORY::`hostname`-`date +%Y-%m-%d`    \
-        /home                                       \
-        /var/www                                    \
-        --exclude '/home/*/.cache'                  \
-        --exclude /home/Ben/Music/Justin\ Bieber    \
+    # setting this, so the repo does not need to be given on the commandline:
+    export BORG_REPO=username@remoteserver.com:backup
+
+    # setting this, so you won't be asked for your passphrase - make sure the
+    # script has appropriate owner/group and mode, e.g. root.root 600:
+    export BORG_PASSPHRASE=mysecret
+
+    # Backup most important stuff:
+    borg create -v --stats -C lz4 ::`hostname`-`date +%Y-%m-%d` \
+        /etc                                                    \
+        /home                                                   \
+        /var                                                    \
+        --exclude '/home/*/.cache'                              \
         --exclude '*.pyc'
 
     # Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
-    # archives of THIS machine. --prefix `hostname`- is very important to
+    # archives of THIS machine. Using --prefix is very important to
     # limit prune's operation to this machine's archives and not apply to
     # other machine's archives also.
-    borg prune -v $REPOSITORY --prefix `hostname`- \
+    borg prune -v --prefix `hostname`- \
         --keep-daily=7 --keep-weekly=4 --keep-monthly=6
 
 .. backup_compression:

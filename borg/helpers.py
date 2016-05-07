@@ -282,8 +282,7 @@ def load_excludes(fh):
     """Load and parse exclude patterns from file object. Lines empty or starting with '#' after stripping whitespace on
     both line ends are ignored.
     """
-    patterns = (line for line in (i.strip() for i in fh) if not line.startswith('#'))
-    return [parse_pattern(pattern) for pattern in patterns if pattern]
+    return [parse_pattern(pattern) for pattern in clean_lines(fh)]
 
 
 def update_excludes(args):

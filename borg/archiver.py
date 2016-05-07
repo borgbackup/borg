@@ -789,9 +789,8 @@ class Archiver:
         is_checkpoint = re.compile(r'\.checkpoint(\.\d+)?$').search
         checkpoints = [arch for arch in archives_checkpoints if is_checkpoint(arch.name)]
         # keep the latest checkpoint, if there is no later non-checkpoint archive
-        latest_checkpoint = checkpoints[0] if checkpoints else None
-        if archives_checkpoints[0] is latest_checkpoint:
-            keep_checkpoints = [latest_checkpoint, ]
+        if archives_checkpoints and checkpoints and archives_checkpoints[0] is checkpoints[0]:
+            keep_checkpoints = checkpoints[:1]
         else:
             keep_checkpoints = []
         checkpoints = set(checkpoints)

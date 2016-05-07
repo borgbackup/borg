@@ -327,6 +327,9 @@ Examples
     # Extract entire archive and list files while processing
     $ borg extract -v --list /path/to/repo::my-files
 
+    # Verify whether an archive could be successfully extracted, but do not write files to disk
+    $ borg extract --dry-run /path/to/repo::my-files
+
     # Extract the "src" directory
     $ borg extract /path/to/repo::my-files home/USERNAME/src
 

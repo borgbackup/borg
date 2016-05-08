@@ -1,3 +1,4 @@
+import getpass
 import os
 import re
 import shutil
@@ -5,9 +6,10 @@ import tempfile
 from binascii import hexlify, unhexlify
 
 import pytest
+
 from ..crypto import bytes_to_long, num_aes_blocks
-from ..key import PlaintextKey, PassphraseKey, KeyfileKey
-from ..helpers import Location, IntegrityError, Chunk, bin_to_hex
+from ..key import PlaintextKey, PassphraseKey, KeyfileKey, Passphrase, PasswordRetriesExceeded, bin_to_hex
+from ..helpers import Location, Chunk, IntegrityError
 from . import environment_variable
 
 
@@ -77,7 +79,6 @@ class TestKey:
         # Key data sanity check
         assert len({key2.id_key, key2.enc_key, key2.enc_hmac_key}) == 3
         assert key2.chunk_seed != 0
-        data = b'foo'
         chunk = Chunk(b'foo')
         assert chunk == key2.decrypt(key.id_hash(chunk.data), key.encrypt(chunk))
 
@@ -92,7 +93,7 @@ class TestKey:
             chunk_cdata = key.encrypt(chunk)
             key = KeyfileKey.detect(self.MockRepository(), chunk_cdata)
             assert chunk == key.decrypt(chunk_id, chunk_cdata)
-            keyfile.unlink()
+            keyfile.remove()
             with pytest.raises(FileNotFoundError):
                 KeyfileKey.detect(self.MockRepository(), chunk_cdata)
 
@@ -107,7 +108,7 @@ class TestKey:
         keyfile = tmpdir.join('keyfile')
         with keyfile.open('w') as fd:
             fd.write(self.keyfile2_key_file)
-        with environment_variable(BORG_KEY_FILE=keyfile, BORG_PASSPHRASE='passphrase'):
+        with environment_variable(BORG_KEY_FILE=str(keyfile), BORG_PASSPHRASE='passphrase'):
             key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
             assert key.decrypt(self.keyfile2_id, self.keyfile2_cdata).data == b'payload'
 
@@ -132,7 +133,6 @@ class TestKey:
         assert key.enc_hmac_key == key2.enc_hmac_key
         assert key.enc_key == key2.enc_key
         assert key.chunk_seed == key2.chunk_seed
-        data = b'foo'
         chunk = Chunk(b'foo')
         assert hexlify(key.id_hash(chunk.data)) == b'818217cf07d37efad3860766dcdf1d21e401650fed2d76ed1d797d3aae925990'
         assert chunk == key2.decrypt(key2.id_hash(chunk.data), key.encrypt(chunk))
@@ -158,3 +158,44 @@ class TestKey:
             id = bytearray(key.id_hash(data))  # corrupt chunk id
             id[12] = 0
             key.decrypt(id, data)
+
+
+class TestPassphrase:
+    def test_passphrase_new_verification(self, capsys, monkeypatch):
+        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "12aöäü")
+        monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'no')
+        Passphrase.new()
+        out, err = capsys.readouterr()
+        assert "12" not in out
+        assert "12" not in err
+
+        monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'yes')
+        passphrase = Passphrase.new()
+        out, err = capsys.readouterr()
+        assert "313261c3b6c3a4c3bc" not in out
+        assert "313261c3b6c3a4c3bc" in err
+        assert passphrase == "12aöäü"
+
+        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "1234/@=")
+        Passphrase.new()
+        out, err = capsys.readouterr()
+        assert "1234/@=" not in out
+        assert "1234/@=" in err
+
+    def test_passphrase_new_empty(self, capsys, monkeypatch):
+        monkeypatch.delenv('BORG_PASSPHRASE', False)
+        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "")
+        with pytest.raises(PasswordRetriesExceeded):
+            Passphrase.new(allow_empty=False)
+        out, err = capsys.readouterr()
+        assert "must not be blank" in err
+
+    def test_passphrase_new_retries(self, monkeypatch):
+        monkeypatch.delenv('BORG_PASSPHRASE', False)
+        ascending_numbers = iter(range(20))
+        monkeypatch.setattr(getpass, 'getpass', lambda prompt: str(next(ascending_numbers)))
+        with pytest.raises(PasswordRetriesExceeded):
+            Passphrase.new()
+
+    def test_passphrase_repr(self):
+        assert "secret" not in repr(Passphrase("secret"))

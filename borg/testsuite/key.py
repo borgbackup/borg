@@ -10,7 +10,6 @@ import pytest
 from ..crypto import bytes_to_long, num_aes_blocks
 from ..key import PlaintextKey, PassphraseKey, KeyfileKey, Passphrase, PasswordRetriesExceeded, bin_to_hex
 from ..helpers import Location, Chunk, IntegrityError
-from . import environment_variable
 
 
 @pytest.fixture(autouse=True)
@@ -82,20 +81,21 @@ class TestKey:
         chunk = Chunk(b'foo')
         assert chunk == key2.decrypt(key.id_hash(chunk.data), key.encrypt(chunk))
 
-    def test_keyfile_kfenv(self, tmpdir):
+    def test_keyfile_kfenv(self, tmpdir, monkeypatch):
         keyfile = tmpdir.join('keyfile')
-        with environment_variable(BORG_KEY_FILE=str(keyfile), BORG_PASSPHRASE='testkf'):
-            assert not keyfile.exists()
-            key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
-            assert keyfile.exists()
-            chunk = Chunk(b'XXX')
-            chunk_id = key.id_hash(chunk.data)
-            chunk_cdata = key.encrypt(chunk)
-            key = KeyfileKey.detect(self.MockRepository(), chunk_cdata)
-            assert chunk == key.decrypt(chunk_id, chunk_cdata)
-            keyfile.remove()
-            with pytest.raises(FileNotFoundError):
-                KeyfileKey.detect(self.MockRepository(), chunk_cdata)
+        monkeypatch.setenv('BORG_KEY_FILE', str(keyfile))
+        monkeypatch.setenv('BORG_PASSPHRASE', 'testkf')
+        assert not keyfile.exists()
+        key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
+        assert keyfile.exists()
+        chunk = Chunk(b'XXX')
+        chunk_id = key.id_hash(chunk.data)
+        chunk_cdata = key.encrypt(chunk)
+        key = KeyfileKey.detect(self.MockRepository(), chunk_cdata)
+        assert chunk == key.decrypt(chunk_id, chunk_cdata)
+        keyfile.remove()
+        with pytest.raises(FileNotFoundError):
+            KeyfileKey.detect(self.MockRepository(), chunk_cdata)
 
     def test_keyfile2(self, monkeypatch):
         with open(os.path.join(os.environ['BORG_KEYS_DIR'], 'keyfile'), 'w') as fd:
@@ -104,13 +104,14 @@ class TestKey:
         key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
         assert key.decrypt(self.keyfile2_id, self.keyfile2_cdata).data == b'payload'
 
-    def test_keyfile2_kfenv(self, tmpdir):
+    def test_keyfile2_kfenv(self, tmpdir, monkeypatch):
         keyfile = tmpdir.join('keyfile')
         with keyfile.open('w') as fd:
             fd.write(self.keyfile2_key_file)
-        with environment_variable(BORG_KEY_FILE=str(keyfile), BORG_PASSPHRASE='passphrase'):
-            key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
-            assert key.decrypt(self.keyfile2_id, self.keyfile2_cdata).data == b'payload'
+        monkeypatch.setenv('BORG_KEY_FILE', str(keyfile))
+        monkeypatch.setenv('BORG_PASSPHRASE', 'passphrase')
+        key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
+        assert key.decrypt(self.keyfile2_id, self.keyfile2_cdata).data == b'payload'
 
     def test_passphrase(self, keys_dir, monkeypatch):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')

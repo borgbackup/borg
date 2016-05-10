@@ -15,6 +15,7 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
     fi
 
     brew install lz4
+    brew install xz  # required for python lzma module
     brew outdated pyenv || brew upgrade pyenv
 
     case "${TOXENV}" in

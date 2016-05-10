@@ -10,11 +10,12 @@ import msgpack
 import msgpack.fallback
 import time
 
-from ..helpers import Location, format_file_size, format_timedelta, make_path_safe, \
+from ..helpers import Location, format_file_size, format_timedelta, make_path_safe, clean_lines, \
     prune_within, prune_split, get_cache_dir, get_keys_dir, Statistics, is_slow_msgpack, \
     yes, TRUISH, FALSISH, DEFAULTISH, \
-    StableDict, int_to_bigint, bigint_to_int, bin_to_hex, parse_timestamp, CompressionSpec, ChunkerParams, Chunk, \
+    StableDict, int_to_bigint, bigint_to_int, bin_to_hex, parse_timestamp, ChunkerParams, Chunk, \
     ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
+    CompressionSpec, CompressionDecider1, CompressionDecider2, \
     PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, partial_format, ChunkIteratorFileWrapper
 from . import BaseTestCase, environment_variable, FakeInputs
 
@@ -915,3 +916,50 @@ def test_chunk_file_wrapper():
     cfw = ChunkIteratorFileWrapper(iter([]))
     assert cfw.read(2) == b''
     assert cfw.exhausted
+
+
+def test_clean_lines():
+    conf = """\
+#comment
+data1 #data1
+data2
+
+ data3
+""".splitlines(keepends=True)
+    assert list(clean_lines(conf)) == ['data1 #data1', 'data2', 'data3', ]
+    assert list(clean_lines(conf, lstrip=False)) == ['data1 #data1', 'data2', ' data3', ]
+    assert list(clean_lines(conf, rstrip=False)) == ['data1 #data1\n', 'data2\n', 'data3\n', ]
+    assert list(clean_lines(conf, remove_empty=False)) == ['data1 #data1', 'data2', '', 'data3', ]
+    assert list(clean_lines(conf, remove_comments=False)) == ['#comment', 'data1 #data1', 'data2', 'data3', ]
+
+
+def test_compression_decider1():
+    default = CompressionSpec('zlib')
+    conf = """
+# use super-fast lz4 compression on huge VM files in this path:
+lz4:/srv/vm_disks
+
+# jpeg or zip files do not compress:
+none:*.jpeg
+none:*.zip
+""".splitlines()
+
+    cd = CompressionDecider1(default, [])  # no conf, always use default
+    assert cd.decide('/srv/vm_disks/linux')['name'] == 'zlib'
+    assert cd.decide('test.zip')['name'] == 'zlib'
+    assert cd.decide('test')['name'] == 'zlib'
+
+    cd = CompressionDecider1(default, [conf, ])
+    assert cd.decide('/srv/vm_disks/linux')['name'] == 'lz4'
+    assert cd.decide('test.zip')['name'] == 'none'
+    assert cd.decide('test')['name'] == 'zlib'  # no match in conf, use default
+
+
+def test_compression_decider2():
+    default = CompressionSpec('zlib')
+
+    cd = CompressionDecider2(default)
+    compr_spec, chunk = cd.decide(Chunk(None))
+    assert compr_spec['name'] == 'zlib'
+    compr_spec, chunk = cd.decide(Chunk(None, compress=CompressionSpec('lzma')))
+    assert compr_spec['name'] == 'lzma'

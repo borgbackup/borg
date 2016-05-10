@@ -7,7 +7,7 @@ from binascii import hexlify, unhexlify
 from ..crypto import bytes_to_long, num_aes_blocks
 from ..key import PlaintextKey, PassphraseKey, KeyfileKey
 from ..helpers import Location, Chunk, bin_to_hex
-from . import BaseTestCase
+from . import BaseTestCase, environment_variable
 
 
 class KeyTestCase(BaseTestCase):
@@ -34,9 +34,11 @@ class KeyTestCase(BaseTestCase):
     def setUp(self):
         self.tmppath = tempfile.mkdtemp()
         os.environ['BORG_KEYS_DIR'] = self.tmppath
+        self.tmppath2 = tempfile.mkdtemp()
 
     def tearDown(self):
         shutil.rmtree(self.tmppath)
+        shutil.rmtree(self.tmppath2)
 
     class MockRepository:
         class _Location:
@@ -71,12 +73,34 @@ class KeyTestCase(BaseTestCase):
         chunk = Chunk(b'foo')
         self.assert_equal(chunk, key2.decrypt(key.id_hash(chunk.data), key.encrypt(chunk)))
 
+    def test_keyfile_kfenv(self):
+        keyfile = os.path.join(self.tmppath2, 'keyfile')
+        with environment_variable(BORG_KEY_FILE=keyfile, BORG_PASSPHRASE='testkf'):
+            assert not os.path.exists(keyfile)
+            key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
+            assert os.path.exists(keyfile)
+            chunk = Chunk(b'XXX')
+            chunk_id = key.id_hash(chunk.data)
+            chunk_cdata = key.encrypt(chunk)
+            key = KeyfileKey.detect(self.MockRepository(), chunk_cdata)
+            self.assert_equal(chunk, key.decrypt(chunk_id, chunk_cdata))
+            os.unlink(keyfile)
+            self.assert_raises(FileNotFoundError, KeyfileKey.detect, self.MockRepository(), chunk_cdata)
+
     def test_keyfile2(self):
         with open(os.path.join(os.environ['BORG_KEYS_DIR'], 'keyfile'), 'w') as fd:
             fd.write(self.keyfile2_key_file)
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
         key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
         self.assert_equal(key.decrypt(self.keyfile2_id, self.keyfile2_cdata).data, b'payload')
+
+    def test_keyfile2_kfenv(self):
+        keyfile = os.path.join(self.tmppath2, 'keyfile')
+        with open(keyfile, 'w') as fd:
+            fd.write(self.keyfile2_key_file)
+        with environment_variable(BORG_KEY_FILE=keyfile, BORG_PASSPHRASE='passphrase'):
+            key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
+            self.assert_equal(key.decrypt(self.keyfile2_id, self.keyfile2_cdata).data, b'payload')
 
     def test_passphrase(self):
         os.environ['BORG_PASSPHRASE'] = 'test'

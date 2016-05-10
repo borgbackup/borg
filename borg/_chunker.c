@@ -184,9 +184,9 @@ chunker_fill(Chunker *c)
         length = c->bytes_read - offset;
         #if ( ( _XOPEN_SOURCE >= 600 || _POSIX_C_SOURCE >= 200112L ) && defined(POSIX_FADV_DONTNEED) )
 
-	// Only do it once per run.
-	if (pagemask == 0)
-		pagemask = getpagesize() - 1;
+        // Only do it once per run.
+        if (pagemask == 0)
+            pagemask = getpagesize() - 1;
 
         // We tell the OS that we do not need the data that we just have read any
         // more (that it maybe has in the cache). This avoids that we spoil the
@@ -207,7 +207,7 @@ chunker_fill(Chunker *c)
             // fadvise. This will cancel the final page and is not part
             // of the above workaround.
             overshoot = 0;
-	}
+        }
 
         posix_fadvise(c->fh, offset & ~pagemask, length - overshoot, POSIX_FADV_DONTNEED);
         #endif

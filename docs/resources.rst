@@ -36,6 +36,6 @@ Some of them refer to attic, but you can do the same stuff (and more) with borgb
 Software
 --------
 
-- `BorgWeb - a very simple web UI for BorgBackup <https://borgbackup.github.io/borgweb/>`_
+- `BorgWeb - a very simple web UI for BorgBackup <https://borgweb.readthedocs.io/>`_
 - some other stuff found at the `BorgBackup Github organisation <https://github.com/borgbackup/>`_
 - `atticmatic <https://github.com/witten/atticmatic/>`_ (includes borgmatic)

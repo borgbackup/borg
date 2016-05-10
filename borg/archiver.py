@@ -9,9 +9,11 @@ import hashlib
 import inspect
 import io
 import os
+import re
 import shlex
 import signal
 import stat
+import subprocess
 import sys
 import textwrap
 import traceback
@@ -34,6 +36,7 @@ from .constants import *  # NOQA
 from .key import key_creator, RepoKey, PassphraseKey
 from .archive import Archive, ArchiveChecker, ArchiveRecreater
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
+from .selftest import selftest
 from .hashindex import ChunkIndexEntry
 
 has_lchflags = hasattr(os, 'lchflags')
@@ -285,14 +288,12 @@ class Archiver:
         dry_run = args.dry_run
         t0 = datetime.utcnow()
         if not dry_run:
-            compr_args = dict(buffer=COMPR_BUFFER)
-            compr_args.update(args.compression)
-            key.compressor = Compressor(**compr_args)
             with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
                                   numeric_owner=args.numeric_owner, progress=args.progress,
-                                  chunker_params=args.chunker_params, start=t0)
+                                  chunker_params=args.chunker_params, start=t0,
+                                  compression=args.compression, compression_files=args.compression_files)
                 create_inner(archive, cache)
         else:
             create_inner(None, None)
@@ -788,9 +789,20 @@ class Archiver:
                              '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
                              '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.')
             return self.exit_code
-        archives = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
+        archives_checkpoints = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
         if args.prefix:
-            archives = [archive for archive in archives if archive.name.startswith(args.prefix)]
+            archives_checkpoints = [arch for arch in archives_checkpoints if arch.name.startswith(args.prefix)]
+        is_checkpoint = re.compile(r'\.checkpoint(\.\d+)?$').search
+        checkpoints = [arch for arch in archives_checkpoints if is_checkpoint(arch.name)]
+        # keep the latest checkpoint, if there is no later non-checkpoint archive
+        if archives_checkpoints and checkpoints and archives_checkpoints[0] is checkpoints[0]:
+            keep_checkpoints = checkpoints[:1]
+        else:
+            keep_checkpoints = []
+        checkpoints = set(checkpoints)
+        # ignore all checkpoint archives to avoid keeping one (which is an incomplete backup)
+        # that is newer than a successfully completed backup - and killing the successful backup.
+        archives = [arch for arch in archives_checkpoints if arch not in checkpoints]
         keep = []
         if args.within:
             keep += prune_within(archives, args.within)
@@ -808,11 +820,10 @@ class Archiver:
             keep += prune_split(archives, '%Y-%m', args.monthly, keep)
         if args.yearly:
             keep += prune_split(archives, '%Y', args.yearly, keep)
-
-        to_delete = set(archives) - set(keep)
+        to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
         stats = Statistics()
         with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
-            for archive in archives:
+            for archive in archives_checkpoints:
                 if archive in to_delete:
                     if args.dry_run:
                         if args.output_list:
@@ -874,8 +885,8 @@ class Archiver:
 
         recreater = ArchiveRecreater(repository, manifest, key, cache, matcher,
                                      exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
-                                     keep_tag_files=args.keep_tag_files,
-                                     compression=args.compression, chunker_params=args.chunker_params,
+                                     keep_tag_files=args.keep_tag_files, chunker_params=args.chunker_params,
+                                     compression=args.compression, compression_files=args.compression_files,
                                      progress=args.progress, stats=args.stats,
                                      file_status_printer=self.print_file_status,
                                      dry_run=args.dry_run)
@@ -901,6 +912,21 @@ class Archiver:
         repository.commit()
         cache.commit()
         return self.exit_code
+
+    @with_repository(manifest=False)
+    def do_with_lock(self, args, repository):
+        """run a user specified command with the repository lock held"""
+        # re-write manifest to start a repository transaction - this causes a
+        # lock upgrade to exclusive for remote (and also for local) repositories.
+        # by using manifest=False in the decorator, we avoid having to require
+        # the encryption key (and can operate just with encrypted data).
+        data = repository.get(Manifest.MANIFEST_ID)
+        repository.put(Manifest.MANIFEST_ID, data)
+        try:
+            # we exit with the return code we get from the subprocess
+            return subprocess.call([args.command] + args.args)
+        finally:
+            repository.rollback()
 
     @with_repository()
     def do_debug_dump_archive_items(self, args, repository, manifest, key):
@@ -1265,6 +1291,12 @@ class Archiver:
         traversing all paths specified. The archive will consume almost no disk space for
         files or parts of files that have already been stored in other archives.
 
+        The archive name needs to be unique. It must not end in '.checkpoint' or
+        '.checkpoint.N' (with N being a number), because these names are used for
+        checkpoints and treated in special ways.
+
+        In the archive name, you may use the following format tags:
+        {now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}
 
         To speed up pulling backups over sshfs and similar network file systems which do
         not provide correct inode information the --ignore-inode flag can be used. This
@@ -1350,11 +1382,16 @@ class Archiver:
                                    type=CompressionSpec, default=dict(name='none'), metavar='COMPRESSION',
                                    help='select compression algorithm (and level):\n'
                                         'none == no compression (default),\n'
+                                        'auto,C[,L] == built-in heuristic decides between none or C[,L] - with C[,L]\n'
+                                        '              being any valid compression algorithm (and optional level),\n'
                                         'lz4 == lz4,\n'
                                         'zlib == zlib (default level 6),\n'
                                         'zlib,0 .. zlib,9 == zlib (with level 0..9),\n'
                                         'lzma == lzma (default level 6),\n'
                                         'lzma,0 .. lzma,9 == lzma (with level 0..9).')
+        archive_group.add_argument('--compression-from', dest='compression_files',
+                                   type=argparse.FileType('r'), action='append',
+                                   metavar='COMPRESSIONCONFIG', help='read compression patterns from COMPRESSIONCONFIG, one per line')
 
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
@@ -1369,6 +1406,10 @@ class Archiver:
         be restricted by using the ``--exclude`` option.
 
         See the output of the "borg help patterns" command for more help on exclude patterns.
+
+        By using ``--dry-run``, you can do all extraction steps except actually writing the
+        output data: reading metadata and data chunks from the repo, checking the hash/hmac,
+        decrypting, decompressing.
         """)
         subparser = subparsers.add_parser('extract', parents=[common_parser], add_help=False,
                                           description=self.do_extract.__doc__,
@@ -1603,10 +1644,19 @@ class Archiver:
         any of the specified retention options. This command is normally used by
         automated backup scripts wanting to keep a certain number of historic backups.
 
+        Also, prune automatically removes checkpoint archives (incomplete archives left
+        behind by interrupted backup runs) except if the checkpoint is the latest
+        archive (and thus still needed). Checkpoint archives are not considered when
+        comparing archive counts against the retention limits (--keep-*).
+
         If a prefix is set with -P, then only archives that start with the prefix are
         considered for deletion and only those archives count towards the totals
         specified by the rules.
         Otherwise, *all* archives in the repository are candidates for deletion!
+
+        If you have multiple sequences of archives with different data sets (e.g.
+        from different machines) in one shared repository, use one prune call per
+        data set that matches only the respective archives using the -P option.
 
         The "--keep-within" option takes an argument of the form "<int><char>",
         where char is "H", "d", "w", "m", "y". For example, "--keep-within 2d" means
@@ -1816,11 +1866,16 @@ class Archiver:
                                    type=CompressionSpec, default=None, metavar='COMPRESSION',
                                    help='select compression algorithm (and level):\n'
                                         'none == no compression (default),\n'
+                                        'auto,C[,L] == built-in heuristic decides between none or C[,L] - with C[,L]\n'
+                                        '              being any valid compression algorithm (and optional level),\n'
                                         'lz4 == lz4,\n'
                                         'zlib == zlib (default level 6),\n'
                                         'zlib,0 .. zlib,9 == zlib (with level 0..9),\n'
                                         'lzma == lzma (default level 6),\n'
                                         'lzma,0 .. lzma,9 == lzma (with level 0..9).')
+        archive_group.add_argument('--compression-from', dest='compression_files',
+                                   type=argparse.FileType('r'), action='append',
+                                   metavar='COMPRESSIONCONFIG', help='read compression patterns from COMPRESSIONCONFIG, one per line')
         archive_group.add_argument('--chunker-params', dest='chunker_params',
                                    type=ChunkerParams, default=None,
                                    metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
@@ -1831,6 +1886,32 @@ class Archiver:
                                help='repository/archive to recreate')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to recreate; patterns are supported')
+
+        with_lock_epilog = textwrap.dedent("""
+        This command runs a user-specified command while the repository lock is held.
+
+        It will first try to acquire the lock (make sure that no other operation is
+        running in the repo), then execute the given command as a subprocess and wait
+        for its termination, release the lock and return the user command's return
+        code as borg's return code.
+
+        Note: if you copy a repository with the lock held, the lock will be present in
+              the copy, obviously. Thus, before using borg on the copy, you need to
+              use "borg break-lock" on it.
+        """)
+        subparser = subparsers.add_parser('with-lock', parents=[common_parser], add_help=False,
+                                          description=self.do_with_lock.__doc__,
+                                          epilog=with_lock_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='run user command with lock held')
+        subparser.set_defaults(func=self.do_with_lock)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repository to lock')
+        subparser.add_argument('command', metavar='COMMAND',
+                               help='command to run')
+        subparser.add_argument('args', metavar='ARGS', nargs=argparse.REMAINDER,
+                               help='command arguments')
 
         subparser = subparsers.add_parser('help', parents=[common_parser], add_help=False,
                                           description='Extra help')
@@ -1926,13 +2007,17 @@ class Archiver:
         update_excludes(args)
         return args
 
+    def prerun_checks(self, logger):
+        check_extension_modules()
+        selftest(logger)
+
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
         setup_logging(level=args.log_level, is_serve=args.func == self.do_serve)  # do not use loggers before this!
         if args.show_version:
             logger.info('borgbackup version %s' % __version__)
-        check_extension_modules()
+        self.prerun_checks(logger)
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
         return args.func(args)

@@ -735,7 +735,10 @@ class Archiver:
                 elif args.short:
                     format = "{path}{NL}"
                 else:
-                    format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
+                    if sys.platform == 'win32':
+                        format = "{user:15} {size:8} {isomtime} {path}{extra}{NL}"
+                    else:
+                        format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
                 formatter = ItemFormatter(archive, format)
 
                 if not hasattr(sys.stdout, 'buffer'):
@@ -2009,7 +2012,8 @@ class Archiver:
 
     def prerun_checks(self, logger):
         check_extension_modules()
-        selftest(logger)
+        if sys.platform != 'win32':
+            selftest(logger)
 
     def run(self, args):
         os.umask(args.umask)  # early, before opening files

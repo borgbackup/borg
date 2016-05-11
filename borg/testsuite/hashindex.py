@@ -1,14 +1,15 @@
 import base64
 import hashlib
 import os
-import struct
 import tempfile
 import zlib
 
-import pytest
 from ..hashindex import NSIndex, ChunkIndex
 from .. import hashindex
 from . import BaseTestCase
+
+# Note: these tests are part of the self test, do not use or import py.test functionality here.
+#       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT
 
 
 def H(x):
@@ -194,7 +195,7 @@ class HashIndexRefcountingTestCase(BaseTestCase):
     def test_decref_zero(self):
         idx1 = ChunkIndex()
         idx1[H(1)] = 0, 0, 0
-        with pytest.raises(AssertionError):
+        with self.assert_raises(AssertionError):
             idx1.decref(H(1))
 
     def test_incref_decref(self):
@@ -208,18 +209,18 @@ class HashIndexRefcountingTestCase(BaseTestCase):
 
     def test_setitem_raises(self):
         idx1 = ChunkIndex()
-        with pytest.raises(AssertionError):
+        with self.assert_raises(AssertionError):
             idx1[H(1)] = hashindex.MAX_VALUE + 1, 0, 0
 
     def test_keyerror(self):
         idx = ChunkIndex()
-        with pytest.raises(KeyError):
+        with self.assert_raises(KeyError):
             idx.incref(H(1))
-        with pytest.raises(KeyError):
+        with self.assert_raises(KeyError):
             idx.decref(H(1))
-        with pytest.raises(KeyError):
+        with self.assert_raises(KeyError):
             idx[H(1)]
-        with pytest.raises(OverflowError):
+        with self.assert_raises(OverflowError):
             idx.add(H(1), -1, 0, 0)
 
 
@@ -269,10 +270,11 @@ class HashIndexDataTestCase(BaseTestCase):
         assert idx1[H(3)] == (hashindex.MAX_VALUE, 6, 7)
 
 
-def test_nsindex_segment_limit():
-    idx = NSIndex()
-    with pytest.raises(AssertionError):
-        idx[H(1)] = hashindex.MAX_VALUE + 1, 0
-    assert H(1) not in idx
-    idx[H(2)] = hashindex.MAX_VALUE, 0
-    assert H(2) in idx
+class NSIndexTestCase(BaseTestCase):
+    def test_nsindex_segment_limit(self):
+        idx = NSIndex()
+        with self.assert_raises(AssertionError):
+            idx[H(1)] = hashindex.MAX_VALUE + 1, 0
+        assert H(1) not in idx
+        idx[H(2)] = hashindex.MAX_VALUE, 0
+        assert H(2) in idx

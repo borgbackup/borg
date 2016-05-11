@@ -107,7 +107,7 @@ Now doing another backup, just to show off the great deduplication::
     -----------------------------------------------------------------------------
 
 
-For a graphical frontend refer to our complementary project `BorgWeb <https://borgbackup.github.io/borgweb/>`_.
+For a graphical frontend refer to our complementary project `BorgWeb <https://borgweb.readthedocs.io/>`_.
 
 Links
 =====

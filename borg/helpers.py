@@ -36,6 +36,7 @@ from . import hashindex
 from . import chunker
 from .constants import *  # NOQA
 from . import crypto
+from .compress import COMPR_BUFFER, get_compressor
 from . import shellpattern
 import msgpack
 import msgpack.fallback
@@ -83,7 +84,7 @@ def check_extension_modules():
         raise ExtensionModuleError
     if chunker.API_VERSION != 2:
         raise ExtensionModuleError
-    if crypto.API_VERSION != 2:
+    if crypto.API_VERSION != 3:
         raise ExtensionModuleError
     if platform.API_VERSION != 2:
         raise ExtensionModuleError
@@ -285,8 +286,7 @@ def load_excludes(fh):
     """Load and parse exclude patterns from file object. Lines empty or starting with '#' after stripping whitespace on
     both line ends are ignored.
     """
-    patterns = (line for line in (i.strip() for i in fh) if not line.startswith('#'))
-    return [parse_pattern(pattern) for pattern in patterns if pattern]
+    return [parse_pattern(pattern) for pattern in clean_lines(fh)]
 
 
 def update_excludes(args):
@@ -539,6 +539,12 @@ def CompressionSpec(s):
         else:
             raise ValueError
         return dict(name=name, level=level)
+    if name == 'auto':
+        if 2 <= count <= 3:
+            compression = ','.join(values[1:])
+        else:
+            raise ValueError
+        return dict(name=name, spec=CompressionSpec(compression))
     raise ValueError
 
 
@@ -1484,3 +1490,96 @@ except ImportError:
 
 def scandir_inorder(path='.'):
     return sorted(scandir(path), key=lambda dirent: dirent.inode())
+
+
+def clean_lines(lines, lstrip=None, rstrip=None, remove_empty=True, remove_comments=True):
+    """
+    clean lines (usually read from a config file):
+
+    1. strip whitespace (left and right), 2. remove empty lines, 3. remove comments.
+
+    note: only "pure comment lines" are supported, no support for "trailing comments".
+
+    :param lines: input line iterator (e.g. list or open text file) that gives unclean input lines
+    :param lstrip: lstrip call arguments or False, if lstripping is not desired
+    :param rstrip: rstrip call arguments or False, if rstripping is not desired
+    :param remove_comments: remove comment lines (lines starting with "#")
+    :param remove_empty: remove empty lines
+    :return: yields processed lines
+    """
+    for line in lines:
+        if lstrip is not False:
+            line = line.lstrip(lstrip)
+        if rstrip is not False:
+            line = line.rstrip(rstrip)
+        if remove_empty and not line:
+            continue
+        if remove_comments and line.startswith('#'):
+            continue
+        yield line
+
+
+class CompressionDecider1:
+    def __init__(self, compression, compression_files):
+        """
+        Initialize a CompressionDecider instance (and read config files, if needed).
+
+        :param compression: default CompressionSpec (e.g. from --compression option)
+        :param compression_files: list of compression config files (e.g. from --compression-from) or
+                                  a list of other line iterators
+        """
+        self.compression = compression
+        if not compression_files:
+            self.matcher = None
+        else:
+            self.matcher = PatternMatcher(fallback=compression)
+            for file in compression_files:
+                try:
+                    for line in clean_lines(file):
+                        try:
+                            compr_spec, fn_pattern = line.split(':', 1)
+                        except:
+                            continue
+                        self.matcher.add([parse_pattern(fn_pattern)], CompressionSpec(compr_spec))
+                finally:
+                    if hasattr(file, 'close'):
+                        file.close()
+
+    def decide(self, path):
+        if self.matcher is not None:
+            return self.matcher.match(path)
+        return self.compression
+
+
+class CompressionDecider2:
+    def __init__(self, compression):
+        self.compression = compression
+
+    def decide(self, chunk):
+        # nothing fancy here yet: we either use what the metadata says or the default
+        # later, we can decide based on the chunk data also.
+        # if we compress the data here to decide, we can even update the chunk data
+        # and modify the metadata as desired.
+        compr_spec = chunk.meta.get('compress', self.compression)
+        compr_args = dict(buffer=COMPR_BUFFER)
+        compr_args.update(compr_spec)
+        if compr_args['name'] == 'auto':
+            # we did not decide yet, use heuristic:
+            compr_args, chunk = self.heuristic_lz4(compr_args, chunk)
+        return compr_args, chunk
+
+    def heuristic_lz4(self, compr_args, chunk):
+        meta, data = chunk
+        lz4 = get_compressor('lz4', buffer=compr_args['buffer'])
+        cdata = lz4.compress(data)
+        data_len = len(data)
+        cdata_len = len(cdata)
+        if cdata_len < data_len:
+            compr_spec = compr_args['spec']
+        else:
+            # uncompressible - we could have a special "uncompressible compressor"
+            # that marks such data as uncompressible via compression-type metadata.
+            compr_spec = CompressionSpec('none')
+        compr_args.update(compr_spec)
+        logger.debug("len(data) == %d, len(lz4(data)) == %d, choosing %s", data_len, cdata_len, compr_spec)
+        return compr_args, Chunk(data, **meta)

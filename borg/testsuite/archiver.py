@@ -61,6 +61,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
             sys.stdout = sys.stderr = output = StringIO()
             if archiver is None:
                 archiver = Archiver()
+            archiver.prerun_checks = lambda *args: None
             archiver.exit_code = EXIT_SUCCESS
             args = archiver.parse_args(list(args))
             ret = archiver.run(args)
@@ -987,16 +988,39 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test1', src_dir)
         self.cmd('create', self.repository_location + '::test2', src_dir)
+        # these are not really a checkpoints, but they look like some:
+        self.cmd('create', self.repository_location + '::test3.checkpoint', src_dir)
+        self.cmd('create', self.repository_location + '::test3.checkpoint.1', src_dir)
+        self.cmd('create', self.repository_location + '::test4.checkpoint', src_dir)
         output = self.cmd('prune', '-v', '--list', '--dry-run', self.repository_location, '--keep-daily=2')
-        self.assert_in('Keeping archive: test2', output)
         self.assert_in('Would prune:     test1', output)
+        # must keep the latest non-checkpoint archive:
+        self.assert_in('Keeping archive: test2', output)
+        # must keep the latest checkpoint archive:
+        self.assert_in('Keeping archive: test4.checkpoint', output)
         output = self.cmd('list', self.repository_location)
         self.assert_in('test1', output)
         self.assert_in('test2', output)
+        self.assert_in('test3.checkpoint', output)
+        self.assert_in('test3.checkpoint.1', output)
+        self.assert_in('test4.checkpoint', output)
         self.cmd('prune', self.repository_location, '--keep-daily=2')
         output = self.cmd('list', self.repository_location)
         self.assert_not_in('test1', output)
+        # the latest non-checkpoint archive must be still there:
         self.assert_in('test2', output)
+        # only the latest checkpoint archive must still be there:
+        self.assert_not_in('test3.checkpoint', output)
+        self.assert_not_in('test3.checkpoint.1', output)
+        self.assert_in('test4.checkpoint', output)
+        # now we supercede the latest checkpoint by a successful backup:
+        self.cmd('create', self.repository_location + '::test5', src_dir)
+        self.cmd('prune', self.repository_location, '--keep-daily=2')
+        output = self.cmd('list', self.repository_location)
+        # all checkpoints should be gone now:
+        self.assert_not_in('checkpoint', output)
+        # the latest archive must be still there
+        self.assert_in('test5', output)
 
     def test_prune_repository_save_space(self):
         self.cmd('init', self.repository_location)
@@ -1087,6 +1111,64 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('list', '--format', '{size} {csize} {path}{NL}', test_archive)
         size, csize, path = output.split("\n")[1].split(" ")
         assert int(csize) < int(size)
+
+    def _get_sizes(self, compression, compressible, size=10000):
+        if compressible:
+            contents = b'X' * size
+        else:
+            contents = os.urandom(size)
+        self.create_regular_file('file', contents=contents)
+        self.cmd('init', '--encryption=none', self.repository_location)
+        archive = self.repository_location + '::test'
+        self.cmd('create', '-C', compression, archive, 'input')
+        output = self.cmd('list', '--format', '{size} {csize} {path}{NL}', archive)
+        size, csize, path = output.split("\n")[1].split(" ")
+        return int(size), int(csize)
+
+    def test_compression_none_compressible(self):
+        size, csize = self._get_sizes('none', compressible=True)
+        assert csize >= size
+        assert csize == size + 3
+
+    def test_compression_none_uncompressible(self):
+        size, csize = self._get_sizes('none', compressible=False)
+        assert csize >= size
+        assert csize == size + 3
+
+    def test_compression_zlib_compressible(self):
+        size, csize = self._get_sizes('zlib', compressible=True)
+        assert csize < size * 0.1
+        assert csize == 35
+
+    def test_compression_zlib_uncompressible(self):
+        size, csize = self._get_sizes('zlib', compressible=False)
+        assert csize >= size
+
+    def test_compression_auto_compressible(self):
+        size, csize = self._get_sizes('auto,zlib', compressible=True)
+        assert csize < size * 0.1
+        assert csize == 35  # same as compression 'zlib'
+
+    def test_compression_auto_uncompressible(self):
+        size, csize = self._get_sizes('auto,zlib', compressible=False)
+        assert csize >= size
+        assert csize == size + 3  # same as compression 'none'
+
+    def test_compression_lz4_compressible(self):
+        size, csize = self._get_sizes('lz4', compressible=True)
+        assert csize < size * 0.1
+
+    def test_compression_lz4_uncompressible(self):
+        size, csize = self._get_sizes('lz4', compressible=False)
+        assert csize >= size
+
+    def test_compression_lzma_compressible(self):
+        size, csize = self._get_sizes('lzma', compressible=True)
+        assert csize < size * 0.1
+
+    def test_compression_lzma_uncompressible(self):
+        size, csize = self._get_sizes('lzma', compressible=False)
+        assert csize >= size
 
     def test_break_lock(self):
         self.cmd('init', self.repository_location)
@@ -1397,6 +1479,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('recreate', self.repository_location, '--chunker-params', 'default')
         info_after = self.cmd('info', self.repository_location + '::test')
         assert info_before == info_after  # includes archive ID
+
+    def test_with_lock(self):
+        self.cmd('init', self.repository_location)
+        lock_path = os.path.join(self.repository_path, 'lock.exclusive')
+        cmd = 'python3', '-c', 'import os, sys; sys.exit(42 if os.path.exists("%s") else 23)' % lock_path
+        self.cmd('with-lock', self.repository_location, *cmd, fork=True, exit_code=42)
 
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')

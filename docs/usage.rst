@@ -101,9 +101,11 @@ Some automatic "answerers" (if set, they automatically answer confirmation quest
     answer or ask you interactively, depending on whether retries are allowed (they by default are
     allowed). So please test your scripts interactively before making them a non-interactive script.
 
-Directories:
+Directories and files:
     BORG_KEYS_DIR
         Default to '~/.config/borg/keys'. This directory contains keys for encrypted repositories.
+    BORG_KEY_FILE
+        When set, use the given filename as repository key file.
     BORG_CACHE_DIR
         Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
         of space for dealing with big repositories).
@@ -309,10 +311,9 @@ Examples
     # Even slower, even higher compression (N = 0..9)
     $ borg create --compression lzma,N /path/to/repo::arch ~
 
-    # Format tags available for archive name:
-    # {now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}
-    # add short hostname, backup username and current unixtime (seconds from epoch)
-    $ borg create  /path/to/repo::{hostname}-{user}-{now:%s} ~
+    # Use short hostname, user name and current time in archive name
+    $ borg create /path/to/repo::{hostname}-{user}-{now} ~
+    $ borg create /path/to/repo::{hostname}-{user}-{now:%Y-%m-%d_%H:%M:%S} ~
 
 .. include:: usage/extract.rst.inc
 
@@ -325,6 +326,9 @@ Examples
 
     # Extract entire archive and list files while processing
     $ borg extract -v --list /path/to/repo::my-files
+
+    # Verify whether an archive could be successfully extracted, but do not write files to disk
+    $ borg extract --dry-run /path/to/repo::my-files
 
     # Extract the "src" directory
     $ borg extract /path/to/repo::my-files home/USERNAME/src
@@ -645,6 +649,12 @@ Examples
     ...
 
 
+.. include:: usage/with-lock.rst.inc
+
+
+.. include:: usage/break-lock.rst.inc
+
+
 Miscellaneous Help
 ------------------
 
@@ -814,13 +824,16 @@ Now, let's see how to restore some LVs from such a backup. ::
     $ borg extract --stdout /path/to/repo::arch dev/vg0/home-snapshot > /dev/vg0/home
 
 
+.. _append-only-mode:
+
 Append-only mode
 ~~~~~~~~~~~~~~~~
 
 A repository can be made "append-only", which means that Borg will never overwrite or
-delete committed data. This is useful for scenarios where multiple machines back up to
-a central backup server using ``borg serve``, since a hacked machine cannot delete
-backups permanently.
+delete committed data (append-only refers to the segment files, but borg will also
+reject to delete the repository completely). This is useful for scenarios where a
+backup client machine backups remotely to a backup server using ``borg serve``, since
+a hacked client machine cannot delete backups on the server permanently.
 
 To activate append-only mode, edit the repository ``config`` file and add a line
 ``append_only=1`` to the ``[repository]`` section (or edit the line if it exists).
@@ -881,6 +894,6 @@ repository. Make sure that backup client machines only get to access the reposit
 Ensure that no remote access is possible if the repository is temporarily set to normal mode
 for e.g. regular pruning.
 
-Further protections can be implemented, but are outside of Borgs scope. For example,
+Further protections can be implemented, but are outside of Borg's scope. For example,
 file system snapshots or wrapping ``borg serve`` to set special permissions or ACLs on
 new data files.

@@ -9,7 +9,8 @@ import sysconfig
 import time
 import unittest
 from ..xattr import get_all
-from ..logger import setup_logging
+
+# Note: this is used by borg.selftest, do not use or import py.test functionality here.
 
 try:
     import llfuse
@@ -17,6 +18,11 @@ try:
     have_fuse_mtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
 except ImportError:
     have_fuse_mtime_ns = False
+
+try:
+    from pytest import raises
+except ImportError:
+    raises = None
 
 has_lchflags = hasattr(os, 'lchflags')
 
@@ -32,9 +38,6 @@ else:
 if sys.platform.startswith('netbsd'):
     st_mtime_ns_round = -4  # only >1 microsecond resolution here?
 
-# Ensure that the loggers exist for all tests
-setup_logging()
-
 
 class BaseTestCase(unittest.TestCase):
     """
@@ -43,8 +46,12 @@ class BaseTestCase(unittest.TestCase):
     assert_not_in = unittest.TestCase.assertNotIn
     assert_equal = unittest.TestCase.assertEqual
     assert_not_equal = unittest.TestCase.assertNotEqual
-    assert_raises = unittest.TestCase.assertRaises
     assert_true = unittest.TestCase.assertTrue
+
+    if raises:
+        assert_raises = staticmethod(raises)
+    else:
+        assert_raises = unittest.TestCase.assertRaises
 
     @contextmanager
     def assert_creates_file(self, path):

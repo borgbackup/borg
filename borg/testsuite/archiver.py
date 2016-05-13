@@ -1598,6 +1598,29 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.cmd('check', self.repository_location, exit_code=0)
         self.cmd('extract', '--dry-run', self.repository_location + '::archive1', exit_code=0)
 
+    def _test_verify_data(self, *init_args):
+        shutil.rmtree(self.repository_path)
+        self.cmd('init', self.repository_location, *init_args)
+        self.create_src_archive('archive1')
+        archive, repository = self.open_archive('archive1')
+        with repository:
+            for item in archive.iter_items():
+                if item[b'path'].endswith('testsuite/archiver.py'):
+                    chunk = item[b'chunks'][-1]
+                    data = repository.get(chunk.id) + b'1234'
+                    repository.put(chunk.id, data)
+                    break
+            repository.commit()
+        self.cmd('check', self.repository_location, exit_code=0)
+        output = self.cmd('check', '--verify-data', self.repository_location, exit_code=1)
+        assert bin_to_hex(chunk.id) + ', integrity error' in output
+
+    def test_verify_data(self):
+        self._test_verify_data('--encryption', 'repokey')
+
+    def test_verify_data_unencrypted(self):
+        self._test_verify_data('--encryption', 'none')
+
 
 class RemoteArchiverTestCase(ArchiverTestCase):
     prefix = '__testsuite__:'

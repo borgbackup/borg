@@ -38,15 +38,10 @@ class TestKey:
         """))
     keyfile2_id = unhexlify('c3fbf14bc001ebcc3cd86e696c13482ed071740927cd7cbe1b01b4bfcee49314')
 
-    @pytest.fixture(autouse=True)
-    def keys_dir(self, request, monkeypatch):
-        tmp_keys_dir = tempfile.mkdtemp()
-
-        def finalize():
-            shutil.rmtree(tmp_keys_dir)
-
-        request.addfinalizer(finalize)
-        monkeypatch.setenv('BORG_KEYS_DIR', tmp_keys_dir)
+    @pytest.fixture
+    def keys_dir(self, request, monkeypatch, tmpdir):
+        monkeypatch.setenv('BORG_KEYS_DIR', tmpdir)
+        return tmpdir
 
     class MockRepository:
         class _Location:
@@ -62,7 +57,7 @@ class TestKey:
         assert hexlify(key.id_hash(chunk.data)) == b'2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae'
         assert chunk == key.decrypt(key.id_hash(chunk.data), key.encrypt(chunk))
 
-    def test_keyfile(self, monkeypatch):
+    def test_keyfile(self, monkeypatch, keys_dir):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
         key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
         assert bytes_to_long(key.enc_cipher.iv, 8) == 0
@@ -97,8 +92,8 @@ class TestKey:
         with pytest.raises(FileNotFoundError):
             KeyfileKey.detect(self.MockRepository(), chunk_cdata)
 
-    def test_keyfile2(self, monkeypatch):
-        with open(os.path.join(os.environ['BORG_KEYS_DIR'], 'keyfile'), 'w') as fd:
+    def test_keyfile2(self, monkeypatch, keys_dir):
+        with keys_dir.join('keyfile').open('w') as fd:
             fd.write(self.keyfile2_key_file)
         monkeypatch.setenv('BORG_PASSPHRASE', 'passphrase')
         key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
@@ -144,8 +139,8 @@ class TestKey:
         with pytest.raises(IntegrityError):
             key.decrypt("", data)
 
-    def test_decrypt_integrity(self, monkeypatch):
-        with open(os.path.join(os.environ['BORG_KEYS_DIR'], 'keyfile'), 'w') as fd:
+    def test_decrypt_integrity(self, monkeypatch, keys_dir):
+        with keys_dir.join('keyfile').open('w') as fd:
             fd.write(self.keyfile2_key_file)
         monkeypatch.setenv('BORG_PASSPHRASE', 'passphrase')
         key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)

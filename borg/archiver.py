@@ -144,12 +144,16 @@ class Archiver:
             if not yes(msg, false_msg="Aborting.", truish=('YES', ),
                        env_var_override='BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
                 return EXIT_ERROR
+        if args.repo_only and args.verify_data:
+            self.print_error("--repository-only and --verify-data contradict each other. Please select one.")
+            return EXIT_ERROR
         if not args.archives_only:
             if not repository.check(repair=args.repair, save_space=args.save_space):
                 return EXIT_WARNING
         if not args.repo_only and not ArchiveChecker().check(
                 repository, repair=args.repair, archive=args.location.archive,
-                last=args.last, prefix=args.prefix, save_space=args.save_space):
+                last=args.last, prefix=args.prefix, verify_data=args.verify_data,
+                save_space=args.save_space):
             return EXIT_WARNING
         return EXIT_SUCCESS
 
@@ -1035,6 +1039,18 @@ class Archiver:
           required).
         - The archive checks can be time consuming, they can be skipped using the
           --repository-only option.
+
+        The --verify-data option will perform a full integrity verification (as opposed to
+        checking the CRC32 of the segment) of data, which means reading the data from the
+        repository, decrypting and decompressing it. This is a cryptographic verification,
+        which will detect (accidental) corruption. For encrypted repositories it is
+        tamper-resistant as well, unless the attacker has access to the keys.
+
+        It is also very slow.
+
+        --verify-data only verifies data used by the archives specified with --last,
+        --prefix or an explicitly named archive. If none of these are passed,
+        all data in the repository is verified.
         """)
         subparser = subparsers.add_parser('check', parents=[common_parser],
                                           description=self.do_check.__doc__,
@@ -1051,6 +1067,10 @@ class Archiver:
         subparser.add_argument('--archives-only', dest='archives_only', action='store_true',
                                default=False,
                                help='only perform archives checks')
+        subparser.add_argument('--verify-data', dest='verify_data', action='store_true',
+                               default=False,
+                               help='perform cryptographic archive data integrity verification '
+                                    '(conflicts with --repository-only)')
         subparser.add_argument('--repair', dest='repair', action='store_true',
                                default=False,
                                help='attempt to repair any inconsistencies found')

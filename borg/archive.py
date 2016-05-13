@@ -22,7 +22,8 @@ from .helpers import Chunk, Error, uid2user, user2uid, gid2group, group2gid, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, bin_to_hex, \
     ProgressIndicatorPercent, ChunkIteratorFileWrapper, remove_surrogates, log_multi, \
     PathPrefixPattern, FnmatchPattern, open_item, file_status, format_file_size, consume, \
-    CompressionDecider1, CompressionDecider2, CompressionSpec
+    CompressionDecider1, CompressionDecider2, CompressionSpec, \
+    IntegrityError
 from .repository import Repository
 from .platform import acl_get, acl_set
 from .chunker import Chunker
@@ -698,7 +699,17 @@ class ArchiveChecker:
         self.error_found = False
         self.possibly_superseded = set()
 
-    def check(self, repository, repair=False, archive=None, last=None, prefix=None, save_space=False):
+    def check(self, repository, repair=False, archive=None, last=None, prefix=None, verify_data=False,
+              save_space=False):
+        """Perform a set of checks on 'repository'
+
+        :param repair: enable repair mode, write updated or corrected data into repository
+        :param archive: only check this archive
+        :param last: only check this number of recent archives
+        :param prefix: only check archives with this prefix
+        :param verify_data: integrity verification of data referenced by archives
+        :param save_space: Repository.commit(save_space)
+        """
         logger.info('Starting archive consistency check...')
         self.check_all = archive is None and last is None and prefix is None
         self.repair = repair
@@ -712,6 +723,8 @@ class ArchiveChecker:
         else:
             self.manifest, _ = Manifest.load(repository, key=self.key)
         self.rebuild_refcounts(archive=archive, last=last, prefix=prefix)
+        if verify_data:
+            self.verify_data()
         self.orphan_chunks_check()
         self.finish(save_space=save_space)
         if self.error_found:
@@ -740,6 +753,26 @@ class ArchiveChecker:
     def identify_key(self, repository):
         cdata = repository.get(next(self.chunks.iteritems())[0])
         return key_factory(repository, cdata)
+
+    def verify_data(self):
+        logger.info('Starting cryptographic data integrity verification...')
+        pi = ProgressIndicatorPercent(total=len(self.chunks), msg="Verifying data %6.2f%%", step=0.01, same_line=True)
+        count = errors = 0
+        for chunk_id, (refcount, *_) in self.chunks.iteritems():
+            pi.show()
+            if not refcount:
+                continue
+            encrypted_data = self.repository.get(chunk_id)
+            try:
+                _, data = self.key.decrypt(chunk_id, encrypted_data)
+            except IntegrityError as integrity_error:
+                self.error_found = True
+                errors += 1
+                logger.error('chunk %s, integrity error: %s', bin_to_hex(chunk_id), integrity_error)
+            count += 1
+        pi.finish()
+        log = logger.error if errors else logger.info
+        log('Finished cryptographic data integrity verification, verified %d chunks with %d integrity errors.', count, errors)
 
     def rebuild_manifest(self):
         """Rebuild the manifest object if it is missing
@@ -874,6 +907,8 @@ class ArchiveChecker:
         else:
             # we only want one specific archive
             archive_items = [item for item in self.manifest.archives.items() if item[0] == archive]
+            if not archive_items:
+                logger.error("Archive '%s' not found.", archive)
             num_archives = 1
             end = 1
 

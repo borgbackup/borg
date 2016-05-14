@@ -17,6 +17,7 @@ from .helpers import Error, ErrorWithTraceback, IntegrityError, Location, Progre
 from .hashindex import NSIndex
 from .locking import UpgradableLock, LockError, LockErrorT
 from .lrucache import LRUCache
+from .platform import SyncFile, sync_dir
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
 MAGIC = b'BORG_SEG'
@@ -32,7 +33,7 @@ class Repository:
     On disk layout:
     dir/README
     dir/config
-    dir/data/<X / SEGMENTS_PER_DIR>/<X>
+    dir/data/<X // SEGMENTS_PER_DIR>/<X>
     dir/index.X
     dir/hints.X
     """
@@ -507,7 +508,7 @@ class LoggedIO:
     def __init__(self, path, limit, segments_per_dir, capacity=90):
         self.path = path
         self.fds = LRUCache(capacity,
-                            dispose=lambda fd: fd.close())
+                            dispose=self.close_fd)
         self.segment = 0
         self.limit = limit
         self.segments_per_dir = segments_per_dir
@@ -518,6 +519,11 @@ class LoggedIO:
         self.close_segment()
         self.fds.clear()
         self.fds = None  # Just to make sure we're disabled
+
+    def close_fd(self, fd):
+        if hasattr(os, 'posix_fadvise'):  # only on UNIX
+            os.posix_fadvise(fd.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
+        fd.close()
 
     def segment_iterator(self, reverse=False):
         data_path = os.path.join(self.path, 'data')
@@ -535,7 +541,7 @@ class LoggedIO:
         return None
 
     def get_segments_transaction_id(self):
-        """Verify that the transaction id is consistent with the index transaction id
+        """Return the last committed segment.
         """
         for segment, filename in self.segment_iterator(reverse=True):
             if self.is_committed_segment(filename):
@@ -578,7 +584,8 @@ class LoggedIO:
                 dirname = os.path.join(self.path, 'data', str(self.segment // self.segments_per_dir))
                 if not os.path.exists(dirname):
                     os.mkdir(dirname)
-            self._write_fd = open(self.segment_filename(self.segment), 'ab')
+                    sync_dir(os.path.join(self.path, 'data'))
+            self._write_fd = SyncFile(self.segment_filename(self.segment))
             self._write_fd.write(MAGIC)
             self.offset = MAGIC_LEN
         return self._write_fd
@@ -590,6 +597,13 @@ class LoggedIO:
             fd = open(self.segment_filename(segment), 'rb')
             self.fds[segment] = fd
             return fd
+
+    def close_segment(self):
+        if self._write_fd:
+            self.segment += 1
+            self.offset = 0
+            self._write_fd.close()
+            self._write_fd = None
 
     def delete_segment(self, segment):
         if segment in self.fds:
@@ -641,7 +655,7 @@ class LoggedIO:
 
     def read(self, segment, offset, id):
         if segment == self.segment and self._write_fd:
-            self._write_fd.flush()
+            self._write_fd.sync()
         fd = self.get_fd(segment)
         fd.seek(offset)
         header = fd.read(self.put_header_fmt.size)
@@ -703,20 +717,8 @@ class LoggedIO:
 
     def write_commit(self):
         fd = self.get_write_fd(no_new=True)
+        fd.sync()
         header = self.header_no_crc_fmt.pack(self.header_fmt.size, TAG_COMMIT)
         crc = self.crc_fmt.pack(crc32(header) & 0xffffffff)
         fd.write(b''.join((crc, header)))
         self.close_segment()
-
-    def close_segment(self):
-        if self._write_fd:
-            self.segment += 1
-            self.offset = 0
-            self._write_fd.flush()
-            os.fsync(self._write_fd.fileno())
-            if hasattr(os, 'posix_fadvise'):  # only on UNIX
-                # tell the OS that it does not need to cache what we just wrote,
-                # avoids spoiling the cache for the OS and other processes.
-                os.posix_fadvise(self._write_fd.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
-            self._write_fd.close()
-            self._write_fd = None

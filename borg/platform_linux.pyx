@@ -1,13 +1,17 @@
 import os
 import re
+import resource
 from stat import S_ISLNK
 from .helpers import posix_acl_use_stored_uid_gid, user2uid, group2gid, safe_decode, safe_encode
+from .platform_base import SyncFile as BaseSyncFile
+from libc cimport errno
 
-API_VERSION = 2
+API_VERSION = 3
 
 cdef extern from "sys/types.h":
     int ACL_TYPE_ACCESS
     int ACL_TYPE_DEFAULT
+    ctypedef off64_t
 
 cdef extern from "sys/acl.h":
     ctypedef struct _acl_t:
@@ -22,6 +26,12 @@ cdef extern from "sys/acl.h":
 
 cdef extern from "acl/libacl.h":
     int acl_extended_file(const char *path)
+
+cdef extern from "fcntl.h":
+    int sync_file_range(int fd, off64_t offset, off64_t nbytes, unsigned int flags)
+    unsigned int SYNC_FILE_RANGE_WRITE
+    unsigned int SYNC_FILE_RANGE_WAIT_BEFORE
+    unsigned int SYNC_FILE_RANGE_WAIT_AFTER
 
 
 _comment_re = re.compile(' *#.*', re.M)
@@ -77,10 +87,6 @@ cdef acl_numeric_ids(acl):
 
 
 def acl_get(path, item, st, numeric_owner=False):
-    """Saves ACL Entries
-
-    If `numeric_owner` is True the user/group field is not preserved only uid/gid
-    """
     cdef acl_t default_acl = NULL
     cdef acl_t access_acl = NULL
     cdef char *default_text = NULL
@@ -112,11 +118,6 @@ def acl_get(path, item, st, numeric_owner=False):
 
 
 def acl_set(path, item, numeric_owner=False):
-    """Restore ACL Entries
-
-    If `numeric_owner` is True the stored uid/gid is used instead
-    of the user/group names
-    """
     cdef acl_t access_acl = NULL
     cdef acl_t default_acl = NULL
 
@@ -141,3 +142,45 @@ def acl_set(path, item, numeric_owner=False):
                 acl_set_file(p, ACL_TYPE_DEFAULT, default_acl)
         finally:
             acl_free(default_acl)
+
+cdef _sync_file_range(fd, offset, length, flags):
+    assert offset & PAGE_MASK == 0, "offset %d not page-aligned" % offset
+    assert length & PAGE_MASK == 0, "length %d not page-aligned" % length
+    if sync_file_range(fd, offset, length, flags) != 0:
+        raise OSError(errno, os.strerror(errno))
+    os.posix_fadvise(fd, offset, length, os.POSIX_FADV_DONTNEED)
+
+cdef unsigned PAGE_MASK = resource.getpagesize() - 1
+
+
+class SyncFile(BaseSyncFile):
+    """
+    Implemented using sync_file_range for asynchronous write-out and fdatasync for actual durability.
+
+    "write-out" means that dirty pages (= data that was written) are submitted to an I/O queue and will be send to
+    disk in the immediate future.
+    """
+
+    def __init__(self, path):
+        super().__init__(path)
+        self.offset = 0
+        self.write_window = (16 * 1024 ** 2) & ~PAGE_MASK
+        self.last_sync = 0
+        self.pending_sync = None
+
+    def write(self, data):
+        self.offset += self.fd.write(data)
+        offset = self.offset & ~PAGE_MASK
+        if offset >= self.last_sync + self.write_window:
+            self.fd.flush()
+            _sync_file_range(self.fileno, self.last_sync, offset - self.last_sync, SYNC_FILE_RANGE_WRITE)
+            if self.pending_sync is not None:
+                _sync_file_range(self.fileno, self.pending_sync, self.last_sync - self.pending_sync,
+                                 SYNC_FILE_RANGE_WRITE | SYNC_FILE_RANGE_WAIT_BEFORE | SYNC_FILE_RANGE_WAIT_AFTER)
+            self.pending_sync = self.last_sync
+            self.last_sync = offset
+
+    def sync(self):
+        self.fd.flush()
+        os.fdatasync(self.fileno)
+        os.posix_fadvise(self.fileno, 0, 0, os.POSIX_FADV_DONTNEED)

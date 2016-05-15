@@ -170,6 +170,22 @@ Network:
 
 In case you are interested in more details, please read the internals documentation.
 
+File systems
+~~~~~~~~~~~~
+
+We strongly recommend against using Borg (or any other database-like
+software) on non-journaling file systems like FAT, since it is not
+possible to assume any consistency in case of power failures (or a
+sudden disconnect of an external drive or similar failures).
+
+While Borg uses a data store that is resilient against these failures
+when used on journaling file systems, it is not possible to guarantee
+this with some hardware -- independent of the software used. We don't
+know a list of affected hardware.
+
+If you are suspicious whether your Borg repository is still consistent
+and readable after one of the failures mentioned above occured, run
+``borg check --verify-data`` to make sure it is consistent.
 
 Units
 ~~~~~

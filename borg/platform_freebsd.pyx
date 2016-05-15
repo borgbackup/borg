@@ -1,7 +1,7 @@
 import os
 from .helpers import posix_acl_use_stored_uid_gid, safe_encode, safe_decode
 
-API_VERSION = 2
+API_VERSION = 3
 
 cdef extern from "errno.h":
     int errno

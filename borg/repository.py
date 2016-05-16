@@ -32,15 +32,51 @@ FreeSpace = partial(defaultdict, int)
 
 
 class Repository:
-    """Filesystem based transactional key value store
+    """
+    Filesystem based transactional key value store
+
+    Transactionality is achieved by using a log (aka journal) to record changes. The log is a series of numbered files
+    called segments. Each segment is a series of log entries. The segment number together with the offset of each
+    entry relative to its segment start establishes an ordering of the log entries. This is the "definition" of
+    time for the purposes of the log.
+
+    Log entries are either PUT, DELETE or COMMIT.
+
+    A COMMIT is always the final log entry in a segment and marks all data from the beginning of the log until the
+    segment ending with the COMMIT as committed and consistent. The segment number of a segment ending with a COMMIT
+    is called the transaction ID of that commit, and a segment ending with a COMMIT is called committed.
+
+    When reading from a repository it is first checked whether the last segment is committed. If it is not, then
+    all segments after the last committed segment are deleted; they contain log entries whose consistency is not
+    established by a COMMIT.
+
+    Note that the COMMIT can't establish consistency by itself, but only manages to do so with proper support from
+    the platform (including the hardware). See platform_base.SyncFile for details.
+
+    A PUT inserts a key-value pair. The value is stored in the log entry, hence the repository implements
+    full data logging, meaning that all data is consistent, not just metadata (which is common in file systems).
+
+    A DELETE marks a key as deleted.
+
+    For a given key only the last entry regarding the key, which is called current (all other entries are called
+    superseded), is relevant: If there is no entry or the last entry is a DELETE then the key does not exist.
+    Otherwise the last PUT defines the value of the key.
+
+    By superseding a PUT (with either another PUT or a DELETE) the log entry becomes obsolete. A segment containing
+    such obsolete entries is called sparse, while a segment containing no such entries is called compact.
+
+    Sparse segments can be compacted and thereby disk space freed. This destroys the transaction for which the
+    superseded entries where current.
 
     On disk layout:
+
     dir/README
     dir/config
     dir/data/<X // SEGMENTS_PER_DIR>/<X>
     dir/index.X
     dir/hints.X
     """
+
     class DoesNotExist(Error):
         """Repository {} does not exist."""
 

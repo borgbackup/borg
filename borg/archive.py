@@ -25,14 +25,13 @@ from .helpers import Chunk, Error, uid2user, user2uid, gid2group, group2gid, \
     CompressionDecider1, CompressionDecider2, CompressionSpec, \
     IntegrityError
 from .repository import Repository
-from .platform import acl_get, acl_set
+from .platform import acl_get, acl_set, set_flags, get_flags
 from .chunker import Chunker
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .cache import ChunkListEntry
 import msgpack
 
 has_lchmod = hasattr(os, 'lchmod')
-has_lchflags = hasattr(os, 'lchflags')
 
 flags_normal = os.O_RDONLY | getattr(os, 'O_BINARY', 0)
 flags_noatime = flags_normal | getattr(os, 'O_NOATIME', 0)
@@ -435,10 +434,9 @@ Number of files: {0.stats.nfiles}'''.format(
         else:
             os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
         acl_set(path, item, self.numeric_owner)
-        # Only available on OS X and FreeBSD
-        if has_lchflags and b'bsdflags' in item:
+        if b'bsdflags' in item:
             try:
-                os.lchflags(path, item[b'bsdflags'])
+                set_flags(path, item[b'bsdflags'], fd=fd)
             except OSError:
                 pass
         # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
@@ -506,8 +504,9 @@ Number of files: {0.stats.nfiles}'''.format(
         xattrs = xattr.get_all(path, follow_symlinks=False)
         if xattrs:
             item[b'xattrs'] = StableDict(xattrs)
-        if has_lchflags and st.st_flags:
-            item[b'bsdflags'] = st.st_flags
+        bsdflags = get_flags(path, st)
+        if bsdflags:
+            item[b'bsdflags'] = bsdflags
         acl_get(path, item, st, self.numeric_owner)
         return item
 

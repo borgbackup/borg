@@ -1,7 +1,8 @@
 import os
 import re
 import resource
-from stat import S_ISLNK
+import stat
+
 from .helpers import posix_acl_use_stored_uid_gid, user2uid, group2gid, safe_decode, safe_encode
 from .platform_base import SyncFile as BaseSyncFile
 from libc cimport errno
@@ -33,8 +34,70 @@ cdef extern from "fcntl.h":
     unsigned int SYNC_FILE_RANGE_WAIT_BEFORE
     unsigned int SYNC_FILE_RANGE_WAIT_AFTER
 
+cdef extern from "linux/fs.h":
+    # ioctls
+    int FS_IOC_SETFLAGS
+    int FS_IOC_GETFLAGS
+
+    # inode flags
+    int FS_NODUMP_FL
+    int FS_IMMUTABLE_FL
+    int FS_APPEND_FL
+    int FS_COMPR_FL
+
+cdef extern from "stropts.h":
+    int ioctl(int fildes, int request, ...)
+
+cdef extern from "errno.h":
+    int errno
+
+cdef extern from "string.h":
+    char *strerror(int errnum)
 
 _comment_re = re.compile(' *#.*', re.M)
+
+
+BSD_TO_LINUX_FLAGS = {
+    stat.UF_NODUMP: FS_NODUMP_FL,
+    stat.UF_IMMUTABLE: FS_IMMUTABLE_FL,
+    stat.UF_APPEND: FS_APPEND_FL,
+    stat.UF_COMPRESSED: FS_COMPR_FL,
+}
+
+
+def set_flags(path, bsd_flags, fd=None):
+    if fd is None and stat.S_ISLNK(os.lstat(path).st_mode):
+        return
+    cdef int flags = 0
+    for bsd_flag, linux_flag in BSD_TO_LINUX_FLAGS.items():
+        if bsd_flags & bsd_flag:
+            flags |= linux_flag
+    open_fd = fd is None
+    if open_fd:
+        fd = os.open(path, os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
+    try:
+        if ioctl(fd, FS_IOC_SETFLAGS, &flags) == -1:
+            raise OSError(errno, strerror(errno).decode(), path)
+    finally:
+        if open_fd:
+            os.close(fd)
+
+
+def get_flags(path, st):
+    if stat.S_ISLNK(st.st_mode):
+        return 0
+    cdef int linux_flags
+    fd = os.open(path, os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
+    try:
+        if ioctl(fd, FS_IOC_GETFLAGS, &linux_flags) == -1:
+            return 0
+    finally:
+        os.close(fd)
+    bsd_flags = 0
+    for bsd_flag, linux_flag in BSD_TO_LINUX_FLAGS.items():
+        if linux_flags & linux_flag:
+            bsd_flags |= bsd_flag
+    return bsd_flags
 
 
 def acl_use_local_uid_gid(acl):
@@ -93,7 +156,7 @@ def acl_get(path, item, st, numeric_owner=False):
     cdef char *access_text = NULL
 
     p = <bytes>os.fsencode(path)
-    if S_ISLNK(st.st_mode) or acl_extended_file(p) <= 0:
+    if stat.S_ISLNK(st.st_mode) or acl_extended_file(p) <= 0:
         return
     if numeric_owner:
         converter = acl_numeric_ids

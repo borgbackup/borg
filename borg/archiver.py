@@ -38,8 +38,7 @@ from .archive import Archive, ArchiveChecker, ArchiveRecreater
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 from .selftest import selftest
 from .hashindex import ChunkIndexEntry
-
-has_lchflags = hasattr(os, 'lchflags')
+from .platform import get_flags
 
 
 def argument(args, str_or_bool):
@@ -316,7 +315,7 @@ class Archiver:
             return
         status = None
         # Ignore if nodump flag is set
-        if has_lchflags and (st.st_flags & stat.UF_NODUMP):
+        if get_flags(path, st) & stat.UF_NODUMP:
             return
         if stat.S_ISREG(st.st_mode) or read_special and not stat.S_ISDIR(st.st_mode):
             if not dry_run:

@@ -21,6 +21,20 @@ def acl_set(path, item, numeric_owner=False):
     of the user/group names
     """
 
+try:
+    from os import lchflags
+
+    def set_flags(path, bsd_flags, fd=None):
+        lchflags(path, bsd_flags)
+except ImportError:
+    def set_flags(path, bsd_flags, fd=None):
+        pass
+
+
+def get_flags(path, st):
+    """Return BSD-style file flags for path or stat without following symlinks."""
+    return getattr(st, 'st_flags', 0)
+
 
 def sync_dir(path):
     fd = os.open(path, os.O_RDONLY)

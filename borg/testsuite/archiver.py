@@ -16,7 +16,7 @@ from hashlib import sha256
 
 import pytest
 
-from .. import xattr, helpers
+from .. import xattr, helpers, platform
 from ..archive import Archive, ChunkBuffer, ArchiveRecreater
 from ..archiver import Archiver
 from ..cache import Cache
@@ -26,15 +26,13 @@ from ..helpers import Chunk, Manifest, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, b
 from ..key import KeyfileKeyBase
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
+from . import has_lchflags, has_llfuse
 from . import BaseTestCase, changedir, environment_variable
 
 try:
     import llfuse
-    has_llfuse = True or llfuse  # avoids "unused import"
 except ImportError:
-    has_llfuse = False
-
-has_lchflags = hasattr(os, 'lchflags')
+    pass
 
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -280,7 +278,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         # FIFO node
         os.mkfifo(os.path.join(self.input_path, 'fifo1'))
         if has_lchflags:
-            os.lchflags(os.path.join(self.input_path, 'flagfile'), stat.UF_NODUMP)
+            platform.set_flags(os.path.join(self.input_path, 'flagfile'), stat.UF_NODUMP)
         try:
             # Block device
             os.mknod('input/bdev', 0o600 | stat.S_IFBLK, os.makedev(10, 20))

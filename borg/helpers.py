@@ -1166,7 +1166,7 @@ class ItemFormatter:
         'NUL': 'NUL character for creating print0 / xargs -0 like ouput, see bpath',
     }
     KEY_GROUPS = (
-        ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget'),
+        ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget', 'flags'),
         ('size', 'csize', 'num_chunks', 'unique_chunks'),
         ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
         tuple(sorted(hashlib.algorithms_guaranteed)),
@@ -1259,6 +1259,7 @@ class ItemFormatter:
         item_data['source'] = source
         item_data['linktarget'] = source
         item_data['extra'] = extra
+        item_data['flags'] = item.get(b'bsdflags')
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)
         return item_data

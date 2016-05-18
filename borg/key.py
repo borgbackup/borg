@@ -394,13 +394,15 @@ class KeyfileKey(KeyfileKeyBase):
     FILE_ID = 'BORG_KEY'
 
     def find_key(self):
-        id = hexlify(self.repository.id).decode('ascii')
+        file_id = self.FILE_ID.encode()
+        first_line = file_id + b' ' + hexlify(self.repository.id)
         keys_dir = get_keys_dir()
         for name in os.listdir(keys_dir):
             filename = os.path.join(keys_dir, name)
-            with open(filename, 'r') as fd:
-                line = fd.readline().strip()
-                if line.startswith(self.FILE_ID) and line[len(self.FILE_ID) + 1:] == id:
+            # we do the magic / id check in binary mode to avoid stumbling over
+            # decoding errors if somebody has binary files in the keys dir for some reason.
+            with open(filename, 'rb') as fd:
+                if fd.read(len(first_line)) == first_line:
                     return filename
         raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
 

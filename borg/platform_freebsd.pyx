@@ -1,17 +1,12 @@
 import os
 from .helpers import posix_acl_use_stored_uid_gid, safe_encode, safe_decode
+from .platform_posix import swidth
 
 API_VERSION = 3
 
 cdef extern from "errno.h":
     int errno
     int EINVAL
-
-cdef extern from "wchar.h":
-    cdef int wcswidth(const Py_UNICODE *str, size_t n)
-
-def swidth(s):
-    return wcswidth(s, len(s))
 
 cdef extern from "sys/types.h":
     int ACL_TYPE_ACCESS

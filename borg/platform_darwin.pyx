@@ -1,13 +1,8 @@
 import os
 from .helpers import user2uid, group2gid, safe_decode, safe_encode
+from .platform_posix import swidth
 
 API_VERSION = 3
-
-cdef extern from "wchar.h":
-    cdef int wcswidth(const Py_UNICODE *str, size_t n)
-
-def swidth(s):
-    return wcswidth(s, len(s))
 
 cdef extern from "sys/acl.h":
     ctypedef struct _acl_t:

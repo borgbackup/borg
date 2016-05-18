@@ -5,15 +5,11 @@ import stat
 
 from .helpers import posix_acl_use_stored_uid_gid, user2uid, group2gid, safe_decode, safe_encode
 from .platform_base import SyncFile as BaseSyncFile
+from .platform_posix import swidth
+
 from libc cimport errno
 
 API_VERSION = 3
-
-cdef extern from "wchar.h":
-    cdef int wcswidth(const Py_UNICODE *str, size_t n)
-
-def swidth(s):
-    return wcswidth(s, len(s))
 
 cdef extern from "sys/types.h":
     int ACL_TYPE_ACCESS

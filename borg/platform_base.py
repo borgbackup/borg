@@ -90,3 +90,11 @@ class SyncFile:
         self.sync()
         self.fd.close()
         sync_dir(os.path.dirname(self.fd.name))
+
+
+def swidth(s):
+    """terminal output width of string <s>
+
+    For western scripts, this is just len(s), but for cjk glyphs, 2 cells are used.
+    """
+    return len(s)

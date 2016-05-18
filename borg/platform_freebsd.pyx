@@ -1,5 +1,6 @@
 import os
 from .helpers import posix_acl_use_stored_uid_gid, safe_encode, safe_decode
+from .platform_posix import swidth
 
 API_VERSION = 3
 

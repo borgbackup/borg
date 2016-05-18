@@ -9,6 +9,7 @@ from .key import key_factory
 from .remote import cache_if_remote
 
 import os
+from shutil import get_terminal_size
 import socket
 import stat
 import sys
@@ -19,13 +20,13 @@ from .compress import COMPR_BUFFER
 from .constants import *  # NOQA
 from .helpers import Chunk, Error, uid2user, user2uid, gid2group, group2gid, \
     parse_timestamp, to_localtime, format_time, format_timedelta, safe_encode, safe_decode, \
-    Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, bin_to_hex, \
+    Manifest, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, bin_to_hex, \
     ProgressIndicatorPercent, ChunkIteratorFileWrapper, remove_surrogates, log_multi, \
     PathPrefixPattern, FnmatchPattern, open_item, file_status, format_file_size, consume, \
     CompressionDecider1, CompressionDecider2, CompressionSpec, \
     IntegrityError
 from .repository import Repository
-from .platform import acl_get, acl_set, set_flags, get_flags
+from .platform import acl_get, acl_set, set_flags, get_flags, swidth
 from .chunker import Chunker
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .cache import ChunkListEntry
@@ -35,6 +36,58 @@ has_lchmod = hasattr(os, 'lchmod')
 
 flags_normal = os.O_RDONLY | getattr(os, 'O_BINARY', 0)
 flags_noatime = flags_normal | getattr(os, 'O_NOATIME', 0)
+
+
+class Statistics:
+
+    def __init__(self):
+        self.osize = self.csize = self.usize = self.nfiles = 0
+        self.last_progress = 0  # timestamp when last progress was shown
+
+    def update(self, size, csize, unique):
+        self.osize += size
+        self.csize += csize
+        if unique:
+            self.usize += csize
+
+    summary = """\
+                       Original size      Compressed size    Deduplicated size
+{label:15} {stats.osize_fmt:>20s} {stats.csize_fmt:>20s} {stats.usize_fmt:>20s}"""
+
+    def __str__(self):
+        return self.summary.format(stats=self, label='This archive:')
+
+    def __repr__(self):
+        return "<{cls} object at {hash:#x} ({self.osize}, {self.csize}, {self.usize})>".format(
+            cls=type(self).__name__, hash=id(self), self=self)
+
+    @property
+    def osize_fmt(self):
+        return format_file_size(self.osize)
+
+    @property
+    def usize_fmt(self):
+        return format_file_size(self.usize)
+
+    @property
+    def csize_fmt(self):
+        return format_file_size(self.csize)
+
+    def show_progress(self, item=None, final=False, stream=None, dt=None):
+        now = time.time()
+        if dt is None or now - self.last_progress > dt:
+            self.last_progress = now
+            columns, lines = get_terminal_size()
+            if not final:
+                msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
+                path = remove_surrogates(item[b'path']) if item else ''
+                space = columns - swidth(msg)
+                if space < swidth('...') + swidth(path):
+                    path = '%s...%s' % (path[:(space // 2) - swidth('...')], path[-space // 2:])
+                msg += "{0:<{space}}".format(path, space=space)
+            else:
+                msg = ' ' * columns
+            print(msg, file=stream or sys.stderr, end="\r", flush=True)
 
 
 class DownloadPipeline:

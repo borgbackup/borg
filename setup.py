@@ -40,6 +40,7 @@ compress_source = 'borg/compress.pyx'
 crypto_source = 'borg/crypto.pyx'
 chunker_source = 'borg/chunker.pyx'
 hashindex_source = 'borg/hashindex.pyx'
+platform_posix_source = 'borg/platform_posix.pyx'
 platform_linux_source = 'borg/platform_linux.pyx'
 platform_darwin_source = 'borg/platform_darwin.pyx'
 platform_freebsd_source = 'borg/platform_freebsd.pyx'
@@ -60,6 +61,7 @@ try:
                 'borg/crypto.c',
                 'borg/chunker.c', 'borg/_chunker.c',
                 'borg/hashindex.c', 'borg/_hashindex.c',
+                'borg/platform_posix.c',
                 'borg/platform_linux.c',
                 'borg/platform_freebsd.c',
                 'borg/platform_darwin.c',
@@ -75,13 +77,14 @@ except ImportError:
     crypto_source = crypto_source.replace('.pyx', '.c')
     chunker_source = chunker_source.replace('.pyx', '.c')
     hashindex_source = hashindex_source.replace('.pyx', '.c')
+    platform_posix_source = platform_posix_source.replace('.pyx', '.c')
     platform_linux_source = platform_linux_source.replace('.pyx', '.c')
     platform_freebsd_source = platform_freebsd_source.replace('.pyx', '.c')
     platform_darwin_source = platform_darwin_source.replace('.pyx', '.c')
     from distutils.command.build_ext import build_ext
     if not on_rtd and not all(os.path.exists(path) for path in [
         compress_source, crypto_source, chunker_source, hashindex_source,
-        platform_linux_source, platform_freebsd_source]):
+        platform_posix_source, platform_linux_source, platform_freebsd_source]):
         raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 
 
@@ -286,6 +289,9 @@ if not on_rtd:
     Extension('borg.chunker', [chunker_source]),
     Extension('borg.hashindex', [hashindex_source])
 ]
+    if sys.platform.startswith(('linux', 'freebsd', 'darwin')):
+        ext_modules.append(Extension('borg.platform_posix', [platform_posix_source]))
+
     if sys.platform == 'linux':
         ext_modules.append(Extension('borg.platform_linux', [platform_linux_source], libraries=['acl']))
     elif sys.platform.startswith('freebsd'):

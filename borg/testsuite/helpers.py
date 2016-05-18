@@ -1,7 +1,6 @@
 import hashlib
 from time import mktime, strptime
 from datetime import datetime, timezone, timedelta
-from io import StringIO
 import os
 
 import pytest
@@ -11,7 +10,7 @@ import msgpack.fallback
 import time
 
 from ..helpers import Location, format_file_size, format_timedelta, make_path_safe, clean_lines, \
-    prune_within, prune_split, get_cache_dir, get_keys_dir, Statistics, is_slow_msgpack, \
+    prune_within, prune_split, get_cache_dir, get_keys_dir, is_slow_msgpack, \
     yes, TRUISH, FALSISH, DEFAULTISH, \
     StableDict, int_to_bigint, bigint_to_int, bin_to_hex, parse_timestamp, ChunkerParams, Chunk, \
     ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
@@ -627,53 +626,6 @@ def test_get_keys_dir():
     # reset old env
     if old_env is not None:
         os.environ['BORG_KEYS_DIR'] = old_env
-
-
-@pytest.fixture()
-def stats():
-    stats = Statistics()
-    stats.update(20, 10, unique=True)
-    return stats
-
-
-def test_stats_basic(stats):
-    assert stats.osize == 20
-    assert stats.csize == stats.usize == 10
-    stats.update(20, 10, unique=False)
-    assert stats.osize == 40
-    assert stats.csize == 20
-    assert stats.usize == 10
-
-
-def tests_stats_progress(stats, columns=80):
-    os.environ['COLUMNS'] = str(columns)
-    out = StringIO()
-    stats.show_progress(stream=out)
-    s = '20 B O 10 B C 10 B D 0 N '
-    buf = ' ' * (columns - len(s))
-    assert out.getvalue() == s + buf + "\r"
-
-    out = StringIO()
-    stats.update(10**3, 0, unique=False)
-    stats.show_progress(item={b'path': 'foo'}, final=False, stream=out)
-    s = '1.02 kB O 10 B C 10 B D 0 N foo'
-    buf = ' ' * (columns - len(s))
-    assert out.getvalue() == s + buf + "\r"
-    out = StringIO()
-    stats.show_progress(item={b'path': 'foo'*40}, final=False, stream=out)
-    s = '1.02 kB O 10 B C 10 B D 0 N foofoofoofoofoofoofoofo...oofoofoofoofoofoofoofoofoo'
-    buf = ' ' * (columns - len(s))
-    assert out.getvalue() == s + buf + "\r"
-
-
-def test_stats_format(stats):
-    assert str(stats) == """\
-                       Original size      Compressed size    Deduplicated size
-This archive:                   20 B                 10 B                 10 B"""
-    s = "{0.osize_fmt}".format(stats)
-    assert s == "20 B"
-    # kind of redundant, but id is variable so we can't match reliably
-    assert repr(stats) == '<Statistics object at {:#x} (20, 10, 10)>'.format(id(stats))
 
 
 def test_file_size():

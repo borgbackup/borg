@@ -11,7 +11,6 @@ import stat
 import textwrap
 import pwd
 import re
-from shutil import get_terminal_size
 import sys
 from string import Formatter
 import platform
@@ -32,7 +31,6 @@ from . import chunker
 from .constants import *  # NOQA
 from . import crypto
 from .compress import COMPR_BUFFER, get_compressor
-from .platform import swidth
 from . import shellpattern
 import msgpack
 import msgpack.fallback
@@ -171,57 +169,6 @@ def prune_split(archives, pattern, n, skip=[]):
                 if len(keep) == n:
                     break
     return keep
-
-
-class Statistics:
-
-    def __init__(self):
-        self.osize = self.csize = self.usize = self.nfiles = 0
-        self.last_progress = 0  # timestamp when last progress was shown
-
-    def update(self, size, csize, unique):
-        self.osize += size
-        self.csize += csize
-        if unique:
-            self.usize += csize
-
-    summary = """\
-                       Original size      Compressed size    Deduplicated size
-{label:15} {stats.osize_fmt:>20s} {stats.csize_fmt:>20s} {stats.usize_fmt:>20s}"""
-
-    def __str__(self):
-        return self.summary.format(stats=self, label='This archive:')
-
-    def __repr__(self):
-        return "<{cls} object at {hash:#x} ({self.osize}, {self.csize}, {self.usize})>".format(cls=type(self).__name__, hash=id(self), self=self)
-
-    @property
-    def osize_fmt(self):
-        return format_file_size(self.osize)
-
-    @property
-    def usize_fmt(self):
-        return format_file_size(self.usize)
-
-    @property
-    def csize_fmt(self):
-        return format_file_size(self.csize)
-
-    def show_progress(self, item=None, final=False, stream=None, dt=None):
-        now = time.time()
-        if dt is None or now - self.last_progress > dt:
-            self.last_progress = now
-            columns, lines = get_terminal_size()
-            if not final:
-                msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
-                path = remove_surrogates(item[b'path']) if item else ''
-                space = columns - swidth(msg)
-                if space < swidth('...') + swidth(path):
-                    path = '%s...%s' % (path[:(space // 2) - swidth('...')], path[-space // 2:])
-                msg += "{0:<{space}}".format(path, space=space)
-            else:
-                msg = ' ' * columns
-            print(msg, file=stream or sys.stderr, end="\r", flush=True)
 
 
 def get_home_dir():

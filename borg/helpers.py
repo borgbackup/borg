@@ -32,6 +32,7 @@ from . import chunker
 from .constants import *  # NOQA
 from . import crypto
 from .compress import COMPR_BUFFER, get_compressor
+from .platform import swidth
 from . import shellpattern
 import msgpack
 import msgpack.fallback
@@ -214,9 +215,9 @@ class Statistics:
             if not final:
                 msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
                 path = remove_surrogates(item[b'path']) if item else ''
-                space = columns - len(msg)
-                if space < len('...') + len(path):
-                    path = '%s...%s' % (path[:(space // 2) - len('...')], path[-space // 2:])
+                space = columns - swidth(msg)
+                if space < swidth('...') + swidth(path):
+                    path = '%s...%s' % (path[:(space // 2) - swidth('...')], path[-space // 2:])
                 msg += "{0:<{space}}".format(path, space=space)
             else:
                 msg = ' ' * columns

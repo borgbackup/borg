@@ -79,7 +79,7 @@ except ImportError:
     from distutils.command.build_ext import build_ext
     if not on_rtd and not all(os.path.exists(path) for path in [
         compress_source, crypto_source, chunker_source, hashindex_source,
-        platform_linux_source, platform_freebsd_source]):
+        platform_linux_source, platform_freebsd_source, platform_darwin_source]):
         raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 
 

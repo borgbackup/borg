@@ -9,6 +9,12 @@ from libc cimport errno
 
 API_VERSION = 3
 
+cdef extern from "wchar.h":
+    cdef int wcswidth(const Py_UNICODE *str, size_t n)
+
+def swidth(s):
+    return wcswidth(s, len(s))
+
 cdef extern from "sys/types.h":
     int ACL_TYPE_ACCESS
     int ACL_TYPE_DEFAULT

@@ -6,6 +6,10 @@ Version 1.1.0 (not released yet)
 
 New features:
 
+- borg check: will not produce the "Checking segments" output unless
+  new --progress option is passed, #824.
+- options that imply output (--show-rc, --show-version, --list, --stats, 
+  --progress) don't need -v/--info to have that output displayed, #865
 - borg recreate: re-create existing archives, #787 #686 #630 #70, also see
   #757, #770.
 
@@ -34,7 +38,7 @@ New features:
 - borg comment: add archive comments, #842
 - provide "borgfs" wrapper for borg mount, enables usage via fstab, #743
 - create: add 'x' status for excluded paths, #814
-- --show-version: shows/logs the borg version (use -v), #725
+- --show-version: shows/logs the borg version, #725
 - borg list/prune/delete: also output archive id, #731
 
 Bug fixes:

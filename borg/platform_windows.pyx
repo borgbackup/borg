@@ -1,3 +1,5 @@
+#cython: language_level=3
+
 import json
 from libc.stddef cimport wchar_t
 from libc.stdint cimport uint16_t, uint32_t, uint64_t
@@ -9,16 +11,19 @@ from .helpers import safe_decode, safe_encode
 
 API_VERSION = 2
 
+
 cdef extern from 'stdlib.h':
     void free(void* ptr)
     void* malloc(size_t)
     void* calloc(size_t, size_t)
+
 
 cdef extern from 'Python.h':
     wchar_t* PyUnicode_AsWideCharString(object, Py_ssize_t *)
     object PyUnicode_FromWideChar(const wchar_t*, Py_ssize_t)
     void* PyMem_Malloc(int)
     void PyMem_Free(void*)
+
 
 cdef extern from 'windows.h':
     ctypedef int HLOCAL
@@ -36,6 +41,9 @@ cdef extern from 'windows.h':
     DWORD GetLastError();
     void SetLastError(DWORD)
 
+    DWORD FormatMessageW(DWORD, void*, DWORD, DWORD, wchar_t**, DWORD, void*)
+
+
     BOOL InitializeSecurityDescriptor(BYTE*, DWORD)
 
     BOOL LookupAccountNameW(LPCTSTR, LPCTSTR, PSID, LPDWORD, LPCTSTR, LPDWORD, LPDWORD)
@@ -43,6 +51,7 @@ cdef extern from 'windows.h':
 
     cdef extern int ERROR_INSUFFICIENT_BUFFER
     cdef extern int ERROR_INVALID_SID
+    cdef extern int ERROR_NONE_MAPPED
 
     cdef extern int OWNER_SECURITY_INFORMATION
     cdef extern int GROUP_SECURITY_INFORMATION
@@ -58,6 +67,11 @@ cdef extern from 'windows.h':
     cdef extern int PROTECTED_DACL_SECURITY_INFORMATION
 
     cdef extern int SECURITY_DESCRIPTOR_MIN_LENGTH
+
+    cdef extern int FORMAT_MESSAGE_ALLOCATE_BUFFER
+    cdef extern int FORMAT_MESSAGE_FROM_SYSTEM
+    cdef extern int FORMAT_MESSAGE_IGNORE_INSERTS
+
 
 cdef extern from 'accctrl.h':
     ctypedef enum _SE_OBJECT_TYPE:
@@ -80,6 +94,7 @@ cdef extern from 'accctrl.h':
 
     DWORD GetExplicitEntriesFromAclW(_ACL*, uint32_t*, _EXPLICIT_ACCESS_W**)
 
+
 cdef extern from 'Sddl.h':
     ctypedef int* LPBOOL
 
@@ -92,35 +107,53 @@ cdef extern from 'Sddl.h':
 
     cdef extern int SDDL_REVISION_1
 
+
 cdef extern from 'Aclapi.h':
     ctypedef void* PACL
     DWORD GetNamedSecurityInfoW(LPCTSTR, SE_OBJECT_TYPE, DWORD, PSID*, PSID*, PACL*, PACL*, _ACL**)
     DWORD SetNamedSecurityInfoW(LPCTSTR, int, int, PSID, PSID, PACL, PACL)
     DWORD SetEntriesInAclW(unsigned int, _EXPLICIT_ACCESS_W*, PACL, _ACL**)
 
+
+def raise_error(api, path=''):
+    cdef wchar_t *error_message
+    error = GetLastError()
+    if not error:
+        return
+    FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                   NULL, error, 0, &error_message, 0, NULL)
+    error_string = PyUnicode_FromWideChar(error_message, -1)
+    LocalFree(<HLOCAL>error_message)
+    error_string = api + ': ' + error_string
+    if path:
+        raise OSError(error, error_string, path)
+    else:
+        raise OSError(error, error_string)
+
+
 cdef PSID _get_file_security(filename, int request):
     cdef DWORD length = 0
     # N.B. This query may fail with ERROR_INVALID_FUNCTION
     # for some filesystems.
     cdef wchar_t* wcharfilename = PyUnicode_AsWideCharString(filename, NULL)
-    if wcharfilename == NULL:
-        print 'filename is NULL'
     GetFileSecurityW(wcharfilename, request, NULL, 0, &length)
     if GetLastError() == ERROR_INSUFFICIENT_BUFFER:
         SetLastError(0)
     else:
-        print '_get_file_security failed. Windows error:', GetLastError()
+        raise_error('GetFileSecurityW', filename)
         return NULL
     cdef BYTE* sd = <BYTE*>malloc((length) * sizeof(BYTE))
     GetFileSecurityW(wcharfilename, request, sd, length, &length)
     PyMem_Free(wcharfilename)
     return sd
 
+
 cdef PSID _get_security_descriptor_owner(PSID sd):
     cdef PSID sid
     cdef BOOL sid_defaulted
     GetSecurityDescriptorOwner(sd, &sid, &sid_defaulted)
     return (sid)
+
 
 cdef _look_up_account_sid(PSID sid):
     cdef int SIZE = 256
@@ -133,13 +166,13 @@ cdef _look_up_account_sid(PSID sid):
     cdef BOOL ret = LookupAccountSidW(NULL, sid, name, &cch_name, domain, &cch_domain, &sid_type)
     if ret == 0:
         lasterror = GetLastError()
-        if lasterror == 1332:
+        if lasterror == ERROR_NONE_MAPPED:
             # Unknown (removed?) user or file from another windows installation
             free(name)
             free(domain)
             return 'unknown', 'unknown', 0
         else:
-            print 'Windows error:', lasterror
+            raise_error('LookupAccountSidW')
 
     pystrName = PyUnicode_FromWideChar(name, -1)
     pystrDomain = PyUnicode_FromWideChar(domain, -1)
@@ -148,12 +181,14 @@ cdef _look_up_account_sid(PSID sid):
     free(domain)
     return pystrName, pystrDomain, <unsigned int>sid_type
 
+
 cdef sid2string(PSID sid):
     cdef wchar_t* sidstr
     ConvertSidToStringSidW(sid, &sidstr)
     ret = PyUnicode_FromWideChar(sidstr, -1)
     LocalFree(<HLOCAL>sidstr)
     return ret
+
 
 def get_owner(path):
     cdef int request = OWNER_SECURITY_INFORMATION
@@ -162,7 +197,6 @@ def get_owner(path):
         return 'unknown', 'S-1-0-0'
     cdef PSID sid = _get_security_descriptor_owner(sd)
     if sid == NULL:
-        print 'sid is null'
         return 'unknown', 'S-1-0-0'
     name, domain, sid_type = _look_up_account_sid(sid)
     free(sd)
@@ -170,6 +204,7 @@ def get_owner(path):
         return '{0}\\{1}'.format(domain, name), sid2string(sid)
     else:
         return name, sid2string(sid)
+
 
 def set_owner(path, owner, sidstring = None):
     cdef PSID newsid
@@ -190,6 +225,7 @@ def set_owner(path, owner, sidstring = None):
         domainlength = 0
         LookupAccountNameW(NULL, temp, newsid, &length, NULL, &domainlength, &sid_type)
         if GetLastError() != 0:
+            raise_error('LookupAccountNameW', owner)
             PyMem_Free(temp)
             return
 
@@ -202,6 +238,7 @@ def set_owner(path, owner, sidstring = None):
         LocalFree(<HLOCAL>newsid)
     else:
         free(newsid)
+
 
 def acl_get(path, item, st, numeric_owner=False):
     cdef int request = DACL_SECURITY_INFORMATION
@@ -224,7 +261,7 @@ def acl_get(path, item, st, numeric_owner=False):
     cdef PSID newsid
     cdef uint32_t domainlength
     cdef uint32_t sid_type
-    for i in range(0, length):
+    for i in range(length):
         permissions = None
         name = ""
         sidstr = ""
@@ -255,15 +292,16 @@ def acl_get(path, item, st, numeric_owner=False):
     free(SD)
     LocalFree(<HLOCAL>ACEs)
 
+
 def acl_set(path, item, numeric_owner=False):
-    if b'dacl' not in item:
+    if b'win_dacl' not in item:
         return
 
     pyDACL = json.loads(safe_decode(item[b'win_dacl']))
     cdef _EXPLICIT_ACCESS_W* ACEs = <_EXPLICIT_ACCESS_W*>calloc(sizeof(_EXPLICIT_ACCESS_W), len(pyDACL))
     cdef wchar_t* temp
     cdef PSID newsid
-    for i in range(0, len(pyDACL)):
+    for i in range(len(pyDACL)):
         if pyDACL[i]['user']['name'] == '' or numeric_owner:
             ACEs[i].Trustee.TrusteeForm = TRUSTEE_IS_SID
             temp = PyUnicode_AsWideCharString(pyDACL[i]['user']['sid'], NULL)
@@ -281,7 +319,7 @@ def acl_set(path, item, numeric_owner=False):
     cdef wchar_t* cstrPath = PyUnicode_AsWideCharString(path, NULL)
     SetNamedSecurityInfoW(cstrPath, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, NULL, NULL, newDACL, NULL)
 
-    for i in range(0, len(pyDACL)):
+    for i in range(len(pyDACL)):
         if pyDACL[i]['user']['name'] == '' or numeric_owner:
             LocalFree(<HLOCAL>ACEs[i].Trustee.ptstrName)
         else:

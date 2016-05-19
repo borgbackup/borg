@@ -54,7 +54,6 @@ try:
         def __init__(self, *args, **kwargs):
             for src in glob('borg/*.pyx'):
                 options = cython_compiler.default_options
-                options['language_level'] = 3
                 cython_compiler.compile(src, options)
             super().__init__(*args, **kwargs)
 

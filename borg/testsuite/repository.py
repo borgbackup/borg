@@ -8,7 +8,7 @@ from ..hashindex import NSIndex
 from ..helpers import Location, IntegrityError
 from ..locking import UpgradableLock, LockFailed
 from ..remote import RemoteRepository, InvalidRPCMethod
-from ..repository import Repository
+from ..repository import Repository, LoggedIO, TAG_COMMIT
 from . import BaseTestCase
 
 
@@ -192,6 +192,13 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
             self.assert_equal(self.repository.check(), True)
             self.assert_equal(len(self.repository), 3)
 
+    def test_ignores_commit_tag_in_data(self):
+        self.repository.put(b'0' * 32, LoggedIO.COMMIT)
+        self.reopen()
+        with self.repository:
+            io = self.repository.io
+            assert not io.is_committed_segment(io.get_latest_segment())
+
 
 class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
     def test_destroy_append_only(self):
@@ -268,7 +275,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         return set(int(key) for key in self.repository.list())
 
     def test_repair_corrupted_segment(self):
-        self.add_objects([[1, 2, 3], [4, 5, 6]])
+        self.add_objects([[1, 2, 3], [4, 5], [6]])
         self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
         self.check(status=True)
         self.corrupt_object(5)

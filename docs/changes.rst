@@ -1,15 +1,16 @@
 Changelog
 =========
 
-Version 1.0.3 (not released yet)
---------------------------------
+Version 1.0.3
+-------------
 
 Bug fixes:
 
-- prune: ignore checkpoints (avoid that checkpoints are kept and completed
-  archives are deleted in a prune run), #997
-- prune: fix bad commandline argument validator, #942
-- fix capabilities extraction on Linux (set xattrs last, after chown())
+- prune: avoid that checkpoints are kept and completed archives are deleted in
+  a prune run), #997
+- prune: fix commandline argument validation - some valid command lines were
+  considered invalid (annoying, but harmless), #942
+- fix capabilities extraction on Linux (set xattrs last, after chown()), #1069
 - repository: fix commit tags being seen in data
 - when probing key files, do binary reads. avoids crash when non-borg binary
   files are located in borg's key files directory.
@@ -21,6 +22,7 @@ Other changes:
 
 - Vagrantfile: OS X: update osxfuse / install lzma package, #933
 - setup.py: add check for platform_darwin.c
+- setup.py: on freebsd, use a llfuse release that builds ok
 - docs / help:
 
   - update readthedocs URLs, #991

@@ -6,17 +6,27 @@ Version 1.0.3 (not released yet)
 
 Bug fixes:
 
-- prune: ignore checkpoints, #997
-- prune: fix bad validator, #942
+- prune: ignore checkpoints (avoid that checkpoints are kept and completed
+  archives are deleted in a prune run), #997
+- prune: fix bad commandline argument validator, #942
 - fix capabilities extraction on Linux (set xattrs last, after chown())
+- repository: fix commit tags being seen in data
+- when probing key files, do binary reads. avoids crash when non-borg binary
+  files are located in borg's key files directory.
+- handle SIGTERM and make a clean exit - avoids orphan lock files.
+- repository cache: don't cache large objects (avoid using lots of temp. disk
+  space), #1063
 
 Other changes:
 
-- update readthedocs URLs, #991
-- add missing docs for "borg break-lock", #992
-- borg create help: add some words to about the archive name
-- borg create help: document format tags, #894
 - Vagrantfile: OS X: update osxfuse / install lzma package, #933
+- setup.py: add check for platform_darwin.c
+- docs / help:
+
+  - update readthedocs URLs, #991
+  - add missing docs for "borg break-lock", #992
+  - borg create help: add some words to about the archive name
+  - borg create help: document format tags, #894
 
 
 Version 1.0.2

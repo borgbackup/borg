@@ -424,6 +424,9 @@ class RepositoryCache(RepositoryNoCache):
 
     Caches Repository GET operations using a local temporary Repository.
     """
+    # maximum object size that will be cached, 64 kiB.
+    THRESHOLD = 2**16
+
     def __init__(self, repository):
         super().__init__(repository)
         tmppath = tempfile.mkdtemp(prefix='borg-tmp')
@@ -444,7 +447,8 @@ class RepositoryCache(RepositoryNoCache):
             except Repository.ObjectNotFound:
                 for key_, data in repository_iterator:
                     if key_ == key:
-                        self.caching_repo.put(key, data)
+                        if len(data) <= self.THRESHOLD:
+                            self.caching_repo.put(key, data)
                         yield data
                         break
         # Consume any pending requests

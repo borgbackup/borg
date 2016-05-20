@@ -544,7 +544,7 @@ class LoggedIO:
         """Return the last committed segment.
         """
         for segment, filename in self.segment_iterator(reverse=True):
-            if self.is_committed_segment(filename):
+            if self.is_committed_segment(segment):
                 return segment
         return None
 
@@ -558,10 +558,14 @@ class LoggedIO:
             else:
                 break
 
-    def is_committed_segment(self, filename):
+    def is_committed_segment(self, segment):
         """Check if segment ends with a COMMIT_TAG tag
         """
-        with open(filename, 'rb') as fd:
+        try:
+            iterator = self.iter_objects(segment)
+        except IntegrityError:
+            return False
+        with open(self.segment_filename(segment), 'rb') as fd:
             try:
                 fd.seek(-self.header_fmt.size, os.SEEK_END)
             except OSError as e:
@@ -569,7 +573,22 @@ class LoggedIO:
                 if e.errno == errno.EINVAL:
                     return False
                 raise e
-            return fd.read(self.header_fmt.size) == self.COMMIT
+            if fd.read(self.header_fmt.size) != self.COMMIT:
+                return False
+        seen_commit = False
+        while True:
+            try:
+                tag, key, offset = next(iterator)
+            except IntegrityError:
+                return False
+            except StopIteration:
+                break
+            if tag == TAG_COMMIT:
+                seen_commit = True
+                continue
+            if seen_commit:
+                return False
+        return seen_commit
 
     def segment_filename(self, segment):
         return os.path.join(self.path, 'data', str(segment // self.segments_per_dir), str(segment))

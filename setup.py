@@ -26,11 +26,17 @@ install_requires = ['msgpack-python>=0.4.6', ]
 extras_require = {
     # llfuse 0.40 (tested, proven, ok), needs FUSE version >= 2.8.0
     # llfuse 0.41 (tested shortly, looks ok), needs FUSE version >= 2.8.0
+    # llfuse 0.41.1 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 0.42 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 1.0 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 2.0 will break API
     'fuse': ['llfuse<2.0', ],
 }
+
+if sys.platform.startswith('freebsd'):
+    # while llfuse 1.0 is the latest llfuse release right now,
+    # llfuse 0.41.1 is the latest release that actually builds on freebsd:
+    extras_require['fuse'] = ['llfuse==0.41.1', ]
 
 from setuptools import setup, Extension
 from setuptools.command.sdist import sdist
@@ -84,7 +90,7 @@ except ImportError:
     from distutils.command.build_ext import build_ext
     if not on_rtd and not all(os.path.exists(path) for path in [
         compress_source, crypto_source, chunker_source, hashindex_source,
-        platform_posix_source, platform_linux_source, platform_freebsd_source]):
+        platform_posix_source, platform_linux_source, platform_freebsd_source, platform_darwin_source]):
         raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 
 

@@ -2120,6 +2120,14 @@ def sig_info_handler(signum, stack):  # pragma: no cover
             break
 
 
+class SIGTERMReceived(BaseException):
+    pass
+
+
+def sig_term_handler(signum, stack):
+    raise SIGTERMReceived
+
+
 def setup_signal_handlers():  # pragma: no cover
     sigs = []
     if hasattr(signal, 'SIGUSR1'):
@@ -2128,6 +2136,7 @@ def setup_signal_handlers():  # pragma: no cover
         sigs.append(signal.SIGINFO)  # kill -INFO pid (or ctrl-t)
     for sig in sigs:
         signal.signal(sig, sig_info_handler)
+    signal.signal(signal.SIGTERM, sig_term_handler)
 
 
 def main():  # pragma: no cover
@@ -2158,6 +2167,9 @@ def main():  # pragma: no cover
         exit_code = EXIT_ERROR
     except KeyboardInterrupt:
         msg = 'Keyboard interrupt.\n%s\n%s' % (traceback.format_exc(), sysinfo())
+        exit_code = EXIT_ERROR
+    except SIGTERMReceived:
+        msg = 'Received SIGTERM.'
         exit_code = EXIT_ERROR
     if msg:
         logger.error(msg)

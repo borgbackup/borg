@@ -202,8 +202,8 @@ def install_borg(boxname)
     rm -f borg/{chunker,crypto,compress,hashindex,platform_linux}.c
     rm -rf borg/__pycache__ borg/support/__pycache__ borg/testsuite/__pycache__
     pip install -r requirements.d/development.txt
-    pip install -r requirements.d/fuse.txt
-    pip install -e .
+    # by using [fuse], setup.py can handle different fuse requirements:
+    pip install -e .[fuse]
   EOF
 end
 

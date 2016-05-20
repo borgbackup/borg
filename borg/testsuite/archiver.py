@@ -3,6 +3,7 @@ import errno
 import os
 import inspect
 from io import StringIO
+import logging
 import random
 import stat
 import subprocess
@@ -297,9 +298,14 @@ class ArchiverTestCaseBase(BaseTestCase):
 class ArchiverTestCase(ArchiverTestCaseBase):
     def test_basic_functionality(self):
         have_root = self.create_test_files()
-        self.cmd('init', self.repository_location)
+        # fork required to test show-rc output
+        output = self.cmd('init', '--show-version', '--show-rc', self.repository_location, fork=True)
+        self.assert_in('borgbackup version', output)
+        self.assert_in('terminating with success status, rc 0', output)
         self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('create', '--stats', self.repository_location + '::test.2', 'input')
+        output = self.cmd('create', '--stats', self.repository_location + '::test.2', 'input')
+        self.assert_in('Archive name: test.2', output)
+        self.assert_in('This archive: ', output)
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
         list_output = self.cmd('list', '--short', self.repository_location)
@@ -645,6 +651,31 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd("extract", self.repository_location + "::test", "fm:input/file1", "fm:*file33*", "input/file2")
         self.assert_equal(sorted(os.listdir("output/input")), ["file1", "file2", "file333"])
 
+    def test_extract_list_output(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('file', size=1024 * 80)
+
+        self.cmd('create', self.repository_location + '::test', 'input')
+
+        with changedir('output'):
+            output = self.cmd('extract', self.repository_location + '::test')
+        self.assert_not_in("input/file", output)
+        shutil.rmtree('output/input')
+
+        with changedir('output'):
+            output = self.cmd('extract', '--info', self.repository_location + '::test')
+        self.assert_not_in("input/file", output)
+        shutil.rmtree('output/input')
+
+        with changedir('output'):
+            output = self.cmd('extract', '--list', self.repository_location + '::test')
+        self.assert_in("input/file", output)
+        shutil.rmtree('output/input')
+
+        with changedir('output'):
+            output = self.cmd('extract', '--list', '--info', self.repository_location + '::test')
+        self.assert_in("input/file", output)
+
     def _create_test_caches(self):
         self.cmd('init', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)
@@ -857,7 +888,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
         self.cmd('delete', self.repository_location + '::test')
         self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
-        self.cmd('delete', '--stats', self.repository_location + '::test.2')
+        output = self.cmd('delete', '--stats', self.repository_location + '::test.2')
+        self.assert_in('Deleted data:', output)
         # Make sure all data except the manifest has been deleted
         with Repository(self.repository_path) as repository:
             self.assert_equal(len(repository), 1)
@@ -880,12 +912,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', self.repository_location)
         self.create_src_archive('test')
         self.cmd('extract', '--dry-run', self.repository_location + '::test')
-        self.cmd('check', self.repository_location)
+        output = self.cmd('check', '--show-version', self.repository_location)
+        self.assert_in('borgbackup version', output)  # implied output even without --info given
+        self.assert_not_in('Starting repository check', output)  # --info not given for root logger
+
         name = sorted(os.listdir(os.path.join(self.tmpdir, 'repository', 'data', '0')), reverse=True)[0]
         with open(os.path.join(self.tmpdir, 'repository', 'data', '0', name), 'r+b') as fd:
             fd.seek(100)
             fd.write(b'XXXX')
-        self.cmd('check', self.repository_location, exit_code=1)
+        output = self.cmd('check', '--info', self.repository_location, exit_code=1)
+        self.assert_in('Starting repository check', output)  # --info given for root logger
 
     # we currently need to be able to create a lock directory inside the repo:
     @pytest.mark.xfail(reason="we need to be able to create the lock directory inside the repo")
@@ -933,11 +969,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.utime('input/file1', (now - 5, now - 5))  # 5 seconds ago
         self.create_regular_file('file2', size=1024 * 80)
         self.cmd('init', self.repository_location)
-        output = self.cmd('create', '-v', '--list', self.repository_location + '::test', 'input')
+        output = self.cmd('create', '--list', self.repository_location + '::test', 'input')
         self.assert_in("A input/file1", output)
         self.assert_in("A input/file2", output)
         # should find first file as unmodified
-        output = self.cmd('create', '-v', '--list', self.repository_location + '::test1', 'input')
+        output = self.cmd('create', '--list', self.repository_location + '::test1', 'input')
         self.assert_in("U input/file1", output)
         # this is expected, although surprising, for why, see:
         # https://borgbackup.readthedocs.org/en/latest/faq.html#i-am-seeing-a-added-status-for-a-unchanged-file
@@ -951,11 +987,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.utime('input/file1', (now - 5, now - 5))  # 5 seconds ago
         self.create_regular_file('file2', size=1024 * 80)
         self.cmd('init', self.repository_location)
-        output = self.cmd('create', '-v', '--list', self.repository_location + '::test', 'input')
+        output = self.cmd('create', '--list', self.repository_location + '::test', 'input')
         self.assert_in("A input/file1", output)
         self.assert_in("A input/file2", output)
         # should find second file as excluded
-        output = self.cmd('create', '-v', '--list', self.repository_location + '::test1', 'input', '--exclude', '*/file2')
+        output = self.cmd('create', '--list', self.repository_location + '::test1', 'input', '--exclude', '*/file2')
         self.assert_in("U input/file1", output)
         self.assert_in("x input/file2", output)
 
@@ -972,15 +1008,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('create', self.repository_location + '::test0', 'input')
         self.assert_not_in('file1', output)
         # should list the file as unchanged
-        output = self.cmd('create', '-v', '--list', '--filter=U', self.repository_location + '::test1', 'input')
+        output = self.cmd('create', '--list', '--filter=U', self.repository_location + '::test1', 'input')
         self.assert_in('file1', output)
         # should *not* list the file as changed
-        output = self.cmd('create', '-v', '--filter=AM', self.repository_location + '::test2', 'input')
+        output = self.cmd('create', '--list', '--filter=AM', self.repository_location + '::test2', 'input')
         self.assert_not_in('file1', output)
         # change the file
         self.create_regular_file('file1', size=1024 * 100)
         # should list the file as changed
-        output = self.cmd('create', '-v', '--list', '--filter=AM', self.repository_location + '::test3', 'input')
+        output = self.cmd('create', '--list', '--filter=AM', self.repository_location + '::test3', 'input')
         self.assert_in('file1', output)
 
     # def test_cmdline_compatibility(self):
@@ -998,7 +1034,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test3.checkpoint', src_dir)
         self.cmd('create', self.repository_location + '::test3.checkpoint.1', src_dir)
         self.cmd('create', self.repository_location + '::test4.checkpoint', src_dir)
-        output = self.cmd('prune', '-v', '--list', '--dry-run', self.repository_location, '--keep-daily=2')
+        output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=2')
+        self.assert_in('Keeping archive: test2', output)
         self.assert_in('Would prune:     test1', output)
         # must keep the latest non-checkpoint archive:
         self.assert_in('Keeping archive: test2', output)
@@ -1032,9 +1069,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test1', src_dir)
         self.cmd('create', self.repository_location + '::test2', src_dir)
-        output = self.cmd('prune', '-v', '--list', '--dry-run', self.repository_location, '--keep-daily=2')
+        output = self.cmd('prune', '--list', '--stats', '--dry-run', self.repository_location, '--keep-daily=2')
         self.assert_in('Keeping archive: test2', output)
         self.assert_in('Would prune:     test1', output)
+        self.assert_in('Deleted data:', output)
         output = self.cmd('list', self.repository_location)
         self.assert_in('test1', output)
         self.assert_in('test2', output)
@@ -1049,7 +1087,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::foo-2015-08-12-20:00', src_dir)
         self.cmd('create', self.repository_location + '::bar-2015-08-12-10:00', src_dir)
         self.cmd('create', self.repository_location + '::bar-2015-08-12-20:00', src_dir)
-        output = self.cmd('prune', '-v', '--list', '--dry-run', self.repository_location, '--keep-daily=2', '--prefix=foo-')
+        output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=2', '--prefix=foo-')
         self.assert_in('Keeping archive: foo-2015-08-12-20:00', output)
         self.assert_in('Would prune:     foo-2015-08-12-10:00', output)
         output = self.cmd('list', self.repository_location)
@@ -1401,7 +1439,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         if interrupt_early:
             process_files = 0
         with patch.object(ArchiveRecreater, 'process_item', self._recreate_interrupt_patch(process_files)):
-            self.cmd('recreate', '-sv', '--list', self.repository_location, 'input/dir2')
+            self.cmd('recreate', self.repository_location, 'input/dir2')
         assert 'test.recreate' in self.cmd('list', self.repository_location)
         if change_args:
             with patch.object(sys, 'argv', sys.argv + ['non-forking tests don\'t use sys.argv']):
@@ -1492,6 +1530,32 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         cmd = 'python3', '-c', 'import os, sys; sys.exit(42 if os.path.exists("%s") else 23)' % lock_path
         self.cmd('with-lock', self.repository_location, *cmd, fork=True, exit_code=42)
 
+    def test_recreate_list_output(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('file1', size=0)
+        self.create_regular_file('file2', size=0)
+        self.create_regular_file('file3', size=0)
+        self.create_regular_file('file4', size=0)
+        self.create_regular_file('file5', size=0)
+
+        self.cmd('create', self.repository_location + '::test', 'input')
+
+        output = self.cmd('recreate', '--list', '--info', self.repository_location + '::test', '-e', 'input/file2')
+        self.assert_in("input/file1", output)
+        self.assert_in("x input/file2", output)
+
+        output = self.cmd('recreate', '--list', self.repository_location + '::test', '-e', 'input/file3')
+        self.assert_in("input/file1", output)
+        self.assert_in("x input/file3", output)
+
+        output = self.cmd('recreate', self.repository_location + '::test', '-e', 'input/file4')
+        self.assert_not_in("input/file1", output)
+        self.assert_not_in("x input/file4", output)
+
+        output = self.cmd('recreate', '--info', self.repository_location + '::test', '-e', 'input/file5')
+        self.assert_not_in("input/file1", output)
+        self.assert_not_in("x input/file5", output)
+
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
 class ArchiverTestCaseBinary(ArchiverTestCase):
@@ -1532,12 +1596,16 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         return archive, repository
 
     def test_check_usage(self):
-        output = self.cmd('check', '-v', self.repository_location, exit_code=0)
+        output = self.cmd('check', '-v', '--progress', self.repository_location, exit_code=0)
         self.assert_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)
+        self.assert_in('Checking segments', output)
+        # reset logging to new process default to avoid need for fork=True on next check
+        logging.getLogger('borg.output.progress').setLevel(logging.NOTSET)
         output = self.cmd('check', '-v', '--repository-only', self.repository_location, exit_code=0)
         self.assert_in('Starting repository check', output)
         self.assert_not_in('Starting archive consistency check', output)
+        self.assert_not_in('Checking segments', output)
         output = self.cmd('check', '-v', '--archives-only', self.repository_location, exit_code=0)
         self.assert_not_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)

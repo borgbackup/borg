@@ -985,7 +985,7 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
 
 
 class ProgressIndicatorPercent:
-    def __init__(self, total, step=5, start=0, same_line=False, msg="%3.0f%%", file=None):
+    def __init__(self, total, step=5, start=0, same_line=False, msg="%3.0f%%"):
         """
         Percentage-based progress indicator
 
@@ -994,17 +994,33 @@ class ProgressIndicatorPercent:
         :param start: at which percent value to start
         :param same_line: if True, emit output always on same line
         :param msg: output message, must contain one %f placeholder for the percentage
-        :param file: output file, default: sys.stderr
         """
         self.counter = 0  # 0 .. (total-1)
         self.total = total
         self.trigger_at = start  # output next percentage value when reaching (at least) this
         self.step = step
-        if file is None:
-            file = sys.stderr
-        self.file = file
         self.msg = msg
         self.same_line = same_line
+        self.handler = None
+        self.logger = logging.getLogger('borg.output.progress')
+
+        # If there are no handlers, set one up explicitly because the
+        # terminator and propagation needs to be set.  If there are,
+        # they must have been set up by BORG_LOGGING_CONF: skip setup.
+        if not self.logger.handlers:
+            self.handler = logging.StreamHandler(stream=sys.stderr)
+            self.handler.setLevel(logging.INFO)
+            self.handler.terminator = '\r' if self.same_line else '\n'
+
+            self.logger.addHandler(self.handler)
+            if self.logger.level == logging.NOTSET:
+                self.logger.setLevel(logging.WARN)
+            self.logger.propagate = False
+
+    def __del__(self):
+        if self.handler is not None:
+            self.logger.removeHandler(self.handler)
+            self.handler.close()
 
     def progress(self, current=None):
         if current is not None:
@@ -1021,11 +1037,11 @@ class ProgressIndicatorPercent:
             return self.output(pct)
 
     def output(self, percent):
-        print(self.msg % percent, file=self.file, end='\r' if self.same_line else '\n', flush=True)
+        self.logger.info(self.msg % percent)
 
     def finish(self):
         if self.same_line:
-            print(" " * len(self.msg % 100.0), file=self.file, end='\r')
+            self.logger.info(" " * len(self.msg % 100.0))
 
 
 class ProgressIndicatorEndless:
@@ -1075,7 +1091,7 @@ def sysinfo():
     return '\n'.join(info)
 
 
-def log_multi(*msgs, level=logging.INFO):
+def log_multi(*msgs, level=logging.INFO, logger=logger):
     """
     log multiple lines of text, each line by a separate logging call for cosmetic reasons
 

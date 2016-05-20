@@ -1,4 +1,6 @@
 import hashlib
+import io
+import logging
 from time import mktime, strptime
 from datetime import datetime, timezone, timedelta
 import os
@@ -778,7 +780,7 @@ def test_yes_output(capfd):
 
 
 def test_progress_percentage_multiline(capfd):
-    pi = ProgressIndicatorPercent(1000, step=5, start=0, same_line=False, msg="%3.0f%%", file=sys.stderr)
+    pi = ProgressIndicatorPercent(1000, step=5, start=0, same_line=False, msg="%3.0f%%")
     pi.show(0)
     out, err = capfd.readouterr()
     assert err == '  0%\n'
@@ -794,13 +796,14 @@ def test_progress_percentage_multiline(capfd):
 
 
 def test_progress_percentage_sameline(capfd):
-    pi = ProgressIndicatorPercent(1000, step=5, start=0, same_line=True, msg="%3.0f%%", file=sys.stderr)
+    pi = ProgressIndicatorPercent(1000, step=5, start=0, same_line=True, msg="%3.0f%%")
     pi.show(0)
     out, err = capfd.readouterr()
     assert err == '  0%\r'
     pi.show(420)
+    pi.show(680)
     out, err = capfd.readouterr()
-    assert err == ' 42%\r'
+    assert err == ' 42%\r 68%\r'
     pi.show(1000)
     out, err = capfd.readouterr()
     assert err == '100%\r'
@@ -810,7 +813,7 @@ def test_progress_percentage_sameline(capfd):
 
 
 def test_progress_percentage_step(capfd):
-    pi = ProgressIndicatorPercent(100, step=2, start=0, same_line=False, msg="%3.0f%%", file=sys.stderr)
+    pi = ProgressIndicatorPercent(100, step=2, start=0, same_line=False, msg="%3.0f%%")
     pi.show()
     out, err = capfd.readouterr()
     assert err == '  0%\n'
@@ -820,6 +823,21 @@ def test_progress_percentage_step(capfd):
     pi.show()
     out, err = capfd.readouterr()
     assert err == '  2%\n'
+
+
+def test_progress_percentage_quiet(capfd):
+    logging.getLogger('borg.output.progress').setLevel(logging.WARN)
+
+    pi = ProgressIndicatorPercent(1000, step=5, start=0, same_line=False, msg="%3.0f%%")
+    pi.show(0)
+    out, err = capfd.readouterr()
+    assert err == ''
+    pi.show(1000)
+    out, err = capfd.readouterr()
+    assert err == ''
+    pi.finish()
+    out, err = capfd.readouterr()
+    assert err == ''
 
 
 def test_progress_endless(capfd):

@@ -16,7 +16,8 @@ Type of log output
 
 The log level of the builtin logging configuration defaults to WARNING.
 This is because we want |project_name| to be mostly silent and only output
-warnings, errors and critical messages.
+warnings, errors and critical messages, unless output has been requested
+by supplying an option that implies output (eg, --list or --progress).
 
 Log levels: DEBUG < INFO < WARNING < ERROR < CRITICAL
 
@@ -40,10 +41,6 @@ give different output on different log levels - it's just a possibility.
 
 .. warning:: Options --critical and --error are provided for completeness,
              their usage is not recommended as you might miss important information.
-
-.. warning:: While some options (like ``--stats`` or ``--list``) will emit more
-             informational messages, you have to use INFO (or lower) log level to make
-             them show up in log output. Use ``-v`` or a logging configuration.
 
 Return codes
 ~~~~~~~~~~~~
@@ -245,8 +242,8 @@ Examples
     # Backup ~/Documents into an archive named "my-documents"
     $ borg create /path/to/repo::my-documents ~/Documents
 
-    # same, but verbosely list all files as we process them
-    $ borg create -v --list /path/to/repo::my-documents ~/Documents
+    # same, but list all files as we process them
+    $ borg create --list /path/to/repo::my-documents ~/Documents
 
     # Backup ~/Documents and ~/src but exclude pyc files
     $ borg create /path/to/repo::my-files \
@@ -301,7 +298,7 @@ Examples
     $ borg extract /path/to/repo::my-files
 
     # Extract entire archive and list files while processing
-    $ borg extract -v --list /path/to/repo::my-files
+    $ borg extract --list /path/to/repo::my-files
 
     # Verify whether an archive could be successfully extracted, but do not write files to disk
     $ borg extract --dry-run /path/to/repo::my-files
@@ -480,7 +477,7 @@ Examples
     Username: root
     Time (start): Mon, 2016-02-15 19:36:29
     Time (end):   Mon, 2016-02-15 19:39:26
-    Command line: /usr/local/bin/borg create -v --list -C zlib,6 /path/to/repo::root-2016-02-15 / --one-file-system
+    Command line: /usr/local/bin/borg create --list -C zlib,6 /path/to/repo::root-2016-02-15 / --one-file-system
     Number of files: 38100
 
                            Original size      Compressed size    Deduplicated size
@@ -655,7 +652,7 @@ Here are misc. notes about topics that are maybe not covered in enough detail in
 Item flags
 ~~~~~~~~~~
 
-``borg create -v --list`` outputs a verbose list of all files, directories and other
+``borg create --list`` outputs a list of all files, directories and other
 file system items it considered (no matter whether they had content changes
 or not). For each item, it prefixes a single-letter flag that indicates type
 and/or status of the item.

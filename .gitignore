@@ -11,6 +11,7 @@ crypto.c
 platform_darwin.c
 platform_freebsd.c
 platform_linux.c
+platform_posix.c
 *.egg-info
 *.pyc
 *.pyo

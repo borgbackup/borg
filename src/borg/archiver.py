@@ -8,6 +8,7 @@ import functools
 import hashlib
 import inspect
 import io
+import logging
 import os
 import re
 import shlex
@@ -22,7 +23,7 @@ from . import __version__
 from .helpers import Error, location_validator, archivename_validator, format_time, format_file_size, \
     parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
     get_cache_dir, prune_within, prune_split, bin_to_hex, safe_encode, \
-    Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
+    Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, \
     dir_is_tagged, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
     log_multi, PatternMatcher, ItemFormatter
 from .logger import create_logger, setup_logging
@@ -34,12 +35,11 @@ from .repository import Repository
 from .cache import Cache
 from .constants import *  # NOQA
 from .key import key_creator, RepoKey, PassphraseKey
-from .archive import Archive, ArchiveChecker, ArchiveRecreater
+from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 from .selftest import selftest
 from .hashindex import ChunkIndexEntry
-
-has_lchflags = hasattr(os, 'lchflags')
+from .platform import get_flags
 
 
 def argument(args, str_or_bool):
@@ -112,7 +112,7 @@ class Archiver:
 
     def print_file_status(self, status, path):
         if self.output_list and (self.output_filter is None or status in self.output_filter):
-            logger.info("%1s %s", status, remove_surrogates(path))
+            logging.getLogger('borg.output.list').info("%1s %s", status, remove_surrogates(path))
 
     @staticmethod
     def compare_chunk_contents(chunks1, chunks2):
@@ -185,12 +185,16 @@ class Archiver:
             if not yes(msg, false_msg="Aborting.", truish=('YES', ),
                        env_var_override='BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
                 return EXIT_ERROR
+        if args.repo_only and args.verify_data:
+            self.print_error("--repository-only and --verify-data contradict each other. Please select one.")
+            return EXIT_ERROR
         if not args.archives_only:
             if not repository.check(repair=args.repair, save_space=args.save_space):
                 return EXIT_WARNING
         if not args.repo_only and not ArchiveChecker().check(
                 repository, repair=args.repair, archive=args.location.archive,
-                last=args.last, prefix=args.prefix, save_space=args.save_space):
+                last=args.last, prefix=args.prefix, verify_data=args.verify_data,
+                save_space=args.save_space):
             return EXIT_WARNING
         return EXIT_SUCCESS
 
@@ -274,7 +278,7 @@ class Archiver:
                               DASHES,
                               str(archive.stats),
                               str(cache),
-                              DASHES)
+                              DASHES, logger=logging.getLogger('borg.output.stats'))
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list
@@ -312,7 +316,7 @@ class Archiver:
             return
         status = None
         # Ignore if nodump flag is set
-        if has_lchflags and (st.st_flags & stat.UF_NODUMP):
+        if get_flags(path, st) & stat.UF_NODUMP:
             return
         if stat.S_ISREG(st.st_mode) or read_special and not stat.S_ISDIR(st.st_mode):
             if not dry_run:
@@ -413,7 +417,7 @@ class Archiver:
                 while dirs and not item[b'path'].startswith(dirs[-1][b'path']):
                     archive.extract_item(dirs.pop(-1), stdout=stdout)
             if output_list:
-                logger.info(remove_surrogates(orig_path))
+                logging.getLogger('borg.output.list').info(remove_surrogates(orig_path))
             try:
                 if dry_run:
                     archive.extract_item(item, dry_run=True)
@@ -670,7 +674,7 @@ class Archiver:
                     log_multi(DASHES,
                               stats.summary.format(label='Deleted data:', stats=stats),
                               str(cache),
-                              DASHES)
+                              DASHES, logger=logging.getLogger('borg.output.stats'))
         else:
             if not args.cache_only:
                 msg = []
@@ -789,9 +793,8 @@ class Archiver:
         is_checkpoint = re.compile(r'\.checkpoint(\.\d+)?$').search
         checkpoints = [arch for arch in archives_checkpoints if is_checkpoint(arch.name)]
         # keep the latest checkpoint, if there is no later non-checkpoint archive
-        latest_checkpoint = checkpoints[0] if checkpoints else None
-        if archives_checkpoints[0] is latest_checkpoint:
-            keep_checkpoints = [latest_checkpoint, ]
+        if archives_checkpoints and checkpoints and archives_checkpoints[0] is checkpoints[0]:
+            keep_checkpoints = checkpoints[:1]
         else:
             keep_checkpoints = []
         checkpoints = set(checkpoints)
@@ -818,18 +821,19 @@ class Archiver:
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
         stats = Statistics()
         with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
+            list_logger = logging.getLogger('borg.output.list')
             for archive in archives_checkpoints:
                 if archive in to_delete:
                     if args.dry_run:
                         if args.output_list:
-                            logger.info('Would prune:     %s' % format_archive(archive))
+                            list_logger.info('Would prune:     %s' % format_archive(archive))
                     else:
                         if args.output_list:
-                            logger.info('Pruning archive: %s' % format_archive(archive))
+                            list_logger.info('Pruning archive: %s' % format_archive(archive))
                         Archive(repository, key, manifest, archive.name, cache).delete(stats)
                 else:
                     if args.output_list:
-                        logger.info('Keeping archive: %s' % format_archive(archive))
+                        list_logger.info('Keeping archive: %s' % format_archive(archive))
             if to_delete and not args.dry_run:
                 manifest.write()
                 repository.commit(save_space=args.save_space)
@@ -838,7 +842,7 @@ class Archiver:
                 log_multi(DASHES,
                           stats.summary.format(label='Deleted data:', stats=stats),
                           str(cache),
-                          DASHES)
+                          DASHES, logger=logging.getLogger('borg.output.stats'))
         return self.exit_code
 
     def do_upgrade(self, args):
@@ -1164,7 +1168,48 @@ class Archiver:
         init_epilog = textwrap.dedent("""
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
-        Encryption can be enabled at repository init time.
+
+        Encryption can be enabled at repository init time (the default).
+
+        It is not recommended to disable encryption. Repository encryption protects you
+        e.g. against the case that an attacker has access to your backup repository.
+
+        But be careful with the key / the passphrase:
+
+        If you want "passphrase-only" security, use the repokey mode. The key will
+        be stored inside the repository (in its "config" file). In above mentioned
+        attack scenario, the attacker will have the key (but not the passphrase).
+
+        If you want "passphrase and having-the-key" security, use the keyfile mode.
+        The key will be stored in your home directory (in .config/borg/keys). In
+        the attack scenario, the attacker who has just access to your repo won't have
+        the key (and also not the passphrase).
+
+        Make a backup copy of the key file (keyfile mode) or repo config file
+        (repokey mode) and keep it at a safe place, so you still have the key in
+        case it gets corrupted or lost. Also keep the passphrase at a safe place.
+        The backup that is encrypted with that key won't help you with that, of course.
+
+        Make sure you use a good passphrase. Not too short, not too simple. The real
+        encryption / decryption key is encrypted with / locked by your passphrase.
+        If an attacker gets your key, he can't unlock and use it without knowing the
+        passphrase.
+
+        Be careful with special or non-ascii characters in your passphrase:
+
+        - Borg processes the passphrase as unicode (and encodes it as utf-8),
+          so it does not have problems dealing with even the strangest characters.
+        - BUT: that does not necessarily apply to your OS / VM / keyboard configuration.
+
+        So better use a long passphrase made from simple ascii chars than one that
+        includes non-ascii stuff or characters that are hard/impossible to enter on
+        a different keyboard layout.
+
+        You can change your passphrase for existing repos at any time, it won't affect
+        the encryption/decryption key or other secrets.
+
+        When encrypting, AES-CTR-256 is used for encryption, and HMAC-SHA256 for
+        authentication. Hardware acceleration will be used automatically.
         """)
         subparser = subparsers.add_parser('init', parents=[common_parser], add_help=False,
                                           description=self.do_init.__doc__, epilog=init_epilog,
@@ -1213,6 +1258,18 @@ class Archiver:
           required).
         - The archive checks can be time consuming, they can be skipped using the
           --repository-only option.
+
+        The --verify-data option will perform a full integrity verification (as opposed to
+        checking the CRC32 of the segment) of data, which means reading the data from the
+        repository, decrypting and decompressing it. This is a cryptographic verification,
+        which will detect (accidental) corruption. For encrypted repositories it is
+        tamper-resistant as well, unless the attacker has access to the keys.
+
+        It is also very slow.
+
+        --verify-data only verifies data used by the archives specified with --last,
+        --prefix or an explicitly named archive. If none of these are passed,
+        all data in the repository is verified.
         """)
         subparser = subparsers.add_parser('check', parents=[common_parser], add_help=False,
                                           description=self.do_check.__doc__,
@@ -1229,6 +1286,10 @@ class Archiver:
         subparser.add_argument('--archives-only', dest='archives_only', action='store_true',
                                default=False,
                                help='only perform archives checks')
+        subparser.add_argument('--verify-data', dest='verify_data', action='store_true',
+                               default=False,
+                               help='perform cryptographic archive data integrity verification '
+                                    '(conflicts with --repository-only)')
         subparser.add_argument('--repair', dest='repair', action='store_true',
                                default=False,
                                help='attempt to repair any inconsistencies found')
@@ -1240,6 +1301,9 @@ class Archiver:
                                help='only check last N archives (Default: all)')
         subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
                                help='only consider archive names starting with this prefix')
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help="""show progress display while checking""")
 
         change_passphrase_epilog = textwrap.dedent("""
         The key files used for repository encryption are optionally passphrase
@@ -1401,6 +1465,10 @@ class Archiver:
         be restricted by using the ``--exclude`` option.
 
         See the output of the "borg help patterns" command for more help on exclude patterns.
+
+        By using ``--dry-run``, you can do all extraction steps except actually writing the
+        output data: reading metadata and data chunks from the repo, checking the hash/hmac,
+        decrypting, decompressing.
         """)
         subparser = subparsers.add_parser('extract', parents=[common_parser], add_help=False,
                                           description=self.do_extract.__doc__,
@@ -2002,12 +2070,27 @@ class Archiver:
         check_extension_modules()
         selftest(logger)
 
+    def _setup_implied_logging(self, args):
+        """ turn on INFO level logging for args that imply that they will produce output """
+        # map of option name to name of logger for that option
+        option_logger = {
+                'output_list': 'borg.output.list',
+                'show_version': 'borg.output.show-version',
+                'show_rc': 'borg.output.show-rc',
+                'stats': 'borg.output.stats',
+                'progress': 'borg.output.progress',
+                }
+        for option, logger_name in option_logger.items():
+            if args.get(option, False):
+                logging.getLogger(logger_name).setLevel('INFO')
+
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
         setup_logging(level=args.log_level, is_serve=args.func == self.do_serve)  # do not use loggers before this!
+        self._setup_implied_logging(vars(args))
         if args.show_version:
-            logger.info('borgbackup version %s' % __version__)
+            logging.getLogger('borg.output.show-version').info('borgbackup version %s' % __version__)
         self.prerun_checks(logger)
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
@@ -2037,6 +2120,14 @@ def sig_info_handler(signum, stack):  # pragma: no cover
             break
 
 
+class SIGTERMReceived(BaseException):
+    pass
+
+
+def sig_term_handler(signum, stack):
+    raise SIGTERMReceived
+
+
 def setup_signal_handlers():  # pragma: no cover
     sigs = []
     if hasattr(signal, 'SIGUSR1'):
@@ -2045,6 +2136,7 @@ def setup_signal_handlers():  # pragma: no cover
         sigs.append(signal.SIGINFO)  # kill -INFO pid (or ctrl-t)
     for sig in sigs:
         signal.signal(sig, sig_info_handler)
+    signal.signal(signal.SIGTERM, sig_term_handler)
 
 
 def main():  # pragma: no cover
@@ -2076,18 +2168,22 @@ def main():  # pragma: no cover
     except KeyboardInterrupt:
         msg = 'Keyboard interrupt.\n%s\n%s' % (traceback.format_exc(), sysinfo())
         exit_code = EXIT_ERROR
+    except SIGTERMReceived:
+        msg = 'Received SIGTERM.'
+        exit_code = EXIT_ERROR
     if msg:
         logger.error(msg)
     if args.show_rc:
+        rc_logger = logging.getLogger('borg.output.show-rc')
         exit_msg = 'terminating with %s status, rc %d'
         if exit_code == EXIT_SUCCESS:
-            logger.info(exit_msg % ('success', exit_code))
+            rc_logger.info(exit_msg % ('success', exit_code))
         elif exit_code == EXIT_WARNING:
-            logger.warning(exit_msg % ('warning', exit_code))
+            rc_logger.warning(exit_msg % ('warning', exit_code))
         elif exit_code == EXIT_ERROR:
-            logger.error(exit_msg % ('error', exit_code))
+            rc_logger.error(exit_msg % ('error', exit_code))
         else:
-            logger.error(exit_msg % ('abnormal', exit_code or 666))
+            rc_logger.error(exit_msg % ('abnormal', exit_code or 666))
     sys.exit(exit_code)
 
 

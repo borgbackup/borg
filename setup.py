@@ -26,20 +26,26 @@ install_requires = ['msgpack-python>=0.4.6', ]
 extras_require = {
     # llfuse 0.40 (tested, proven, ok), needs FUSE version >= 2.8.0
     # llfuse 0.41 (tested shortly, looks ok), needs FUSE version >= 2.8.0
+    # llfuse 0.41.1 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 0.42 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 1.0 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 2.0 will break API
     'fuse': ['llfuse<2.0', ],
 }
 
+if sys.platform.startswith('freebsd'):
+    # while llfuse 1.0 is the latest llfuse release right now,
+    # llfuse 0.41.1 is the latest release that actually builds on freebsd:
+    extras_require['fuse'] = ['llfuse==0.41.1', ]
+
 from setuptools import setup, find_packages, Extension
 from setuptools.command.sdist import sdist
-
 
 compress_source = 'src/borg/compress.pyx'
 crypto_source = 'src/borg/crypto.pyx'
 chunker_source = 'src/borg/chunker.pyx'
 hashindex_source = 'src/borg/hashindex.pyx'
+platform_posix_source = 'src/borg/platform_posix.pyx'
 platform_linux_source = 'src/borg/platform_linux.pyx'
 platform_darwin_source = 'src/borg/platform_darwin.pyx'
 platform_freebsd_source = 'src/borg/platform_freebsd.pyx'
@@ -60,6 +66,7 @@ try:
                 'src/borg/crypto.c',
                 'src/borg/chunker.c', 'src/borg/_chunker.c',
                 'src/borg/hashindex.c', 'src/borg/_hashindex.c',
+                'src/borg/platform_posix.c',
                 'src/borg/platform_linux.c',
                 'src/borg/platform_freebsd.c',
                 'src/borg/platform_darwin.c',
@@ -75,13 +82,14 @@ except ImportError:
     crypto_source = crypto_source.replace('.pyx', '.c')
     chunker_source = chunker_source.replace('.pyx', '.c')
     hashindex_source = hashindex_source.replace('.pyx', '.c')
+    platform_posix_source = platform_posix_source.replace('.pyx', '.c')
     platform_linux_source = platform_linux_source.replace('.pyx', '.c')
     platform_freebsd_source = platform_freebsd_source.replace('.pyx', '.c')
     platform_darwin_source = platform_darwin_source.replace('.pyx', '.c')
     from distutils.command.build_ext import build_ext
     if not on_rtd and not all(os.path.exists(path) for path in [
         compress_source, crypto_source, chunker_source, hashindex_source,
-        platform_linux_source, platform_freebsd_source]):
+        platform_posix_source, platform_linux_source, platform_freebsd_source, platform_darwin_source]):
         raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 
 
@@ -106,7 +114,8 @@ def detect_lz4(prefixes):
 include_dirs = []
 library_dirs = []
 
-possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl', '/usr/local/borg', '/opt/local']
+possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl',
+                             '/usr/local/borg', '/opt/local', '/opt/pkg', ]
 if os.environ.get('BORG_OPENSSL_PREFIX'):
     possible_openssl_prefixes.insert(0, os.environ.get('BORG_OPENSSL_PREFIX'))
 ssl_prefix = detect_openssl(possible_openssl_prefixes)
@@ -116,7 +125,8 @@ include_dirs.append(os.path.join(ssl_prefix, 'include'))
 library_dirs.append(os.path.join(ssl_prefix, 'lib'))
 
 
-possible_lz4_prefixes = ['/usr', '/usr/local', '/usr/local/opt/lz4', '/usr/local/lz4', '/usr/local/borg', '/opt/local']
+possible_lz4_prefixes = ['/usr', '/usr/local', '/usr/local/opt/lz4', '/usr/local/lz4',
+                         '/usr/local/borg', '/opt/local', '/opt/pkg', ]
 if os.environ.get('BORG_LZ4_PREFIX'):
     possible_lz4_prefixes.insert(0, os.environ.get('BORG_LZ4_PREFIX'))
 lz4_prefix = detect_lz4(possible_lz4_prefixes)
@@ -284,6 +294,9 @@ if not on_rtd:
     Extension('borg.chunker', [chunker_source]),
     Extension('borg.hashindex', [hashindex_source])
 ]
+    if sys.platform.startswith(('linux', 'freebsd', 'darwin')):
+        ext_modules.append(Extension('borg.platform_posix', [platform_posix_source]))
+
     if sys.platform == 'linux':
         ext_modules.append(Extension('borg.platform_linux', [platform_linux_source], libraries=['acl']))
     elif sys.platform.startswith('freebsd'):

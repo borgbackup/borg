@@ -12,8 +12,14 @@ UMASK_DEFAULT = 0o077
 CACHE_TAG_NAME = 'CACHEDIR.TAG'
 CACHE_TAG_CONTENTS = b'Signature: 8a477f597d28d172789f06886806bc55'
 
-DEFAULT_MAX_SEGMENT_SIZE = 5 * 1024 * 1024
-DEFAULT_SEGMENTS_PER_DIR = 10000
+# A large, but not unreasonably large segment size. Always less than 2 GiB (for legacy file systems). We choose
+# 500 MiB which means that no indirection from the inode is needed for typical Linux file systems.
+# Note that this is a soft-limit and can be exceeded (worst case) by a full maximum chunk size and some metadata
+# bytes. That's why it's 500 MiB instead of 512 MiB.
+DEFAULT_MAX_SEGMENT_SIZE = 500 * 1024 * 1024
+
+# A few hundred files per directory to go easy on filesystems which don't like too many files per dir (NTFS)
+DEFAULT_SEGMENTS_PER_DIR = 500
 
 CHUNK_MIN_EXP = 19  # 2**19 == 512kiB
 CHUNK_MAX_EXP = 23  # 2**23 == 8MiB

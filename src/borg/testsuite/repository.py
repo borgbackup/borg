@@ -1,3 +1,5 @@
+import io
+import logging
 import os
 import shutil
 import sys
@@ -7,8 +9,8 @@ from unittest.mock import patch
 from ..hashindex import NSIndex
 from ..helpers import Location, IntegrityError
 from ..locking import UpgradableLock, LockFailed
-from ..remote import RemoteRepository, InvalidRPCMethod
-from ..repository import Repository
+from ..remote import RemoteRepository, InvalidRPCMethod, ConnectionClosedWithHint
+from ..repository import Repository, LoggedIO
 from . import BaseTestCase
 
 
@@ -192,6 +194,13 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
             self.assert_equal(self.repository.check(), True)
             self.assert_equal(len(self.repository), 3)
 
+    def test_ignores_commit_tag_in_data(self):
+        self.repository.put(b'0' * 32, LoggedIO.COMMIT)
+        self.reopen()
+        with self.repository:
+            io = self.repository.io
+            assert not io.is_committed_segment(io.get_latest_segment())
+
 
 class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
     def test_destroy_append_only(self):
@@ -268,7 +277,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         return set(int(key) for key in self.repository.list())
 
     def test_repair_corrupted_segment(self):
-        self.add_objects([[1, 2, 3], [4, 5, 6]])
+        self.add_objects([[1, 2, 3], [4, 5], [6]])
         self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
         self.check(status=True)
         self.corrupt_object(5)
@@ -389,3 +398,83 @@ class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
     def test_crash_before_compact(self):
         # skip this test, we can't mock-patch a Repository class in another process!
         pass
+
+
+class RemoteRepositoryLoggingStub(RemoteRepository):
+    """ run a remote command that just prints a logging-formatted message to
+    stderr, and stub out enough of RemoteRepository to avoid the resulting
+    exceptions """
+    def __init__(self, *args, **kw):
+        self.msg = kw.pop('msg')
+        super().__init__(*args, **kw)
+
+    def borg_cmd(self, cmd, testing):
+        return [sys.executable, '-c', 'import sys; print("{}", file=sys.stderr)'.format(self.msg), ]
+
+    def __del__(self):
+        # clean up from exception without triggering assert
+        if self.p:
+            self.close()
+
+
+class RemoteRepositoryLoggerTestCase(RepositoryTestCaseBase):
+    def setUp(self):
+        self.location = Location('__testsuite__:/doesntexist/repo')
+        self.stream = io.StringIO()
+        self.handler = logging.StreamHandler(self.stream)
+        logging.getLogger().handlers[:] = [self.handler]
+        logging.getLogger('borg.repository').handlers[:] = []
+        logging.getLogger('borg.repository.foo').handlers[:] = []
+
+    def tearDown(self):
+        pass
+
+    def create_repository(self, msg):
+        try:
+            RemoteRepositoryLoggingStub(self.location, msg=msg)
+        except ConnectionClosedWithHint:
+            # stub is dumb, so this exception expected
+            pass
+
+    def test_old_format_messages(self):
+        self.handler.setLevel(logging.DEBUG)
+        logging.getLogger().setLevel(logging.DEBUG)
+
+        self.create_repository("$LOG INFO Remote: old format message")
+        self.assert_equal(self.stream.getvalue(), 'Remote: old format message\n')
+
+    def test_new_format_messages(self):
+        self.handler.setLevel(logging.DEBUG)
+        logging.getLogger().setLevel(logging.DEBUG)
+
+        self.create_repository("$LOG INFO borg.repository Remote: new format message")
+        self.assert_equal(self.stream.getvalue(), 'Remote: new format message\n')
+
+    def test_remote_messages_screened(self):
+        # default borg config for root logger
+        self.handler.setLevel(logging.WARNING)
+        logging.getLogger().setLevel(logging.WARNING)
+
+        self.create_repository("$LOG INFO borg.repository Remote: new format info message")
+        self.assert_equal(self.stream.getvalue(), '')
+
+    def test_info_to_correct_local_child(self):
+        logging.getLogger('borg.repository').setLevel(logging.INFO)
+        logging.getLogger('borg.repository.foo').setLevel(logging.INFO)
+        # default borg config for root logger
+        self.handler.setLevel(logging.WARNING)
+        logging.getLogger().setLevel(logging.WARNING)
+
+        child_stream = io.StringIO()
+        child_handler = logging.StreamHandler(child_stream)
+        child_handler.setLevel(logging.INFO)
+        logging.getLogger('borg.repository').handlers[:] = [child_handler]
+        foo_stream = io.StringIO()
+        foo_handler = logging.StreamHandler(foo_stream)
+        foo_handler.setLevel(logging.INFO)
+        logging.getLogger('borg.repository.foo').handlers[:] = [foo_handler]
+
+        self.create_repository("$LOG INFO borg.repository Remote: new format child message")
+        self.assert_equal(foo_stream.getvalue(), '')
+        self.assert_equal(child_stream.getvalue(), 'Remote: new format child message\n')
+        self.assert_equal(self.stream.getvalue(), '')

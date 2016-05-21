@@ -196,10 +196,10 @@ chunker_fill(Chunker *c)
         // We rollback the initial offset back to the start of the page,
         // to avoid it not being truncated as a partial page request.
         if (length > 0) {
-            // Linux kernels prior to 4.7 have a bug where they truncate
-            // last partial page of POSIX_FADV_DONTNEED request, so we need
-            // to page-align it ourselves. We'll need the rest of this page
-            // on the next read (assuming this was not EOF)
+            // All Linux kernels (at least up to and including 4.6(.0)) have a bug where
+            // they truncate last partial page of POSIX_FADV_DONTNEED request, so we need
+            // to page-align it ourselves. We'll need the rest of this page on the next
+            // read (assuming this was not EOF).
             overshoot = (offset + length) & pagemask;
         } else {
             // For length == 0 we set overshoot 0, so the below

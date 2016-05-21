@@ -96,7 +96,7 @@ buzhash(const unsigned char *data, size_t len, const uint32_t *h)
 static uint32_t
 buzhash_update(uint32_t sum, unsigned char remove, unsigned char add, size_t len, const uint32_t *h)
 {
-    uint32_t lenmod = len & 0x1f;
+    uint32_t lenmod = len & 0x1f;  /* Note: replace by constant to get small speedup */
     return BARREL_SHIFT(sum, 1) ^ BARREL_SHIFT(h[remove], lenmod) ^ h[add];
 }
 

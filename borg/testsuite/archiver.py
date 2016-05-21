@@ -1491,9 +1491,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test', 'input')
         archive_before = self.cmd('list', self.repository_location + '::test', '--format', '{sha512}')
         with patch.object(Cache, 'add_chunk', self._test_recreate_chunker_interrupt_patch()):
-            self.cmd('recreate', '-pv', '--chunker-params', '10,12,11,4095', self.repository_location)
+            self.cmd('recreate', '-pv', '--chunker-params', '10,13,11,4095', self.repository_location)
         assert 'test.recreate' in self.cmd('list', self.repository_location)
-        output = self.cmd('recreate', '-svp', '--debug', '--chunker-params', '10,12,11,4095', self.repository_location)
+        output = self.cmd('recreate', '-svp', '--debug', '--chunker-params', '10,13,11,4095', self.repository_location)
         assert 'Found test.recreate, will resume' in output
         assert 'Copied 1 chunks from a partially processed item' in output
         archive_after = self.cmd('list', self.repository_location + '::test', '--format', '{sha512}')

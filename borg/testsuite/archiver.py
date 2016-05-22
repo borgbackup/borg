@@ -1255,6 +1255,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         try:
             self.cmd('mount', self.repository_location, mountpoint, fork=True)
             self.wait_for_mount(mountpoint)
+            if has_lchflags:
+                # remove the file we did not backup, so input and output become equal
+                os.remove(os.path.join('input', 'flagfile'))
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive', 'input'))
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive2', 'input'))
         finally:
@@ -1276,6 +1279,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         try:
             self.cmd('mount', self.repository_location + '::archive', mountpoint, fork=True)
             self.wait_for_mount(mountpoint)
+            if has_lchflags:
+                # remove the file we did not backup, so input and output become equal
+                os.remove(os.path.join('input', 'flagfile'))
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'))
         finally:
             if sys.platform.startswith('linux'):

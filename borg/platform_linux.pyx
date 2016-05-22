@@ -50,9 +50,6 @@ cdef extern from "linux/fs.h":
 cdef extern from "stropts.h":
     int ioctl(int fildes, int request, ...)
 
-cdef extern from "errno.h":
-    int errno
-
 cdef extern from "string.h":
     char *strerror(int errnum)
 
@@ -79,7 +76,8 @@ def set_flags(path, bsd_flags, fd=None):
         fd = os.open(path, os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
     try:
         if ioctl(fd, FS_IOC_SETFLAGS, &flags) == -1:
-            raise OSError(errno, strerror(errno).decode(), path)
+            if errno.errno != errno.EOPNOTSUPP:
+                raise OSError(errno, strerror(errno).decode(), path)
     finally:
         if open_fd:
             os.close(fd)

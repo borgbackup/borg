@@ -997,14 +997,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=1024 * 80)
         os.utime('input/file1', (now - 5, now - 5))  # 5 seconds ago
         self.create_regular_file('file2', size=1024 * 80)
+        if has_lchflags:
+            self.create_regular_file('file3', size=1024 * 80)
+            platform.set_flags(os.path.join(self.input_path, 'file3'), stat.UF_NODUMP)
         self.cmd('init', self.repository_location)
         output = self.cmd('create', '--list', self.repository_location + '::test', 'input')
         self.assert_in("A input/file1", output)
         self.assert_in("A input/file2", output)
+        if has_lchflags:
+            self.assert_in("x input/file3", output)
         # should find second file as excluded
         output = self.cmd('create', '--list', self.repository_location + '::test1', 'input', '--exclude', '*/file2')
         self.assert_in("U input/file1", output)
         self.assert_in("x input/file2", output)
+        if has_lchflags:
+            self.assert_in("x input/file3", output)
 
     def test_create_topical(self):
         now = time.time()

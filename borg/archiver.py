@@ -317,6 +317,7 @@ class Archiver:
         status = None
         # Ignore if nodump flag is set
         if get_flags(path, st) & stat.UF_NODUMP:
+            self.print_file_status('x', path)
             return
         if stat.S_ISREG(st.st_mode) or read_special and not stat.S_ISDIR(st.st_mode):
             if not dry_run:

@@ -76,8 +76,9 @@ def set_flags(path, bsd_flags, fd=None):
         fd = os.open(path, os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
     try:
         if ioctl(fd, FS_IOC_SETFLAGS, &flags) == -1:
-            if errno.errno != errno.EOPNOTSUPP:
-                raise OSError(errno, strerror(errno).decode(), path)
+            error_number = errno.errno
+            if error_number != errno.EOPNOTSUPP:
+                raise OSError(error_number, strerror(error_number).decode(), path)
     finally:
         if open_fd:
             os.close(fd)

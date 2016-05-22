@@ -927,7 +927,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('borgbackup version', output)  # implied output even without --info given
         self.assert_not_in('Starting repository check', output)  # --info not given for root logger
 
-        name = sorted(os.listdir(os.path.join(self.tmpdir, 'repository', 'data', '0')), reverse=True)[0]
+        name = sorted(os.listdir(os.path.join(self.tmpdir, 'repository', 'data', '0')), reverse=True)[1]
         with open(os.path.join(self.tmpdir, 'repository', 'data', '0', name), 'r+b') as fd:
             fd.seek(100)
             fd.write(b'XXXX')

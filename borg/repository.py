@@ -735,8 +735,8 @@ class LoggedIO:
         return self.segment
 
     def write_commit(self):
-        fd = self.get_write_fd(no_new=True)
-        fd.sync()
+        self.close_segment()
+        fd = self.get_write_fd()
         header = self.header_no_crc_fmt.pack(self.header_fmt.size, TAG_COMMIT)
         crc = self.crc_fmt.pack(crc32(header) & 0xffffffff)
         fd.write(b''.join((crc, header)))

@@ -8,13 +8,13 @@ from .platform_base import SyncFile as BaseSyncFile
 from .platform_posix import swidth
 
 from libc cimport errno
+from libc.stdint cimport int64_t
 
 API_VERSION = 3
 
 cdef extern from "sys/types.h":
     int ACL_TYPE_ACCESS
     int ACL_TYPE_DEFAULT
-    ctypedef off64_t
 
 cdef extern from "sys/acl.h":
     ctypedef struct _acl_t:
@@ -31,7 +31,7 @@ cdef extern from "acl/libacl.h":
     int acl_extended_file(const char *path)
 
 cdef extern from "fcntl.h":
-    int sync_file_range(int fd, off64_t offset, off64_t nbytes, unsigned int flags)
+    int sync_file_range(int fd, int64_t offset, int64_t nbytes, unsigned int flags)
     unsigned int SYNC_FILE_RANGE_WRITE
     unsigned int SYNC_FILE_RANGE_WAIT_BEFORE
     unsigned int SYNC_FILE_RANGE_WAIT_AFTER

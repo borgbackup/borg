@@ -5,6 +5,7 @@ import inspect
 from io import StringIO
 import logging
 import random
+import socket
 import stat
 import subprocess
 import sys
@@ -356,6 +357,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         # the interesting parts of info_output2 and info_output should be same
         self.assert_equal(filter(info_output), filter(info_output2))
+
+    def test_unix_socket(self):
+        self.cmd('init', self.repository_location)
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.bind(os.path.join(self.input_path, 'unix-socket'))
+        self.cmd('create', self.repository_location + '::test', 'input')
+        sock.close()
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+            assert not os.path.exists('input/unix-socket')
 
     def test_symlink_extract(self):
         self.create_test_files()
@@ -1244,6 +1255,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         try:
             self.cmd('mount', self.repository_location, mountpoint, fork=True)
             self.wait_for_mount(mountpoint)
+            if has_lchflags:
+                # remove the file we did not backup, so input and output become equal
+                os.remove(os.path.join('input', 'flagfile'))
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive', 'input'))
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive2', 'input'))
         finally:
@@ -1265,6 +1279,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         try:
             self.cmd('mount', self.repository_location + '::archive', mountpoint, fork=True)
             self.wait_for_mount(mountpoint)
+            if has_lchflags:
+                # remove the file we did not backup, so input and output become equal
+                os.remove(os.path.join('input', 'flagfile'))
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'))
         finally:
             if sys.platform.startswith('linux'):

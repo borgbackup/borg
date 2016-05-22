@@ -86,10 +86,11 @@ def set_flags(path, bsd_flags, fd=None):
 
 
 def get_flags(path, st):
-    if stat.S_ISLNK(st.st_mode):
-        return 0
     cdef int linux_flags
-    fd = os.open(path, os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
+    try:
+        fd = os.open(path, os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
+    except OSError:
+        return 0
     try:
         if ioctl(fd, FS_IOC_GETFLAGS, &linux_flags) == -1:
             return 0

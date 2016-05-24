@@ -23,6 +23,8 @@ cdef class Chunker:
     def __cinit__(self, int seed, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size):
         min_size = 1 << chunk_min_exp
         max_size = 1 << chunk_max_exp
+        # see chunker_process, first while loop condition, first term must be able to get True:
+        assert hash_window_size + min_size + 1 <= max_size, "too small max_size"
         hash_mask = (1 << hash_mask_bits) - 1
         self.chunker = chunker_init(hash_window_size, hash_mask, min_size, max_size, seed & 0xffffffff)
 

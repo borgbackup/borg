@@ -96,7 +96,7 @@ buzhash(const unsigned char *data, size_t len, const uint32_t *h)
 static uint32_t
 buzhash_update(uint32_t sum, unsigned char remove, unsigned char add, size_t len, const uint32_t *h)
 {
-    uint32_t lenmod = len & 0x1f;
+    uint32_t lenmod = len & 0x1f;  /* Note: replace by constant to get small speedup */
     return BARREL_SHIFT(sum, 1) ^ BARREL_SHIFT(h[remove], lenmod) ^ h[add];
 }
 
@@ -249,11 +249,12 @@ chunker_process(Chunker *c)
             PyErr_SetString(PyExc_Exception, "chunkifier byte count mismatch");
         return NULL;
     }
-    while(c->remaining <= window_size && !c->eof) {
+    while(c->remaining < min_size + window_size + 1 && !c->eof) {  /* see assert in Chunker init */
         if(!chunker_fill(c)) {
             return NULL;
         }
     }
+    /* here we either are at eof ... */
     if(c->eof) {
         c->done = 1;
         if(c->remaining) {
@@ -268,8 +269,15 @@ chunker_process(Chunker *c)
             return NULL;
         }
     }
+    /* ... or we have at least min_size + window_size + 1 bytes remaining.
+     * We do not want to "cut" a chunk smaller than min_size and the hash
+     * window starts at the potential cutting place.
+     */
+    c->position += min_size;
+    c->remaining -= min_size;
+    n += min_size;
     sum = buzhash(c->data + c->position, window_size, c->table);
-    while(c->remaining > c->window_size && ((sum & chunk_mask) || n < min_size)) {
+    while(c->remaining > c->window_size && (sum & chunk_mask)) {
         sum = buzhash_update(sum, c->data[c->position],
                              c->data[c->position + window_size],
                              window_size, c->table);

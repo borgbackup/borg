@@ -216,18 +216,18 @@ class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
         self.repository.commit()
 
         self.repository.append_only = False
-        assert segments_in_repository() == 1
+        assert segments_in_repository() == 2
         self.repository.put(b'00000000000000000000000000000000', b'foo')
         self.repository.commit()
         # normal: compact squashes the data together, only one segment
-        assert segments_in_repository() == 1
+        assert segments_in_repository() == 4
 
         self.repository.append_only = True
-        assert segments_in_repository() == 1
+        assert segments_in_repository() == 4
         self.repository.put(b'00000000000000000000000000000000', b'foo')
         self.repository.commit()
         # append only: does not compact, only new segments written
-        assert segments_in_repository() == 2
+        assert segments_in_repository() == 6
 
 
 class RepositoryCheckTestCase(RepositoryTestCaseBase):
@@ -296,20 +296,20 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
         self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
         self.check(status=True)
-        self.delete_segment(1)
+        self.delete_segment(2)
         self.repository.rollback()
         self.check(repair=True, status=True)
         self.assert_equal(set([1, 2, 3]), self.list_objects())
 
     def test_repair_missing_commit_segment(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
-        self.delete_segment(1)
+        self.delete_segment(3)
         self.assert_raises(Repository.ObjectNotFound, lambda: self.get_objects(4))
         self.assert_equal(set([1, 2, 3]), self.list_objects())
 
     def test_repair_corrupted_commit_segment(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
-        with open(os.path.join(self.tmppath, 'repository', 'data', '0', '1'), 'r+b') as fd:
+        with open(os.path.join(self.tmppath, 'repository', 'data', '0', '3'), 'r+b') as fd:
             fd.seek(-1, os.SEEK_END)
             fd.write(b'X')
         self.assert_raises(Repository.ObjectNotFound, lambda: self.get_objects(4))
@@ -319,15 +319,15 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
     def test_repair_no_commits(self):
         self.add_objects([[1, 2, 3]])
-        with open(os.path.join(self.tmppath, 'repository', 'data', '0', '0'), 'r+b') as fd:
+        with open(os.path.join(self.tmppath, 'repository', 'data', '0', '1'), 'r+b') as fd:
             fd.seek(-1, os.SEEK_END)
             fd.write(b'X')
         self.assert_raises(Repository.CheckNeeded, lambda: self.get_objects(4))
         self.check(status=False)
         self.check(status=False)
-        self.assert_equal(self.list_indices(), ['index.0'])
-        self.check(repair=True, status=True)
         self.assert_equal(self.list_indices(), ['index.1'])
+        self.check(repair=True, status=True)
+        self.assert_equal(self.list_indices(), ['index.3'])
         self.check(status=True)
         self.get_objects(3)
         self.assert_equal(set([1, 2, 3]), self.list_objects())
@@ -341,10 +341,10 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
     def test_repair_index_too_new(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
-        self.assert_equal(self.list_indices(), ['index.1'])
+        self.assert_equal(self.list_indices(), ['index.3'])
         self.rename_index('index.100')
         self.check(status=True)
-        self.assert_equal(self.list_indices(), ['index.1'])
+        self.assert_equal(self.list_indices(), ['index.3'])
         self.get_objects(4)
         self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
 

@@ -1,3 +1,4 @@
+import os.path
 import sys
 
 # This is a hack to fix path problems because "borg" (the package) is in the source root.
@@ -11,7 +12,7 @@ import sys
 
 original_path = list(sys.path)
 for entry in original_path:
-    if entry == '' or entry.endswith('/borg'):
+    if entry == '' or entry == os.path.dirname(__file__):
         sys.path.remove(entry)
 
 try:

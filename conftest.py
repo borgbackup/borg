@@ -27,7 +27,12 @@ setup_logging()
 
 from borg.testsuite import has_lchflags, no_lchlfags_because, has_llfuse
 from borg.testsuite.platform import fakeroot_detected
-from borg import xattr
+from borg import xattr, constants
+
+
+def pytest_configure(config):
+    # no fixture-based monkey-patching since star-imports are used for the constants module
+    constants.PBKDF2_ITERATIONS = 1
 
 
 def pytest_report_header(config, startdir):

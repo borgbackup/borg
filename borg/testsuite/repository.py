@@ -10,7 +10,7 @@ from ..hashindex import NSIndex
 from ..helpers import Location, IntegrityError
 from ..locking import UpgradableLock, LockFailed
 from ..remote import RemoteRepository, InvalidRPCMethod, ConnectionClosedWithHint
-from ..repository import Repository, LoggedIO
+from ..repository import Repository, LoggedIO, MAGIC
 from . import BaseTestCase
 
 
@@ -123,6 +123,46 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         self.assert_equal(len(second_half), 50)
         self.assert_equal(second_half, all[50:])
         self.assert_equal(len(self.repository.list(limit=50)), 50)
+
+
+class LocalRepositoryTestCase(RepositoryTestCaseBase):
+    # test case that doesn't work with remote repositories
+
+    def _assert_sparse(self):
+        # The superseded 123456... PUT
+        assert self.repository.compact[0] == 41 + 9
+        # The DELETE issued by the superseding PUT (or issued directly)
+        assert self.repository.compact[2] == 41
+        self.repository._rebuild_sparse(0)
+        assert self.repository.compact[0] == 41 + 9
+
+    def test_sparse1(self):
+        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.put(b'00000000000000000000000000000001', b'123456789')
+        self.repository.commit()
+        self.repository.put(b'00000000000000000000000000000001', b'bar')
+        self._assert_sparse()
+
+    def test_sparse2(self):
+        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.put(b'00000000000000000000000000000001', b'123456789')
+        self.repository.commit()
+        self.repository.delete(b'00000000000000000000000000000001')
+        self._assert_sparse()
+
+    def test_sparse_delete(self):
+        self.repository.put(b'00000000000000000000000000000000', b'1245')
+        self.repository.delete(b'00000000000000000000000000000000')
+        self.repository.io._write_fd.sync()
+
+        # The on-line tracking works on a per-object basis...
+        assert self.repository.compact[0] == 41 + 41 + 4
+        self.repository._rebuild_sparse(0)
+        # ...while _rebuild_sparse can mark whole segments as completely sparse (which then includes the segment magic)
+        assert self.repository.compact[0] == 41 + 41 + 4 + len(MAGIC)
+
+        self.repository.commit()
+        assert 0 not in [segment for segment, _ in self.repository.io.segment_iterator()]
 
 
 class RepositoryCommitTestCase(RepositoryTestCaseBase):

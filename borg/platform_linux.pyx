@@ -47,7 +47,7 @@ cdef extern from "linux/fs.h":
     int FS_APPEND_FL
     int FS_COMPR_FL
 
-cdef extern from "stropts.h":
+cdef extern from "sys/ioctl.h":
     int ioctl(int fildes, int request, ...)
 
 cdef extern from "string.h":

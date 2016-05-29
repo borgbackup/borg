@@ -19,6 +19,8 @@ RPC_PROTOCOL_VERSION = 2
 
 BUFSIZE = 10 * 1024 * 1024
 
+MAX_INFLIGHT = 100
+
 
 class ConnectionClosed(Error):
     """Connection closed by remote host"""
@@ -246,7 +248,6 @@ class RemoteRepository:
 
         calls = list(calls)
         waiting_for = []
-        w_fds = [self.stdin_fd]
         while wait or calls:
             while waiting_for:
                 try:
@@ -275,6 +276,10 @@ class RemoteRepository:
                             return
                 except KeyError:
                     break
+            if self.to_send or ((calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT):
+                w_fds = [self.stdin_fd]
+            else:
+                w_fds = []
             r, w, x = select.select(self.r_fds, w_fds, self.x_fds, 1)
             if x:
                 raise Exception('FD exception occurred')
@@ -311,7 +316,7 @@ class RemoteRepository:
                         else:
                             sys.stderr.write("Remote: " + line)
             if w:
-                while not self.to_send and (calls or self.preload_ids) and len(waiting_for) < 100:
+                while not self.to_send and (calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT:
                     if calls:
                         if is_preloaded:
                             if calls[0] in self.cache:
@@ -338,8 +343,6 @@ class RemoteRepository:
                         # that the fd should be writable
                         if e.errno != errno.EAGAIN:
                             raise
-                if not self.to_send and not (calls or self.preload_ids):
-                    w_fds = []
         self.ignore_responses |= set(waiting_for)
 
     def check(self, repair=False, save_space=False):

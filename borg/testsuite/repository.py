@@ -283,38 +283,38 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
             self.repository.commit()
 
     def test_corrupted_hints(self):
-        with open(os.path.join(self.repository.path, 'hints.0'), 'ab') as fd:
+        with open(os.path.join(self.repository.path, 'hints.1'), 'ab') as fd:
             fd.write(b'123456789')
         self.do_commit()
 
     def test_deleted_hints(self):
-        os.unlink(os.path.join(self.repository.path, 'hints.0'))
+        os.unlink(os.path.join(self.repository.path, 'hints.1'))
         self.do_commit()
 
     def test_deleted_index(self):
-        os.unlink(os.path.join(self.repository.path, 'index.0'))
+        os.unlink(os.path.join(self.repository.path, 'index.1'))
         self.do_commit()
 
     def test_unreadable_hints(self):
-        hints = os.path.join(self.repository.path, 'hints.0')
+        hints = os.path.join(self.repository.path, 'hints.1')
         os.unlink(hints)
         os.mkdir(hints)
         with self.assert_raises(InternalOSError):
             self.do_commit()
 
     def test_index(self):
-        with open(os.path.join(self.repository.path, 'index.0'), 'wb') as fd:
+        with open(os.path.join(self.repository.path, 'index.1'), 'wb') as fd:
             fd.write(b'123456789')
         self.do_commit()
 
     def test_index_outside_transaction(self):
-        with open(os.path.join(self.repository.path, 'index.0'), 'wb') as fd:
+        with open(os.path.join(self.repository.path, 'index.1'), 'wb') as fd:
             fd.write(b'123456789')
         with self.repository:
             assert len(self.repository) == 1
 
     def test_unreadable_index(self):
-        index = os.path.join(self.repository.path, 'index.0')
+        index = os.path.join(self.repository.path, 'index.1')
         os.unlink(index)
         os.mkdir(index)
         with self.assert_raises(InternalOSError):

@@ -25,6 +25,8 @@ from .helpers import Chunk, Error, uid2user, user2uid, gid2group, group2gid, \
     CompressionDecider1, CompressionDecider2, CompressionSpec
 from .repository import Repository
 from .platform import acl_get, acl_set
+if sys.platform == 'win32':
+    from .platform import get_owner, set_owner
 from .chunker import Chunker
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .cache import ChunkListEntry
@@ -423,6 +425,11 @@ Number of files: {0.stats.nfiles}'''.format(
                     os.lchown(path, uid, gid)
             except OSError:
                 pass
+        else:
+            try:
+                set_owner(path, item[b'user'], safe_decode(item[b'uid']))
+            except OSError:
+                pass
         if sys.platform != 'win32':
             if fd:
                 os.fchmod(fd, item[b'mode'])
@@ -501,14 +508,26 @@ Number of files: {0.stats.nfiles}'''.format(
         del self.manifest.archives[self.name]
 
     def stat_attrs(self, st, path):
-        item = {
-            b'mode': st.st_mode,
-            b'uid': st.st_uid, b'user': uid2user(st.st_uid),
-            b'gid': st.st_gid, b'group': gid2group(st.st_gid),
-            b'atime': int_to_bigint(st.st_atime_ns),
-            b'ctime': int_to_bigint(st.st_ctime_ns),
-            b'mtime': int_to_bigint(st.st_mtime_ns),
-        }
+        item = {}
+        if sys.platform == 'win32':
+            owner = get_owner(path)
+            item = {
+                b'mode': st.st_mode,
+                b'uid': owner[1], b'user': owner[0],
+                b'gid': st.st_gid, b'group': gid2group(st.st_gid),
+                b'atime': int_to_bigint(st.st_atime_ns),
+                b'ctime': int_to_bigint(st.st_ctime_ns),
+                b'mtime': int_to_bigint(st.st_mtime_ns),
+            }
+        else:
+            item = {
+                b'mode': st.st_mode,
+                b'uid': st.st_uid, b'user': uid2user(st.st_uid),
+                b'gid': st.st_gid, b'group': gid2group(st.st_gid),
+                b'atime': int_to_bigint(st.st_atime_ns),
+                b'ctime': int_to_bigint(st.st_ctime_ns),
+                b'mtime': int_to_bigint(st.st_mtime_ns),
+            }
         if self.numeric_owner:
             item[b'user'] = item[b'group'] = None
         xattrs = xattr.get_all(path, follow_symlinks=False)

@@ -44,6 +44,7 @@ hashindex_source = 'borg/hashindex.pyx'
 platform_linux_source = 'borg/platform_linux.pyx'
 platform_darwin_source = 'borg/platform_darwin.pyx'
 platform_freebsd_source = 'borg/platform_freebsd.pyx'
+platform_windows_source = 'borg/platform_windows.pyx'
 
 try:
     from Cython.Distutils import build_ext
@@ -52,7 +53,8 @@ try:
     class Sdist(sdist):
         def __init__(self, *args, **kwargs):
             for src in glob('borg/*.pyx'):
-                cython_compiler.compile(src, cython_compiler.default_options)
+                options = cython_compiler.default_options
+                cython_compiler.compile(src, options)
             super().__init__(*args, **kwargs)
 
         def make_distribution(self):
@@ -64,6 +66,7 @@ try:
                 'borg/platform_linux.c',
                 'borg/platform_freebsd.c',
                 'borg/platform_darwin.c',
+                'borg/platform_windows.c',
             ])
             super().make_distribution()
 
@@ -79,10 +82,11 @@ except ImportError:
     platform_linux_source = platform_linux_source.replace('.pyx', '.c')
     platform_freebsd_source = platform_freebsd_source.replace('.pyx', '.c')
     platform_darwin_source = platform_darwin_source.replace('.pyx', '.c')
+    platform_windows_source = platform_windows_source.replace('.pyx', '.c')
     from distutils.command.build_ext import build_ext
     if not on_rtd and not all(os.path.exists(path) for path in [
         compress_source, crypto_source, chunker_source, hashindex_source,
-        platform_linux_source, platform_freebsd_source]):
+        platform_linux_source, platform_freebsd_source, platform_windows_source]):
         raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 
 
@@ -312,6 +316,8 @@ if not on_rtd:
         ext_modules.append(Extension('borg.platform_freebsd', [platform_freebsd_source]))
     elif sys.platform == 'darwin':
         ext_modules.append(Extension('borg.platform_darwin', [platform_darwin_source]))
+    elif sys.platform == 'win32':
+        ext_modules.append(Extension('borg.platform_windows', [platform_windows_source]))
 
 
 def parse(root, describe_command=None):

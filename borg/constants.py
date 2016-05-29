@@ -1,7 +1,7 @@
 # this set must be kept complete, otherwise the RobustUnpacker might malfunction:
 ITEM_KEYS = set([b'path', b'source', b'rdev', b'chunks', b'hardlink_master',
                  b'mode', b'user', b'group', b'uid', b'gid', b'mtime', b'atime', b'ctime',
-                 b'xattrs', b'bsdflags', b'acl_nfs4', b'acl_access', b'acl_default', b'acl_extended', ])
+                 b'xattrs', b'bsdflags', b'acl_nfs4', b'acl_access', b'acl_default', b'acl_extended', b'win_dacl'])
 
 ARCHIVE_TEXT_KEYS = (b'name', b'comment', b'hostname', b'username', b'time', b'time_end')
 ITEM_TEXT_KEYS = (b'path', b'source', b'user', b'group')

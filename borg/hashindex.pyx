@@ -5,6 +5,8 @@ import os
 
 cimport cython
 from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
+from libc.errno cimport errno
+from cpython.exc cimport PyErr_SetFromErrnoWithFilename
 
 API_VERSION = 2
 
@@ -26,14 +28,6 @@ cdef extern from "_hashindex.c":
     int hashindex_set(HashIndex *index, void *key, void *value)
     uint32_t _htole32(uint32_t v)
     uint32_t _le32toh(uint32_t v)
-
-
-cdef extern from "errno.h":
-    int errno
-
-
-cdef extern from "string.h":
-    char *strerror(int errnum)
 
 
 cdef _NoDefault = object()
@@ -62,10 +56,6 @@ MAX_VALUE = _MAX_VALUE
 assert _MAX_VALUE % 2 == 1
 
 
-def decoded_strerror(errno):
-    return strerror(errno).decode(locale.getpreferredencoding(), 'surrogateescape')
-
-
 @cython.internal
 cdef class IndexBase:
     cdef HashIndex *index
@@ -78,7 +68,8 @@ cdef class IndexBase:
             self.index = hashindex_read(path)
             if not self.index:
                 if errno:
-                    raise OSError(errno, decoded_strerror(errno), os.fsdecode(path))
+                    PyErr_SetFromErrnoWithFilename(OSError, path)
+                    return
                 raise RuntimeError('hashindex_read failed')
         else:
             self.index = hashindex_init(capacity, self.key_size, self.value_size)

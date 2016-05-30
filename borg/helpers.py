@@ -16,8 +16,6 @@ import stat
 import textwrap
 
 import re
-from shutil import get_terminal_size
-
 from string import Formatter
 import platform
 import time
@@ -70,6 +68,18 @@ class ErrorWithTraceback(Error):
     traceback = True
 
 
+class InternalOSError(Error):
+    """Error while accessing repository: [Errno {}] {}: {}"""
+
+    def __init__(self, os_error):
+        self.errno = os_error.errno
+        self.strerror = os_error.strerror
+        self.filename = os_error.filename
+
+    def get_message(self):
+        return self.__doc__.format(self.errno, self.strerror, self.filename)
+
+
 class IntegrityError(ErrorWithTraceback):
     """Data integrity error"""
 
@@ -86,7 +96,7 @@ def check_extension_modules():
         raise ExtensionModuleError
     if crypto.API_VERSION != 3:
         raise ExtensionModuleError
-    if platform.API_VERSION != 2:
+    if platform.API_VERSION != 3:
         raise ExtensionModuleError
 
 
@@ -174,57 +184,6 @@ def prune_split(archives, pattern, n, skip=[]):
                 if len(keep) == n:
                     break
     return keep
-
-
-class Statistics:
-
-    def __init__(self):
-        self.osize = self.csize = self.usize = self.nfiles = 0
-        self.last_progress = 0  # timestamp when last progress was shown
-
-    def update(self, size, csize, unique):
-        self.osize += size
-        self.csize += csize
-        if unique:
-            self.usize += csize
-
-    summary = """\
-                       Original size      Compressed size    Deduplicated size
-{label:15} {stats.osize_fmt:>20s} {stats.csize_fmt:>20s} {stats.usize_fmt:>20s}"""
-
-    def __str__(self):
-        return self.summary.format(stats=self, label='This archive:')
-
-    def __repr__(self):
-        return "<{cls} object at {hash:#x} ({self.osize}, {self.csize}, {self.usize})>".format(cls=type(self).__name__, hash=id(self), self=self)
-
-    @property
-    def osize_fmt(self):
-        return format_file_size(self.osize)
-
-    @property
-    def usize_fmt(self):
-        return format_file_size(self.usize)
-
-    @property
-    def csize_fmt(self):
-        return format_file_size(self.csize)
-
-    def show_progress(self, item=None, final=False, stream=None, dt=None):
-        now = time.time()
-        if dt is None or now - self.last_progress > dt:
-            self.last_progress = now
-            columns, lines = get_terminal_size()
-            if not final:
-                msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
-                path = remove_surrogates(item[b'path']) if item else ''
-                space = columns - len(msg)
-                if space < len('...') + len(path):
-                    path = '%s...%s' % (path[:(space // 2) - len('...')], path[-space // 2:])
-                msg += "{0:<{space}}".format(path, space=space)
-            else:
-                msg = ' ' * columns
-            print(msg, file=stream or sys.stderr, end="\r", flush=True)
 
 
 def get_home_dir():
@@ -764,11 +723,15 @@ def posix_acl_use_stored_uid_gid(acl):
 
 def safe_decode(s, coding='utf-8', errors='surrogateescape'):
     """decode bytes to str, with round-tripping "invalid" bytes"""
+    if s is None:
+        return None
     return s.decode(coding, errors)
 
 
 def safe_encode(s, coding='utf-8', errors='surrogateescape'):
     """encode str to bytes, with round-tripping "invalid" bytes"""
+    if s is None:
+        return None
     return s.encode(coding, errors)
 
 
@@ -1098,7 +1061,7 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
 
 
 class ProgressIndicatorPercent:
-    def __init__(self, total, step=5, start=0, same_line=False, msg="%3.0f%%", file=None):
+    def __init__(self, total, step=5, start=0, same_line=False, msg="%3.0f%%"):
         """
         Percentage-based progress indicator
 
@@ -1107,17 +1070,33 @@ class ProgressIndicatorPercent:
         :param start: at which percent value to start
         :param same_line: if True, emit output always on same line
         :param msg: output message, must contain one %f placeholder for the percentage
-        :param file: output file, default: sys.stderr
         """
         self.counter = 0  # 0 .. (total-1)
         self.total = total
         self.trigger_at = start  # output next percentage value when reaching (at least) this
         self.step = step
-        if file is None:
-            file = sys.stderr
-        self.file = file
         self.msg = msg
         self.same_line = same_line
+        self.handler = None
+        self.logger = logging.getLogger('borg.output.progress')
+
+        # If there are no handlers, set one up explicitly because the
+        # terminator and propagation needs to be set.  If there are,
+        # they must have been set up by BORG_LOGGING_CONF: skip setup.
+        if not self.logger.handlers:
+            self.handler = logging.StreamHandler(stream=sys.stderr)
+            self.handler.setLevel(logging.INFO)
+            self.handler.terminator = '\r' if self.same_line else '\n'
+
+            self.logger.addHandler(self.handler)
+            if self.logger.level == logging.NOTSET:
+                self.logger.setLevel(logging.WARN)
+            self.logger.propagate = False
+
+    def __del__(self):
+        if self.handler is not None:
+            self.logger.removeHandler(self.handler)
+            self.handler.close()
 
     def progress(self, current=None):
         if current is not None:
@@ -1134,11 +1113,11 @@ class ProgressIndicatorPercent:
             return self.output(pct)
 
     def output(self, percent):
-        print(self.msg % percent, file=self.file, end='\r' if self.same_line else '\n', flush=True)
+        self.logger.info(self.msg % percent)
 
     def finish(self):
         if self.same_line:
-            print(" " * len(self.msg % 100.0), file=self.file, end='\r')
+            self.logger.info(" " * len(self.msg % 100.0))
 
 
 class ProgressIndicatorEndless:
@@ -1188,7 +1167,7 @@ def sysinfo():
     return '\n'.join(info)
 
 
-def log_multi(*msgs, level=logging.INFO):
+def log_multi(*msgs, level=logging.INFO, logger=logger):
     """
     log multiple lines of text, each line by a separate logging call for cosmetic reasons
 
@@ -1227,7 +1206,7 @@ class ItemFormatter:
         'NUL': 'NUL character for creating print0 / xargs -0 like ouput, see bpath',
     }
     KEY_GROUPS = (
-        ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget'),
+        ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget', 'flags'),
         ('size', 'csize', 'num_chunks', 'unique_chunks'),
         ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
         tuple(sorted(hashlib.algorithms_guaranteed)),
@@ -1320,6 +1299,7 @@ class ItemFormatter:
         item_data['source'] = source
         item_data['linktarget'] = source
         item_data['extra'] = extra
+        item_data['flags'] = item.get(b'bsdflags')
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)
         return item_data

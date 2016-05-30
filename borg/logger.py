@@ -88,7 +88,7 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
     logger = logging.getLogger('')
     handler = logging.StreamHandler(stream)
     if is_serve:
-        fmt = '$LOG %(levelname)s Remote: %(message)s'
+        fmt = '$LOG %(levelname)s %(name)s Remote: %(message)s'
     else:
         fmt = '%(message)s'
     handler.setFormatter(logging.Formatter(fmt))

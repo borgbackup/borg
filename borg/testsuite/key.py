@@ -1,17 +1,24 @@
+import getpass
 import os
 import re
 import shutil
 import tempfile
 from binascii import hexlify, unhexlify
 
+import pytest
+
 from ..crypto import bytes_to_long, num_aes_blocks
-from ..key import PlaintextKey, PassphraseKey, KeyfileKey
-from ..helpers import Location, Chunk, bin_to_hex
-from . import BaseTestCase, environment_variable
+from ..key import PlaintextKey, PassphraseKey, KeyfileKey, Passphrase, PasswordRetriesExceeded, bin_to_hex
+from ..helpers import Location, Chunk, IntegrityError
 
 
-class KeyTestCase(BaseTestCase):
+@pytest.fixture(autouse=True)
+def clean_env(monkeypatch):
+    # Workaround for some tests (testsuite/archiver) polluting the environment
+    monkeypatch.delenv('BORG_PASSPHRASE', False)
 
+
+class TestKey:
     class MockArgs:
         location = Location(tempfile.mkstemp()[1])
 
@@ -31,14 +38,10 @@ class KeyTestCase(BaseTestCase):
         """))
     keyfile2_id = unhexlify('c3fbf14bc001ebcc3cd86e696c13482ed071740927cd7cbe1b01b4bfcee49314')
 
-    def setUp(self):
-        self.tmppath = tempfile.mkdtemp()
-        os.environ['BORG_KEYS_DIR'] = self.tmppath
-        self.tmppath2 = tempfile.mkdtemp()
-
-    def tearDown(self):
-        shutil.rmtree(self.tmppath)
-        shutil.rmtree(self.tmppath2)
+    @pytest.fixture
+    def keys_dir(self, request, monkeypatch, tmpdir):
+        monkeypatch.setenv('BORG_KEYS_DIR', tmpdir)
+        return tmpdir
 
     class MockRepository:
         class _Location:
@@ -51,78 +54,144 @@ class KeyTestCase(BaseTestCase):
     def test_plaintext(self):
         key = PlaintextKey.create(None, None)
         chunk = Chunk(b'foo')
-        self.assert_equal(hexlify(key.id_hash(chunk.data)), b'2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae')
-        self.assert_equal(chunk, key.decrypt(key.id_hash(chunk.data), key.encrypt(chunk)))
+        assert hexlify(key.id_hash(chunk.data)) == b'2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae'
+        assert chunk == key.decrypt(key.id_hash(chunk.data), key.encrypt(chunk))
 
-    def test_keyfile(self):
-        os.environ['BORG_PASSPHRASE'] = 'test'
+    def test_keyfile(self, monkeypatch, keys_dir):
+        monkeypatch.setenv('BORG_PASSPHRASE', 'test')
         key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
-        self.assert_equal(bytes_to_long(key.enc_cipher.iv, 8), 0)
+        assert bytes_to_long(key.enc_cipher.iv, 8) == 0
         manifest = key.encrypt(Chunk(b'XXX'))
-        self.assert_equal(key.extract_nonce(manifest), 0)
+        assert key.extract_nonce(manifest) == 0
         manifest2 = key.encrypt(Chunk(b'XXX'))
-        self.assert_not_equal(manifest, manifest2)
-        self.assert_equal(key.decrypt(None, manifest), key.decrypt(None, manifest2))
-        self.assert_equal(key.extract_nonce(manifest2), 1)
+        assert manifest != manifest2
+        assert key.decrypt(None, manifest) == key.decrypt(None, manifest2)
+        assert key.extract_nonce(manifest2) == 1
         iv = key.extract_nonce(manifest)
         key2 = KeyfileKey.detect(self.MockRepository(), manifest)
-        self.assert_equal(bytes_to_long(key2.enc_cipher.iv, 8), iv + num_aes_blocks(len(manifest) - KeyfileKey.PAYLOAD_OVERHEAD))
+        assert bytes_to_long(key2.enc_cipher.iv, 8) == iv + num_aes_blocks(len(manifest) - KeyfileKey.PAYLOAD_OVERHEAD)
         # Key data sanity check
-        self.assert_equal(len(set([key2.id_key, key2.enc_key, key2.enc_hmac_key])), 3)
-        self.assert_equal(key2.chunk_seed == 0, False)
+        assert len({key2.id_key, key2.enc_key, key2.enc_hmac_key}) == 3
+        assert key2.chunk_seed != 0
         chunk = Chunk(b'foo')
-        self.assert_equal(chunk, key2.decrypt(key.id_hash(chunk.data), key.encrypt(chunk)))
+        assert chunk == key2.decrypt(key.id_hash(chunk.data), key.encrypt(chunk))
 
-    def test_keyfile_kfenv(self):
-        keyfile = os.path.join(self.tmppath2, 'keyfile')
-        with environment_variable(BORG_KEY_FILE=keyfile, BORG_PASSPHRASE='testkf'):
-            assert not os.path.exists(keyfile)
-            key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
-            assert os.path.exists(keyfile)
-            chunk = Chunk(b'XXX')
-            chunk_id = key.id_hash(chunk.data)
-            chunk_cdata = key.encrypt(chunk)
-            key = KeyfileKey.detect(self.MockRepository(), chunk_cdata)
-            self.assert_equal(chunk, key.decrypt(chunk_id, chunk_cdata))
-            os.unlink(keyfile)
-            self.assert_raises(FileNotFoundError, KeyfileKey.detect, self.MockRepository(), chunk_cdata)
+    def test_keyfile_kfenv(self, tmpdir, monkeypatch):
+        keyfile = tmpdir.join('keyfile')
+        monkeypatch.setenv('BORG_KEY_FILE', str(keyfile))
+        monkeypatch.setenv('BORG_PASSPHRASE', 'testkf')
+        assert not keyfile.exists()
+        key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
+        assert keyfile.exists()
+        chunk = Chunk(b'XXX')
+        chunk_id = key.id_hash(chunk.data)
+        chunk_cdata = key.encrypt(chunk)
+        key = KeyfileKey.detect(self.MockRepository(), chunk_cdata)
+        assert chunk == key.decrypt(chunk_id, chunk_cdata)
+        keyfile.remove()
+        with pytest.raises(FileNotFoundError):
+            KeyfileKey.detect(self.MockRepository(), chunk_cdata)
 
-    def test_keyfile2(self):
-        with open(os.path.join(os.environ['BORG_KEYS_DIR'], 'keyfile'), 'w') as fd:
+    def test_keyfile2(self, monkeypatch, keys_dir):
+        with keys_dir.join('keyfile').open('w') as fd:
             fd.write(self.keyfile2_key_file)
-        os.environ['BORG_PASSPHRASE'] = 'passphrase'
+        monkeypatch.setenv('BORG_PASSPHRASE', 'passphrase')
         key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
-        self.assert_equal(key.decrypt(self.keyfile2_id, self.keyfile2_cdata).data, b'payload')
+        assert key.decrypt(self.keyfile2_id, self.keyfile2_cdata).data == b'payload'
 
-    def test_keyfile2_kfenv(self):
-        keyfile = os.path.join(self.tmppath2, 'keyfile')
-        with open(keyfile, 'w') as fd:
+    def test_keyfile2_kfenv(self, tmpdir, monkeypatch):
+        keyfile = tmpdir.join('keyfile')
+        with keyfile.open('w') as fd:
             fd.write(self.keyfile2_key_file)
-        with environment_variable(BORG_KEY_FILE=keyfile, BORG_PASSPHRASE='passphrase'):
-            key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
-            self.assert_equal(key.decrypt(self.keyfile2_id, self.keyfile2_cdata).data, b'payload')
+        monkeypatch.setenv('BORG_KEY_FILE', str(keyfile))
+        monkeypatch.setenv('BORG_PASSPHRASE', 'passphrase')
+        key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
+        assert key.decrypt(self.keyfile2_id, self.keyfile2_cdata).data == b'payload'
 
-    def test_passphrase(self):
-        os.environ['BORG_PASSPHRASE'] = 'test'
+    def test_passphrase(self, keys_dir, monkeypatch):
+        monkeypatch.setenv('BORG_PASSPHRASE', 'test')
         key = PassphraseKey.create(self.MockRepository(), None)
-        self.assert_equal(bytes_to_long(key.enc_cipher.iv, 8), 0)
-        self.assert_equal(hexlify(key.id_key), b'793b0717f9d8fb01c751a487e9b827897ceea62409870600013fbc6b4d8d7ca6')
-        self.assert_equal(hexlify(key.enc_hmac_key), b'b885a05d329a086627412a6142aaeb9f6c54ab7950f996dd65587251f6bc0901')
-        self.assert_equal(hexlify(key.enc_key), b'2ff3654c6daf7381dbbe718d2b20b4f1ea1e34caa6cc65f6bb3ac376b93fed2a')
-        self.assert_equal(key.chunk_seed, -775740477)
+        assert bytes_to_long(key.enc_cipher.iv, 8) == 0
+        assert hexlify(key.id_key) == b'793b0717f9d8fb01c751a487e9b827897ceea62409870600013fbc6b4d8d7ca6'
+        assert hexlify(key.enc_hmac_key) == b'b885a05d329a086627412a6142aaeb9f6c54ab7950f996dd65587251f6bc0901'
+        assert hexlify(key.enc_key) == b'2ff3654c6daf7381dbbe718d2b20b4f1ea1e34caa6cc65f6bb3ac376b93fed2a'
+        assert key.chunk_seed == -775740477
         manifest = key.encrypt(Chunk(b'XXX'))
-        self.assert_equal(key.extract_nonce(manifest), 0)
+        assert key.extract_nonce(manifest) == 0
         manifest2 = key.encrypt(Chunk(b'XXX'))
-        self.assert_not_equal(manifest, manifest2)
-        self.assert_equal(key.decrypt(None, manifest), key.decrypt(None, manifest2))
-        self.assert_equal(key.extract_nonce(manifest2), 1)
+        assert manifest != manifest2
+        assert key.decrypt(None, manifest) == key.decrypt(None, manifest2)
+        assert key.extract_nonce(manifest2) == 1
         iv = key.extract_nonce(manifest)
         key2 = PassphraseKey.detect(self.MockRepository(), manifest)
-        self.assert_equal(bytes_to_long(key2.enc_cipher.iv, 8), iv + num_aes_blocks(len(manifest) - PassphraseKey.PAYLOAD_OVERHEAD))
-        self.assert_equal(key.id_key, key2.id_key)
-        self.assert_equal(key.enc_hmac_key, key2.enc_hmac_key)
-        self.assert_equal(key.enc_key, key2.enc_key)
-        self.assert_equal(key.chunk_seed, key2.chunk_seed)
+        assert bytes_to_long(key2.enc_cipher.iv, 8) == iv + num_aes_blocks(len(manifest) - PassphraseKey.PAYLOAD_OVERHEAD)
+        assert key.id_key == key2.id_key
+        assert key.enc_hmac_key == key2.enc_hmac_key
+        assert key.enc_key == key2.enc_key
+        assert key.chunk_seed == key2.chunk_seed
         chunk = Chunk(b'foo')
-        self.assert_equal(hexlify(key.id_hash(chunk.data)), b'818217cf07d37efad3860766dcdf1d21e401650fed2d76ed1d797d3aae925990')
-        self.assert_equal(chunk, key2.decrypt(key2.id_hash(chunk.data), key.encrypt(chunk)))
+        assert hexlify(key.id_hash(chunk.data)) == b'818217cf07d37efad3860766dcdf1d21e401650fed2d76ed1d797d3aae925990'
+        assert chunk == key2.decrypt(key2.id_hash(chunk.data), key.encrypt(chunk))
+
+    def _corrupt_byte(self, key, data, offset):
+        data = bytearray(data)
+        data[offset] += 1
+        with pytest.raises(IntegrityError):
+            key.decrypt("", data)
+
+    def test_decrypt_integrity(self, monkeypatch, keys_dir):
+        with keys_dir.join('keyfile').open('w') as fd:
+            fd.write(self.keyfile2_key_file)
+        monkeypatch.setenv('BORG_PASSPHRASE', 'passphrase')
+        key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
+
+        data = self.keyfile2_cdata
+        for i in range(len(data)):
+            self._corrupt_byte(key, data, i)
+
+        with pytest.raises(IntegrityError):
+            data = bytearray(self.keyfile2_cdata)
+            id = bytearray(key.id_hash(data))  # corrupt chunk id
+            id[12] = 0
+            key.decrypt(id, data)
+
+
+class TestPassphrase:
+    def test_passphrase_new_verification(self, capsys, monkeypatch):
+        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "12aöäü")
+        monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'no')
+        Passphrase.new()
+        out, err = capsys.readouterr()
+        assert "12" not in out
+        assert "12" not in err
+
+        monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'yes')
+        passphrase = Passphrase.new()
+        out, err = capsys.readouterr()
+        assert "313261c3b6c3a4c3bc" not in out
+        assert "313261c3b6c3a4c3bc" in err
+        assert passphrase == "12aöäü"
+
+        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "1234/@=")
+        Passphrase.new()
+        out, err = capsys.readouterr()
+        assert "1234/@=" not in out
+        assert "1234/@=" in err
+
+    def test_passphrase_new_empty(self, capsys, monkeypatch):
+        monkeypatch.delenv('BORG_PASSPHRASE', False)
+        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "")
+        with pytest.raises(PasswordRetriesExceeded):
+            Passphrase.new(allow_empty=False)
+        out, err = capsys.readouterr()
+        assert "must not be blank" in err
+
+    def test_passphrase_new_retries(self, monkeypatch):
+        monkeypatch.delenv('BORG_PASSPHRASE', False)
+        ascending_numbers = iter(range(20))
+        monkeypatch.setattr(getpass, 'getpass', lambda prompt: str(next(ascending_numbers)))
+        with pytest.raises(PasswordRetriesExceeded):
+            Passphrase.new()
+
+    def test_passphrase_repr(self):
+        assert "secret" not in repr(Passphrase("secret"))

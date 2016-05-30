@@ -46,7 +46,7 @@ A step by step example
 
 3. The next day create a new archive called *Tuesday*::
 
-    $ borg create -v --stats /path/to/repo::Tuesday ~/src ~/Documents
+    $ borg create --stats /path/to/repo::Tuesday ~/src ~/Documents
 
    This backup will be a lot quicker and a lot smaller since only new never
    before seen data is stored. The ``--stats`` option causes |project_name| to
@@ -93,9 +93,10 @@ A step by step example
 
 .. Note::
     Borg is quiet by default (it works on WARNING log level).
-    Add the ``-v`` (or ``--verbose`` or ``--info``) option to adjust the log
-    level to INFO and also use options like ``--progress`` or ``--list`` to
-    get progress reporting during command execution.
+    You can use options like ``--progress`` or ``--list`` to get specific
+    reports during command execution.  You can also add the ``-v`` (or
+    ``--verbose`` or ``--info``) option to adjust the log level to INFO to
+    get other informational messages.
 
 Automating backups
 ------------------
@@ -114,7 +115,7 @@ certain number of old archives::
     export BORG_PASSPHRASE=mysecret
 
     # Backup most important stuff:
-    borg create -v --stats -C lz4 ::`hostname`-`date +%Y-%m-%d` \
+    borg create --stats -C lz4 ::`hostname`-`date +%Y-%m-%d` \
         /etc                                                    \
         /home                                                   \
         /var                                                    \

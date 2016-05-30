@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 from collections import namedtuple
+import locale
 import os
 
 cimport cython
 from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
+from libc.errno cimport errno
+from cpython.exc cimport PyErr_SetFromErrnoWithFilename
 
 API_VERSION = 2
 
@@ -52,6 +55,7 @@ MAX_VALUE = _MAX_VALUE
 
 assert _MAX_VALUE % 2 == 1
 
+
 @cython.internal
 cdef class IndexBase:
     cdef HashIndex *index
@@ -63,7 +67,10 @@ cdef class IndexBase:
             path = os.fsencode(path)
             self.index = hashindex_read(path)
             if not self.index:
-                raise Exception('hashindex_read failed')
+                if errno:
+                    PyErr_SetFromErrnoWithFilename(OSError, path)
+                    return
+                raise RuntimeError('hashindex_read failed')
         else:
             self.index = hashindex_init(capacity, self.key_size, self.value_size)
             if not self.index:

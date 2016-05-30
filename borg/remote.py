@@ -20,6 +20,8 @@ RPC_PROTOCOL_VERSION = 2
 
 BUFSIZE = 10 * 1024 * 1024
 
+MAX_INFLIGHT = 100
+
 
 class ConnectionClosed(Error):
     """Connection closed by remote host"""
@@ -248,7 +250,6 @@ class RemoteRepository:
 
         calls = list(calls)
         waiting_for = []
-        w_fds = [self.stdin_fd]
         while wait or calls:
             while waiting_for:
                 try:
@@ -277,6 +278,10 @@ class RemoteRepository:
                             return
                 except KeyError:
                     break
+            if self.to_send or ((calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT):
+                w_fds = [self.stdin_fd]
+            else:
+                w_fds = []
             r, w, x = select.select(self.r_fds, w_fds, self.x_fds, 1)
             if x:
                 raise Exception('FD exception occurred')
@@ -300,14 +305,9 @@ class RemoteRepository:
                         raise ConnectionClosed()
                     data = data.decode('utf-8')
                     for line in data.splitlines(keepends=True):
-                        if line.startswith('$LOG '):
-                            _, level, msg = line.split(' ', 2)
-                            level = getattr(logging, level, logging.CRITICAL)  # str -> int
-                            logging.log(level, msg.rstrip())
-                        else:
-                            sys.stderr.write("Remote: " + line)
+                        handle_remote_line(line)
             if w:
-                while not self.to_send and (calls or self.preload_ids) and len(waiting_for) < 100:
+                while not self.to_send and (calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT:
                     if calls:
                         if is_preloaded:
                             if calls[0] in self.cache:
@@ -334,8 +334,6 @@ class RemoteRepository:
                         # that the fd should be writable
                         if e.errno != errno.EAGAIN:
                             raise
-                if not self.to_send and not (calls or self.preload_ids):
-                    w_fds = []
         self.ignore_responses |= set(waiting_for)
 
     def check(self, repair=False, save_space=False):
@@ -390,6 +388,21 @@ class RemoteRepository:
         self.preload_ids += ids
 
 
+def handle_remote_line(line):
+    if line.startswith('$LOG '):
+        _, level, msg = line.split(' ', 2)
+        level = getattr(logging, level, logging.CRITICAL)  # str -> int
+        if msg.startswith('Remote:'):
+            # server format: '$LOG <level> Remote: <msg>'
+            logging.log(level, msg.rstrip())
+        else:
+            # server format '$LOG <level> <logname> Remote: <msg>'
+            logname, msg = msg.split(' ', 1)
+            logging.getLogger(logname).log(level, msg.rstrip())
+    else:
+        sys.stderr.write("Remote: " + line)
+
+
 class RepositoryNoCache:
     """A not caching Repository wrapper, passes through to repository.
 
@@ -420,6 +433,9 @@ class RepositoryCache(RepositoryNoCache):
 
     Caches Repository GET operations using a local temporary Repository.
     """
+    # maximum object size that will be cached, 64 kiB.
+    THRESHOLD = 2**16
+
     def __init__(self, repository):
         super().__init__(repository)
         tmppath = tempfile.mkdtemp(prefix='borg-tmp')
@@ -440,7 +456,8 @@ class RepositoryCache(RepositoryNoCache):
             except Repository.ObjectNotFound:
                 for key_, data in repository_iterator:
                     if key_ == key:
-                        self.caching_repo.put(key, data)
+                        if len(data) <= self.THRESHOLD:
+                            self.caching_repo.put(key, data)
                         yield data
                         break
         # Consume any pending requests

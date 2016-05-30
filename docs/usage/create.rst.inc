@@ -74,6 +74,12 @@ This command creates a backup archive containing all files found while recursive
 traversing all paths specified. The archive will consume almost no disk space for
 files or parts of files that have already been stored in other archives.
 
+The archive name needs to be unique. It must not end in '.checkpoint' or
+'.checkpoint.N' (with N being a number), because these names are used for
+checkpoints and treated in special ways.
+
+In the archive name, you may use the following format tags:
+{now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}
 
 To speed up pulling backups over sshfs and similar network file systems which do
 not provide correct inode information the --ignore-inode flag can be used. This

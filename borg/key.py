@@ -1,4 +1,4 @@
-from binascii import a2b_base64, b2a_base64
+from binascii import a2b_base64, b2a_base64, hexlify
 import configparser
 import getpass
 import os
@@ -413,16 +413,19 @@ class KeyfileKey(KeyfileKeyBase):
     FILE_ID = 'BORG_KEY'
 
     def sanity_check(self, filename, id):
-        with open(filename, 'r') as fd:
-            line = fd.readline().strip()
-            if not line.startswith(self.FILE_ID):
+        file_id = self.FILE_ID.encode() + b' '
+        repo_id = hexlify(id)
+        with open(filename, 'rb') as fd:
+            # we do the magic / id check in binary mode to avoid stumbling over
+            # decoding errors if somebody has binary files in the keys dir for some reason.
+            if fd.read(len(file_id)) != file_id:
                 raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)
-            if line[len(self.FILE_ID) + 1:] != id:
+            if fd.read(len(repo_id)) != repo_id:
                 raise KeyfileMismatchError(self.repository._location.canonical_path(), filename)
             return filename
 
     def find_key(self):
-        id = self.repository.id_str
+        id = self.repository.id
         keyfile = os.environ.get('BORG_KEY_FILE')
         if keyfile:
             return self.sanity_check(keyfile, id)

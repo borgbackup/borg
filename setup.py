@@ -38,18 +38,17 @@ if sys.platform.startswith('freebsd'):
     # llfuse 0.41.1 is the latest release that actually builds on freebsd:
     extras_require['fuse'] = ['llfuse==0.41.1', ]
 
-from setuptools import setup, Extension
+from setuptools import setup, find_packages, Extension
 from setuptools.command.sdist import sdist
 
-
-compress_source = 'borg/compress.pyx'
-crypto_source = 'borg/crypto.pyx'
-chunker_source = 'borg/chunker.pyx'
-hashindex_source = 'borg/hashindex.pyx'
-platform_posix_source = 'borg/platform_posix.pyx'
-platform_linux_source = 'borg/platform_linux.pyx'
-platform_darwin_source = 'borg/platform_darwin.pyx'
-platform_freebsd_source = 'borg/platform_freebsd.pyx'
+compress_source = 'src/borg/compress.pyx'
+crypto_source = 'src/borg/crypto.pyx'
+chunker_source = 'src/borg/chunker.pyx'
+hashindex_source = 'src/borg/hashindex.pyx'
+platform_posix_source = 'src/borg/platform_posix.pyx'
+platform_linux_source = 'src/borg/platform_linux.pyx'
+platform_darwin_source = 'src/borg/platform_darwin.pyx'
+platform_freebsd_source = 'src/borg/platform_freebsd.pyx'
 
 try:
     from Cython.Distutils import build_ext
@@ -57,20 +56,20 @@ try:
 
     class Sdist(sdist):
         def __init__(self, *args, **kwargs):
-            for src in glob('borg/*.pyx'):
+            for src in glob('src/borg/*.pyx'):
                 cython_compiler.compile(src, cython_compiler.default_options)
             super().__init__(*args, **kwargs)
 
         def make_distribution(self):
             self.filelist.extend([
-                'borg/compress.c',
-                'borg/crypto.c',
-                'borg/chunker.c', 'borg/_chunker.c',
-                'borg/hashindex.c', 'borg/_hashindex.c',
-                'borg/platform_posix.c',
-                'borg/platform_linux.c',
-                'borg/platform_freebsd.c',
-                'borg/platform_darwin.c',
+                'src/borg/compress.c',
+                'src/borg/crypto.c',
+                'src/borg/chunker.c', 'src/borg/_chunker.c',
+                'src/borg/hashindex.c', 'src/borg/_hashindex.c',
+                'src/borg/platform_posix.c',
+                'src/borg/platform_linux.c',
+                'src/borg/platform_freebsd.c',
+                'src/borg/platform_darwin.c',
             ])
             super().make_distribution()
 
@@ -269,7 +268,7 @@ class build_api(Command):
 API Documentation
 =================
 """)
-            for mod in glob('borg/*.py') + glob('borg/*.pyx'):
+            for mod in glob('src/borg/*.py') + glob('src/borg/*.pyx'):
                 print("examining module %s" % mod)
                 mod = mod.replace('.pyx', '').replace('.py', '').replace('/', '.')
                 if "._" not in mod:
@@ -308,7 +307,7 @@ if not on_rtd:
 setup(
     name='borgbackup',
     use_scm_version={
-        'write_to': 'borg/_version.py',
+        'write_to': 'src/borg/_version.py',
     },
     author='The Borg Collective (see AUTHORS file)',
     author_email='borgbackup@python.org',
@@ -334,7 +333,10 @@ setup(
         'Topic :: Security :: Cryptography',
         'Topic :: System :: Archiving :: Backup',
     ],
-    packages=['borg', 'borg.testsuite', ],
+    packages=find_packages('src'),
+    package_dir={'': 'src'},
+    include_package_data=True,
+    zip_safe=False,
     entry_points={
         'console_scripts': [
             'borg = borg.archiver:main',

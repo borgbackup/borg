@@ -512,20 +512,20 @@ class RemoteLoggerTestCase(BaseTestCase):
         # stderr messages don't get an implicit newline
         self.assert_equal(self.stderr.getvalue(), 'Remote: unstructured stderr message')
 
-    def test_old_format_messages(self):
+    def test_pre11_format_messages(self):
         self.handler.setLevel(logging.DEBUG)
         logging.getLogger().setLevel(logging.DEBUG)
 
-        handle_remote_line("$LOG INFO Remote: old format message")
-        self.assert_equal(self.stream.getvalue(), 'Remote: old format message\n')
+        handle_remote_line("$LOG INFO Remote: borg < 1.1 format message")
+        self.assert_equal(self.stream.getvalue(), 'Remote: borg < 1.1 format message\n')
         self.assert_equal(self.stderr.getvalue(), '')
 
-    def test_new_format_messages(self):
+    def test_post11_format_messages(self):
         self.handler.setLevel(logging.DEBUG)
         logging.getLogger().setLevel(logging.DEBUG)
 
-        handle_remote_line("$LOG INFO borg.repository Remote: new format message")
-        self.assert_equal(self.stream.getvalue(), 'Remote: new format message\n')
+        handle_remote_line("$LOG INFO borg.repository Remote: borg >= 1.1 format message")
+        self.assert_equal(self.stream.getvalue(), 'Remote: borg >= 1.1 format message\n')
         self.assert_equal(self.stderr.getvalue(), '')
 
     def test_remote_messages_screened(self):

@@ -7,7 +7,12 @@ import textwrap
 from hmac import compare_digest
 from hashlib import sha256, pbkdf2_hmac
 
-from .helpers import Chunk, IntegrityError, get_keys_dir, Error, yes, bin_to_hex, CompressionDecider2, CompressionSpec
+from .helpers import Chunk
+from .helpers import Error, IntegrityError
+from .helpers import yes
+from .helpers import get_keys_dir
+from .helpers import bin_to_hex
+from .helpers import CompressionDecider2, CompressionSpec
 from .logger import create_logger
 logger = create_logger()
 

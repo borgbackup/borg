@@ -5,7 +5,8 @@ import os
 import shutil
 import time
 
-from .helpers import get_home_dir, get_keys_dir, get_cache_dir, ProgressIndicatorPercent
+from .helpers import get_home_dir, get_keys_dir, get_cache_dir
+from .helpers import ProgressIndicatorPercent
 from .locking import UpgradableLock
 from .repository import Repository, MAGIC
 from .key import KeyfileKey, KeyfileNotFoundError

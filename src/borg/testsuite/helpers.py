@@ -11,13 +11,19 @@ import msgpack
 import msgpack.fallback
 import time
 
-from ..helpers import Location, format_file_size, format_timedelta, make_path_safe, clean_lines, \
-    prune_within, prune_split, get_cache_dir, get_keys_dir, is_slow_msgpack, \
-    yes, TRUISH, FALSISH, DEFAULTISH, \
-    StableDict, int_to_bigint, bigint_to_int, bin_to_hex, parse_timestamp, ChunkerParams, Chunk, \
-    ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
-    CompressionSpec, CompressionDecider1, CompressionDecider2, \
-    PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, partial_format, ChunkIteratorFileWrapper
+from ..helpers import Location
+from ..helpers import partial_format, format_file_size, format_timedelta
+from ..helpers import make_path_safe, clean_lines
+from ..helpers import prune_within, prune_split
+from ..helpers import get_cache_dir, get_keys_dir
+from ..helpers import is_slow_msgpack
+from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
+from ..helpers import StableDict, int_to_bigint, bigint_to_int, bin_to_hex
+from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams, Chunk
+from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
+from ..helpers import load_excludes
+from ..helpers import CompressionSpec, CompressionDecider1, CompressionDecider2
+from ..helpers import parse_pattern, PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern
 from . import BaseTestCase, environment_variable, FakeInputs
 
 

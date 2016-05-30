@@ -20,12 +20,18 @@ import textwrap
 import traceback
 
 from . import __version__
-from .helpers import Error, location_validator, archivename_validator, format_time, format_file_size, \
-    parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
-    get_cache_dir, prune_within, prune_split, bin_to_hex, safe_encode, \
-    Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, \
-    dir_is_tagged, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
-    log_multi, PatternMatcher, ItemFormatter
+from .helpers import Error
+from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
+from .helpers import ItemFormatter, format_time, format_file_size, format_archive
+from .helpers import safe_encode, remove_surrogates, bin_to_hex
+from .helpers import prune_within, prune_split
+from .helpers import to_localtime, timestamp
+from .helpers import get_cache_dir
+from .helpers import Manifest
+from .helpers import update_excludes, check_extension_modules
+from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo
+from .helpers import log_multi
+from .helpers import parse_pattern, PatternMatcher, PathPrefixPattern
 from .logger import create_logger, setup_logging
 logger = create_logger()
 from . import helpers

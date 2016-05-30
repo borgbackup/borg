@@ -24,7 +24,9 @@ from ..archiver import Archiver
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto import bytes_to_long, num_aes_blocks
-from ..helpers import Chunk, Manifest, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, bin_to_hex
+from ..helpers import Chunk, Manifest
+from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
+from ..helpers import bin_to_hex
 from ..key import KeyfileKeyBase
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository

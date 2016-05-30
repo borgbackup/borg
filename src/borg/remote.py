@@ -10,7 +10,10 @@ import tempfile
 
 from . import __version__
 
-from .helpers import Error, IntegrityError, get_home_dir, sysinfo, bin_to_hex
+from .helpers import Error, IntegrityError
+from .helpers import get_home_dir
+from .helpers import sysinfo
+from .helpers import bin_to_hex
 from .repository import Repository
 
 import msgpack

@@ -15,8 +15,10 @@ from zlib import crc32
 
 import msgpack
 from .constants import *  # NOQA
-from .helpers import Error, ErrorWithTraceback, IntegrityError, InternalOSError, Location, ProgressIndicatorPercent, \
-    bin_to_hex
+from .helpers import Error, ErrorWithTraceback, IntegrityError, InternalOSError
+from .helpers import Location
+from .helpers import ProgressIndicatorPercent
+from .helpers import bin_to_hex
 from .hashindex import NSIndex
 from .locking import UpgradableLock, LockError, LockErrorT
 from .lrucache import LRUCache

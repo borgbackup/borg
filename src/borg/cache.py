@@ -9,8 +9,11 @@ import shutil
 from .key import PlaintextKey
 from .logger import create_logger
 logger = create_logger()
-from .helpers import Error, get_cache_dir, decode_dict, int_to_bigint, \
-    bigint_to_int, bin_to_hex, format_file_size, yes
+from .helpers import Error
+from .helpers import get_cache_dir
+from .helpers import decode_dict, int_to_bigint, bigint_to_int, bin_to_hex
+from .helpers import format_file_size
+from .helpers import yes
 from .locking import UpgradableLock
 from .hashindex import ChunkIndex, ChunkIndexEntry
 

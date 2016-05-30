@@ -9,7 +9,9 @@ import pytest
 
 from ..crypto import bytes_to_long, num_aes_blocks
 from ..key import PlaintextKey, PassphraseKey, KeyfileKey, Passphrase, PasswordRetriesExceeded, bin_to_hex
-from ..helpers import Location, Chunk, IntegrityError
+from ..helpers import Location
+from ..helpers import Chunk
+from ..helpers import IntegrityError
 
 
 @pytest.fixture(autouse=True)

@@ -3,7 +3,9 @@ import re
 import resource
 import stat
 
-from .helpers import posix_acl_use_stored_uid_gid, user2uid, group2gid, safe_decode, safe_encode
+from .helpers import posix_acl_use_stored_uid_gid
+from .helpers import user2uid, group2gid
+from .helpers import safe_decode, safe_encode
 from .platform_base import SyncFile as BaseSyncFile
 from .platform_posix import swidth
 

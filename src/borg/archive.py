@@ -1,7 +1,7 @@
+import errno
 from datetime import datetime, timezone
 from getpass import getuser
 from itertools import groupby
-import errno
 
 from .logger import create_logger
 logger = create_logger()
@@ -16,15 +16,20 @@ import sys
 import time
 from io import BytesIO
 from . import xattr
-from .compress import COMPR_BUFFER
 from .constants import *  # NOQA
-from .helpers import Chunk, Error, uid2user, user2uid, gid2group, group2gid, \
-    parse_timestamp, to_localtime, format_time, format_timedelta, safe_encode, safe_decode, \
-    Manifest, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, bin_to_hex, \
-    ProgressIndicatorPercent, ChunkIteratorFileWrapper, remove_surrogates, log_multi, \
-    PathPrefixPattern, FnmatchPattern, open_item, file_status, format_file_size, consume, \
-    CompressionDecider1, CompressionDecider2, CompressionSpec, \
-    IntegrityError
+from .helpers import Manifest
+from .helpers import Chunk, ChunkIteratorFileWrapper, open_item
+from .helpers import Error, IntegrityError
+from .helpers import uid2user, user2uid, gid2group, group2gid
+from .helpers import parse_timestamp, to_localtime
+from .helpers import format_time, format_timedelta, format_file_size, file_status
+from .helpers import safe_encode, safe_decode, make_path_safe, remove_surrogates
+from .helpers import decode_dict, StableDict
+from .helpers import int_to_bigint, bigint_to_int, bin_to_hex
+from .helpers import ProgressIndicatorPercent, log_multi
+from .helpers import PathPrefixPattern, FnmatchPattern
+from .helpers import consume
+from .helpers import CompressionDecider1, CompressionDecider2, CompressionSpec
 from .repository import Repository
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth
 from .chunker import Chunker

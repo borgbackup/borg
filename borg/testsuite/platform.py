@@ -4,7 +4,7 @@ import sys
 import tempfile
 import unittest
 
-from ..platform import acl_get, acl_set
+from ..platform import acl_get, acl_set, swidth
 from . import BaseTestCase
 
 
@@ -138,3 +138,16 @@ class PlatformDarwinTestCase(BaseTestCase):
         self.set_acl(file2.name, b'!#acl 1\ngroup:ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000000:staff:0:allow:read\nuser:FFFFEEEE-DDDD-CCCC-BBBB-AAAA00000000:root:0:allow:read\n', numeric_owner=True)
         self.assert_in(b'group:ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000000:wheel:0:allow:read', self.get_acl(file2.name)[b'acl_extended'])
         self.assert_in(b'group:ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000000::0:allow:read', self.get_acl(file2.name, numeric_owner=True)[b'acl_extended'])
+
+
+@unittest.skipUnless(sys.platform.startswith(('linux', 'freebsd', 'darwin')), 'POSIX only tests')
+class PlatformPosixTestCase(BaseTestCase):
+
+    def test_swidth_ascii(self):
+        self.assert_equal(swidth("borg"), 4)
+
+    def test_swidth_cjk(self):
+        self.assert_equal(swidth("バックアップ"), 6 * 2)
+
+    def test_swidth_mixed(self):
+        self.assert_equal(swidth("borgバックアップ"), 4 + 6 * 2)

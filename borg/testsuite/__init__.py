@@ -6,9 +6,13 @@ if sys.platform != 'win32':
     import posix
 import stat
 import sysconfig
+import tempfile
 import time
 import unittest
+
 from ..xattr import get_all
+from ..platform import get_flags
+from .. import platform
 
 # Note: this is used by borg.selftest, do not use or import py.test functionality here.
 
@@ -24,8 +28,20 @@ try:
 except ImportError:
     raises = None
 
-has_lchflags = hasattr(os, 'lchflags')
+has_lchflags = hasattr(os, 'lchflags') or sys.platform.startswith('linux')
+no_lchlfags_because = '' if has_lchflags else '(not supported on this platform)'
+try:
+    with tempfile.NamedTemporaryFile() as file:
+        platform.set_flags(file.name, stat.UF_NODUMP)
+except OSError:
+    has_lchflags = False
+    no_lchlfags_because = '(the file system at %s does not support flags)' % tempfile.gettempdir()
 
+try:
+    import llfuse
+    has_llfuse = True or llfuse  # avoids "unused import"
+except ImportError:
+    has_llfuse = False
 
 # The mtime get/set precision varies on different OS and Python versions
 if sys.platform != 'win32' and 'HAVE_FUTIMENS' in getattr(posix, '_have_functions', []):
@@ -76,13 +92,13 @@ class BaseTestCase(unittest.TestCase):
             # Assume path2 is on FUSE if st_dev is different
             fuse = s1.st_dev != s2.st_dev
             attrs = ['st_mode', 'st_uid', 'st_gid', 'st_rdev']
-            if has_lchflags:
-                attrs.append('st_flags')
             if not fuse or not os.path.isdir(path1):
                 # dir nlink is always 1 on our fuse filesystem
                 attrs.append('st_nlink')
             d1 = [filename] + [getattr(s1, a) for a in attrs]
             d2 = [filename] + [getattr(s2, a) for a in attrs]
+            d1.append(get_flags(path1, s1))
+            d2.append(get_flags(path2, s2))
             # ignore st_rdev if file is not a block/char device, fixes #203
             if not stat.S_ISCHR(d1[1]) and not stat.S_ISBLK(d1[1]):
                 d1[4] = None

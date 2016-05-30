@@ -1,7 +1,8 @@
 import os
 from .helpers import user2uid, group2gid, safe_decode, safe_encode
+from .platform_posix import swidth
 
-API_VERSION = 2
+API_VERSION = 3
 
 cdef extern from "sys/acl.h":
     ctypedef struct _acl_t:

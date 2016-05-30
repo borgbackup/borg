@@ -1,12 +1,62 @@
+import os
 from datetime import datetime, timezone
+from io import StringIO
 from unittest.mock import Mock
 
+import pytest
 import msgpack
 
-from ..archive import Archive, CacheChunkBuffer, RobustUnpacker
+from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, Statistics
 from ..key import PlaintextKey
 from ..helpers import Manifest
 from . import BaseTestCase
+
+
+@pytest.fixture()
+def stats():
+    stats = Statistics()
+    stats.update(20, 10, unique=True)
+    return stats
+
+
+def test_stats_basic(stats):
+    assert stats.osize == 20
+    assert stats.csize == stats.usize == 10
+    stats.update(20, 10, unique=False)
+    assert stats.osize == 40
+    assert stats.csize == 20
+    assert stats.usize == 10
+
+
+def tests_stats_progress(stats, columns=80):
+    os.environ['COLUMNS'] = str(columns)
+    out = StringIO()
+    stats.show_progress(stream=out)
+    s = '20 B O 10 B C 10 B D 0 N '
+    buf = ' ' * (columns - len(s))
+    assert out.getvalue() == s + buf + "\r"
+
+    out = StringIO()
+    stats.update(10**3, 0, unique=False)
+    stats.show_progress(item={b'path': 'foo'}, final=False, stream=out)
+    s = '1.02 kB O 10 B C 10 B D 0 N foo'
+    buf = ' ' * (columns - len(s))
+    assert out.getvalue() == s + buf + "\r"
+    out = StringIO()
+    stats.show_progress(item={b'path': 'foo'*40}, final=False, stream=out)
+    s = '1.02 kB O 10 B C 10 B D 0 N foofoofoofoofoofoofoofo...oofoofoofoofoofoofoofoofoo'
+    buf = ' ' * (columns - len(s))
+    assert out.getvalue() == s + buf + "\r"
+
+
+def test_stats_format(stats):
+    assert str(stats) == """\
+                       Original size      Compressed size    Deduplicated size
+This archive:                   20 B                 10 B                 10 B"""
+    s = "{0.osize_fmt}".format(stats)
+    assert s == "20 B"
+    # kind of redundant, but id is variable so we can't match reliably
+    assert repr(stats) == '<Statistics object at {:#x} (20, 10, 10)>'.format(id(stats))
 
 
 class MockCache:

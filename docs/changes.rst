@@ -6,6 +6,10 @@ Version 1.1.0 (not released yet)
 
 New features:
 
+- borg check: will not produce the "Checking segments" output unless
+  new --progress option is passed, #824.
+- options that imply output (--show-rc, --show-version, --list, --stats, 
+  --progress) don't need -v/--info to have that output displayed, #865
 - borg recreate: re-create existing archives, #787 #686 #630 #70, also see
   #757, #770.
 
@@ -34,7 +38,7 @@ New features:
 - borg comment: add archive comments, #842
 - provide "borgfs" wrapper for borg mount, enables usage via fstab, #743
 - create: add 'x' status for excluded paths, #814
-- --show-version: shows/logs the borg version (use -v), #725
+- --show-version: shows/logs the borg version, #725
 - borg list/prune/delete: also output archive id, #731
 
 Bug fixes:
@@ -70,22 +74,34 @@ Other changes:
   - ChunkBuffer: add test for leaving partial chunk in buffer, fixes #945
 
 
-Version 1.0.3 (not released yet)
---------------------------------
+Version 1.0.3
+-------------
 
 Bug fixes:
 
-- prune: ignore checkpoints, #997
-- prune: fix bad validator, #942
-- fix capabilities extraction on Linux (set xattrs last, after chown())
+- prune: avoid that checkpoints are kept and completed archives are deleted in
+  a prune run), #997
+- prune: fix commandline argument validation - some valid command lines were
+  considered invalid (annoying, but harmless), #942
+- fix capabilities extraction on Linux (set xattrs last, after chown()), #1069
+- repository: fix commit tags being seen in data
+- when probing key files, do binary reads. avoids crash when non-borg binary
+  files are located in borg's key files directory.
+- handle SIGTERM and make a clean exit - avoids orphan lock files.
+- repository cache: don't cache large objects (avoid using lots of temp. disk
+  space), #1063
 
 Other changes:
 
-- update readthedocs URLs, #991
-- add missing docs for "borg break-lock", #992
-- borg create help: add some words to about the archive name
-- borg create help: document format tags, #894
 - Vagrantfile: OS X: update osxfuse / install lzma package, #933
+- setup.py: add check for platform_darwin.c
+- setup.py: on freebsd, use a llfuse release that builds ok
+- docs / help:
+
+  - update readthedocs URLs, #991
+  - add missing docs for "borg break-lock", #992
+  - borg create help: add some words to about the archive name
+  - borg create help: document format tags, #894
 
 
 Version 1.0.2

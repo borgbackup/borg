@@ -1,3 +1,5 @@
+import io
+import logging
 import os
 import shutil
 import sys
@@ -5,10 +7,10 @@ import tempfile
 from unittest.mock import patch
 
 from ..hashindex import NSIndex
-from ..helpers import Location, IntegrityError
+from ..helpers import Location, IntegrityError, InternalOSError
 from ..locking import UpgradableLock, LockFailed
-from ..remote import RemoteRepository, InvalidRPCMethod
-from ..repository import Repository
+from ..remote import RemoteRepository, InvalidRPCMethod, ConnectionClosedWithHint, handle_remote_line
+from ..repository import Repository, LoggedIO, MAGIC
 from . import BaseTestCase
 
 
@@ -123,6 +125,46 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         self.assert_equal(len(self.repository.list(limit=50)), 50)
 
 
+class LocalRepositoryTestCase(RepositoryTestCaseBase):
+    # test case that doesn't work with remote repositories
+
+    def _assert_sparse(self):
+        # The superseded 123456... PUT
+        assert self.repository.compact[0] == 41 + 9
+        # The DELETE issued by the superseding PUT (or issued directly)
+        assert self.repository.compact[2] == 41
+        self.repository._rebuild_sparse(0)
+        assert self.repository.compact[0] == 41 + 9
+
+    def test_sparse1(self):
+        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.put(b'00000000000000000000000000000001', b'123456789')
+        self.repository.commit()
+        self.repository.put(b'00000000000000000000000000000001', b'bar')
+        self._assert_sparse()
+
+    def test_sparse2(self):
+        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.put(b'00000000000000000000000000000001', b'123456789')
+        self.repository.commit()
+        self.repository.delete(b'00000000000000000000000000000001')
+        self._assert_sparse()
+
+    def test_sparse_delete(self):
+        self.repository.put(b'00000000000000000000000000000000', b'1245')
+        self.repository.delete(b'00000000000000000000000000000000')
+        self.repository.io._write_fd.sync()
+
+        # The on-line tracking works on a per-object basis...
+        assert self.repository.compact[0] == 41 + 41 + 4
+        self.repository._rebuild_sparse(0)
+        # ...while _rebuild_sparse can mark whole segments as completely sparse (which then includes the segment magic)
+        assert self.repository.compact[0] == 41 + 41 + 4 + len(MAGIC)
+
+        self.repository.commit()
+        assert 0 not in [segment for segment, _ in self.repository.io.segment_iterator()]
+
+
 class RepositoryCommitTestCase(RepositoryTestCaseBase):
 
     def add_keys(self):
@@ -192,6 +234,13 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
             self.assert_equal(self.repository.check(), True)
             self.assert_equal(len(self.repository), 3)
 
+    def test_ignores_commit_tag_in_data(self):
+        self.repository.put(b'0' * 32, LoggedIO.COMMIT)
+        self.reopen()
+        with self.repository:
+            io = self.repository.io
+            assert not io.is_committed_segment(io.get_latest_segment())
+
 
 class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
     def test_destroy_append_only(self):
@@ -207,18 +256,69 @@ class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
         self.repository.commit()
 
         self.repository.append_only = False
-        assert segments_in_repository() == 1
+        assert segments_in_repository() == 2
         self.repository.put(b'00000000000000000000000000000000', b'foo')
         self.repository.commit()
         # normal: compact squashes the data together, only one segment
-        assert segments_in_repository() == 1
+        assert segments_in_repository() == 4
 
         self.repository.append_only = True
-        assert segments_in_repository() == 1
+        assert segments_in_repository() == 4
         self.repository.put(b'00000000000000000000000000000000', b'foo')
         self.repository.commit()
         # append only: does not compact, only new segments written
-        assert segments_in_repository() == 2
+        assert segments_in_repository() == 6
+
+
+class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
+    def setUp(self):
+        super().setUp()
+        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.commit()
+        self.repository.close()
+
+    def do_commit(self):
+        with self.repository:
+            self.repository.put(b'00000000000000000000000000000000', b'fox')
+            self.repository.commit()
+
+    def test_corrupted_hints(self):
+        with open(os.path.join(self.repository.path, 'hints.1'), 'ab') as fd:
+            fd.write(b'123456789')
+        self.do_commit()
+
+    def test_deleted_hints(self):
+        os.unlink(os.path.join(self.repository.path, 'hints.1'))
+        self.do_commit()
+
+    def test_deleted_index(self):
+        os.unlink(os.path.join(self.repository.path, 'index.1'))
+        self.do_commit()
+
+    def test_unreadable_hints(self):
+        hints = os.path.join(self.repository.path, 'hints.1')
+        os.unlink(hints)
+        os.mkdir(hints)
+        with self.assert_raises(InternalOSError):
+            self.do_commit()
+
+    def test_index(self):
+        with open(os.path.join(self.repository.path, 'index.1'), 'wb') as fd:
+            fd.write(b'123456789')
+        self.do_commit()
+
+    def test_index_outside_transaction(self):
+        with open(os.path.join(self.repository.path, 'index.1'), 'wb') as fd:
+            fd.write(b'123456789')
+        with self.repository:
+            assert len(self.repository) == 1
+
+    def test_unreadable_index(self):
+        index = os.path.join(self.repository.path, 'index.1')
+        os.unlink(index)
+        os.mkdir(index)
+        with self.assert_raises(InternalOSError):
+            self.do_commit()
 
 
 class RepositoryCheckTestCase(RepositoryTestCaseBase):
@@ -268,7 +368,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         return set(int(key) for key in self.repository.list())
 
     def test_repair_corrupted_segment(self):
-        self.add_objects([[1, 2, 3], [4, 5, 6]])
+        self.add_objects([[1, 2, 3], [4, 5], [6]])
         self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
         self.check(status=True)
         self.corrupt_object(5)
@@ -287,20 +387,20 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
         self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
         self.check(status=True)
-        self.delete_segment(1)
+        self.delete_segment(2)
         self.repository.rollback()
         self.check(repair=True, status=True)
         self.assert_equal(set([1, 2, 3]), self.list_objects())
 
     def test_repair_missing_commit_segment(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
-        self.delete_segment(1)
+        self.delete_segment(3)
         self.assert_raises(Repository.ObjectNotFound, lambda: self.get_objects(4))
         self.assert_equal(set([1, 2, 3]), self.list_objects())
 
     def test_repair_corrupted_commit_segment(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
-        with open(os.path.join(self.tmppath, 'repository', 'data', '0', '1'), 'r+b') as fd:
+        with open(os.path.join(self.tmppath, 'repository', 'data', '0', '3'), 'r+b') as fd:
             fd.seek(-1, os.SEEK_END)
             fd.write(b'X')
         self.assert_raises(Repository.ObjectNotFound, lambda: self.get_objects(4))
@@ -310,15 +410,15 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
     def test_repair_no_commits(self):
         self.add_objects([[1, 2, 3]])
-        with open(os.path.join(self.tmppath, 'repository', 'data', '0', '0'), 'r+b') as fd:
+        with open(os.path.join(self.tmppath, 'repository', 'data', '0', '1'), 'r+b') as fd:
             fd.seek(-1, os.SEEK_END)
             fd.write(b'X')
         self.assert_raises(Repository.CheckNeeded, lambda: self.get_objects(4))
         self.check(status=False)
         self.check(status=False)
-        self.assert_equal(self.list_indices(), ['index.0'])
-        self.check(repair=True, status=True)
         self.assert_equal(self.list_indices(), ['index.1'])
+        self.check(repair=True, status=True)
+        self.assert_equal(self.list_indices(), ['index.3'])
         self.check(status=True)
         self.get_objects(3)
         self.assert_equal(set([1, 2, 3]), self.list_objects())
@@ -332,10 +432,10 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
     def test_repair_index_too_new(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
-        self.assert_equal(self.list_indices(), ['index.1'])
+        self.assert_equal(self.list_indices(), ['index.3'])
         self.rename_index('index.100')
         self.check(status=True)
-        self.assert_equal(self.list_indices(), ['index.1'])
+        self.assert_equal(self.list_indices(), ['index.3'])
         self.get_objects(4)
         self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
 
@@ -389,3 +489,72 @@ class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
     def test_crash_before_compact(self):
         # skip this test, we can't mock-patch a Repository class in another process!
         pass
+
+
+class RemoteLoggerTestCase(BaseTestCase):
+    def setUp(self):
+        self.stream = io.StringIO()
+        self.handler = logging.StreamHandler(self.stream)
+        logging.getLogger().handlers[:] = [self.handler]
+        logging.getLogger('borg.repository').handlers[:] = []
+        logging.getLogger('borg.repository.foo').handlers[:] = []
+        # capture stderr
+        sys.stderr.flush()
+        self.old_stderr = sys.stderr
+        self.stderr = sys.stderr = io.StringIO()
+
+    def tearDown(self):
+        sys.stderr = self.old_stderr
+
+    def test_stderr_messages(self):
+        handle_remote_line("unstructured stderr message")
+        self.assert_equal(self.stream.getvalue(), '')
+        # stderr messages don't get an implicit newline
+        self.assert_equal(self.stderr.getvalue(), 'Remote: unstructured stderr message')
+
+    def test_pre11_format_messages(self):
+        self.handler.setLevel(logging.DEBUG)
+        logging.getLogger().setLevel(logging.DEBUG)
+
+        handle_remote_line("$LOG INFO Remote: borg < 1.1 format message")
+        self.assert_equal(self.stream.getvalue(), 'Remote: borg < 1.1 format message\n')
+        self.assert_equal(self.stderr.getvalue(), '')
+
+    def test_post11_format_messages(self):
+        self.handler.setLevel(logging.DEBUG)
+        logging.getLogger().setLevel(logging.DEBUG)
+
+        handle_remote_line("$LOG INFO borg.repository Remote: borg >= 1.1 format message")
+        self.assert_equal(self.stream.getvalue(), 'Remote: borg >= 1.1 format message\n')
+        self.assert_equal(self.stderr.getvalue(), '')
+
+    def test_remote_messages_screened(self):
+        # default borg config for root logger
+        self.handler.setLevel(logging.WARNING)
+        logging.getLogger().setLevel(logging.WARNING)
+
+        handle_remote_line("$LOG INFO borg.repository Remote: new format info message")
+        self.assert_equal(self.stream.getvalue(), '')
+        self.assert_equal(self.stderr.getvalue(), '')
+
+    def test_info_to_correct_local_child(self):
+        logging.getLogger('borg.repository').setLevel(logging.INFO)
+        logging.getLogger('borg.repository.foo').setLevel(logging.INFO)
+        # default borg config for root logger
+        self.handler.setLevel(logging.WARNING)
+        logging.getLogger().setLevel(logging.WARNING)
+
+        child_stream = io.StringIO()
+        child_handler = logging.StreamHandler(child_stream)
+        child_handler.setLevel(logging.INFO)
+        logging.getLogger('borg.repository').handlers[:] = [child_handler]
+        foo_stream = io.StringIO()
+        foo_handler = logging.StreamHandler(foo_stream)
+        foo_handler.setLevel(logging.INFO)
+        logging.getLogger('borg.repository.foo').handlers[:] = [foo_handler]
+
+        handle_remote_line("$LOG INFO borg.repository Remote: new format child message")
+        self.assert_equal(foo_stream.getvalue(), '')
+        self.assert_equal(child_stream.getvalue(), 'Remote: new format child message\n')
+        self.assert_equal(self.stream.getvalue(), '')
+        self.assert_equal(self.stderr.getvalue(), '')

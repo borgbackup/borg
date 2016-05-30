@@ -16,7 +16,8 @@ Type of log output
 
 The log level of the builtin logging configuration defaults to WARNING.
 This is because we want |project_name| to be mostly silent and only output
-warnings, errors and critical messages.
+warnings, errors and critical messages, unless output has been requested
+by supplying an option that implies output (eg, --list or --progress).
 
 Log levels: DEBUG < INFO < WARNING < ERROR < CRITICAL
 
@@ -40,10 +41,6 @@ give different output on different log levels - it's just a possibility.
 
 .. warning:: Options --critical and --error are provided for completeness,
              their usage is not recommended as you might miss important information.
-
-.. warning:: While some options (like ``--stats`` or ``--list``) will emit more
-             informational messages, you have to use INFO (or lower) log level to make
-             them show up in log output. Use ``-v`` or a logging configuration.
 
 Return codes
 ~~~~~~~~~~~~
@@ -170,6 +167,22 @@ Network:
 
 In case you are interested in more details, please read the internals documentation.
 
+File systems
+~~~~~~~~~~~~
+
+We strongly recommend against using Borg (or any other database-like
+software) on non-journaling file systems like FAT, since it is not
+possible to assume any consistency in case of power failures (or a
+sudden disconnect of an external drive or similar failures).
+
+While Borg uses a data store that is resilient against these failures
+when used on journaling file systems, it is not possible to guarantee
+this with some hardware -- independent of the software used. We don't
+know a list of affected hardware.
+
+If you are suspicious whether your Borg repository is still consistent
+and readable after one of the failures mentioned above occured, run
+``borg check --verify-data`` to make sure it is consistent.
 
 Units
 ~~~~~
@@ -220,46 +233,6 @@ Examples
     # Remote repository (store the key your home dir)
     $ borg init --encryption=keyfile user@hostname:backup
 
-Important notes about encryption:
-
-It is not recommended to disable encryption. Repository encryption protects you
-e.g. against the case that an attacker has access to your backup repository.
-
-But be careful with the key / the passphrase:
-
-If you want "passphrase-only" security, use the ``repokey`` mode. The key will
-be stored inside the repository (in its "config" file). In above mentioned
-attack scenario, the attacker will have the key (but not the passphrase).
-
-If you want "passphrase and having-the-key" security, use the ``keyfile`` mode.
-The key will be stored in your home directory (in ``.config/borg/keys``). In
-the attack scenario, the attacker who has just access to your repo won't have
-the key (and also not the passphrase).
-
-Make a backup copy of the key file (``keyfile`` mode) or repo config file
-(``repokey`` mode) and keep it at a safe place, so you still have the key in
-case it gets corrupted or lost. Also keep the passphrase at a safe place.
-The backup that is encrypted with that key won't help you with that, of course.
-
-Make sure you use a good passphrase. Not too short, not too simple. The real
-encryption / decryption key is encrypted with / locked by your passphrase.
-If an attacker gets your key, he can't unlock and use it without knowing the
-passphrase.
-
-Be careful with special or non-ascii characters in your passphrase:
-
-- |project_name| processes the passphrase as unicode (and encodes it as utf-8),
-  so it does not have problems dealing with even the strangest characters.
-- BUT: that does not necessarily apply to your OS / VM / keyboard configuration.
-
-So better use a long passphrase made from simple ascii chars than one that
-includes non-ascii stuff or characters that are hard/impossible to enter on
-a different keyboard layout.
-
-You can change your passphrase for existing repos at any time, it won't affect
-the encryption/decryption key or other secrets.
-
-
 .. include:: usage/create.rst.inc
 
 Examples
@@ -269,8 +242,8 @@ Examples
     # Backup ~/Documents into an archive named "my-documents"
     $ borg create /path/to/repo::my-documents ~/Documents
 
-    # same, but verbosely list all files as we process them
-    $ borg create -v --list /path/to/repo::my-documents ~/Documents
+    # same, but list all files as we process them
+    $ borg create --list /path/to/repo::my-documents ~/Documents
 
     # Backup ~/Documents and ~/src but exclude pyc files
     $ borg create /path/to/repo::my-files \
@@ -325,7 +298,7 @@ Examples
     $ borg extract /path/to/repo::my-files
 
     # Extract entire archive and list files while processing
-    $ borg extract -v --list /path/to/repo::my-files
+    $ borg extract --list /path/to/repo::my-files
 
     # Verify whether an archive could be successfully extracted, but do not write files to disk
     $ borg extract --dry-run /path/to/repo::my-files
@@ -504,7 +477,7 @@ Examples
     Username: root
     Time (start): Mon, 2016-02-15 19:36:29
     Time (end):   Mon, 2016-02-15 19:39:26
-    Command line: /usr/local/bin/borg create -v --list -C zlib,6 /path/to/repo::root-2016-02-15 / --one-file-system
+    Command line: /usr/local/bin/borg create --list -C zlib,6 /path/to/repo::root-2016-02-15 / --one-file-system
     Number of files: 38100
 
                            Original size      Compressed size    Deduplicated size
@@ -679,7 +652,7 @@ Here are misc. notes about topics that are maybe not covered in enough detail in
 Item flags
 ~~~~~~~~~~
 
-``borg create -v --list`` outputs a verbose list of all files, directories and other
+``borg create --list`` outputs a list of all files, directories and other
 file system items it considered (no matter whether they had content changes
 or not). For each item, it prefixes a single-letter flag that indicates type
 and/or status of the item.

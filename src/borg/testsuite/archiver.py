@@ -17,6 +17,10 @@ from unittest.mock import patch
 from hashlib import sha256
 
 import pytest
+try:
+    import llfuse
+except ImportError:
+    pass
 
 from .. import xattr, helpers, platform
 from ..archive import Archive, ChunkBuffer, ArchiveRecreater
@@ -32,11 +36,6 @@ from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import has_lchflags, has_llfuse
 from . import BaseTestCase, changedir, environment_variable
-
-try:
-    import llfuse
-except ImportError:
-    pass
 
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 

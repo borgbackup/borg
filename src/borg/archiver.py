@@ -1,7 +1,3 @@
-from binascii import unhexlify
-from datetime import datetime
-from itertools import zip_longest
-from operator import attrgetter
 import argparse
 import collections
 import functools
@@ -18,8 +14,18 @@ import subprocess
 import sys
 import textwrap
 import traceback
+from binascii import unhexlify
+from datetime import datetime
+from itertools import zip_longest
+
+from .logger import create_logger, setup_logging
+logger = create_logger()
 
 from . import __version__
+from . import helpers
+from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics
+from .cache import Cache
+from .constants import *  # NOQA
 from .helpers import Error
 from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
 from .helpers import ItemFormatter, format_time, format_file_size, format_archive
@@ -32,20 +38,12 @@ from .helpers import update_excludes, check_extension_modules
 from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo
 from .helpers import log_multi
 from .helpers import parse_pattern, PatternMatcher, PathPrefixPattern
-from .logger import create_logger, setup_logging
-logger = create_logger()
-from . import helpers
-from .compress import Compressor, COMPR_BUFFER
-from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
-from .repository import Repository
-from .cache import Cache
-from .constants import *  # NOQA
 from .key import key_creator, RepoKey, PassphraseKey
-from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics
-from .remote import RepositoryServer, RemoteRepository, cache_if_remote
-from .selftest import selftest
-from .hashindex import ChunkIndexEntry
 from .platform import get_flags
+from .remote import RepositoryServer, RemoteRepository, cache_if_remote
+from .repository import Repository
+from .selftest import selftest
+from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 
 
 def argument(args, str_or_bool):

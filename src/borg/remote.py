@@ -4,19 +4,18 @@ import logging
 import os
 import select
 import shlex
-from subprocess import Popen, PIPE
 import sys
 import tempfile
+from subprocess import Popen, PIPE
+
+import msgpack
 
 from . import __version__
-
 from .helpers import Error, IntegrityError
 from .helpers import get_home_dir
 from .helpers import sysinfo
 from .helpers import bin_to_hex
 from .repository import Repository
-
-import msgpack
 
 RPC_PROTOCOL_VERSION = 2
 

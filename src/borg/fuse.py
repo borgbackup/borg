@@ -1,20 +1,22 @@
-from collections import defaultdict
 import errno
 import io
-import llfuse
 import os
 import stat
 import tempfile
 import time
+from collections import defaultdict
+from distutils.version import LooseVersion
+
+import llfuse
+import msgpack
+
+from .logger import create_logger
+logger = create_logger()
+
 from .archive import Archive
 from .helpers import daemonize
 from .helpers import bigint_to_int
-from .logger import create_logger
 from .lrucache import LRUCache
-from distutils.version import LooseVersion
-import msgpack
-
-logger = create_logger()
 
 # Does this version of llfuse support ns precision?
 have_fuse_xtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')

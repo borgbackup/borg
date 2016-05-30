@@ -1,15 +1,16 @@
 import datetime
-import logging
-logger = logging.getLogger(__name__)
 import os
 import shutil
 import time
 
+import logging
+logger = logging.getLogger(__name__)
+
 from .helpers import get_home_dir, get_keys_dir, get_cache_dir
 from .helpers import ProgressIndicatorPercent
+from .key import KeyfileKey, KeyfileNotFoundError
 from .locking import UpgradableLock
 from .repository import Repository, MAGIC
-from .key import KeyfileKey, KeyfileNotFoundError
 
 ATTIC_MAGIC = b'ATTICSEG'
 

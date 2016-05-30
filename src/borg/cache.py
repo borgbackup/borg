@@ -1,23 +1,24 @@
 import configparser
-from .remote import cache_if_remote
-from collections import namedtuple
 import os
 import stat
-from binascii import unhexlify
 import shutil
+from binascii import unhexlify
+from collections import namedtuple
 
-from .key import PlaintextKey
+import msgpack
+
 from .logger import create_logger
 logger = create_logger()
+
+from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Error
 from .helpers import get_cache_dir
 from .helpers import decode_dict, int_to_bigint, bigint_to_int, bin_to_hex
 from .helpers import format_file_size
 from .helpers import yes
+from .key import PlaintextKey
 from .locking import UpgradableLock
-from .hashindex import ChunkIndex, ChunkIndexEntry
-
-import msgpack
+from .remote import cache_if_remote
 
 ChunkListEntry = namedtuple('ChunkListEntry', 'id size csize')
 FileCacheEntry = namedtuple('FileCacheEntry', 'age inode size mtime chunk_ids')

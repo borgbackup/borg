@@ -1,15 +1,13 @@
 import hashlib
-import io
 import logging
-from time import mktime, strptime
-from datetime import datetime, timezone, timedelta
 import os
+import sys
+from datetime import datetime, timezone, timedelta
+from time import mktime, strptime, sleep
 
 import pytest
-import sys
 import msgpack
 import msgpack.fallback
-import time
 
 from ..helpers import Location
 from ..helpers import partial_format, format_file_size, format_timedelta
@@ -121,7 +119,7 @@ class TestLocationWithoutEnv:
         assert repr(Location('/some/path::archive{pid}')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive{}')".format(test_pid)
         location_time1 = Location('/some/path::archive{now:%s}')
-        time.sleep(1.1)
+        sleep(1.1)
         location_time2 = Location('/some/path::archive{now:%s}')
         assert location_time1.archive != location_time2.archive
 

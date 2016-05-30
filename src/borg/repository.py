@@ -1,25 +1,26 @@
-from configparser import ConfigParser
-from binascii import unhexlify
-from datetime import datetime
-from itertools import islice
 import errno
-import logging
-logger = logging.getLogger(__name__)
-
 import os
 import shutil
 import struct
+from binascii import unhexlify
 from collections import defaultdict
+from configparser import ConfigParser
+from datetime import datetime
 from functools import partial
+from itertools import islice
 from zlib import crc32
 
 import msgpack
+
+import logging
+logger = logging.getLogger(__name__)
+
 from .constants import *  # NOQA
+from .hashindex import NSIndex
 from .helpers import Error, ErrorWithTraceback, IntegrityError, InternalOSError
 from .helpers import Location
 from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
-from .hashindex import NSIndex
 from .locking import UpgradableLock, LockError, LockErrorT
 from .lrucache import LRUCache
 from .platform import SyncFile, sync_dir

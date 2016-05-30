@@ -1,22 +1,25 @@
 import errno
-from datetime import datetime, timezone
-from getpass import getuser
-from itertools import groupby
-
-from .logger import create_logger
-logger = create_logger()
-from .key import key_factory
-from .remote import cache_if_remote
-
 import os
-from shutil import get_terminal_size
 import socket
 import stat
 import sys
 import time
+from datetime import datetime, timezone
+from getpass import getuser
 from io import BytesIO
+from itertools import groupby
+from shutil import get_terminal_size
+
+import msgpack
+
+from .logger import create_logger
+logger = create_logger()
+
 from . import xattr
+from .cache import ChunkListEntry
+from .chunker import Chunker
 from .constants import *  # NOQA
+from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Manifest
 from .helpers import Chunk, ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError
@@ -30,12 +33,10 @@ from .helpers import ProgressIndicatorPercent, log_multi
 from .helpers import PathPrefixPattern, FnmatchPattern
 from .helpers import consume
 from .helpers import CompressionDecider1, CompressionDecider2, CompressionSpec
-from .repository import Repository
+from .key import key_factory
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth
-from .chunker import Chunker
-from .hashindex import ChunkIndex, ChunkIndexEntry
-from .cache import ChunkListEntry
-import msgpack
+from .remote import cache_if_remote
+from .repository import Repository
 
 has_lchmod = hasattr(os, 'lchmod')
 

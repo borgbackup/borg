@@ -1,42 +1,40 @@
 import argparse
-from binascii import hexlify
-from collections import namedtuple, deque
-from functools import wraps, partial
 import grp
 import hashlib
-from itertools import islice
+import logging
 import os
 import os.path
-import stat
-import textwrap
+import platform
 import pwd
 import re
+import socket
 import sys
-from string import Formatter
-import platform
+import stat
+import textwrap
 import time
 import unicodedata
-import logging
+from binascii import hexlify
+from collections import namedtuple, deque
+from datetime import datetime, timezone, timedelta
+from fnmatch import translate
+from functools import wraps, partial
+from itertools import islice
+from operator import attrgetter
+from string import Formatter
+
+import msgpack
+import msgpack.fallback
 
 from .logger import create_logger
 logger = create_logger()
 
-from datetime import datetime, timezone, timedelta
-from fnmatch import translate
-from operator import attrgetter
-
 from . import __version__ as borg_version
-from . import hashindex
 from . import chunker
-from .constants import *  # NOQA
 from . import crypto
-from .compress import COMPR_BUFFER, get_compressor
+from . import hashindex
 from . import shellpattern
-import msgpack
-import msgpack.fallback
-
-import socket
-
+from .constants import *  # NOQA
+from .compress import COMPR_BUFFER, get_compressor
 
 # meta dict, data bytes
 _Chunk = namedtuple('_Chunk', 'meta data')

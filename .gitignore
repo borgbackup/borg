@@ -12,13 +12,14 @@ platform_darwin.c
 platform_freebsd.c
 platform_linux.c
 platform_windows.c
+platform_posix.c
 *.egg-info
 *.pyc
 *.pyo
 *.so
 .idea/
 .cache/
-borg/_version.py
+src/borg/_version.py
 borg.build/
 borg.dist/
 borg.exe

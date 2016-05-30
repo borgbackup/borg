@@ -6,6 +6,7 @@ import sys
 import textwrap
 from hmac import compare_digest
 from hashlib import sha256, pbkdf2_hmac
+from subprocess import check_output, CalledProcessError
 
 from .helpers import Chunk, IntegrityError, get_keys_dir, Error, yes, bin_to_hex, CompressionDecider2, CompressionSpec
 from .logger import create_logger
@@ -205,7 +206,20 @@ class Passphrase(str):
 
     @classmethod
     def getpass(cls, prompt):
-        return cls(getpass.getpass(prompt))
+        askpass = os.environ.get('BORG_ASKPASS', None)
+        if askpass is None:
+            return cls(getpass.getpass(prompt))
+        else:
+            try:
+                return cls(
+                    check_output([askpass, prompt])
+                        .decode(sys.getfilesystemencoding(), 'surrogateescape')
+                        .strip()
+                )
+            except CalledProcessError:
+                # This follows what openssl does with non-zero exit codes on SSH_ASKPASS
+                #https://github.com/openssh/openssh-portable/blob/94141b7ade24afceeb6762a3f99e09e47a6c42b6/readpass.c#L152
+                return ""
 
     @classmethod
     def verification(cls, passphrase):

@@ -9,7 +9,7 @@ import array
 import platform
 from .helpers import safe_decode, safe_encode
 
-API_VERSION = 2
+API_VERSION = 3
 
 
 cdef extern from 'stdlib.h':

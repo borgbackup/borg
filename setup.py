@@ -158,7 +158,7 @@ class build_usage(Command):
         print('generating usage docs')
         # allows us to build docs without the C modules fully loaded during help generation
         from borg.archiver import Archiver
-        parser = Archiver().build_parser(prog='borg')
+        parser = Archiver(prog='borg').parser
         choices = {}
         for action in parser._actions:
             if action.choices is not None:

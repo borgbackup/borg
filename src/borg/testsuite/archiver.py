@@ -5,6 +5,7 @@ import inspect
 from io import StringIO
 import logging
 import random
+import socket
 import stat
 import subprocess
 import sys
@@ -356,6 +357,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         # the interesting parts of info_output2 and info_output should be same
         self.assert_equal(filter(info_output), filter(info_output2))
+
+    def test_unix_socket(self):
+        self.cmd('init', self.repository_location)
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.bind(os.path.join(self.input_path, 'unix-socket'))
+        self.cmd('create', self.repository_location + '::test', 'input')
+        sock.close()
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+            assert not os.path.exists('input/unix-socket')
 
     def test_symlink_extract(self):
         self.create_test_files()
@@ -916,7 +927,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('borgbackup version', output)  # implied output even without --info given
         self.assert_not_in('Starting repository check', output)  # --info not given for root logger
 
-        name = sorted(os.listdir(os.path.join(self.tmpdir, 'repository', 'data', '0')), reverse=True)[0]
+        name = sorted(os.listdir(os.path.join(self.tmpdir, 'repository', 'data', '0')), reverse=True)[1]
         with open(os.path.join(self.tmpdir, 'repository', 'data', '0', name), 'r+b') as fd:
             fd.seek(100)
             fd.write(b'XXXX')
@@ -986,14 +997,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=1024 * 80)
         os.utime('input/file1', (now - 5, now - 5))  # 5 seconds ago
         self.create_regular_file('file2', size=1024 * 80)
+        if has_lchflags:
+            self.create_regular_file('file3', size=1024 * 80)
+            platform.set_flags(os.path.join(self.input_path, 'file3'), stat.UF_NODUMP)
         self.cmd('init', self.repository_location)
         output = self.cmd('create', '--list', self.repository_location + '::test', 'input')
         self.assert_in("A input/file1", output)
         self.assert_in("A input/file2", output)
+        if has_lchflags:
+            self.assert_in("x input/file3", output)
         # should find second file as excluded
         output = self.cmd('create', '--list', self.repository_location + '::test1', 'input', '--exclude', '*/file2')
         self.assert_in("U input/file1", output)
         self.assert_in("x input/file2", output)
+        if has_lchflags:
+            self.assert_in("x input/file3", output)
 
     def test_create_topical(self):
         now = time.time()
@@ -1244,6 +1262,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         try:
             self.cmd('mount', self.repository_location, mountpoint, fork=True)
             self.wait_for_mount(mountpoint)
+            if has_lchflags:
+                # remove the file we did not backup, so input and output become equal
+                os.remove(os.path.join('input', 'flagfile'))
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive', 'input'))
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive2', 'input'))
         finally:
@@ -1265,6 +1286,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         try:
             self.cmd('mount', self.repository_location + '::archive', mountpoint, fork=True)
             self.wait_for_mount(mountpoint)
+            if has_lchflags:
+                # remove the file we did not backup, so input and output become equal
+                os.remove(os.path.join('input', 'flagfile'))
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'))
         finally:
             if sys.platform.startswith('linux'):
@@ -1491,9 +1515,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test', 'input')
         archive_before = self.cmd('list', self.repository_location + '::test', '--format', '{sha512}')
         with patch.object(Cache, 'add_chunk', self._test_recreate_chunker_interrupt_patch()):
-            self.cmd('recreate', '-pv', '--chunker-params', '10,12,11,4095', self.repository_location)
+            self.cmd('recreate', '-pv', '--chunker-params', '10,13,11,4095', self.repository_location)
         assert 'test.recreate' in self.cmd('list', self.repository_location)
-        output = self.cmd('recreate', '-svp', '--debug', '--chunker-params', '10,12,11,4095', self.repository_location)
+        output = self.cmd('recreate', '-svp', '--debug', '--chunker-params', '10,13,11,4095', self.repository_location)
         assert 'Found test.recreate, will resume' in output
         assert 'Copied 1 chunks from a partially processed item' in output
         archive_after = self.cmd('list', self.repository_location + '::test', '--format', '{sha512}')

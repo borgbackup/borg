@@ -96,9 +96,10 @@ def with_archive(method):
 
 class Archiver:
 
-    def __init__(self, lock_wait=None):
+    def __init__(self, lock_wait=None, prog=None):
         self.exit_code = EXIT_SUCCESS
         self.lock_wait = lock_wait
+        self.parser = self.build_parser(prog)
 
     def print_error(self, msg, *args):
         msg = args and msg % args or msg
@@ -317,6 +318,7 @@ class Archiver:
         status = None
         # Ignore if nodump flag is set
         if get_flags(path, st) & stat.UF_NODUMP:
+            self.print_file_status('x', path)
             return
         if stat.S_ISREG(st.st_mode) or read_special and not stat.S_ISDIR(st.st_mode):
             if not dry_run:
@@ -1117,7 +1119,7 @@ class Archiver:
                     self.print_warning(warning)
         return args
 
-    def build_parser(self, args=None, prog=None):
+    def build_parser(self, prog=None):
         common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
 
         common_group = common_parser.add_argument_group('Common options')
@@ -2061,8 +2063,7 @@ class Archiver:
         # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
         if args:
             args = self.preprocess_args(args)
-        parser = self.build_parser(args)
-        args = parser.parse_args(args or ['-h'])
+        args = self.parser.parse_args(args or ['-h'])
         update_excludes(args)
         return args
 

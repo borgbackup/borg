@@ -8,13 +8,13 @@ from .platform_base import SyncFile as BaseSyncFile
 from .platform_posix import swidth
 
 from libc cimport errno
+from libc.stdint cimport int64_t
 
 API_VERSION = 3
 
 cdef extern from "sys/types.h":
     int ACL_TYPE_ACCESS
     int ACL_TYPE_DEFAULT
-    ctypedef off64_t
 
 cdef extern from "sys/acl.h":
     ctypedef struct _acl_t:
@@ -31,7 +31,7 @@ cdef extern from "acl/libacl.h":
     int acl_extended_file(const char *path)
 
 cdef extern from "fcntl.h":
-    int sync_file_range(int fd, off64_t offset, off64_t nbytes, unsigned int flags)
+    int sync_file_range(int fd, int64_t offset, int64_t nbytes, unsigned int flags)
     unsigned int SYNC_FILE_RANGE_WRITE
     unsigned int SYNC_FILE_RANGE_WAIT_BEFORE
     unsigned int SYNC_FILE_RANGE_WAIT_AFTER
@@ -47,11 +47,8 @@ cdef extern from "linux/fs.h":
     int FS_APPEND_FL
     int FS_COMPR_FL
 
-cdef extern from "stropts.h":
+cdef extern from "sys/ioctl.h":
     int ioctl(int fildes, int request, ...)
-
-cdef extern from "errno.h":
-    int errno
 
 cdef extern from "string.h":
     char *strerror(int errnum)
@@ -79,17 +76,20 @@ def set_flags(path, bsd_flags, fd=None):
         fd = os.open(path, os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
     try:
         if ioctl(fd, FS_IOC_SETFLAGS, &flags) == -1:
-            raise OSError(errno, strerror(errno).decode(), path)
+            error_number = errno.errno
+            if error_number != errno.EOPNOTSUPP:
+                raise OSError(error_number, strerror(error_number).decode(), path)
     finally:
         if open_fd:
             os.close(fd)
 
 
 def get_flags(path, st):
-    if stat.S_ISLNK(st.st_mode):
-        return 0
     cdef int linux_flags
-    fd = os.open(path, os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
+    try:
+        fd = os.open(path, os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
+    except OSError:
+        return 0
     try:
         if ioctl(fd, FS_IOC_GETFLAGS, &linux_flags) == -1:
             return 0

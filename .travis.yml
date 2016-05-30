@@ -14,6 +14,9 @@ matrix:
         - python: 3.5
           os: linux
           env: TOXENV=py35
+        - python: nightly
+          os: linux
+          env: TOXENV=py36
         - python: 3.5
           os: linux
           env: TOXENV=flake8
@@ -25,6 +28,8 @@ matrix:
           os: osx
           osx_image: xcode6.4
           env: TOXENV=py35
+    allow_failures:
+        - python: nightly
 
 install:
     - ./.travis/install.sh

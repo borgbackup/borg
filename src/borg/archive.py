@@ -371,7 +371,7 @@ Number of files: {0.stats.nfiles}'''.format(
         """
         if dry_run or stdout:
             if b'chunks' in item:
-                for data in self.pipeline.fetch_many([c.id for c in item[b'chunks']], is_preloaded=True):
+                for _, data in self.pipeline.fetch_many([c.id for c in item[b'chunks']], is_preloaded=True):
                     if stdout:
                         sys.stdout.buffer.write(data)
                 if stdout:

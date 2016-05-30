@@ -1,6 +1,7 @@
 #cython: language_level=3
 
 import json
+import os.path
 from libc.stddef cimport wchar_t
 from libc.stdint cimport uint16_t, uint32_t, uint64_t
 cimport cpython.array
@@ -8,6 +9,7 @@ import array
 
 import platform
 from .helpers import safe_decode, safe_encode
+from .platform_base import SyncFile as BaseSyncFile
 
 API_VERSION = 3
 
@@ -327,3 +329,16 @@ def acl_set(path, item, numeric_owner=False):
     free(ACEs)
     PyMem_Free(cstrPath)
     LocalFree(<HLOCAL>newDACL)
+
+
+def sync_dir(path):
+    # TODO
+    pass
+
+
+class SyncFile(BaseSyncFile):
+    def close(self):
+        """sync() and close."""
+        self.sync()
+        self.fd.close()
+        sync_dir(os.path.dirname(self.fd.name))

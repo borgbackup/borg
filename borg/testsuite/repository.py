@@ -9,7 +9,7 @@ from unittest.mock import patch
 from ..hashindex import NSIndex
 from ..helpers import Location, IntegrityError, InternalOSError
 from ..locking import UpgradableLock, LockFailed
-from ..remote import RemoteRepository, InvalidRPCMethod, ConnectionClosedWithHint
+from ..remote import RemoteRepository, InvalidRPCMethod, ConnectionClosedWithHint, handle_remote_line
 from ..repository import Repository, LoggedIO, MAGIC
 from . import BaseTestCase
 
@@ -491,63 +491,51 @@ class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
         pass
 
 
-class RemoteRepositoryLoggingStub(RemoteRepository):
-    """ run a remote command that just prints a logging-formatted message to
-    stderr, and stub out enough of RemoteRepository to avoid the resulting
-    exceptions """
-    def __init__(self, *args, **kw):
-        self.msg = kw.pop('msg')
-        super().__init__(*args, **kw)
-
-    def borg_cmd(self, cmd, testing):
-        return [sys.executable, '-c', 'import sys; print("{}", file=sys.stderr)'.format(self.msg), ]
-
-    def __del__(self):
-        # clean up from exception without triggering assert
-        if self.p:
-            self.close()
-
-
-class RemoteRepositoryLoggerTestCase(RepositoryTestCaseBase):
+class RemoteLoggerTestCase(BaseTestCase):
     def setUp(self):
-        self.location = Location('__testsuite__:/doesntexist/repo')
         self.stream = io.StringIO()
         self.handler = logging.StreamHandler(self.stream)
         logging.getLogger().handlers[:] = [self.handler]
         logging.getLogger('borg.repository').handlers[:] = []
         logging.getLogger('borg.repository.foo').handlers[:] = []
+        # capture stderr
+        sys.stderr.flush()
+        self.old_stderr = sys.stderr
+        self.stderr = sys.stderr = io.StringIO()
 
     def tearDown(self):
-        pass
+        sys.stderr = self.old_stderr
 
-    def create_repository(self, msg):
-        try:
-            RemoteRepositoryLoggingStub(self.location, msg=msg)
-        except ConnectionClosedWithHint:
-            # stub is dumb, so this exception expected
-            pass
+    def test_stderr_messages(self):
+        handle_remote_line("unstructured stderr message")
+        self.assert_equal(self.stream.getvalue(), '')
+        # stderr messages don't get an implicit newline
+        self.assert_equal(self.stderr.getvalue(), 'Remote: unstructured stderr message')
 
     def test_old_format_messages(self):
         self.handler.setLevel(logging.DEBUG)
         logging.getLogger().setLevel(logging.DEBUG)
 
-        self.create_repository("$LOG INFO Remote: old format message")
+        handle_remote_line("$LOG INFO Remote: old format message")
         self.assert_equal(self.stream.getvalue(), 'Remote: old format message\n')
+        self.assert_equal(self.stderr.getvalue(), '')
 
     def test_new_format_messages(self):
         self.handler.setLevel(logging.DEBUG)
         logging.getLogger().setLevel(logging.DEBUG)
 
-        self.create_repository("$LOG INFO borg.repository Remote: new format message")
+        handle_remote_line("$LOG INFO borg.repository Remote: new format message")
         self.assert_equal(self.stream.getvalue(), 'Remote: new format message\n')
+        self.assert_equal(self.stderr.getvalue(), '')
 
     def test_remote_messages_screened(self):
         # default borg config for root logger
         self.handler.setLevel(logging.WARNING)
         logging.getLogger().setLevel(logging.WARNING)
 
-        self.create_repository("$LOG INFO borg.repository Remote: new format info message")
+        handle_remote_line("$LOG INFO borg.repository Remote: new format info message")
         self.assert_equal(self.stream.getvalue(), '')
+        self.assert_equal(self.stderr.getvalue(), '')
 
     def test_info_to_correct_local_child(self):
         logging.getLogger('borg.repository').setLevel(logging.INFO)
@@ -565,7 +553,8 @@ class RemoteRepositoryLoggerTestCase(RepositoryTestCaseBase):
         foo_handler.setLevel(logging.INFO)
         logging.getLogger('borg.repository.foo').handlers[:] = [foo_handler]
 
-        self.create_repository("$LOG INFO borg.repository Remote: new format child message")
+        handle_remote_line("$LOG INFO borg.repository Remote: new format child message")
         self.assert_equal(foo_stream.getvalue(), '')
         self.assert_equal(child_stream.getvalue(), 'Remote: new format child message\n')
         self.assert_equal(self.stream.getvalue(), '')
+        self.assert_equal(self.stderr.getvalue(), '')

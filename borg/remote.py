@@ -303,18 +303,7 @@ class RemoteRepository:
                         raise ConnectionClosed()
                     data = data.decode('utf-8')
                     for line in data.splitlines(keepends=True):
-                        if line.startswith('$LOG '):
-                            _, level, msg = line.split(' ', 2)
-                            level = getattr(logging, level, logging.CRITICAL)  # str -> int
-                            if msg.startswith('Remote:'):
-                                # server format: '$LOG <level> Remote: <msg>'
-                                logging.log(level, msg.rstrip())
-                            else:
-                                # server format '$LOG <level> <logname> Remote: <msg>'
-                                logname, msg = msg.split(' ', 1)
-                                logging.getLogger(logname).log(level, msg.rstrip())
-                        else:
-                            sys.stderr.write("Remote: " + line)
+                        handle_remote_line(line)
             if w:
                 while not self.to_send and (calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT:
                     if calls:
@@ -395,6 +384,21 @@ class RemoteRepository:
 
     def preload(self, ids):
         self.preload_ids += ids
+
+
+def handle_remote_line(line):
+    if line.startswith('$LOG '):
+        _, level, msg = line.split(' ', 2)
+        level = getattr(logging, level, logging.CRITICAL)  # str -> int
+        if msg.startswith('Remote:'):
+            # server format: '$LOG <level> Remote: <msg>'
+            logging.log(level, msg.rstrip())
+        else:
+            # server format '$LOG <level> <logname> Remote: <msg>'
+            logname, msg = msg.split(' ', 1)
+            logging.getLogger(logname).log(level, msg.rstrip())
+    else:
+        sys.stderr.write("Remote: " + line)
 
 
 class RepositoryNoCache:

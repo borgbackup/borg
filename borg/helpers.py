@@ -8,6 +8,7 @@ if sys.platform != 'win32':
     import pwd
 else:
     import posixpath
+    import encodings.idna
 import hashlib
 from itertools import islice
 import os

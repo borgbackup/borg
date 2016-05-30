@@ -1,0 +1,4 @@
+SET PATH=%~dp0bin;%PATH%
+SET PYTHONPATH=%~dp0bin
+CD /D %USERPROFILE%
+CMD /K

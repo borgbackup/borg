@@ -16,6 +16,7 @@ from .helpers import get_cache_dir
 from .helpers import decode_dict, int_to_bigint, bigint_to_int, bin_to_hex
 from .helpers import format_file_size
 from .helpers import yes
+from .item import Item
 from .key import PlaintextKey
 from .locking import UpgradableLock
 from .remote import cache_if_remote
@@ -298,8 +299,9 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     if not isinstance(item, dict):
                         logger.error('Error: Did not get expected metadata dict - archive corrupted!')
                         continue
-                    if b'chunks' in item:
-                        for chunk_id, size, csize in item[b'chunks']:
+                    item = Item(internal_dict=item)
+                    if 'chunks' in item:
+                        for chunk_id, size, csize in item.chunks:
                             chunk_idx.add(chunk_id, 1, size, csize)
             if self.do_cache:
                 fn = mkpath(archive_id)

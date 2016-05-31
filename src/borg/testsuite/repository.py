@@ -7,7 +7,8 @@ import tempfile
 from unittest.mock import patch
 
 from ..hashindex import NSIndex
-from ..helpers import Location, IntegrityError, InternalOSError
+from ..helpers import Location
+from ..helpers import IntegrityError, InternalOSError
 from ..locking import UpgradableLock, LockFailed
 from ..remote import RemoteRepository, InvalidRPCMethod, ConnectionClosedWithHint, handle_remote_line
 from ..repository import Repository, LoggedIO, MAGIC

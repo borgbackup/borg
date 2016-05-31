@@ -1,38 +1,45 @@
-from datetime import datetime, timezone
-from getpass import getuser
-from itertools import groupby
 import errno
-
-from .logger import create_logger
-logger = create_logger()
-from .key import key_factory
-from .remote import cache_if_remote
-
 import os
-from shutil import get_terminal_size
 import socket
 import stat
 import sys
 import time
+from datetime import datetime, timezone
+from getpass import getuser
 from io import BytesIO
+from itertools import groupby
+from shutil import get_terminal_size
+
+import msgpack
+
+from .logger import create_logger
+logger = create_logger()
+
 from . import xattr
-from .compress import COMPR_BUFFER
+from .cache import ChunkListEntry
+from .chunker import Chunker
 from .constants import *  # NOQA
-from .helpers import Chunk, Error, uid2user, user2uid, gid2group, group2gid, \
-    parse_timestamp, to_localtime, format_time, format_timedelta, safe_encode, safe_decode, \
-    Manifest, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, bin_to_hex, \
-    ProgressIndicatorPercent, ChunkIteratorFileWrapper, remove_surrogates, log_multi, \
-    PathPrefixPattern, FnmatchPattern, open_item, file_status, format_file_size, consume, \
-    CompressionDecider1, CompressionDecider2, CompressionSpec, \
-    IntegrityError
+from .hashindex import ChunkIndex, ChunkIndexEntry
+from .helpers import Manifest
+from .helpers import Chunk, ChunkIteratorFileWrapper, open_item
+from .helpers import Error, IntegrityError
+from .helpers import uid2user, user2uid, gid2group, group2gid
+from .helpers import parse_timestamp, to_localtime
+from .helpers import format_time, format_timedelta, format_file_size, file_status
+from .helpers import safe_encode, safe_decode, make_path_safe, remove_surrogates
+from .helpers import decode_dict, StableDict
+from .helpers import int_to_bigint, bigint_to_int, bin_to_hex
+from .helpers import ProgressIndicatorPercent, log_multi
+from .helpers import PathPrefixPattern, FnmatchPattern
+from .helpers import consume
+from .helpers import CompressionDecider1, CompressionDecider2, CompressionSpec
+from .key import key_factory
+from .platform import acl_get, acl_set, set_flags, get_flags, swidth
+from .remote import cache_if_remote
 from .repository import Repository
+
 if sys.platform == 'win32':
     from .platform import get_owner, set_owner
-from .platform import acl_get, acl_set, set_flags, get_flags, swidth
-from .chunker import Chunker
-from .hashindex import ChunkIndex, ChunkIndexEntry
-from .cache import ChunkListEntry
-import msgpack
 
 has_lchmod = hasattr(os, 'lchmod')
 

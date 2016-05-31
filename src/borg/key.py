@@ -1,20 +1,27 @@
-from binascii import a2b_base64, b2a_base64, hexlify
 import configparser
 import getpass
 import os
 import sys
 import textwrap
-from hmac import compare_digest
+from binascii import a2b_base64, b2a_base64, hexlify
 from hashlib import sha256, pbkdf2_hmac
+from hmac import compare_digest
 
-from .helpers import Chunk, IntegrityError, get_keys_dir, Error, yes, bin_to_hex, CompressionDecider2, CompressionSpec
+import msgpack
+
 from .logger import create_logger
 logger = create_logger()
 
 from .constants import *  # NOQA
-from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks, hmac_sha256
 from .compress import Compressor, COMPR_BUFFER, get_compressor
-import msgpack
+from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks, hmac_sha256
+from .helpers import Chunk
+from .helpers import Error, IntegrityError
+from .helpers import yes
+from .helpers import get_keys_dir
+from .helpers import bin_to_hex
+from .helpers import CompressionDecider2, CompressionSpec
+
 
 PREFIX = b'\0' * 8
 

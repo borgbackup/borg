@@ -3,7 +3,7 @@ import os
 import socket
 import time
 
-from borg.helpers import Error, ErrorWithTraceback
+from .helpers import Error, ErrorWithTraceback
 
 ADD, REMOVE = 'add', 'remove'
 SHARED, EXCLUSIVE = 'shared', 'exclusive'

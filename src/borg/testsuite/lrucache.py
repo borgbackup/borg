@@ -1,6 +1,8 @@
-from ..lrucache import LRUCache
-import pytest
 from tempfile import TemporaryFile
+
+import pytest
+
+from ..lrucache import LRUCache
 
 
 class TestLRUCache:

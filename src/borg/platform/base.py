@@ -1,5 +1,17 @@
 import os
 
+"""
+platform base module
+====================
+
+Contains platform API implementations based on what Python itself provides. More specific
+APIs are stubs in this module.
+
+When functions in this module use platform APIs themselves they access the public
+platform API: that way platform APIs provided by the platform-specific support module
+are correctly composed into the base functionality.
+"""
+
 API_VERSION = 3
 
 fdatasync = getattr(os, 'fdatasync', os.fsync)
@@ -80,16 +92,18 @@ class SyncFile:
         Synchronize file contents. Everything written prior to sync() must become durable before anything written
         after sync().
         """
+        from .. import platform
         self.fd.flush()
-        fdatasync(self.fileno)
+        platform.fdatasync(self.fileno)
         if hasattr(os, 'posix_fadvise'):
             os.posix_fadvise(self.fileno, 0, 0, os.POSIX_FADV_DONTNEED)
 
     def close(self):
         """sync() and close."""
+        from .. import platform
         self.sync()
         self.fd.close()
-        sync_dir(os.path.dirname(self.fd.name))
+        platform.sync_dir(os.path.dirname(self.fd.name))
 
 
 def swidth(s):

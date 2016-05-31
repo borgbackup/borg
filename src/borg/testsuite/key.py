@@ -1,15 +1,15 @@
 import getpass
-import os
 import re
-import shutil
 import tempfile
 from binascii import hexlify, unhexlify
 
 import pytest
 
 from ..crypto import bytes_to_long, num_aes_blocks
+from ..helpers import Location
+from ..helpers import Chunk
+from ..helpers import IntegrityError
 from ..key import PlaintextKey, PassphraseKey, KeyfileKey, Passphrase, PasswordRetriesExceeded, bin_to_hex
-from ..helpers import Location, Chunk, IntegrityError
 
 
 @pytest.fixture(autouse=True)

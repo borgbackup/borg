@@ -1,7 +1,3 @@
-from binascii import unhexlify
-from datetime import datetime
-from itertools import zip_longest
-from operator import attrgetter
 import argparse
 import collections
 import functools
@@ -18,28 +14,36 @@ import subprocess
 import sys
 import textwrap
 import traceback
+from binascii import unhexlify
+from datetime import datetime
+from itertools import zip_longest
 
-from . import __version__
-from .helpers import Error, location_validator, archivename_validator, format_time, format_file_size, \
-    parse_pattern, PathPrefixPattern, to_localtime, timestamp, \
-    get_cache_dir, prune_within, prune_split, bin_to_hex, safe_encode, \
-    Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, \
-    dir_is_tagged, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
-    log_multi, PatternMatcher, ItemFormatter
 from .logger import create_logger, setup_logging
 logger = create_logger()
+
+from . import __version__
 from . import helpers
-from .compress import Compressor, COMPR_BUFFER
-from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
-from .repository import Repository
+from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics
 from .cache import Cache
 from .constants import *  # NOQA
+from .helpers import Error
+from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
+from .helpers import ItemFormatter, format_time, format_file_size, format_archive
+from .helpers import safe_encode, remove_surrogates, bin_to_hex
+from .helpers import prune_within, prune_split
+from .helpers import to_localtime, timestamp
+from .helpers import get_cache_dir
+from .helpers import Manifest
+from .helpers import update_excludes, check_extension_modules
+from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo
+from .helpers import log_multi
+from .helpers import parse_pattern, PatternMatcher, PathPrefixPattern
 from .key import key_creator, RepoKey, PassphraseKey
-from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics
-from .remote import RepositoryServer, RemoteRepository, cache_if_remote
-from .selftest import selftest
-from .hashindex import ChunkIndexEntry
 from .platform import get_flags
+from .remote import RepositoryServer, RemoteRepository, cache_if_remote
+from .repository import Repository
+from .selftest import selftest
+from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 
 
 def argument(args, str_or_bool):

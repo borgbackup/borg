@@ -9,7 +9,6 @@ import array
 
 import platform
 from .helpers import safe_decode, safe_encode
-from .platform_base import SyncFile as BaseSyncFile
 
 API_VERSION = 3
 
@@ -335,10 +334,3 @@ def sync_dir(path):
     # TODO
     pass
 
-
-class SyncFile(BaseSyncFile):
-    def close(self):
-        """sync() and close."""
-        self.sync()
-        self.fd.close()
-        sync_dir(os.path.dirname(self.fd.name))

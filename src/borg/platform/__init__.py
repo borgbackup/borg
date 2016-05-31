@@ -25,5 +25,5 @@ elif sys.platform == 'darwin':  # pragma: darwin only
 elif sys.platform == 'win32':  # pragma: windows only
     from .windows import acl_get, acl_set
     from .windows import API_VERSION
-    from .windows import sync_dir, SyncFile
+    from .windows import sync_dir
     from .windows import get_owner, set_owner

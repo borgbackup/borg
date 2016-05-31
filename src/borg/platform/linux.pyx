@@ -3,11 +3,11 @@ import re
 import resource
 import stat
 
-from .helpers import posix_acl_use_stored_uid_gid
-from .helpers import user2uid, group2gid
-from .helpers import safe_decode, safe_encode
-from .platform_base import SyncFile as BaseSyncFile
-from .platform_posix import swidth
+from ..helpers import posix_acl_use_stored_uid_gid
+from ..helpers import user2uid, group2gid
+from ..helpers import safe_decode, safe_encode
+from .base import SyncFile as BaseSyncFile
+from .posix import swidth
 
 from libc cimport errno
 from libc.stdint cimport int64_t

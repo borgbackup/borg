@@ -62,9 +62,9 @@ def acl_get(path, item, st, numeric_owner=False):
         if text == NULL:
             return
         if numeric_owner:
-            item[b'acl_extended'] = _remove_non_numeric_identifier(text)
+            item['acl_extended'] = _remove_non_numeric_identifier(text)
         else:
-            item[b'acl_extended'] = text
+            item['acl_extended'] = text
     finally:
         acl_free(text)
         acl_free(acl)
@@ -75,9 +75,9 @@ def acl_set(path, item, numeric_owner=False):
     try:
         try:
             if numeric_owner:
-                acl = acl_from_text(item[b'acl_extended'])
+                acl = acl_from_text(item['acl_extended'])
             else:
-                acl = acl_from_text(<bytes>_remove_numeric_id_if_possible(item[b'acl_extended']))
+                acl = acl_from_text(<bytes>_remove_numeric_id_if_possible(item['acl_extended']))
         except KeyError:
             return
         if acl == NULL:

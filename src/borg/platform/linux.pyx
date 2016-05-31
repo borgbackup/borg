@@ -171,12 +171,12 @@ def acl_get(path, item, st, numeric_owner=False):
         if access_acl:
             access_text = acl_to_text(access_acl, NULL)
             if access_text:
-                item[b'acl_access'] = converter(access_text)
+                item['acl_access'] = converter(access_text)
         default_acl = acl_get_file(p, ACL_TYPE_DEFAULT)
         if default_acl:
             default_text = acl_to_text(default_acl, NULL)
             if default_text:
-                item[b'acl_default'] = converter(default_text)
+                item['acl_default'] = converter(default_text)
     finally:
         acl_free(default_text)
         acl_free(default_acl)
@@ -193,8 +193,8 @@ def acl_set(path, item, numeric_owner=False):
         converter = posix_acl_use_stored_uid_gid
     else:
         converter = acl_use_local_uid_gid
-    access_text = item.get(b'acl_access')
-    default_text = item.get(b'acl_default')
+    access_text = item.get('acl_access')
+    default_text = item.get('acl_default')
     if access_text:
         try:
             access_acl = acl_from_text(<bytes>converter(access_text))

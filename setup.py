@@ -45,10 +45,22 @@ compress_source = 'src/borg/compress.pyx'
 crypto_source = 'src/borg/crypto.pyx'
 chunker_source = 'src/borg/chunker.pyx'
 hashindex_source = 'src/borg/hashindex.pyx'
-platform_posix_source = 'src/borg/platform_posix.pyx'
-platform_linux_source = 'src/borg/platform_linux.pyx'
-platform_darwin_source = 'src/borg/platform_darwin.pyx'
-platform_freebsd_source = 'src/borg/platform_freebsd.pyx'
+platform_posix_source = 'src/borg/platform/posix.pyx'
+platform_linux_source = 'src/borg/platform/linux.pyx'
+platform_darwin_source = 'src/borg/platform/darwin.pyx'
+platform_freebsd_source = 'src/borg/platform/freebsd.pyx'
+
+cython_sources = [
+    compress_source,
+    crypto_source,
+    chunker_source,
+    hashindex_source,
+
+    platform_posix_source,
+    platform_linux_source,
+    platform_freebsd_source,
+    platform_darwin_source,
+]
 
 try:
     from Cython.Distutils import build_ext
@@ -56,7 +68,7 @@ try:
 
     class Sdist(sdist):
         def __init__(self, *args, **kwargs):
-            for src in glob('src/borg/*.pyx'):
+            for src in cython_sources:
                 cython_compiler.compile(src, cython_compiler.default_options)
             super().__init__(*args, **kwargs)
 
@@ -66,10 +78,10 @@ try:
                 'src/borg/crypto.c',
                 'src/borg/chunker.c', 'src/borg/_chunker.c',
                 'src/borg/hashindex.c', 'src/borg/_hashindex.c',
-                'src/borg/platform_posix.c',
-                'src/borg/platform_linux.c',
-                'src/borg/platform_freebsd.c',
-                'src/borg/platform_darwin.c',
+                'src/borg/platform/posix.c',
+                'src/borg/platform/linux.c',
+                'src/borg/platform/freebsd.c',
+                'src/borg/platform/darwin.c',
             ])
             super().make_distribution()
 
@@ -295,14 +307,14 @@ if not on_rtd:
     Extension('borg.hashindex', [hashindex_source])
 ]
     if sys.platform.startswith(('linux', 'freebsd', 'darwin')):
-        ext_modules.append(Extension('borg.platform_posix', [platform_posix_source]))
+        ext_modules.append(Extension('borg.platform.posix', [platform_posix_source]))
 
     if sys.platform == 'linux':
-        ext_modules.append(Extension('borg.platform_linux', [platform_linux_source], libraries=['acl']))
+        ext_modules.append(Extension('borg.platform.linux', [platform_linux_source], libraries=['acl']))
     elif sys.platform.startswith('freebsd'):
-        ext_modules.append(Extension('borg.platform_freebsd', [platform_freebsd_source]))
+        ext_modules.append(Extension('borg.platform.freebsd', [platform_freebsd_source]))
     elif sys.platform == 'darwin':
-        ext_modules.append(Extension('borg.platform_darwin', [platform_darwin_source]))
+        ext_modules.append(Extension('borg.platform.darwin', [platform_darwin_source]))
 
 setup(
     name='borgbackup',

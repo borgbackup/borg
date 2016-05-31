@@ -55,7 +55,7 @@ class Repository:
     established by a COMMIT.
 
     Note that the COMMIT can't establish consistency by itself, but only manages to do so with proper support from
-    the platform (including the hardware). See platform_base.SyncFile for details.
+    the platform (including the hardware). See platform.base.SyncFile for details.
 
     A PUT inserts a key-value pair. The value is stored in the log entry, hence the repository implements
     full data logging, meaning that all data is consistent, not just metadata (which is common in file systems).

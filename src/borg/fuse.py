@@ -86,6 +86,7 @@ class FuseOperations(llfuse.Operations):
             _, data = self.key.decrypt(key, chunk)
             unpacker.feed(data)
             for item in unpacker:
+                item = Item(internal_dict=item)
                 segments = prefix + os.fsencode(os.path.normpath(item.path)).split(b'/')
                 del item.path
                 num_segments = len(segments)

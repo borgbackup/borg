@@ -354,6 +354,7 @@ Number of files: {0.stats.nfiles}'''.format(
             _, data = self.key.decrypt(id, chunk)
             unpacker.feed(data)
             for item in unpacker:
+                item = Item(internal_dict=item)
                 if 'chunks' in item:
                     stats.nfiles += 1
                     add_file_chunks(item.chunks)
@@ -539,6 +540,7 @@ Number of files: {0.stats.nfiles}'''.format(
             unpacker.feed(data)
             self.cache.chunk_decref(items_id, stats)
             for item in unpacker:
+                item = Item(internal_dict=item)
                 if 'chunks' in item:
                     for chunk_id, size, csize in item.chunks:
                         self.cache.chunk_decref(chunk_id, stats)

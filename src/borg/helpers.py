@@ -1,11 +1,3 @@
-
-if sys.platform != 'win32':
-    import grp
-    import pwd
-else:
-    import posixpath
-    import encodings.idna
-
 import argparse
 import hashlib
 import logging
@@ -27,6 +19,14 @@ from functools import wraps, partial
 from itertools import islice
 from operator import attrgetter
 from string import Formatter
+
+if sys.platform != 'win32':
+    import grp
+    import pwd
+else:
+    import posixpath
+    import encodings.idna
+
 
 import msgpack
 import msgpack.fallback

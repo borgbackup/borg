@@ -8,7 +8,7 @@ cimport cpython.array
 import array
 
 import platform
-from .helpers import safe_decode, safe_encode
+from ..helpers import safe_decode, safe_encode
 
 API_VERSION = 3
 

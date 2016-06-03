@@ -44,6 +44,7 @@ openSUSE     `openSUSE official repository`_               ``zypper in python3-b
 Fedora       `Fedora official repository`_                 ``dnf install borgbackup``
 OS X         `Brew cask`_                                  ``brew cask install borgbackup``
 Ubuntu       `16.04`_, backports (PPA): `15.10`_, `14.04`_ ``apt install borgbackup``
+Mageia       `Mageia official repository`_                 ``urpmi borgbackup``
 ============ ============================================= =======
 
 .. _[community]: https://www.archlinux.org/packages/?name=borg
@@ -62,6 +63,7 @@ Ubuntu       `16.04`_, backports (PPA): `15.10`_, `14.04`_ ``apt install borgbac
 .. _Fedora official repository: https://apps.fedoraproject.org/packages/borgbackup
 .. _Brew cask: http://caskroom.io/
 .. _GNU Guix: https://www.gnu.org/software/guix/package-list.html#borg
+.. _Mageia official repository: http://madb.mageia.org/package/show/application/0/release/cauldron/name/borgbackup
 
 Please ask package maintainers to build a package or, if you can package /
 submit it yourself, please help us with that! See :issue:`105` on

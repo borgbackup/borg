@@ -173,26 +173,15 @@ class FuseOperations(llfuse.Operations):
         entry.st_blksize = 512
         entry.st_blocks = dsize / 512
         # note: older archives only have mtime (not atime nor ctime)
+        mtime_ns = item.mtime
         if have_fuse_xtime_ns:
-            entry.st_mtime_ns = item.mtime
-            if 'atime' in item:
-                entry.st_atime_ns = item.atime
-            else:
-                entry.st_atime_ns = item.mtime
-            if 'ctime' in item:
-                entry.st_ctime_ns = item.ctime
-            else:
-                entry.st_ctime_ns = item.mtime
+            entry.st_mtime_ns = mtime_ns
+            entry.st_atime_ns = item.get('atime', mtime_ns)
+            entry.st_ctime_ns = item.get('ctime', mtime_ns)
         else:
-            entry.st_mtime = item.mtime / 1e9
-            if 'atime' in item:
-                entry.st_atime = item.atime / 1e9
-            else:
-                entry.st_atime = item.mtime / 1e9
-            if 'ctime' in item:
-                entry.st_ctime = item.ctime / 1e9
-            else:
-                entry.st_ctime = item.mtime / 1e9
+            entry.st_mtime = mtime_ns / 1e9
+            entry.st_atime = item.get('atime', mtime_ns) / 1e9
+            entry.st_ctime = item.get('ctime', mtime_ns) / 1e9
         return entry
 
     def listxattr(self, inode, ctx=None):

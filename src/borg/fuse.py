@@ -38,12 +38,13 @@ class ItemCache:
 
     def add(self, item):
         pos = self.fd.seek(0, io.SEEK_END)
-        self.fd.write(msgpack.packb(item))
+        self.fd.write(msgpack.packb(item.as_dict()))
         return pos + self.offset
 
     def get(self, inode):
         self.fd.seek(inode - self.offset, io.SEEK_SET)
-        return next(msgpack.Unpacker(self.fd, read_size=1024))
+        item = next(msgpack.Unpacker(self.fd, read_size=1024))
+        return Item(internal_dict=item)
 
 
 class FuseOperations(llfuse.Operations):
@@ -152,14 +153,12 @@ class FuseOperations(llfuse.Operations):
         item = self.get_item(inode)
         size = 0
         dsize = 0
-        try:
+        if 'chunks' in item:
             for key, chunksize, _ in item.chunks:
                 size += chunksize
                 if self.accounted_chunks.get(key, inode) == inode:
                     self.accounted_chunks[key] = inode
                     dsize += chunksize
-        except KeyError:
-            pass
         entry = llfuse.EntryAttributes()
         entry.st_ino = inode
         entry.generation = 0

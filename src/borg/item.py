@@ -119,7 +119,7 @@ class Item(PropDict):
     If an Item shall be serialized, give as_dict() method output to msgpack packer.
     """
 
-    VALID_KEYS = ITEM_KEYS | {'deleted'}  # str-typed keys
+    VALID_KEYS = ITEM_KEYS | {'deleted', 'nlink', }  # str-typed keys
 
     __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 
@@ -152,3 +152,4 @@ class Item(PropDict):
     xattrs = PropDict._make_property('xattrs', StableDict)
 
     deleted = PropDict._make_property('deleted', bool)
+    nlink = PropDict._make_property('nlink', int)

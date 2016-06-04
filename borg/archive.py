@@ -695,7 +695,12 @@ class ArchiveChecker:
                 self.chunks[id_] = (0, 0, 0)
 
     def identify_key(self, repository):
-        cdata = repository.get(next(self.chunks.iteritems())[0])
+        try:
+            some_chunkid, _ = next(self.chunks.iteritems())
+        except StopIteration:
+            # repo is completely empty, no chunks
+            return None
+        cdata = repository.get(some_chunkid)
         return key_factory(repository, cdata)
 
     def rebuild_manifest(self):

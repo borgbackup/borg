@@ -65,6 +65,10 @@ class ExtensionModuleError(Error):
     """The Borg binary extension modules do not seem to be properly installed"""
 
 
+class NoManifestError(Error):
+    """Repository has no manifest."""
+
+
 def check_extension_modules():
     from . import platform
     if hashindex.API_VERSION != 2:
@@ -90,7 +94,11 @@ class Manifest:
     @classmethod
     def load(cls, repository, key=None):
         from .key import key_factory
-        cdata = repository.get(cls.MANIFEST_ID)
+        from .repository import Repository
+        try:
+            cdata = repository.get(cls.MANIFEST_ID)
+        except Repository.ObjectNotFound:
+            raise NoManifestError
         if not key:
             key = key_factory(repository, cdata)
         manifest = cls(key, repository)

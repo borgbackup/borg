@@ -7,6 +7,7 @@ import pytest
 import msgpack
 
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, Statistics
+from ..item import Item
 from ..key import PlaintextKey
 from ..helpers import Manifest
 from . import BaseTestCase
@@ -38,12 +39,12 @@ def tests_stats_progress(stats, columns=80):
 
     out = StringIO()
     stats.update(10**3, 0, unique=False)
-    stats.show_progress(item={b'path': 'foo'}, final=False, stream=out)
+    stats.show_progress(item=Item(path='foo'), final=False, stream=out)
     s = '1.02 kB O 10 B C 10 B D 0 N foo'
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
     out = StringIO()
-    stats.show_progress(item={b'path': 'foo'*40}, final=False, stream=out)
+    stats.show_progress(item=Item(path='foo'*40), final=False, stream=out)
     s = '1.02 kB O 10 B C 10 B D 0 N foofoofoofoofoofoofoofo...oofoofoofoofoofoofoofoofoo'
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
@@ -93,7 +94,7 @@ class ArchiveTimestampTestCase(BaseTestCase):
 class ChunkBufferTestCase(BaseTestCase):
 
     def test(self):
-        data = [{b'foo': 1}, {b'bar': 2}]
+        data = [Item(path='p1'), Item(path='p2')]
         cache = MockCache()
         key = PlaintextKey(None)
         chunks = CacheChunkBuffer(cache, key, None)
@@ -105,11 +106,11 @@ class ChunkBufferTestCase(BaseTestCase):
         unpacker = msgpack.Unpacker()
         for id in chunks.chunks:
             unpacker.feed(cache.objects[id])
-        self.assert_equal(data, list(unpacker))
+        self.assert_equal(data, [Item(internal_dict=d) for d in unpacker])
 
     def test_partial(self):
-        big = b"0123456789" * 10000
-        data = [{b'full': 1, b'data': big}, {b'partial': 2, b'data': big}]
+        big = "0123456789" * 10000
+        data = [Item(path='full', source=big), Item(path='partial', source=big)]
         cache = MockCache()
         key = PlaintextKey(None)
         chunks = CacheChunkBuffer(cache, key, None)
@@ -126,7 +127,7 @@ class ChunkBufferTestCase(BaseTestCase):
         unpacker = msgpack.Unpacker()
         for id in chunks.chunks:
             unpacker.feed(cache.objects[id])
-        self.assert_equal(data, list(unpacker))
+        self.assert_equal(data, [Item(internal_dict=d) for d in unpacker])
 
 
 class RobustUnpackerTestCase(BaseTestCase):

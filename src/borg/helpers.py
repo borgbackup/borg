@@ -1157,10 +1157,8 @@ class ItemFormatter:
         class FakeArchive:
             fpr = name = ""
 
-        fake_item = {
-            b'mode': 0, b'path': '', b'user': '', b'group': '', b'mtime': 0,
-            b'uid': 0, b'gid': 0,
-        }
+        from .item import Item
+        fake_item = Item(mode=0, path='', user='', group='', mtime=0, uid=0, gid=0)
         formatter = cls(FakeArchive, "")
         keys = []
         keys.extend(formatter.call_keys.keys())
@@ -1196,12 +1194,12 @@ class ItemFormatter:
             'csize': self.calculate_csize,
             'num_chunks': self.calculate_num_chunks,
             'unique_chunks': self.calculate_unique_chunks,
-            'isomtime': partial(self.format_time, b'mtime'),
-            'isoctime': partial(self.format_time, b'ctime'),
-            'isoatime': partial(self.format_time, b'atime'),
-            'mtime': partial(self.time, b'mtime'),
-            'ctime': partial(self.time, b'ctime'),
-            'atime': partial(self.time, b'atime'),
+            'isomtime': partial(self.format_time, 'mtime'),
+            'isoctime': partial(self.format_time, 'ctime'),
+            'isoatime': partial(self.format_time, 'atime'),
+            'mtime': partial(self.time, 'mtime'),
+            'ctime': partial(self.time, 'ctime'),
+            'atime': partial(self.time, 'atime'),
         }
         for hash_function in hashlib.algorithms_guaranteed:
             self.add_key(hash_function, partial(self.hash_item, hash_function))
@@ -1213,11 +1211,11 @@ class ItemFormatter:
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
     def get_item_data(self, item):
-        mode = stat.filemode(item[b'mode'])
+        mode = stat.filemode(item.mode)
         item_type = mode[0]
         item_data = self.item_data
 
-        source = item.get(b'source', '')
+        source = item.get('source', '')
         extra = ''
         if source:
             source = remove_surrogates(source)
@@ -1228,16 +1226,16 @@ class ItemFormatter:
                 extra = ' link to %s' % source
         item_data['type'] = item_type
         item_data['mode'] = mode
-        item_data['user'] = item[b'user'] or item[b'uid']
-        item_data['group'] = item[b'group'] or item[b'gid']
-        item_data['uid'] = item[b'uid']
-        item_data['gid'] = item[b'gid']
-        item_data['path'] = remove_surrogates(item[b'path'])
-        item_data['bpath'] = item[b'path']
+        item_data['user'] = item.user or item.uid
+        item_data['group'] = item.group or item.gid
+        item_data['uid'] = item.uid
+        item_data['gid'] = item.gid
+        item_data['path'] = remove_surrogates(item.path)
+        item_data['bpath'] = item.path
         item_data['source'] = source
         item_data['linktarget'] = source
         item_data['extra'] = extra
-        item_data['flags'] = item.get(b'bsdflags')
+        item_data['flags'] = item.get('bsdflags')
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)
         return item_data
@@ -1246,31 +1244,31 @@ class ItemFormatter:
         return self.format.format_map(self.get_item_data(item))
 
     def calculate_num_chunks(self, item):
-        return len(item.get(b'chunks', []))
+        return len(item.get('chunks', []))
 
     def calculate_unique_chunks(self, item):
         chunk_index = self.archive.cache.chunks
-        return sum(1 for c in item.get(b'chunks', []) if chunk_index[c.id].refcount == 1)
+        return sum(1 for c in item.get('chunks', []) if chunk_index[c.id].refcount == 1)
 
     def calculate_size(self, item):
-        return sum(c.size for c in item.get(b'chunks', []))
+        return sum(c.size for c in item.get('chunks', []))
 
     def calculate_csize(self, item):
-        return sum(c.csize for c in item.get(b'chunks', []))
+        return sum(c.csize for c in item.get('chunks', []))
 
     def hash_item(self, hash_function, item):
-        if b'chunks' not in item:
+        if 'chunks' not in item:
             return ""
         hash = hashlib.new(hash_function)
-        for _, data in self.archive.pipeline.fetch_many([c.id for c in item[b'chunks']]):
+        for _, data in self.archive.pipeline.fetch_many([c.id for c in item.chunks]):
             hash.update(data)
         return hash.hexdigest()
 
     def format_time(self, key, item):
-        return format_time(safe_timestamp(item.get(key) or item[b'mtime']))
+        return format_time(safe_timestamp(item.get(key) or item.mtime))
 
     def time(self, key, item):
-        return safe_timestamp(item.get(key) or item[b'mtime'])
+        return safe_timestamp(item.get(key) or item.mtime)
 
 
 class ChunkIteratorFileWrapper:
@@ -1314,7 +1312,7 @@ class ChunkIteratorFileWrapper:
 
 def open_item(archive, item):
     """Return file-like object for archived item (with chunks)."""
-    chunk_iterator = archive.pipeline.fetch_many([c.id for c in item[b'chunks']])
+    chunk_iterator = archive.pipeline.fetch_many([c.id for c in item.chunks])
     return ChunkIteratorFileWrapper(chunk_iterator)
 
 

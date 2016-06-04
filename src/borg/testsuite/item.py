@@ -35,13 +35,13 @@ def test_item_empty():
 
 def test_item_from_dict():
     # does not matter whether we get str or bytes keys
-    item = Item({b'path': b'/a/b/c', b'mode': 0o666})
+    item = Item({b'path': '/a/b/c', b'mode': 0o666})
     assert item.path == '/a/b/c'
     assert item.mode == 0o666
     assert 'path' in item
 
     # does not matter whether we get str or bytes keys
-    item = Item({'path': b'/a/b/c', 'mode': 0o666})
+    item = Item({'path': '/a/b/c', 'mode': 0o666})
     assert item.path == '/a/b/c'
     assert item.mode == 0o666
     assert 'mode' in item
@@ -60,7 +60,7 @@ def test_item_from_dict():
 
 
 def test_item_from_kw():
-    item = Item(path=b'/a/b/c', mode=0o666)
+    item = Item(path='/a/b/c', mode=0o666)
     assert item.path == '/a/b/c'
     assert item.mode == 0o666
 
@@ -107,7 +107,7 @@ def test_item_se_str_property():
         item.path = 42
 
     # non-utf-8 path, needing surrogate-escaping for latin-1 u-umlaut
-    item = Item({'path': b'/a/\xfc/c'})
+    item = Item(internal_dict={'path': b'/a/\xfc/c'})
     assert item.path == '/a/\udcfc/c'  # getting a surrogate-escaped representation
     assert item.as_dict() == {'path': b'/a/\xfc/c'}
     del item.path

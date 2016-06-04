@@ -25,9 +25,17 @@ Distribution Package
 --------------------
 
 Some distributions might offer a ready-to-use ``borgbackup``
-package which can be installed with the package manager.  As |project_name| is
-still a young project, such a package might be not available for your system
-yet.
+package which can be installed with the package manager.
+
+.. important:: Those packages may not be up to date with the latest
+               |project_name| releases. Before submitting a bug
+               report, check the package version and compare that to
+               our latest release then review :doc:`changes` to see if
+               the bug has been fixed. Report bugs to the package
+               maintainer rather than directly to |project_name| if the
+               package is out of date in the distribution.
+
+.. keep this list in alphabetical order
 
 ============ ============================================= =======
 Distribution Source                                        Command
@@ -36,13 +44,16 @@ Arch Linux   `[community]`_                                ``pacman -S borg``
 Debian       `jessie-backports`_, `stretch`_, `sid`_       ``apt install borgbackup``
 Gentoo       `ebuild`_                                     ``emerge borgbackup``
 GNU Guix     `GNU Guix`_                                   ``guix package --install borg``
-FreeBSD      `Ports-Tree`_                                 ``cd /usr/ports/archivers/py-borgbackup && make install clean``
+Fedora/RHEL  `Fedora official repository`_, `EPEL`_        ``dnf install borgbackup``
+FreeBSD      `FreeBSD ports`_                              ``cd /usr/ports/archivers/py-borgbackup && make install clean``
+Mageia       `cauldron`_                                   ``urpmi borgbackup``
 NetBSD       `pkgsrc`_                                     ``pkg_add py-borgbackup``
 NixOS        `.nix file`_                                  N/A
 OpenBSD      `OpenBSD ports`_                              ``pkg_add borgbackup``
+OpenIndiana  `OpenIndiana hipster repository`_             ``pkg install borg``
 openSUSE     `openSUSE official repository`_               ``zypper in python3-borgbackup``
-Fedora       `Fedora official repository`_                 ``dnf install borgbackup``
 OS X         `Brew cask`_                                  ``brew cask install borgbackup``
+Raspbian     `Raspbian testing`_                           ``apt install borgbackup``
 Ubuntu       `16.04`_, backports (PPA): `15.10`_, `14.04`_ ``apt install borgbackup``
 ============ ============================================= =======
 
@@ -50,25 +61,26 @@ Ubuntu       `16.04`_, backports (PPA): `15.10`_, `14.04`_ ``apt install borgbac
 .. _jessie-backports: https://packages.debian.org/jessie-backports/borgbackup
 .. _stretch: https://packages.debian.org/stretch/borgbackup
 .. _sid: https://packages.debian.org/sid/borgbackup
+.. _Fedora official repository: https://apps.fedoraproject.org/packages/borgbackup
+.. _EPEL: https://admin.fedoraproject.org/pkgdb/package/rpms/borgbackup/
+.. _FreeBSD ports: http://www.freshports.org/archivers/py-borgbackup/
 .. _ebuild: https://packages.gentoo.org/packages/app-backup/borgbackup
-.. _Ports-Tree: http://www.freshports.org/archivers/py-borgbackup/
+.. _GNU Guix: https://www.gnu.org/software/guix/package-list.html#borg
 .. _pkgsrc: http://pkgsrc.se/sysutils/py-borgbackup
+.. _cauldron: http://madb.mageia.org/package/show/application/0/release/cauldron/name/borgbackup
+.. _.nix file: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/backup/borg/default.nix
+.. _OpenBSD ports: http://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/sysutils/borgbackup/
+.. _OpenIndiana hipster repository: http://pkg.openindiana.org/hipster/en/search.shtml?token=borg&action=Search
+.. _openSUSE official repository: http://software.opensuse.org/package/borgbackup
+.. _Brew cask: http://caskroom.io/
+.. _Raspbian testing: http://archive.raspbian.org/raspbian/pool/main/b/borgbackup/
 .. _16.04: https://launchpad.net/ubuntu/xenial/+source/borgbackup
 .. _15.10: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
 .. _14.04: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
-.. _.nix file: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/backup/borg/default.nix
-.. _OpenBSD ports: http://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/sysutils/borgbackup/
-.. _openSUSE official repository: http://software.opensuse.org/package/borgbackup
-.. _Fedora official repository: https://apps.fedoraproject.org/packages/borgbackup
-.. _Brew cask: http://caskroom.io/
-.. _GNU Guix: https://www.gnu.org/software/guix/package-list.html#borg
 
 Please ask package maintainers to build a package or, if you can package /
 submit it yourself, please help us with that! See :issue:`105` on
 github to followup on packaging efforts.
-
-If a package is available, it might be interesting to check its version
-and compare that to our latest release and review the :doc:`changes`.
 
 .. _pyinstaller-binary:
 

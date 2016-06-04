@@ -499,13 +499,22 @@ Examples
 
 Examples
 ~~~~~~~~
-borg mount/borgfs
-+++++++++++++++++
+borg mount
+++++++++++
 ::
 
     $ borg mount /path/to/repo::root-2016-02-15 /tmp/mymountpoint
     $ ls /tmp/mymountpoint
     bin  boot  etc	home  lib  lib64  lost+found  media  mnt  opt  root  sbin  srv  tmp  usr  var
+    $ fusermount -u /tmp/mymountpoint
+
+::
+
+    $ borg mount -o versions /path/to/repo /tmp/mymountpoint
+    $ ls -l /tmp/mymountpoint/home/user/doc.txt/
+    total 24
+    -rw-rw-r-- 1 user group 12357 Aug 26 21:19 doc.txt.cda00bc9
+    -rw-rw-r-- 1 user group 12204 Aug 26 21:04 doc.txt.fa760f28
     $ fusermount -u /tmp/mymountpoint
 
 borgfs

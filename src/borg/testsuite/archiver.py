@@ -1442,6 +1442,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 assert stat.S_ISFIFO(sto.st_mode)
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    def test_fuse_versions_view(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('test', contents=b'first')
+        self.cmd('create', self.repository_location + '::archive1', 'input')
+        self.create_regular_file('test', contents=b'second')
+        self.cmd('create', self.repository_location + '::archive2', 'input')
+        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
+        # mount the whole repository, archive contents shall show up in versioned view:
+        with self.fuse_mount(self.repository_location, mountpoint, 'versions'):
+            path = os.path.join(mountpoint, 'input', 'test')  # filename shows up as directory ...
+            files = os.listdir(path)
+            assert all(f.startswith('test.') for f in files)  # ... with files test.xxxxxxxx in there
+            assert {b'first', b'second'} == {open(os.path.join(path, f), 'rb').read() for f in files}
+
+    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
     def test_fuse_allow_damaged_files(self):
         self.cmd('init', self.repository_location)
         self.create_src_archive('archive')

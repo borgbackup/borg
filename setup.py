@@ -32,9 +32,9 @@ extras_require = {
 }
 
 if sys.platform.startswith('freebsd'):
-    # while llfuse 1.0 is the latest llfuse release right now,
-    # llfuse 0.41.1 is the latest release that actually builds on freebsd:
-    extras_require['fuse'] = ['llfuse==0.41.1', ]
+    # llfuse was frequently broken / did not build on freebsd
+    # llfuse 0.41.1, 1.1 are ok
+    extras_require['fuse'] = ['llfuse <2.0, !=0.42.*, !=0.43, !=1.0', ]
 
 from setuptools import setup, Extension
 from setuptools.command.sdist import sdist

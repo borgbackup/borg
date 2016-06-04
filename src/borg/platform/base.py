@@ -75,7 +75,7 @@ class SyncFile:
     """
 
     def __init__(self, path):
-        self.fd = open(path, 'wb')
+        self.fd = open(path, 'xb')
         self.fileno = self.fd.fileno()
 
     def __enter__(self):

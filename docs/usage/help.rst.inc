@@ -18,7 +18,7 @@ desired pattern starts with two alphanumeric characters followed by a colon
     any number of characters, '?' matching any single character, '[...]'
     matching any single character specified, including ranges, and '[!...]'
     matching any character not specified. For the purpose of these patterns,
-    the path separator ('\' for Windows and '/' on other systems) is not
+    the path separator ('\\' for Windows and '/' on other systems) is not
     treated specially. Wrap meta-characters in brackets for a literal match
     (i.e. `[?]` to match the literal character `?`). For a path to match
     a pattern, it must completely match from start to end, or must match from
@@ -40,7 +40,7 @@ Regular expressions, selector `re:`
     shell patterns regular expressions are not required to match the complete
     path and any substring match is sufficient. It is strongly recommended to
     anchor patterns to the start ('^'), to the end ('$') or both. Path
-    separators ('\' for Windows and '/' on other systems) in paths are
+    separators ('\\' for Windows and '/' on other systems) in paths are
     always normalized to a forward slash ('/') before applying a pattern. The
     regular expression syntax is described in the `Python documentation for
     the re module <https://docs.python.org/3/library/re.html>`_.

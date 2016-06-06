@@ -2,7 +2,7 @@
 #define MyAppVersion "1.1"
 #define MyAppPublisher "The Borg Collective"
 #define MyAppURL "https://borgbackup.rtfd.org/"
-#define MyAppExeName "bin/borg.exe"
+#define MyAppExeName "borg.exe"
 
 [Setup]
 AppId={{1B6E8CD4-25F2-4400-A53F-4338D6614475}
@@ -32,8 +32,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "win32exe\bin\*"; DestDir: "{app}\bin"; Flags: replacesameversion recursesubdirs
-Source: "win32exe\lib\*"; DestDir: "{app}\lib"; Flags: replacesameversion recursesubdirs
+Source: "win32exe\*"; DestDir: "{app}"; Flags: replacesameversion recursesubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]

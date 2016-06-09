@@ -68,7 +68,7 @@ class RobustUnpackerTestCase(BaseTestCase):
         return isinstance(value, dict) and value.get(b'path') in (b'foo', b'bar', b'boo', b'baz')
 
     def process(self, input):
-        unpacker = RobustUnpacker(validator=self._validator)
+        unpacker = RobustUnpacker(validator=self._validator, item_keys=ITEM_KEYS)
         result = []
         for should_sync, chunks in input:
             if should_sync:

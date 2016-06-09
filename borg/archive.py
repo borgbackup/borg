@@ -592,6 +592,34 @@ ITEM_KEYS = set([b'path', b'source', b'rdev', b'chunks',
                  b'xattrs', b'bsdflags', b'acl_nfs4', b'acl_access', b'acl_default', b'acl_extended', ])
 
 
+def valid_msgpacked_item(d, item_keys_serialized):
+    """check if the data <d> looks like a msgpacked item metadata dict"""
+    d_len = len(d)
+    if d_len == 0:
+        return False
+    if d[0] & 0xf0 == 0x80:  # object is a fixmap (up to 15 elements)
+        offs = 1
+    elif d[0] == 0xde:  # object is a map16 (up to 2^16-1 elements)
+        offs = 3
+    else:
+        # object is not a map (dict)
+        # note: we must not have item dicts with > 2^16-1 elements
+        return False
+    if d_len <= offs:
+        return False
+    # is the first dict key a bytestring?
+    if d[offs] & 0xe0 == 0xa0:  # key is a small bytestring (up to 31 chars)
+        pass
+    elif d[offs] in (0xd9, 0xda, 0xdb):  # key is a str8, str16 or str32
+        pass
+    else:
+        # key is not a bytestring
+        return False
+    # is the bytestring any of the expected key names?
+    key_serialized = d[offs:]
+    return any(key_serialized.startswith(pattern) for pattern in item_keys_serialized)
+
+
 class RobustUnpacker:
     """A restartable/robust version of the streaming msgpack unpacker
     """
@@ -622,18 +650,10 @@ class RobustUnpacker:
             while self._resync:
                 if not data:
                     raise StopIteration
-                # Abort early if the data does not look like a serialized dict
-                if len(data) < 2 or ((data[0] & 0xf0) != 0x80) or ((data[1] & 0xe0) != 0xa0):
+                # Abort early if the data does not look like a serialized item dict
+                if not valid_msgpacked_item(data, self.item_keys):
                     data = data[1:]
                     continue
-                # Make sure it looks like an item dict
-                for pattern in self.item_keys:
-                    if data[1:].startswith(pattern):
-                        break
-                else:
-                    data = data[1:]
-                    continue
-
                 self._unpacker = msgpack.Unpacker(object_hook=StableDict)
                 self._unpacker.feed(data)
                 try:

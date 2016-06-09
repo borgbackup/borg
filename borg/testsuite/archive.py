@@ -2,8 +2,9 @@ from datetime import datetime, timezone
 from unittest.mock import Mock
 
 import msgpack
+import pytest
 
-from ..archive import Archive, CacheChunkBuffer, RobustUnpacker
+from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_item, ITEM_KEYS
 from ..key import PlaintextKey
 from ..helpers import Manifest
 from . import BaseTestCase
@@ -112,3 +113,35 @@ class RobustUnpackerTestCase(BaseTestCase):
         input = [(False, chunks[:3]), (True, [b'gar', b'bage'] + chunks[3:])]
         result = self.process(input)
         self.assert_equal(result, [{b'path': b'foo'}, {b'path': b'boo'}, {b'path': b'baz'}])
+
+
+@pytest.fixture
+def item_keys_serialized():
+    return [msgpack.packb(name) for name in ITEM_KEYS]
+
+
+@pytest.mark.parametrize('packed',
+    [b'', b'x', b'foobar', ] +
+    [msgpack.packb(o) for o in (
+        [None, 0, 0.0, False, '', {}, [], ()] +
+        [42, 23.42, True, b'foobar', {b'foo': b'bar'}, [b'foo', b'bar'], (b'foo', b'bar')]
+    )])
+def test_invalid_msgpacked_item(packed, item_keys_serialized):
+    assert not valid_msgpacked_item(packed, item_keys_serialized)
+
+
+@pytest.mark.parametrize('packed',
+    [msgpack.packb(o) for o in [
+        {b'path': b'/a/b/c'},  # small (different msgpack mapping type!)
+        dict((k, b'') for k in ITEM_KEYS),  # as big (key count) as it gets
+        dict((k, b'x' * 1000) for k in ITEM_KEYS),  # as big (key count and volume) as it gets
+    ]])
+def test_valid_msgpacked_items(packed, item_keys_serialized):
+    assert valid_msgpacked_item(packed, item_keys_serialized)
+
+
+def test_key_length_msgpacked_items():
+    key = b'x' * 32  # 31 bytes is the limit for fixstr msgpack type
+    data = {key: b''}
+    item_keys_serialized = [msgpack.packb(key), ]
+    assert valid_msgpacked_item(msgpack.packb(data), item_keys_serialized)

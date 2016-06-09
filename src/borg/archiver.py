@@ -1706,7 +1706,7 @@ class Archiver:
                                help='repository for which to break the locks')
 
         prune_epilog = textwrap.dedent("""
-        The prune command prunes a repository by deleting archives not matching
+        The prune command prunes a repository by deleting all archives not matching
         any of the specified retention options. This command is normally used by
         automated backup scripts wanting to keep a certain number of historic backups.
 
@@ -1735,7 +1735,7 @@ class Archiver:
         up to 7 most recent days with backups (days without backups do not count).
         The rules are applied from secondly to yearly, and backups selected by previous
         rules do not count towards those of later rules. The time that each backup
-        completes is used for pruning purposes. Dates and times are interpreted in
+        starts is used for pruning purposes. Dates and times are interpreted in
         the local timezone, and weeks go from Monday to Sunday. Specifying a
         negative number of archives to keep means that there is no limit.
 

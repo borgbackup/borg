@@ -408,8 +408,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             return repository.id
 
     def test_sparse_file(self):
-        # no sparse file support on Mac OS X
-        sparse_support = sys.platform != 'darwin'
+        # Mac OS X has no sparse file support
+        # Solaris (ZFS) has sparse file support, but is less predictable about it
+        sparse_support = sys.platform not in ['darwin', 'sunos5']
         filename = os.path.join(self.input_path, 'sparse')
         content = b'foobar'
         hole_size = 5 * (1 << CHUNK_MAX_EXP)  # 5 full chunker buffers

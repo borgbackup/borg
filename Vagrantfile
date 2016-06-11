@@ -272,15 +272,40 @@ def fix_perms
   EOF
 end
 
+def windows_requirements
+  return <<-EOF
+    $url = "https://eternallybored.org/misc/wget/releases/wget-1.18-win64.zip"
+    (New-Object System.Net.WebClient).DownloadFile($url, "./wget.zip")
+    & { Add-Type -A 'System.IO.Compression.FileSystem'; [IO.Compression.ZipFile]::ExtractToDirectory('wget.zip', './wget'); }
+    wget\\wget.exe "http://gnuwin32.sourceforge.net/downlinks/tar-bin-zip.php" -O tar-bin.zip
+    wget\\wget.exe "http://gnuwin32.sourceforge.net/downlinks/tar-dep-zip.php" -O tar-dep.zip
+    & { Add-Type -A 'System.IO.Compression.FileSystem'; [IO.Compression.ZipFile]::ExtractToDirectory('tar-bin.zip', './tar'); }
+    & { Add-Type -A 'System.IO.Compression.FileSystem'; [IO.Compression.ZipFile]::ExtractToDirectory('tar-dep.zip', './tar'); }
+    wget\\wget.exe http://tukaani.org/xz/xz-5.2.1-windows.zip -O xz.zip
+    & { Add-Type -A 'System.IO.Compression.FileSystem'; [IO.Compression.ZipFile]::ExtractToDirectory('xz.zip', './xz'); }
+    wget\\wget.exe -Axz "https://sourceforge.net/projects/msys2/files/Base/x86_64/msys2-base-x86_64-20160205.tar.xz/download" -O msys.tar.xz
+    xz\\bin_x86-64\\xz -d msys.tar.xz
+    tar\\bin\\tar -xf msys.tar
+    msys64\\msys2.exe -c | more
+    Start-Sleep -s 10
+    msys64\\usr\\bin\\pacman --noconfirm -S mingw-w64-x86_64-python3 git mingw-w64-x86_64-lz4 mingw-w64-x86_64-python3-pip mingw-w64-x86_64-cython mingw-w64-x86_64-gcc mingw-w64-x86_64-ntldd-git
+    python3 -m pip install --upgrade pip
+  EOF
+end
+
+def windows_build
+  return <<-EOF
+    $msyspath = $(get-location).path + "\\msys64"
+    $Env:Path = $Env:Path + ";" + $msyspath + "\\mingw64\\bin;" + $msyspath + "\\usr\\bin"
+    net use x: \\\\vboxsvr\\vagrant
+    x:
+    pip3 install -r requirements.d/development.txt
+    pip3 install -e .
+    python3 deployment/windows/buildwin32.py
+  EOF
+end
+
 Vagrant.configure(2) do |config|
-  # use rsync to copy content to the folder
-  config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"]
-  # do not let the VM access . on the host machine via the default shared folder!
-  config.vm.synced_folder ".", "/vagrant", disabled: true
-
-  # fix permissions on synced folder
-  config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
-
   config.vm.provider :virtualbox do |v|
     #v.gui = true
     v.cpus = 1
@@ -288,6 +313,9 @@ Vagrant.configure(2) do |config|
 
   # Linux
   config.vm.define "centos7_64" do |b|
+    config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"]
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+    config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
     b.vm.box = "centos/7"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
@@ -301,6 +329,9 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "centos6_32" do |b|
+    config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"]
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+    config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
     b.vm.box = "centos6-32"
     b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_32")
@@ -313,6 +344,9 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "centos6_64" do |b|
+    config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"]
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+    config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
     b.vm.box = "centos6-64"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
@@ -328,6 +362,9 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "xenial64" do |b|
+    config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"]
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+    config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
     b.vm.box = "ubuntu/xenial64"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
@@ -339,6 +376,9 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "trusty64" do |b|
+    config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"]
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+    config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
     b.vm.box = "ubuntu/trusty64"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
@@ -350,6 +390,9 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "jessie64" do |b|
+    config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"]
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+    config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
     b.vm.box = "debian/jessie64"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
@@ -361,6 +404,9 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "wheezy32" do |b|
+    config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"]
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+    config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
     b.vm.box = "boxcutter/debian79-i386"
     b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
@@ -374,6 +420,9 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "wheezy64" do |b|
+    config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"]
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+    config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
     b.vm.box = "boxcutter/debian79"
     b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
@@ -388,6 +437,9 @@ Vagrant.configure(2) do |config|
 
   # OS X
   config.vm.define "darwin64" do |b|
+    config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"]
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+    config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
     b.vm.box = "jhcook/yosemite-clitools"
     b.vm.provision "packages darwin", :type => :shell, :privileged => false, :inline => packages_darwin
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("darwin64")
@@ -402,6 +454,9 @@ Vagrant.configure(2) do |config|
 
   # BSD
   config.vm.define "freebsd64" do |b|
+    config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"]
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+    config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
     b.vm.box = "geoffgarside/freebsd-10.2"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
@@ -417,6 +472,9 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd64" do |b|
+    config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"]
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+    config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
     b.vm.box = "bodgit/openbsd-5.7-amd64"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
@@ -428,6 +486,9 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "netbsd64" do |b|
+    config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"]
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+    config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
     b.vm.box = "alex-skimlinks/netbsd-6.1.5-amd64"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
@@ -436,5 +497,17 @@ Vagrant.configure(2) do |config|
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("netbsd64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd64")
+  end
+
+  config.vm.define "windows" do |b|
+    b.vm.communicator = "winrm"
+    # Defaults for vagrant box from Microsoft
+    # b.winrm.username = "IEUser"
+    # b.winrm.password = "Passw0rd!"
+    # b.ssh.username = "IEUser"
+    # b.ssh.password = "Passw0rd!"
+    b.vm.box = "windows"
+    b.vm.provision "install msys2", :type => :shell, :privileged => false, :inline => windows_requirements
+    b.vm.provision "build", :type => :shell, :privileged => false, :inline => windows_build
   end
 end

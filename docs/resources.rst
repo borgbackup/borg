@@ -38,4 +38,4 @@ Software
 
 - `BorgWeb - a very simple web UI for BorgBackup <https://borgweb.readthedocs.io/>`_
 - some other stuff found at the `BorgBackup Github organisation <https://github.com/borgbackup/>`_
-- `atticmatic <https://github.com/witten/atticmatic/>`_ (includes borgmatic)
+- `borgmatic <https://torsion.org/borgmatic/>`_ - simple wrapper script for BorgBackup that creates and prunes backups

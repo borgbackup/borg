@@ -742,7 +742,7 @@ class Location:
             'now': current_time.now(),
             'utcnow': current_time.utcnow(),
             'user': uid2user(os.getuid(), os.getuid()),
-            'uuid': str(uuid.uuid4())
+            'uuid4': str(uuid.uuid4())
             }
         return format_line(text, data)
 

@@ -835,8 +835,14 @@ class ArchiveChecker:
                     unpacker.feed(self.key.decrypt(chunk_id, cdata))
                     try:
                         for item in unpacker:
-                            if isinstance(item, dict):
-                                yield item
+                            # we expect item to be a StableDict and check if .items() works
+                            if isinstance(item, StableDict):
+                                try:
+                                    item.items()
+                                except Exception as e:
+                                    report('Skipping broken item metadata dict [%s]: %r' % (e, item), chunk_id, i)
+                                else:
+                                    yield item
                             else:
                                 report('Did not get expected metadata dict when unpacking item metadata', chunk_id, i)
                     except Exception:

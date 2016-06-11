@@ -112,14 +112,14 @@ for name, mod in items:
         os.makedirs(os.path.join(builddir, 'bin', os.path.split(relpath)[0]), exist_ok=True)
         shutil.copyfile(file, os.path.join(builddir, 'bin', relpath))
     else:
-        relativepath = file[file.find('lib')+14:]
+        relativepath = file[file.find('lib')+len('lib/python3.5/'):]
         if 'encodings' in file:
             continue
         if relativepath not in library.namelist():
             if relativepath.startswith('site-packages'):
-                relativepath = relativepath[14:]
+                relativepath = relativepath[len('site-packages/'):]
             library.write(file, relativepath)
-    if file[-4:] == '.dll' or file[-4:] == '.DLL':
+    if file.endswith(('dll', 'DLL')):
         shutil.copyfile(file, os.path.join(builddir, 'bin', os.path.split(file)[1]))
         for dll in finddlls(file):
             if builddir not in dll:
@@ -128,7 +128,7 @@ for dll in finddlls(os.path.join(builddir, "borg.exe")):
     if builddir not in dll:
         shutil.copyfile(dll, os.path.join(builddir, os.path.split(dll)[1]))
 
-shutil.copyfile('src/borg/__main__.py', os.path.join(builddir, 'bin', 'borg/__main__.py'))
+shutil.copyfile(os.path.join('src', 'borg', '__main__.py'), os.path.join(builddir, 'bin', 'borg', '__main__.py'))
 library.write(os.path.join(modulepath, 'site.py'), 'site.py')
 
 for extmodule in ['src/borg/chunker-cpython-35m.dll', 'src/borg/compress-cpython-35m.dll',

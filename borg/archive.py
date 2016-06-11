@@ -591,6 +591,9 @@ ITEM_KEYS = frozenset([b'path', b'source', b'rdev', b'chunks',
                        b'mode', b'user', b'group', b'uid', b'gid', b'mtime', b'atime', b'ctime',
                        b'xattrs', b'bsdflags', b'acl_nfs4', b'acl_access', b'acl_default', b'acl_extended', ])
 
+# this is the set of keys that are always present in items:
+REQUIRED_ITEM_KEYS = frozenset([b'path', b'mtime', ])
+
 
 def valid_msgpacked_item(d, item_keys_serialized):
     """check if the data <d> looks like a msgpacked item metadata dict"""
@@ -811,8 +814,8 @@ class ArchiveChecker:
 
             Missing item chunks will be skipped and the msgpack stream will be restarted
             """
-            unpacker = RobustUnpacker(lambda item: isinstance(item, dict) and b'path' in item,
-                                      self.manifest.item_keys)
+            item_keys = self.manifest.item_keys
+            unpacker = RobustUnpacker(lambda item: isinstance(item, dict) and b'path' in item, item_keys)
             _state = 0
 
             def missing_chunk_detector(chunk_id):
@@ -826,6 +829,12 @@ class ArchiveChecker:
                 msg += ' [chunk: %06d_%s]' % (chunk_no, cid)  # see debug-dump-archive-items
                 self.error_found = True
                 logger.error(msg)
+
+            def valid_item(obj):
+                if not isinstance(obj, StableDict):
+                    return False
+                keys = set(obj)
+                return REQUIRED_ITEM_KEYS.issubset(keys) and keys.issubset(item_keys)
 
             i = 0
             for state, items in groupby(archive[b'items'], missing_chunk_detector):
@@ -841,7 +850,7 @@ class ArchiveChecker:
                     unpacker.feed(self.key.decrypt(chunk_id, cdata))
                     try:
                         for item in unpacker:
-                            if isinstance(item, dict):
+                            if valid_item(item):
                                 yield item
                             else:
                                 report('Did not get expected metadata dict when unpacking item metadata', chunk_id, i)

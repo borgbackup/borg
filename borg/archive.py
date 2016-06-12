@@ -594,6 +594,9 @@ ITEM_KEYS = frozenset([b'path', b'source', b'rdev', b'chunks',
 # this is the set of keys that are always present in items:
 REQUIRED_ITEM_KEYS = frozenset([b'path', b'mtime', ])
 
+# this set must be kept complete, otherwise rebuild_manifest might malfunction:
+ARCHIVE_KEYS = set([b'version', b'name', b'items', b'cmdline', b'hostname', b'username', b'time', b'time_end'])
+
 
 def valid_msgpacked_dict(d, keys_serialized):
     """check if the data <d> looks like a msgpacked dict"""
@@ -738,11 +741,11 @@ class ArchiveChecker:
         # lost manifest on a older borg version than the most recent one that was ever used
         # within this repository (assuming that newer borg versions support more item keys).
         manifest = Manifest(self.key, self.repository)
+        archive_keys_serialized = [msgpack.packb(name) for name in ARCHIVE_KEYS]
         for chunk_id, _ in self.chunks.iteritems():
             cdata = self.repository.get(chunk_id)
             data = self.key.decrypt(chunk_id, cdata)
-            # Some basic sanity checks of the payload before feeding it into msgpack
-            if len(data) < 2 or ((data[0] & 0xf0) != 0x80) or ((data[1] & 0xe0) != 0xa0):
+            if not valid_msgpacked_dict(data, archive_keys_serialized):
                 continue
             if b'cmdline' not in data or b'\xa7version\x01' not in data:
                 continue

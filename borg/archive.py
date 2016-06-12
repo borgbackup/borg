@@ -224,7 +224,7 @@ Number of files: {0.stats.nfiles}'''.format(
             yield item
 
     def add_item(self, item):
-        unknown_keys = set(item) - ITEM_KEYS
+        unknown_keys = set(item) - self.manifest.item_keys
         assert not unknown_keys, ('unknown item metadata keys detected, please update ITEM_KEYS: %s',
                                   ','.join(k.decode('ascii') for k in unknown_keys))
         if self.show_progress:
@@ -587,9 +587,12 @@ Number of files: {0.stats.nfiles}'''.format(
 
 
 # this set must be kept complete, otherwise the RobustUnpacker might malfunction:
-ITEM_KEYS = set([b'path', b'source', b'rdev', b'chunks',
-                 b'mode', b'user', b'group', b'uid', b'gid', b'mtime', b'atime', b'ctime',
-                 b'xattrs', b'bsdflags', b'acl_nfs4', b'acl_access', b'acl_default', b'acl_extended', ])
+ITEM_KEYS = frozenset([b'path', b'source', b'rdev', b'chunks',
+                       b'mode', b'user', b'group', b'uid', b'gid', b'mtime', b'atime', b'ctime',
+                       b'xattrs', b'bsdflags', b'acl_nfs4', b'acl_access', b'acl_default', b'acl_extended', ])
+
+# this is the set of keys that are always present in items:
+REQUIRED_ITEM_KEYS = frozenset([b'path', b'mtime', ])
 
 
 def valid_msgpacked_item(d, item_keys_serialized):
@@ -623,9 +626,9 @@ def valid_msgpacked_item(d, item_keys_serialized):
 class RobustUnpacker:
     """A restartable/robust version of the streaming msgpack unpacker
     """
-    def __init__(self, validator):
+    def __init__(self, validator, item_keys):
         super().__init__()
-        self.item_keys = [msgpack.packb(name) for name in ITEM_KEYS]
+        self.item_keys = [msgpack.packb(name) for name in item_keys]
         self.validator = validator
         self._buffered_data = []
         self._resync = False
@@ -729,6 +732,11 @@ class ArchiveChecker:
         Iterates through all objects in the repository looking for archive metadata blocks.
         """
         logger.info('Rebuilding missing manifest, this might take some time...')
+        # as we have lost the manifest, we do not know any more what valid item keys we had.
+        # collecting any key we encounter in a damaged repo seems unwise, thus we just use
+        # the hardcoded list from the source code. thus, it is not recommended to rebuild a
+        # lost manifest on a older borg version than the most recent one that was ever used
+        # within this repository (assuming that newer borg versions support more item keys).
         manifest = Manifest(self.key, self.repository)
         for chunk_id, _ in self.chunks.iteritems():
             cdata = self.repository.get(chunk_id)
@@ -806,7 +814,8 @@ class ArchiveChecker:
 
             Missing item chunks will be skipped and the msgpack stream will be restarted
             """
-            unpacker = RobustUnpacker(lambda item: isinstance(item, dict) and b'path' in item)
+            item_keys = self.manifest.item_keys
+            unpacker = RobustUnpacker(lambda item: isinstance(item, dict) and b'path' in item, item_keys)
             _state = 0
 
             def missing_chunk_detector(chunk_id):
@@ -820,6 +829,12 @@ class ArchiveChecker:
                 msg += ' [chunk: %06d_%s]' % (chunk_no, cid)  # see debug-dump-archive-items
                 self.error_found = True
                 logger.error(msg)
+
+            def valid_item(obj):
+                if not isinstance(obj, StableDict):
+                    return False
+                keys = set(obj)
+                return REQUIRED_ITEM_KEYS.issubset(keys) and keys.issubset(item_keys)
 
             i = 0
             for state, items in groupby(archive[b'items'], missing_chunk_detector):
@@ -835,7 +850,7 @@ class ArchiveChecker:
                     unpacker.feed(self.key.decrypt(chunk_id, cdata))
                     try:
                         for item in unpacker:
-                            if isinstance(item, dict):
+                            if valid_item(item):
                                 yield item
                             else:
                                 report('Did not get expected metadata dict when unpacking item metadata', chunk_id, i)

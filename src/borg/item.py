@@ -153,3 +153,51 @@ class Item(PropDict):
 
     deleted = PropDict._make_property('deleted', bool)
     nlink = PropDict._make_property('nlink', int)
+
+
+class EncryptedKey(PropDict):
+    """
+    EncryptedKey abstraction that deals with validation and the low-level details internally:
+
+    A EncryptedKey is created either from msgpack unpacker output, from another dict, from kwargs or
+    built step-by-step by setting attributes.
+
+    msgpack gives us a dict with bytes-typed keys, just give it to EncryptedKey(d) and use enc_key.xxx later.
+
+    If a EncryptedKey shall be serialized, give as_dict() method output to msgpack packer.
+    """
+
+    VALID_KEYS = {'version', 'algorithm', 'iterations', 'salt', 'hash', 'data'}  # str-typed keys
+
+    __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
+
+    version = PropDict._make_property('version', int)
+    algorithm = PropDict._make_property('algorithm', str, encode=str.encode, decode=bytes.decode)
+    iterations = PropDict._make_property('iterations', int)
+    salt = PropDict._make_property('salt', bytes)
+    hash = PropDict._make_property('hash', bytes)
+    data = PropDict._make_property('data', bytes)
+
+
+class Key(PropDict):
+    """
+    Key abstraction that deals with validation and the low-level details internally:
+
+    A Key is created either from msgpack unpacker output, from another dict, from kwargs or
+    built step-by-step by setting attributes.
+
+    msgpack gives us a dict with bytes-typed keys, just give it to Key(d) and use key.xxx later.
+
+    If a Key shall be serialized, give as_dict() method output to msgpack packer.
+    """
+
+    VALID_KEYS = {'version', 'repository_id', 'enc_key', 'enc_hmac_key', 'id_key', 'chunk_seed'}  # str-typed keys
+
+    __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
+
+    version = PropDict._make_property('version', int)
+    repository_id = PropDict._make_property('repository_id', bytes)
+    enc_key = PropDict._make_property('enc_key', bytes)
+    enc_hmac_key = PropDict._make_property('enc_hmac_key', bytes)
+    id_key = PropDict._make_property('id_key', bytes)
+    chunk_seed = PropDict._make_property('chunk_seed', int)

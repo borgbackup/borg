@@ -595,7 +595,10 @@ ITEM_KEYS = frozenset([b'path', b'source', b'rdev', b'chunks',
 REQUIRED_ITEM_KEYS = frozenset([b'path', b'mtime', ])
 
 # this set must be kept complete, otherwise rebuild_manifest might malfunction:
-ARCHIVE_KEYS = set([b'version', b'name', b'items', b'cmdline', b'hostname', b'username', b'time', b'time_end'])
+ARCHIVE_KEYS = frozenset([b'version', b'name', b'items', b'cmdline', b'hostname', b'username', b'time', b'time_end', ])
+
+# this is the set of keys that are always present in archives:
+REQUIRED_ARCHIVE_KEYS = frozenset([b'version', b'name', b'items', b'cmdline', b'time', ])
 
 
 def valid_msgpacked_dict(d, keys_serialized):
@@ -734,6 +737,12 @@ class ArchiveChecker:
 
         Iterates through all objects in the repository looking for archive metadata blocks.
         """
+        def valid_archive(obj):
+            if not isinstance(obj, dict):
+                return False
+            keys = set(obj)
+            return REQUIRED_ARCHIVE_KEYS.issubset(keys)
+
         logger.info('Rebuilding missing manifest, this might take some time...')
         # as we have lost the manifest, we do not know any more what valid item keys we had.
         # collecting any key we encounter in a damaged repo seems unwise, thus we just use
@@ -755,7 +764,7 @@ class ArchiveChecker:
             # msgpack with invalid data
             except (TypeError, ValueError, StopIteration):
                 continue
-            if isinstance(archive, dict) and b'items' in archive and b'cmdline' in archive:
+            if valid_archive(archive):
                 logger.info('Found archive %s', archive[b'name'].decode('utf-8'))
                 manifest.archives[archive[b'name'].decode('utf-8')] = {b'id': chunk_id, b'time': archive[b'time']}
         logger.info('Manifest rebuild complete.')

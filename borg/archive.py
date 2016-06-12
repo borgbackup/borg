@@ -595,8 +595,8 @@ ITEM_KEYS = frozenset([b'path', b'source', b'rdev', b'chunks',
 REQUIRED_ITEM_KEYS = frozenset([b'path', b'mtime', ])
 
 
-def valid_msgpacked_item(d, item_keys_serialized):
-    """check if the data <d> looks like a msgpacked item metadata dict"""
+def valid_msgpacked_dict(d, keys_serialized):
+    """check if the data <d> looks like a msgpacked dict"""
     d_len = len(d)
     if d_len == 0:
         return False
@@ -606,7 +606,7 @@ def valid_msgpacked_item(d, item_keys_serialized):
         offs = 3
     else:
         # object is not a map (dict)
-        # note: we must not have item dicts with > 2^16-1 elements
+        # note: we must not have dicts with > 2^16-1 elements
         return False
     if d_len <= offs:
         return False
@@ -620,7 +620,7 @@ def valid_msgpacked_item(d, item_keys_serialized):
         return False
     # is the bytestring any of the expected key names?
     key_serialized = d[offs:]
-    return any(key_serialized.startswith(pattern) for pattern in item_keys_serialized)
+    return any(key_serialized.startswith(pattern) for pattern in keys_serialized)
 
 
 class RobustUnpacker:
@@ -654,7 +654,7 @@ class RobustUnpacker:
                 if not data:
                     raise StopIteration
                 # Abort early if the data does not look like a serialized item dict
-                if not valid_msgpacked_item(data, self.item_keys):
+                if not valid_msgpacked_dict(data, self.item_keys):
                     data = data[1:]
                     continue
                 self._unpacker = msgpack.Unpacker(object_hook=StableDict)

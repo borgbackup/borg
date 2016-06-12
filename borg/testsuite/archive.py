@@ -4,7 +4,7 @@ from unittest.mock import Mock
 import msgpack
 import pytest
 
-from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_item, ITEM_KEYS
+from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_dict, ITEM_KEYS
 from ..key import PlaintextKey
 from ..helpers import Manifest
 from . import BaseTestCase
@@ -127,7 +127,7 @@ def item_keys_serialized():
         [42, 23.42, True, b'foobar', {b'foo': b'bar'}, [b'foo', b'bar'], (b'foo', b'bar')]
     )])
 def test_invalid_msgpacked_item(packed, item_keys_serialized):
-    assert not valid_msgpacked_item(packed, item_keys_serialized)
+    assert not valid_msgpacked_dict(packed, item_keys_serialized)
 
 
 @pytest.mark.parametrize('packed',
@@ -137,11 +137,11 @@ def test_invalid_msgpacked_item(packed, item_keys_serialized):
         dict((k, b'x' * 1000) for k in ITEM_KEYS),  # as big (key count and volume) as it gets
     ]])
 def test_valid_msgpacked_items(packed, item_keys_serialized):
-    assert valid_msgpacked_item(packed, item_keys_serialized)
+    assert valid_msgpacked_dict(packed, item_keys_serialized)
 
 
 def test_key_length_msgpacked_items():
     key = b'x' * 32  # 31 bytes is the limit for fixstr msgpack type
     data = {key: b''}
     item_keys_serialized = [msgpack.packb(key), ]
-    assert valid_msgpacked_item(msgpack.packb(data), item_keys_serialized)
+    assert valid_msgpacked_dict(msgpack.packb(data), item_keys_serialized)

@@ -594,9 +594,15 @@ ITEM_KEYS = frozenset([b'path', b'source', b'rdev', b'chunks',
 # this is the set of keys that are always present in items:
 REQUIRED_ITEM_KEYS = frozenset([b'path', b'mtime', ])
 
+# this set must be kept complete, otherwise rebuild_manifest might malfunction:
+ARCHIVE_KEYS = frozenset([b'version', b'name', b'items', b'cmdline', b'hostname', b'username', b'time', b'time_end', ])
 
-def valid_msgpacked_item(d, item_keys_serialized):
-    """check if the data <d> looks like a msgpacked item metadata dict"""
+# this is the set of keys that are always present in archives:
+REQUIRED_ARCHIVE_KEYS = frozenset([b'version', b'name', b'items', b'cmdline', b'time', ])
+
+
+def valid_msgpacked_dict(d, keys_serialized):
+    """check if the data <d> looks like a msgpacked dict"""
     d_len = len(d)
     if d_len == 0:
         return False
@@ -606,7 +612,7 @@ def valid_msgpacked_item(d, item_keys_serialized):
         offs = 3
     else:
         # object is not a map (dict)
-        # note: we must not have item dicts with > 2^16-1 elements
+        # note: we must not have dicts with > 2^16-1 elements
         return False
     if d_len <= offs:
         return False
@@ -620,7 +626,7 @@ def valid_msgpacked_item(d, item_keys_serialized):
         return False
     # is the bytestring any of the expected key names?
     key_serialized = d[offs:]
-    return any(key_serialized.startswith(pattern) for pattern in item_keys_serialized)
+    return any(key_serialized.startswith(pattern) for pattern in keys_serialized)
 
 
 class RobustUnpacker:
@@ -654,7 +660,7 @@ class RobustUnpacker:
                 if not data:
                     raise StopIteration
                 # Abort early if the data does not look like a serialized item dict
-                if not valid_msgpacked_item(data, self.item_keys):
+                if not valid_msgpacked_dict(data, self.item_keys):
                     data = data[1:]
                     continue
                 self._unpacker = msgpack.Unpacker(object_hook=StableDict)
@@ -731,6 +737,12 @@ class ArchiveChecker:
 
         Iterates through all objects in the repository looking for archive metadata blocks.
         """
+        def valid_archive(obj):
+            if not isinstance(obj, dict):
+                return False
+            keys = set(obj)
+            return REQUIRED_ARCHIVE_KEYS.issubset(keys)
+
         logger.info('Rebuilding missing manifest, this might take some time...')
         # as we have lost the manifest, we do not know any more what valid item keys we had.
         # collecting any key we encounter in a damaged repo seems unwise, thus we just use
@@ -738,11 +750,11 @@ class ArchiveChecker:
         # lost manifest on a older borg version than the most recent one that was ever used
         # within this repository (assuming that newer borg versions support more item keys).
         manifest = Manifest(self.key, self.repository)
+        archive_keys_serialized = [msgpack.packb(name) for name in ARCHIVE_KEYS]
         for chunk_id, _ in self.chunks.iteritems():
             cdata = self.repository.get(chunk_id)
             data = self.key.decrypt(chunk_id, cdata)
-            # Some basic sanity checks of the payload before feeding it into msgpack
-            if len(data) < 2 or ((data[0] & 0xf0) != 0x80) or ((data[1] & 0xe0) != 0xa0):
+            if not valid_msgpacked_dict(data, archive_keys_serialized):
                 continue
             if b'cmdline' not in data or b'\xa7version\x01' not in data:
                 continue
@@ -752,7 +764,7 @@ class ArchiveChecker:
             # msgpack with invalid data
             except (TypeError, ValueError, StopIteration):
                 continue
-            if isinstance(archive, dict) and b'items' in archive and b'cmdline' in archive:
+            if valid_archive(archive):
                 logger.info('Found archive %s', archive[b'name'].decode('utf-8'))
                 manifest.archives[archive[b'name'].decode('utf-8')] = {b'id': chunk_id, b'time': archive[b'time']}
         logger.info('Manifest rebuild complete.')

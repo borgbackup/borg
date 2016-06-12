@@ -13,6 +13,7 @@ import stat
 import textwrap
 import time
 import unicodedata
+import uuid
 from binascii import hexlify
 from collections import namedtuple, deque
 from datetime import datetime, timezone, timedelta
@@ -740,7 +741,8 @@ class Location:
             'hostname': socket.gethostname(),
             'now': current_time.now(),
             'utcnow': current_time.utcnow(),
-            'user': uid2user(os.getuid(), os.getuid())
+            'user': uid2user(os.getuid(), os.getuid()),
+            'uuid4': str(uuid.uuid4())
             }
         return format_line(text, data)
 

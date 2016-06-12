@@ -690,12 +690,40 @@ Number of files: {0.stats.nfiles}'''.format(
             return os.open(path, flags_normal)
 
 
+def valid_msgpacked_dict(d, keys_serialized):
+    """check if the data <d> looks like a msgpacked dict"""
+    d_len = len(d)
+    if d_len == 0:
+        return False
+    if d[0] & 0xf0 == 0x80:  # object is a fixmap (up to 15 elements)
+        offs = 1
+    elif d[0] == 0xde:  # object is a map16 (up to 2^16-1 elements)
+        offs = 3
+    else:
+        # object is not a map (dict)
+        # note: we must not have dicts with > 2^16-1 elements
+        return False
+    if d_len <= offs:
+        return False
+    # is the first dict key a bytestring?
+    if d[offs] & 0xe0 == 0xa0:  # key is a small bytestring (up to 31 chars)
+        pass
+    elif d[offs] in (0xd9, 0xda, 0xdb):  # key is a str8, str16 or str32
+        pass
+    else:
+        # key is not a bytestring
+        return False
+    # is the bytestring any of the expected key names?
+    key_serialized = d[offs:]
+    return any(key_serialized.startswith(pattern) for pattern in keys_serialized)
+
+
 class RobustUnpacker:
     """A restartable/robust version of the streaming msgpack unpacker
     """
-    def __init__(self, validator):
+    def __init__(self, validator, item_keys):
         super().__init__()
-        self.item_keys = [msgpack.packb(name.encode()) for name in ITEM_KEYS]
+        self.item_keys = [msgpack.packb(name.encode()) for name in item_keys]
         self.validator = validator
         self._buffered_data = []
         self._resync = False
@@ -720,18 +748,10 @@ class RobustUnpacker:
             while self._resync:
                 if not data:
                     raise StopIteration
-                # Abort early if the data does not look like a serialized dict
-                if len(data) < 2 or ((data[0] & 0xf0) != 0x80) or ((data[1] & 0xe0) != 0xa0):
+                # Abort early if the data does not look like a serialized item dict
+                if not valid_msgpacked_dict(data, self.item_keys):
                     data = data[1:]
                     continue
-                # Make sure it looks like an item dict
-                for pattern in self.item_keys:
-                    if data[1:].startswith(pattern):
-                        break
-                else:
-                    data = data[1:]
-                    continue
-
                 self._unpacker = msgpack.Unpacker(object_hook=StableDict)
                 self._unpacker.feed(data)
                 try:
@@ -806,7 +826,12 @@ class ArchiveChecker:
                 self.chunks[id_] = init_entry
 
     def identify_key(self, repository):
-        cdata = repository.get(next(self.chunks.iteritems())[0])
+        try:
+            some_chunkid, _ = next(self.chunks.iteritems())
+        except StopIteration:
+            # repo is completely empty, no chunks
+            return None
+        cdata = repository.get(some_chunkid)
         return key_factory(repository, cdata)
 
     def verify_data(self):
@@ -834,13 +859,26 @@ class ArchiveChecker:
 
         Iterates through all objects in the repository looking for archive metadata blocks.
         """
+        required_archive_keys = frozenset(key.encode() for key in REQUIRED_ARCHIVE_KEYS)
+
+        def valid_archive(obj):
+            if not isinstance(obj, dict):
+                return False
+            keys = set(obj)
+            return required_archive_keys.issubset(keys)
+
         logger.info('Rebuilding missing manifest, this might take some time...')
+        # as we have lost the manifest, we do not know any more what valid item keys we had.
+        # collecting any key we encounter in a damaged repo seems unwise, thus we just use
+        # the hardcoded list from the source code. thus, it is not recommended to rebuild a
+        # lost manifest on a older borg version than the most recent one that was ever used
+        # within this repository (assuming that newer borg versions support more item keys).
         manifest = Manifest(self.key, self.repository)
+        archive_keys_serialized = [msgpack.packb(name.encode()) for name in ARCHIVE_KEYS]
         for chunk_id, _ in self.chunks.iteritems():
             cdata = self.repository.get(chunk_id)
             _, data = self.key.decrypt(chunk_id, cdata)
-            # Some basic sanity checks of the payload before feeding it into msgpack
-            if len(data) < 2 or ((data[0] & 0xf0) != 0x80) or ((data[1] & 0xe0) != 0xa0):
+            if not valid_msgpacked_dict(data, archive_keys_serialized):
                 continue
             if b'cmdline' not in data or b'\xa7version\x01' not in data:
                 continue
@@ -850,7 +888,7 @@ class ArchiveChecker:
             # msgpack with invalid data
             except (TypeError, ValueError, StopIteration):
                 continue
-            if isinstance(archive, dict) and b'items' in archive and b'cmdline' in archive:
+            if valid_archive(archive):
                 logger.info('Found archive %s', archive[b'name'].decode('utf-8'))
                 manifest.archives[archive[b'name'].decode('utf-8')] = {b'id': chunk_id, b'time': archive[b'time']}
         logger.info('Manifest rebuild complete.')
@@ -912,7 +950,10 @@ class ArchiveChecker:
 
             Missing item chunks will be skipped and the msgpack stream will be restarted
             """
-            unpacker = RobustUnpacker(lambda item: isinstance(item, dict) and 'path' in item)
+            item_keys = frozenset(key.encode() for key in self.manifest.item_keys)
+            required_item_keys = frozenset(key.encode() for key in REQUIRED_ITEM_KEYS)
+            unpacker = RobustUnpacker(lambda item: isinstance(item, dict) and 'path' in item,
+                                      self.manifest.item_keys)
             _state = 0
 
             def missing_chunk_detector(chunk_id):
@@ -926,6 +967,12 @@ class ArchiveChecker:
                 msg += ' [chunk: %06d_%s]' % (chunk_no, cid)  # see debug-dump-archive-items
                 self.error_found = True
                 logger.error(msg)
+
+            def valid_item(obj):
+                if not isinstance(obj, StableDict):
+                    return False
+                keys = set(obj)
+                return required_item_keys.issubset(keys) and keys.issubset(item_keys)
 
             i = 0
             for state, items in groupby(archive[b'items'], missing_chunk_detector):
@@ -942,7 +989,7 @@ class ArchiveChecker:
                     unpacker.feed(data)
                     try:
                         for item in unpacker:
-                            if isinstance(item, dict):
+                            if valid_item(item):
                                 yield Item(internal_dict=item)
                             else:
                                 report('Did not get expected metadata dict when unpacking item metadata', chunk_id, i)

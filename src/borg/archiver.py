@@ -26,7 +26,8 @@ from . import helpers
 from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics
 from .cache import Cache
 from .constants import *  # NOQA
-from .helpers import Error
+from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
+from .helpers import Error, NoManifestError
 from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
 from .helpers import ItemFormatter, format_time, format_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex
@@ -665,10 +666,11 @@ class Archiver:
         cache.commit()
         return self.exit_code
 
-    @with_repository(exclusive=True)
-    def do_delete(self, args, repository, manifest, key):
+    @with_repository(exclusive=True, manifest=False)
+    def do_delete(self, args, repository):
         """Delete an existing repository or archive"""
         if args.location.archive:
+            manifest, key = Manifest.load(repository)
             with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
                 stats = Statistics()
@@ -685,9 +687,15 @@ class Archiver:
         else:
             if not args.cache_only:
                 msg = []
-                msg.append("You requested to completely DELETE the repository *including* all archives it contains:")
-                for archive_info in manifest.list_archive_infos(sort_by='ts'):
-                    msg.append(format_archive(archive_info))
+                try:
+                    manifest, key = Manifest.load(repository)
+                except NoManifestError:
+                    msg.append("You requested to completely DELETE the repository *including* all archives it may contain.")
+                    msg.append("This repository seems to have no manifest, so we can't tell anything about its contents.")
+                else:
+                    msg.append("You requested to completely DELETE the repository *including* all archives it contains:")
+                    for archive_info in manifest.list_archive_infos(sort_by='ts'):
+                        msg.append(format_archive(archive_info))
                 msg.append("Type 'YES' if you understand this and want to continue: ")
                 msg = '\n'.join(msg)
                 if not yes(msg, false_msg="Aborting.", truish=('YES', ),

@@ -84,6 +84,10 @@ class ExtensionModuleError(Error):
     """The Borg binary extension modules do not seem to be properly installed"""
 
 
+class NoManifestError(Error):
+    """Repository has no manifest."""
+
+
 def check_extension_modules():
     from . import platform
     if hashindex.API_VERSION != 2:
@@ -100,11 +104,12 @@ class Manifest:
 
     MANIFEST_ID = b'\0' * 32
 
-    def __init__(self, key, repository):
+    def __init__(self, key, repository, item_keys=None):
         self.archives = {}
         self.config = {}
         self.key = key
         self.repository = repository
+        self.item_keys = frozenset(item_keys) if item_keys is not None else ITEM_KEYS
 
     @property
     def id_str(self):
@@ -113,7 +118,11 @@ class Manifest:
     @classmethod
     def load(cls, repository, key=None):
         from .key import key_factory
-        cdata = repository.get(cls.MANIFEST_ID)
+        from .repository import Repository
+        try:
+            cdata = repository.get(cls.MANIFEST_ID)
+        except Repository.ObjectNotFound:
+            raise NoManifestError
         if not key:
             key = key_factory(repository, cdata)
         manifest = cls(key, repository)
@@ -127,6 +136,8 @@ class Manifest:
         if manifest.timestamp:
             manifest.timestamp = manifest.timestamp.decode('ascii')
         manifest.config = m[b'config']
+        # valid item keys are whatever is known in the repo or every key we know
+        manifest.item_keys = ITEM_KEYS | frozenset(key.decode() for key in m.get(b'item_keys', []))
         return manifest, key
 
     def write(self):
@@ -136,6 +147,7 @@ class Manifest:
             'archives': self.archives,
             'timestamp': self.timestamp,
             'config': self.config,
+            'item_keys': tuple(self.item_keys),
         }))
         self.id = self.key.id_hash(data)
         self.repository.put(self.MANIFEST_ID, self.key.encrypt(Chunk(data)))

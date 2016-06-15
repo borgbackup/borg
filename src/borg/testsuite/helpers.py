@@ -104,6 +104,21 @@ class TestLocationWithoutEnv:
         with pytest.raises(ValueError):
             Location('/some/path/to/repo::archive_name_with/slashes/is_invalid')
 
+    def test_only_printable_characters(self, monkeypatch):
+        monkeypatch.delenv('BORG_REPO', raising=False)
+        with pytest.raises(ValueError):
+            Location('/some/path/to/repo::\x01crap')
+        with pytest.raises(ValueError):
+            Location('/some/path/to/repo::more\x01crap')
+
+    def test_no_leading_or_trailing_whitespace(self, monkeypatch):
+        monkeypatch.delenv('BORG_REPO', raising=False)
+        Location('/some/path/to/repo::spaces in the middle is ok,')
+        with pytest.raises(ValueError):
+            Location('/some/path/to/repo:: but not leading whitespace,')
+        with pytest.raises(ValueError):
+            Location('/some/path/to/repo::nor trailing whitespace.   ')
+
     def test_canonical_path(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
         locations = ['some/path::archive', 'file://some/path::archive', 'host:some/path::archive',
@@ -171,6 +186,21 @@ class TestLocationWithEnv:
         monkeypatch.setenv('BORG_REPO', '/some/absolute/path')
         with pytest.raises(ValueError):
             Location('::archive_name_with/slashes/is_invalid')
+
+    def test_only_printable_characters(self, monkeypatch):
+        monkeypatch.setenv('BORG_REPO', '/some/absolute/path')
+        with pytest.raises(ValueError):
+            Location('::\x01crap')
+        with pytest.raises(ValueError):
+            Location('::more\x10crap')
+
+    def test_no_leading_or_trailing_whitespace(self, monkeypatch):
+        monkeypatch.setenv('BORG_REPO', '/some/absolute/path')
+        Location('::spaces in the middle is ok,')
+        with pytest.raises(ValueError):
+            Location(':: but not leading whitespace,')
+        with pytest.raises(ValueError):
+            Location('::nor trailing whitespace.   ')
 
 
 class FormatTimedeltaTestCase(BaseTestCase):

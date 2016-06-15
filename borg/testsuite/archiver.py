@@ -412,8 +412,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.assert_equal(fd.read(hole_size), b'\0' * hole_size)
         st = os.stat(filename)
         self.assert_equal(st.st_size, total_len)
-        if sparse_support and hasattr(st, 'st_blocks'):
-            self.assert_true(st.st_blocks * 512 < total_len / 9)  # is output sparse?
+        if sparse_support:
+            if hasattr(st, 'st_blocks'):
+                # do only check if it is less, do NOT check if it is much less
+                # as that causes troubles on xfs and zfs:
+                self.assert_true(st.st_blocks * 512 < total_len)
+            if hasattr(os, 'SEEK_HOLE') and hasattr(os, 'SEEK_DATA'):
+                with open(filename, 'rb') as fd:
+                    # only check if the first hole is as expected, because the 2nd hole check
+                    # is problematic on xfs due to its "dynamic speculative EOF preallocation
+                    try:
+                        self.assert_equal(fd.seek(0, os.SEEK_HOLE), 0)
+                        self.assert_equal(fd.seek(0, os.SEEK_DATA), hole_size)
+                    except OSError:
+                        # does not really support SEEK_HOLE/SEEK_DATA
+                        pass
 
     def test_unusual_filenames(self):
         filenames = ['normal', 'with some blanks', '(with_parens)', ]

@@ -46,7 +46,7 @@ A step by step example
 
 3. The next day create a new archive called *Tuesday*::
 
-    $ borg create -v --stats /path/to/repo::Tuesday ~/src ~/Documents
+    $ borg create --stats /path/to/repo::Tuesday ~/src ~/Documents
 
    This backup will be a lot quicker and a lot smaller since only new never
    before seen data is stored. The ``--stats`` option causes |project_name| to
@@ -93,9 +93,10 @@ A step by step example
 
 .. Note::
     Borg is quiet by default (it works on WARNING log level).
-    Add the ``-v`` (or ``--verbose`` or ``--info``) option to adjust the log
-    level to INFO and also use options like ``--progress`` or ``--list`` to
-    get progress reporting during command execution.
+    You can use options like ``--progress`` or ``--list`` to get specific
+    reports during command execution.  You can also add the ``-v`` (or
+    ``--verbose`` or ``--info``) option to adjust the log level to INFO to
+    get other informational messages.
 
 Automating backups
 ------------------
@@ -105,23 +106,27 @@ server. The script also uses the :ref:`borg_prune` subcommand to maintain a
 certain number of old archives::
 
     #!/bin/sh
-    REPOSITORY=username@remoteserver.com:backup
 
-    # Backup all of /home and /var/www except a few
-    # excluded directories
-    borg create -v --stats                          \
-        $REPOSITORY::`hostname`-`date +%Y-%m-%d`    \
-        /home                                       \
-        /var/www                                    \
-        --exclude '/home/*/.cache'                  \
-        --exclude /home/Ben/Music/Justin\ Bieber    \
+    # setting this, so the repo does not need to be given on the commandline:
+    export BORG_REPO=username@remoteserver.com:backup
+
+    # setting this, so you won't be asked for your passphrase - make sure the
+    # script has appropriate owner/group and mode, e.g. root.root 600:
+    export BORG_PASSPHRASE=mysecret
+
+    # Backup most important stuff:
+    borg create --stats -C lz4 ::`hostname`-`date +%Y-%m-%d` \
+        /etc                                                    \
+        /home                                                   \
+        /var                                                    \
+        --exclude '/home/*/.cache'                              \
         --exclude '*.pyc'
 
     # Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
-    # archives of THIS machine. --prefix `hostname`- is very important to
+    # archives of THIS machine. Using --prefix is very important to
     # limit prune's operation to this machine's archives and not apply to
     # other machine's archives also.
-    borg prune -v $REPOSITORY --prefix `hostname`- \
+    borg prune -v --prefix `hostname`- \
         --keep-daily=7 --keep-weekly=4 --keep-monthly=6
 
 .. backup_compression:

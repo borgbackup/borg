@@ -16,7 +16,8 @@ Type of log output
 
 The log level of the builtin logging configuration defaults to WARNING.
 This is because we want |project_name| to be mostly silent and only output
-warnings, errors and critical messages.
+warnings, errors and critical messages, unless output has been requested
+by supplying an option that implies output (eg, --list or --progress).
 
 Log levels: DEBUG < INFO < WARNING < ERROR < CRITICAL
 
@@ -40,10 +41,6 @@ give different output on different log levels - it's just a possibility.
 
 .. warning:: Options --critical and --error are provided for completeness,
              their usage is not recommended as you might miss important information.
-
-.. warning:: While some options (like ``--stats`` or ``--list``) will emit more
-             informational messages, you have to use INFO (or lower) log level to make
-             them show up in log output. Use ``-v`` or a logging configuration.
 
 Return codes
 ~~~~~~~~~~~~
@@ -94,14 +91,18 @@ Some automatic "answerers" (if set, they automatically answer confirmation quest
         For "Warning: 'check --repair' is an experimental feature that might result in data loss."
     BORG_DELETE_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
         For "You requested to completely DELETE the repository *including* all archives it contains:"
+    BORG_RECREATE_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
+        For "recreate is an experimental feature."
 
     Note: answers are case sensitive. setting an invalid answer value might either give the default
     answer or ask you interactively, depending on whether retries are allowed (they by default are
     allowed). So please test your scripts interactively before making them a non-interactive script.
 
-Directories:
+Directories and files:
     BORG_KEYS_DIR
         Default to '~/.config/borg/keys'. This directory contains keys for encrypted repositories.
+    BORG_KEY_FILE
+        When set, use the given filename as repository key file.
     BORG_CACHE_DIR
         Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
         of space for dealing with big repositories).
@@ -166,6 +167,22 @@ Network:
 
 In case you are interested in more details, please read the internals documentation.
 
+File systems
+~~~~~~~~~~~~
+
+We strongly recommend against using Borg (or any other database-like
+software) on non-journaling file systems like FAT, since it is not
+possible to assume any consistency in case of power failures (or a
+sudden disconnect of an external drive or similar failures).
+
+While Borg uses a data store that is resilient against these failures
+when used on journaling file systems, it is not possible to guarantee
+this with some hardware -- independent of the software used. We don't
+know a list of affected hardware.
+
+If you are suspicious whether your Borg repository is still consistent
+and readable after one of the failures mentioned above occured, run
+``borg check --verify-data`` to make sure it is consistent.
 
 Units
 ~~~~~
@@ -191,6 +208,12 @@ For more information about that, see: https://xkcd.com/1179/
 Unless otherwise noted, we display local date and time.
 Internally, we store and process date and time as UTC.
 
+Common options
+~~~~~~~~~~~~~~
+
+All |project_name| commands share these options:
+
+.. include:: usage/common-options.rst.inc
 
 .. include:: usage/init.rst.inc
 
@@ -210,46 +233,6 @@ Examples
     # Remote repository (store the key your home dir)
     $ borg init --encryption=keyfile user@hostname:backup
 
-Important notes about encryption:
-
-It is not recommended to disable encryption. Repository encryption protects you
-e.g. against the case that an attacker has access to your backup repository.
-
-But be careful with the key / the passphrase:
-
-If you want "passphrase-only" security, use the ``repokey`` mode. The key will
-be stored inside the repository (in its "config" file). In above mentioned
-attack scenario, the attacker will have the key (but not the passphrase).
-
-If you want "passphrase and having-the-key" security, use the ``keyfile`` mode.
-The key will be stored in your home directory (in ``.config/borg/keys``). In
-the attack scenario, the attacker who has just access to your repo won't have
-the key (and also not the passphrase).
-
-Make a backup copy of the key file (``keyfile`` mode) or repo config file
-(``repokey`` mode) and keep it at a safe place, so you still have the key in
-case it gets corrupted or lost. Also keep the passphrase at a safe place.
-The backup that is encrypted with that key won't help you with that, of course.
-
-Make sure you use a good passphrase. Not too short, not too simple. The real
-encryption / decryption key is encrypted with / locked by your passphrase.
-If an attacker gets your key, he can't unlock and use it without knowing the
-passphrase.
-
-Be careful with special or non-ascii characters in your passphrase:
-
-- |project_name| processes the passphrase as unicode (and encodes it as utf-8),
-  so it does not have problems dealing with even the strangest characters.
-- BUT: that does not necessarily apply to your OS / VM / keyboard configuration.
-
-So better use a long passphrase made from simple ascii chars than one that
-includes non-ascii stuff or characters that are hard/impossible to enter on
-a different keyboard layout.
-
-You can change your passphrase for existing repos at any time, it won't affect
-the encryption/decryption key or other secrets.
-
-
 .. include:: usage/create.rst.inc
 
 Examples
@@ -259,8 +242,8 @@ Examples
     # Backup ~/Documents into an archive named "my-documents"
     $ borg create /path/to/repo::my-documents ~/Documents
 
-    # same, but verbosely list all files as we process them
-    $ borg create -v --list /path/to/repo::my-documents ~/Documents
+    # same, but list all files as we process them
+    $ borg create --list /path/to/repo::my-documents ~/Documents
 
     # Backup ~/Documents and ~/src but exclude pyc files
     $ borg create /path/to/repo::my-files \
@@ -315,7 +298,10 @@ Examples
     $ borg extract /path/to/repo::my-files
 
     # Extract entire archive and list files while processing
-    $ borg extract -v --list /path/to/repo::my-files
+    $ borg extract --list /path/to/repo::my-files
+
+    # Verify whether an archive could be successfully extracted, but do not write files to disk
+    $ borg extract --dry-run /path/to/repo::my-files
 
     # Extract the "src" directory
     $ borg extract /path/to/repo::my-files home/USERNAME/src
@@ -326,8 +312,11 @@ Examples
     # Restore a raw device (must not be active/in use/mounted at that time)
     $ borg extract --stdout /path/to/repo::my-sdx | dd of=/dev/sdx bs=10M
 
-Note: currently, extract always writes into the current working directory ("."),
-      so make sure you ``cd`` to the right place before calling ``borg extract``.
+
+.. Note::
+
+    Currently, extract always writes into the current working directory ("."),
+    so make sure you ``cd`` to the right place before calling ``borg extract``.
 
 .. include:: usage/check.rst.inc
 
@@ -384,6 +373,44 @@ Examples
     1422781200      1416192 code/myproject/file.ext               | 1454664653      1416192 code/myproject/file.ext
     ...
 
+
+
+.. include:: usage/diff.rst.inc
+
+Examples
+~~~~~~~~
+::
+
+    $ borg init testrepo
+    $ mkdir testdir
+    $ cd testdir
+    $ echo asdf > file1
+    $ dd if=/dev/urandom bs=1M count=4 > file2
+    $ touch file3
+    $ borg create ../testrepo::archive1 .
+
+    $ chmod a+x file1
+    $ echo "something" >> file2
+    $ borg create ../testrepo::archive2 .
+
+    $ rm file3
+    $ touch file4
+    $ borg create ../testrepo::archive3 .
+
+    $ cd ..
+    $ borg diff testrepo::archive1 archive2
+    [-rw-r--r-- -> -rwxr-xr-x] file1
+       +135 B    -252 B file2
+
+    $ borg diff testrepo::archive2 archive3
+    added           0 B file4
+    removed         0 B file3
+
+    $ borg diff testrepo::archive1 archive3
+    [-rw-r--r-- -> -rwxr-xr-x] file1
+       +135 B    -252 B file2
+    added           0 B file4
+    removed         0 B file3
 
 .. include:: usage/delete.rst.inc
 
@@ -450,7 +477,7 @@ Examples
     Username: root
     Time (start): Mon, 2016-02-15 19:36:29
     Time (end):   Mon, 2016-02-15 19:39:26
-    Command line: /usr/local/bin/borg create -v --list -C zlib,6 /path/to/repo::root-2016-02-15 / --one-file-system
+    Command line: /usr/local/bin/borg create --list -C zlib,6 /path/to/repo::root-2016-02-15 / --one-file-system
     Number of files: 38100
 
                            Original size      Compressed size    Deduplicated size
@@ -465,6 +492,8 @@ Examples
 
 Examples
 ~~~~~~~~
+borg mount/borgfs
++++++++++++++++++
 ::
 
     $ borg mount /path/to/repo::root-2016-02-15 /tmp/mymountpoint
@@ -472,6 +501,25 @@ Examples
     bin  boot  etc	home  lib  lib64  lost+found  media  mnt  opt  root  sbin  srv  tmp  usr  var
     $ fusermount -u /tmp/mymountpoint
 
+borgfs
+++++++
+::
+
+    $ echo '/mnt/backup /tmp/myrepo fuse.borgfs defaults,noauto 0 0' >> /etc/fstab
+    $ echo '/mnt/backup::root-2016-02-15 /tmp/myarchive fuse.borgfs defaults,noauto 0 0' >> /etc/fstab
+    $ mount /tmp/myrepo
+    $ mount /tmp/myarchive
+    $ ls /tmp/myrepo
+    root-2016-02-01 root-2016-02-2015
+    $ ls /tmp/myarchive
+    bin  boot  etc	home  lib  lib64  lost+found  media  mnt  opt  root  sbin  srv  tmp  usr  var
+
+.. Note::
+
+    ``borgfs`` will be automatically provided if you used a distribution
+    package, ``pip`` or ``setup.py`` to install |project_name|. Users of the
+    standalone binary will have to manually create a symlink (see
+    :ref:`pyinstaller-binary`).
 
 .. include:: usage/change-passphrase.rst.inc
 
@@ -539,6 +587,44 @@ Examples
     no key file found for repository
 
 
+.. include:: usage/recreate.rst.inc
+
+Examples
+~~~~~~~~
+::
+
+    # Make old (Attic / Borg 0.xx) archives deduplicate with Borg 1.x archives
+    # Archives created with Borg 1.1+ and the default chunker params are skipped (archive ID stays the same)
+    $ borg recreate /mnt/backup --chunker-params default --progress
+
+    # Create a backup with little but fast compression
+    $ borg create /mnt/backup::archive /some/files --compression lz4
+    # Then compress it - this might take longer, but the backup has already completed, so no inconsistencies
+    # from a long-running backup job.
+    $ borg recreate /mnt/backup::archive --compression zlib,9
+
+    # Remove unwanted files from all archives in a repository
+    $ borg recreate /mnt/backup -e /home/icke/Pictures/drunk_photos
+
+
+    # Change archive comment
+    $ borg create --comment "This is a comment" /mnt/backup::archivename ~
+    $ borg info /mnt/backup::archivename
+    Name: archivename
+    Fingerprint: ...
+    Comment: This is a comment
+    ...
+    $ borg recreate --comment "This is a better comment" /mnt/backup::archivename
+    $ borg info /mnt/backup::archivename
+    Name: archivename
+    Fingerprint: ...
+    Comment: This is a better comment
+    ...
+
+
+.. include:: usage/with-lock.rst.inc
+
+
 .. include:: usage/break-lock.rst.inc
 
 
@@ -566,7 +652,7 @@ Here are misc. notes about topics that are maybe not covered in enough detail in
 Item flags
 ~~~~~~~~~~
 
-``borg create -v --list`` outputs a verbose list of all files, directories and other
+``borg create --list`` outputs a list of all files, directories and other
 file system items it considered (no matter whether they had content changes
 or not). For each item, it prefixes a single-letter flag that indicates type
 and/or status of the item.
@@ -599,6 +685,7 @@ Other flags used include:
 
 - 'i' = backup data was read from standard input (stdin)
 - '-' = dry run, item was *not* backed up
+- 'x' = excluded, item was *not* backed up
 - '?' = missing status code (if you see this, please file a bug report!)
 
 
@@ -710,13 +797,16 @@ Now, let's see how to restore some LVs from such a backup. ::
     $ borg extract --stdout /path/to/repo::arch dev/vg0/home-snapshot > /dev/vg0/home
 
 
+.. _append-only-mode:
+
 Append-only mode
 ~~~~~~~~~~~~~~~~
 
 A repository can be made "append-only", which means that Borg will never overwrite or
-delete committed data. This is useful for scenarios where multiple machines back up to
-a central backup server using ``borg serve``, since a hacked machine cannot delete
-backups permanently.
+delete committed data (append-only refers to the segment files, but borg will also
+reject to delete the repository completely). This is useful for scenarios where a
+backup client machine backups remotely to a backup server using ``borg serve``, since
+a hacked client machine cannot delete backups on the server permanently.
 
 To activate append-only mode, edit the repository ``config`` file and add a line
 ``append_only=1`` to the ``[repository]`` section (or edit the line if it exists).
@@ -777,6 +867,6 @@ repository. Make sure that backup client machines only get to access the reposit
 Ensure that no remote access is possible if the repository is temporarily set to normal mode
 for e.g. regular pruning.
 
-Further protections can be implemented, but are outside of Borgs scope. For example,
+Further protections can be implemented, but are outside of Borg's scope. For example,
 file system snapshots or wrapping ``borg serve`` to set special permissions or ACLs on
 new data files.

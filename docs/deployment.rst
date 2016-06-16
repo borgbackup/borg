@@ -147,6 +147,59 @@ package manager to install and keep borg up-to-date.
     - file: path="{{ pool }}/{{ item.host }}" owner="{{ user }}" group="{{ group }}" mode=0700 state=directory
       with_items: auth_users
 
+Salt
+----
+
+This is a configuration similar to the one above, configured to be deployed with
+Salt running on a Debian system.
+
+::
+
+  Install borg backup from pip:
+    pkg.installed: 
+      - pkgs:
+        - python3
+        - python3-dev
+        - python3-pip
+        - python-virtualenv
+        - libssl-dev
+        - openssl
+        - libacl1-dev
+        - libacl1
+        - liblz4-dev
+        - liblz4-1
+        - build-essential
+        - libfuse-dev
+        - fuse
+        - pkg-config
+    pip.installed:
+      - pkgs: ["borgbackup"]
+      - bin_env: /usr/bin/pip3
+
+  Setup backup user:
+    user.present:
+      - name: backup
+      - fullname: Backup User
+      - home: /home/backup
+      - shell: /bin/bash
+  # CAUTION!
+  # If you change the ssh command= option below, it won't necessarily get pushed to the backup
+  # server correctly unless you delete the ~/.ssh/authorized_keys file and re-create it!
+  {% for host in backupclients %}
+  Give backup access to {{host}}:
+    ssh_auth.present:
+      - user: backup
+      - source: salt://conf/ssh-pubkeys/{{host}}-backup.id_ecdsa.pub
+      - options:
+        - command="cd /home/backup/repos/{{host}}; borg serve --restrict-to-path /home/backup/repos/{{host}}"
+        - no-port-forwarding
+        - no-X11-forwarding
+        - no-pty
+        - no-agent-forwarding
+        - no-user-rc
+  {% endfor %}
+
+
 Enhancements
 ------------
 
@@ -164,3 +217,4 @@ See also
 
 * `SSH Daemon manpage <http://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
 * `Ansible <https://docs.ansible.com>`_
+* `Salt <https://docs.saltstack.com/>`_

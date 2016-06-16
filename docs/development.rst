@@ -27,8 +27,10 @@ errors, critical for critical errors/states).
 When directly talking to the user (e.g. Y/N questions), do not use logging,
 but directly output to stderr (not: stdout, it could be connected to a pipe).
 
-To control the amount and kinds of messages output to stderr or emitted at
-info level, use flags like ``--stats`` or ``--list``.
+To control the amount and kinds of messages output emitted at info level, use
+flags like ``--stats`` or ``--list``, then create a topic logger for messages
+controlled by that flag.  See ``_setup_implied_logging()`` in
+``borg/archiver.py`` for the entry point to topic logging.
 
 Building a development environment
 ----------------------------------
@@ -122,7 +124,9 @@ Usage::
    # To create and provision the VM:
    vagrant up OS
    # To create an ssh session to the VM:
-   vagrant ssh OS command
+   vagrant ssh OS
+   # To execute a command via ssh in the VM:
+   vagrant ssh OS -c "command args"
    # To shut down the VM:
    vagrant halt OS
    # To shut down and destroy the VM:

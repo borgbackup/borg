@@ -1,6 +1,6 @@
 [run]
 branch = True
-source = borg
+source = src/borg
 omit =
     */borg/__init__.py
     */borg/__main__.py

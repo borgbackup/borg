@@ -133,6 +133,50 @@ into the repository.
 Yes, as an attacker with access to the remote server could delete (or
 otherwise make unavailable) all your backups.
 
+How can I protect against a hacked backup client?
+-------------------------------------------------
+
+Assume you backup your backup client machine C to the backup server S and
+C gets hacked. In a simple push setup, the attacker could then use borg on
+C to delete all backups residing on S.
+
+These are your options to protect against that:
+
+- Do not allow to permanently delete data from the repo, see :ref:`append-only-mode`.
+- Use a pull-mode setup using ``ssh -R``, see :issue:`900`.
+- Mount C's filesystem on another machine and then create a backup of it.
+- Do not give C filesystem-level access to S.
+
+How can I protect against a hacked backup server?
+-------------------------------------------------
+
+Just in case you got the impression that pull-mode backups are way more safe
+than push-mode, you also need to consider the case that your backup server S
+gets hacked. In case S has access to a lot of clients C, that might bring you
+into even bigger trouble than a hacked backup client in the previous FAQ entry.
+
+These are your options to protect against that:
+
+- Use the standard push-mode setup (see also previous FAQ entry).
+- Mount (the repo part of) S's filesystem on C.
+- Do not give S file-system level access to C.
+- Have your backup server at a well protected place (maybe not reachable from
+  the internet), configure it safely, apply security updates, monitor it, ...
+
+How can I protect against theft, sabotage, lightning, fire, ...?
+----------------------------------------------------------------
+
+In general: if your only backup medium is nearby the backupped machine and
+always connected, you can easily get into trouble: they likely share the same
+fate if something goes really wrong.
+
+Thus:
+
+- have multiple backup media
+- have media disconnected from network, power, computer
+- have media at another place
+- have a relatively recent backup on your media
+
 Why do I get "connection closed by remote" after a while?
 ---------------------------------------------------------
 
@@ -140,8 +184,7 @@ When doing a backup to a remote server (using a ssh: repo URL), it sometimes
 stops after a while (some minutes, hours, ... - not immediately) with
 "connection closed by remote" error message. Why?
 
-That's a good question and we are trying to find a good answer in
-`ticket 636 <https://github.com/borgbackup/borg/issues/636>`_.
+That's a good question and we are trying to find a good answer in :issue:`636`.
 
 The borg cache eats way too much disk space, what can I do?
 -----------------------------------------------------------
@@ -180,12 +223,25 @@ Yes, |project_name| supports resuming backups.
 
 During a backup a special checkpoint archive named ``<archive-name>.checkpoint``
 is saved every checkpoint interval (the default value for this is 5
-minutes) containing all the data backed-up until that point. This means
+minutes) containing all the data backed-up until that point. This checkpoint
+archive is a valid archive, but it is only a partial backup. Having it
+in the repo until a successful, full backup is completed is useful because it
+references all the transmitted chunks up to the checkpoint time. This means
 that at most <checkpoint interval> worth of data needs to be retransmitted
-if a backup needs to be restarted.
+if you restart the backup.
+
+If a backup was interrupted, you do not need to do any special considerations,
+just invoke ``borg create`` as you always do. You may use the same archive name
+as in previous attempt or a different one (e.g. if you always include the current
+datetime), it does not matter.
+|project_name| always does full single-pass backups, so it will start again
+from the beginning - but it will be much faster, because some of the data was
+already stored into the repo (and is still referenced by the checkpoint
+archive), so it does not need to get transmitted and stored again.
 
 Once your backup has finished successfully, you can delete all
-``<archive-name>.checkpoint`` archives.
+``<archive-name>.checkpoint`` archives. If you run ``borg prune``, it will
+also care for deleting unneeded checkpoints.
 
 If it crashes with a UnicodeError, what can I do?
 -------------------------------------------------
@@ -217,7 +273,7 @@ control which we do not have (and also can't get, even if we wanted).
 So, if you need that, consider RAID or a filesystem that offers redundant
 storage or just make backups to different locations / different hardware.
 
-See also `ticket 225 <https://github.com/borgbackup/borg/issues/225>`_.
+See also :issue:`225`.
 
 Can |project_name| verify data integrity of a backup archive?
 -------------------------------------------------------------

@@ -43,6 +43,7 @@ int wmain(int argc , wchar_t *argv[] )
     PathRemoveFileSpecW(path);
     std::wstring selfpath(path);
     std::wstring libpath = selfpath + L"/library.zip;" + selfpath + L"/bin";
+    SetDllDirectoryW(path);
 
     Py_SetPath(libpath.c_str());
     Py_SetProgramName(argv[0]);

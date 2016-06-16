@@ -334,8 +334,9 @@ class Archiver:
                     status = archive.process_file(path, st, cache, self.ignore_inode)
                 except OSError as e:
                     if e.errno == errno.EIO:
-                        status = 'E'
                         return e.errno
+                    status = 'E'
+                    self.print_warning('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
             tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)
             if tag_paths:

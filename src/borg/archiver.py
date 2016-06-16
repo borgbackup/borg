@@ -1,5 +1,6 @@
 import argparse
 import collections
+import errno
 import functools
 import hashlib
 import inspect
@@ -271,9 +272,10 @@ class Archiver:
                     restrict_dev = st.st_dev
                 else:
                     restrict_dev = None
-                self._process(archive, cache, matcher, args.exclude_caches, args.exclude_if_present,
+                if self._process(archive, cache, matcher, args.exclude_caches, args.exclude_if_present,
                               args.keep_tag_files, skip_inodes, path, restrict_dev,
-                              read_special=args.read_special, dry_run=dry_run, st=st)
+                              read_special=args.read_special, dry_run=dry_run, st=st):
+                              return
             if not dry_run:
                 archive.save(comment=args.comment, timestamp=args.timestamp)
                 if args.progress:
@@ -331,20 +333,26 @@ class Archiver:
                 try:
                     status = archive.process_file(path, st, cache, self.ignore_inode)
                 except OSError as e:
-                    status = 'E'
-                    self.print_warning('%s: %s', path, e)
+                    if e.errno == errno.EIO:
+                        status = 'E'
+                        return e.errno
         elif stat.S_ISDIR(st.st_mode):
             tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)
             if tag_paths:
                 if keep_tag_files and not dry_run:
                     archive.process_dir(path, st)
                     for tag_path in tag_paths:
-                        self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
+                        if self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
                                       keep_tag_files, skip_inodes, tag_path, restrict_dev,
-                                      read_special=read_special, dry_run=dry_run)
+                                      read_special=read_special, dry_run=dry_run):
+                                      return errno.EIO
                 return
             if not dry_run:
-                status = archive.process_dir(path, st)
+                try:
+                    status = archive.process_dir(path, st)
+                except OSError as e:
+                    if e.errno == errno.EIO:
+                        return e.errno
             try:
                 entries = helpers.scandir_inorder(path)
             except OSError as e:
@@ -353,18 +361,31 @@ class Archiver:
             else:
                 for dirent in entries:
                     normpath = os.path.normpath(dirent.path)
-                    self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
+                    if self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
                                   keep_tag_files, skip_inodes, normpath, restrict_dev,
-                                  read_special=read_special, dry_run=dry_run)
+                                  read_special=read_special, dry_run=dry_run):
+                                  return errno.EIO
         elif stat.S_ISLNK(st.st_mode):
             if not dry_run:
-                status = archive.process_symlink(path, st)
+                try:
+                    status = archive.process_symlink(path, st)
+                except OSError as e:
+                    if e.errno == errno.EIO:
+                        return e.errno
         elif stat.S_ISFIFO(st.st_mode):
             if not dry_run:
-                status = archive.process_fifo(path, st)
+                try:
+                    status = archive.process_fifo(path, st)
+                except OSError as e:
+                    if e.errno == errno.EIO:
+                        return e.errno
         elif stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
             if not dry_run:
-                status = archive.process_dev(path, st)
+                try:
+                    status = archive.process_dev(path, st)
+                except OSError as e:
+                    if e.errno == errno.EIO:
+                        return e.errno
         elif stat.S_ISSOCK(st.st_mode):
             # Ignore unix sockets
             return
@@ -2174,6 +2195,9 @@ def main():  # pragma: no cover
             msg += "\n%s\n%s" % (traceback.format_exc(), sysinfo())
         exit_code = e.exit_code
     except RemoteRepository.RPCError as e:
+        msg = '%s\n%s' % (str(e), sysinfo())
+        exit_code = EXIT_ERROR
+    except OSError as e:
         msg = '%s\n%s' % (str(e), sysinfo())
         exit_code = EXIT_ERROR
     except Exception:

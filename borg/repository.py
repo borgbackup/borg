@@ -67,8 +67,13 @@ class Repository:
 
     def __del__(self):
         if self.lock:
-            self.close()
-            assert False, "cleanup happened in Repository.__del__"
+            try:
+                self.close()
+            except Exception:
+                self.rollback()
+                return
+            else:
+                assert False, "cleanup happened in Repository.__del__"
 
     def __repr__(self):
         return '<%s %s>' % (self.__class__.__name__, self.path)

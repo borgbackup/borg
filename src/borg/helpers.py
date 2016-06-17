@@ -96,7 +96,7 @@ def check_extension_modules():
         raise ExtensionModuleError
     if crypto.API_VERSION != 3:
         raise ExtensionModuleError
-    if platform.API_VERSION != 3:
+    if platform.API_VERSION != 4:
         raise ExtensionModuleError
 
 
@@ -857,6 +857,12 @@ def archivename_validator():
             raise argparse.ArgumentTypeError('Invalid repository name: "%s"' % text)
         return text
     return validator
+
+
+def validate_capuser(text):
+    if os.geteuid() != 0:
+        raise argparse.ArgumentTypeError('only available when running borg as root')
+    return text
 
 
 def decode_dict(d, keys, encoding='utf-8', errors='surrogateescape'):

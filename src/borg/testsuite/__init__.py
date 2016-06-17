@@ -1,7 +1,9 @@
 from contextlib import contextmanager
+from itertools import chain
 import filecmp
 import os
 import posix
+import pwd
 import stat
 import sys
 import sysconfig
@@ -52,6 +54,10 @@ else:
 
 if sys.platform.startswith('netbsd'):
     st_mtime_ns_round = -4  # only >1 microsecond resolution here?
+
+
+def running_as_nonfake_root():
+    return os.geteuid() == 0 and 'FAKEROOTKEY' not in os.environ
 
 
 class BaseTestCase(unittest.TestCase):
@@ -115,6 +121,15 @@ class BaseTestCase(unittest.TestCase):
             self.assert_equal(d1, d2)
         for sub_diff in diff.subdirs.values():
             self._assert_dirs_equal_cmp(sub_diff)
+
+    def assert_all_owned_by(self, path, user):
+        expected_uid = pwd.getpwnam(user).pw_uid
+        expected_gid = pwd.getpwnam(user).pw_gid
+        for dirpath, dirnames, filenames in os.walk(path):
+            for basename in chain(filenames, dirnames):
+                st = os.stat(os.path.join(dirpath, basename), follow_symlinks=False)
+                self.assert_equal(expected_uid, st.st_uid)
+                self.assert_equal(expected_gid, st.st_gid)
 
     def wait_for_mount(self, path, timeout=5):
         """Wait until a filesystem is mounted on `path`

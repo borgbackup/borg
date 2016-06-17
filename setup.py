@@ -170,7 +170,7 @@ class build_usage(Command):
         print('generating usage docs')
         # allows us to build docs without the C modules fully loaded during help generation
         from borg.archiver import Archiver
-        parser = Archiver(prog='borg').parser
+        parser = Archiver(prog='borg', include_all_platform_args=True).parser
         choices = {}
         for action in parser._actions:
             if action.choices is not None:
@@ -310,7 +310,7 @@ if not on_rtd:
         ext_modules.append(Extension('borg.platform.posix', [platform_posix_source]))
 
     if sys.platform == 'linux':
-        ext_modules.append(Extension('borg.platform.linux', [platform_linux_source], libraries=['acl']))
+        ext_modules.append(Extension('borg.platform.linux', [platform_linux_source], libraries=['acl', 'cap']))
     elif sys.platform.startswith('freebsd'):
         ext_modules.append(Extension('borg.platform.freebsd', [platform_freebsd_source]))
     elif sys.platform == 'darwin':

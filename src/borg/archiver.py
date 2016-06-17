@@ -28,7 +28,7 @@ from .cache import Cache
 from .constants import *  # NOQA
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError
-from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
+from .helpers import location_validator, archivename_validator, validate_capuser, ChunkerParams, CompressionSpec
 from .helpers import ItemFormatter, format_time, format_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex
 from .helpers import prune_within, prune_split
@@ -41,7 +41,7 @@ from .helpers import log_multi
 from .helpers import parse_pattern, PatternMatcher, PathPrefixPattern
 from .item import Item
 from .key import key_creator, RepoKey, PassphraseKey
-from .platform import get_flags
+from .platform import get_flags, set_capuser, switch_to_user
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 from .repository import Repository
 from .selftest import selftest
@@ -102,10 +102,10 @@ def with_archive(method):
 
 class Archiver:
 
-    def __init__(self, lock_wait=None, prog=None):
+    def __init__(self, lock_wait=None, prog=None, include_all_platform_args=False):
         self.exit_code = EXIT_SUCCESS
         self.lock_wait = lock_wait
-        self.parser = self.build_parser(prog)
+        self.parser = self.build_parser(prog, include_all_platform_args)
 
     def print_error(self, msg, *args):
         msg = args and msg % args or msg
@@ -1132,7 +1132,7 @@ class Archiver:
                     self.print_warning(warning)
         return args
 
-    def build_parser(self, prog=None):
+    def build_parser(self, prog=None, include_all_platform_args=False):
         common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
 
         common_group = common_parser.add_argument_group('Common options')
@@ -1380,6 +1380,16 @@ class Archiver:
         See the output of the "borg help patterns" command for more help on exclude patterns.
         """)
 
+        if set_capuser or include_all_platform_args:
+            create_epilog += textwrap.dedent("""
+            {0}If you want to back up root-only-readable files (e.g. files in ``/etc``), you need to run
+            borg as the root user. In this case, you may wish to use the ``--cap-user`` option, which
+            will cause borg to immediately switch to the given user, while *retaining* the ability to
+            read arbitrary files; all other root privileges are dropped. This is useful in two ways:
+            (i) it means chunk files in the repository are created as the specified user, not root;
+            (ii) it reduces the potential impact of any bugs in borg as well as accidental misuse.
+            """).format("Linux only:\n" if include_all_platform_args else '')
+
         subparser = subparsers.add_parser('create', parents=[common_parser], add_help=False,
                                           description=self.do_create.__doc__,
                                           epilog=create_epilog,
@@ -1404,6 +1414,11 @@ class Archiver:
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
                                help='only display items with the given status characters')
+
+        if set_capuser or include_all_platform_args:
+            subparser.add_argument('--cap-user', dest='capuser', metavar='USERNAME', type=validate_capuser,
+                                   help='run as given user but with read-access to everything (only as root{0})'.\
+                                    format('; Linux only' if include_all_platform_args else ''))
 
         exclude_group = subparser.add_argument_group('Exclusion options')
         exclude_group.add_argument('-e', '--exclude', dest='excludes',
@@ -2080,9 +2095,8 @@ class Archiver:
         update_excludes(args)
         return args
 
-    def prerun_checks(self, logger):
+    def prerun_checks(self):
         check_extension_modules()
-        selftest(logger)
 
     def _setup_implied_logging(self, args):
         """ turn on INFO level logging for args that imply that they will produce output """
@@ -2098,14 +2112,31 @@ class Archiver:
             if args.get(option, False):
                 logging.getLogger(logger_name).setLevel('INFO')
 
+    def run_selftest(self, logger):
+        selftest(logger)
+
     def run(self, args):
-        os.umask(args.umask)  # early, before opening files
+        try:
+            self.prerun_checks()
+            if hasattr(args, 'capuser') and args.capuser:
+                # This needs to happen early enough, before we create any logfiles.
+                set_capuser(args.capuser)
+            os.umask(args.umask)  # early, before opening files
+        except Exception as e:
+            err = e
+            logging_env_var = None  # Force using default logger; don't log to file
+        else:
+            err = None
+            logging_env_var = 'BORG_LOGGING_CONF'
         self.lock_wait = args.lock_wait
-        setup_logging(level=args.log_level, is_serve=args.func == self.do_serve)  # do not use loggers before this!
+        setup_logging(level=args.log_level, env_var=logging_env_var,
+                      is_serve=(args.func == self.do_serve))  # do not use loggers before this!
         self._setup_implied_logging(vars(args))
+        if err:
+            raise err
         if args.show_version:
             logging.getLogger('borg.output.show-version').info('borgbackup version %s' % __version__)
-        self.prerun_checks(logger)
+        self.run_selftest(logger)
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
         return args.func(args)

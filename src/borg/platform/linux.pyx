@@ -214,7 +214,7 @@ cdef _sync_file_range(fd, offset, length, flags):
     assert offset & PAGE_MASK == 0, "offset %d not page-aligned" % offset
     assert length & PAGE_MASK == 0, "length %d not page-aligned" % length
     if sync_file_range(fd, offset, length, flags) != 0:
-        raise OSError(errno, os.strerror(errno))
+        raise OSError(errno.errno, os.strerror(errno.errno))
     os.posix_fadvise(fd, offset, length, os.POSIX_FADV_DONTNEED)
 
 cdef unsigned PAGE_MASK = resource.getpagesize() - 1

@@ -2158,7 +2158,7 @@ def main():  # pragma: no cover
     if os.path.basename(sys.argv[0]) == "borgfs":
         sys.argv.insert(1, "mount")
 
-    # Make sure stdout and stderr have errors='replace') to avoid unicode
+    # Make sure stdout and stderr have errors='replace' to avoid unicode
     # issues when print()-ing unicode file names
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=True)
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, sys.stderr.encoding, 'replace', line_buffering=True)

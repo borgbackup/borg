@@ -5,7 +5,7 @@ Self testing module
 The selftest() function runs a small test suite of relatively fast tests that are meant to discover issues
 with the way Borg was compiled or packaged and also bugs in Borg itself.
 
-Theses tests are a subset of the borg/testsuite and are run with Pythons built-in unittest, hence none of
+These tests are a subset of the borg/testsuite and are run with Pythons built-in unittest, hence none of
 the tests used for this can or should be ported to py.test currently.
 
 To assert that self test discovery works correctly the number of tests is kept in the SELFTEST_COUNT

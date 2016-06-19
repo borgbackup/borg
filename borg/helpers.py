@@ -559,7 +559,7 @@ def format_line(format, data):
     except (KeyError, ValueError) as e:
         # this should catch format errors
         print('Error in lineformat: "{}" - reason "{}"'.format(format, str(e)))
-    except:
+    except Exception as e:
         # something unexpected, print error and raise exception
         print('Error in lineformat: "{}" - reason "{}"'.format(format, str(e)))
         raise

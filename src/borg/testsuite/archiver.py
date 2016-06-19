@@ -35,12 +35,12 @@ from ..key import KeyfileKeyBase
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import has_lchflags, has_llfuse
-from . import BaseTestCase, changedir, environment_variable
+from . import BaseTestCase, changedir, environment_variable, running_as_nonfake_root
 
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 
-def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
+def exec_cmd(*args, archiver=None, fork=False, switch_user=None, exe=None, **kw):
     if fork:
         try:
             if exe is None:
@@ -49,13 +49,18 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
                 borg = (exe, )
             elif not isinstance(exe, tuple):
                 raise ValueError('exe must be None, a tuple or a str')
-            output = subprocess.check_output(borg + args, stderr=subprocess.STDOUT)
+            if switch_user:
+                preexec = lambda: platform.switch_to_user(switch_user)
+            else:
+                preexec = None
+            output = subprocess.check_output(borg + args, stderr=subprocess.STDOUT, preexec_fn=preexec)
             ret = 0
         except subprocess.CalledProcessError as e:
             output = e.output
             ret = e.returncode
         return ret, os.fsdecode(output)
     else:
+        assert switch_user is None
         stdin, stdout, stderr = sys.stdin, sys.stdout, sys.stderr
         try:
             sys.stdin = StringIO()
@@ -63,6 +68,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
             if archiver is None:
                 archiver = Archiver()
             archiver.prerun_checks = lambda *args: None
+            archiver.run_selftest = lambda *args: None
             archiver.exit_code = EXIT_SUCCESS
             args = archiver.parse_args(list(args))
             ret = archiver.run(args)
@@ -228,9 +234,10 @@ class ArchiverTestCaseBase(BaseTestCase):
     def cmd(self, *args, **kw):
         exit_code = kw.pop('exit_code', 0)
         fork = kw.pop('fork', None)
+        switch_user = kw.pop('switch_user', None)
         if fork is None:
             fork = self.FORK_DEFAULT
-        ret, output = exec_cmd(*args, fork=fork, exe=self.EXE, archiver=self.archiver, **kw)
+        ret, output = exec_cmd(*args, fork=fork, switch_user=switch_user, exe=self.EXE, archiver=self.archiver, **kw)
         if ret != exit_code:
             print(output)
         self.assert_equal(ret, exit_code)
@@ -799,6 +806,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             with patch.object(os, 'fchown', patched_fchown):
                 self.cmd('extract', self.repository_location + '::test')
             assert xattr.getxattr('input/file', 'security.capability') == capabilities
+
+    @pytest.mark.skipif(not (running_as_nonfake_root() and platform.set_capuser),
+                        reason='capuser unavailable in current setup')
+    def test_capuser(self):
+        username = os.environ.get('BORG_TEST_USER', os.environ['SUDO_USER'])
+        os.chmod(self.tmpdir, 0o777)
+        os.chmod(self.keys_path, 0o777)
+        os.chmod(self.cache_path, 0o777)
+        self.cmd('init', self.repository_location, fork=True, switch_user=username)
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('create', '--cap-user=' + username, self.repository_location + '::test', 'input', fork=True)
+        self.assert_all_owned_by(self.repository_location, username)
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        self.assert_dirs_equal('input', 'output/input')
 
     def test_path_normalization(self):
         self.cmd('init', self.repository_location)

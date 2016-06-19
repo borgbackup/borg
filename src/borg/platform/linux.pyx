@@ -7,12 +7,12 @@ from ..helpers import posix_acl_use_stored_uid_gid
 from ..helpers import user2uid, group2gid
 from ..helpers import safe_decode, safe_encode
 from .base import SyncFile as BaseSyncFile
-from .posix import swidth
+from .posix import swidth, switch_to_user
 
 from libc cimport errno
 from libc.stdint cimport int64_t
 
-API_VERSION = 3
+API_VERSION = 4
 
 cdef extern from "sys/types.h":
     int ACL_TYPE_ACCESS
@@ -54,6 +54,40 @@ cdef extern from "sys/ioctl.h":
 
 cdef extern from "string.h":
     char *strerror(int errnum)
+
+cdef extern from "sys/prctl.h":
+    int prctl(int option, ...)
+    enum:
+        PR_SET_SECUREBITS
+
+cdef extern from "linux/securebits.h":
+    enum:
+        SECBIT_KEEP_CAPS_LOCKED
+        SECBIT_NO_SETUID_FIXUP
+        SECBIT_NO_SETUID_FIXUP_LOCKED
+        SECBIT_NOROOT
+        SECBIT_NOROOT_LOCKED
+
+cdef extern from "sys/capability.h":
+    enum:
+        CAP_DAC_READ_SEARCH
+        CAP_LAST_CAP
+    ctypedef enum cap_flag_t:
+        CAP_PERMITTED
+        CAP_EFFECTIVE
+    ctypedef enum cap_flag_value_t:
+        CAP_SET
+        CAP_CLEAR
+    ctypedef int cap_value_t
+    ctypedef struct _cap_struct:
+        pass
+    ctypedef _cap_struct *cap_t
+    cap_t cap_init()
+    int cap_free(void *obj_d)
+    int cap_set_flag(cap_t cap_p, cap_flag_t flag, int ncap,
+                     const cap_value_t *caps, cap_flag_value_t value)
+    int cap_set_proc(cap_t cap_p)
+    int cap_drop_bound(cap_value_t cap)
 
 _comment_re = re.compile(' *#.*', re.M)
 
@@ -209,6 +243,59 @@ def acl_set(path, item, numeric_owner=False):
                 acl_set_file(p, ACL_TYPE_DEFAULT, default_acl)
         finally:
             acl_free(default_acl)
+
+def set_capuser(username):
+    """Switch to given user while keeping the 'CAP_DAC_READ_SEARCH' capability, which allows us to read (but not write)
+       arbitrary files.
+       Useful for people who want to back up /etc but (a) feel nervous about having borg run with full root privileges
+       and (b) want the repo chunk files to be owned by a non-root user.
+    """
+
+    # Configure locked-down capability behaviour
+    cdef int secbits = \
+        SECBIT_KEEP_CAPS_LOCKED | \
+        SECBIT_NO_SETUID_FIXUP | \
+        SECBIT_NO_SETUID_FIXUP_LOCKED | \
+        SECBIT_NOROOT | \
+        SECBIT_NOROOT_LOCKED
+    # The above securebits setting is mentioned in the capabilities(7) manpage as a way to lock the process and all
+    # descendents into a locked-down environment.
+    if prctl(PR_SET_SECUREBITS, secbits) != 0:
+        raise OSError(errno.errno, os.strerror(errno.errno))
+
+    # Irrevocably switch to role user. This does *not* clear any capabilities as would usually happen, because we have
+    # set SECBIT_NO_SETUID_FIXUP in 'setSecurebits()' above.
+    switch_to_user(username)
+
+    # Drop capability bounding set to include only CAP_DAC_READ_SEARCH.
+    # This means we can never again acquire any further capabilities beyond those specified in the bounding set, even
+    # when we exec() another binary.
+    cdef int i
+    for i in range(CAP_LAST_CAP):
+        if i == CAP_DAC_READ_SEARCH:
+            continue
+        if cap_drop_bound(i) != 0:
+            raise OSError(errno.errno, os.strerror(errno.errno))
+
+    # Drop process capabilities to include only CAP_DAC_READ_SEARCH, which is documented in the capabilities(7) manpage
+    # as follows:
+    #   CAP_DAC_READ_SEARCH
+    #         * Bypass file read permission checks and directory read and execute permission checks;
+    #         * Invoke open_by_handle_at(2).
+    cdef cap_t cap
+    cap = cap_init()
+    cdef cap_value_t cap_values[1]
+    cap_values[0] = CAP_DAC_READ_SEARCH
+    try:
+        if cap_set_flag(cap, CAP_PERMITTED, 1, cap_values, CAP_SET) != 0:
+            raise OSError(errno.errno, os.strerror(errno.errno))
+        if cap_set_flag(cap, CAP_EFFECTIVE, 1, cap_values, CAP_SET) != 0:
+            raise OSError(errno.errno, os.strerror(errno.errno))
+        if cap_set_proc(cap) != 0:
+            raise OSError(errno.errno, os.strerror(errno.errno))
+    finally:
+        cap_free(cap)
+
 
 cdef _sync_file_range(fd, offset, length, flags):
     assert offset & PAGE_MASK == 0, "offset %d not page-aligned" % offset

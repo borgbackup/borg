@@ -4,7 +4,7 @@ from ..helpers import posix_acl_use_stored_uid_gid
 from ..helpers import safe_encode, safe_decode
 from .posix import swidth
 
-API_VERSION = 3
+API_VERSION = 4
 
 cdef extern from "errno.h":
     int errno

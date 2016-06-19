@@ -12,7 +12,7 @@ platform API: that way platform APIs provided by the platform-specific support m
 are correctly composed into the base functionality.
 """
 
-API_VERSION = 3
+API_VERSION = 4
 
 fdatasync = getattr(os, 'fdatasync', os.fsync)
 
@@ -46,6 +46,10 @@ except ImportError:
 def get_flags(path, st):
     """Return BSD-style file flags for path or stat without following symlinks."""
     return getattr(st, 'st_flags', 0)
+
+
+def set_capuser():
+    raise "cap user is not supported on this platform"
 
 
 def sync_dir(path):

@@ -738,6 +738,14 @@ class Archiver:
     @with_repository()
     def do_list(self, args, repository, manifest, key):
         """List archive or repository contents"""
+        if not hasattr(sys.stdout, 'buffer'):
+            # This is a shim for supporting unit tests replacing sys.stdout with e.g. StringIO,
+            # which doesn't have an underlying buffer (= lower file object).
+            def write(bytestring):
+                sys.stdout.write(bytestring.decode('utf-8', errors='replace'))
+        else:
+            write = sys.stdout.buffer.write
+
         if args.location.archive:
             matcher, _ = self.build_matcher(args.excludes, args.paths)
             with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
@@ -751,13 +759,6 @@ class Archiver:
                     format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
                 formatter = ItemFormatter(archive, format)
 
-                if not hasattr(sys.stdout, 'buffer'):
-                    # This is a shim for supporting unit tests replacing sys.stdout with e.g. StringIO,
-                    # which doesn't have an underlying buffer (= lower file object).
-                    def write(bytestring):
-                        sys.stdout.write(bytestring.decode('utf-8', errors='replace'))
-                else:
-                    write = sys.stdout.buffer.write
                 for item in archive.iter_items(lambda item: matcher.match(item.path)):
                     write(safe_encode(formatter.format_item(item)))
         else:

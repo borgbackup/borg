@@ -2,6 +2,7 @@
 """
 import errno
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -52,16 +53,20 @@ if libc_name is None:
 # the 'test_extract_capabilities' test, but also allows xattrs to work with fakeroot on Linux in normal use.
 # TODO: Check whether fakeroot supports xattrs on all platforms supported below.
 # TODO: If that's the case then we can make Borg fakeroot-xattr-compatible on these as well.
-LD_PRELOAD = os.environ.get('LD_PRELOAD', '')
 XATTR_FAKEROOT = False
-if sys.platform.startswith('linux') and 'fakeroot' in LD_PRELOAD:
-    fakeroot_version = LooseVersion(subprocess.check_output(['fakeroot', '-v']).decode('ascii').split()[-1])
-    if fakeroot_version >= LooseVersion("1.20.2"):
-        # 1.20.2 has been confirmed to have xattr support
-        # 1.18.2 has been confirmed not to have xattr support
-        # Versions in-between are unknown
-        libc_name = LD_PRELOAD
-        XATTR_FAKEROOT = True
+if sys.platform.startswith('linux'):
+    LD_PRELOAD = os.environ.get('LD_PRELOAD', '')
+    preloads = re.split("[ :]", LD_PRELOAD)
+    for preload in preloads:
+        if preload.startswith("libfakeroot"):
+            fakeroot_version = LooseVersion(subprocess.check_output(['fakeroot', '-v']).decode('ascii').split()[-1])
+            if fakeroot_version >= LooseVersion("1.20.2"):
+                # 1.20.2 has been confirmed to have xattr support
+                # 1.18.2 has been confirmed not to have xattr support
+                # Versions in-between are unknown
+                libc_name = preload
+                XATTR_FAKEROOT = True
+            break
 
 try:
     libc = CDLL(libc_name, use_errno=True)

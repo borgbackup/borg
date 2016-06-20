@@ -29,7 +29,7 @@ from .constants import *  # NOQA
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError
 from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
-from .helpers import ItemFormatter, format_time, format_file_size, format_archive
+from .helpers import ItemFormatter, ArchiveFormatter, format_time, format_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex
 from .helpers import prune_within, prune_split
 from .helpers import to_localtime, timestamp
@@ -762,13 +762,19 @@ class Archiver:
                 for item in archive.iter_items(lambda item: matcher.match(item.path)):
                     write(safe_encode(formatter.format_item(item)))
         else:
+            if args.format:
+                format = args.format
+            elif args.short:
+                format = "{archive}{NL}"
+            else:
+                format = "{archive:<36} {time} [{id}]{NL}"
+            formatter = ArchiveFormatter(format)
+
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 if args.prefix and not archive_info.name.startswith(args.prefix):
                     continue
-                if args.short:
-                    print(archive_info.name)
-                else:
-                    print(format_archive(archive_info))
+                write(safe_encode(formatter.format_item(archive_info)))
+
         return self.exit_code
 
     @with_repository(cache=True)

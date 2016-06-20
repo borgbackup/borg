@@ -1132,7 +1132,7 @@ def log_multi(*msgs, level=logging.INFO, logger=logger):
         logger.log(level, line)
 
 
-class ItemFormatter:
+class BaseFormatter:
     FIXED_KEYS = {
         # Formatting aids
         'LF': '\n',
@@ -1143,6 +1143,29 @@ class ItemFormatter:
         'NEWLINE': os.linesep,
         'NL': os.linesep,
     }
+
+    def get_item_data(self, item):
+        raise NotImplementedError
+
+    def format_item(self, item):
+        return self.format.format_map(self.get_item_data(item))
+
+
+class ArchiveFormatter(BaseFormatter):
+
+    def __init__(self, format):
+        self.format = partial_format(format, self.FIXED_KEYS)
+
+    def get_item_data(self, archive):
+        return {
+            'barchive': archive.name,
+            'archive': remove_surrogates(archive.name),
+            'id': bin_to_hex(archive.id),
+            'time': format_time(to_localtime(archive.ts)),
+        }
+
+
+class ItemFormatter(BaseFormatter):
     KEY_DESCRIPTIONS = {
         'bpath': 'verbatim POSIX path, can contain any character except NUL',
         'path': 'path interpreted as text (might be missing non-text characters, see bpath)',
@@ -1253,9 +1276,6 @@ class ItemFormatter:
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)
         return item_data
-
-    def format_item(self, item):
-        return self.format.format_map(self.get_item_data(item))
 
     def calculate_num_chunks(self, item):
         return len(item.get('chunks', []))

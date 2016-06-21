@@ -16,7 +16,6 @@ cdef extern from "openssl/evp.h":
     ctypedef struct EVP_CIPHER:
         pass
     ctypedef struct EVP_CIPHER_CTX:
-        unsigned char *iv
         pass
     ctypedef struct ENGINE:
         pass
@@ -40,10 +39,38 @@ import struct
 
 _int = struct.Struct('>I')
 _long = struct.Struct('>Q')
+_2long = struct.Struct('>QQ')
 
 bytes_to_int = lambda x, offset=0: _int.unpack_from(x, offset)[0]
 bytes_to_long = lambda x, offset=0: _long.unpack_from(x, offset)[0]
 long_to_bytes = lambda x: _long.pack(x)
+
+
+def bytes16_to_int(b, offset=0):
+    h, l = _2long.unpack_from(b, offset)
+    return (h << 64) + l
+
+
+def int_to_bytes16(i):
+    max_uint64 = 0xffffffffffffffff
+    l = i & max_uint64
+    h = (i >> 64) & max_uint64
+    return _2long.pack(h, l)
+
+
+def increment_iv(iv, amount=1):
+    """
+    Increment the IV by the given amount (default 1).
+
+    :param iv: input IV, 16 bytes (128 bit)
+    :param amount: increment value
+    :return: input_IV + amount, 16 bytes (128 bit)
+    """
+    assert len(iv) == 16
+    iv = bytes16_to_int(iv)
+    iv += amount
+    iv = int_to_bytes16(iv)
+    return iv
 
 
 def num_aes_blocks(int length):
@@ -58,6 +85,8 @@ cdef class AES:
     """
     cdef EVP_CIPHER_CTX *ctx
     cdef int is_encrypt
+    cdef unsigned char iv_orig[16]
+    cdef int blocks
 
     def __cinit__(self, is_encrypt, key, iv=None):
         self.ctx = EVP_CIPHER_CTX_new()
@@ -82,6 +111,10 @@ cdef class AES:
             key2 = key
         if iv:
             iv2 = iv
+            assert isinstance(iv, bytes) and len(iv) == 16
+            for i in range(16):
+                self.iv_orig[i] = iv[i]
+            self.blocks = 0  # number of AES blocks encrypted starting with iv_orig
         # Initialise key and IV
         if self.is_encrypt:
             if not EVP_EncryptInit_ex(self.ctx, NULL, NULL, key2, iv2):
@@ -92,7 +125,7 @@ cdef class AES:
 
     @property
     def iv(self):
-        return self.ctx.iv[:16]
+        return increment_iv(self.iv_orig[:16], self.blocks)
 
     def encrypt(self, data):
         cdef int inl = len(data)
@@ -109,6 +142,7 @@ cdef class AES:
             if not EVP_EncryptFinal_ex(self.ctx, out+ctl, &outl):
                 raise Exception('EVP_EncryptFinal failed')
             ctl += outl
+            self.blocks += num_aes_blocks(ctl)
             return out[:ctl]
         finally:
             free(out)
@@ -133,6 +167,7 @@ cdef class AES:
                 # CTR mode does not use padding nor authentication.
                 raise Exception('EVP_DecryptFinal failed')
             ptl += outl
+            self.blocks += num_aes_blocks(inl)
             return out[:ptl]
         finally:
             free(out)

@@ -10,7 +10,7 @@ import msgpack
 import msgpack.fallback
 import time
 
-from ..helpers import Location, format_file_size, format_timedelta, make_path_safe, \
+from ..helpers import Location, format_file_size, format_timedelta, format_line, make_path_safe, \
     prune_within, prune_split, get_cache_dir, get_keys_dir, Statistics, is_slow_msgpack, \
     yes, TRUISH, FALSISH, DEFAULTISH, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
@@ -877,3 +877,15 @@ def test_progress_endless_step(capfd):
     pi.show()
     out, err = capfd.readouterr()
     assert err == '.'
+
+
+def test_format_line():
+    data = dict(foo='bar baz')
+    assert format_line('', data) == ''
+    assert format_line('{foo}', data) == 'bar baz'
+    assert format_line('foo{foo}foo', data) == 'foobar bazfoo'
+
+
+def test_format_line_erroneous():
+    data = dict(foo='bar baz')
+    assert format_line('{invalid}', data) == ''  # TODO: rather raise exception

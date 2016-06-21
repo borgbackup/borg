@@ -933,7 +933,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', test_archive, src_dir)
         output_1 = self.cmd('list', test_archive)
         output_2 = self.cmd('list', '--list-format', '{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}', test_archive)
-        output_3 = self.cmd('list', '--list-format', '{mtime:%s} {path}{NL}', test_archive)
+        output_3 = self.cmd('list', '--list-format', '{mtime:%s} {path}{NEWLINE}', test_archive)
         self.assertEqual(output_1, output_2)
         self.assertNotEqual(output_1, output_3)
 

@@ -20,7 +20,7 @@ from .helpers import Error, location_validator, archivename_validator, format_li
     parse_pattern, PathPrefixPattern, to_localtime, timestamp, safe_timestamp, \
     get_cache_dir, prune_within, prune_split, \
     Manifest, NoManifestError, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
-    dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, is_slow_msgpack, yes, sysinfo, \
+    dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, PrefixSpec, is_slow_msgpack, yes, sysinfo, \
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher
 from .logger import create_logger, setup_logging
 logger = create_logger()
@@ -952,7 +952,7 @@ class Archiver:
         subparser.add_argument('--last', dest='last',
                                type=int, default=None, metavar='N',
                                help='only check last N archives (Default: all)')
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec,
                                help='only consider archive names starting with this prefix')
 
         change_passphrase_epilog = textwrap.dedent("""
@@ -1194,7 +1194,7 @@ class Archiver:
                                help="""specify format for archive file listing
                                 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}")
                                 Special "{formatkeys}" exists to list available keys""")
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec,
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
@@ -1301,7 +1301,7 @@ class Archiver:
                                help='number of monthly archives to keep')
         subparser.add_argument('-y', '--keep-yearly', dest='yearly', type=int, default=0,
                                help='number of yearly archives to keep')
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec,
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,

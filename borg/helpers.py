@@ -518,6 +518,10 @@ def CompressionSpec(s):
     raise ValueError
 
 
+def PrefixSpec(s):
+    return replace_placeholders(s)
+
+
 def dir_is_cachedir(path):
     """Determines whether the specified path is a cache directory (and
     therefore should potentially be excluded from the backup) according to

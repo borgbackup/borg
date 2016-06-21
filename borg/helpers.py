@@ -566,6 +566,20 @@ def format_line(format, data):
     return ''
 
 
+def replace_placeholders(text):
+    """Replace placeholders in text with their values."""
+    current_time = datetime.now()
+    data = {
+        'pid': os.getpid(),
+        'fqdn': socket.getfqdn(),
+        'hostname': socket.gethostname(),
+        'now': current_time.now(),
+        'utcnow': current_time.utcnow(),
+        'user': uid2user(os.getuid(), os.getuid())
+    }
+    return format_line(text, data)
+
+
 def safe_timestamp(item_timestamp_ns):
     try:
         return datetime.fromtimestamp(bigint_to_int(item_timestamp_ns) / 1e9)
@@ -720,21 +734,8 @@ class Location:
         if not self.parse(self.orig):
             raise ValueError
 
-    def preformat_text(self, text):
-        """Format repository and archive path with common tags"""
-        current_time = datetime.now()
-        data = {
-            'pid': os.getpid(),
-            'fqdn': socket.getfqdn(),
-            'hostname': socket.gethostname(),
-            'now': current_time.now(),
-            'utcnow': current_time.utcnow(),
-            'user': uid2user(os.getuid(), os.getuid())
-            }
-        return format_line(text, data)
-
     def parse(self, text):
-        text = self.preformat_text(text)
+        text = replace_placeholders(text)
         valid = self._parse(text)
         if valid:
             return True

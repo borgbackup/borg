@@ -69,6 +69,10 @@ class NoManifestError(Error):
     """Repository has no manifest."""
 
 
+class PlaceholderError(Error):
+    """Formatting Error: "{}".format({}): {}({})"""
+
+
 def check_extension_modules():
     from . import platform
     if hashindex.API_VERSION != 2:
@@ -552,18 +556,10 @@ def dir_is_tagged(path, exclude_caches, exclude_if_present):
 
 
 def format_line(format, data):
-    # TODO: Filter out unwanted properties of str.format(), because "format" is user provided.
-
     try:
         return format.format(**data)
-    except (KeyError, ValueError) as e:
-        # this should catch format errors
-        print('Error in lineformat: "{}" - reason "{}"'.format(format, str(e)))
     except Exception as e:
-        # something unexpected, print error and raise exception
-        print('Error in lineformat: "{}" - reason "{}"'.format(format, str(e)))
-        raise
-    return ''
+        raise PlaceholderError(format, data, e.__class__.__name__, str(e))
 
 
 def replace_placeholders(text):

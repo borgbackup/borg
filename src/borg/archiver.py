@@ -29,7 +29,7 @@ from .constants import *  # NOQA
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError
 from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
-from .helpers import ItemFormatter, ArchiveFormatter, format_time, format_file_size, format_archive
+from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter, format_time, format_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex
 from .helpers import prune_within, prune_split
 from .helpers import to_localtime, timestamp
@@ -1625,8 +1625,13 @@ class Archiver:
 
         See the "borg help patterns" command for more help on exclude patterns.
 
-        The following keys are available for --format when listing files:
+        The following keys are available for --format:
+        """) + BaseFormatter.keys_help() + textwrap.dedent("""
 
+        -- Keys for listing repository archives:
+        """) + ArchiveFormatter.keys_help() + textwrap.dedent("""
+
+        -- Keys for listing archive files:
         """) + ItemFormatter.keys_help()
         subparser = subparsers.add_parser('list', parents=[common_parser], add_help=False,
                                           description=self.do_list.__doc__,

@@ -1150,6 +1150,16 @@ class BaseFormatter:
     def format_item(self, item):
         return self.format.format_map(self.get_item_data(item))
 
+    @staticmethod
+    def keys_help():
+        return " - NEWLINE: OS dependent line separator\n" \
+               " - NL: alias of NEWLINE\n" \
+               " - NUL: NUL character for creating print0 / xargs -0 like output, see barchive/bpath\n" \
+               " - SPACE\n" \
+               " - TAB\n" \
+               " - CR\n" \
+               " - LF"
+
 
 class ArchiveFormatter(BaseFormatter):
 
@@ -1164,6 +1174,13 @@ class ArchiveFormatter(BaseFormatter):
             'time': format_time(to_localtime(archive.ts)),
         }
 
+    @staticmethod
+    def keys_help():
+        return " - archive: archive name interpreted as text (might be missing non-text characters, see barchive)\n" \
+               " - barchive: verbatim archive name, can contain any character except NUL\n" \
+               " - time: time of creation of the archive\n" \
+               " - id: internal ID of the archive"
+
 
 class ItemFormatter(BaseFormatter):
     KEY_DESCRIPTIONS = {
@@ -1171,14 +1188,9 @@ class ItemFormatter(BaseFormatter):
         'path': 'path interpreted as text (might be missing non-text characters, see bpath)',
         'source': 'link target for links (identical to linktarget)',
         'extra': 'prepends {source} with " -> " for soft links and " link to " for hard links',
-
         'csize': 'compressed size',
         'num_chunks': 'number of chunks in this file',
         'unique_chunks': 'number of unique chunks in this file',
-
-        'NEWLINE': 'OS dependent line separator',
-        'NL': 'alias of NEWLINE',
-        'NUL': 'NUL character for creating print0 / xargs -0 like ouput, see bpath',
     }
     KEY_GROUPS = (
         ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget', 'flags'),
@@ -1186,7 +1198,6 @@ class ItemFormatter(BaseFormatter):
         ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
         tuple(sorted(hashlib.algorithms_guaranteed)),
         ('archiveid', 'archivename', 'extra'),
-        ('NEWLINE', 'NL', 'NUL', 'SPACE', 'TAB', 'CR', 'LF'),
     )
 
     @classmethod
@@ -1206,6 +1217,9 @@ class ItemFormatter(BaseFormatter):
     def keys_help(cls):
         help = []
         keys = cls.available_keys()
+        for key in cls.FIXED_KEYS:
+            keys.remove(key)
+
         for group in cls.KEY_GROUPS:
             for key in group:
                 keys.remove(key)

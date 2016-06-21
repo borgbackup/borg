@@ -110,7 +110,7 @@ certain number of old archives::
     # Backup all of /home and /var/www except a few
     # excluded directories
     borg create -v --stats                          \
-        $REPOSITORY::`hostname`-`date +%Y-%m-%d`    \
+        $REPOSITORY::'{hostname}-{now:%Y-%m-%d}'    \
         /home                                       \
         /var/www                                    \
         --exclude '/home/*/.cache'                  \
@@ -118,10 +118,10 @@ certain number of old archives::
         --exclude '*.pyc'
 
     # Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
-    # archives of THIS machine. --prefix `hostname`- is very important to
+    # archives of THIS machine. The '{hostname}-' prefix is very important to
     # limit prune's operation to this machine's archives and not apply to
     # other machine's archives also.
-    borg prune -v $REPOSITORY --prefix `hostname`- \
+    borg prune -v $REPOSITORY --prefix '{hostname}-' \
         --keep-daily=7 --keep-weekly=4 --keep-monthly=6
 
 .. backup_compression:

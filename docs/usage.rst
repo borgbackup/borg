@@ -425,8 +425,9 @@ will see what it would do without it actually doing anything.
     # Do a dry-run without actually deleting anything.
     $ borg prune --dry-run --keep-daily=7 --keep-weekly=4 /path/to/repo
 
-    # Same as above but only apply to archive names starting with "foo":
-    $ borg prune --keep-daily=7 --keep-weekly=4 --prefix=foo /path/to/repo
+    # Same as above but only apply to archive names starting with the hostname
+    # of the machine followed by a "-" character:
+    $ borg prune --keep-daily=7 --keep-weekly=4 --prefix='{hostname}-' /path/to/repo
 
     # Keep 7 end of day, 4 additional end of week archives,
     # and an end of month archive for every month:

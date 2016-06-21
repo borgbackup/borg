@@ -803,6 +803,39 @@ class Archiver:
         EOF
         $ borg create --exclude-from exclude.txt backup /
         ''')
+    helptext['placeholders'] = textwrap.dedent('''
+        Repository (or Archive) URLs and --prefix values support these placeholders:
+
+        {hostname}
+
+            The (short) hostname of the machine.
+
+        {fqdn}
+
+            The full name of the machine.
+
+        {now}
+
+            The current local date and time.
+
+        {utcnow}
+
+            The current UTC date and time.
+
+        {user}
+
+            The user name (or UID, if no name is available) of the user running borg.
+
+        {pid}
+
+            The current process ID.
+
+        Examples::
+
+            borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
+            borg create /path/to/repo::{hostname}-{now:%Y-%m-%d_%H:%M:%S} ...
+            borg prune --prefix '{hostname}-' ...
+        ''')
 
     def do_help(self, parser, commands, args):
         if not args.topic:
@@ -1013,6 +1046,7 @@ class Archiver:
         all files on these file systems.
 
         See the output of the "borg help patterns" command for more help on exclude patterns.
+        See the output of the "borg help placeholders" command for more help on placeholders.
         """)
 
         subparser = subparsers.add_parser('create', parents=[common_parser],

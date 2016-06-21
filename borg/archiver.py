@@ -1522,7 +1522,15 @@ def main():  # pragma: no cover
     setup_signal_handlers()
     archiver = Archiver()
     msg = None
-    args = archiver.get_args(sys.argv, os.environ.get('SSH_ORIGINAL_COMMAND'))
+    try:
+        args = archiver.get_args(sys.argv, os.environ.get('SSH_ORIGINAL_COMMAND'))
+    except Error as e:
+        msg = e.get_message()
+        if e.traceback:
+            msg += "\n%s\n%s" % (traceback.format_exc(), sysinfo())
+        # we might not have logging setup yet, so get out quickly
+        print(msg, file=sys.stderr)
+        sys.exit(e.exit_code)
     try:
         exit_code = archiver.run(args)
     except Error as e:

@@ -728,16 +728,16 @@ class Location:
     # the archive names. Thus, we must not accept "/" in archive names.
     ssh_re = re.compile(r'(?P<proto>ssh)://(?:(?P<user>[^@]+)@)?'
                         r'(?P<host>[^:/#]+)(?::(?P<port>\d+))?'
-                        r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
+                        r'(?P<path>[^:]+)(?:::(?P<archive>[^/\s]([^/\s]| )*[^/\s]))?$')
     file_re = re.compile(r'(?P<proto>file)://'
-                         r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
+                         r'(?P<path>[^:]+)(?:::(?P<archive>[^/\s]([^/\s]| )*[^/\s]))?$')
     scp_re = re.compile(r'((?:(?P<user>[^@]+)@)?(?P<host>[^:/]+):)?'
-                        r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
+                        r'(?P<path>[^:]+)(?:::(?P<archive>[^/\s]([^/\s]| )*[^/\s]))?$')
     # get the repo from BORG_RE env and the optional archive from param.
     # if the syntax requires giving REPOSITORY (see "borg mount"),
     # use "::" to let it use the env var.
     # if REPOSITORY argument is optional, it'll automatically use the env.
-    env_re = re.compile(r'(?:::(?P<archive>[^/]+)?)?$')
+    env_re = re.compile(r'(?:::(?P<archive>[^/\s]([^/\s]| )*[^/\s])?)?$')
 
     def __init__(self, text=''):
         self.orig = text
@@ -773,6 +773,14 @@ class Location:
         if not valid:
             return False
         self.archive = m.group('archive')
+        return self._is_archive_name_printable()
+
+    # lookout for non-printable characters
+    def _is_archive_name_printable(self):
+        if self.archive:
+            for char in self.archive:
+                if unicodedata.category(char)[0] == 'C':
+                    return False
         return True
 
     def _parse(self, text):
@@ -784,13 +792,15 @@ class Location:
             self.port = m.group('port') and int(m.group('port')) or None
             self.path = os.path.normpath(m.group('path'))
             self.archive = m.group('archive')
-            return True
+            return self._is_archive_name_printable()
+
         m = self.file_re.match(text)
         if m:
             self.proto = m.group('proto')
             self.path = os.path.normpath(m.group('path'))
             self.archive = m.group('archive')
-            return True
+            return self._is_archive_name_printable()
+
         m = self.scp_re.match(text)
         if m:
             self.user = m.group('user')
@@ -798,7 +808,8 @@ class Location:
             self.path = os.path.normpath(m.group('path'))
             self.archive = m.group('archive')
             self.proto = self.host and 'ssh' or 'file'
-            return True
+            return self._is_archive_name_printable()
+
         return False
 
     def __str__(self):

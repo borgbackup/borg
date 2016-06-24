@@ -66,6 +66,8 @@ class Repository:
         self.exclusive = exclusive
 
     def __del__(self):
+        if not os.path.exists(self.path):
+            return
         if self.lock:
             self.close()
             assert False, "cleanup happened in Repository.__del__"
@@ -83,6 +85,9 @@ class Repository:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
             self.rollback()
+            if hasattr(exc_val, 'errno'):
+                if exc_val.errno in [errno.EIO, errno.ENXIO]:
+                    return
         self.close()
 
     def create(self, path):

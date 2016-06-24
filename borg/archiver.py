@@ -3,6 +3,7 @@ from datetime import datetime
 from hashlib import sha256
 from operator import attrgetter
 import argparse
+import errno
 import functools
 import inspect
 import io
@@ -266,6 +267,7 @@ class Archiver:
         if restrict_dev is not None and st.st_dev != restrict_dev:
             return
         status = None
+        io_errorcodes = [errno.EIO, errno.ENXIO]
         # Ignore if nodump flag is set
         if has_lchflags and (st.st_flags & stat.UF_NODUMP):
             return
@@ -274,20 +276,30 @@ class Archiver:
                 try:
                     status = archive.process_file(path, st, cache, self.ignore_inode)
                 except OSError as e:
+                    if e.errno in io_errorcodes:
+                        raise
                     status = 'E'
                     self.print_warning('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
             tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)
             if tag_paths:
                 if keep_tag_files and not dry_run:
-                    archive.process_dir(path, st)
+                    try:
+                        archive.process_dir(path, st)
+                    except OSError as e:
+                        if e.errno in io_errorcodes:
+                            raise
                     for tag_path in tag_paths:
                         self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
                                       keep_tag_files, skip_inodes, tag_path, restrict_dev,
                                       read_special=read_special, dry_run=dry_run)
                 return
             if not dry_run:
-                status = archive.process_dir(path, st)
+                try:
+                    status = archive.process_dir(path, st)
+                except OSError as e:
+                    if e.errno in io_errorcodes:
+                        raise
             try:
                 entries = os.listdir(path)
             except OSError as e:
@@ -301,13 +313,25 @@ class Archiver:
                                   read_special=read_special, dry_run=dry_run)
         elif stat.S_ISLNK(st.st_mode):
             if not dry_run:
-                status = archive.process_symlink(path, st)
+                try:
+                    status = archive.process_symlink(path, st)
+                except OSError as e:
+                    if e.errno in io_errorcodes:
+                        raise
         elif stat.S_ISFIFO(st.st_mode):
             if not dry_run:
-                status = archive.process_fifo(path, st)
+                try:
+                    status = archive.process_fifo(path, st)
+                except OSError as e:
+                    if e.errno in io_errorcodes:
+                        raise
         elif stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
             if not dry_run:
-                status = archive.process_dev(path, st)
+                try:
+                    status = archive.process_dev(path, st)
+                except OSError as e:
+                    if e.errno in io_errorcodes:
+                        raise
         elif stat.S_ISSOCK(st.st_mode):
             # Ignore unix sockets
             return
@@ -1574,6 +1598,9 @@ def main():  # pragma: no cover
         exit_code = e.exit_code
     except RemoteRepository.RPCError as e:
         msg = '%s\n%s' % (str(e), sysinfo())
+        exit_code = EXIT_ERROR
+    except OSError as e:
+        msg = '\n%s\n%s' % (str(e), sysinfo())
         exit_code = EXIT_ERROR
     except Exception:
         msg = 'Local Exception.\n%s\n%s' % (traceback.format_exc(), sysinfo())

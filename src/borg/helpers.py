@@ -1132,7 +1132,7 @@ def log_multi(*msgs, level=logging.INFO, logger=logger):
         logger.log(level, line)
 
 
-class ItemFormatter:
+class BaseFormatter:
     FIXED_KEYS = {
         # Formatting aids
         'LF': '\n',
@@ -1143,19 +1143,54 @@ class ItemFormatter:
         'NEWLINE': os.linesep,
         'NL': os.linesep,
     }
+
+    def get_item_data(self, item):
+        raise NotImplementedError
+
+    def format_item(self, item):
+        return self.format.format_map(self.get_item_data(item))
+
+    @staticmethod
+    def keys_help():
+        return " - NEWLINE: OS dependent line separator\n" \
+               " - NL: alias of NEWLINE\n" \
+               " - NUL: NUL character for creating print0 / xargs -0 like output, see barchive/bpath\n" \
+               " - SPACE\n" \
+               " - TAB\n" \
+               " - CR\n" \
+               " - LF"
+
+
+class ArchiveFormatter(BaseFormatter):
+
+    def __init__(self, format):
+        self.format = partial_format(format, self.FIXED_KEYS)
+
+    def get_item_data(self, archive):
+        return {
+            'barchive': archive.name,
+            'archive': remove_surrogates(archive.name),
+            'id': bin_to_hex(archive.id),
+            'time': format_time(to_localtime(archive.ts)),
+        }
+
+    @staticmethod
+    def keys_help():
+        return " - archive: archive name interpreted as text (might be missing non-text characters, see barchive)\n" \
+               " - barchive: verbatim archive name, can contain any character except NUL\n" \
+               " - time: time of creation of the archive\n" \
+               " - id: internal ID of the archive"
+
+
+class ItemFormatter(BaseFormatter):
     KEY_DESCRIPTIONS = {
         'bpath': 'verbatim POSIX path, can contain any character except NUL',
         'path': 'path interpreted as text (might be missing non-text characters, see bpath)',
         'source': 'link target for links (identical to linktarget)',
         'extra': 'prepends {source} with " -> " for soft links and " link to " for hard links',
-
         'csize': 'compressed size',
         'num_chunks': 'number of chunks in this file',
         'unique_chunks': 'number of unique chunks in this file',
-
-        'NEWLINE': 'OS dependent line separator',
-        'NL': 'alias of NEWLINE',
-        'NUL': 'NUL character for creating print0 / xargs -0 like ouput, see bpath',
     }
     KEY_GROUPS = (
         ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget', 'flags'),
@@ -1163,7 +1198,6 @@ class ItemFormatter:
         ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
         tuple(sorted(hashlib.algorithms_guaranteed)),
         ('archiveid', 'archivename', 'extra'),
-        ('NEWLINE', 'NL', 'NUL', 'SPACE', 'TAB', 'CR', 'LF'),
     )
 
     @classmethod
@@ -1183,6 +1217,9 @@ class ItemFormatter:
     def keys_help(cls):
         help = []
         keys = cls.available_keys()
+        for key in cls.FIXED_KEYS:
+            keys.remove(key)
+
         for group in cls.KEY_GROUPS:
             for key in group:
                 keys.remove(key)
@@ -1253,9 +1290,6 @@ class ItemFormatter:
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)
         return item_data
-
-    def format_item(self, item):
-        return self.format.format_map(self.get_item_data(item))
 
     def calculate_num_chunks(self, item):
         return len(item.get('chunks', []))

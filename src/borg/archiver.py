@@ -29,7 +29,7 @@ from .constants import *  # NOQA
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError
 from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
-from .helpers import ItemFormatter, format_time, format_file_size, format_archive
+from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter, format_time, format_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex
 from .helpers import prune_within, prune_split
 from .helpers import to_localtime, timestamp
@@ -738,6 +738,14 @@ class Archiver:
     @with_repository()
     def do_list(self, args, repository, manifest, key):
         """List archive or repository contents"""
+        if not hasattr(sys.stdout, 'buffer'):
+            # This is a shim for supporting unit tests replacing sys.stdout with e.g. StringIO,
+            # which doesn't have an underlying buffer (= lower file object).
+            def write(bytestring):
+                sys.stdout.write(bytestring.decode('utf-8', errors='replace'))
+        else:
+            write = sys.stdout.buffer.write
+
         if args.location.archive:
             matcher, _ = self.build_matcher(args.excludes, args.paths)
             with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
@@ -751,23 +759,22 @@ class Archiver:
                     format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
                 formatter = ItemFormatter(archive, format)
 
-                if not hasattr(sys.stdout, 'buffer'):
-                    # This is a shim for supporting unit tests replacing sys.stdout with e.g. StringIO,
-                    # which doesn't have an underlying buffer (= lower file object).
-                    def write(bytestring):
-                        sys.stdout.write(bytestring.decode('utf-8', errors='replace'))
-                else:
-                    write = sys.stdout.buffer.write
                 for item in archive.iter_items(lambda item: matcher.match(item.path)):
                     write(safe_encode(formatter.format_item(item)))
         else:
+            if args.format:
+                format = args.format
+            elif args.short:
+                format = "{archive}{NL}"
+            else:
+                format = "{archive:<36} {time} [{id}]{NL}"
+            formatter = ArchiveFormatter(format)
+
             for archive_info in manifest.list_archive_infos(sort_by='ts'):
                 if args.prefix and not archive_info.name.startswith(args.prefix):
                     continue
-                if args.short:
-                    print(archive_info.name)
-                else:
-                    print(format_archive(archive_info))
+                write(safe_encode(formatter.format_item(archive_info)))
+
         return self.exit_code
 
     @with_repository(cache=True)
@@ -1618,8 +1625,13 @@ class Archiver:
 
         See the "borg help patterns" command for more help on exclude patterns.
 
-        The following keys are available for --format when listing files:
+        The following keys are available for --format:
+        """) + BaseFormatter.keys_help() + textwrap.dedent("""
 
+        -- Keys for listing repository archives:
+        """) + ArchiveFormatter.keys_help() + textwrap.dedent("""
+
+        -- Keys for listing archive files:
         """) + ItemFormatter.keys_help()
         subparser = subparsers.add_parser('list', parents=[common_parser], add_help=False,
                                           description=self.do_list.__doc__,

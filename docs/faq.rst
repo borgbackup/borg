@@ -143,6 +143,24 @@ stops after a while (some minutes, hours, ... - not immediately) with
 That's a good question and we are trying to find a good answer in
 `ticket 636 <https://github.com/borgbackup/borg/issues/636>`_.
 
+Why am I seeing idle borg serve processes on the repo server?
+-------------------------------------------------------------
+
+Maybe the ssh connection between client and server broke down and that was not
+yet noticed on the server. Try these settings:
+
+::
+
+    # /etc/ssh/sshd_config on borg repo server - kill connection to client
+    # after ClientAliveCountMax * ClientAliveInterval seconds with no response
+    ClientAliveInterval 20
+    ClientAliveCountMax 3
+
+If you have multiple borg create ... ; borg create ... commands in a already
+serialized way in a single script, you need to give them --lock-wait N (with N
+being a bit more than the time the server needs to terminate broken down
+connections and release the lock).
+
 The borg cache eats way too much disk space, what can I do?
 -----------------------------------------------------------
 

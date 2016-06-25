@@ -1001,7 +1001,7 @@ def daemonize():
     os.close(0)
     os.close(1)
     os.close(2)
-    fd = os.open('/dev/null', os.O_RDWR)
+    fd = os.open(os.devnull, os.O_RDWR)
     os.dup2(fd, 0)
     os.dup2(fd, 1)
     os.dup2(fd, 2)

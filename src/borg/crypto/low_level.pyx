@@ -111,6 +111,9 @@ cdef extern from "openssl/hmac.h":
     void HMAC_CTX_init(HMAC_CTX *ctx)
     void HMAC_CTX_cleanup(HMAC_CTX *ctx)
 
+    HMAC_CTX *HMAC_CTX_new()
+    void HMAC_CTX_free(HMAC_CTX *a)
+
     int HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int key_len, const EVP_MD *md, ENGINE *impl)
     int HMAC_Update(HMAC_CTX *ctx, const unsigned char *data, int len)
     int HMAC_Final(HMAC_CTX *ctx, unsigned char *md, unsigned int *len)
@@ -183,7 +186,7 @@ cdef class AES256_CTR_HMAC_SHA256:
     # Layout: HEADER + HMAC 32 + IV 8 + CT (same as attic / borg < 1.2 IF HEADER = TYPE_BYTE, no AAD)
 
     cdef EVP_CIPHER_CTX *ctx
-    cdef HMAC_CTX hmac_ctx
+    cdef HMAC_CTX *hmac_ctx
     cdef unsigned char *mac_key
     cdef unsigned char *enc_key
     cdef unsigned char iv[16]
@@ -200,11 +203,11 @@ cdef class AES256_CTR_HMAC_SHA256:
 
     def __cinit__(self, mac_key, enc_key, iv=None):
         self.ctx = EVP_CIPHER_CTX_new()
-        HMAC_CTX_init(&self.hmac_ctx) # XXX
+        self.hmac_ctx = HMAC_CTX_new()
 
     def __dealloc__(self):
         EVP_CIPHER_CTX_free(self.ctx)
-        HMAC_CTX_cleanup(&self.hmac_ctx) # XXX
+        HMAC_CTX_free(self.hmac_ctx)
 
     def encrypt(self, data, header=b'', aad_offset=0):
         """
@@ -241,13 +244,13 @@ cdef class AES256_CTR_HMAC_SHA256:
             if not rc:
                 raise CryptoError('EVP_EncryptFinal_ex failed')
             offset += olen
-            if not HMAC_Init_ex(&self.hmac_ctx, self.mac_key, 32, EVP_sha256(), NULL):
+            if not HMAC_Init_ex(self.hmac_ctx, self.mac_key, 32, EVP_sha256(), NULL):
                 raise CryptoError('HMAC_Init_ex failed')
-            if not HMAC_Update(&self.hmac_ctx, <const unsigned char *> hdata.buf+aoffset, alen):
+            if not HMAC_Update(self.hmac_ctx, <const unsigned char *> hdata.buf+aoffset, alen):
                 raise CryptoError('HMAC_Update failed')
-            if not HMAC_Update(&self.hmac_ctx, odata+hlen+32, offset-hlen-32):
+            if not HMAC_Update(self.hmac_ctx, odata+hlen+32, offset-hlen-32):
                 raise CryptoError('HMAC_Update failed')
-            if not HMAC_Final(&self.hmac_ctx, odata+hlen, NULL):
+            if not HMAC_Final(self.hmac_ctx, odata+hlen, NULL):
                 raise CryptoError('HMAC_Final failed')
             self.blocks += num_aes_blocks(ilen)
             return odata[:offset]
@@ -272,13 +275,13 @@ cdef class AES256_CTR_HMAC_SHA256:
         cdef unsigned char hmac_buf[32]
         cdef Py_buffer idata = ro_buffer(envelope)
         try:
-            if not HMAC_Init_ex(&self.hmac_ctx, self.mac_key, 32, EVP_sha256(), NULL):
+            if not HMAC_Init_ex(self.hmac_ctx, self.mac_key, 32, EVP_sha256(), NULL):
                 raise CryptoError('HMAC_Init_ex failed')
-            if not HMAC_Update(&self.hmac_ctx, <const unsigned char *> idata.buf+aoffset, alen):
+            if not HMAC_Update(self.hmac_ctx, <const unsigned char *> idata.buf+aoffset, alen):
                 raise CryptoError('HMAC_Update failed')
-            if not HMAC_Update(&self.hmac_ctx, <const unsigned char *> idata.buf+hlen+32, ilen-hlen-32):
+            if not HMAC_Update(self.hmac_ctx, <const unsigned char *> idata.buf+hlen+32, ilen-hlen-32):
                 raise CryptoError('HMAC_Update failed')
-            if not HMAC_Final(&self.hmac_ctx, hmac_buf, NULL):
+            if not HMAC_Final(self.hmac_ctx, hmac_buf, NULL):
                 raise CryptoError('HMAC_Final failed')
             if CRYPTO_memcmp(hmac_buf, idata.buf+hlen, 32):
                 raise IntegrityError('HMAC Authentication failed')

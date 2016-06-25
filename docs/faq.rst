@@ -186,6 +186,24 @@ stops after a while (some minutes, hours, ... - not immediately) with
 
 That's a good question and we are trying to find a good answer in :issue:`636`.
 
+Why am I seeing idle borg serve processes on the repo server?
+-------------------------------------------------------------
+
+Maybe the ssh connection between client and server broke down and that was not
+yet noticed on the server. Try these settings:
+
+::
+
+    # /etc/ssh/sshd_config on borg repo server - kill connection to client
+    # after ClientAliveCountMax * ClientAliveInterval seconds with no response
+    ClientAliveInterval 20
+    ClientAliveCountMax 3
+
+If you have multiple borg create ... ; borg create ... commands in a already
+serialized way in a single script, you need to give them --lock-wait N (with N
+being a bit more than the time the server needs to terminate broken down
+connections and release the lock).
+
 The borg cache eats way too much disk space, what can I do?
 -----------------------------------------------------------
 
@@ -223,17 +241,23 @@ Yes, |project_name| supports resuming backups.
 
 During a backup a special checkpoint archive named ``<archive-name>.checkpoint``
 is saved every checkpoint interval (the default value for this is 5
-minutes) containing all the data backed-up until that point. This checkpoint
-archive is a valid archive, but it is only a partial backup. Having it
-in the repo until a successful, full backup is completed is useful because it
-references all the transmitted chunks up to the checkpoint time. This means
-that at most <checkpoint interval> worth of data needs to be retransmitted
-if you restart the backup.
+minutes) containing all the data backed-up until that point.
+
+Checkpoints only happen between files (so they don't help for interruptions
+happening while a very large file is being processed).
+
+This checkpoint archive is a valid archive (all files in it are valid and complete),
+but it is only a partial backup (not all files that you wanted to backup are
+contained in it). Having it in the repo until a successful, full backup is
+completed is useful because it references all the transmitted chunks up
+to the checkpoint. This means that in case of an interruption, you only need to
+retransfer the data since the last checkpoint.
 
 If a backup was interrupted, you do not need to do any special considerations,
 just invoke ``borg create`` as you always do. You may use the same archive name
 as in previous attempt or a different one (e.g. if you always include the current
 datetime), it does not matter.
+
 |project_name| always does full single-pass backups, so it will start again
 from the beginning - but it will be much faster, because some of the data was
 already stored into the repo (and is still referenced by the checkpoint
@@ -242,6 +266,28 @@ archive), so it does not need to get transmitted and stored again.
 Once your backup has finished successfully, you can delete all
 ``<archive-name>.checkpoint`` archives. If you run ``borg prune``, it will
 also care for deleting unneeded checkpoints.
+
+How can I backup huge file(s) over a instable connection?
+---------------------------------------------------------
+
+You can use this "split trick" as a workaround for the in-between-files-only
+checkpoints (see above), huge files and a instable connection to the repository:
+
+Split the huge file(s) into parts of manageable size (e.g. 100MB) and create
+a temporary archive of them. Borg will create checkpoints now more frequently
+than if you try to backup the files in their original form (e.g. 100GB).
+
+After that, you can remove the parts again and backup the huge file(s) in
+their original form. This will now work a lot faster as a lot of content chunks
+are already in the repository.
+
+After you have successfully backed up the huge original file(s), you can remove
+the temporary archive you made from the parts.
+
+We realize that this is just a better-than-nothing workaround, see :issue:`1198`
+for a potential solution.
+
+Please note that this workaround only helps you for backup, not for restore.
 
 If it crashes with a UnicodeError, what can I do?
 -------------------------------------------------

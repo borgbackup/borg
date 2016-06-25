@@ -1,0 +1,5 @@
+# Please note:
+# attic only builds using OpenSSL 1.0.x, it can not be installed using OpenSSL >= 1.1.0.
+# If attic is not installed, our unit tests will just skip the tests that require attic.
+attic
+

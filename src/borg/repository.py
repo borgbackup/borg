@@ -176,7 +176,9 @@ class Repository:
         shutil.rmtree(self.path)
 
     def get_index_transaction_id(self):
-        indices = sorted((int(name[6:]) for name in os.listdir(self.path) if name.startswith('index.') and name[6:].isdigit()))
+        indices = sorted(int(fn[6:])
+                         for fn in os.listdir(self.path)
+                         if fn.startswith('index.') and fn[6:].isdigit() and os.stat(os.path.join(self.path, fn)).st_size != 0)
         if indices:
             return indices[-1]
         else:

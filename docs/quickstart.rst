@@ -103,10 +103,11 @@ Automating backups
 
 The following example script backs up ``/home`` and ``/var/www`` to a remote
 server. The script also uses the :ref:`borg_prune` subcommand to maintain a
-certain number of old archives::
+certain number of old archives:
+
+::
 
     #!/bin/sh
-
     # setting this, so the repo does not need to be given on the commandline:
     export BORG_REPO=username@remoteserver.com:backup
 
@@ -115,18 +116,18 @@ certain number of old archives::
     export BORG_PASSPHRASE=mysecret
 
     # Backup most important stuff:
-    borg create --stats -C lz4 ::`hostname`-`date +%Y-%m-%d` \
-        /etc                                                    \
-        /home                                                   \
-        /var                                                    \
-        --exclude '/home/*/.cache'                              \
+    borg create --stats -C lz4 ::'{hostname}-{now:%Y-%m-%d}' \
+        /etc                                                 \
+        /home                                                \
+        /var                                                 \
+        --exclude '/home/*/.cache'                           \
         --exclude '*.pyc'
 
     # Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
-    # archives of THIS machine. Using --prefix is very important to
+    # archives of THIS machine. The '{hostname}-' prefix is very important to
     # limit prune's operation to this machine's archives and not apply to
     # other machine's archives also.
-    borg prune -v --prefix `hostname`- \
+    borg prune -v --prefix '{hostname}-' \
         --keep-daily=7 --keep-weekly=4 --keep-monthly=6
 
 .. backup_compression:

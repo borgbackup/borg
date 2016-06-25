@@ -28,7 +28,7 @@ from .cache import Cache
 from .constants import *  # NOQA
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError
-from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
+from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec, PrefixSpec
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter, format_time, format_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex
 from .helpers import prune_within, prune_split
@@ -1079,35 +1079,68 @@ class Archiver:
         whitespace removal paths with whitespace at the beginning or end can only be
         excluded using regular expressions.
 
-        Examples:
+        Examples::
 
-        # Exclude '/home/user/file.o' but not '/home/user/file.odt':
-        $ borg create -e '*.o' backup /
+            # Exclude '/home/user/file.o' but not '/home/user/file.odt':
+            $ borg create -e '*.o' backup /
 
-        # Exclude '/home/user/junk' and '/home/user/subdir/junk' but
-        # not '/home/user/importantjunk' or '/etc/junk':
-        $ borg create -e '/home/*/junk' backup /
+            # Exclude '/home/user/junk' and '/home/user/subdir/junk' but
+            # not '/home/user/importantjunk' or '/etc/junk':
+            $ borg create -e '/home/*/junk' backup /
 
-        # Exclude the contents of '/home/user/cache' but not the directory itself:
-        $ borg create -e /home/user/cache/ backup /
+            # Exclude the contents of '/home/user/cache' but not the directory itself:
+            $ borg create -e /home/user/cache/ backup /
 
-        # The file '/home/user/cache/important' is *not* backed up:
-        $ borg create -e /home/user/cache/ backup / /home/user/cache/important
+            # The file '/home/user/cache/important' is *not* backed up:
+            $ borg create -e /home/user/cache/ backup / /home/user/cache/important
 
-        # The contents of directories in '/home' are not backed up when their name
-        # ends in '.tmp'
-        $ borg create --exclude 're:^/home/[^/]+\.tmp/' backup /
+            # The contents of directories in '/home' are not backed up when their name
+            # ends in '.tmp'
+            $ borg create --exclude 're:^/home/[^/]+\.tmp/' backup /
 
-        # Load exclusions from file
-        $ cat >exclude.txt <<EOF
-        # Comment line
-        /home/*/junk
-        *.tmp
-        fm:aa:something/*
-        re:^/home/[^/]\.tmp/
-        sh:/home/*/.thumbnails
-        EOF
-        $ borg create --exclude-from exclude.txt backup /
+            # Load exclusions from file
+            $ cat >exclude.txt <<EOF
+            # Comment line
+            /home/*/junk
+            *.tmp
+            fm:aa:something/*
+            re:^/home/[^/]\.tmp/
+            sh:/home/*/.thumbnails
+            EOF
+            $ borg create --exclude-from exclude.txt backup /
+        ''')
+    helptext['placeholders'] = textwrap.dedent('''
+        Repository (or Archive) URLs and --prefix values support these placeholders:
+
+        {hostname}
+
+            The (short) hostname of the machine.
+
+        {fqdn}
+
+            The full name of the machine.
+
+        {now}
+
+            The current local date and time.
+
+        {utcnow}
+
+            The current UTC date and time.
+
+        {user}
+
+            The user name (or UID, if no name is available) of the user running borg.
+
+        {pid}
+
+            The current process ID.
+
+        Examples::
+
+            borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
+            borg create /path/to/repo::{hostname}-{now:%Y-%m-%d_%H:%M:%S} ...
+            borg prune --prefix '{hostname}-' ...
         ''')
 
     def do_help(self, parser, commands, args):
@@ -1321,7 +1354,7 @@ class Archiver:
         subparser.add_argument('--last', dest='last',
                                type=int, default=None, metavar='N',
                                help='only check last N archives (Default: all)')
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec,
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('-p', '--progress', dest='progress',
                                action='store_true', default=False,
@@ -1385,6 +1418,7 @@ class Archiver:
         all files on these file systems.
 
         See the output of the "borg help patterns" command for more help on exclude patterns.
+        See the output of the "borg help placeholders" command for more help on placeholders.
         """)
 
         subparser = subparsers.add_parser('create', parents=[common_parser], add_help=False,
@@ -1645,7 +1679,7 @@ class Archiver:
         subparser.add_argument('--format', '--list-format', dest='format', type=str,
                                help="""specify format for file listing
                                 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")""")
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec,
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=parse_pattern, action='append',
@@ -1794,7 +1828,7 @@ class Archiver:
                                help='number of monthly archives to keep')
         subparser.add_argument('-y', '--keep-yearly', dest='yearly', type=int, default=0,
                                help='number of yearly archives to keep')
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=str,
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec,
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
@@ -2177,7 +2211,15 @@ def main():  # pragma: no cover
     setup_signal_handlers()
     archiver = Archiver()
     msg = None
-    args = archiver.get_args(sys.argv, os.environ.get('SSH_ORIGINAL_COMMAND'))
+    try:
+        args = archiver.get_args(sys.argv, os.environ.get('SSH_ORIGINAL_COMMAND'))
+    except Error as e:
+        msg = e.get_message()
+        if e.traceback:
+            msg += "\n%s\n%s" % (traceback.format_exc(), sysinfo())
+        # we might not have logging setup yet, so get out quickly
+        print(msg, file=sys.stderr)
+        sys.exit(e.exit_code)
     try:
         exit_code = archiver.run(args)
     except Error as e:

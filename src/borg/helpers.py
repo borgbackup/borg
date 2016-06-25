@@ -88,6 +88,10 @@ class NoManifestError(Error):
     """Repository has no manifest."""
 
 
+class PlaceholderError(Error):
+    """Formatting Error: "{}".format({}): {}({})"""
+
+
 def check_extension_modules():
     from . import platform
     if hashindex.API_VERSION != 2:
@@ -509,6 +513,10 @@ def CompressionSpec(s):
     raise ValueError
 
 
+def PrefixSpec(s):
+    return replace_placeholders(s)
+
+
 def dir_is_cachedir(path):
     """Determines whether the specified path is a cache directory (and
     therefore should potentially be excluded from the backup) according to
@@ -560,18 +568,25 @@ def partial_format(format, mapping):
 
 
 def format_line(format, data):
-    # TODO: Filter out unwanted properties of str.format(), because "format" is user provided.
-
     try:
         return format.format(**data)
-    except (KeyError, ValueError) as e:
-        # this should catch format errors
-        print('Error in lineformat: "{}" - reason "{}"'.format(format, str(e)))
     except Exception as e:
-        # something unexpected, print error and raise exception
-        print('Error in lineformat: "{}" - reason "{}"'.format(format, str(e)))
-        raise
-    return ''
+        raise PlaceholderError(format, data, e.__class__.__name__, str(e))
+
+
+def replace_placeholders(text):
+    """Replace placeholders in text with their values."""
+    current_time = datetime.now()
+    data = {
+        'pid': os.getpid(),
+        'fqdn': socket.getfqdn(),
+        'hostname': socket.gethostname(),
+        'now': current_time.now(),
+        'utcnow': current_time.utcnow(),
+        'user': uid2user(os.getuid(), os.getuid()),
+        'uuid4': str(uuid.uuid4()),
+    }
+    return format_line(text, data)
 
 
 def safe_timestamp(item_timestamp_ns):
@@ -744,22 +759,8 @@ class Location:
         if not self.parse(self.orig):
             raise ValueError
 
-    def preformat_text(self, text):
-        """Format repository and archive path with common tags"""
-        current_time = datetime.now()
-        data = {
-            'pid': os.getpid(),
-            'fqdn': socket.getfqdn(),
-            'hostname': socket.gethostname(),
-            'now': current_time.now(),
-            'utcnow': current_time.utcnow(),
-            'user': uid2user(os.getuid(), os.getuid()),
-            'uuid4': str(uuid.uuid4())
-            }
-        return format_line(text, data)
-
     def parse(self, text):
-        text = self.preformat_text(text)
+        text = replace_placeholders(text)
         valid = self._parse(text)
         if valid:
             return True

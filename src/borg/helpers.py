@@ -22,7 +22,7 @@ from collections import namedtuple, deque, abc
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
-from functools import wraps, partial
+from functools import wraps, partial, lru_cache
 from itertools import islice
 from operator import attrgetter
 from string import Formatter
@@ -722,17 +722,7 @@ def format_archive(archive):
     )
 
 
-def memoize(function):
-    cache = {}
-
-    def decorated_function(*args):
-        try:
-            return cache[args]
-        except KeyError:
-            val = function(*args)
-            cache[args] = val
-            return val
-    return decorated_function
+memoize = lru_cache(maxsize=None)
 
 
 class Buffer:

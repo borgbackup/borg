@@ -714,20 +714,19 @@ Number of files: {0.stats.nfiles}'''.format(
 
     def process_stdin(self, path, cache):
         uid, gid = 0, 0
-        fd = sys.stdin.buffer  # binary
-        chunks = []
-        for data in backup_io_iter(self.chunker.chunkify(fd)):
-            chunks.append(cache.add_chunk(self.key.id_hash(data), Chunk(data), self.stats))
-        self.stats.nfiles += 1
         t = int(time.time()) * 1000000000
         item = Item(
             path=path,
-            chunks=chunks,
             mode=0o100660,  # regular file, ug=rw
             uid=uid, user=uid2user(uid),
             gid=gid, group=gid2group(gid),
             mtime=t, atime=t, ctime=t,
         )
+        fd = sys.stdin.buffer  # binary
+        item.chunks = []
+        for data in backup_io_iter(self.chunker.chunkify(fd)):
+            item.chunks.append(cache.add_chunk(self.key.id_hash(data), Chunk(data), self.stats))
+        self.stats.nfiles += 1
         self.add_item(item)
         return 'i'  # stdin
 

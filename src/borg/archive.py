@@ -773,15 +773,17 @@ Number of files: {0.stats.nfiles}'''.format(
         )
         item.update(self.stat_simple_attrs(st))
         # Only chunkify the file if needed
-        if chunks is None:
+        if chunks is not None:
+            item.chunks = chunks
+        else:
             compress = self.compression_decider1.decide(path)
             logger.debug('%s -> compression %s', path, compress['name'])
             with backup_io():
                 fh = Archive._open_rb(path)
             with os.fdopen(fh, 'rb') as fd:
-                chunks = []
+                item.chunks = []
                 for data in backup_io_iter(self.chunker.chunkify(fd, fh)):
-                    chunks.append(cache.add_chunk(self.key.id_hash(data),
+                    item.chunks.append(cache.add_chunk(self.key.id_hash(data),
                                                   Chunk(data, compress=compress),
                                                   self.stats))
                     if self.show_progress:
@@ -789,9 +791,8 @@ Number of files: {0.stats.nfiles}'''.format(
             if not is_special_file:
                 # we must not memorize special files, because the contents of e.g. a
                 # block or char device will change without its mtime/size/inode changing.
-                cache.memorize_file(path_hash, st, [c.id for c in chunks])
+                cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
             status = status or 'M'  # regular file, modified (if not 'A' already)
-        item.chunks = chunks
         item.update(self.stat_attrs(st, path))
         if is_special_file:
             # we processed a special file like a regular file. reflect that in mode,

@@ -130,10 +130,10 @@ class Item(PropDict):
     user = PropDict._make_property('user', (str, type(None)), 'surrogate-escaped str or None', encode=safe_encode, decode=safe_decode)
     group = PropDict._make_property('group', (str, type(None)), 'surrogate-escaped str or None', encode=safe_encode, decode=safe_decode)
 
-    acl_access = PropDict._make_property('acl_access', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    acl_default = PropDict._make_property('acl_default', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    acl_extended = PropDict._make_property('acl_extended', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    acl_nfs4 = PropDict._make_property('acl_nfs4', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    acl_access = PropDict._make_property('acl_access', bytes)
+    acl_default = PropDict._make_property('acl_default', bytes)
+    acl_extended = PropDict._make_property('acl_extended', bytes)
+    acl_nfs4 = PropDict._make_property('acl_nfs4', bytes)
 
     mode = PropDict._make_property('mode', int)
     uid = PropDict._make_property('uid', int)

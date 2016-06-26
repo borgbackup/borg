@@ -327,8 +327,12 @@ Number of files: {0.stats.nfiles}'''.format(
     def __repr__(self):
         return 'Archive(%r)' % self.name
 
+    def item_filter(self, item, filter=None):
+        return 'checkpoint' not in item and (filter(item) if filter else True)
+
     def iter_items(self, filter=None, preload=False):
-        for item in self.pipeline.unpack_many(self.metadata[b'items'], filter=filter, preload=preload):
+        for item in self.pipeline.unpack_many(self.metadata[b'items'], preload=preload,
+                                              filter=lambda item: self.item_filter(item, filter)):
             yield item
 
     def add_item(self, item, show_progress=True):

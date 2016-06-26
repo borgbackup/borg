@@ -96,7 +96,7 @@ cdef class AES:
     cdef EVP_CIPHER_CTX *ctx
     cdef int is_encrypt
     cdef unsigned char iv_orig[16]
-    cdef int blocks
+    cdef long long blocks
 
     def __cinit__(self, is_encrypt, key, iv=None):
         self.ctx = EVP_CIPHER_CTX_new()

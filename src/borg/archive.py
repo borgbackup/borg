@@ -651,17 +651,24 @@ Number of files: {0.stats.nfiles}'''.format(
             logger.warning('forced deletion succeeded, but the deleted archive was corrupted.')
             logger.warning('borg check --repair is required to free all space.')
 
-    def stat_attrs(self, st, path):
+    def stat_simple_attrs(self, st):
         attrs = dict(
             mode=st.st_mode,
-            uid=st.st_uid, user=uid2user(st.st_uid),
-            gid=st.st_gid, group=gid2group(st.st_gid),
+            uid=st.st_uid,
+            gid=st.st_gid,
             atime=st.st_atime_ns,
             ctime=st.st_ctime_ns,
             mtime=st.st_mtime_ns,
         )
         if self.numeric_owner:
             attrs['user'] = attrs['group'] = None
+        else:
+            attrs['user'] = uid2user(st.st_uid)
+            attrs['group'] = gid2group(st.st_gid)
+        return attrs
+
+    def stat_ext_attrs(self, st, path):
+        attrs = {}
         with backup_io():
             xattrs = xattr.get_all(path, follow_symlinks=False)
             bsdflags = get_flags(path, st)
@@ -670,6 +677,11 @@ Number of files: {0.stats.nfiles}'''.format(
             attrs['xattrs'] = StableDict(xattrs)
         if bsdflags:
             attrs['bsdflags'] = bsdflags
+        return attrs
+
+    def stat_attrs(self, st, path):
+        attrs = self.stat_simple_attrs(st)
+        attrs.update(self.stat_ext_attrs(st, path))
         return attrs
 
     def process_dir(self, path, st):
@@ -760,6 +772,7 @@ Number of files: {0.stats.nfiles}'''.format(
             path=safe_path,
             hardlink_master=st.st_nlink > 1,  # item is a hard link and has the chunks
         )
+        item.update(self.stat_simple_attrs(st))
         # Only chunkify the file if needed
         if chunks is None:
             compress = self.compression_decider1.decide(path)

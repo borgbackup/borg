@@ -155,6 +155,8 @@ class Item(PropDict):
     deleted = PropDict._make_property('deleted', bool)
     nlink = PropDict._make_property('nlink', int)
 
+    checkpoint = PropDict._make_property('checkpoint', int)
+
 
 class EncryptedKey(PropDict):
     """

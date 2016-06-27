@@ -1,4 +1,5 @@
 from binascii import hexlify
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from getpass import getuser
 from itertools import groupby
@@ -43,6 +44,37 @@ has_lchflags = hasattr(os, 'lchflags')
 
 flags_normal = os.O_RDONLY | getattr(os, 'O_BINARY', 0)
 flags_noatime = flags_normal | getattr(os, 'O_NOATIME', 0)
+
+
+class InputOSError(Exception):
+    """Wrapper for OSError raised while accessing input files."""
+    def __init__(self, os_error):
+        self.os_error = os_error
+        self.errno = os_error.errno
+        self.strerror = os_error.strerror
+        self.filename = os_error.filename
+
+    def __str__(self):
+        return str(self.os_error)
+
+
+@contextmanager
+def input_io():
+    """Context manager changing OSError to InputOSError."""
+    try:
+        yield
+    except OSError as os_error:
+        raise InputOSError(os_error) from os_error
+
+
+def input_io_iter(iterator):
+    while True:
+        try:
+            with input_io():
+                item = next(iterator)
+        except StopIteration:
+            return
+        yield item
 
 
 class DownloadPipeline:
@@ -464,12 +496,14 @@ Number of files: {0.stats.nfiles}'''.format(
         }
         if self.numeric_owner:
             item[b'user'] = item[b'group'] = None
-        xattrs = xattr.get_all(path, follow_symlinks=False)
+        with input_io():
+            xattrs = xattr.get_all(path, follow_symlinks=False)
         if xattrs:
             item[b'xattrs'] = StableDict(xattrs)
         if has_lchflags and st.st_flags:
             item[b'bsdflags'] = st.st_flags
-        acl_get(path, item, st, self.numeric_owner)
+        with input_io():
+            acl_get(path, item, st, self.numeric_owner)
         return item
 
     def process_dir(self, path, st):
@@ -504,7 +538,7 @@ Number of files: {0.stats.nfiles}'''.format(
         uid, gid = 0, 0
         fd = sys.stdin.buffer  # binary
         chunks = []
-        for chunk in self.chunker.chunkify(fd):
+        for chunk in input_io_iter(self.chunker.chunkify(fd)):
             chunks.append(cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats))
         self.stats.nfiles += 1
         t = int_to_bigint(int(time.time()) * 1000000000)
@@ -552,10 +586,11 @@ Number of files: {0.stats.nfiles}'''.format(
         item = {b'path': safe_path}
         # Only chunkify the file if needed
         if chunks is None:
-            fh = Archive._open_rb(path)
+            with input_io():
+                fh = Archive._open_rb(path)
             with os.fdopen(fh, 'rb') as fd:
                 chunks = []
-                for chunk in self.chunker.chunkify(fd, fh):
+                for chunk in input_io_iter(self.chunker.chunkify(fd, fh)):
                     chunks.append(cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats))
                     if self.show_progress:
                         self.stats.show_progress(item=item, dt=0.2)

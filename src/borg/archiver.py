@@ -1487,8 +1487,8 @@ class Archiver:
                                    help='manually specify the archive creation date/time (UTC). '
                                         'alternatively, give a reference file/directory.')
         archive_group.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
-                                   type=int, default=300, metavar='SECONDS',
-                                   help='write checkpoint every SECONDS seconds (Default: 300)')
+                                   type=int, default=1800, metavar='SECONDS',
+                                   help='write checkpoint every SECONDS seconds (Default: 1800)')
         archive_group.add_argument('--chunker-params', dest='chunker_params',
                                    type=ChunkerParams, default=CHUNKER_PARAMS,
                                    metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',

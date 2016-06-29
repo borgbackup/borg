@@ -446,6 +446,8 @@ prefix "foo" if you do not also want to match "foobar".
 It is strongly recommended to always run ``prune --dry-run ...`` first so you
 will see what it would do without it actually doing anything.
 
+There is also a visualized prune example in ``docs/misc/prune-example.txt``.
+
 ::
 
     # Keep 7 end of day and 4 additional end of week archives.

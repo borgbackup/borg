@@ -109,7 +109,6 @@ def packages_openbsd
     pkg_add lz4
     # pkg_add fuse  # does not install, sdl dependency missing
     pkg_add git  # no fakeroot
-    pkg_add python-3.4.2
     pkg_add py3-setuptools
     ln -sf /usr/local/bin/python3.4 /usr/local/bin/python3
     ln -sf /usr/local/bin/python3.4 /usr/local/bin/python
@@ -166,7 +165,7 @@ def install_pythons(boxname)
     . ~/.bash_profile
     pyenv install 3.4.0  # tests
     pyenv install 3.5.0  # tests
-    pyenv install 3.5.1  # binary build, use latest 3.5.x release
+    pyenv install 3.5.2  # binary build, use latest 3.5.x release
     pyenv rehash
   EOF
 end
@@ -184,8 +183,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.5 release
-    pyenv global 3.5.1
-    pyenv virtualenv 3.5.1 borg-env
+    pyenv global 3.5.2
+    pyenv virtualenv 3.5.2 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -204,6 +203,22 @@ def install_borg(boxname)
     pip install -r requirements.d/development.txt
     # by using [fuse], setup.py can handle different fuse requirements:
     pip install -e .[fuse]
+  EOF
+end
+
+def install_borg_no_fuse(boxname)
+  return <<-EOF
+    . ~/.bash_profile
+    cd /vagrant/borg
+    . borg-env/bin/activate
+    pip install -U wheel  # upgrade wheel, too old for 3.5
+    cd borg
+    # clean up (wrong/outdated) stuff we likely got via rsync:
+    rm -f borg/*.so borg/*.cpy*
+    rm -f borg/{chunker,crypto,compress,hashindex,platform_linux}.c
+    rm -rf borg/__pycache__ borg/support/__pycache__ borg/testsuite/__pycache__
+    pip install -r requirements.d/development.txt
+    pip install -e .
   EOF
 end
 
@@ -417,13 +432,13 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd64" do |b|
-    b.vm.box = "bodgit/openbsd-5.7-amd64"
+    b.vm.box = "kaorimatz/openbsd-5.9-amd64"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
     b.vm.provision "packages openbsd", :type => :shell, :inline => packages_openbsd
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openbsd64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("openbsd64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("openbsd64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openbsd64")
   end
 

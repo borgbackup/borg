@@ -24,6 +24,7 @@ logger = create_logger()
 from . import __version__
 from . import helpers
 from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics
+from .archive import InputOSError, CHUNKER_PARAMS
 from .cache import Cache
 from .constants import *  # NOQA
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
@@ -254,7 +255,7 @@ class Archiver:
                     if not dry_run:
                         try:
                             status = archive.process_stdin(path, cache)
-                        except OSError as e:
+                        except InputOSError as e:
                             status = 'E'
                             self.print_warning('%s: %s', path, e)
                     else:
@@ -312,7 +313,15 @@ class Archiver:
             return
         if st is None:
             try:
-                st = os.lstat(path)
+                # usually, do not follow symlinks (if we have a symlink, we want to
+                # backup it as such).
+                # but if we are in --read-special mode, we later process <path> as
+                # a regular file (we open and read the symlink target file's content).
+                # thus, in read_special mode, we also want to stat the symlink target
+                # file, for consistency. if we did not, we also have issues extracting
+                # this file, as it would be in the archive as a symlink, not as the
+                # target's file type (which could be e.g. a block device).
+                st = os.stat(path, follow_symlinks=read_special)
             except OSError as e:
                 self.print_warning('%s: %s', path, e)
                 return
@@ -330,7 +339,7 @@ class Archiver:
             if not dry_run:
                 try:
                     status = archive.process_file(path, st, cache, self.ignore_inode)
-                except OSError as e:
+                except InputOSError as e:
                     status = 'E'
                     self.print_warning('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):

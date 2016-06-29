@@ -256,7 +256,15 @@ class Archiver:
             return
 
         try:
-            st = os.lstat(path)
+            # usually, do not follow symlinks (if we have a symlink, we want to
+            # backup it as such).
+            # but if we are in --read-special mode, we later process <path> as
+            # a regular file (we open and read the symlink target file's content).
+            # thus, in read_special mode, we also want to stat the symlink target
+            # file, for consistency. if we did not, we also have issues extracting
+            # this file, as it would be in the archive as a symlink, not as the
+            # target's file type (which could be e.g. a block device).
+            st = os.stat(path, follow_symlinks=read_special)
         except OSError as e:
             self.print_warning('%s: %s', path, e)
             return

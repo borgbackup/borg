@@ -5,7 +5,7 @@ import msgpack
 import pytest
 
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_dict, ITEM_KEYS
-from ..archive import InputOSError, input_io, input_io_iter
+from ..archive import BackupOSError, backup_io, input_io_iter
 from ..key import PlaintextKey
 from ..helpers import Manifest
 from . import BaseTestCase
@@ -148,13 +148,13 @@ def test_key_length_msgpacked_items():
     assert valid_msgpacked_dict(msgpack.packb(data), item_keys_serialized)
 
 
-def test_input_io():
-    with pytest.raises(InputOSError):
-        with input_io():
+def test_backup_io():
+    with pytest.raises(BackupOSError):
+        with backup_io():
             raise OSError(123)
 
 
-def test_input_io_iter():
+def test_backup_io_iter():
     class Iterator:
         def __init__(self, exc):
             self.exc = exc
@@ -163,7 +163,7 @@ def test_input_io_iter():
             raise self.exc()
 
     oserror_iterator = Iterator(OSError)
-    with pytest.raises(InputOSError):
+    with pytest.raises(BackupOSError):
         for _ in input_io_iter(oserror_iterator):
             pass
 

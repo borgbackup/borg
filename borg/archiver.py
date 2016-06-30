@@ -29,7 +29,7 @@ from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache
 from .key import key_creator, RepoKey, PassphraseKey
-from .archive import input_io, InputOSError, Archive, ArchiveChecker, CHUNKER_PARAMS
+from .archive import backup_io, BackupOSError, Archive, ArchiveChecker, CHUNKER_PARAMS
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 
 has_lchflags = hasattr(os, 'lchflags')
@@ -198,7 +198,7 @@ class Archiver:
                     if not dry_run:
                         try:
                             status = archive.process_stdin(path, cache)
-                        except InputOSError as e:
+                        except BackupOSError as e:
                             status = 'E'
                             self.print_warning('%s: %s', path, e)
                     else:
@@ -281,7 +281,7 @@ class Archiver:
             if not dry_run:
                 try:
                     status = archive.process_file(path, st, cache, self.ignore_inode)
-                except InputOSError as e:
+                except BackupOSError as e:
                     status = 'E'
                     self.print_warning('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):

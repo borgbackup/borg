@@ -46,7 +46,7 @@ flags_normal = os.O_RDONLY | getattr(os, 'O_BINARY', 0)
 flags_noatime = flags_normal | getattr(os, 'O_NOATIME', 0)
 
 
-class InputOSError(Exception):
+class BackupOSError(Exception):
     """Wrapper for OSError raised while accessing input files."""
     def __init__(self, os_error):
         self.os_error = os_error
@@ -59,18 +59,18 @@ class InputOSError(Exception):
 
 
 @contextmanager
-def input_io():
-    """Context manager changing OSError to InputOSError."""
+def backup_io():
+    """Context manager changing OSError to BackupOSError."""
     try:
         yield
     except OSError as os_error:
-        raise InputOSError(os_error) from os_error
+        raise BackupOSError(os_error) from os_error
 
 
 def input_io_iter(iterator):
     while True:
         try:
-            with input_io():
+            with backup_io():
                 item = next(iterator)
         except StopIteration:
             return
@@ -496,13 +496,13 @@ Number of files: {0.stats.nfiles}'''.format(
         }
         if self.numeric_owner:
             item[b'user'] = item[b'group'] = None
-        with input_io():
+        with backup_io():
             xattrs = xattr.get_all(path, follow_symlinks=False)
         if xattrs:
             item[b'xattrs'] = StableDict(xattrs)
         if has_lchflags and st.st_flags:
             item[b'bsdflags'] = st.st_flags
-        with input_io():
+        with backup_io():
             acl_get(path, item, st, self.numeric_owner)
         return item
 
@@ -586,7 +586,7 @@ Number of files: {0.stats.nfiles}'''.format(
         item = {b'path': safe_path}
         # Only chunkify the file if needed
         if chunks is None:
-            with input_io():
+            with backup_io():
                 fh = Archive._open_rb(path)
             with os.fdopen(fh, 'rb') as fd:
                 chunks = []

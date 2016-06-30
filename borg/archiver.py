@@ -389,7 +389,11 @@ class Archiver:
 
         if not args.dry_run:
             while dirs:
-                archive.extract_item(dirs.pop(-1))
+                dir_item = dirs.pop(-1)
+                try:
+                    archive.extract_item(dir_item)
+                except BackupOSError as e:
+                    self.print_warning('%s: %s', remove_surrogates(dir_item[b'path']), e)
         for pattern in include_patterns:
             if pattern.match_count == 0:
                 self.print_warning("Include pattern '%s' never matched.", pattern)

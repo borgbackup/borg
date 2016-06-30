@@ -727,8 +727,11 @@ class LoggedIO:
         fd = self.get_write_fd(no_new=True)
         header = self.header_no_crc_fmt.pack(self.header_fmt.size, TAG_COMMIT)
         crc = self.crc_fmt.pack(crc32(header) & 0xffffffff)
+        # first fsync(fd) here (to ensure data supposedly hits the disk before the commit tag)
+        fd.flush()
+        os.fsync(fd.fileno())
         fd.write(b''.join((crc, header)))
-        self.close_segment()
+        self.close_segment()  # after-commit fsync()
 
     def close_segment(self):
         if self._write_fd:

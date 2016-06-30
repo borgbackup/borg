@@ -372,7 +372,11 @@ class Archiver:
                     continue
             if not args.dry_run:
                 while dirs and not item[b'path'].startswith(dirs[-1][b'path']):
-                    archive.extract_item(dirs.pop(-1), stdout=stdout)
+                    dir_item = dirs.pop(-1)
+                    try:
+                        archive.extract_item(dir_item, stdout=stdout)
+                    except BackupOSError as e:
+                        self.print_warning('%s: %s', remove_surrogates(dir_item[b'path']), e)
             if output_list:
                 logger.info(remove_surrogates(orig_path))
             try:

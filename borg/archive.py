@@ -356,54 +356,68 @@ Number of files: {0.stats.nfiles}'''.format(
         mode = item[b'mode']
         if stat.S_ISREG(mode):
             if not os.path.exists(os.path.dirname(path)):
-                os.makedirs(os.path.dirname(path))
+                with backup_io():
+                    os.makedirs(os.path.dirname(path))
             # Hard link?
             if b'source' in item:
                 source = os.path.join(dest, item[b'source'])
-                if os.path.exists(path):
-                    os.unlink(path)
-                os.link(source, path)
+                with backup_io():
+                    if os.path.exists(path):
+                        os.unlink(path)
+                    os.link(source, path)
             else:
-                with open(path, 'wb') as fd:
+                with backup_io():
+                    fd = open(path, 'wb')
+                with fd:
                     ids = [c[0] for c in item[b'chunks']]
                     for data in self.pipeline.fetch_many(ids, is_preloaded=True):
-                        if sparse and self.zeros.startswith(data):
-                            # all-zero chunk: create a hole in a sparse file
-                            fd.seek(len(data), 1)
-                        else:
-                            fd.write(data)
-                    pos = fd.tell()
-                    fd.truncate(pos)
-                    fd.flush()
-                    self.restore_attrs(path, item, fd=fd.fileno())
-        elif stat.S_ISDIR(mode):
-            if not os.path.exists(path):
-                os.makedirs(path)
-            if restore_attrs:
+                        with backup_io():
+                            if sparse and self.zeros.startswith(data):
+                                # all-zero chunk: create a hole in a sparse file
+                                fd.seek(len(data), 1)
+                            else:
+                                fd.write(data)
+                    with backup_io():
+                        pos = fd.tell()
+                        fd.truncate(pos)
+                        fd.flush()
+                        self.restore_attrs(path, item, fd=fd.fileno())
+            return
+        with backup_io():
+            # No repository access beyond this point.
+            if stat.S_ISDIR(mode):
+                if not os.path.exists(path):
+                    os.makedirs(path)
+                if restore_attrs:
+                    self.restore_attrs(path, item)
+            elif stat.S_ISLNK(mode):
+                if not os.path.exists(os.path.dirname(path)):
+                    os.makedirs(os.path.dirname(path))
+                source = item[b'source']
+                if os.path.exists(path):
+                    os.unlink(path)
+                try:
+                    os.symlink(source, path)
+                except UnicodeEncodeError:
+                    raise self.IncompatibleFilesystemEncodingError(source, sys.getfilesystemencoding()) from None
+                self.restore_attrs(path, item, symlink=True)
+            elif stat.S_ISFIFO(mode):
+                if not os.path.exists(os.path.dirname(path)):
+                    os.makedirs(os.path.dirname(path))
+                os.mkfifo(path)
                 self.restore_attrs(path, item)
-        elif stat.S_ISLNK(mode):
-            if not os.path.exists(os.path.dirname(path)):
-                os.makedirs(os.path.dirname(path))
-            source = item[b'source']
-            if os.path.exists(path):
-                os.unlink(path)
-            try:
-                os.symlink(source, path)
-            except UnicodeEncodeError:
-                raise self.IncompatibleFilesystemEncodingError(source, sys.getfilesystemencoding()) from None
-            self.restore_attrs(path, item, symlink=True)
-        elif stat.S_ISFIFO(mode):
-            if not os.path.exists(os.path.dirname(path)):
-                os.makedirs(os.path.dirname(path))
-            os.mkfifo(path)
-            self.restore_attrs(path, item)
-        elif stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
-            os.mknod(path, item[b'mode'], item[b'rdev'])
-            self.restore_attrs(path, item)
-        else:
-            raise Exception('Unknown archive item type %r' % item[b'mode'])
+            elif stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
+                os.mknod(path, item[b'mode'], item[b'rdev'])
+                self.restore_attrs(path, item)
+            else:
+                raise Exception('Unknown archive item type %r' % item[b'mode'])
 
     def restore_attrs(self, path, item, symlink=False, fd=None):
+        """
+        Restore filesystem attributes on *path* from *item* (*fd*).
+
+        Does not access the repository.
+        """
         uid = gid = None
         if not self.numeric_owner:
             uid = user2uid(item[b'user'])

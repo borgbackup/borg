@@ -115,7 +115,7 @@ class Archiver:
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
         """
-        return RepositoryServer(restrict_to_paths=args.restrict_to_paths).serve()
+        return RepositoryServer(restrict_to_paths=args.restrict_to_paths, append_only=args.append_only).serve()
 
     @with_repository(create=True, exclusive=True, manifest=False)
     def do_init(self, args, repository):
@@ -916,6 +916,8 @@ class Archiver:
         subparser.set_defaults(func=self.do_serve)
         subparser.add_argument('--restrict-to-path', dest='restrict_to_paths', action='append',
                                metavar='PATH', help='restrict repository access to PATH')
+        subparser.add_argument('--append-only', dest='append_only', action='store_true',
+                               help='only allow appending to repository segment files')
         init_epilog = textwrap.dedent("""
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
@@ -1491,8 +1493,9 @@ class Archiver:
             if result.func != forced_result.func:
                 # someone is trying to execute a different borg subcommand, don't do that!
                 return forced_result
-            # the only thing we take from the forced "borg serve" ssh command is --restrict-to-path
+            # we only take specific options from the forced "borg serve" command:
             result.restrict_to_paths = forced_result.restrict_to_paths
+            result.append_only = forced_result.append_only
         return result
 
     def parse_args(self, args=None):

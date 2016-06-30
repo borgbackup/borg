@@ -53,7 +53,7 @@ class Repository:
     class ObjectNotFound(ErrorWithTraceback):
         """Object with key {} not found in repository {}."""
 
-    def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True):
+    def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True, append_only=False):
         self.path = os.path.abspath(path)
         self._location = Location('file://%s' % self.path)
         self.io = None
@@ -64,6 +64,7 @@ class Repository:
         self.do_lock = lock
         self.do_create = create
         self.exclusive = exclusive
+        self.append_only = append_only
 
     def __del__(self):
         if self.lock:
@@ -169,7 +170,9 @@ class Repository:
             raise self.InvalidRepository(path)
         self.max_segment_size = self.config.getint('repository', 'max_segment_size')
         self.segments_per_dir = self.config.getint('repository', 'segments_per_dir')
-        self.append_only = self.config.getboolean('repository', 'append_only', fallback=False)
+        # append_only can be set in the constructor
+        # it shouldn't be overridden (True -> False) here
+        self.append_only = self.append_only or self.config.getboolean('repository', 'append_only', fallback=False)
         self.id = unhexlify(self.config.get('repository', 'id').strip())
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
 

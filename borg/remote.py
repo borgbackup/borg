@@ -54,9 +54,10 @@ class RepositoryServer:  # pragma: no cover
         'break_lock',
     )
 
-    def __init__(self, restrict_to_paths):
+    def __init__(self, restrict_to_paths, append_only):
         self.repository = None
         self.restrict_to_paths = restrict_to_paths
+        self.append_only = append_only
 
     def serve(self):
         stdin_fd = sys.stdin.fileno()
@@ -123,7 +124,7 @@ class RepositoryServer:  # pragma: no cover
                     break
             else:
                 raise PathNotAllowed(path)
-        self.repository = Repository(path, create, lock_wait=lock_wait, lock=lock)
+        self.repository = Repository(path, create, lock_wait=lock_wait, lock=lock, append_only=self.append_only)
         self.repository.__enter__()  # clean exit handled by serve() method
         return self.repository.id
 

@@ -727,6 +727,13 @@ To activate append-only mode, edit the repository ``config`` file and add a line
 In append-only mode Borg will create a transaction log in the ``transactions`` file,
 where each line is a transaction and a UTC timestamp.
 
+In addition, ``borg serve`` can act as if a repository is in append-only mode with
+its option ``--append-only``. This can be very useful for fine-tuning access control
+in ``.ssh/authorized_keys`` ::
+
+    command="borg serve --append-only ..." ssh-rsa <key used for not-always-trustable backup clients>
+    command="borg serve ..." ssh-rsa <key used for backup management>
+
 Example
 +++++++
 

@@ -16,6 +16,7 @@ from .helpers import Error, ErrorWithTraceback, IntegrityError, Location, Progre
 from .hashindex import NSIndex
 from .locking import UpgradableLock, LockError, LockErrorT
 from .lrucache import LRUCache
+from .platform import sync_dir
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
 MAGIC = b'BORG_SEG'
@@ -600,6 +601,7 @@ class LoggedIO:
                 dirname = os.path.join(self.path, 'data', str(self.segment // self.segments_per_dir))
                 if not os.path.exists(dirname):
                     os.mkdir(dirname)
+                    sync_dir(os.path.join(self.path, 'data'))
             self._write_fd = open(self.segment_filename(self.segment), 'ab')
             self._write_fd.write(MAGIC)
             self.offset = MAGIC_LEN
@@ -744,4 +746,5 @@ class LoggedIO:
                 # avoids spoiling the cache for the OS and other processes.
                 os.posix_fadvise(self._write_fd.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
             self._write_fd.close()
+            sync_dir(os.path.dirname(self._write_fd.name))
             self._write_fd = None

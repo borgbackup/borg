@@ -1,4 +1,15 @@
+import os
 import sys
+
+
+# POSIX-only, from borg 1.1 platform.base
+def sync_dir(path):
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
 
 if sys.platform.startswith('linux'):  # pragma: linux only
     from .platform_linux import acl_get, acl_set, API_VERSION

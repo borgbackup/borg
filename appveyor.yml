@@ -1,0 +1,27 @@
+version: '{build}'
+
+init:
+  - ps: Update-AppveyorBuild -Version "1.0.3-$($env:appveyor_repo_commit.substring(0,7))"
+
+environment:
+  matrix:
+    - compiler: msys2
+      MSYS2_ARCH: x86_64
+      MSYS2_DIR: msys64
+      MINGW: MINGW64
+install:
+  - 'SET PATH=C:\%MSYS2_DIR%\usr\bin;C:\%MSYS2_DIR%\%MINGW%\bin;%PATH%'
+  - 'bash -lc "pacman --noprogressbar --noconfirm --needed -S mingw-w64-%MSYS2_ARCH%-{python3,gcc,lz4,python3-pip,cython,ntldd-git} git openssl"'
+  - 'bash -lc "python3 -m pip install -U pip"'
+  - 'pip3 install -r requirements.d/development.txt'
+  - 'pip3 install setuptools_scm'
+build_script:
+  - 'pip3 install -e .'
+  - 'python3 deployment/windows/buildwin32.py'
+test_script:
+  - 'echo tests disabled'
+  # - 'py.test --cov=borg --cov-config=.coveragerc --benchmark-skip --pyargs src/borg/testsuite'
+artifacts:
+  - path: win32exe
+    name: windowsbuild
+    type: zip

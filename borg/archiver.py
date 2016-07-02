@@ -1139,7 +1139,8 @@ class Archiver:
                                     'lzma,0 .. lzma,9 == lzma (with level 0..9).')
         subparser.add_argument('--read-special', dest='read_special',
                                action='store_true', default=False,
-                               help='open and read special files as if they were regular files')
+                               help='open and read block and char device files as well as FIFOs as if they were '
+                                    'regular files. Also follows symlinks pointing to these kinds of files.')
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                action='store_true', default=False,
                                help='do not create a backup archive')

@@ -651,31 +651,33 @@ For more details, see :ref:`chunker_details`.
 --read-special
 ~~~~~~~~~~~~~~
 
-The option ``--read-special`` is not intended for normal, filesystem-level (full or
-partly-recursive) backups. You only give this option if you want to do something
-rather ... special -- and if you have hand-picked some files that you want to treat
-that way.
+The --read-special option is special - you do not want to use it for normal
+full-filesystem backups, but rather after carefully picking some targets for it.
 
-``borg create --read-special`` will open all files without doing any special
-treatment according to the file type (the only exception here are directories:
-they will be recursed into). Just imagine what happens if you do ``cat
-filename`` --- the content you will see there is what borg will backup for that
-filename.
+The option ``--read-special`` triggers special treatment for block and char
+device files as well as FIFOs. Instead of storing them as such a device (or
+FIFO), they will get opened, their content will be read and in the backup
+archive they will show up like a regular file.
 
-So, for example, symlinks will be followed, block device content will be read,
-named pipes / UNIX domain sockets will be read.
+Symlinks will also get special treatment if (and only if) they point to such
+a special file: instead of storing them as a symlink, the target special file
+will get processed as described above.
 
-You need to be careful with what you give as filename when using ``--read-special``,
-e.g. if you give ``/dev/zero``, your backup will never terminate.
+One intended use case of this is backing up the contents of one or multiple
+block devices, like e.g. LVM snapshots or inactive LVs or disk partitions.
 
-The given files' metadata is saved as it would be saved without
-``--read-special`` (e.g. its name, its size [might be 0], its mode, etc.) -- but
-additionally, also the content read from it will be saved for it.
+You need to be careful about what you include when using ``--read-special``,
+e.g. if you include ``/dev/zero``, your backup will never terminate.
 
 Restoring such files' content is currently only supported one at a time via
 ``--stdout`` option (and you have to redirect stdout to where ever it shall go,
 maybe directly into an existing device file of your choice or indirectly via
 ``dd``).
+
+To some extent, mounting a backup archive with the backups of special files
+via ``borg mount`` and then loop-mounting the image files from inside the mount
+point will work. If you plan to access a lot of data in there, it likely will
+scale and perform better if you do not work via the FUSE mount.
 
 Example
 +++++++

@@ -630,6 +630,10 @@ Number of files: {0.stats.nfiles}'''.format(
             status = status or 'M'  # regular file, modified (if not 'A' already)
         item[b'chunks'] = chunks
         item.update(self.stat_attrs(st, path))
+        if not is_regular_file:
+            # we processed a special file like a regular file. reflect that in mode,
+            # so it can be extracted / accessed in fuse mount like a regular file:
+            item[b'mode'] = stat.S_IFREG | stat.S_IMODE(item[b'mode'])
         self.stats.nfiles += 1
         self.add_item(item)
         return status

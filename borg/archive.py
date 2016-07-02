@@ -46,6 +46,11 @@ flags_normal = os.O_RDONLY | getattr(os, 'O_BINARY', 0)
 flags_noatime = flags_normal | getattr(os, 'O_NOATIME', 0)
 
 
+def is_special(mode):
+    # file types that get special treatment in --read-special mode
+    return stat.S_ISBLK(mode) or stat.S_ISCHR(mode) or stat.S_ISFIFO(mode)
+
+
 class BackupOSError(Exception):
     """
     Wrapper for OSError raised while accessing backup files.
@@ -589,8 +594,8 @@ Number of files: {0.stats.nfiles}'''.format(
                 return status
             else:
                 self.hard_links[st.st_ino, st.st_dev] = safe_path
-        is_regular_file = stat.S_ISREG(st.st_mode)
-        if is_regular_file:
+        is_special_file = is_special(st.st_mode)
+        if not is_special_file:
             path_hash = self.key.id_hash(os.path.join(self.cwd, path).encode('utf-8', 'surrogateescape'))
             ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode)
         else:
@@ -623,16 +628,16 @@ Number of files: {0.stats.nfiles}'''.format(
                     chunks.append(cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats))
                     if self.show_progress:
                         self.stats.show_progress(item=item, dt=0.2)
-            if is_regular_file:
+            if not is_special_file:
                 # we must not memorize special files, because the contents of e.g. a
                 # block or char device will change without its mtime/size/inode changing.
                 cache.memorize_file(path_hash, st, [c[0] for c in chunks])
             status = status or 'M'  # regular file, modified (if not 'A' already)
         item[b'chunks'] = chunks
         item.update(self.stat_attrs(st, path))
-        if not is_regular_file:
+        if is_special_file:
             # we processed a special file like a regular file. reflect that in mode,
-            # so it can be extracted / accessed in fuse mount like a regular file:
+            # so it can be extracted / accessed in FUSE mount like a regular file:
             item[b'mode'] = stat.S_IFREG | stat.S_IMODE(item[b'mode'])
         self.stats.nfiles += 1
         self.add_item(item)

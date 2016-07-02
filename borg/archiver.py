@@ -29,7 +29,7 @@ from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache
 from .key import key_creator, RepoKey, PassphraseKey
-from .archive import backup_io, BackupOSError, Archive, ArchiveChecker, CHUNKER_PARAMS
+from .archive import backup_io, BackupOSError, Archive, ArchiveChecker, CHUNKER_PARAMS, is_special
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 
 has_lchflags = hasattr(os, 'lchflags')
@@ -301,7 +301,14 @@ class Archiver:
                                   read_special=read_special, dry_run=dry_run)
         elif stat.S_ISLNK(st.st_mode):
             if not dry_run:
-                status = archive.process_symlink(path, st)
+                if not read_special:
+                    status = archive.process_symlink(path, st)
+                else:
+                    st_target = os.stat(path)
+                    if is_special(st_target.st_mode):
+                        status = archive.process_file(path, st_target, cache)
+                    else:
+                        status = archive.process_symlink(path, st)
         elif stat.S_ISFIFO(st.st_mode):
             if not dry_run:
                 if not read_special:

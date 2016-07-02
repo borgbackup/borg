@@ -269,7 +269,7 @@ class Archiver:
         # Ignore if nodump flag is set
         if has_lchflags and (st.st_flags & stat.UF_NODUMP):
             return
-        if stat.S_ISREG(st.st_mode) or read_special and not stat.S_ISDIR(st.st_mode):
+        if stat.S_ISREG(st.st_mode):
             if not dry_run:
                 try:
                     status = archive.process_file(path, st, cache, self.ignore_inode)

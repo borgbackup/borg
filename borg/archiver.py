@@ -304,10 +304,16 @@ class Archiver:
                 status = archive.process_symlink(path, st)
         elif stat.S_ISFIFO(st.st_mode):
             if not dry_run:
-                status = archive.process_fifo(path, st)
+                if not read_special:
+                    status = archive.process_fifo(path, st)
+                else:
+                    status = archive.process_file(path, st, cache)
         elif stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
             if not dry_run:
-                status = archive.process_dev(path, st)
+                if not read_special:
+                    status = archive.process_dev(path, st)
+                else:
+                    status = archive.process_file(path, st, cache)
         elif stat.S_ISSOCK(st.st_mode):
             # Ignore unix sockets
             return

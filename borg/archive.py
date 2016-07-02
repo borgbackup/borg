@@ -589,9 +589,16 @@ Number of files: {0.stats.nfiles}'''.format(
                 return status
             else:
                 self.hard_links[st.st_ino, st.st_dev] = safe_path
-        path_hash = self.key.id_hash(os.path.join(self.cwd, path).encode('utf-8', 'surrogateescape'))
+        is_regular_file = stat.S_ISREG(st.st_mode)
+        if is_regular_file:
+            path_hash = self.key.id_hash(os.path.join(self.cwd, path).encode('utf-8', 'surrogateescape'))
+            ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode)
+        else:
+            # in --read-special mode, we may be called for special files.
+            # there should be no information in the cache about special files processed in
+            # read-special mode, but we better play safe as this was wrong in the past:
+            path_hash = ids = None
         first_run = not cache.files
-        ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode)
         if first_run:
             logger.debug('Processing files ...')
         chunks = None
@@ -616,7 +623,10 @@ Number of files: {0.stats.nfiles}'''.format(
                     chunks.append(cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats))
                     if self.show_progress:
                         self.stats.show_progress(item=item, dt=0.2)
-            cache.memorize_file(path_hash, st, [c[0] for c in chunks])
+            if is_regular_file:
+                # we must not memorize special files, because the contents of e.g. a
+                # block or char device will change without its mtime/size/inode changing.
+                cache.memorize_file(path_hash, st, [c[0] for c in chunks])
             status = status or 'M'  # regular file, modified (if not 'A' already)
         item[b'chunks'] = chunks
         item.update(self.stat_attrs(st, path))

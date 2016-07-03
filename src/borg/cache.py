@@ -75,6 +75,7 @@ class Cache:
         self.key = key
         self.manifest = manifest
         self.path = path or os.path.join(get_cache_dir(), repository.id_str)
+        self.unique_hostname = bool(os.environ.get('BORG_UNIQUE_HOSTNAME'))
         self.do_files = do_files
         # Warn user before sending data to a never seen before unencrypted repository
         if not os.path.exists(self.path):
@@ -202,7 +203,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
     def open(self, lock_wait=None):
         if not os.path.isdir(self.path):
             raise Exception('%s Does not look like a Borg cache' % self.path)
-        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait).acquire()
+        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait, kill_stale_locks=self.unique_hostname).acquire()
         self.rollback()
 
     def close(self):

@@ -189,9 +189,14 @@ class RemoteRepository:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is not None:
-            self.rollback()
-        self.close()
+        try:
+            if exc_type is not None:
+                self.rollback()
+        finally:
+            # in any case, we want to cleanly close the repo, even if the
+            # rollback can not succeed (e.g. because the connection was
+            # already closed) and raised another exception:
+            self.close()
 
     def borg_cmd(self, args, testing):
         """return a borg serve command line"""

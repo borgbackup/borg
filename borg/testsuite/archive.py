@@ -5,7 +5,7 @@ import msgpack
 import pytest
 
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_dict, ITEM_KEYS
-from ..archive import BackupOSError, backup_io, input_io_iter
+from ..archive import BackupOSError, backup_io, backup_io_iter
 from ..key import PlaintextKey
 from ..helpers import Manifest
 from . import BaseTestCase
@@ -164,9 +164,9 @@ def test_backup_io_iter():
 
     oserror_iterator = Iterator(OSError)
     with pytest.raises(BackupOSError):
-        for _ in input_io_iter(oserror_iterator):
+        for _ in backup_io_iter(oserror_iterator):
             pass
 
     normal_iterator = Iterator(StopIteration)
-    for _ in input_io_iter(normal_iterator):
+    for _ in backup_io_iter(normal_iterator):
         assert False, 'StopIteration handled incorrectly'

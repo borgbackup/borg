@@ -67,7 +67,7 @@ def backup_io():
         raise BackupOSError(os_error) from os_error
 
 
-def input_io_iter(iterator):
+def backup_io_iter(iterator):
     while True:
         try:
             with backup_io():
@@ -552,7 +552,7 @@ Number of files: {0.stats.nfiles}'''.format(
         uid, gid = 0, 0
         fd = sys.stdin.buffer  # binary
         chunks = []
-        for chunk in input_io_iter(self.chunker.chunkify(fd)):
+        for chunk in backup_io_iter(self.chunker.chunkify(fd)):
             chunks.append(cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats))
         self.stats.nfiles += 1
         t = int_to_bigint(int(time.time()) * 1000000000)
@@ -604,7 +604,7 @@ Number of files: {0.stats.nfiles}'''.format(
                 fh = Archive._open_rb(path)
             with os.fdopen(fh, 'rb') as fd:
                 chunks = []
-                for chunk in input_io_iter(self.chunker.chunkify(fd, fh)):
+                for chunk in backup_io_iter(self.chunker.chunkify(fd, fh)):
                     chunks.append(cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats))
                     if self.show_progress:
                         self.stats.show_progress(item=item, dt=0.2)

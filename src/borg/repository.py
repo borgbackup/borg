@@ -107,6 +107,7 @@ class Repository:
         self.do_lock = lock
         self.do_create = create
         self.exclusive = exclusive
+        self.unique_hostname = bool(os.environ.get('BORG_UNIQUE_HOSTNAME'))
 
     def __del__(self):
         if self.lock:
@@ -210,7 +211,7 @@ class Repository:
         if not os.path.isdir(path):
             raise self.DoesNotExist(path)
         if lock:
-            self.lock = UpgradableLock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait).acquire()
+            self.lock = UpgradableLock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait, kill_stale_locks=self.unique_hostname).acquire()
         else:
             self.lock = None
         self.config = ConfigParser(interpolation=None)

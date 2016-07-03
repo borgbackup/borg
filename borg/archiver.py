@@ -726,26 +726,27 @@ class Archiver:
     helptext = {}
     helptext['patterns'] = textwrap.dedent('''
         Exclusion patterns support four separate styles, fnmatch, shell, regular
-        expressions and path prefixes. If followed by a colon (':') the first two
-        characters of a pattern are used as a style selector. Explicit style
-        selection is necessary when a non-default style is desired or when the
-        desired pattern starts with two alphanumeric characters followed by a colon
-        (i.e. `aa:something/*`).
+        expressions and path prefixes. By default, fnmatch is used. If followed
+        by a colon (':') the first two characters of a pattern are used as a
+        style selector. Explicit style selection is necessary when a
+        non-default style is desired or when the desired pattern starts with
+        two alphanumeric characters followed by a colon (i.e. `aa:something/*`).
 
         `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_, selector `fm:`
 
-            These patterns use a variant of shell pattern syntax, with '*' matching
-            any number of characters, '?' matching any single character, '[...]'
-            matching any single character specified, including ranges, and '[!...]'
-            matching any character not specified. For the purpose of these patterns,
-            the path separator ('\\' for Windows and '/' on other systems) is not
-            treated specially. Wrap meta-characters in brackets for a literal match
-            (i.e. `[?]` to match the literal character `?`). For a path to match
-            a pattern, it must completely match from start to end, or must match from
-            the start to just before a path separator. Except for the root path,
-            paths will never end in the path separator when matching is attempted.
-            Thus, if a given pattern ends in a path separator, a '*' is appended
-            before matching is attempted.
+            This is the default style.  These patterns use a variant of shell
+            pattern syntax, with '*' matching any number of characters, '?'
+            matching any single character, '[...]' matching any single
+            character specified, including ranges, and '[!...]' matching any
+            character not specified. For the purpose of these patterns, the
+            path separator ('\\' for Windows and '/' on other systems) is not
+            treated specially. Wrap meta-characters in brackets for a literal
+            match (i.e. `[?]` to match the literal character `?`). For a path
+            to match a pattern, it must completely match from start to end, or
+            must match from the start to just before a path separator. Except
+            for the root path, paths will never end in the path separator when
+            matching is attempted.  Thus, if a given pattern ends in a path
+            separator, a '*' is appended before matching is attempted.
 
         Shell-style patterns, selector `sh:`
 

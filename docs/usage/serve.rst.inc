@@ -7,6 +7,7 @@ borg serve
     usage: borg serve [-h] [--critical] [--error] [--warning] [--info] [--debug]
                       [--lock-wait N] [--show-rc] [--no-files-cache] [--umask M]
                       [--remote-path PATH] [--restrict-to-path PATH]
+                      [--append-only]
     
     Start in server mode. This command is usually not used manually.
             
@@ -27,6 +28,7 @@ borg serve
       --remote-path PATH    set remote path to executable (default: "borg")
       --restrict-to-path PATH
                             restrict repository access to PATH
+      --append-only         only allow appending to repository segment files
     
 Description
 ~~~~~~~~~~~

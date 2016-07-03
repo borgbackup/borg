@@ -389,7 +389,7 @@ Number of files: {0.stats.nfiles}'''.format(
 
         original_path = original_path or item[b'path']
         dest = self.cwd
-        if item[b'path'].startswith('/') or item[b'path'].startswith('..') or (sys.platform == 'win32' and item[b'path'][1] == ':'):
+        if item[b'path'].startswith('/') or item[b'path'].startswith('..') or (sys.platform == 'win32' and len(item[b'path']) > 1 and item[b'path'][1] == ':'):
             raise Exception('Path should be relative and local')
         path = os.path.join(dest, item[b'path'])
         # Attempt to remove existing files, ignore errors on failure

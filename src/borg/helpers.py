@@ -369,11 +369,17 @@ class FnmatchPattern(PatternBase):
     PREFIX = "fm"
 
     def _prepare(self, pattern):
-        if pattern.endswith(os.path.sep):
-            pattern = os.path.normpath(pattern).rstrip(os.path.sep) + os.path.sep + '*' + os.path.sep
+        if sys.platform != 'win32':
+            if pattern.endswith(os.path.sep):
+                pattern = os.path.normpath(pattern).rstrip(os.path.sep) + os.path.sep + '*' + os.path.sep
+            else:
+                pattern = os.path.normpath(pattern) + os.path.sep + '*'
         else:
-            pattern = os.path.normpath(pattern) + os.path.sep + '*'
-
+            if pattern.endswith(os.path.sep) or pattern.endswith(posixpath.sep):
+                pattern = posixpath.normpath(pattern).rstrip(posixpath.sep) + posixpath.sep + '*' + posixpath.sep
+            else:
+                pattern = posixpath.normpath(pattern) + posixpath.sep + '*'
+        
         self.pattern = pattern
 
         # fnmatch and re.match both cache compiled regular expressions.
@@ -381,7 +387,10 @@ class FnmatchPattern(PatternBase):
         self.regex = re.compile(translate(self.pattern))
 
     def _match(self, path):
-        return (self.regex.match(path + os.path.sep) is not None)
+        if sys.platform != 'win32':
+            return (self.regex.match(path + os.path.sep) is not None)
+        else:
+            return (self.regex.match(path.replace('\\', '/') + posixpath.sep) is not None)
 
 
 class ShellPattern(PatternBase):
@@ -802,7 +811,7 @@ class Location:
         if sys.platform == 'win32':
             m = self.file_re.match(text)
             if m:
-                self.proto = m.group('proto')
+                self.proto = 'file'
                 self.path = posixpath.normpath(m.group('drive') + ":\\" + m.group('path'))
                 self.archive = m.group('archive')
                 return True

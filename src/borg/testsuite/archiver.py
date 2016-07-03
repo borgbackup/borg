@@ -205,6 +205,8 @@ class ArchiverTestCaseBase(BaseTestCase):
         self.tmpdir = tempfile.mkdtemp()
         self.repository_path = os.path.join(self.tmpdir, 'repository')
         self.repository_location = self.prefix + self.repository_path
+        if sys.platform == 'win32':
+            self.repository_location = self.repository_path
         self.input_path = os.path.join(self.tmpdir, 'input')
         self.output_path = os.path.join(self.tmpdir, 'output')
         self.keys_path = os.path.join(self.tmpdir, 'keys')
@@ -269,7 +271,8 @@ class ArchiverTestCaseBase(BaseTestCase):
         os.link(os.path.join(self.input_path, 'file1'),
                 os.path.join(self.input_path, 'hardlink'))
         # Symlink
-        os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
+        if sys.platform != 'win32':
+            os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
         if xattr.is_enabled(self.input_path):
             xattr.setxattr(os.path.join(self.input_path, 'file1'), 'user.foo', b'bar')
             # XXX this always fails for me
@@ -279,22 +282,25 @@ class ArchiverTestCaseBase(BaseTestCase):
             # so that the test setup for all tests using it does not fail here always for others.
             # xattr.setxattr(os.path.join(self.input_path, 'link1'), 'user.foo_symlink', b'bar_symlink', follow_symlinks=False)
         # FIFO node
-        os.mkfifo(os.path.join(self.input_path, 'fifo1'))
-        if has_lchflags:
-            platform.set_flags(os.path.join(self.input_path, 'flagfile'), stat.UF_NODUMP)
-        try:
-            # Block device
-            os.mknod('input/bdev', 0o600 | stat.S_IFBLK, os.makedev(10, 20))
-            # Char device
-            os.mknod('input/cdev', 0o600 | stat.S_IFCHR, os.makedev(30, 40))
-            # File mode
-            os.chmod('input/dir2', 0o555)  # if we take away write perms, we need root to remove contents
-            # File owner
-            os.chown('input/file1', 100, 200)
-            have_root = True  # we have (fake)root
-        except PermissionError:
-            have_root = False
-        return have_root
+        if sys.platform != 'win32':
+            os.mkfifo(os.path.join(self.input_path, 'fifo1'))
+            if has_lchflags:
+                platform.set_flags(os.path.join(self.input_path, 'flagfile'), stat.UF_NODUMP)
+            try:
+                # Block device
+                os.mknod('input/bdev', 0o600 | stat.S_IFBLK, os.makedev(10, 20))
+                # Char device
+                os.mknod('input/cdev', 0o600 | stat.S_IFCHR, os.makedev(30, 40))
+                # File mode
+                os.chmod('input/dir2', 0o555)  # if we take away write perms, we need root to remove contents
+                # File owner
+                os.chown('input/file1', 100, 200)
+                have_root = True  # we have (fake)root
+            except PermissionError:
+                have_root = False
+            return have_root
+        else:
+            return False
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -330,6 +336,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # we could not create these device files without (fake)root
             expected.remove('input/bdev')
             expected.remove('input/cdev')
+        if sys.platform == 'win32':
+            expected.remove('input/link1')
+            expected.remove('input/fifo1')
         if has_lchflags:
             # remove the file we did not backup, so input and output become equal
             expected.remove('input/flagfile')  # this file is UF_NODUMP
@@ -359,6 +368,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # the interesting parts of info_output2 and info_output should be same
         self.assert_equal(filter(info_output), filter(info_output2))
 
+    @pytest.mark.skipif(sys.platform == 'win32', reason='Can not test on Windows.')
     def test_unix_socket(self):
         self.cmd('init', self.repository_location)
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -369,6 +379,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
             assert not os.path.exists('input/unix-socket')
 
+    @pytest.mark.skipif(sys.platform == 'win32', reason='Can not test on Windows.')
     def test_symlink_extract(self):
         self.create_test_files()
         self.cmd('init', self.repository_location)
@@ -947,6 +958,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # Restore permissions so shutil.rmtree is able to delete it
             os.system('chmod -R u+w ' + self.repository_path)
 
+    @pytest.mark.skipif(sys.platform == 'win32', reason='Meaningless and fails on windows.')
     def test_umask(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', self.repository_location)
@@ -982,10 +994,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file2', size=1024 * 80)
         self.cmd('init', self.repository_location)
         output = self.cmd('create', '--list', self.repository_location + '::test', 'input')
+        if sys.platform == 'win32':
+            output = output.replace('\\', '/')
         self.assert_in("A input/file1", output)
         self.assert_in("A input/file2", output)
         # should find first file as unmodified
         output = self.cmd('create', '--list', self.repository_location + '::test1', 'input')
+        if sys.platform == 'win32':
+            output = output.replace('\\', '/')
         self.assert_in("U input/file1", output)
         # this is expected, although surprising, for why, see:
         # https://borgbackup.readthedocs.org/en/latest/faq.html#i-am-seeing-a-added-status-for-a-unchanged-file
@@ -1003,12 +1019,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             platform.set_flags(os.path.join(self.input_path, 'file3'), stat.UF_NODUMP)
         self.cmd('init', self.repository_location)
         output = self.cmd('create', '--list', self.repository_location + '::test', 'input')
+        if sys.platform == 'win32':
+            output = output.replace('\\', '/')
         self.assert_in("A input/file1", output)
         self.assert_in("A input/file2", output)
         if has_lchflags:
             self.assert_in("x input/file3", output)
         # should find second file as excluded
         output = self.cmd('create', '--list', self.repository_location + '::test1', 'input', '--exclude', '*/file2')
+        if sys.platform == 'win32':
+            output = output.replace('\\', '/')
         self.assert_in("U input/file1", output)
         self.assert_in("x input/file2", output)
         if has_lchflags:
@@ -1138,7 +1158,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('list', '--list-format', '-', test_archive, exit_code=1)
         self.archiver.exit_code = 0  # reset exit code for following tests
         output_1 = self.cmd('list', test_archive)
-        output_2 = self.cmd('list', '--format', '{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}', test_archive)
+        output_2 = ''
+        if sys.platform == 'win32':
+            output_2 = self.cmd('list', '--format', '{user:15} {size:8} {isomtime} {path}{extra}{NL}', test_archive)
+        else:
+            output_2 = self.cmd('list', '--format', '{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}', test_archive)
         output_3 = self.cmd('list', '--format', '{mtime:%s} {path}{NL}', test_archive)
         self.assertEqual(output_1, output_2)
         self.assertNotEqual(output_1, output_3)
@@ -1252,7 +1276,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert 'positional arguments' not in self.cmd('help', 'init', '--epilog-only')
         assert 'This command initializes' not in self.cmd('help', 'init', '--usage-only')
 
-    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    @unittest.skipUnless(has_llfuse and sys.platform != 'win32', 'llfuse not installed')
     def test_fuse_mount_repository(self):
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
         os.mkdir(mountpoint)
@@ -1277,7 +1301,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # Give the daemon some time to exit
             time.sleep(.2)
 
-    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    @unittest.skipUnless(has_llfuse and sys.platform != 'win32', 'llfuse not installed')
     def test_fuse_mount_archive(self):
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
         os.mkdir(mountpoint)

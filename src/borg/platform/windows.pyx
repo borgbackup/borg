@@ -192,8 +192,7 @@ cdef sid2string(PSID sid):
 
 
 def get_owner(path):
-    cdef int request = OWNER_SECURITY_INFORMATION
-    cdef BYTE* sd = _get_file_security(path, request)
+    cdef BYTE* sd = _get_file_security(path, OWNER_SECURITY_INFORMATION)
     if sd == NULL:
         return 'unknown', 'S-1-0-0'
     cdef PSID sid = _get_security_descriptor_owner(sd)

@@ -456,7 +456,10 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
 class RemoteRepositoryTestCase(RepositoryTestCase):
 
     def open(self, create=False):
-        return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')), create=create)
+        if sys.platform != 'win32':
+            return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')), create=create)
+        else:
+            return RemoteRepository(Location(os.path.join(self.tmppath, 'repository')), create=create)
 
     def test_invalid_rpc(self):
         self.assert_raises(InvalidRPCMethod, lambda: self.repository.call('__init__', None))
@@ -485,7 +488,10 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
 class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
 
     def open(self, create=False):
-        return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')), create=create)
+        if sys.platform != 'win32':
+            return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')), create=create)
+        else:
+            return RemoteRepository(Location(os.path.join(self.tmppath, 'repository')), create=create)
 
     def test_crash_before_compact(self):
         # skip this test, we can't mock-patch a Repository class in another process!

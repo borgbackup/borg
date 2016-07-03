@@ -47,7 +47,15 @@ flags_noatime = flags_normal | getattr(os, 'O_NOATIME', 0)
 
 
 class BackupOSError(Exception):
-    """Wrapper for OSError raised while accessing input files."""
+    """
+    Wrapper for OSError raised while accessing backup files.
+
+    Borg does different kinds of IO, and IO failures have different consequences.
+    This wrapper represents failures of input file or extraction IO.
+    These are non-critical and are only reported (exit code = 1, warning).
+
+    Any unwrapped IO error is critical and aborts execution (for example repository IO failure).
+    """
     def __init__(self, os_error):
         self.os_error = os_error
         self.errno = os_error.errno
@@ -414,7 +422,7 @@ Number of files: {0.stats.nfiles}'''.format(
 
     def restore_attrs(self, path, item, symlink=False, fd=None):
         """
-        Restore filesystem attributes on *path* from *item* (*fd*).
+        Restore filesystem attributes on *path* (*fd*) from *item*.
 
         Does not access the repository.
         """

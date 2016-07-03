@@ -19,8 +19,8 @@ build_script:
   - 'pip3 install -e .'
   - 'python3 deployment/windows/buildwin32.py'
 test_script:
-  - 'echo tests disabled'
-  # - 'py.test --cov=borg --cov-config=.coveragerc --benchmark-skip --pyargs src/borg/testsuite'
+  # - 'echo tests disabled'
+  - 'py.test --cov=borg --cov-config=.coveragerc --benchmark-skip --pyargs src/borg/testsuite'
 artifacts:
   - path: win32exe
     name: windowsbuild

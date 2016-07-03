@@ -221,7 +221,7 @@ class Repository:
                 hints = msgpack.unpack(fd)
             hints_version = hints[b'version']
             if hints_version not in (1, 2):
-                raise ValueError('Unknown hints file version: %d' % hints['version'])
+                raise ValueError('Unknown hints file version: %d' % hints_version)
             self.segments = hints[b'segments']
             if hints_version == 1:
                 self.compact = set(hints[b'compact'])

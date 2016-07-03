@@ -95,3 +95,4 @@ potentially decreases reliability of change detection, while avoiding always rea
 all files on these file systems.
 
 See the output of the "borg help patterns" command for more help on exclude patterns.
+See the output of the "borg help placeholders" command for more help on placeholders.

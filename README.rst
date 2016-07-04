@@ -113,13 +113,14 @@ Links
 =====
 
 * `Main Web Site <https://borgbackup.readthedocs.org/>`_
-* `Releases <https://github.com/borgbackup/borg/releases>`_
-* `PyPI packages <https://pypi.python.org/pypi/borgbackup>`_
-* `ChangeLog <https://github.com/borgbackup/borg/blob/master/docs/changes.rst>`_
-* `GitHub <https://github.com/borgbackup/borg>`_
-* `Issue Tracker <https://github.com/borgbackup/borg/issues>`_
-* `Bounties & Fundraisers <https://www.bountysource.com/teams/borgbackup>`_
-* `Mailing List <https://mail.python.org/mailman/listinfo/borgbackup>`_
+* `Releases <https://github.com/borgbackup/borg/releases>`_,
+  `PyPI packages <https://pypi.python.org/pypi/borgbackup>`_ and
+  `ChangeLog <https://github.com/borgbackup/borg/blob/master/docs/changes.rst>`_
+* `GitHub <https://github.com/borgbackup/borg>`_,
+  `Issue Tracker <https://github.com/borgbackup/borg/issues>`_ and
+  `Bounties & Fundraisers <https://www.bountysource.com/teams/borgbackup>`_
+* `Web-Chat (IRC) <http://webchat.freenode.net/?randomnick=1&channels=%23borgbackup&uio=MTY9dHJ1ZSY5PXRydWUa8>`_ and
+  `Mailing List <https://mail.python.org/mailman/listinfo/borgbackup>`_
 * `License <https://borgbackup.readthedocs.org/en/stable/authors.html#license>`_
 
 Notes

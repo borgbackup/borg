@@ -82,6 +82,9 @@ General:
     BORG_RSH
         When set, use this command instead of ``ssh``. This can be used to specify ssh options, such as
         a custom identity file ``ssh -i /path/to/private/key``. See ``man ssh`` for other options.
+    BORG_REMOTE_PATH
+        When set, use the given path/filename as remote path (default is "borg").
+        Using ``--remote-path PATH`` commandline option overrides the environment variable.
     TMPDIR
         where temporary files are stored (might need a lot of temporary space for some operations)
 

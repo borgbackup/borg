@@ -1,6 +1,143 @@
 Changelog
 =========
 
+Important note about pre-1.0.4 potential repo corruption
+--------------------------------------------------------
+
+Some external errors (like network or disk I/O errors) could lead to
+corruption of the backup repository due to issue #1138.
+
+A sign that this happened is if "E" status was reported for a file that can
+not be explained by problems with the source file. If you still have logs from
+"borg create -v --list", you can check for "E" status.
+
+Here is what could cause corruption and what you can do now:
+
+1) I/O errors (e.g. repo disk errors) while writing data to repo.
+
+This could lead to corrupted segment files.
+
+Fix::
+
+    # check for corrupt chunks / segments:
+    borg check -v --repository-only REPO
+
+    # repair the repo:
+    borg check -v --repository-only --repair REPO
+
+    # make sure everything is fixed:
+    borg check -v --repository-only REPO
+
+2) Unreliable network / unreliable connection to the repo.
+
+This could lead to archive metadata corruption.
+
+Fix::
+
+    # check for corrupt archives:
+    borg check -v --archives-only REPO
+
+    # delete the corrupt archives:
+    borg delete --force REPO::CORRUPT_ARCHIVE
+
+    # make sure everything is fixed:
+    borg check -v --archives-only REPO
+
+3) In case you want to do more intensive checking.
+
+The best check that everything is ok is to run a dry-run extraction::
+
+    borg extract -v --dry-run REPO::ARCHIVE
+
+
+Version 1.0.4 (not released yet)
+--------------------------------
+
+New features:
+
+- borg serve --append-only, #1168
+  This was included because it was a simple change (append-only functionality
+  was already present via repository config file) and makes better security now
+  practically usable.
+- BORG_REMOTE_PATH environment variable, #1258
+  This was included because it was a simple change (--remote-path cli option
+  was already present) and makes borg much easier to use if you need it.
+
+Bug fixes:
+
+- Fix wrong handling and reporting of OSErrors in borg create, #1138.
+  This was a serious issue: in the context of "borg create", errors like
+  repository I/O errors (e.g. disk I/O errors, ssh repo connection errors)
+  were handled badly and did not lead to a crash (which would be good for this
+  case, because the repo transaction would be incomplete and trigger a
+  transaction rollback to clean up).
+  Now, error handling for source files is cleanly separated from every other
+  error handling, so only problematic input files are logged and skipped.
+- Implement fail-safe error handling for borg extract.
+  Note that this isn't nearly as critical as the borg create error handling
+  bug, since nothing is written to the repo. So this was "merely" misleading
+  error reporting.
+- Add missing error handler in directory attr restore loop.
+- repo: make sure write data hits disk before the commit tag (#1236) and also
+  sync the containing directory.
+- fixes for --read-special mode:
+
+  - ignore known files cache, #1241
+  - fake regular file mode, #1214
+  - improve symlinks handling, #1215
+- remove passphrase from subprocess environment, #1105
+- Ignore empty index file (will trigger index rebuild), #1195
+- add missing placeholder support for --prefix, #1027
+- improve exception handling for placeholder replacement
+- catch and format exceptions in arg parsing
+- helpers: fix "undefined name 'e'" in exception handler
+- better error handling for missing repo manifest, #1043
+- borg delete:
+
+  - make it possible to delete a repo without manifest
+  - borg delete --forced allows to delete corrupted archives, #1139
+- borg check:
+
+  - make borg check work for empty repo
+  - fix resync and msgpacked item qualifier, #1135
+  - rebuild_manifest: fix crash if 'name' or 'time' key were missing.
+  - better validation of item metadata dicts, #1130
+  - better validation of archive metadata dicts
+- close the repo on exit - even if rollback did not work, #1197.
+  This is rather cosmetic, it avoids repo closing in the destructor.
+
+- tests:
+
+  - fix sparse file test, #1170
+  - flake8: ignore new F405, #1185
+
+Other changes:
+
+- make borg build/work on OpenSSL 1.0 and 1.1, #1187
+- docs / help:
+
+  - fix / clarify prune help, #1143
+  - fix "patterns" help formatting
+  - add missing docs / help about placeholders
+  - resources: rename atticmatic to borgmatic
+  - document sshd settings, #545
+  - more details about checkpoints, add split trick, #1171
+  - support docs: add freenode web chat link, #1175
+  - add prune visualization / example, #723
+  - add note that Fnmatch is default, #1247
+  - make clear that lzma levels > 6 are a waste of cpu cycles
+- repository interoperability with borg master (1.1dev) branch:
+
+  - borg check: read item metadata keys from manifest, #1147
+  - read v2 hints files, #1235
+  - fix hints file "unknown version" error handling bug
+- tests: add tests for format_line
+- llfuse: update version requirement for freebsd
+- Vagrantfile: use openbsd 5.9, #716
+- use Python 3.5.2 to build the binaries
+- add .eggs to .gitignore
+
+
 Version 1.0.3
 -------------
 

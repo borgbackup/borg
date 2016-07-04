@@ -29,7 +29,7 @@ from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache
 from .key import key_creator, RepoKey, PassphraseKey
-from .archive import backup_io, BackupOSError, Archive, ArchiveChecker, CHUNKER_PARAMS
+from .archive import backup_io, BackupOSError, Archive, ArchiveChecker, CHUNKER_PARAMS, is_special
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 
 has_lchflags = hasattr(os, 'lchflags')
@@ -256,15 +256,7 @@ class Archiver:
             return
 
         try:
-            # usually, do not follow symlinks (if we have a symlink, we want to
-            # backup it as such).
-            # but if we are in --read-special mode, we later process <path> as
-            # a regular file (we open and read the symlink target file's content).
-            # thus, in read_special mode, we also want to stat the symlink target
-            # file, for consistency. if we did not, we also have issues extracting
-            # this file, as it would be in the archive as a symlink, not as the
-            # target's file type (which could be e.g. a block device).
-            st = os.stat(path, follow_symlinks=read_special)
+            st = os.lstat(path)
         except OSError as e:
             self.print_warning('%s: %s', path, e)
             return
@@ -277,7 +269,7 @@ class Archiver:
         # Ignore if nodump flag is set
         if has_lchflags and (st.st_flags & stat.UF_NODUMP):
             return
-        if stat.S_ISREG(st.st_mode) or read_special and not stat.S_ISDIR(st.st_mode):
+        if stat.S_ISREG(st.st_mode):
             if not dry_run:
                 try:
                     status = archive.process_file(path, st, cache, self.ignore_inode)
@@ -309,13 +301,26 @@ class Archiver:
                                   read_special=read_special, dry_run=dry_run)
         elif stat.S_ISLNK(st.st_mode):
             if not dry_run:
-                status = archive.process_symlink(path, st)
+                if not read_special:
+                    status = archive.process_symlink(path, st)
+                else:
+                    st_target = os.stat(path)
+                    if is_special(st_target.st_mode):
+                        status = archive.process_file(path, st_target, cache)
+                    else:
+                        status = archive.process_symlink(path, st)
         elif stat.S_ISFIFO(st.st_mode):
             if not dry_run:
-                status = archive.process_fifo(path, st)
+                if not read_special:
+                    status = archive.process_fifo(path, st)
+                else:
+                    status = archive.process_file(path, st, cache)
         elif stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
             if not dry_run:
-                status = archive.process_dev(path, st)
+                if not read_special:
+                    status = archive.process_dev(path, st)
+                else:
+                    status = archive.process_file(path, st, cache)
         elif stat.S_ISSOCK(st.st_mode):
             # Ignore unix sockets
             return
@@ -1134,7 +1139,8 @@ class Archiver:
                                     'lzma,0 .. lzma,9 == lzma (with level 0..9).')
         subparser.add_argument('--read-special', dest='read_special',
                                action='store_true', default=False,
-                               help='open and read special files as if they were regular files')
+                               help='open and read block and char device files as well as FIFOs as if they were '
+                                    'regular files. Also follows symlinks pointing to these kinds of files.')
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                action='store_true', default=False,
                                help='do not create a backup archive')

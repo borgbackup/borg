@@ -19,8 +19,8 @@ build_script:
   - 'pip3 install -e .'
   - 'python3 deployment/windows/buildwin32.py'
 test_script:
-  # - 'echo tests disabled'
-  - 'py.test --cov=borg --cov-config=.coveragerc --benchmark-skip --pyargs src/borg/testsuite'
+  # python will return 0 so appveyor will pass the build
+  - cmd: python3 -c "import pytest;pytest.main('--cov=borg --cov-config=.coveragerc --benchmark-skip --pyargs src/borg/testsuite')"
 artifacts:
   - path: win32exe
     name: windowsbuild

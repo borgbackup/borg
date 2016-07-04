@@ -426,7 +426,7 @@ class Archiver:
             with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
                 stats = Statistics()
-                archive.delete(stats, progress=args.progress)
+                archive.delete(stats, progress=args.progress, forced=args.forced)
                 manifest.write()
                 repository.commit(save_space=args.save_space)
                 cache.commit()
@@ -635,7 +635,7 @@ class Archiver:
                 else:
                     if args.output_list:
                         logger.info('Pruning archive: %s' % format_archive(archive))
-                    Archive(repository, key, manifest, archive.name, cache).delete(stats)
+                    Archive(repository, key, manifest, archive.name, cache).delete(stats, forced=args.forced)
             if to_delete and not args.dry_run:
                 manifest.write()
                 repository.commit(save_space=args.save_space)
@@ -1230,6 +1230,9 @@ class Archiver:
         subparser.add_argument('-c', '--cache-only', dest='cache_only',
                                action='store_true', default=False,
                                help='delete only the local cache for the given repository')
+        subparser.add_argument('--force', dest='forced',
+                               action='store_true', default=False,
+                               help='force deletion of corrupted archives')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
                                help='work slower, but using less space')
@@ -1342,6 +1345,9 @@ class Archiver:
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
                                help='do not change repository')
+        subparser.add_argument('--force', dest='forced',
+                               action='store_true', default=False,
+                               help='force pruning of corrupted archives')
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the deleted archive')

@@ -29,7 +29,7 @@ from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache
 from .key import key_creator, RepoKey, PassphraseKey
-from .archive import input_io, InputOSError, Archive, ArchiveChecker, CHUNKER_PARAMS
+from .archive import backup_io, BackupOSError, Archive, ArchiveChecker, CHUNKER_PARAMS
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 
 has_lchflags = hasattr(os, 'lchflags')
@@ -198,7 +198,7 @@ class Archiver:
                     if not dry_run:
                         try:
                             status = archive.process_stdin(path, cache)
-                        except InputOSError as e:
+                        except BackupOSError as e:
                             status = 'E'
                             self.print_warning('%s: %s', path, e)
                     else:
@@ -281,7 +281,7 @@ class Archiver:
             if not dry_run:
                 try:
                     status = archive.process_file(path, st, cache, self.ignore_inode)
-                except InputOSError as e:
+                except BackupOSError as e:
                     status = 'E'
                     self.print_warning('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
@@ -372,7 +372,11 @@ class Archiver:
                     continue
             if not args.dry_run:
                 while dirs and not item[b'path'].startswith(dirs[-1][b'path']):
-                    archive.extract_item(dirs.pop(-1), stdout=stdout)
+                    dir_item = dirs.pop(-1)
+                    try:
+                        archive.extract_item(dir_item, stdout=stdout)
+                    except BackupOSError as e:
+                        self.print_warning('%s: %s', remove_surrogates(dir_item[b'path']), e)
             if output_list:
                 logger.info(remove_surrogates(orig_path))
             try:
@@ -384,12 +388,16 @@ class Archiver:
                         archive.extract_item(item, restore_attrs=False)
                     else:
                         archive.extract_item(item, stdout=stdout, sparse=sparse)
-            except OSError as e:
+            except BackupOSError as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 
         if not args.dry_run:
             while dirs:
-                archive.extract_item(dirs.pop(-1))
+                dir_item = dirs.pop(-1)
+                try:
+                    archive.extract_item(dir_item)
+                except BackupOSError as e:
+                    self.print_warning('%s: %s', remove_surrogates(dir_item[b'path']), e)
         for pattern in include_patterns:
             if pattern.match_count == 0:
                 self.print_warning("Include pattern '%s' never matched.", pattern)

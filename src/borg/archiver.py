@@ -23,8 +23,8 @@ logger = create_logger()
 
 from . import __version__
 from . import helpers
-from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics
-from .archive import InputOSError, CHUNKER_PARAMS
+from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
+from .archive import BackupOSError, CHUNKER_PARAMS
 from .cache import Cache
 from .constants import *  # NOQA
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
@@ -164,7 +164,7 @@ class Archiver:
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
         """
-        return RepositoryServer(restrict_to_paths=args.restrict_to_paths).serve()
+        return RepositoryServer(restrict_to_paths=args.restrict_to_paths, append_only=args.append_only).serve()
 
     @with_repository(create=True, exclusive=True, manifest=False)
     def do_init(self, args, repository):
@@ -255,7 +255,7 @@ class Archiver:
                     if not dry_run:
                         try:
                             status = archive.process_stdin(path, cache)
-                        except InputOSError as e:
+                        except BackupOSError as e:
                             status = 'E'
                             self.print_warning('%s: %s', path, e)
                     else:
@@ -313,15 +313,7 @@ class Archiver:
             return
         if st is None:
             try:
-                # usually, do not follow symlinks (if we have a symlink, we want to
-                # backup it as such).
-                # but if we are in --read-special mode, we later process <path> as
-                # a regular file (we open and read the symlink target file's content).
-                # thus, in read_special mode, we also want to stat the symlink target
-                # file, for consistency. if we did not, we also have issues extracting
-                # this file, as it would be in the archive as a symlink, not as the
-                # target's file type (which could be e.g. a block device).
-                st = os.stat(path, follow_symlinks=read_special)
+                st = os.lstat(path)
             except OSError as e:
                 self.print_warning('%s: %s', path, e)
                 return
@@ -335,11 +327,11 @@ class Archiver:
         if get_flags(path, st) & stat.UF_NODUMP:
             self.print_file_status('x', path)
             return
-        if stat.S_ISREG(st.st_mode) or read_special and not stat.S_ISDIR(st.st_mode):
+        if stat.S_ISREG(st.st_mode):
             if not dry_run:
                 try:
                     status = archive.process_file(path, st, cache, self.ignore_inode)
-                except InputOSError as e:
+                except BackupOSError as e:
                     status = 'E'
                     self.print_warning('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
@@ -367,13 +359,26 @@ class Archiver:
                                   read_special=read_special, dry_run=dry_run)
         elif stat.S_ISLNK(st.st_mode):
             if not dry_run:
-                status = archive.process_symlink(path, st)
+                if not read_special:
+                    status = archive.process_symlink(path, st)
+                else:
+                    st_target = os.stat(path)
+                    if is_special(st_target.st_mode):
+                        status = archive.process_file(path, st_target, cache)
+                    else:
+                        status = archive.process_symlink(path, st)
         elif stat.S_ISFIFO(st.st_mode):
             if not dry_run:
-                status = archive.process_fifo(path, st)
+                if not read_special:
+                    status = archive.process_fifo(path, st)
+                else:
+                    status = archive.process_file(path, st, cache)
         elif stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
             if not dry_run:
-                status = archive.process_dev(path, st)
+                if not read_special:
+                    status = archive.process_dev(path, st)
+                else:
+                    status = archive.process_file(path, st, cache)
         elif stat.S_ISSOCK(st.st_mode):
             # Ignore unix sockets
             return
@@ -432,7 +437,11 @@ class Archiver:
                     continue
             if not args.dry_run:
                 while dirs and not item.path.startswith(dirs[-1].path):
-                    archive.extract_item(dirs.pop(-1), stdout=stdout)
+                    dir_item = dirs.pop(-1)
+                    try:
+                        archive.extract_item(dir_item, stdout=stdout)
+                    except BackupOSError as e:
+                        self.print_warning('%s: %s', remove_surrogates(dir_item[b'path']), e)
             if output_list:
                 logging.getLogger('borg.output.list').info(remove_surrogates(orig_path))
             try:
@@ -445,12 +454,16 @@ class Archiver:
                     else:
                         archive.extract_item(item, stdout=stdout, sparse=sparse, hardlink_masters=hardlink_masters,
                                              original_path=orig_path)
-            except OSError as e:
+            except BackupOSError as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 
         if not args.dry_run:
             while dirs:
-                archive.extract_item(dirs.pop(-1))
+                dir_item = dirs.pop(-1)
+                try:
+                    archive.extract_item(dir_item)
+                except BackupOSError as e:
+                    self.print_warning('%s: %s', remove_surrogates(dir_item[b'path']), e)
         for pattern in include_patterns:
             if pattern.match_count == 0:
                 self.print_warning("Include pattern '%s' never matched.", pattern)
@@ -1033,26 +1046,27 @@ class Archiver:
     helptext = {}
     helptext['patterns'] = textwrap.dedent('''
         Exclusion patterns support four separate styles, fnmatch, shell, regular
-        expressions and path prefixes. If followed by a colon (':') the first two
-        characters of a pattern are used as a style selector. Explicit style
-        selection is necessary when a non-default style is desired or when the
-        desired pattern starts with two alphanumeric characters followed by a colon
-        (i.e. `aa:something/*`).
+        expressions and path prefixes. By default, fnmatch is used. If followed
+        by a colon (':') the first two characters of a pattern are used as a
+        style selector. Explicit style selection is necessary when a
+        non-default style is desired or when the desired pattern starts with
+        two alphanumeric characters followed by a colon (i.e. `aa:something/*`).
 
         `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_, selector `fm:`
 
-            These patterns use a variant of shell pattern syntax, with '*' matching
-            any number of characters, '?' matching any single character, '[...]'
-            matching any single character specified, including ranges, and '[!...]'
-            matching any character not specified. For the purpose of these patterns,
-            the path separator ('\\' for Windows and '/' on other systems) is not
-            treated specially. Wrap meta-characters in brackets for a literal match
-            (i.e. `[?]` to match the literal character `?`). For a path to match
-            a pattern, it must completely match from start to end, or must match from
-            the start to just before a path separator. Except for the root path,
-            paths will never end in the path separator when matching is attempted.
-            Thus, if a given pattern ends in a path separator, a '*' is appended
-            before matching is attempted.
+            This is the default style.  These patterns use a variant of shell
+            pattern syntax, with '*' matching any number of characters, '?'
+            matching any single character, '[...]' matching any single
+            character specified, including ranges, and '[!...]' matching any
+            character not specified. For the purpose of these patterns, the
+            path separator ('\\' for Windows and '/' on other systems) is not
+            treated specially. Wrap meta-characters in brackets for a literal
+            match (i.e. `[?]` to match the literal character `?`). For a path
+            to match a pattern, it must completely match from start to end, or
+            must match from the start to just before a path separator. Except
+            for the root path, paths will never end in the path separator when
+            matching is attempted.  Thus, if a given pattern ends in a path
+            separator, a '*' is appended before matching is attempted.
 
         Shell-style patterns, selector `sh:`
 
@@ -1229,6 +1243,8 @@ class Archiver:
         subparser.set_defaults(func=self.do_serve)
         subparser.add_argument('--restrict-to-path', dest='restrict_to_paths', action='append',
                                metavar='PATH', help='restrict repository access to PATH')
+        subparser.add_argument('--append-only', dest='append_only', action='store_true',
+                               help='only allow appending to repository segment files')
         init_epilog = textwrap.dedent("""
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
@@ -1485,7 +1501,8 @@ class Archiver:
                               help='ignore inode data in the file metadata cache used to detect unchanged files.')
         fs_group.add_argument('--read-special', dest='read_special',
                               action='store_true', default=False,
-                              help='open and read special files as if they were regular files')
+                              help='open and read block and char device files as well as FIFOs as if they were '
+                                   'regular files. Also follows symlinks pointing to these kinds of files.')
 
         archive_group = subparser.add_argument_group('Archive options')
         archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default='',
@@ -2123,8 +2140,9 @@ class Archiver:
             if result.func != forced_result.func:
                 # someone is trying to execute a different borg subcommand, don't do that!
                 return forced_result
-            # the only thing we take from the forced "borg serve" ssh command is --restrict-to-path
+            # we only take specific options from the forced "borg serve" command:
             result.restrict_to_paths = forced_result.restrict_to_paths
+            result.append_only = forced_result.append_only
         return result
 
     def parse_args(self, args=None):

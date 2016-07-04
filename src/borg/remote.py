@@ -58,9 +58,10 @@ class RepositoryServer:  # pragma: no cover
         'break_lock',
     )
 
-    def __init__(self, restrict_to_paths):
+    def __init__(self, restrict_to_paths, append_only):
         self.repository = None
         self.restrict_to_paths = restrict_to_paths
+        self.append_only = append_only
 
     def serve(self):
         stdin_fd = sys.stdin.fileno()
@@ -127,7 +128,7 @@ class RepositoryServer:  # pragma: no cover
                     break
             else:
                 raise PathNotAllowed(path)
-        self.repository = Repository(path, create, lock_wait=lock_wait, lock=lock)
+        self.repository = Repository(path, create, lock_wait=lock_wait, lock=lock, append_only=self.append_only)
         self.repository.__enter__()  # clean exit handled by serve() method
         return self.repository.id
 
@@ -192,9 +193,14 @@ class RemoteRepository:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is not None:
-            self.rollback()
-        self.close()
+        try:
+            if exc_type is not None:
+                self.rollback()
+        finally:
+            # in any case, we want to cleanly close the repo, even if the
+            # rollback can not succeed (e.g. because the connection was
+            # already closed) and raised another exception:
+            self.close()
 
     @property
     def id_str(self):

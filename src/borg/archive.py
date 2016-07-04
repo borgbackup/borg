@@ -98,8 +98,21 @@ class Statistics:
             print(msg, file=stream or sys.stderr, end="\r", flush=True)
 
 
-class InputOSError(Exception):
-    """Wrapper for OSError raised while accessing input files."""
+def is_special(mode):
+    # file types that get special treatment in --read-special mode
+    return stat.S_ISBLK(mode) or stat.S_ISCHR(mode) or stat.S_ISFIFO(mode)
+
+
+class BackupOSError(Exception):
+    """
+    Wrapper for OSError raised while accessing backup files.
+
+    Borg does different kinds of IO, and IO failures have different consequences.
+    This wrapper represents failures of input file or extraction IO.
+    These are non-critical and are only reported (exit code = 1, warning).
+
+    Any unwrapped IO error is critical and aborts execution (for example repository IO failure).
+    """
     def __init__(self, os_error):
         self.os_error = os_error
         self.errno = os_error.errno
@@ -111,18 +124,18 @@ class InputOSError(Exception):
 
 
 @contextmanager
-def input_io():
-    """Context manager changing OSError to InputOSError."""
+def backup_io():
+    """Context manager changing OSError to BackupOSError."""
     try:
         yield
     except OSError as os_error:
-        raise InputOSError(os_error) from os_error
+        raise BackupOSError(os_error) from os_error
 
 
-def input_io_iter(iterator):
+def backup_io_iter(iterator):
     while True:
         try:
-            with input_io():
+            with backup_io():
                 item = next(iterator)
         except StopIteration:
             return
@@ -433,66 +446,80 @@ Number of files: {0.stats.nfiles}'''.format(
             pass
         mode = item.mode
         if stat.S_ISREG(mode):
-            if not os.path.exists(os.path.dirname(path)):
-                os.makedirs(os.path.dirname(path))
-
+            with backup_io():
+                if not os.path.exists(os.path.dirname(path)):
+                    os.makedirs(os.path.dirname(path))
             # Hard link?
             if 'source' in item:
                 source = os.path.join(dest, item.source)
-                if os.path.exists(path):
-                    os.unlink(path)
-                if not hardlink_masters:
-                    os.link(source, path)
-                    return
+                with backup_io():
+                    if os.path.exists(path):
+                        os.unlink(path)
+                    if not hardlink_masters:
+                        os.link(source, path)
+                        return
                 item.chunks, link_target = hardlink_masters[item.source]
                 if link_target:
                     # Hard link was extracted previously, just link
-                    os.link(link_target, path)
+                    with backup_io():
+                        os.link(link_target, path)
                     return
                 # Extract chunks, since the item which had the chunks was not extracted
-            with open(path, 'wb') as fd:
+            with backup_io():
+                fd = open(path, 'wb')
+            with fd:
                 ids = [c.id for c in item.chunks]
                 for _, data in self.pipeline.fetch_many(ids, is_preloaded=True):
-                    if sparse and self.zeros.startswith(data):
-                        # all-zero chunk: create a hole in a sparse file
-                        fd.seek(len(data), 1)
-                    else:
-                        fd.write(data)
-                pos = fd.tell()
-                fd.truncate(pos)
-                fd.flush()
-                self.restore_attrs(path, item, fd=fd.fileno())
+                    with backup_io():
+                        if sparse and self.zeros.startswith(data):
+                            # all-zero chunk: create a hole in a sparse file
+                            fd.seek(len(data), 1)
+                        else:
+                            fd.write(data)
+                with backup_io():
+                    pos = fd.tell()
+                    fd.truncate(pos)
+                    fd.flush()
+                    self.restore_attrs(path, item, fd=fd.fileno())
             if hardlink_masters:
                 # Update master entry with extracted file path, so that following hardlinks don't extract twice.
                 hardlink_masters[item.get('source') or original_path] = (None, path)
-        elif stat.S_ISDIR(mode):
-            if not os.path.exists(path):
-                os.makedirs(path)
-            if restore_attrs:
+            return
+        with backup_io():
+            # No repository access beyond this point.
+            if stat.S_ISDIR(mode):
+                if not os.path.exists(path):
+                    os.makedirs(path)
+                if restore_attrs:
+                    self.restore_attrs(path, item)
+            elif stat.S_ISLNK(mode):
+                if not os.path.exists(os.path.dirname(path)):
+                    os.makedirs(os.path.dirname(path))
+                source = item.source
+                if os.path.exists(path):
+                    os.unlink(path)
+                try:
+                    os.symlink(source, path)
+                except UnicodeEncodeError:
+                    raise self.IncompatibleFilesystemEncodingError(source, sys.getfilesystemencoding()) from None
+                self.restore_attrs(path, item, symlink=True)
+            elif stat.S_ISFIFO(mode):
+                if not os.path.exists(os.path.dirname(path)):
+                    os.makedirs(os.path.dirname(path))
+                os.mkfifo(path)
                 self.restore_attrs(path, item)
-        elif stat.S_ISLNK(mode):
-            if not os.path.exists(os.path.dirname(path)):
-                os.makedirs(os.path.dirname(path))
-            source = item.source
-            if os.path.exists(path):
-                os.unlink(path)
-            try:
-                os.symlink(source, path)
-            except UnicodeEncodeError:
-                raise self.IncompatibleFilesystemEncodingError(source, sys.getfilesystemencoding()) from None
-            self.restore_attrs(path, item, symlink=True)
-        elif stat.S_ISFIFO(mode):
-            if not os.path.exists(os.path.dirname(path)):
-                os.makedirs(os.path.dirname(path))
-            os.mkfifo(path)
-            self.restore_attrs(path, item)
-        elif stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
-            os.mknod(path, item.mode, item.rdev)
-            self.restore_attrs(path, item)
-        else:
-            raise Exception('Unknown archive item type %r' % item.mode)
+            elif stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
+                os.mknod(path, item.mode, item.rdev)
+                self.restore_attrs(path, item)
+            else:
+                raise Exception('Unknown archive item type %r' % item.mode)
 
     def restore_attrs(self, path, item, symlink=False, fd=None):
+        """
+        Restore filesystem attributes on *path* (*fd*) from *item*.
+
+        Does not access the repository.
+        """
         uid = gid = None
         if not self.numeric_owner:
             uid = user2uid(item.user)
@@ -592,14 +619,14 @@ Number of files: {0.stats.nfiles}'''.format(
         )
         if self.numeric_owner:
             attrs['user'] = attrs['group'] = None
-        with input_io():
+        with backup_io():
             xattrs = xattr.get_all(path, follow_symlinks=False)
         if xattrs:
             attrs['xattrs'] = StableDict(xattrs)
         bsdflags = get_flags(path, st)
         if bsdflags:
             attrs['bsdflags'] = bsdflags
-        with input_io():
+        with backup_io():
             acl_get(path, attrs, st, self.numeric_owner)
         return attrs
 
@@ -635,7 +662,7 @@ Number of files: {0.stats.nfiles}'''.format(
         uid, gid = 0, 0
         fd = sys.stdin.buffer  # binary
         chunks = []
-        for data in input_io_iter(self.chunker.chunkify(fd)):
+        for data in backup_io_iter(self.chunker.chunkify(fd)):
             chunks.append(cache.add_chunk(self.key.id_hash(data), Chunk(data), self.stats))
         self.stats.nfiles += 1
         t = int(time.time()) * 1000000000
@@ -664,9 +691,16 @@ Number of files: {0.stats.nfiles}'''.format(
                 return status
             else:
                 self.hard_links[st.st_ino, st.st_dev] = safe_path
-        path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
+        is_special_file = is_special(st.st_mode)
+        if not is_special_file:
+            path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
+            ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode)
+        else:
+            # in --read-special mode, we may be called for special files.
+            # there should be no information in the cache about special files processed in
+            # read-special mode, but we better play safe as this was wrong in the past:
+            path_hash = ids = None
         first_run = not cache.files
-        ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode)
         if first_run:
             logger.debug('Processing files ...')
         chunks = None
@@ -688,20 +722,27 @@ Number of files: {0.stats.nfiles}'''.format(
         if chunks is None:
             compress = self.compression_decider1.decide(path)
             logger.debug('%s -> compression %s', path, compress['name'])
-            with input_io():
+            with backup_io():
                 fh = Archive._open_rb(path)
             with os.fdopen(fh, 'rb') as fd:
                 chunks = []
-                for data in input_io_iter(self.chunker.chunkify(fd, fh)):
+                for data in backup_io_iter(self.chunker.chunkify(fd, fh)):
                     chunks.append(cache.add_chunk(self.key.id_hash(data),
                                                   Chunk(data, compress=compress),
                                                   self.stats))
                     if self.show_progress:
                         self.stats.show_progress(item=item, dt=0.2)
-            cache.memorize_file(path_hash, st, [c.id for c in chunks])
+            if not is_special_file:
+                # we must not memorize special files, because the contents of e.g. a
+                # block or char device will change without its mtime/size/inode changing.
+                cache.memorize_file(path_hash, st, [c.id for c in chunks])
             status = status or 'M'  # regular file, modified (if not 'A' already)
         item.chunks = chunks
         item.update(self.stat_attrs(st, path))
+        if is_special_file:
+            # we processed a special file like a regular file. reflect that in mode,
+            # so it can be extracted / accessed in FUSE mount like a regular file:
+            item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
         self.stats.nfiles += 1
         self.add_item(item)
         return status

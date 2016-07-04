@@ -24,3 +24,4 @@ borg.dist/
 borg.exe
 .coverage
 .vagrant
+.eggs

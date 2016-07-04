@@ -244,11 +244,14 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
 
 
 class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
+    def open(self, create=False):
+        return Repository(os.path.join(self.tmppath, 'repository'), create=create, append_only=True)
+
     def test_destroy_append_only(self):
         # Can't destroy append only repo (via the API)
-        self.repository.append_only = True
         with self.assert_raises(ValueError):
             self.repository.destroy()
+        assert self.repository.append_only
 
     def test_append_only(self):
         def segments_in_repository():

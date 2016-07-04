@@ -70,7 +70,8 @@ borg create
                             compression (default), lz4 == lz4, zlib == zlib
                             (default level 6), zlib,0 .. zlib,9 == zlib (with
                             level 0..9), lzma == lzma (default level 6), lzma,0 ..
-                            lzma,9 == lzma (with level 0..9).
+                            lzma,6 == lzma (with level 0..6. levels above 6 do not
+                            improve compression and only waste many cpu cycles)
       --read-special        open and read special files as if they were regular
                             files
       -n, --dry-run         do not create a backup archive

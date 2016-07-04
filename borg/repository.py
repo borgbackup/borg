@@ -219,10 +219,14 @@ class Repository:
                 self.io.cleanup(transaction_id)
             with open(os.path.join(self.path, 'hints.%d' % transaction_id), 'rb') as fd:
                 hints = msgpack.unpack(fd)
-            if hints[b'version'] != 1:
-                raise ValueError('Unknown hints file version: %d' % hints['version'])
+            hints_version = hints[b'version']
+            if hints_version not in (1, 2):
+                raise ValueError('Unknown hints file version: %d' % hints_version)
             self.segments = hints[b'segments']
-            self.compact = set(hints[b'compact'])
+            if hints_version == 1:
+                self.compact = set(hints[b'compact'])
+            elif hints_version == 2:
+                self.compact = set(hints[b'compact'].keys())
 
     def write_index(self):
         hints = {b'version': 1,

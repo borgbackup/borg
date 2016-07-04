@@ -1,6 +1,55 @@
 Changelog
 =========
 
+Important note about pre-1.0.4 potential repo corruption
+--------------------------------------------------------
+
+Some external errors (like network or disk I/O errors) could lead to
+corruption of the backup repository due to issue #1138.
+
+A sign that this happened is if "E" status was reported for a file that can
+not be explained by problems with the source file. If you still have logs from
+"borg create -v --list", you can check for "E" status.
+
+Here is what could cause corruption and what you can do now:
+
+1) I/O errors (e.g. repo disk errors) while writing data to repo.
+
+This could lead to corrupted segment files.
+
+Fix::
+
+    # check for corrupt chunks / segments:
+    borg check -v --repository-only REPO
+
+    # repair the repo:
+    borg check -v --repository-only --repair REPO
+
+    # make sure everything is fixed:
+    borg check -v --repository-only REPO
+
+2) Unreliable network / unreliable connection to the repo.
+
+This could lead to archive metadata corruption.
+
+Fix::
+
+    # check for corrupt archives:
+    borg check -v --archives-only REPO
+
+    # delete the corrupt archives:
+    borg delete --force REPO::CORRUPT_ARCHIVE
+
+    # make sure everything is fixed:
+    borg check -v --archives-only REPO
+
+3) In case you want to do more intensive checking.
+
+The best check that everything is ok is to run a dry-run extraction::
+
+    borg extract -v --dry-run REPO::ARCHIVE
+
+
 Version 1.0.4 (not released yet)
 --------------------------------
 

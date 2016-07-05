@@ -11,11 +11,15 @@ The next section continues by showing how backups can be automated.
 Important note about free space
 -------------------------------
 
-Before you start creating backups, please make sure that there is **always**
+Before you start creating backups, please make sure that there is *always*
 a good amount of free space on the filesystem that has your backup repository
-(and also on ~/.cache). It is hard to tell how much, maybe 1-5%.
+(and also on ~/.cache). A few GB should suffice for most hard-drive sized
+repositories. See also :ref:`cache-memory-usage`.
 
-If you run out of disk space, it can be hard or impossible to free space,
+If |project_name| runs out of disk space, it tries to free as much space as it
+can while aborting the current operation safely, which allows to free more space
+by deleting/pruning archives. This mechanism is not bullet-proof though.
+If you *really* run out of disk space, it can be hard or impossible to free space,
 because |project_name| needs free space to operate - even to delete backup
 archives. There is a ``--save-space`` option for some commands, but even with
 that |project_name| will need free space to operate.

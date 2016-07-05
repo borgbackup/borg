@@ -84,6 +84,12 @@ class Repository:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
+            no_space_left_on_device = exc_type is OSError and exc_val.errno == errno.ENOSPC
+            # The ENOSPC could have originated somewhere else besides the Repository. The cleanup is always safe, unless
+            # EIO or FS corruption ensues, which is why we specifically check for ENOSPC.
+            if self._active_txn and no_space_left_on_device:
+                logger.warning('No space left on device, cleaning up partial transaction to free space.')
+                self.io.cleanup(self.io.get_segments_transaction_id())
             self.rollback()
         self.close()
 
@@ -543,7 +549,7 @@ class LoggedIO:
         return None
 
     def get_segments_transaction_id(self):
-        """Verify that the transaction id is consistent with the index transaction id
+        """Return last committed segment
         """
         for segment, filename in self.segment_iterator(reverse=True):
             if self.is_committed_segment(segment):

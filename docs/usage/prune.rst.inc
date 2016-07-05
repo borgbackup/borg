@@ -1,3 +1,5 @@
+.. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
+
 .. _borg_prune:
 
 borg prune
@@ -6,7 +8,7 @@ borg prune
 
     usage: borg prune [-h] [--critical] [--error] [--warning] [--info] [--debug]
                       [--lock-wait N] [--show-rc] [--no-files-cache] [--umask M]
-                      [--remote-path PATH] [-n] [-s] [--list]
+                      [--remote-path PATH] [-n] [--force] [-s] [--list]
                       [--keep-within WITHIN] [-H HOURLY] [-d DAILY] [-w WEEKLY]
                       [-m MONTHLY] [-y YEARLY] [-P PREFIX] [--save-space]
                       [REPOSITORY]
@@ -31,6 +33,7 @@ borg prune
       --umask M             set umask to M (local and remote, default: 0077)
       --remote-path PATH    set remote path to executable (default: "borg")
       -n, --dry-run         do not change repository
+      --force               force pruning of corrupted archives
       -s, --stats           print statistics for the deleted archive
       --list                output verbose list of archives it keeps/prunes
       --keep-within WITHIN  keep all archives within this time interval

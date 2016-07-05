@@ -1,41 +1,5 @@
-.. _borg_placeholders:
+.. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
 
-borg help placeholders
-~~~~~~~~~~~~~~~~~~~~~~
-::
-
-
-Repository (or Archive) URLs and --prefix values support these placeholders:
-
-{hostname}
-
-    The (short) hostname of the machine.
-
-{fqdn}
-
-    The full name of the machine.
-
-{now}
-
-    The current local date and time.
-
-{utcnow}
-
-    The current UTC date and time.
-
-{user}
-
-    The user name (or UID, if no name is available) of the user running borg.
-
-{pid}
-
-    The current process ID.
-
-Examples::
-
-    borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
-    borg create /path/to/repo::{hostname}-{now:%Y-%m-%d_%H:%M:%S} ...
-    borg prune --prefix '{hostname}-' ...
 .. _borg_patterns:
 
 borg help patterns
@@ -129,3 +93,41 @@ Examples::
     sh:/home/*/.thumbnails
     EOF
     $ borg create --exclude-from exclude.txt backup /
+.. _borg_placeholders:
+
+borg help placeholders
+~~~~~~~~~~~~~~~~~~~~~~
+::
+
+
+Repository (or Archive) URLs and --prefix values support these placeholders:
+
+{hostname}
+
+    The (short) hostname of the machine.
+
+{fqdn}
+
+    The full name of the machine.
+
+{now}
+
+    The current local date and time.
+
+{utcnow}
+
+    The current UTC date and time.
+
+{user}
+
+    The user name (or UID, if no name is available) of the user running borg.
+
+{pid}
+
+    The current process ID.
+
+Examples::
+
+    borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
+    borg create /path/to/repo::{hostname}-{now:%Y-%m-%d_%H:%M:%S} ...
+    borg prune --prefix '{hostname}-' ...

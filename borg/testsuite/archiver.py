@@ -288,9 +288,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # File mode
             os.chmod('input/dir2', 0o555)  # if we take away write perms, we need root to remove contents
             # File owner
-            os.chown('input/file1', 100, 200)
+            os.chown('input/file1', 100, 200)  # raises OSError invalid argument on cygwin
             have_root = True  # we have (fake)root
         except PermissionError:
+            have_root = False
+        except OSError as e:
+            if e.errno != errno.EINVAL:
+                raise
             have_root = False
         return have_root
 

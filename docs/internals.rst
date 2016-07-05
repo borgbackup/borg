@@ -280,6 +280,7 @@ emptied to 25%, its size is shrinked. So operations on it have a variable
 complexity between constant and linear with low factor, and memory overhead
 varies between 33% and 300%.
 
+.. _cache-memory-usage:
 
 Indexes / Caches memory usage
 -----------------------------

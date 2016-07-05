@@ -267,7 +267,7 @@ Once your backup has finished successfully, you can delete all
 ``<archive-name>.checkpoint`` archives. If you run ``borg prune``, it will
 also care for deleting unneeded checkpoints.
 
-How can I backup huge file(s) over a instable connection?
+How can I backup huge file(s) over a unstable connection?
 ---------------------------------------------------------
 
 You can use this "split trick" as a workaround for the in-between-files-only

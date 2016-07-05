@@ -1,3 +1,5 @@
+.. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
+
 .. _borg_create:
 
 borg create
@@ -70,10 +72,10 @@ borg create
                             compression (default), lz4 == lz4, zlib == zlib
                             (default level 6), zlib,0 .. zlib,9 == zlib (with
                             level 0..9), lzma == lzma (default level 6), lzma,0 ..
-                            lzma,6 == lzma (with level 0..6. levels above 6 do not
-                            improve compression and only waste many cpu cycles)
-      --read-special        open and read special files as if they were regular
-                            files
+                            lzma,9 == lzma (with level 0..9).
+      --read-special        open and read block and char device files as well as
+                            FIFOs as if they were regular files. Also follows
+                            symlinks pointing to these kinds of files.
       -n, --dry-run         do not create a backup archive
     
 Description

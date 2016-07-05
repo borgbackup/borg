@@ -1,3 +1,5 @@
+.. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
+
 .. _borg_delete:
 
 borg delete
@@ -6,7 +8,8 @@ borg delete
 
     usage: borg delete [-h] [--critical] [--error] [--warning] [--info] [--debug]
                        [--lock-wait N] [--show-rc] [--no-files-cache] [--umask M]
-                       [--remote-path PATH] [-p] [-s] [-c] [--save-space]
+                       [--remote-path PATH] [-p] [-s] [-c] [--force]
+                       [--save-space]
                        [TARGET]
     
     Delete an existing repository or archive
@@ -31,6 +34,7 @@ borg delete
       -p, --progress        show progress display while deleting a single archive
       -s, --stats           print statistics for the deleted archive
       -c, --cache-only      delete only the local cache for the given repository
+      --force               force deletion of corrupted archives
       --save-space          work slower, but using less space
     
 Description

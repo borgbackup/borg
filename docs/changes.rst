@@ -62,6 +62,9 @@ New features:
 - BORG_REMOTE_PATH environment variable, #1258
   This was included because it was a simple change (--remote-path cli option
   was already present) and makes borg much easier to use if you need it.
+- Repository: cleanup incomplete transaction on "no space left" condition.
+  In many cases, this can avoid a 100% full repo filesystem (which is very
+  problematic as borg always needs free space - even to delete archives).
 
 Bug fixes:
 
@@ -110,6 +113,8 @@ Bug fixes:
 
   - fix sparse file test, #1170
   - flake8: ignore new F405, #1185
+  - catch "invalid argument" on cygwin, #257
+  - fix sparseness assertion in test prep, #1264
 
 Other changes:
 
@@ -126,6 +131,7 @@ Other changes:
   - add prune visualization / example, #723
   - add note that Fnmatch is default, #1247
   - make clear that lzma levels > 6 are a waste of cpu cycles
+  - add a "do not edit" note to auto-generated files, #1250
 - repository interoperability with borg master (1.1dev) branch:
 
   - borg check: read item metadata keys from manifest, #1147
@@ -135,6 +141,7 @@ Other changes:
 - llfuse: update version requirement for freebsd
 - Vagrantfile: use openbsd 5.9, #716
 - use Python 3.5.2 to build the binaries
+- glibc compatibility checker: scripts/glibc_check.py
 - add .eggs to .gitignore
 
 

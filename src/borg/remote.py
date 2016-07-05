@@ -228,7 +228,8 @@ class RemoteRepository:
         if testing:
             return [sys.executable, '-m', 'borg.archiver', 'serve'] + opts + self.extra_test_args
         else:  # pragma: no cover
-            return [args.remote_path, 'serve'] + opts
+            remote_path = args.remote_path or os.environ.get('BORG_REMOTE_PATH', 'borg')
+            return [remote_path, 'serve'] + opts
 
     def ssh_cmd(self, location):
         """return a ssh command line that can be prefixed to a borg command line"""

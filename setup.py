@@ -181,6 +181,7 @@ class build_usage(Command):
         for command, parser in choices.items():
             print('generating help for %s' % command)
             with open('docs/usage/%s.rst.inc' % command, 'w') as doc:
+                doc.write(".. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!\n\n")
                 if command == 'help':
                     for topic in Archiver.helptext:
                         params = {"topic": topic,

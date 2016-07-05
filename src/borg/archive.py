@@ -588,25 +588,61 @@ Number of files: {0.stats.nfiles}'''.format(
         self.set_meta(b'name', name)
         del self.manifest.archives[oldname]
 
-    def delete(self, stats, progress=False):
-        unpacker = msgpack.Unpacker(use_list=False)
-        items_ids = self.metadata[b'items']
-        pi = ProgressIndicatorPercent(total=len(items_ids), msg="Decrementing references %3.0f%%", same_line=True)
-        for (i, (items_id, data)) in enumerate(zip(items_ids, self.repository.get_many(items_ids))):
+    def delete(self, stats, progress=False, forced=False):
+        class ChunksIndexError(Error):
+            """Chunk ID {} missing from chunks index, corrupted chunks index - aborting transaction."""
+
+        def chunk_decref(id, stats):
+            nonlocal error
+            try:
+                self.cache.chunk_decref(id, stats)
+            except KeyError:
+                cid = hexlify(id).decode('ascii')
+                raise ChunksIndexError(cid)
+            except Repository.ObjectNotFound as e:
+                # object not in repo - strange, but we wanted to delete it anyway.
+                if not forced:
+                    raise
+                error = True
+
+        error = False
+        try:
+            unpacker = msgpack.Unpacker(use_list=False)
+            items_ids = self.metadata[b'items']
+            pi = ProgressIndicatorPercent(total=len(items_ids), msg="Decrementing references %3.0f%%", same_line=True)
+            for (i, (items_id, data)) in enumerate(zip(items_ids, self.repository.get_many(items_ids))):
+                if progress:
+                    pi.show(i)
+                _, data = self.key.decrypt(items_id, data)
+                unpacker.feed(data)
+                chunk_decref(items_id, stats)
+                try:
+                    for item in unpacker:
+                        item = Item(internal_dict=item)
+                        if 'chunks' in item:
+                            for chunk_id, size, csize in item.chunks:
+                                chunk_decref(chunk_id, stats)
+                except (TypeError, ValueError):
+                    # if items metadata spans multiple chunks and one chunk got dropped somehow,
+                    # it could be that unpacker yields bad types
+                    if not forced:
+                        raise
+                    error = True
             if progress:
-                pi.show(i)
-            _, data = self.key.decrypt(items_id, data)
-            unpacker.feed(data)
-            self.cache.chunk_decref(items_id, stats)
-            for item in unpacker:
-                item = Item(internal_dict=item)
-                if 'chunks' in item:
-                    for chunk_id, size, csize in item.chunks:
-                        self.cache.chunk_decref(chunk_id, stats)
-        if progress:
-            pi.finish()
-        self.cache.chunk_decref(self.id, stats)
+                pi.finish()
+        except (msgpack.UnpackException, Repository.ObjectNotFound):
+            # items metadata corrupted
+            if not forced:
+                raise
+            error = True
+        # in forced delete mode, we try hard to delete at least the manifest entry,
+        # if possible also the archive superblock, even if processing the items raises
+        # some harmless exception.
+        chunk_decref(self.id, stats)
         del self.manifest.archives[self.name]
+        if error:
+            logger.warning('forced deletion succeeded, but the deleted archive was corrupted.')
+            logger.warning('borg check --repair is required to free all space.')
 
     def stat_attrs(self, st, path):
         attrs = dict(

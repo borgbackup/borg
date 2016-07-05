@@ -1,3 +1,5 @@
+.. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
+
 .. _borg_extract:
 
 borg extract
@@ -42,3 +44,7 @@ by passing a list of ``PATHs`` as arguments. The file selection can further
 be restricted by using the ``--exclude`` option.
 
 See the output of the "borg help patterns" command for more help on exclude patterns.
+
+By using ``--dry-run``, you can do all extraction steps except actually writing the
+output data: reading metadata and data chunks from the repo, checking the hash/hmac,
+decrypting, decompressing.

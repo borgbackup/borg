@@ -1,3 +1,5 @@
+.. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
+
 .. _borg_recreate:
 
 borg recreate
@@ -47,11 +49,15 @@ Archive options
     ``-C COMPRESSION``, ``--compression COMPRESSION``
         | select compression algorithm (and level):
         | none == no compression (default),
+        | auto,C[,L] == built-in heuristic decides between none or C[,L] - with C[,L]
+        |               being any valid compression algorithm (and optional level),
         | lz4 == lz4,
         | zlib == zlib (default level 6),
         | zlib,0 .. zlib,9 == zlib (with level 0..9),
         | lzma == lzma (default level 6),
         | lzma,0 .. lzma,9 == lzma (with level 0..9).
+    ``--compression-from COMPRESSIONCONFIG``
+        | read compression patterns from COMPRESSIONCONFIG, one per line
     ``--chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE``
         | specify the chunker parameters (or "default").
 

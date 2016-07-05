@@ -1,3 +1,5 @@
+.. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
+
 .. _borg_check:
 
 borg check
@@ -15,6 +17,8 @@ optional arguments
         | only perform repository checks
     ``--archives-only``
         | only perform archives checks
+    ``--verify-data``
+        | perform cryptographic archive data integrity verification (conflicts with --repository-only)
     ``--repair``
         | attempt to repair any inconsistencies found
     ``--save-space``
@@ -23,6 +27,8 @@ optional arguments
         | only check last N archives (Default: all)
     ``-P``, ``--prefix``
         | only consider archive names starting with this prefix
+    ``-p``, ``--progress``
+        | show progress display while checking
 
 `Common options`_
     |
@@ -64,3 +70,15 @@ Second, the consistency and correctness of the archive metadata is verified:
   required).
 - The archive checks can be time consuming, they can be skipped using the
   --repository-only option.
+
+The --verify-data option will perform a full integrity verification (as opposed to
+checking the CRC32 of the segment) of data, which means reading the data from the
+repository, decrypting and decompressing it. This is a cryptographic verification,
+which will detect (accidental) corruption. For encrypted repositories it is
+tamper-resistant as well, unless the attacker has access to the keys.
+
+It is also very slow.
+
+--verify-data only verifies data used by the archives specified with --last,
+--prefix or an explicitly named archive. If none of these are passed,
+all data in the repository is verified.

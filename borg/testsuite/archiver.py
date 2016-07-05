@@ -398,7 +398,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         st = os.stat(filename)
         self.assert_equal(st.st_size, total_len)
         if sparse_support and hasattr(st, 'st_blocks'):
-            self.assert_true(st.st_blocks * 512 < total_len / 9)  # is input sparse?
+            self.assert_true(st.st_blocks * 512 < total_len)  # is input sparse?
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
         with changedir('output'):
@@ -415,7 +415,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         if sparse_support:
             if hasattr(st, 'st_blocks'):
                 # do only check if it is less, do NOT check if it is much less
-                # as that causes troubles on xfs and zfs:
+                # as that causes troubles on xfs, zfs, ntfs:
                 self.assert_true(st.st_blocks * 512 < total_len)
             if hasattr(os, 'SEEK_HOLE') and hasattr(os, 'SEEK_DATA'):
                 with open(filename, 'rb') as fd:

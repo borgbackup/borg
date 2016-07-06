@@ -701,7 +701,7 @@ Number of files: {0.stats.nfiles}'''.format(
 
 
 # this set must be kept complete, otherwise the RobustUnpacker might malfunction:
-ITEM_KEYS = frozenset([b'path', b'source', b'rdev', b'chunks',
+ITEM_KEYS = frozenset([b'path', b'source', b'rdev', b'chunks', b'chunks_healthy',
                        b'mode', b'user', b'group', b'uid', b'gid', b'mtime', b'atime', b'ctime',
                        b'xattrs', b'bsdflags', b'acl_nfs4', b'acl_access', b'acl_default', b'acl_extended', ])
 
@@ -933,6 +933,9 @@ class ArchiveChecker:
                     add_reference(chunk_id, size, csize)
                 chunk_list.append((chunk_id, size, csize))
                 offset += size
+            if b'chunks_healthy' not in item:
+                # if this is first repair, remember the correct chunk IDs, so we can maybe heal the file later
+                item[b'chunks_healthy'] = item[b'chunks']
             item[b'chunks'] = chunk_list
 
         def robust_iterator(archive):

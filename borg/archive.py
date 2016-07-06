@@ -919,11 +919,12 @@ class ArchiveChecker:
             """
             offset = 0
             chunk_list = []
+            chunks_replaced = False
             for chunk_id, size, csize in item[b'chunks']:
                 if chunk_id not in self.chunks:
                     # If a file chunk is missing, create an all empty replacement chunk
                     logger.error('{}: Missing file chunk detected (Byte {}-{})'.format(item[b'path'].decode('utf-8', 'surrogateescape'), offset, offset + size))
-                    self.error_found = True
+                    self.error_found = chunks_replaced = True
                     data = bytes(size)
                     chunk_id = self.key.id_hash(data)
                     cdata = self.key.encrypt(data)
@@ -933,7 +934,7 @@ class ArchiveChecker:
                     add_reference(chunk_id, size, csize)
                 chunk_list.append((chunk_id, size, csize))
                 offset += size
-            if b'chunks_healthy' not in item:
+            if chunks_replaced and b'chunks_healthy' not in item:
                 # if this is first repair, remember the correct chunk IDs, so we can maybe heal the file later
                 item[b'chunks_healthy'] = item[b'chunks']
             item[b'chunks'] = chunk_list

@@ -32,8 +32,6 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
     python -m pip install --user 'virtualenv<14.0'
 else
     pip install 'virtualenv<14.0'
-    sudo add-apt-repository -y ppa:gezakovacs/lz4
-    sudo apt-get update
     sudo apt-get install -y liblz4-dev
     sudo apt-get install -y libacl1-dev
 fi

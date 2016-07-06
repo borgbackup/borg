@@ -6,19 +6,24 @@ cache:
     directories:
         - $HOME/.cache/pip
 
+# note: use py 3.5.2, it has lzma support. 3.5(.0) on travis.org/trusty does not.
 matrix:
     include:
         - python: 3.4
           os: linux
+          dist: trusty
           env: TOXENV=py34
-        - python: 3.5
+        - python: 3.5.2
           os: linux
+          dist: trusty
           env: TOXENV=py35
         - python: nightly
           os: linux
+          dist: trusty
           env: TOXENV=py36
-        - python: 3.5
+        - python: 3.4
           os: linux
+          dist: trusty
           env: TOXENV=flake8
         - language: generic
           os: osx

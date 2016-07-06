@@ -1,5 +1,6 @@
 import configparser
 import os
+import random
 import stat
 import shutil
 from binascii import unhexlify
@@ -217,7 +218,8 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     # Discard cached files with the newest mtime to avoid
                     # issues with filesystem snapshots and mtime precision
                     entry = FileCacheEntry(*msgpack.unpackb(item))
-                    if entry.age < 10 and bigint_to_int(entry.mtime) < self._newest_mtime:
+                    age_limit = random.randint(8, 16)
+                    if entry.age < age_limit and bigint_to_int(entry.mtime) < self._newest_mtime:
                         msgpack.pack((path_hash, entry), fd)
         self.config.set('cache', 'manifest', self.manifest.id_str)
         self.config.set('cache', 'timestamp', self.manifest.timestamp)

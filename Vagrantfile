@@ -321,9 +321,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_32")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_32")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos6_32")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("centos6_32")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller("centos6_32")
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("centos6_32")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("centos6_32")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos6_32")
   end
 
@@ -336,9 +334,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_64")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_64")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos6_64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("centos6_64")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller("centos6_64")
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("centos6_64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("centos6_64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos6_64")
   end
 

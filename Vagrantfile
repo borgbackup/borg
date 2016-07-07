@@ -438,7 +438,7 @@ Vagrant.configure(2) do |config|
     end
     b.vm.provision "packages netbsd", :type => :shell, :inline => packages_netbsd
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("netbsd64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("netbsd64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd64")
   end
 end

@@ -601,6 +601,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                      '--exclude=re:file(\\d)\\1\\1$', self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file3'])
 
+    @pytest.mark.skipif(sys.platform == 'win32', reason='Can not test on Windows.')
     def test_extract_include_exclude_regex_from_file(self):
         self.cmd('init', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)

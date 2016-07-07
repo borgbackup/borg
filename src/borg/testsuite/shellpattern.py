@@ -1,4 +1,5 @@
 import re
+import sys
 
 import pytest
 
@@ -71,6 +72,7 @@ def check(path, pattern):
     ("foo^", ["foo[^!]"]),
     ("foo!", ["foo[^!]"]),
     ])
+@pytest.mark.skipif(sys.platform == 'win32', reason='Need to use os.path.sep')
 def test_match(path, patterns):
     for p in patterns:
         assert check(path, p)
@@ -108,6 +110,7 @@ def test_match(path, patterns):
     ("foo1", ["foo[!12]"]),
     ("foo2", ["foo[!12]"]),
     ])
+@pytest.mark.skipif(sys.platform == 'win32', reason='Need to use os.path.sep')
 def test_mismatch(path, patterns):
     for p in patterns:
         assert not check(path, p)

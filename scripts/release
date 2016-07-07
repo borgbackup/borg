@@ -1,0 +1,2 @@
+python setup.py register sdist upload --identity="Thomas Waldmann" --sign
+

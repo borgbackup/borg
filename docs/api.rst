@@ -42,10 +42,6 @@ API Documentation
     :members:
     :undoc-members:
 
-.. automodule:: borg.hash_sizes
-    :members:
-    :undoc-members:
-
 .. automodule:: borg.xattr
     :members:
     :undoc-members:

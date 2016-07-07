@@ -50,9 +50,25 @@ The best check that everything is ok is to run a dry-run extraction::
     borg extract -v --dry-run REPO::ARCHIVE
 
 
-Version 1.0.4 (2016-07-07)
+Version 1.0.5 (2016-07-07)
 --------------------------
 
+Bug fixes:
+
+- borg mount: fix FUSE crash in xattr code on Linux introduced in 1.0.4, #1282
+
+Other changes:
+
+- backport some FAQ entries from master branch
+- add release helper scripts
+- Vagrantfile:
+
+  - centos6: no FUSE, don't build binary
+  - add xz for redhat-like dists
+
+
+Version 1.0.4 (2016-07-07)
+--------------------------
 
 New features:
 

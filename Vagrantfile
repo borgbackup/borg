@@ -42,7 +42,7 @@ def packages_redhatted
     # needed to compile msgpack-python (otherwise it will use slow fallback code):
     yum install -y gcc-c++
     # for building python:
-    yum install -y zlib-devel bzip2-devel ncurses-devel readline-devel xz-devel sqlite-devel
+    yum install -y zlib-devel bzip2-devel ncurses-devel readline-devel xz xz-devel sqlite-devel
     #yum install -y python-pip
     #pip install virtualenv
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile

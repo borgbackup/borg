@@ -597,7 +597,7 @@ Number of files: {0.stats.nfiles}'''.format(
             try:
                 self.cache.chunk_decref(id, stats)
             except KeyError:
-                cid = hexlify(id).decode('ascii')
+                cid = bin_to_hex(id)
                 raise ChunksIndexError(cid)
             except Repository.ObjectNotFound as e:
                 # object not in repo - strange, but we wanted to delete it anyway.

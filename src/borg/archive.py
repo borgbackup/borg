@@ -657,13 +657,12 @@ Number of files: {0.stats.nfiles}'''.format(
             attrs['user'] = attrs['group'] = None
         with backup_io():
             xattrs = xattr.get_all(path, follow_symlinks=False)
+            bsdflags = get_flags(path, st)
+            acl_get(path, attrs, st, self.numeric_owner)
         if xattrs:
             attrs['xattrs'] = StableDict(xattrs)
-        bsdflags = get_flags(path, st)
         if bsdflags:
             attrs['bsdflags'] = bsdflags
-        with backup_io():
-            acl_get(path, attrs, st, self.numeric_owner)
         return attrs
 
     def process_dir(self, path, st):

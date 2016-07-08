@@ -2267,6 +2267,13 @@ def main():  # pragma: no cover
     except RemoteRepository.RPCError as e:
         msg = '%s\n%s' % (str(e), sysinfo())
         exit_code = EXIT_ERROR
+    except BrokenPipeError:
+        if args.func.__name__ in ['do_info', 'do_list', 'do_diff']:
+            sys.stderr.close()
+            sys.exit(0)
+        else:
+            msg = '\n%s\n%s' % (traceback.format_exc(), sysinfo())
+            exit_code = EXIT_ERROR
     except Exception:
         msg = 'Local Exception.\n%s\n%s' % (traceback.format_exc(), sysinfo())
         exit_code = EXIT_ERROR

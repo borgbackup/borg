@@ -324,8 +324,12 @@ class Archiver:
             return
         status = None
         # Ignore if nodump flag is set
-        if get_flags(path, st) & stat.UF_NODUMP:
-            self.print_file_status('x', path)
+        try:
+            if get_flags(path, st) & stat.UF_NODUMP:
+                self.print_file_status('x', path)
+                return
+        except OSError as e:
+            self.print_warning('%s: %s', path, e)
             return
         if stat.S_ISREG(st.st_mode):
             if not dry_run:

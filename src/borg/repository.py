@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 from .constants import *  # NOQA
 from .hashindex import NSIndex
-from .helpers import Error, ErrorWithTraceback, IntegrityError, InternalOSError
+from .helpers import Error, ErrorWithTraceback, IntegrityError
 from .helpers import Location
 from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
@@ -258,18 +258,13 @@ class Repository:
         except RuntimeError as error:
             assert str(error) == 'hashindex_read failed'  # everything else means we're in *deep* trouble
             logger.warning('Repository index missing or corrupted, trying to recover')
-            try:
-                os.unlink(index_path)
-            except OSError as e:
-                raise InternalOSError(e) from None
+            os.unlink(index_path)
             if not auto_recover:
                 raise
             self.prepare_txn(self.get_transaction_id())
             # don't leave an open transaction around
             self.commit()
             return self.open_index(self.get_transaction_id())
-        except OSError as e:
-            raise InternalOSError(e) from None
 
     def prepare_txn(self, transaction_id, do_cleanup=True):
         self._active_txn = True
@@ -307,8 +302,6 @@ class Repository:
                 self.check_transaction()
                 self.prepare_txn(transaction_id)
                 return
-            except OSError as os_error:
-                raise InternalOSError(os_error) from None
             if hints[b'version'] == 1:
                 logger.debug('Upgrading from v1 hints.%d', transaction_id)
                 self.segments = hints[b'segments']

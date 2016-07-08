@@ -64,18 +64,6 @@ class ErrorWithTraceback(Error):
     traceback = True
 
 
-class InternalOSError(Error):
-    """Error while accessing repository: [Errno {}] {}: {}"""
-
-    def __init__(self, os_error):
-        self.errno = os_error.errno
-        self.strerror = os_error.strerror
-        self.filename = os_error.filename
-
-    def get_message(self):
-        return self.__doc__.format(self.errno, self.strerror, self.filename)
-
-
 class IntegrityError(ErrorWithTraceback):
     """Data integrity error"""
 

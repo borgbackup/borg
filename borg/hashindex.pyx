@@ -310,7 +310,8 @@ cdef class ChunkIndex(IndexBase):
             result64 = refcount1 + refcount2
             values[0] = _htole32(min(result64, _MAX_VALUE))
         else:
-            hashindex_set(self.index, key, data)
+            if not hashindex_set(self.index, key, data):
+                raise Exception('hashindex_set failed')
 
     def merge(self, ChunkIndex other):
         cdef void *key = NULL

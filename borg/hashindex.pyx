@@ -14,8 +14,6 @@ cdef extern from "_hashindex.c":
     HashIndex *hashindex_read(char *path)
     HashIndex *hashindex_init(int capacity, int key_size, int value_size)
     void hashindex_free(HashIndex *index)
-    void hashindex_merge(HashIndex *index, HashIndex *other)
-    void hashindex_add(HashIndex *index, void *key, void *value)
     int hashindex_get_size(HashIndex *index)
     int hashindex_write(HashIndex *index, char *path)
     void *hashindex_get(HashIndex *index, void *key)

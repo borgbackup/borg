@@ -974,22 +974,17 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert 'This command initializes' not in self.cmd('help', 'init', '--usage-only')
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
-    def test_fuse_mount_repository(self):
+    def test_fuse_mount(self):
         self.cmd('init', self.repository_location)
         self.create_test_files()
         self.cmd('create', self.repository_location + '::archive', 'input')
         self.cmd('create', self.repository_location + '::archive2', 'input')
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
+        # mount the whole repository, archive contents shall show up in archivename subdirs of mountpoint:
         with self.fuse_mount(self.repository_location, mountpoint):
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive', 'input'))
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive2', 'input'))
-
-    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
-    def test_fuse_mount_archive(self):
-        self.cmd('init', self.repository_location)
-        self.create_test_files()
-        self.cmd('create', self.repository_location + '::archive', 'input')
-        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
+        # mount only 1 archive, its contents shall show up directly in mountpoint:
         with self.fuse_mount(self.repository_location + '::archive', mountpoint):
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'))
 
@@ -1165,11 +1160,7 @@ class RemoteArchiverTestCase(ArchiverTestCase):
     # this was introduced because some tests expect stderr contents to show up
     # in "output" also. Also, the non-forking exec_cmd catches both, too.
     @unittest.skip('deadlock issues')
-    def test_fuse_mount_repository(self):
-        pass
-
-    @unittest.skip('deadlock issues')
-    def test_fuse_mount_archive(self):
+    def test_fuse_mount(self):
         pass
 
     @unittest.skip('only works locally')

@@ -142,7 +142,7 @@ C to delete all backups residing on S.
 
 These are your options to protect against that:
 
-- Do not allow to permanently delete data from the repo, see :ref:`append-only-mode`.
+- Do not allow to permanently delete data from the repo, see :ref:`append_only_mode`.
 - Use a pull-mode setup using ``ssh -R``, see :issue:`900`.
 - Mount C's filesystem on another machine and then create a backup of it.
 - Do not give C filesystem-level access to S.

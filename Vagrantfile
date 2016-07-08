@@ -42,7 +42,7 @@ def packages_redhatted
     # needed to compile msgpack-python (otherwise it will use slow fallback code):
     yum install -y gcc-c++
     # for building python:
-    yum install -y zlib-devel bzip2-devel ncurses-devel readline-devel xz-devel sqlite-devel
+    yum install -y zlib-devel bzip2-devel ncurses-devel readline-devel xz xz-devel sqlite-devel
     #yum install -y python-pip
     #pip install virtualenv
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
@@ -53,10 +53,10 @@ def packages_darwin
   return <<-EOF
     # install all the (security and other) updates
     sudo softwareupdate --install --all
-    # get osxfuse 3.0.x pre-release code from github:
-    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.2.0/osxfuse-3.2.0.dmg >osxfuse.dmg
+    # get osxfuse 3.x pre-release code from github:
+    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.3.3/osxfuse-3.3.3.dmg >osxfuse.dmg
     MOUNTDIR=$(echo `hdiutil mount osxfuse.dmg | tail -1 | awk '{$1="" ; print $0}'` | xargs -0 echo) \
-    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for OS X 3.2.0.pkg" -target /
+    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for OS X 3.3.3.pkg" -target /
     sudo chown -R vagrant /usr/local  # brew must be able to create stuff here
     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     brew update
@@ -321,9 +321,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_32")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_32")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos6_32")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("centos6_32")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller("centos6_32")
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("centos6_32")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("centos6_32")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos6_32")
   end
 
@@ -336,9 +334,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_64")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_64")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos6_64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("centos6_64")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller("centos6_64")
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("centos6_64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("centos6_64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos6_64")
   end
 
@@ -449,7 +445,7 @@ Vagrant.configure(2) do |config|
     end
     b.vm.provision "packages netbsd", :type => :shell, :inline => packages_netbsd
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("netbsd64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("netbsd64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd64")
   end
 end

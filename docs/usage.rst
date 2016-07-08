@@ -805,7 +805,7 @@ Now, let's see how to restore some LVs from such a backup. ::
     $ borg extract --stdout /path/to/repo::arch dev/vg0/home-snapshot > /dev/vg0/home
 
 
-.. _append-only-mode:
+.. _append_only_mode:
 
 Append-only mode
 ~~~~~~~~~~~~~~~~

@@ -193,7 +193,7 @@ class FuseOperations(llfuse.Operations):
         try:
             return item.get('xattrs', {})[name]
         except KeyError:
-            raise llfuse.FUSEError(errno.ENODATA) from None
+            raise llfuse.FUSEError(llfuse.ENOATTR) from None
 
     def _load_pending_archive(self, inode):
         # Check if this is an archive we need to load

@@ -217,25 +217,20 @@ Cygwin
 
 .. note::
     Running under Cygwin is experimental and has only been tested with Cygwin
-    (x86-64) v2.1.0.
+    (x86-64) v2.5.2.
 
 Use the Cygwin installer to install the dependencies::
 
     python3 python3-setuptools
-    python3-cython  # not needed for releases
     binutils gcc-g++
     libopenssl openssl-devel
-    liblz4_1 liblz4-devel  # from cygwinports.org
+    liblz4_1 liblz4-devel
     git make openssh
 
 You can then install ``pip`` and ``virtualenv``::
 
     easy_install-3.4 pip
     pip install virtualenv
-
-In case the creation of the virtual environment fails, try deleting this file::
-
-    /usr/lib/python3.4/__pycache__/platform.cpython-34.pyc
 
 
 .. _pip-installation:

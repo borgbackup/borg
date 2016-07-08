@@ -122,8 +122,26 @@ Other changes:
   - vagrant: add ubuntu/xenial 64bit - this box has still some issues
   - ChunkBuffer: add test for leaving partial chunk in buffer, fixes #945
 
-Version 1.0.4 (not released yet)
---------------------------------
+
+Version 1.0.5 (2016-07-07)
+--------------------------
+
+Bug fixes:
+
+- borg mount: fix FUSE crash in xattr code on Linux introduced in 1.0.4, #1282
+
+Other changes:
+
+- backport some FAQ entries from master branch
+- add release helper scripts
+- Vagrantfile:
+
+  - centos6: no FUSE, don't build binary
+  - add xz for redhat-like dists
+
+
+Version 1.0.4 (2016-07-07)
+--------------------------
 
 New features:
 
@@ -155,6 +173,13 @@ Bug fixes:
 - Add missing error handler in directory attr restore loop.
 - repo: make sure write data hits disk before the commit tag (#1236) and also
   sync the containing directory.
+- FUSE: getxattr fail must use errno.ENOATTR, #1126
+  (fixes Mac OS X Finder malfunction: "zero bytes" file length, access denied)
+- borg check --repair: do not lose information about the good/original chunks.
+  If we do not lose the original chunk IDs list when "repairing" a file
+  (replacing missing chunks with all-zero chunks), we have a chance to "heal"
+  the file back into its original state later, in case the chunks re-appear
+  (e.g. in a fresh backup). Healing is not implemented yet, see #148.
 - fixes for --read-special mode:
 
   - ignore known files cache, #1241
@@ -204,6 +229,7 @@ Other changes:
   - add note that Fnmatch is default, #1247
   - make clear that lzma levels > 6 are a waste of cpu cycles
   - add a "do not edit" note to auto-generated files, #1250
+  - update cygwin installation docs
 - repository interoperability with borg master (1.1dev) branch:
 
   - borg check: read item metadata keys from manifest, #1147
@@ -211,8 +237,12 @@ Other changes:
   - fix hints file "unknown version" error handling bug
 - tests: add tests for format_line
 - llfuse: update version requirement for freebsd
-- Vagrantfile: use openbsd 5.9, #716
-- use Python 3.5.2 to build the binaries
+- Vagrantfile:
+
+  - use openbsd 5.9, #716
+  - do not install llfuse on netbsd (broken)
+  - update OSXfuse to version 3.3.3
+  - use Python 3.5.2 to build the binaries
 - glibc compatibility checker: scripts/glibc_check.py
 - add .eggs to .gitignore
 

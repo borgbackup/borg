@@ -148,6 +148,7 @@ class Item(PropDict):
     hardlink_master = PropDict._make_property('hardlink_master', bool)
 
     chunks = PropDict._make_property('chunks', (list, type(None)), 'list or None')
+    chunks_healthy = PropDict._make_property('chunks_healthy', (list, type(None)), 'list or None')
 
     xattrs = PropDict._make_property('xattrs', StableDict)
 

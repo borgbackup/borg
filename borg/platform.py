@@ -1,3 +1,4 @@
+import errno
 import os
 import sys
 
@@ -7,6 +8,11 @@ def sync_dir(path):
     fd = os.open(path, os.O_RDONLY)
     try:
         os.fsync(fd)
+    except OSError as os_error:
+        # Some network filesystems don't support this and fail with EINVAL.
+        # Other error codes (e.g. EIO) shouldn't be silenced.
+        if os_error.errno != errno.EINVAL:
+            raise
     finally:
         os.close(fd)
 

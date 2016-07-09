@@ -18,7 +18,7 @@ import time
 from io import BytesIO
 from . import xattr
 from .helpers import Error, uid2user, user2uid, gid2group, group2gid, \
-    parse_timestamp, to_localtime, format_time, format_timedelta, \
+    parse_timestamp, to_localtime, format_time, format_timedelta, remove_surrogates, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
     ProgressIndicatorPercent
 from .platform import acl_get, acl_set
@@ -344,6 +344,8 @@ Number of files: {0.stats.nfiles}'''.format(
         return stats
 
     def extract_item(self, item, restore_attrs=True, dry_run=False, stdout=False, sparse=False):
+        has_damaged_chunks = b'chunks_healthy' in item
+
         if dry_run or stdout:
             if b'chunks' in item:
                 for data in self.pipeline.fetch_many([c[0] for c in item[b'chunks']], is_preloaded=True):
@@ -351,6 +353,9 @@ Number of files: {0.stats.nfiles}'''.format(
                         sys.stdout.buffer.write(data)
                 if stdout:
                     sys.stdout.buffer.flush()
+            if has_damaged_chunks:
+                logger.warning('File %s has damaged (all-zero) chunks. Try running borg check --repair.' %
+                               remove_surrogates(item[b'path']))
             return
 
         dest = self.cwd
@@ -397,6 +402,9 @@ Number of files: {0.stats.nfiles}'''.format(
                         fd.truncate(pos)
                         fd.flush()
                         self.restore_attrs(path, item, fd=fd.fileno())
+                if has_damaged_chunks:
+                    logger.warning('File %s has damaged (all-zero) chunks. Try running borg check --repair.' %
+                                   remove_surrogates(item[b'path']))
             return
         with backup_io():
             # No repository access beyond this point.

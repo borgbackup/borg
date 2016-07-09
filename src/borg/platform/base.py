@@ -80,8 +80,11 @@ class SyncFile:
     TODO: A Windows implementation should use CreateFile with FILE_FLAG_WRITE_THROUGH.
     """
 
-    def __init__(self, path):
-        self.fd = open(path, 'xb')
+    def __init__(self, path, binary=True):
+        mode = 'x'
+        if binary:
+            mode += 'b'
+        self.fd = open(path, mode)
         self.fileno = self.fd.fileno()
 
     def __enter__(self):
@@ -110,6 +113,43 @@ class SyncFile:
         self.sync()
         self.fd.close()
         platform.sync_dir(os.path.dirname(self.fd.name))
+
+
+class SaveFile:
+    """
+    Update file contents atomically.
+
+    Must be used as a context manager (defining the scope of the transaction).
+
+    On a journaling file system the file contents are always updated
+    atomically and won't become corrupted, even on pure failures or
+    crashes (for caveats see SyncFile).
+    """
+
+    SUFFIX = '.tmp'
+
+    def __init__(self, path, binary=True):
+        self.binary = binary
+        self.path = path
+        self.tmppath = self.path + self.SUFFIX
+
+    def __enter__(self):
+        from .. import platform
+        try:
+            os.unlink(self.tmppath)
+        except OSError:
+            pass
+        self.fd = platform.SyncFile(self.tmppath, self.binary)
+        return self.fd
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        from .. import platform
+        self.fd.close()
+        if exc_type is not None:
+            os.unlink(self.tmppath)
+            return
+        os.rename(self.tmppath, self.path)
+        platform.sync_dir(os.path.dirname(self.path))
 
 
 def swidth(s):

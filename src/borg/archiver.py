@@ -734,8 +734,7 @@ class Archiver:
             logger.info("Cache deleted.")
         return self.exit_code
 
-    @with_repository()
-    def do_mount(self, args, repository, manifest, key):
+    def do_mount(self, args):
         """Mount archive or an entire repository as a FUSE filesystem"""
         try:
             from .fuse import FuseOperations
@@ -743,22 +742,25 @@ class Archiver:
             self.print_error('Loading fuse support failed [ImportError: %s]' % str(e))
             return self.exit_code
 
-        if not os.path.isdir(args.mountpoint) or not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
-            self.print_error('%s: Mountpoint must be a writable directory' % args.mountpoint)
+        if not os.path.isdir(args.mountpoint):
+            self.print_error('%s: Mountpoint must be a directory' % args.mountpoint)
             return self.exit_code
 
-        with cache_if_remote(repository) as cached_repo:
-            if args.location.archive:
-                archive = Archive(repository, key, manifest, args.location.archive)
-            else:
-                archive = None
-            operations = FuseOperations(key, repository, manifest, archive, cached_repo)
-            logger.info("Mounting filesystem")
-            try:
-                operations.mount(args.mountpoint, args.options, args.foreground)
-            except RuntimeError:
-                # Relevant error message already printed to stderr by fuse
-                self.exit_code = EXIT_ERROR
+        # XXX duplication of @with_repository code, but we don't want it
+        # opened all the time.
+        location = args.location  # note: 'location' must be always present in args
+        if location.proto == 'ssh':
+            repository = RemoteRepository(location, args=args)
+        else:
+            repository = Repository(location.path)
+
+        operations = FuseOperations(repository, args.location.archive)
+        logger.info("Mounting filesystem")
+        try:
+            operations.mount(args.mountpoint, args.options, args.foreground)
+        except RuntimeError:
+            # Relevant error message already printed to stderr by fuse
+            self.exit_code = EXIT_ERROR
         return self.exit_code
 
     @with_repository()

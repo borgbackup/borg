@@ -17,6 +17,9 @@ from .archive import Archive
 from .helpers import daemonize
 from .item import Item
 from .lrucache import LRUCache
+from .helpers import Manifest
+from .remote import cache_if_remote
+
 
 # Does this version of llfuse support ns precision?
 have_fuse_xtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
@@ -50,11 +53,12 @@ class ItemCache:
 class FuseOperations(llfuse.Operations):
     """Export archive as a fuse filesystem
     """
-    def __init__(self, key, repository, manifest, archive, cached_repo):
+    def __init__(self, repository, archive_name):
+      with repository:
+        self.key, self.manifest = Manifest.load(repository)
         super().__init__()
         self._inode_count = 0
-        self.key = key
-        self.repository = cached_repo
+        self.repository = repository
         self.items = {}
         self.parent = {}
         self.contents = defaultdict(dict)
@@ -65,25 +69,28 @@ class FuseOperations(llfuse.Operations):
         data_cache_capacity = int(os.environ.get('BORG_MOUNT_DATA_CACHE_ENTRIES', os.cpu_count() or 1))
         logger.debug('mount data cache capacity: %d chunks', data_cache_capacity)
         self.data_cache = LRUCache(capacity=data_cache_capacity, dispose=lambda _: None)
-        if archive:
+        if archive_name:
+            archive = Archive(repository, self.key, self.manifest, archive_name)
             self.process_archive(archive)
         else:
             # Create root inode
             self.parent[1] = self.allocate_inode()
             self.items[1] = self.default_dir
-            for archive_name in manifest.archives:
+            for archive_name in self.manifest.archives:
                 # Create archive placeholder inode
                 archive_inode = self.allocate_inode()
                 self.items[archive_inode] = self.default_dir
                 self.parent[archive_inode] = 1
                 self.contents[1][os.fsencode(archive_name)] = archive_inode
-                self.pending_archives[archive_inode] = Archive(repository, key, manifest, archive_name)
+                self.pending_archives[archive_inode] = archive_name
 
     def process_archive(self, archive, prefix=[]):
-        """Build fuse inode hierarchy from archive metadata
-        """
+      """Build fuse inode hierarchy from archive metadata
+      """
+      with self.repository:
+       with cache_if_remote(self.repository) as cached_repo:
         unpacker = msgpack.Unpacker()
-        for key, chunk in zip(archive.metadata[b'items'], self.repository.get_many(archive.metadata[b'items'])):
+        for key, chunk in zip(archive.metadata[b'items'], cached_repo.get_many(archive.metadata[b'items'])):
             _, data = self.key.decrypt(key, chunk)
             unpacker.feed(data)
             for item in unpacker:
@@ -196,8 +203,11 @@ class FuseOperations(llfuse.Operations):
             raise llfuse.FUSEError(llfuse.ENOATTR) from None
 
     def _load_pending_archive(self, inode):
+      with self.repository:
+       with cache_if_remote(self.repository) as cached_repo:
         # Check if this is an archive we need to load
-        archive = self.pending_archives.pop(inode, None)
+        archive_name = self.pending_archives.pop(inode, None)
+        archive = Archive(cached_repo, self.key, self.manifest, archive_name)
         if archive:
             self.process_archive(archive, [os.fsencode(archive.name)])
 
@@ -221,6 +231,8 @@ class FuseOperations(llfuse.Operations):
         return inode
 
     def read(self, fh, offset, size):
+      with self.repository:
+       with cache_if_remote(self.repository) as cached_repo:
         parts = []
         item = self.get_item(fh)
         for id, s, csize in item.chunks:
@@ -234,7 +246,7 @@ class FuseOperations(llfuse.Operations):
                     # evict fully read chunk from cache
                     del self.data_cache[id]
             else:
-                _, data = self.key.decrypt(id, self.repository.get(id))
+                _, data = self.key.decrypt(id, cached_repo.get(id))
                 if offset + n < len(data):
                     # chunk was only partially read, cache it
                     self.data_cache[id] = data

@@ -912,31 +912,56 @@ class ArchiveChecker:
                     self.repository.put(id_, cdata)
 
         def verify_file_chunks(item):
-            """Verifies that all file chunks are present
+            """Verifies that all file chunks are present.
 
-            Missing file chunks will be replaced with new chunks of the same
-            length containing all zeros.
+            Missing file chunks will be replaced with new chunks of the same length containing all zeros.
+            If a previously missing file chunk re-appears, the replacement chunk is replaced by the correct one.
             """
             offset = 0
             chunk_list = []
             chunks_replaced = False
-            for chunk_id, size, csize in item[b'chunks']:
+            has_chunks_healthy = b'chunks_healthy' in item
+            chunks_current = item[b'chunks']
+            chunks_healthy = item[b'chunks_healthy'] if has_chunks_healthy else chunks_current
+            assert len(chunks_current) == len(chunks_healthy)
+            for chunk_current, chunk_healthy in zip(chunks_current, chunks_healthy):
+                chunk_id, size, csize = chunk_healthy
                 if chunk_id not in self.chunks:
-                    # If a file chunk is missing, create an all empty replacement chunk
-                    logger.error('{}: Missing file chunk detected (Byte {}-{})'.format(item[b'path'].decode('utf-8', 'surrogateescape'), offset, offset + size))
-                    self.error_found = chunks_replaced = True
-                    data = bytes(size)
-                    chunk_id = self.key.id_hash(data)
-                    cdata = self.key.encrypt(data)
-                    csize = len(cdata)
-                    add_reference(chunk_id, size, csize, cdata)
+                    # a chunk of the healthy list is missing
+                    if chunk_current == chunk_healthy:
+                        logger.error('{}: New missing file chunk detected (Byte {}-{}). '
+                                     'Replacing with all-zero chunk.'.format(
+                                     item[b'path'].decode('utf-8', 'surrogateescape'), offset, offset + size))
+                        self.error_found = chunks_replaced = True
+                        data = bytes(size)
+                        chunk_id = self.key.id_hash(data)
+                        cdata = self.key.encrypt(data)
+                        csize = len(cdata)
+                        add_reference(chunk_id, size, csize, cdata)
+                    else:
+                        logger.info('{}: Previously missing file chunk is still missing (Byte {}-{}). '
+                                    'It has a all-zero replacement chunk already.'.format(
+                                    item[b'path'].decode('utf-8', 'surrogateescape'), offset, offset + size))
+                        chunk_id, size, csize = chunk_current
+                        add_reference(chunk_id, size, csize)
                 else:
-                    add_reference(chunk_id, size, csize)
-                chunk_list.append((chunk_id, size, csize))
+                    if chunk_current == chunk_healthy:
+                        # normal case, all fine.
+                        add_reference(chunk_id, size, csize)
+                    else:
+                        logger.info('{}: Healed previously missing file chunk! (Byte {}-{}).'.format(
+                            item[b'path'].decode('utf-8', 'surrogateescape'), offset, offset + size))
+                        add_reference(chunk_id, size, csize)
+                        mark_as_possibly_superseded(chunk_current[0])  # maybe orphaned the all-zero replacement chunk
+                chunk_list.append([chunk_id, size, csize])  # list-typed element as chunks_healthy is list-of-lists
                 offset += size
-            if chunks_replaced and b'chunks_healthy' not in item:
+            if chunks_replaced and not has_chunks_healthy:
                 # if this is first repair, remember the correct chunk IDs, so we can maybe heal the file later
                 item[b'chunks_healthy'] = item[b'chunks']
+            if has_chunks_healthy and chunk_list == chunks_healthy:
+                logger.info('{}: Completely healed previously damaged file!'.format(
+                            item[b'path'].decode('utf-8', 'surrogateescape')))
+                del item[b'chunks_healthy']
             item[b'chunks'] = chunk_list
 
         def robust_iterator(archive):

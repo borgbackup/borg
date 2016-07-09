@@ -1108,6 +1108,14 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
     EXE = 'borg.exe'
     FORK_DEFAULT = True
 
+    @unittest.skip('test_basic_functionality seems incompatible with fakeroot and/or the binary.')
+    def test_basic_functionality(self):
+        pass
+
+    @unittest.skip('test_overwrite seems incompatible with fakeroot and/or the binary.')
+    def test_overwrite(self):
+        pass
+
 
 class ArchiverCheckTestCase(ArchiverTestCaseBase):
 

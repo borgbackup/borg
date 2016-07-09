@@ -23,7 +23,7 @@ from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
 from .locking import UpgradableLock, LockError, LockErrorT
 from .lrucache import LRUCache
-from .platform import SyncFile, sync_dir
+from .platform import SaveFile, SyncFile, sync_dir
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
 MAGIC = b'BORG_SEG'
@@ -160,7 +160,7 @@ class Repository:
 
     def save_config(self, path, config):
         config_path = os.path.join(path, 'config')
-        with open(config_path, 'w') as fd:
+        with SaveFile(config_path, binary=False) as fd:
             config.write(fd)
 
     def save_key(self, keydata):

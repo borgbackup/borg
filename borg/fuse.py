@@ -11,7 +11,7 @@ from distutils.version import LooseVersion
 import msgpack
 
 from .archive import Archive
-from .helpers import daemonize, bigint_to_int, remove_surrogates
+from .helpers import daemonize, bigint_to_int
 from .logger import create_logger
 logger = create_logger()
 
@@ -47,7 +47,8 @@ class ItemCache:
 class FuseOperations(llfuse.Operations):
     """Export archive as a fuse filesystem
     """
-    allow_damaged_files = True
+
+    allow_damaged_files = False
 
     def __init__(self, key, repository, manifest, archive, cached_repo):
         super().__init__()
@@ -74,6 +75,32 @@ class FuseOperations(llfuse.Operations):
                 self.parent[archive_inode] = 1
                 self.contents[1][os.fsencode(archive_name)] = archive_inode
                 self.pending_archives[archive_inode] = Archive(repository, key, manifest, archive_name)
+
+    def mount(self, mountpoint, mount_options, foreground=False):
+        """Mount filesystem on *mountpoint* with *mount_options*."""
+        options = ['fsname=borgfs', 'ro']
+        if mount_options:
+            options.extend(mount_options.split(','))
+        try:
+            options.remove('allow_damaged_files')
+            self.allow_damaged_files = True
+        except ValueError:
+            pass
+        llfuse.init(self, mountpoint, options)
+        if not foreground:
+            daemonize()
+
+        # If the file system crashes, we do not want to umount because in that
+        # case the mountpoint suddenly appears to become empty. This can have
+        # nasty consequences, imagine the user has e.g. an active rsync mirror
+        # job - seeing the mountpoint empty, rsync would delete everything in the
+        # mirror.
+        umount = False
+        try:
+            signal = fuse_main()
+            umount = (signal is None)  # no crash and no signal -> umount request
+        finally:
+            llfuse.close(umount)
 
     def process_archive(self, archive, prefix=[]):
         """Build fuse inode hierarchy from archive metadata
@@ -272,28 +299,3 @@ class FuseOperations(llfuse.Operations):
     def readlink(self, inode, ctx=None):
         item = self.get_item(inode)
         return os.fsencode(item[b'source'])
-
-    def mount(self, mountpoint, extra_options, foreground=False):
-        options = ['fsname=borgfs', 'ro']
-        if extra_options:
-            options.extend(extra_options.split(','))
-        try:
-            options.remove('allow_damaged_files')
-            self.allow_damaged_files = True
-        except ValueError:
-            self.allow_damaged_files = False
-        llfuse.init(self, mountpoint, options)
-        if not foreground:
-            daemonize()
-
-        # If the file system crashes, we do not want to umount because in that
-        # case the mountpoint suddenly appears to become empty. This can have
-        # nasty consequences, imagine the user has e.g. an active rsync mirror
-        # job - seeing the mountpoint empty, rsync would delete everything in the
-        # mirror.
-        umount = False
-        try:
-            signal = fuse_main()
-            umount = (signal is None)  # no crash and no signal -> umount request
-        finally:
-            llfuse.close(umount)

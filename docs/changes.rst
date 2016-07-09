@@ -174,8 +174,8 @@ Other changes:
 - add .eggs to .gitignore
 
 
-Version 1.0.3
--------------
+Version 1.0.3 (2016-05-20)
+--------------------------
 
 Bug fixes:
 
@@ -204,8 +204,8 @@ Other changes:
   - borg create help: document format tags, #894
 
 
-Version 1.0.2
--------------
+Version 1.0.2 (2016-04-16)
+--------------------------
 
 Bug fixes:
 
@@ -240,8 +240,8 @@ Other changes:
   - fix confusing usage of "repo" as archive name (use "arch")
 
 
-Version 1.0.1
--------------
+Version 1.0.1 (2016-04-08)
+--------------------------
 
 New features:
 
@@ -292,8 +292,8 @@ Other changes:
   - Document logo font. Recreate logo png. Remove GIMP logo file.
 
 
-Version 1.0.0
--------------
+Version 1.0.0 (2016-03-05)
+--------------------------
 
 The major release number change (0.x -> 1.x) indicates bigger incompatible
 changes, please read the compatibility notes, adapt / test your scripts and
@@ -376,8 +376,8 @@ Other changes:
   - FAQ: how to limit bandwidth
 
 
-Version 1.0.0rc2
-----------------
+Version 1.0.0rc2 (2016-02-28)
+-----------------------------
 
 New features:
 
@@ -418,8 +418,8 @@ Other changes:
   - "connection closed by remote": add FAQ entry and point to issue #636
 
 
-Version 1.0.0rc1
-----------------
+Version 1.0.0rc1 (2016-02-07)
+-----------------------------
 
 New features:
 
@@ -468,8 +468,8 @@ Other changes:
   - misc. updates and fixes
 
 
-Version 0.30.0
---------------
+Version 0.30.0 (2016-01-23)
+---------------------------
 
 Compatibility notes:
 
@@ -546,8 +546,8 @@ Other changes:
   - add gcc gcc-c++ to redhat/fedora/corora install docs, fixes #583
 
 
-Version 0.29.0
---------------
+Version 0.29.0 (2015-12-13)
+---------------------------
 
 Compatibility notes:
 
@@ -622,8 +622,8 @@ Other changes:
   - fix wrong installation instructions for archlinux
 
 
-Version 0.28.2
---------------
+Version 0.28.2 (2015-11-15)
+---------------------------
 
 New features:
 
@@ -646,8 +646,8 @@ Other changes:
   - minor install docs improvements
 
 
-Version 0.28.1
---------------
+Version 0.28.1 (2015-11-08)
+---------------------------
 
 Bug fixes:
 
@@ -661,8 +661,8 @@ Other changes:
 - fix build on readthedocs
 
 
-Version 0.28.0
---------------
+Version 0.28.0 (2015-11-08)
+---------------------------
 
 Compatibility notes:
 
@@ -759,8 +759,8 @@ Other changes:
   - minor development docs update
 
 
-Version 0.27.0
---------------
+Version 0.27.0 (2015-10-07)
+---------------------------
 
 New features:
 
@@ -794,8 +794,8 @@ Other changes:
   - hint to single-file pyinstaller binaries from README
 
 
-Version 0.26.1
---------------
+Version 0.26.1 (2015-09-28)
+---------------------------
 
 This is a minor update, just docs and new pyinstaller binaries.
 
@@ -807,8 +807,8 @@ This is a minor update, just docs and new pyinstaller binaries.
 Note: if you did a python-based installation, there is no need to upgrade.
 
 
-Version 0.26.0
---------------
+Version 0.26.0 (2015-09-19)
+---------------------------
 
 New features:
 
@@ -868,8 +868,8 @@ Other changes:
   - Darwin (OS X Yosemite)
 
 
-Version 0.25.0
---------------
+Version 0.25.0 (2015-08-29)
+---------------------------
 
 Compatibility notes:
 
@@ -935,8 +935,8 @@ Other changes:
   - split install docs into system-specific preparations and generic instructions
 
 
-Version 0.24.0
---------------
+Version 0.24.0 (2015-08-09)
+---------------------------
 
 Incompatible changes (compared to 0.23):
 
@@ -1039,8 +1039,8 @@ Other changes:
 - some easy micro optimizations
 
 
-Version 0.23.0
---------------
+Version 0.23.0 (2015-06-11)
+---------------------------
 
 Incompatible changes (compared to attic, fork related):
 

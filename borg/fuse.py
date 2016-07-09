@@ -76,6 +76,16 @@ class FuseOperations(llfuse.Operations):
             data = self.key.decrypt(key, chunk)
             unpacker.feed(data)
             for item in unpacker:
+                try:
+                    # This can happen if an archive was created with a command line like
+                    # $ borg create ... dir1/file dir1
+                    # In this case the code below will have created a default_dir inode for dir1 already.
+                    inode = self._find_inode(item[b'path'], prefix)
+                except KeyError:
+                    pass
+                else:
+                    self.items[inode] = item
+                    continue
                 segments = prefix + os.fsencode(os.path.normpath(item[b'path'])).split(b'/')
                 del item[b'path']
                 num_segments = len(segments)

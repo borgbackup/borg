@@ -50,6 +50,51 @@ The best check that everything is ok is to run a dry-run extraction::
     borg extract -v --dry-run REPO::ARCHIVE
 
 
+Version 1.0.6rc1 (2016-07-10)
+-----------------------------
+
+New features:
+
+- borg check --repair: heal damaged files if missing chunks re-appear (e.g. if
+  the previously missing chunk was added again in a later backup archive),
+  #148. (*) Also improved logging.
+
+Bug fixes:
+
+- sync_dir: silence fsync() failing with EINVAL, #1287
+  Some network filesystems (like smbfs) don't support this and we use this in
+  repository code.
+- borg mount (FUSE):
+
+  - fix directories being shadowed when contained paths were also specified,
+    #1295
+  - raise I/O Error (EIO) on damaged files (unless -o allow_damaged_files is
+    used), #1302. (*)
+- borg extract: warn if a damaged file is extracted, #1299. (*)
+- Added some missing return code checks (ChunkIndex._add, hashindex_resize).
+- borg check: fix/optimize initial hash table size, avoids resize of the table.
+
+Other changes:
+
+- tests:
+
+  - add more FUSE tests, #1284
+  - deduplicate fuse (u)mount code
+  - fix borg binary test issues, #862
+- docs:
+
+  - changelog: added release dates to older borg releases
+  - fix some sphinx (docs generator) warnings, #881
+
+Notes:
+
+(*) Some features depend on information (chunks_healthy list) added to item
+metadata when a file with missing chunks was "repaired" using all-zero
+replacement chunks. The chunks_healthy list is generated since borg 1.0.4,
+thus borg can't recognize such "repaired" (but content-damaged) files if the
+repair was done with an older borg version.
+
+
 Version 1.0.5 (2016-07-07)
 --------------------------
 

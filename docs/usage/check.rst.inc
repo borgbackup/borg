@@ -66,9 +66,12 @@ Second, the consistency and correctness of the archive metadata is verified:
 - Check if archive metadata chunk is present. if not, remove archive from
   manifest.
 - For all files (items) in the archive, for all chunks referenced by these
-  files, check if chunk is present (if not and we are in repair mode, replace
-  it with a same-size chunk of zeros). This requires reading of archive and
-  file metadata, but not data.
+  files, check if chunk is present.
+  If a chunk is not present and we are in repair mode, replace it with a same-size
+  replacement chunk of zeros.
+  If a previously lost chunk reappears (e.g. via a later backup) and we are in
+  repair mode, the all-zero replacement chunk will be replaced by the correct chunk.
+  This requires reading of archive and file metadata, but not data.
 - If we are in repair mode and we checked all the archives: delete orphaned
   chunks from the repo.
 - if you use a remote repo server via ssh:, the archive check is executed on

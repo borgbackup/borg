@@ -823,8 +823,7 @@ class Archiver:
             re:^/home/[^/]\.tmp/
             sh:/home/*/.thumbnails
             EOF
-            $ borg create --exclude-from exclude.txt backup /
-        ''')
+            $ borg create --exclude-from exclude.txt backup /\n\n''')
     helptext['placeholders'] = textwrap.dedent('''
         Repository (or Archive) URLs and --prefix values support these placeholders:
 
@@ -856,8 +855,7 @@ class Archiver:
 
             borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
             borg create /path/to/repo::{hostname}-{now:%Y-%m-%d_%H:%M:%S} ...
-            borg prune --prefix '{hostname}-' ...
-        ''')
+            borg prune --prefix '{hostname}-' ...\n\n''')
 
     def do_help(self, parser, commands, args):
         if not args.topic:

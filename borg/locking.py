@@ -101,9 +101,11 @@ class NotMyLock(LockErrorT):
 class ExclusiveLock:
     """An exclusive Lock based on mkdir fs operation being atomic.
 
-    If possible, try to use the contextmanager here like:
-    with ExclusiveLock(...) as lock:
-        ...
+    If possible, try to use the contextmanager here like::
+
+        with ExclusiveLock(...) as lock:
+            ...
+
     This makes sure the lock is released again if the block is left, no
     matter how (e.g. if an exception occurred).
     """
@@ -222,9 +224,11 @@ class UpgradableLock:
     noone is allowed reading) and read access to a resource needs a shared
     lock (multiple readers are allowed).
 
-    If possible, try to use the contextmanager here like:
-    with UpgradableLock(...) as lock:
-        ...
+    If possible, try to use the contextmanager here like::
+
+        with UpgradableLock(...) as lock:
+            ...
+
     This makes sure the lock is released again if the block is left, no
     matter how (e.g. if an exception occurred).
     """

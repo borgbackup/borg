@@ -169,7 +169,7 @@ class build_usage(Command):
                         params = {"topic": topic,
                                   "underline": '~' * len('borg help ' + topic)}
                         doc.write(".. _borg_{topic}:\n\n".format(**params))
-                        doc.write("borg help {topic}\n{underline}\n::\n\n".format(**params))
+                        doc.write("borg help {topic}\n{underline}\n\n".format(**params))
                         doc.write(Archiver.helptext[topic])
                 else:
                     params = {"command": command,

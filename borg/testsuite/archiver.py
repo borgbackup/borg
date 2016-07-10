@@ -218,7 +218,8 @@ class ArchiverTestCaseBase(BaseTestCase):
 
     def tearDown(self):
         os.chdir(self._old_wd)
-        shutil.rmtree(self.tmpdir)
+        # note: ignore_errors=True as workaround for issue #862
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def cmd(self, *args, **kw):
         exit_code = kw.pop('exit_code', 0)
@@ -1138,6 +1139,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 class ArchiverTestCaseBinary(ArchiverTestCase):
     EXE = 'borg.exe'
     FORK_DEFAULT = True
+
+    @unittest.skip('test_basic_functionality seems incompatible with fakeroot and/or the binary.')
+    def test_basic_functionality(self):
+        pass
+
+    @unittest.skip('test_overwrite seems incompatible with fakeroot and/or the binary.')
+    def test_overwrite(self):
+        pass
 
 
 class ArchiverCheckTestCase(ArchiverTestCaseBase):

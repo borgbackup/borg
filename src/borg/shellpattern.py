@@ -5,7 +5,7 @@ import re
 def translate(pat):
     """Translate a shell-style pattern to a regular expression.
 
-    The pattern may include "**<sep>" (<sep> stands for the platform-specific path separator; "/" on POSIX systems) for
+    The pattern may include ``**<sep>`` (<sep> stands for the platform-specific path separator; "/" on POSIX systems) for
     matching zero or more directory levels and "*" for matching zero or more arbitrary characters with the exception of
     any path separator. Wrap meta-characters in brackets for a literal match (i.e. "[?]" to match the literal character
     "?").

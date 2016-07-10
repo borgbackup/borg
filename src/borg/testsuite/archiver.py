@@ -223,7 +223,8 @@ class ArchiverTestCaseBase(BaseTestCase):
 
     def tearDown(self):
         os.chdir(self._old_wd)
-        shutil.rmtree(self.tmpdir)
+        # note: ignore_errors=True as workaround for issue #862
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def cmd(self, *args, **kw):
         exit_code = kw.pop('exit_code', 0)
@@ -238,6 +239,13 @@ class ArchiverTestCaseBase(BaseTestCase):
 
     def create_src_archive(self, name):
         self.cmd('create', self.repository_location + '::' + name, src_dir)
+
+    def open_archive(self, name):
+        repository = Repository(self.repository_path)
+        with repository:
+            manifest, key = Manifest.load(repository)
+            archive = Archive(repository, key, manifest, name)
+        return archive, repository
 
     def create_regular_file(self, name, size=0, contents=None):
         filename = os.path.join(self.input_path, name)
@@ -1283,52 +1291,96 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert 'This command initializes' not in self.cmd('help', 'init', '--usage-only')
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
-    def test_fuse_mount_repository(self):
-        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
-        os.mkdir(mountpoint)
+    def test_fuse(self):
         self.cmd('init', self.repository_location)
         self.create_test_files()
         self.cmd('create', self.repository_location + '::archive', 'input')
         self.cmd('create', self.repository_location + '::archive2', 'input')
-        try:
-            self.cmd('mount', self.repository_location, mountpoint, fork=True)
-            self.wait_for_mount(mountpoint)
-            if has_lchflags:
-                # remove the file we did not backup, so input and output become equal
-                os.remove(os.path.join('input', 'flagfile'))
+        if has_lchflags:
+            # remove the file we did not backup, so input and output become equal
+            os.remove(os.path.join('input', 'flagfile'))
+        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
+        # mount the whole repository, archive contents shall show up in archivename subdirs of mountpoint:
+        with self.fuse_mount(self.repository_location, mountpoint):
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive', 'input'))
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive2', 'input'))
-        finally:
-            if sys.platform.startswith('linux'):
-                os.system('fusermount -u ' + mountpoint)
+        # mount only 1 archive, its contents shall show up directly in mountpoint:
+        with self.fuse_mount(self.repository_location + '::archive', mountpoint):
+            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'))
+            # regular file
+            in_fn = 'input/file1'
+            out_fn = os.path.join(mountpoint, 'input', 'file1')
+            # stat
+            sti1 = os.stat(in_fn)
+            sto1 = os.stat(out_fn)
+            assert sti1.st_mode == sto1.st_mode
+            assert sti1.st_uid == sto1.st_uid
+            assert sti1.st_gid == sto1.st_gid
+            assert sti1.st_size == sto1.st_size
+            assert sti1.st_atime == sto1.st_atime
+            assert sti1.st_ctime == sto1.st_ctime
+            assert sti1.st_mtime == sto1.st_mtime
+            # note: there is another hardlink to this, see below
+            assert sti1.st_nlink == sto1.st_nlink == 2
+            # read
+            with open(in_fn, 'rb') as in_f, open(out_fn, 'rb') as out_f:
+                assert in_f.read() == out_f.read()
+            # list/read xattrs
+            if xattr.is_enabled(self.input_path):
+                assert xattr.listxattr(out_fn) == ['user.foo', ]
+                assert xattr.getxattr(out_fn, 'user.foo') == b'bar'
             else:
-                os.system('umount ' + mountpoint)
-            os.rmdir(mountpoint)
-            # Give the daemon some time to exit
-            time.sleep(.2)
+                assert xattr.listxattr(out_fn) == []
+                try:
+                    xattr.getxattr(out_fn, 'user.foo')
+                except OSError as e:
+                    assert e.errno == llfuse.ENOATTR
+                else:
+                    assert False, "expected OSError(ENOATTR), but no error was raised"
+            # hardlink (to 'input/file1')
+            in_fn = 'input/hardlink'
+            out_fn = os.path.join(mountpoint, 'input', 'hardlink')
+            sti2 = os.stat(in_fn)
+            sto2 = os.stat(out_fn)
+            assert sti2.st_nlink == sto2.st_nlink == 2
+            assert sto1.st_ino == sto2.st_ino
+            # symlink
+            in_fn = 'input/link1'
+            out_fn = os.path.join(mountpoint, 'input', 'link1')
+            sti = os.stat(in_fn, follow_symlinks=False)
+            sto = os.stat(out_fn, follow_symlinks=False)
+            assert stat.S_ISLNK(sti.st_mode)
+            assert stat.S_ISLNK(sto.st_mode)
+            assert os.readlink(in_fn) == os.readlink(out_fn)
+            # FIFO
+            out_fn = os.path.join(mountpoint, 'input', 'fifo1')
+            sto = os.stat(out_fn)
+            assert stat.S_ISFIFO(sto.st_mode)
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
-    def test_fuse_mount_archive(self):
-        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
-        os.mkdir(mountpoint)
+    def test_fuse_allow_damaged_files(self):
         self.cmd('init', self.repository_location)
-        self.create_test_files()
-        self.cmd('create', self.repository_location + '::archive', 'input')
-        try:
-            self.cmd('mount', self.repository_location + '::archive', mountpoint, fork=True)
-            self.wait_for_mount(mountpoint)
-            if has_lchflags:
-                # remove the file we did not backup, so input and output become equal
-                os.remove(os.path.join('input', 'flagfile'))
-            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'))
-        finally:
-            if sys.platform.startswith('linux'):
-                os.system('fusermount -u ' + mountpoint)
+        self.create_src_archive('archive')
+        # Get rid of a chunk and repair it
+        archive, repository = self.open_archive('archive')
+        with repository:
+            for item in archive.iter_items():
+                if item.path.endswith('testsuite/archiver.py'):
+                    repository.delete(item.chunks[-1].id)
+                    path = item.path  # store full path for later
+                    break
             else:
-                os.system('umount ' + mountpoint)
-            os.rmdir(mountpoint)
-            # Give the daemon some time to exit
-            time.sleep(.2)
+                assert False  # missed the file
+            repository.commit()
+        self.cmd('check', '--repair', self.repository_location, exit_code=0)
+
+        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
+        with self.fuse_mount(self.repository_location + '::archive', mountpoint):
+            with pytest.raises(OSError) as excinfo:
+                open(os.path.join(mountpoint, path))
+            assert excinfo.value.errno == errno.EIO
+        with self.fuse_mount(self.repository_location + '::archive', mountpoint, 'allow_damaged_files'):
+            open(os.path.join(mountpoint, path)).close()
 
     def verify_aes_counter_uniqueness(self, method):
         seen = set()  # Chunks already seen
@@ -1633,6 +1685,14 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
     def test_recreate_changed_source(self):
         pass
 
+    @unittest.skip('test_basic_functionality seems incompatible with fakeroot and/or the binary.')
+    def test_basic_functionality(self):
+        pass
+
+    @unittest.skip('test_overwrite seems incompatible with fakeroot and/or the binary.')
+    def test_overwrite(self):
+        pass
+
 
 class ArchiverCheckTestCase(ArchiverTestCaseBase):
 
@@ -1642,13 +1702,6 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             self.cmd('init', self.repository_location)
             self.create_src_archive('archive1')
             self.create_src_archive('archive2')
-
-    def open_archive(self, name):
-        repository = Repository(self.repository_path)
-        with repository:
-            manifest, key = Manifest.load(repository)
-            archive = Archive(repository, key, manifest, name)
-        return archive, repository
 
     def test_check_usage(self):
         output = self.cmd('check', '-v', '--progress', self.repository_location, exit_code=0)
@@ -1672,12 +1725,45 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         with repository:
             for item in archive.iter_items():
                 if item.path.endswith('testsuite/archiver.py'):
-                    repository.delete(item.chunks[-1].id)
+                    valid_chunks = item.chunks
+                    killed_chunk = valid_chunks[-1]
+                    repository.delete(killed_chunk.id)
                     break
+            else:
+                self.assert_true(False)  # should not happen
             repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
-        self.cmd('check', '--repair', self.repository_location, exit_code=0)
+        output = self.cmd('check', '--repair', self.repository_location, exit_code=0)
+        self.assert_in('New missing file chunk detected', output)
         self.cmd('check', self.repository_location, exit_code=0)
+        # check that the file in the old archives has now a different chunk list without the killed chunk
+        for archive_name in ('archive1', 'archive2'):
+            archive, repository = self.open_archive(archive_name)
+            with repository:
+                for item in archive.iter_items():
+                    if item.path.endswith('testsuite/archiver.py'):
+                        self.assert_not_equal(valid_chunks, item.chunks)
+                        self.assert_not_in(killed_chunk, item.chunks)
+                        break
+                else:
+                    self.assert_true(False)  # should not happen
+        # do a fresh backup (that will include the killed chunk)
+        with patch.object(ChunkBuffer, 'BUFFER_SIZE', 10):
+            self.create_src_archive('archive3')
+        # check should be able to heal the file now:
+        output = self.cmd('check', '-v', '--repair', self.repository_location, exit_code=0)
+        self.assert_in('Healed previously missing file chunk', output)
+        self.assert_in('testsuite/archiver.py: Completely healed previously damaged file!', output)
+        # check that the file in the old archives has the correct chunks again
+        for archive_name in ('archive1', 'archive2'):
+            archive, repository = self.open_archive(archive_name)
+            with repository:
+                for item in archive.iter_items():
+                    if item.path.endswith('testsuite/archiver.py'):
+                        self.assert_equal(valid_chunks, item.chunks)
+                        break
+                else:
+                    self.assert_true(False)  # should not happen
 
     def test_missing_archive_item_chunk(self):
         archive, repository = self.open_archive('archive1')
@@ -1762,11 +1848,7 @@ class RemoteArchiverTestCase(ArchiverTestCase):
     # this was introduced because some tests expect stderr contents to show up
     # in "output" also. Also, the non-forking exec_cmd catches both, too.
     @unittest.skip('deadlock issues')
-    def test_fuse_mount_repository(self):
-        pass
-
-    @unittest.skip('deadlock issues')
-    def test_fuse_mount_archive(self):
+    def test_fuse(self):
         pass
 
     @unittest.skip('only works locally')

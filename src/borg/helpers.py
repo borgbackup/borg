@@ -927,8 +927,7 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
         retry_msg=None, invalid_msg=None, env_msg=None,
         falsish=FALSISH, truish=TRUISH, defaultish=DEFAULTISH,
         default=False, retry=True, env_var_override=None, ofile=None, input=input):
-    """
-    Output <msg> (usually a question) and let user input an answer.
+    """Output <msg> (usually a question) and let user input an answer.
     Qualifies the answer according to falsish, truish and defaultish as True, False or <default>.
     If it didn't qualify and retry_msg is None (no retries wanted),
     return the default [which defaults to False]. Otherwise let user retry
@@ -1112,7 +1111,7 @@ def log_multi(*msgs, level=logging.INFO, logger=logger):
     """
     log multiple lines of text, each line by a separate logging call for cosmetic reasons
 
-    each positional argument may be a single or multiple lines (separated by \n) of text.
+    each positional argument may be a single or multiple lines (separated by newlines) of text.
     """
     lines = []
     for msg in msgs:

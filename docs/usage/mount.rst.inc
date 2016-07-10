@@ -38,6 +38,13 @@ used in fstab entries:
 To allow a regular user to use fstab entries, add the ``user`` option:
 ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto,user 0 0``
 
+For mount options, see the fuse(8) manual page. Additional mount options
+supported by borg:
+
+- allow_damaged_files: by default damaged files (where missing chunks were
+  replaced with runs of zeros by borg check --repair) are not readable and
+  return EIO (I/O error). Set this option to read such files.
+
 The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
 to tweak the performance. It sets the number of cached data chunks; additional
 memory usage can be up to ~8 MiB times this number. The default is the number

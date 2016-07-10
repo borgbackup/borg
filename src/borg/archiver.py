@@ -1134,8 +1134,7 @@ class Archiver:
             re:^/home/[^/]\.tmp/
             sh:/home/*/.thumbnails
             EOF
-            $ borg create --exclude-from exclude.txt backup /
-        ''')
+            $ borg create --exclude-from exclude.txt backup /\n\n''')
     helptext['placeholders'] = textwrap.dedent('''
         Repository (or Archive) URLs and --prefix values support these placeholders:
 
@@ -1167,8 +1166,7 @@ class Archiver:
 
             borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
             borg create /path/to/repo::{hostname}-{now:%Y-%m-%d_%H:%M:%S} ...
-            borg prune --prefix '{hostname}-' ...
-        ''')
+            borg prune --prefix '{hostname}-' ...\n\n''')
 
     def do_help(self, parser, commands, args):
         if not args.topic:
@@ -1331,9 +1329,12 @@ class Archiver:
         - Check if archive metadata chunk is present. if not, remove archive from
           manifest.
         - For all files (items) in the archive, for all chunks referenced by these
-          files, check if chunk is present (if not and we are in repair mode, replace
-          it with a same-size chunk of zeros). This requires reading of archive and
-          file metadata, but not data.
+          files, check if chunk is present.
+          If a chunk is not present and we are in repair mode, replace it with a same-size
+          replacement chunk of zeros.
+          If a previously lost chunk reappears (e.g. via a later backup) and we are in
+          repair mode, the all-zero replacement chunk will be replaced by the correct chunk.
+          This requires reading of archive and file metadata, but not data.
         - If we are in repair mode and we checked all the archives: delete orphaned
           chunks from the repo.
         - if you use a remote repo server via ssh:, the archive check is executed on
@@ -1738,6 +1739,13 @@ class Archiver:
 
         To allow a regular user to use fstab entries, add the ``user`` option:
         ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto,user 0 0``
+
+        For mount options, see the fuse(8) manual page. Additional mount options
+        supported by borg:
+
+        - allow_damaged_files: by default damaged files (where missing chunks were
+          replaced with runs of zeros by borg check --repair) are not readable and
+          return EIO (I/O error). Set this option to read such files.
 
         The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
         to tweak the performance. It sets the number of cached data chunks; additional

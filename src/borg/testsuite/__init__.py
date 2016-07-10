@@ -116,6 +116,24 @@ class BaseTestCase(unittest.TestCase):
         for sub_diff in diff.subdirs.values():
             self._assert_dirs_equal_cmp(sub_diff)
 
+    @contextmanager
+    def fuse_mount(self, location, mountpoint, mount_options=None):
+        os.mkdir(mountpoint)
+        args = ['mount', location, mountpoint]
+        if mount_options:
+            args += '-o', mount_options
+        self.cmd(*args, fork=True)
+        self.wait_for_mount(mountpoint)
+        yield
+        if sys.platform.startswith('linux'):
+            cmd = 'fusermount -u %s' % mountpoint
+        else:
+            cmd = 'umount %s' % mountpoint
+        os.system(cmd)
+        os.rmdir(mountpoint)
+        # Give the daemon some time to exit
+        time.sleep(.2)
+
     def wait_for_mount(self, path, timeout=5):
         """Wait until a filesystem is mounted on `path`
         """

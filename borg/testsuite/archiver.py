@@ -234,6 +234,13 @@ class ArchiverTestCaseBase(BaseTestCase):
     def create_src_archive(self, name):
         self.cmd('create', self.repository_location + '::' + name, src_dir)
 
+    def open_archive(self, name):
+        repository = Repository(self.repository_path)
+        with repository:
+            manifest, key = Manifest.load(repository)
+            archive = Archive(repository, key, manifest, name)
+        return archive, repository
+
 
 class ArchiverTestCase(ArchiverTestCaseBase):
 
@@ -1037,6 +1044,30 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             sto = os.stat(out_fn)
             assert stat.S_ISFIFO(sto.st_mode)
 
+    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    def test_fuse_allow_damaged_files(self):
+        self.cmd('init', self.repository_location)
+        self.create_src_archive('archive')
+        # Get rid of a chunk and repair it
+        archive, repository = self.open_archive('archive')
+        with repository:
+            for item in archive.iter_items():
+                if item[b'path'].endswith('testsuite/archiver.py'):
+                    repository.delete(item[b'chunks'][-1][0])
+                    path = item[b'path']  # store full path for later
+                    break
+            else:
+                assert False  # missed the file
+            repository.commit()
+        self.cmd('check', '--repair', self.repository_location, exit_code=0)
+
+        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
+        with self.fuse_mount(self.repository_location + '::archive', mountpoint):
+            with pytest.raises(OSError):
+                open(os.path.join(mountpoint, path))
+        with self.fuse_mount(self.repository_location + '::archive', mountpoint, 'allow_damaged_files'):
+            open(os.path.join(mountpoint, path)).close()
+
     def verify_aes_counter_uniqueness(self, method):
         seen = set()  # Chunks already seen
         used = set()  # counter values already used
@@ -1116,13 +1147,6 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             self.cmd('init', self.repository_location)
             self.create_src_archive('archive1')
             self.create_src_archive('archive2')
-
-    def open_archive(self, name):
-        repository = Repository(self.repository_path)
-        with repository:
-            manifest, key = Manifest.load(repository)
-            archive = Archive(repository, key, manifest, name)
-        return archive, repository
 
     def test_check_usage(self):
         output = self.cmd('check', '-v', self.repository_location, exit_code=0)

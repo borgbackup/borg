@@ -6,10 +6,15 @@ import os
 import stat
 import tempfile
 import time
-from .archive import Archive
-from .helpers import daemonize, bigint_to_int
 from distutils.version import LooseVersion
+
 import msgpack
+
+from .archive import Archive
+from .helpers import daemonize, bigint_to_int, remove_surrogates
+from .logger import create_logger
+logger = create_logger()
+
 
 # Does this version of llfuse support ns precision?
 have_fuse_xtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
@@ -42,6 +47,8 @@ class ItemCache:
 class FuseOperations(llfuse.Operations):
     """Export archive as a fuse filesystem
     """
+    allow_damaged_files = True
+
     def __init__(self, key, repository, manifest, archive, cached_repo):
         super().__init__()
         self._inode_count = 0
@@ -225,6 +232,15 @@ class FuseOperations(llfuse.Operations):
         return self.getattr(inode)
 
     def open(self, inode, flags, ctx=None):
+        if not self.allow_damaged_files:
+            item = self.get_item(inode)
+            if b'chunks_healthy' in item:
+                # Processed archive items don't carry the path anymore; for converting the inode
+                # to the path we'd either have to store the inverse of the current structure,
+                # or search the entire archive. So we just don't print it. It's easy to correlate anyway.
+                logger.warning('File has damaged (all-zero) chunks. Try running borg check --repair. '
+                               'Mount with allow_damaged_files to read damaged files.')
+                raise llfuse.FUSEError(errno.EIO)
         return inode
 
     def opendir(self, inode, ctx=None):
@@ -261,6 +277,11 @@ class FuseOperations(llfuse.Operations):
         options = ['fsname=borgfs', 'ro']
         if extra_options:
             options.extend(extra_options.split(','))
+        try:
+            options.remove('allow_damaged_files')
+            self.allow_damaged_files = True
+        except ValueError:
+            self.allow_damaged_files = False
         llfuse.init(self, mountpoint, options)
         if not foreground:
             daemonize()

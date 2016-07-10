@@ -94,9 +94,12 @@ class BaseTestCase(unittest.TestCase):
             self._assert_dirs_equal_cmp(sub_diff)
 
     @contextmanager
-    def fuse_mount(self, location, mountpoint):
+    def fuse_mount(self, location, mountpoint, mount_options=None):
         os.mkdir(mountpoint)
-        self.cmd('mount', location, mountpoint, fork=True)
+        args = ['mount', location, mountpoint]
+        if mount_options:
+            args += '-o', mount_options
+        self.cmd(*args, fork=True)
         self.wait_for_mount(mountpoint)
         yield
         if sys.platform.startswith('linux'):

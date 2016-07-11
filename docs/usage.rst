@@ -1,4 +1,5 @@
 .. include:: global.rst.inc
+.. highlight:: none
 .. _detailed_usage:
 
 Usage

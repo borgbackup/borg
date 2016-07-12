@@ -363,14 +363,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_equal(filter(info_output), filter(info_output2))
 
     def test_atime(self):
+        def has_noatime(some_file):
+            atime_before = os.stat(some_file).st_atime_ns
+            try:
+                os.close(os.open(some_file, flags_noatime))
+            except PermissionError:
+                return False
+            else:
+                atime_after = os.stat(some_file).st_atime_ns
+                noatime_used = flags_noatime != flags_normal
+                return noatime_used and atime_before == atime_after
+
         self.create_test_files()
         atime, mtime = 123456780, 234567890
-        try:
-            os.close(os.open('input/file1', flags_noatime))
-        except PermissionError:
-            have_noatime = False
-        else:
-            have_noatime = (flags_noatime != flags_normal and sys.platform != 'gnu0')
+        have_noatime = has_noatime('input/file1')
         os.utime('input/file1', (atime, mtime))
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')

@@ -63,12 +63,10 @@ if sys.platform.startswith('linux') and 'fakeroot' in LD_PRELOAD:
         libc_name = LD_PRELOAD
         XATTR_FAKEROOT = True
 
-
 try:
     libc = CDLL(libc_name, use_errno=True)
 except OSError as e:
     msg = "Can't find C library [%s]. Try installing ldconfig, gcc/cc or objdump." % e
-    logger.error(msg)
     raise Exception(msg)
 
 

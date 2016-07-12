@@ -17,7 +17,7 @@ from hashlib import sha256
 import pytest
 
 from .. import xattr
-from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP
+from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP, flags_noatime, flags_normal
 from ..archiver import Archiver
 from ..cache import Cache
 from ..crypto import bytes_to_long, num_aes_blocks
@@ -365,6 +365,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_atime(self):
         self.create_test_files()
         atime, mtime = 123456780, 234567890
+        try:
+            os.close(os.open('input/file1', flags_noatime))
+        except PermissionError:
+            have_noatime = False
+        else:
+            have_noatime = flags_noatime != flags_normal
         os.utime('input/file1', (atime, mtime))
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
@@ -373,7 +379,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         sti = os.stat('input/file1')
         sto = os.stat('output/input/file1')
         assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
-        if hasattr(os, 'O_NOATIME'):
+        if have_noatime:
             assert sti.st_atime_ns == sto.st_atime_ns == atime * 1e9
         else:
             # it touched the input file's atime while backing it up

@@ -370,7 +370,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         except PermissionError:
             have_noatime = False
         else:
-            have_noatime = flags_noatime != flags_normal
+            have_noatime = (flags_noatime != flags_normal and sys.platform != 'gnu0')
         os.utime('input/file1', (atime, mtime))
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')

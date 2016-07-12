@@ -12,12 +12,19 @@ end
 
 def packages_debianoid
   return <<-EOF
+    if id "vagrant" >/dev/null 2>&1; then
+      username='vagrant'
+      home_dir=/home/vagrant
+    else
+      username='ubuntu'
+      home_dir=/home/ubuntu
+    fi
     apt-get update
     # install all the (security and other) updates
     apt-get dist-upgrade -y
     # for building borgbackup and dependencies:
     apt-get install -y libssl-dev libacl1-dev liblz4-dev libfuse-dev fuse pkg-config
-    usermod -a -G fuse vagrant
+    usermod -a -G fuse $username
     apt-get install -y fakeroot build-essential git
     apt-get install -y python3-dev python3-setuptools
     # for building python:
@@ -27,7 +34,7 @@ def packages_debianoid
     # newer versions are not compatible with py 3.2 any more.
     easy_install3 'pip<8.0'
     pip3 install 'virtualenv<14.0'
-    touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
+    touch $home_dir/.bash_profile ; chown $username $home_dir/.bash_profile
   EOF
 end
 
@@ -283,7 +290,13 @@ end
 def fix_perms
   return <<-EOF
     # . ~/.profile
-    chown -R vagrant /vagrant/borg
+
+    if id "vagrant" >/dev/null 2>&1; then
+      chown -R vagrant /vagrant/borg
+    else
+      chown -R ubuntu /vagrant/borg
+    fi
+
   EOF
 end
 

@@ -50,6 +50,25 @@ The best check that everything is ok is to run a dry-run extraction::
     borg extract -v --dry-run REPO::ARCHIVE
 
 
+Version 1.0.6 (2016-07-12)
+--------------------------
+
+Bug fixes:
+
+- Linux: handle multiple LD_PRELOAD entries correctly, #1314, #1111
+- Fix crash with unclear message if the libc is not found, #1314, #1111
+
+Other changes:
+
+- tests:
+
+  - Fixed O_NOATIME tests for Solaris and GNU Hurd, #1315
+  - Fixed sparse file tests for (file) systems not supporting it, #1310
+- docs:
+
+  - Fixed syntax highlighting, #1313
+  - misc docs: added data processing overview picture
+
 Version 1.0.6rc1 (2016-07-10)
 -----------------------------
 

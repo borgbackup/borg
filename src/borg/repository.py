@@ -248,9 +248,10 @@ class Repository:
     def commit(self, save_space=False):
         """Commit transaction
         """
+        # save_space is not used anymore, but stays for RPC/API compatibility.
         self.io.write_commit()
         if not self.append_only:
-            self.compact_segments(save_space=save_space)
+            self.compact_segments()
         self.write_index()
         self.rollback()
 
@@ -348,7 +349,7 @@ class Repository:
             os.unlink(os.path.join(self.path, name))
         self.index = None
 
-    def compact_segments(self, save_space=False):
+    def compact_segments(self):
         """Compact sparse segments by copying data into new segments
         """
         if not self.compact:
@@ -357,12 +358,11 @@ class Repository:
         segments = self.segments
         unused = []  # list of segments, that are not used anymore
 
-        def complete_xfer():
-            # complete the transfer (usually exactly when some target segment
-            # is full, or at the very end when everything is processed)
+        def complete_xfer(intermediate=True):
+            # complete the current transfer (when some target segment is full)
             nonlocal unused
             # commit the new, compact, used segments
-            self.io.write_commit()
+            self.io.write_commit(intermediate=intermediate)
             # get rid of the old, sparse, unused segments. free space.
             for segment in unused:
                 assert self.segments.pop(segment) == 0
@@ -383,7 +383,7 @@ class Repository:
             for tag, key, offset, data in self.io.iter_objects(segment, include_data=True):
                 if tag == TAG_PUT and self.index.get(key, (-1, -1)) == (segment, offset):
                     try:
-                        new_segment, offset = self.io.write_put(key, data, raise_full=save_space)
+                        new_segment, offset = self.io.write_put(key, data, raise_full=True)
                     except LoggedIO.SegmentFull:
                         complete_xfer()
                         new_segment, offset = self.io.write_put(key, data)
@@ -394,13 +394,13 @@ class Repository:
                 elif tag == TAG_DELETE:
                     if index_transaction_id is None or segment > index_transaction_id:
                         try:
-                            self.io.write_delete(key, raise_full=save_space)
+                            self.io.write_delete(key, raise_full=True)
                         except LoggedIO.SegmentFull:
                             complete_xfer()
                             self.io.write_delete(key)
             assert segments[segment] == 0
             unused.append(segment)
-        complete_xfer()
+        complete_xfer(intermediate=False)
 
     def replay_segments(self, index_transaction_id, segments_transaction_id):
         self.prepare_txn(index_transaction_id, do_cleanup=False)
@@ -536,7 +536,7 @@ class Repository:
                     if current_index.get(key, (-1, -1)) != value:
                         report_error('Index mismatch for key {}. {} != {}'.format(key, value, current_index.get(key, (-1, -1))))
         if repair:
-            self.compact_segments(save_space=save_space)
+            self.compact_segments()
             self.write_index()
         self.rollback()
         if error_found:
@@ -898,9 +898,15 @@ class LoggedIO:
         self.offset += self.put_header_fmt.size
         return self.segment, self.put_header_fmt.size
 
-    def write_commit(self):
-        self.close_segment()
-        fd = self.get_write_fd()
+    def write_commit(self, intermediate=False):
+        if intermediate:
+            # Intermediate commits go directly into the current segment - this makes checking their validity more
+            # expensive, but is faster and reduces clobber.
+            fd = self.get_write_fd()
+            fd.sync()
+        else:
+            self.close_segment()
+            fd = self.get_write_fd()
         header = self.header_no_crc_fmt.pack(self.header_fmt.size, TAG_COMMIT)
         crc = self.crc_fmt.pack(crc32(header) & 0xffffffff)
         fd.write(b''.join((crc, header)))

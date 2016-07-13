@@ -1,3 +1,4 @@
+.. highlight:: python
 
 API Documentation
 =================

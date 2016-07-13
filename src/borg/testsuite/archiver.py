@@ -23,7 +23,7 @@ except ImportError:
     pass
 
 from .. import xattr, helpers, platform
-from ..archive import Archive, ChunkBuffer, ArchiveRecreater
+from ..archive import Archive, ChunkBuffer, ArchiveRecreater, flags_noatime, flags_normal
 from ..archiver import Archiver
 from ..cache import Cache
 from ..constants import *  # NOQA
@@ -390,8 +390,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert os.readlink('input/link1') == 'somewhere'
 
     def test_atime(self):
+        def has_noatime(some_file):
+            atime_before = os.stat(some_file).st_atime_ns
+            try:
+                os.close(os.open(some_file, flags_noatime))
+            except PermissionError:
+                return False
+            else:
+                atime_after = os.stat(some_file).st_atime_ns
+                noatime_used = flags_noatime != flags_normal
+                return noatime_used and atime_before == atime_after
+
         self.create_test_files()
         atime, mtime = 123456780, 234567890
+        have_noatime = has_noatime('input/file1')
         os.utime('input/file1', (atime, mtime))
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
@@ -400,7 +412,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         sti = os.stat('input/file1')
         sto = os.stat('output/input/file1')
         assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
-        if hasattr(os, 'O_NOATIME'):
+        if have_noatime:
             assert sti.st_atime_ns == sto.st_atime_ns == atime * 1e9
         else:
             # it touched the input file's atime while backing it up
@@ -420,12 +432,30 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             return repository.id
 
     def test_sparse_file(self):
-        # Mac OS X has no sparse file support
-        # Solaris (ZFS) has sparse file support, but is less predictable about it
-        sparse_support = sys.platform not in ['darwin', 'sunos5']
+        def is_sparse(fn, total_size, hole_size):
+            st = os.stat(fn)
+            assert st.st_size == total_size
+            sparse = True
+            if sparse and hasattr(st, 'st_blocks') and st.st_blocks * 512 >= st.st_size:
+                sparse = False
+            if sparse and hasattr(os, 'SEEK_HOLE') and hasattr(os, 'SEEK_DATA'):
+                with open(fn, 'rb') as fd:
+                    # only check if the first hole is as expected, because the 2nd hole check
+                    # is problematic on xfs due to its "dynamic speculative EOF preallocation
+                    try:
+                        if fd.seek(0, os.SEEK_HOLE) != 0:
+                            sparse = False
+                        if fd.seek(0, os.SEEK_DATA) != hole_size:
+                            sparse = False
+                    except OSError:
+                        # OS/FS does not really support SEEK_HOLE/SEEK_DATA
+                        sparse = False
+            return sparse
+
         filename = os.path.join(self.input_path, 'sparse')
         content = b'foobar'
         hole_size = 5 * (1 << CHUNK_MAX_EXP)  # 5 full chunker buffers
+        total_size = hole_size + len(content) + hole_size
         with open(filename, 'wb') as fd:
             # create a file that has a hole at the beginning and end (if the
             # OS and filesystem supports sparse files)
@@ -434,39 +464,23 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.seek(hole_size, 1)
             pos = fd.tell()
             fd.truncate(pos)
-        total_len = hole_size + len(content) + hole_size
-        st = os.stat(filename)
-        self.assert_equal(st.st_size, total_len)
-        if sparse_support and hasattr(st, 'st_blocks'):
-            self.assert_true(st.st_blocks * 512 < total_len)  # is input sparse?
-        self.cmd('init', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        with changedir('output'):
-            self.cmd('extract', '--sparse', self.repository_location + '::test')
-        self.assert_dirs_equal('input', 'output/input')
-        filename = os.path.join(self.output_path, 'input', 'sparse')
-        with open(filename, 'rb') as fd:
-            # check if file contents are as expected
-            self.assert_equal(fd.read(hole_size), b'\0' * hole_size)
-            self.assert_equal(fd.read(len(content)), content)
-            self.assert_equal(fd.read(hole_size), b'\0' * hole_size)
-        st = os.stat(filename)
-        self.assert_equal(st.st_size, total_len)
+        # we first check if we could create a sparse input file:
+        sparse_support = is_sparse(filename, total_size, hole_size)
         if sparse_support:
-            if hasattr(st, 'st_blocks'):
-                # do only check if it is less, do NOT check if it is much less
-                # as that causes troubles on xfs, zfs, ntfs:
-                self.assert_true(st.st_blocks * 512 < total_len)
-            if hasattr(os, 'SEEK_HOLE') and hasattr(os, 'SEEK_DATA'):
-                with open(filename, 'rb') as fd:
-                    # only check if the first hole is as expected, because the 2nd hole check
-                    # is problematic on xfs due to its "dynamic speculative EOF preallocation
-                    try:
-                        self.assert_equal(fd.seek(0, os.SEEK_HOLE), 0)
-                        self.assert_equal(fd.seek(0, os.SEEK_DATA), hole_size)
-                    except OSError:
-                        # does not really support SEEK_HOLE/SEEK_DATA
-                        pass
+            # we could create a sparse input file, so creating a backup of it and
+            # extracting it again (as sparse) should also work:
+            self.cmd('init', self.repository_location)
+            self.cmd('create', self.repository_location + '::test', 'input')
+            with changedir(self.output_path):
+                self.cmd('extract', '--sparse', self.repository_location + '::test')
+            self.assert_dirs_equal('input', 'output/input')
+            filename = os.path.join(self.output_path, 'input', 'sparse')
+            with open(filename, 'rb') as fd:
+                # check if file contents are as expected
+                self.assert_equal(fd.read(hole_size), b'\0' * hole_size)
+                self.assert_equal(fd.read(len(content)), content)
+                self.assert_equal(fd.read(hole_size), b'\0' * hole_size)
+            self.assert_true(is_sparse(filename, total_size, hole_size))
 
     def test_unusual_filenames(self):
         filenames = ['normal', 'with some blanks', '(with_parens)', ]

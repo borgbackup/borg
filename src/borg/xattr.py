@@ -72,7 +72,6 @@ try:
     libc = CDLL(libc_name, use_errno=True)
 except OSError as e:
     msg = "Can't find C library [%s]. Try installing ldconfig, gcc/cc or objdump." % e
-    logger.error(msg)
     raise Exception(msg)
 
 

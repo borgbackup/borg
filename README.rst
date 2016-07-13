@@ -1,5 +1,7 @@
 |screencast|
 
+.. highlight:: bash
+
 What is BorgBackup?
 ===================
 
@@ -87,7 +89,10 @@ Initialize a new backup repository and create a backup archive::
     $ borg init /path/to/repo
     $ borg create /path/to/repo::Saturday1 ~/Documents
 
-Now doing another backup, just to show off the great deduplication::
+Now doing another backup, just to show off the great deduplication:
+
+.. code-block:: none
+   :emphasize-lines: 11
 
     $ borg create -v --stats /path/to/repo::Saturday2 ~/Documents
     -----------------------------------------------------------------------------

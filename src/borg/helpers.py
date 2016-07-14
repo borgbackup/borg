@@ -7,6 +7,7 @@ import os.path
 import platform
 import pwd
 import re
+import signal
 import socket
 import sys
 import stat
@@ -16,6 +17,7 @@ import unicodedata
 import uuid
 from binascii import hexlify
 from collections import namedtuple, deque
+from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from functools import wraps, partial
@@ -1535,3 +1537,12 @@ class CompressionDecider2:
         compr_args.update(compr_spec)
         logger.debug("len(data) == %d, len(lz4(data)) == %d, choosing %s", data_len, cdata_len, compr_spec)
         return compr_args, Chunk(data, **meta)
+
+
+@contextmanager
+def signal_handler(signo, handler):
+    old_signal_handler = signal.signal(signo, handler)
+    try:
+        yield
+    finally:
+        signal.signal(signo, old_signal_handler)

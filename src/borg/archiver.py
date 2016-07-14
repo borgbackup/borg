@@ -40,6 +40,7 @@ from .helpers import update_excludes, check_extension_modules
 from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo
 from .helpers import log_multi
 from .helpers import parse_pattern, PatternMatcher, PathPrefixPattern
+from .helpers import signal_handler
 from .item import Item
 from .key import key_creator, RepoKey, PassphraseKey
 from .platform import get_flags
@@ -938,27 +939,26 @@ class Archiver:
                                      file_status_printer=self.print_file_status,
                                      dry_run=args.dry_run)
 
-        signal.signal(signal.SIGTERM, interrupt)
-        signal.signal(signal.SIGINT, interrupt)
-
-        if args.location.archive:
-            name = args.location.archive
-            if recreater.is_temporary_archive(name):
-                self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
-                return self.exit_code
-            recreater.recreate(name, args.comment)
-        else:
-            for archive in manifest.list_archive_infos(sort_by='ts'):
-                name = archive.name
+        with signal_handler(signal.SIGTERM, interrupt), \
+             signal_handler(signal.SIGINT, interrupt):
+            if args.location.archive:
+                name = args.location.archive
                 if recreater.is_temporary_archive(name):
-                    continue
-                print('Processing', name)
-                if not recreater.recreate(name, args.comment):
-                    break
-        manifest.write()
-        repository.commit()
-        cache.commit()
-        return self.exit_code
+                    self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
+                    return self.exit_code
+                recreater.recreate(name, args.comment)
+            else:
+                for archive in manifest.list_archive_infos(sort_by='ts'):
+                    name = archive.name
+                    if recreater.is_temporary_archive(name):
+                        continue
+                    print('Processing', name)
+                    if not recreater.recreate(name, args.comment):
+                        break
+            manifest.write()
+            repository.commit()
+            cache.commit()
+            return self.exit_code
 
     @with_repository(manifest=False)
     def do_with_lock(self, args, repository):

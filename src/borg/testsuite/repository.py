@@ -6,6 +6,8 @@ import sys
 import tempfile
 from unittest.mock import patch
 
+import pytest
+
 from ..hashindex import NSIndex
 from ..helpers import Location
 from ..helpers import IntegrityError
@@ -34,6 +36,15 @@ class RepositoryTestCaseBase(BaseTestCase):
         if self.repository:
             self.repository.close()
         self.repository = self.open()
+
+    def add_keys(self):
+        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.put(b'00000000000000000000000000000001', b'bar')
+        self.repository.put(b'00000000000000000000000000000003', b'bar')
+        self.repository.commit()
+        self.repository.put(b'00000000000000000000000000000001', b'bar2')
+        self.repository.put(b'00000000000000000000000000000002', b'boo')
+        self.repository.delete(b'00000000000000000000000000000003')
 
 
 class RepositoryTestCase(RepositoryTestCaseBase):
@@ -168,15 +179,6 @@ class LocalRepositoryTestCase(RepositoryTestCaseBase):
 
 class RepositoryCommitTestCase(RepositoryTestCaseBase):
 
-    def add_keys(self):
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
-        self.repository.put(b'00000000000000000000000000000001', b'bar')
-        self.repository.put(b'00000000000000000000000000000003', b'bar')
-        self.repository.commit()
-        self.repository.put(b'00000000000000000000000000000001', b'bar2')
-        self.repository.put(b'00000000000000000000000000000002', b'boo')
-        self.repository.delete(b'00000000000000000000000000000003')
-
     def test_replay_of_missing_index(self):
         self.add_keys()
         for name in os.listdir(self.repository.path):
@@ -272,6 +274,19 @@ class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
         self.repository.commit()
         # append only: does not compact, only new segments written
         assert segments_in_repository() == 6
+
+
+class RepositoryFreeSpaceTestCase(RepositoryTestCaseBase):
+    def test_additional_free_space(self):
+        self.add_keys()
+        self.repository.config.set('repository', 'additional_free_space', '1000T')
+        self.repository.save_key(b'shortcut to save_config')
+        self.reopen()
+
+        with self.repository:
+            self.repository.put(b'00000000000000000000000000000000', b'foobar')
+            with pytest.raises(Repository.InsufficientFreeSpaceError):
+                self.repository.commit()
 
 
 class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):

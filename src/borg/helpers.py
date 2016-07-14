@@ -85,7 +85,7 @@ class PlaceholderError(Error):
 
 def check_extension_modules():
     from . import platform
-    if hashindex.API_VERSION != 2:
+    if hashindex.API_VERSION != 3:
         raise ExtensionModuleError
     if chunker.API_VERSION != 2:
         raise ExtensionModuleError
@@ -616,6 +616,26 @@ def format_file_size(v, precision=2, sign=False):
     """Format file size into a human friendly format
     """
     return sizeof_fmt_decimal(v, suffix='B', sep=' ', precision=precision, sign=sign)
+
+
+def parse_file_size(s):
+    """Return int from file size (1234, 55G, 1.7T)."""
+    if not s:
+        return int(s)  # will raise
+    suffix = s[-1]
+    power = 1000
+    try:
+        factor = {
+            'K': power,
+            'M': power**2,
+            'G': power**3,
+            'T': power**4,
+            'P': power**5,
+        }[suffix]
+        s = s[:-1]
+    except KeyError:
+        factor = 1
+    return int(float(s) * factor)
 
 
 def sizeof_fmt(num, suffix='B', units=None, power=None, sep='', precision=2, sign=False):

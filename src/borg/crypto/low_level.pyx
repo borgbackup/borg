@@ -123,6 +123,14 @@ cdef extern from "openssl/hmac.h":
                     const unsigned char *data, int data_len,
                     unsigned char *md, unsigned int *md_len) nogil
 
+cdef extern from "_crypto_helpers.h":
+    ctypedef struct HMAC_CTX:
+        pass
+
+    HMAC_CTX *HMAC_CTX_new()
+    void HMAC_CTX_free(HMAC_CTX *a)
+
+
 import struct
 
 _int = struct.Struct('>I')

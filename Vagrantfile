@@ -12,12 +12,19 @@ end
 
 def packages_debianoid
   return <<-EOF
+    if id "vagrant" >/dev/null 2>&1; then
+      username='vagrant'
+      home_dir=/home/vagrant
+    else
+      username='ubuntu'
+      home_dir=/home/ubuntu
+    fi
     apt-get update
     # install all the (security and other) updates
     apt-get dist-upgrade -y
     # for building borgbackup and dependencies:
     apt-get install -y libssl-dev libacl1-dev liblz4-dev libfuse-dev fuse pkg-config
-    usermod -a -G fuse vagrant
+    usermod -a -G fuse $username
     apt-get install -y fakeroot build-essential git
     apt-get install -y python3-dev python3-setuptools
     # for building python:
@@ -27,7 +34,7 @@ def packages_debianoid
     # newer versions are not compatible with py 3.2 any more.
     easy_install3 'pip<8.0'
     pip3 install 'virtualenv<14.0'
-    touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
+    touch $home_dir/.bash_profile ; chown $username $home_dir/.bash_profile
   EOF
 end
 
@@ -283,7 +290,13 @@ end
 def fix_perms
   return <<-EOF
     # . ~/.profile
-    chown -R vagrant /vagrant/borg
+
+    if id "vagrant" >/dev/null 2>&1; then
+      chown -R vagrant /vagrant/borg
+    else
+      chown -R ubuntu /vagrant/borg
+    fi
+
   EOF
 end
 
@@ -336,6 +349,17 @@ Vagrant.configure(2) do |config|
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos6_64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("centos6_64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos6_64")
+  end
+
+  config.vm.define "xenial64" do |b|
+    b.vm.box = "ubuntu/xenial64"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 768
+    end
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("xenial64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("xenial64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("xenial64")
   end
 
   config.vm.define "trusty64" do |b|

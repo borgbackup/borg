@@ -24,6 +24,9 @@ from ..helpers import CompressionSpec, CompressionDecider1, CompressionDecider2
 from ..helpers import parse_pattern, PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern
 from . import BaseTestCase, environment_variable, FakeInputs
 
+if sys.platform == 'win32':
+    import posixpath
+
 
 class BigIntTestCase(BaseTestCase):
 
@@ -52,10 +55,16 @@ class TestLocationWithoutEnv:
 
     def test_file(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
-        assert repr(Location('file:///some/path::archive')) == \
-            "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')"
-        assert repr(Location('file:///some/path')) == \
-            "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive=None)"
+        if sys.platform != 'win32':
+            assert repr(Location('file:///some/path::archive')) == \
+                "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')"
+            assert repr(Location('file:///some/path')) == \
+                "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive=None)"
+        else:
+            assert repr(Location('file://C:/some/path::archive')).replace('\\\\', '/') == \
+                "Location(proto='file', user=None, host=None, port=None, path='C:/some/path', archive='archive')"
+            assert repr(Location('file://C:/some/path')).replace('\\\\', '/') == \
+                "Location(proto='file', user=None, host=None, port=None, path='C:/some/path', archive=None)"
 
     def test_scp(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
@@ -118,9 +127,9 @@ class TestLocationWithoutEnv:
         test_pid = os.getpid()
         assert repr(Location('/some/path::archive{pid}')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive{}')".format(test_pid)
-        location_time1 = Location('/some/path::archive{now:%s}')
+        location_time1 = Location('/some/path::archive{now}')
         sleep(1.1)
-        location_time2 = Location('/some/path::archive{now:%s}')
+        location_time2 = Location('/some/path::archive{now}')
         assert location_time1.archive != location_time2.archive
 
 
@@ -133,11 +142,18 @@ class TestLocationWithEnv:
             "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive=None)"
 
     def test_file(self, monkeypatch):
-        monkeypatch.setenv('BORG_REPO', 'file:///some/path')
-        assert repr(Location('::archive')) == \
-            "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')"
-        assert repr(Location()) == \
-            "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive=None)"
+        if sys.platform != 'win32':
+            monkeypatch.setenv('BORG_REPO', 'file:///some/path')
+            assert repr(Location('::archive')) == \
+                "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')"
+            assert repr(Location()) == \
+                "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive=None)"
+        else:
+            monkeypatch.setenv('BORG_REPO', 'file://C:/some/path')
+            assert repr(Location('::archive')).replace('\\\\', '/') == \
+                "Location(proto='file', user=None, host=None, port=None, path='C:/some/path', archive='archive')"
+            assert repr(Location()).replace('\\\\', '/') == \
+                "Location(proto='file', user=None, host=None, port=None, path='C:/some/path', archive=None)"
 
     def test_scp(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'user@host:/some/path')
@@ -206,6 +222,7 @@ def check_patterns(files, pattern, expected):
     ("/./home//..//home/user2", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
     ("/srv", ["/srv/messages", "/srv/dmesg"]),
     ])
+@pytest.mark.skipif(sys.platform == 'win32', reason='Need some windows path tests')
 def test_patterns_prefix(pattern, expected):
     files = [
         "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
@@ -222,6 +239,7 @@ def test_patterns_prefix(pattern, expected):
     ("relative", ["relative/path1", "relative/two"]),
     ("more", ["more/relative"]),
     ])
+@pytest.mark.skipif(sys.platform == 'win32', reason='Need some windows path tests')
 def test_patterns_prefix_relative(pattern, expected):
     files = ["relative/path1", "relative/two", "more/relative"]
 
@@ -247,6 +265,7 @@ def test_patterns_prefix_relative(pattern, expected):
     ("/srv*", ["/srv/messages", "/srv/dmesg"]),
     ("/home/*/.thumbnails", ["/home/foo/.thumbnails", "/home/foo/bar/.thumbnails"]),
     ])
+@pytest.mark.skipif(sys.platform == 'win32', reason='Need some windows path tests')
 def test_patterns_fnmatch(pattern, expected):
     files = [
         "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
@@ -286,6 +305,7 @@ def test_patterns_fnmatch(pattern, expected):
     ("/home/*/.thumbnails", ["/home/foo/.thumbnails"]),
     ("/home/*/*/.thumbnails", ["/home/foo/bar/.thumbnails"]),
     ])
+@pytest.mark.skipif(sys.platform == 'win32', reason='Need some windows path tests')
 def test_patterns_shell(pattern, expected):
     files = [
         "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
@@ -307,6 +327,7 @@ def test_patterns_shell(pattern, expected):
      ["/home", "/home/user/.profile", "/home/user/.bashrc", "/home/user2/.profile",
       "/home/user2/public_html/index.html", "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails", ]),
     ])
+@pytest.mark.skipif(sys.platform == 'win32', reason='Need some windows path tests')
 def test_patterns_regex(pattern, expected):
     files = [
         '/srv/data', '/foo/bar', '/home',

@@ -37,17 +37,29 @@ cdef extern from 'windows.h':
     ctypedef BYTE* PSID
     struct _ACL:
         uint16_t AceCount
+        
+    cdef enum _SID_NAME_USE:
+        SidTypeUser,
+        SidTypeGroup,
+        SidTypeDomain,
+        SidTypeAlias,
+        SidTypeWellKnownGroup,
+        SidTypeDeletedAccount,
+        SidTypeInvalid,
+        SidTypeUnknown,
+        SidTypeComputer,
+        SidTypeLabel
 
     HLOCAL LocalFree(HLOCAL)
     DWORD GetLastError();
     void SetLastError(DWORD)
 
-    DWORD FormatMessageW(DWORD, void*, DWORD, DWORD, wchar_t**, DWORD, void*)
+    DWORD FormatMessageW(DWORD, void*, DWORD, DWORD, wchar_t*, DWORD, void*)
 
 
     BOOL InitializeSecurityDescriptor(BYTE*, DWORD)
 
-    BOOL LookupAccountNameW(LPCTSTR, LPCTSTR, PSID, LPDWORD, LPCTSTR, LPDWORD, LPDWORD)
+    BOOL LookupAccountNameW(LPCTSTR, LPCTSTR, PSID, LPDWORD, LPCTSTR, LPDWORD, _SID_NAME_USE*)
     BOOL GetSecurityDescriptorDacl(PSID, BOOL*, _ACL**, BOOL*)
 
     cdef extern int ERROR_INSUFFICIENT_BUFFER
@@ -101,7 +113,7 @@ cdef extern from 'Sddl.h':
 
     BOOL GetFileSecurityW(LPCTSTR, int, PSID, DWORD, LPDWORD)
     BOOL GetSecurityDescriptorOwner(PSID, PSID*, LPBOOL)
-    BOOL LookupAccountSidW(LPCTSTR, PSID, LPCTSTR, LPDWORD, LPCTSTR, LPDWORD, uint16_t*)
+    BOOL LookupAccountSidW(LPCTSTR, PSID, LPCTSTR, LPDWORD, LPCTSTR, LPDWORD, _SID_NAME_USE*)
     BOOL ConvertSidToStringSidW(PSID, LPCTSTR*)
     BOOL ConvertStringSidToSidW(LPCTSTR, PSID*)
     BOOL ConvertSecurityDescriptorToStringSecurityDescriptorW(BYTE*, DWORD, int, LPCTSTR*, int*)
@@ -122,7 +134,7 @@ def raise_error(api, path=''):
     if not error:
         return
     FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                   NULL, error, 0, &error_message, 0, NULL)
+                   NULL, error, 0, <wchar_t*>&error_message, 0, NULL)
     error_string = PyUnicode_FromWideChar(error_message, -1)
     LocalFree(<HLOCAL>error_message)
     error_string = api + ': ' + error_string
@@ -162,7 +174,7 @@ cdef _look_up_account_sid(PSID sid):
     cdef wchar_t* domain = <wchar_t*>malloc((SIZE) * sizeof(wchar_t))
     cdef DWORD cch_name = SIZE
     cdef DWORD cch_domain = SIZE
-    cdef uint16_t sid_type = <uint16_t>0
+    cdef _SID_NAME_USE sid_type
 
     cdef BOOL ret = LookupAccountSidW(NULL, sid, name, &cch_name, domain, &cch_domain, &sid_type)
     if ret == 0:
@@ -192,25 +204,25 @@ cdef sid2string(PSID sid):
 
 
 def get_owner(path):
-    cdef int request = OWNER_SECURITY_INFORMATION
-    cdef BYTE* sd = _get_file_security(path, request)
+    cdef BYTE* sd = _get_file_security(path, OWNER_SECURITY_INFORMATION)
     if sd == NULL:
         return 'unknown', 'S-1-0-0'
     cdef PSID sid = _get_security_descriptor_owner(sd)
     if sid == NULL:
         return 'unknown', 'S-1-0-0'
     name, domain, sid_type = _look_up_account_sid(sid)
+    sidstr = sid2string(sid)
     free(sd)
     if domain and domain.lower() != platform.node().lower() and domain != 'BUILTIN':
-        return '{0}\\{1}'.format(domain, name), sid2string(sid)
+        return '{0}\\{1}'.format(domain, name), sidstr
     else:
-        return name, sid2string(sid)
+        return name, sidstr
 
 
 def set_owner(path, owner, sidstring = None):
     cdef PSID newsid
     cdef wchar_t* temp
-    cdef DWORD sid_type = 0
+    cdef _SID_NAME_USE sid_type
     cdef DWORD length = 0
     cdef DWORD domainlength = 0
     if sidstring is not None:
@@ -261,7 +273,7 @@ def acl_get(path, item, st, numeric_owner=False):
     pyDACL = []
     cdef PSID newsid
     cdef uint32_t domainlength
-    cdef uint32_t sid_type
+    cdef _SID_NAME_USE sid_type
     for i in range(length):
         permissions = None
         name = ""
@@ -271,7 +283,7 @@ def acl_get(path, item, st, numeric_owner=False):
             sidstr = sid2string(<PSID>(ACEs[i].Trustee.ptstrName))
 
         elif ACEs[i].Trustee.TrusteeForm == TRUSTEE_IS_NAME:
-            sid_type = 0
+            sid_type = SidTypeInvalid
             domainlength = 0
             LookupAccountNameW(NULL, ACEs[i].Trustee.ptstrName, NULL, &(length), NULL, &domainlength, &sid_type)
 

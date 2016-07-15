@@ -379,7 +379,7 @@ class FnmatchPattern(PatternBase):
                 pattern = posixpath.normpath(pattern).rstrip(posixpath.sep) + posixpath.sep + '*' + posixpath.sep
             else:
                 pattern = posixpath.normpath(pattern) + posixpath.sep + '*'
-        
+
         self.pattern = pattern
 
         # fnmatch and re.match both cache compiled regular expressions.

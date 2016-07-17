@@ -139,6 +139,7 @@ class Item(PropDict):
     mode = PropDict._make_property('mode', int)
     uid = PropDict._make_property('uid', int)
     gid = PropDict._make_property('gid', int)
+    user_sid = PropDict._make_property('user_sid', str, encode=safe_encode, decode=safe_decode)
     rdev = PropDict._make_property('rdev', int)
     bsdflags = PropDict._make_property('bsdflags', int)
 

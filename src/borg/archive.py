@@ -546,26 +546,20 @@ Number of files: {0.stats.nfiles}'''.format(
             try:
                 if fd:
                     os.fchown(fd, uid, gid)
+                    os.fchmod(fd, item.mode)
                 else:
                     os.lchown(path, uid, gid)
+                if not symlink:
+                    os.chmod(path, item.mode)
+                elif has_lchmod:  # Not available on Linux
+                    os.lchmod(path, item.mode)
             except OSError:
                 pass
         else:
             try:
-                set_owner(path, item.user, safe_decode(item.uid))
+                set_owner(path, item.user, item.user_sid)
             except OSError:
                 pass
-        if sys.platform != 'win32':
-            if fd:
-                os.fchown(fd, uid, gid)
-            else:
-                os.lchown(path, uid, gid)
-            if fd:
-                os.fchmod(fd, item.mode)
-            elif not symlink:
-                os.chmod(path, item.mode)
-            elif has_lchmod:  # Not available on Linux
-                os.lchmod(path, item.mode)
         mtime = item.mtime
         if 'atime' in item:
             atime = item.atime
@@ -681,9 +675,9 @@ Number of files: {0.stats.nfiles}'''.format(
             mtime=st.st_mtime_ns,
         )
         if sys.platform == 'win32':
-            owner = get_owner(path)
+            user_name, user_sid = get_owner(path)
             attrs.update({
-                'uid': owner[1], 'user': owner[0],
+                'uid': 0, 'user_sid': user_sid, 'user': user_name,
                 'gid': st.st_gid, 'group': gid2group(st.st_gid),
             })
         else:

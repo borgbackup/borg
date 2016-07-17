@@ -300,7 +300,7 @@ def acl_get(path, item, st, numeric_owner=False):
             continue
         permissions = {'user': {'name': name, 'sid': sidstr}, 'permissions': (ACEs[i].grfAccessPermissions, ACEs[i].grfAccessMode, ACEs[i].grfInheritance)}
         pyDACL.append(permissions)
-    item[b'win_dacl'] = safe_encode(json.dumps(pyDACL))
+    item.win_dacl = safe_encode(json.dumps(pyDACL))
 
     free(SD)
     LocalFree(<HLOCAL>ACEs)
@@ -310,7 +310,7 @@ def acl_set(path, item, numeric_owner=False):
     if b'win_dacl' not in item:
         return
 
-    pyDACL = json.loads(safe_decode(item[b'win_dacl']))
+    pyDACL = json.loads(safe_decode(item.win_dacl))
     cdef _EXPLICIT_ACCESS_W* ACEs = <_EXPLICIT_ACCESS_W*>calloc(sizeof(_EXPLICIT_ACCESS_W), len(pyDACL))
     cdef wchar_t* temp
     cdef PSID newsid

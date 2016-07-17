@@ -452,7 +452,7 @@ class Archiver:
                     try:
                         archive.extract_item(dir_item, stdout=stdout)
                     except BackupOSError as e:
-                        self.print_warning('%s: %s', remove_surrogates(dir_item[b'path']), e)
+                        self.print_warning('%s: %s', remove_surrogates(dir_item.path), e)
             if output_list:
                 logging.getLogger('borg.output.list').info(remove_surrogates(orig_path))
             try:
@@ -474,7 +474,7 @@ class Archiver:
                 try:
                     archive.extract_item(dir_item)
                 except BackupOSError as e:
-                    self.print_warning('%s: %s', remove_surrogates(dir_item[b'path']), e)
+                    self.print_warning('%s: %s', remove_surrogates(dir_item.path), e)
         for pattern in include_patterns:
             if pattern.match_count == 0:
                 self.print_warning("Include pattern '%s' never matched.", pattern)

@@ -432,12 +432,12 @@ Number of files: {0.stats.nfiles}'''.format(
                     sys.stdout.buffer.flush()
             if has_damaged_chunks:
                 logger.warning('File %s has damaged (all-zero) chunks. Try running borg check --repair.' %
-                               remove_surrogates(item[b'path']))
+                               remove_surrogates(item.path))
             return
 
         original_path = original_path or item.path
         dest = self.cwd
-        if item[b'path'].startswith('/') or item[b'path'].startswith('..') or (sys.platform == 'win32' and len(item[b'path']) > 1 and item[b'path'][1] == ':'):
+        if item.path.startswith('/') or item.path.startswith('..') or (sys.platform == 'win32' and len(item.path) > 1 and item.path[1] == ':'):
             raise Exception('Path should be relative and local')
         path = os.path.join(dest, item.path)
         # Attempt to remove existing files, ignore errors on failure
@@ -552,7 +552,7 @@ Number of files: {0.stats.nfiles}'''.format(
                 pass
         else:
             try:
-                set_owner(path, item[b'user'], safe_decode(item[b'uid']))
+                set_owner(path, item.user, safe_decode(item.uid))
             except OSError:
                 pass
         if sys.platform != 'win32':

@@ -1,4 +1,5 @@
 import argparse
+import getpass
 import hashlib
 import logging
 import os
@@ -593,7 +594,7 @@ def replace_placeholders(text):
         'hostname': socket.gethostname(),
         'now': current_time.now(),
         'utcnow': current_time.utcnow(),
-        'user': uid2user(os.getuid(), os.getuid()),
+        'user': getpass.getuser(),
         'uuid4': str(uuid.uuid4()),
     }
     return format_line(text, data)

@@ -114,6 +114,8 @@ static int hashindex_delete(HashIndex *index, const void *key);
 static void *hashindex_next_key(HashIndex *index, const void *key);
 
 /* Private API */
+static void hashindex_free(HashIndex *index);
+
 static int
 hashindex_index(HashIndex *index, const void *key)
 {
@@ -162,7 +164,11 @@ hashindex_resize(HashIndex *index, int capacity)
         return 0;
     }
     while((key = hashindex_next_key(index, key))) {
-        hashindex_set(new, key, key + key_size);
+        if(!hashindex_set(new, key, key + key_size)) {
+            /* This can only happen if there's a bug in the code calculating capacity */
+            hashindex_free(new);
+            return 0;
+        }
     }
     free(index->buckets);
     index->buckets = new->buckets;

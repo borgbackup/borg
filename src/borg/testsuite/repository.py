@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from ..hashindex import NSIndex
 from ..helpers import Location
-from ..helpers import IntegrityError, InternalOSError
+from ..helpers import IntegrityError
 from ..locking import UpgradableLock, LockFailed
 from ..remote import RemoteRepository, InvalidRPCMethod, ConnectionClosedWithHint, handle_remote_line
 from ..repository import Repository, LoggedIO, MAGIC
@@ -244,11 +244,14 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
 
 
 class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
+    def open(self, create=False):
+        return Repository(os.path.join(self.tmppath, 'repository'), create=create, append_only=True)
+
     def test_destroy_append_only(self):
         # Can't destroy append only repo (via the API)
-        self.repository.append_only = True
         with self.assert_raises(ValueError):
             self.repository.destroy()
+        assert self.repository.append_only
 
     def test_append_only(self):
         def segments_in_repository():
@@ -300,7 +303,7 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
         hints = os.path.join(self.repository.path, 'hints.1')
         os.unlink(hints)
         os.mkdir(hints)
-        with self.assert_raises(InternalOSError):
+        with self.assert_raises(OSError):
             self.do_commit()
 
     def test_index(self):
@@ -318,7 +321,7 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
         index = os.path.join(self.repository.path, 'index.1')
         os.unlink(index)
         os.mkdir(index)
-        with self.assert_raises(InternalOSError):
+        with self.assert_raises(OSError):
             self.do_commit()
 
 

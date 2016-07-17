@@ -1,10 +1,20 @@
 # this set must be kept complete, otherwise the RobustUnpacker might malfunction:
-ITEM_KEYS = set([b'path', b'source', b'rdev', b'chunks', b'hardlink_master',
-                 b'mode', b'user', b'group', b'uid', b'gid', b'mtime', b'atime', b'ctime',
-                 b'xattrs', b'bsdflags', b'acl_nfs4', b'acl_access', b'acl_default', b'acl_extended', b'win_dacl'])
+ITEM_KEYS = frozenset(['path', 'source', 'rdev', 'chunks', 'chunks_healthy', 'hardlink_master',
+                       'mode', 'user', 'group', 'uid', 'gid', 'mtime', 'atime', 'ctime',
+                       'xattrs', 'bsdflags', 'acl_nfs4', 'acl_access', 'acl_default', 'acl_extended', 'win_dacl'])
+
+# this is the set of keys that are always present in items:
+REQUIRED_ITEM_KEYS = frozenset(['path', 'mtime', ])
+
+# this set must be kept complete, otherwise rebuild_manifest might malfunction:
+ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'hostname', 'username', 'time', 'time_end',
+                          'comment', 'chunker_params',
+                          'recreate_cmdline', 'recreate_source_id', 'recreate_args'])
+
+# this is the set of keys that are always present in archives:
+REQUIRED_ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'time', ])
 
 ARCHIVE_TEXT_KEYS = (b'name', b'comment', b'hostname', b'username', b'time', b'time_end')
-ITEM_TEXT_KEYS = (b'path', b'source', b'user', b'group')
 
 # default umask, overriden by --umask, defaults to read/write only for owner
 UMASK_DEFAULT = 0o077

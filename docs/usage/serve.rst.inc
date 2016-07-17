@@ -1,3 +1,5 @@
+.. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
+
 .. _borg_serve:
 
 borg serve
@@ -9,6 +11,8 @@ borg serve
 optional arguments
     ``--restrict-to-path PATH``
         | restrict repository access to PATH
+    ``--append-only``
+        | only allow appending to repository segment files
 
 `Common options`_
     |

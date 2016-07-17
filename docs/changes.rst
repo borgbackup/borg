@@ -1,6 +1,55 @@
 Changelog
 =========
 
+Important note about pre-1.0.4 potential repo corruption
+--------------------------------------------------------
+
+Some external errors (like network or disk I/O errors) could lead to
+corruption of the backup repository due to issue #1138.
+
+A sign that this happened is if "E" status was reported for a file that can
+not be explained by problems with the source file. If you still have logs from
+"borg create -v --list", you can check for "E" status.
+
+Here is what could cause corruption and what you can do now:
+
+1) I/O errors (e.g. repo disk errors) while writing data to repo.
+
+This could lead to corrupted segment files.
+
+Fix::
+
+    # check for corrupt chunks / segments:
+    borg check -v --repository-only REPO
+
+    # repair the repo:
+    borg check -v --repository-only --repair REPO
+
+    # make sure everything is fixed:
+    borg check -v --repository-only REPO
+
+2) Unreliable network / unreliable connection to the repo.
+
+This could lead to archive metadata corruption.
+
+Fix::
+
+    # check for corrupt archives:
+    borg check -v --archives-only REPO
+
+    # delete the corrupt archives:
+    borg delete --force REPO::CORRUPT_ARCHIVE
+
+    # make sure everything is fixed:
+    borg check -v --archives-only REPO
+
+3) In case you want to do more intensive checking.
+
+The best check that everything is ok is to run a dry-run extraction::
+
+    borg extract -v --dry-run REPO::ARCHIVE
+
+
 Version 1.1.0 (not released yet)
 --------------------------------
 
@@ -74,8 +123,197 @@ Other changes:
   - ChunkBuffer: add test for leaving partial chunk in buffer, fixes #945
 
 
-Version 1.0.3
--------------
+Version 1.0.6 (2016-07-12)
+--------------------------
+
+Bug fixes:
+
+- Linux: handle multiple LD_PRELOAD entries correctly, #1314, #1111
+- Fix crash with unclear message if the libc is not found, #1314, #1111
+
+Other changes:
+
+- tests:
+
+  - Fixed O_NOATIME tests for Solaris and GNU Hurd, #1315
+  - Fixed sparse file tests for (file) systems not supporting it, #1310
+- docs:
+
+  - Fixed syntax highlighting, #1313
+  - misc docs: added data processing overview picture
+
+
+Version 1.0.6rc1 (2016-07-10)
+-----------------------------
+
+New features:
+
+- borg check --repair: heal damaged files if missing chunks re-appear (e.g. if
+  the previously missing chunk was added again in a later backup archive),
+  #148. (*) Also improved logging.
+
+Bug fixes:
+
+- sync_dir: silence fsync() failing with EINVAL, #1287
+  Some network filesystems (like smbfs) don't support this and we use this in
+  repository code.
+- borg mount (FUSE):
+
+  - fix directories being shadowed when contained paths were also specified,
+    #1295
+  - raise I/O Error (EIO) on damaged files (unless -o allow_damaged_files is
+    used), #1302. (*)
+- borg extract: warn if a damaged file is extracted, #1299. (*)
+- Added some missing return code checks (ChunkIndex._add, hashindex_resize).
+- borg check: fix/optimize initial hash table size, avoids resize of the table.
+
+Other changes:
+
+- tests:
+
+  - add more FUSE tests, #1284
+  - deduplicate fuse (u)mount code
+  - fix borg binary test issues, #862
+- docs:
+
+  - changelog: added release dates to older borg releases
+  - fix some sphinx (docs generator) warnings, #881
+
+Notes:
+
+(*) Some features depend on information (chunks_healthy list) added to item
+metadata when a file with missing chunks was "repaired" using all-zero
+replacement chunks. The chunks_healthy list is generated since borg 1.0.4,
+thus borg can't recognize such "repaired" (but content-damaged) files if the
+repair was done with an older borg version.
+
+
+Version 1.0.5 (2016-07-07)
+--------------------------
+
+Bug fixes:
+
+- borg mount: fix FUSE crash in xattr code on Linux introduced in 1.0.4, #1282
+
+Other changes:
+
+- backport some FAQ entries from master branch
+- add release helper scripts
+- Vagrantfile:
+
+  - centos6: no FUSE, don't build binary
+  - add xz for redhat-like dists
+
+
+Version 1.0.4 (2016-07-07)
+--------------------------
+
+New features:
+
+- borg serve --append-only, #1168
+  This was included because it was a simple change (append-only functionality
+  was already present via repository config file) and makes better security now
+  practically usable.
+- BORG_REMOTE_PATH environment variable, #1258
+  This was included because it was a simple change (--remote-path cli option
+  was already present) and makes borg much easier to use if you need it.
+- Repository: cleanup incomplete transaction on "no space left" condition.
+  In many cases, this can avoid a 100% full repo filesystem (which is very
+  problematic as borg always needs free space - even to delete archives).
+
+Bug fixes:
+
+- Fix wrong handling and reporting of OSErrors in borg create, #1138.
+  This was a serious issue: in the context of "borg create", errors like
+  repository I/O errors (e.g. disk I/O errors, ssh repo connection errors)
+  were handled badly and did not lead to a crash (which would be good for this
+  case, because the repo transaction would be incomplete and trigger a
+  transaction rollback to clean up).
+  Now, error handling for source files is cleanly separated from every other
+  error handling, so only problematic input files are logged and skipped.
+- Implement fail-safe error handling for borg extract.
+  Note that this isn't nearly as critical as the borg create error handling
+  bug, since nothing is written to the repo. So this was "merely" misleading
+  error reporting.
+- Add missing error handler in directory attr restore loop.
+- repo: make sure write data hits disk before the commit tag (#1236) and also
+  sync the containing directory.
+- FUSE: getxattr fail must use errno.ENOATTR, #1126
+  (fixes Mac OS X Finder malfunction: "zero bytes" file length, access denied)
+- borg check --repair: do not lose information about the good/original chunks.
+  If we do not lose the original chunk IDs list when "repairing" a file
+  (replacing missing chunks with all-zero chunks), we have a chance to "heal"
+  the file back into its original state later, in case the chunks re-appear
+  (e.g. in a fresh backup). Healing is not implemented yet, see #148.
+- fixes for --read-special mode:
+
+  - ignore known files cache, #1241
+  - fake regular file mode, #1214
+  - improve symlinks handling, #1215
+- remove passphrase from subprocess environment, #1105
+- Ignore empty index file (will trigger index rebuild), #1195
+- add missing placeholder support for --prefix, #1027
+- improve exception handling for placeholder replacement
+- catch and format exceptions in arg parsing
+- helpers: fix "undefined name 'e'" in exception handler
+- better error handling for missing repo manifest, #1043
+- borg delete:
+
+  - make it possible to delete a repo without manifest
+  - borg delete --forced allows to delete corrupted archives, #1139
+- borg check:
+
+  - make borg check work for empty repo
+  - fix resync and msgpacked item qualifier, #1135
+  - rebuild_manifest: fix crash if 'name' or 'time' key were missing.
+  - better validation of item metadata dicts, #1130
+  - better validation of archive metadata dicts
+- close the repo on exit - even if rollback did not work, #1197.
+  This is rather cosmetic, it avoids repo closing in the destructor.
+
+- tests:
+
+  - fix sparse file test, #1170
+  - flake8: ignore new F405, #1185
+  - catch "invalid argument" on cygwin, #257
+  - fix sparseness assertion in test prep, #1264
+
+Other changes:
+
+- make borg build/work on OpenSSL 1.0 and 1.1, #1187
+- docs / help:
+
+  - fix / clarify prune help, #1143
+  - fix "patterns" help formatting
+  - add missing docs / help about placeholders
+  - resources: rename atticmatic to borgmatic
+  - document sshd settings, #545
+  - more details about checkpoints, add split trick, #1171
+  - support docs: add freenode web chat link, #1175
+  - add prune visualization / example, #723
+  - add note that Fnmatch is default, #1247
+  - make clear that lzma levels > 6 are a waste of cpu cycles
+  - add a "do not edit" note to auto-generated files, #1250
+  - update cygwin installation docs
+- repository interoperability with borg master (1.1dev) branch:
+
+  - borg check: read item metadata keys from manifest, #1147
+  - read v2 hints files, #1235
+  - fix hints file "unknown version" error handling bug
+- tests: add tests for format_line
+- llfuse: update version requirement for freebsd
+- Vagrantfile:
+
+  - use openbsd 5.9, #716
+  - do not install llfuse on netbsd (broken)
+  - update OSXfuse to version 3.3.3
+  - use Python 3.5.2 to build the binaries
+- glibc compatibility checker: scripts/glibc_check.py
+- add .eggs to .gitignore
+
+
+Version 1.0.3 (2016-05-20)
+--------------------------
 
 Bug fixes:
 
@@ -104,8 +342,8 @@ Other changes:
   - borg create help: document format tags, #894
 
 
-Version 1.0.2
--------------
+Version 1.0.2 (2016-04-16)
+--------------------------
 
 Bug fixes:
 
@@ -140,8 +378,8 @@ Other changes:
   - fix confusing usage of "repo" as archive name (use "arch")
 
 
-Version 1.0.1
--------------
+Version 1.0.1 (2016-04-08)
+--------------------------
 
 New features:
 
@@ -192,8 +430,8 @@ Other changes:
   - Document logo font. Recreate logo png. Remove GIMP logo file.
 
 
-Version 1.0.0
--------------
+Version 1.0.0 (2016-03-05)
+--------------------------
 
 The major release number change (0.x -> 1.x) indicates bigger incompatible
 changes, please read the compatibility notes, adapt / test your scripts and
@@ -276,8 +514,8 @@ Other changes:
   - FAQ: how to limit bandwidth
 
 
-Version 1.0.0rc2
-----------------
+Version 1.0.0rc2 (2016-02-28)
+-----------------------------
 
 New features:
 
@@ -318,8 +556,8 @@ Other changes:
   - "connection closed by remote": add FAQ entry and point to issue #636
 
 
-Version 1.0.0rc1
-----------------
+Version 1.0.0rc1 (2016-02-07)
+-----------------------------
 
 New features:
 
@@ -368,8 +606,8 @@ Other changes:
   - misc. updates and fixes
 
 
-Version 0.30.0
---------------
+Version 0.30.0 (2016-01-23)
+---------------------------
 
 Compatibility notes:
 
@@ -446,8 +684,8 @@ Other changes:
   - add gcc gcc-c++ to redhat/fedora/corora install docs, fixes #583
 
 
-Version 0.29.0
---------------
+Version 0.29.0 (2015-12-13)
+---------------------------
 
 Compatibility notes:
 
@@ -522,8 +760,8 @@ Other changes:
   - fix wrong installation instructions for archlinux
 
 
-Version 0.28.2
---------------
+Version 0.28.2 (2015-11-15)
+---------------------------
 
 New features:
 
@@ -546,8 +784,8 @@ Other changes:
   - minor install docs improvements
 
 
-Version 0.28.1
---------------
+Version 0.28.1 (2015-11-08)
+---------------------------
 
 Bug fixes:
 
@@ -561,8 +799,8 @@ Other changes:
 - fix build on readthedocs
 
 
-Version 0.28.0
---------------
+Version 0.28.0 (2015-11-08)
+---------------------------
 
 Compatibility notes:
 
@@ -659,8 +897,8 @@ Other changes:
   - minor development docs update
 
 
-Version 0.27.0
---------------
+Version 0.27.0 (2015-10-07)
+---------------------------
 
 New features:
 
@@ -694,8 +932,8 @@ Other changes:
   - hint to single-file pyinstaller binaries from README
 
 
-Version 0.26.1
---------------
+Version 0.26.1 (2015-09-28)
+---------------------------
 
 This is a minor update, just docs and new pyinstaller binaries.
 
@@ -707,8 +945,8 @@ This is a minor update, just docs and new pyinstaller binaries.
 Note: if you did a python-based installation, there is no need to upgrade.
 
 
-Version 0.26.0
---------------
+Version 0.26.0 (2015-09-19)
+---------------------------
 
 New features:
 
@@ -768,8 +1006,8 @@ Other changes:
   - Darwin (OS X Yosemite)
 
 
-Version 0.25.0
---------------
+Version 0.25.0 (2015-08-29)
+---------------------------
 
 Compatibility notes:
 
@@ -835,8 +1073,8 @@ Other changes:
   - split install docs into system-specific preparations and generic instructions
 
 
-Version 0.24.0
---------------
+Version 0.24.0 (2015-08-09)
+---------------------------
 
 Incompatible changes (compared to 0.23):
 
@@ -939,8 +1177,8 @@ Other changes:
 - some easy micro optimizations
 
 
-Version 0.23.0
---------------
+Version 0.23.0 (2015-06-11)
+---------------------------
 
 Incompatible changes (compared to attic, fork related):
 

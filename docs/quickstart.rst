@@ -1,4 +1,5 @@
 .. include:: global.rst.inc
+.. highlight:: bash
 .. _quickstart:
 
 Quick Start
@@ -11,11 +12,15 @@ The next section continues by showing how backups can be automated.
 Important note about free space
 -------------------------------
 
-Before you start creating backups, please make sure that there is **always**
+Before you start creating backups, please make sure that there is *always*
 a good amount of free space on the filesystem that has your backup repository
-(and also on ~/.cache). It is hard to tell how much, maybe 1-5%.
+(and also on ~/.cache). A few GB should suffice for most hard-drive sized
+repositories. See also :ref:`cache-memory-usage`.
 
-If you run out of disk space, it can be hard or impossible to free space,
+If |project_name| runs out of disk space, it tries to free as much space as it
+can while aborting the current operation safely, which allows to free more space
+by deleting/pruning archives. This mechanism is not bullet-proof though.
+If you *really* run out of disk space, it can be hard or impossible to free space,
 because |project_name| needs free space to operate - even to delete backup
 archives. There is a ``--save-space`` option for some commands, but even with
 that |project_name| will need free space to operate.
@@ -103,10 +108,11 @@ Automating backups
 
 The following example script backs up ``/home`` and ``/var/www`` to a remote
 server. The script also uses the :ref:`borg_prune` subcommand to maintain a
-certain number of old archives::
+certain number of old archives:
+
+::
 
     #!/bin/sh
-
     # setting this, so the repo does not need to be given on the commandline:
     export BORG_REPO=username@remoteserver.com:backup
 
@@ -115,18 +121,18 @@ certain number of old archives::
     export BORG_PASSPHRASE=mysecret
 
     # Backup most important stuff:
-    borg create --stats -C lz4 ::`hostname`-`date +%Y-%m-%d` \
-        /etc                                                    \
-        /home                                                   \
-        /var                                                    \
-        --exclude '/home/*/.cache'                              \
+    borg create --stats -C lz4 ::'{hostname}-{now:%Y-%m-%d}' \
+        /etc                                                 \
+        /home                                                \
+        /var                                                 \
+        --exclude '/home/*/.cache'                           \
         --exclude '*.pyc'
 
     # Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
-    # archives of THIS machine. Using --prefix is very important to
+    # archives of THIS machine. The '{hostname}-' prefix is very important to
     # limit prune's operation to this machine's archives and not apply to
     # other machine's archives also.
-    borg prune -v --prefix `hostname`- \
+    borg prune -v --prefix '{hostname}-' \
         --keep-daily=7 --keep-weekly=4 --keep-monthly=6
 
 .. backup_compression:

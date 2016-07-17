@@ -21,6 +21,7 @@ from .helpers import yes
 from .helpers import get_keys_dir
 from .helpers import bin_to_hex
 from .helpers import CompressionDecider2, CompressionSpec
+from .item import Key, EncryptedKey
 
 
 PREFIX = b'\0' * 8
@@ -341,24 +342,26 @@ class KeyfileKeyBase(AESKeyBase):
         cdata = a2b_base64(key_data)
         data = self.decrypt_key_file(cdata, passphrase)
         if data:
-            key = msgpack.unpackb(data)
-            if key[b'version'] != 1:
+            data = msgpack.unpackb(data)
+            key = Key(internal_dict=data)
+            if key.version != 1:
                 raise IntegrityError('Invalid key file header')
-            self.repository_id = key[b'repository_id']
-            self.enc_key = key[b'enc_key']
-            self.enc_hmac_key = key[b'enc_hmac_key']
-            self.id_key = key[b'id_key']
-            self.chunk_seed = key[b'chunk_seed']
+            self.repository_id = key.repository_id
+            self.enc_key = key.enc_key
+            self.enc_hmac_key = key.enc_hmac_key
+            self.id_key = key.id_key
+            self.chunk_seed = key.chunk_seed
             return True
         return False
 
     def decrypt_key_file(self, data, passphrase):
-        d = msgpack.unpackb(data)
-        assert d[b'version'] == 1
-        assert d[b'algorithm'] == b'sha256'
-        key = passphrase.kdf(d[b'salt'], d[b'iterations'], 32)
-        data = AES(is_encrypt=False, key=key).decrypt(d[b'data'])
-        if hmac_sha256(key, data) == d[b'hash']:
+        data = msgpack.unpackb(data)
+        enc_key = EncryptedKey(internal_dict=data)
+        assert enc_key.version == 1
+        assert enc_key.algorithm == 'sha256'
+        key = passphrase.kdf(enc_key.salt, enc_key.iterations, 32)
+        data = AES(is_encrypt=False, key=key).decrypt(enc_key.data)
+        if hmac_sha256(key, data) == enc_key.hash:
             return data
 
     def encrypt_key_file(self, data, passphrase):
@@ -367,26 +370,26 @@ class KeyfileKeyBase(AESKeyBase):
         key = passphrase.kdf(salt, iterations, 32)
         hash = hmac_sha256(key, data)
         cdata = AES(is_encrypt=True, key=key).encrypt(data)
-        d = {
-            'version': 1,
-            'salt': salt,
-            'iterations': iterations,
-            'algorithm': 'sha256',
-            'hash': hash,
-            'data': cdata,
-        }
-        return msgpack.packb(d)
+        enc_key = EncryptedKey(
+            version=1,
+            salt=salt,
+            iterations=iterations,
+            algorithm='sha256',
+            hash=hash,
+            data=cdata,
+        )
+        return msgpack.packb(enc_key.as_dict())
 
     def _save(self, passphrase):
-        key = {
-            'version': 1,
-            'repository_id': self.repository_id,
-            'enc_key': self.enc_key,
-            'enc_hmac_key': self.enc_hmac_key,
-            'id_key': self.id_key,
-            'chunk_seed': self.chunk_seed,
-        }
-        data = self.encrypt_key_file(msgpack.packb(key), passphrase)
+        key = Key(
+            version=1,
+            repository_id=self.repository_id,
+            enc_key=self.enc_key,
+            enc_hmac_key=self.enc_hmac_key,
+            id_key=self.id_key,
+            chunk_seed=self.chunk_seed,
+        )
+        data = self.encrypt_key_file(msgpack.packb(key.as_dict()), passphrase)
         key_data = '\n'.join(textwrap.wrap(b2a_base64(data).decode('ascii')))
         return key_data
 

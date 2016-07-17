@@ -42,7 +42,7 @@ def packages_redhatted
     # needed to compile msgpack-python (otherwise it will use slow fallback code):
     yum install -y gcc-c++
     # for building python:
-    yum install -y zlib-devel bzip2-devel ncurses-devel readline-devel xz-devel sqlite-devel
+    yum install -y zlib-devel bzip2-devel ncurses-devel readline-devel xz xz-devel sqlite-devel
     #yum install -y python-pip
     #pip install virtualenv
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
@@ -53,10 +53,10 @@ def packages_darwin
   return <<-EOF
     # install all the (security and other) updates
     sudo softwareupdate --install --all
-    # get osxfuse 3.0.x pre-release code from github:
-    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.2.0/osxfuse-3.2.0.dmg >osxfuse.dmg
+    # get osxfuse 3.x pre-release code from github:
+    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.3.3/osxfuse-3.3.3.dmg >osxfuse.dmg
     MOUNTDIR=$(echo `hdiutil mount osxfuse.dmg | tail -1 | awk '{$1="" ; print $0}'` | xargs -0 echo) \
-    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for OS X 3.2.0.pkg" -target /
+    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for OS X 3.3.3.pkg" -target /
     sudo chown -R vagrant /usr/local  # brew must be able to create stuff here
     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     brew update
@@ -109,7 +109,6 @@ def packages_openbsd
     pkg_add lz4
     # pkg_add fuse  # does not install, sdl dependency missing
     pkg_add git  # no fakeroot
-    pkg_add python-3.4.2
     pkg_add py3-setuptools
     ln -sf /usr/local/bin/python3.4 /usr/local/bin/python3
     ln -sf /usr/local/bin/python3.4 /usr/local/bin/python
@@ -166,7 +165,7 @@ def install_pythons(boxname)
     . ~/.bash_profile
     pyenv install 3.4.0  # tests
     pyenv install 3.5.0  # tests
-    pyenv install 3.5.1  # binary build, use latest 3.5.x release
+    pyenv install 3.5.2  # binary build, use latest 3.5.x release
     pyenv rehash
   EOF
 end
@@ -184,8 +183,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.5 release
-    pyenv global 3.5.1
-    pyenv virtualenv 3.5.1 borg-env
+    pyenv global 3.5.2
+    pyenv virtualenv 3.5.2 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -204,6 +203,22 @@ def install_borg(boxname)
     pip install -r requirements.d/development.txt
     # by using [fuse], setup.py can handle different fuse requirements:
     pip install -e .[fuse]
+  EOF
+end
+
+def install_borg_no_fuse(boxname)
+  return <<-EOF
+    . ~/.bash_profile
+    cd /vagrant/borg
+    . borg-env/bin/activate
+    pip install -U wheel  # upgrade wheel, too old for 3.5
+    cd borg
+    # clean up (wrong/outdated) stuff we likely got via rsync:
+    rm -f borg/*.so borg/*.cpy*
+    rm -f borg/{chunker,crypto,compress,hashindex,platform_linux}.c
+    rm -rf borg/__pycache__ borg/support/__pycache__ borg/testsuite/__pycache__
+    pip install -r requirements.d/development.txt
+    pip install -e .
   EOF
 end
 
@@ -241,7 +256,7 @@ def build_binary_with_pyinstaller(boxname)
     cd /vagrant/borg
     . borg-env/bin/activate
     cd borg
-    pyinstaller -F -n borg.exe --distpath=/vagrant/borg --clean borg/__main__.py
+    pyinstaller -F -n borg.exe --distpath=/vagrant/borg --clean src/borg/__main__.py --hidden-import=borg.platform.posix
   EOF
 end
 
@@ -337,9 +352,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_32")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_32")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos6_32")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("centos6_32")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller("centos6_32")
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("centos6_32")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("centos6_32")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos6_32")
   end
 
@@ -355,9 +368,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_64")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_64")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos6_64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("centos6_64")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller("centos6_64")
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("centos6_64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("centos6_64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos6_64")
   end
 
@@ -472,16 +483,13 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd64" do |b|
-    b.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"]
-    b.vm.synced_folder ".", "/vagrant", disabled: true
-    b.vm.provision "fix perms", :type => :shell, :inline => fix_perms
-    b.vm.box = "bodgit/openbsd-5.7-amd64"
+    b.vm.box = "kaorimatz/openbsd-5.9-amd64"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
     b.vm.provision "packages openbsd", :type => :shell, :inline => packages_openbsd
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openbsd64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("openbsd64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("openbsd64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openbsd64")
   end
 
@@ -495,7 +503,7 @@ Vagrant.configure(2) do |config|
     end
     b.vm.provision "packages netbsd", :type => :shell, :inline => packages_netbsd
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("netbsd64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("netbsd64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd64")
   end
 

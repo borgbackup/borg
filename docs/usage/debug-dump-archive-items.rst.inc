@@ -1,3 +1,5 @@
+.. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
+
 .. _borg_debug-dump-archive-items:
 
 borg debug-dump-archive-items

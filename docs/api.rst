@@ -1,3 +1,4 @@
+.. highlight:: python
 
 API Documentation
 =================
@@ -6,27 +7,7 @@ API Documentation
     :members:
     :undoc-members:
 
-.. automodule:: borg.upgrader
-    :members:
-    :undoc-members:
-
 .. automodule:: borg.archive
-    :members:
-    :undoc-members:
-
-.. automodule:: borg.fuse
-    :members:
-    :undoc-members:
-
-.. automodule:: borg.platform
-    :members:
-    :undoc-members:
-
-.. automodule:: borg.locking
-    :members:
-    :undoc-members:
-
-.. automodule:: borg.shellpattern
     :members:
     :undoc-members:
 
@@ -34,23 +15,7 @@ API Documentation
     :members:
     :undoc-members:
 
-.. automodule:: borg.lrucache
-    :members:
-    :undoc-members:
-
 .. automodule:: borg.remote
-    :members:
-    :undoc-members:
-
-.. automodule:: borg.hash_sizes
-    :members:
-    :undoc-members:
-
-.. automodule:: borg.xattr
-    :members:
-    :undoc-members:
-
-.. automodule:: borg.helpers
     :members:
     :undoc-members:
 
@@ -66,7 +31,31 @@ API Documentation
     :members:
     :undoc-members:
 
-.. automodule:: borg.platform_darwin
+.. automodule:: borg.helpers
+    :members:
+    :undoc-members:
+
+.. automodule:: borg.locking
+    :members:
+    :undoc-members:
+
+.. automodule:: borg.shellpattern
+    :members:
+    :undoc-members:
+
+.. automodule:: borg.lrucache
+    :members:
+    :undoc-members:
+
+.. automodule:: borg.fuse
+    :members:
+    :undoc-members:
+
+.. automodule:: borg.xattr
+    :members:
+    :undoc-members:
+
+.. automodule:: borg.platform
     :members:
     :undoc-members:
 
@@ -79,7 +68,7 @@ API Documentation
     :undoc-members:
 
 .. automodule:: borg.compress
-    :members:
+    :members: get_compressor, Compressor, CompressorBase
     :undoc-members:
 
 .. automodule:: borg.chunker
@@ -87,9 +76,5 @@ API Documentation
     :undoc-members:
 
 .. automodule:: borg.crypto
-    :members:
-    :undoc-members:
-
-.. automodule:: borg.platform_freebsd
     :members:
     :undoc-members:

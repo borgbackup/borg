@@ -1,3 +1,5 @@
+.. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
+
 .. _borg_delete:
 
 borg delete
@@ -17,6 +19,8 @@ optional arguments
         | print statistics for the deleted archive
     ``-c``, ``--cache-only``
         | delete only the local cache for the given repository
+    ``--force``
+        | force deletion of corrupted archives
     ``--save-space``
         | work slower, but using less space
 

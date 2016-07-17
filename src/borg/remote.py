@@ -60,9 +60,10 @@ class RepositoryServer:  # pragma: no cover
         'break_lock',
     )
 
-    def __init__(self, restrict_to_paths):
+    def __init__(self, restrict_to_paths, append_only):
         self.repository = None
         self.restrict_to_paths = restrict_to_paths
+        self.append_only = append_only
 
     def serve(self):
         stdin_fd = sys.stdin.fileno()
@@ -129,7 +130,7 @@ class RepositoryServer:  # pragma: no cover
                     break
             else:
                 raise PathNotAllowed(path)
-        self.repository = Repository(path, create, lock_wait=lock_wait, lock=lock)
+        self.repository = Repository(path, create, lock_wait=lock_wait, lock=lock, append_only=self.append_only)
         self.repository.__enter__()  # clean exit handled by serve() method
         return self.repository.id
 
@@ -159,6 +160,7 @@ class RemoteRepository:
             # pyinstaller binary adds LD_LIBRARY_PATH=/tmp/_ME... but we do not want
             # that the system's ssh binary picks up (non-matching) libraries from there
             env.pop('LD_LIBRARY_PATH', None)
+        env.pop('BORG_PASSPHRASE', None)  # security: do not give secrets to subprocess
         self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()
@@ -194,9 +196,14 @@ class RemoteRepository:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is not None:
-            self.rollback()
-        self.close()
+        try:
+            if exc_type is not None:
+                self.rollback()
+        finally:
+            # in any case, we want to cleanly close the repo, even if the
+            # rollback can not succeed (e.g. because the connection was
+            # already closed) and raised another exception:
+            self.close()
 
     @property
     def id_str(self):
@@ -224,7 +231,8 @@ class RemoteRepository:
         if testing:
             return [sys.executable, '-m', 'borg.archiver', 'serve'] + opts + self.extra_test_args
         else:  # pragma: no cover
-            return [args.remote_path, 'serve'] + opts
+            remote_path = args.remote_path or os.environ.get('BORG_REMOTE_PATH', 'borg')
+            return [remote_path, 'serve'] + opts
 
     def ssh_cmd(self, location):
         """return a ssh command line that can be prefixed to a borg command line"""
@@ -251,6 +259,24 @@ class RemoteRepository:
                 del self.cache[args]
             return msgid
 
+        def handle_error(error, res):
+            if error == b'DoesNotExist':
+                raise Repository.DoesNotExist(self.location.orig)
+            elif error == b'AlreadyExists':
+                raise Repository.AlreadyExists(self.location.orig)
+            elif error == b'CheckNeeded':
+                raise Repository.CheckNeeded(self.location.orig)
+            elif error == b'IntegrityError':
+                raise IntegrityError(res)
+            elif error == b'PathNotAllowed':
+                raise PathNotAllowed(*res)
+            elif error == b'ObjectNotFound':
+                raise Repository.ObjectNotFound(res[0], self.location.orig)
+            elif error == b'InvalidRPCMethod':
+                raise InvalidRPCMethod(*res)
+            else:
+                raise self.RPCError(res.decode('utf-8'))
+
         calls = list(calls)
         waiting_for = []
         while wait or calls:
@@ -259,22 +285,7 @@ class RemoteRepository:
                     error, res = self.responses.pop(waiting_for[0])
                     waiting_for.pop(0)
                     if error:
-                        if error == b'DoesNotExist':
-                            raise Repository.DoesNotExist(self.location.orig)
-                        elif error == b'AlreadyExists':
-                            raise Repository.AlreadyExists(self.location.orig)
-                        elif error == b'CheckNeeded':
-                            raise Repository.CheckNeeded(self.location.orig)
-                        elif error == b'IntegrityError':
-                            raise IntegrityError(res)
-                        elif error == b'PathNotAllowed':
-                            raise PathNotAllowed(*res)
-                        elif error == b'ObjectNotFound':
-                            raise Repository.ObjectNotFound(res[0], self.location.orig)
-                        elif error == b'InvalidRPCMethod':
-                            raise InvalidRPCMethod(*res)
-                        else:
-                            raise self.RPCError(res.decode('utf-8'))
+                        handle_error(error, res)
                     else:
                         yield res
                         if not waiting_for and not calls:
@@ -300,6 +311,8 @@ class RemoteRepository:
                         type, msgid, error, res = unpacked
                         if msgid in self.ignore_responses:
                             self.ignore_responses.remove(msgid)
+                            if error:
+                                handle_error(error, res)
                         else:
                             self.responses[msgid] = error, res
                 elif fd is self.stderr_fd:

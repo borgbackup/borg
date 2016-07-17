@@ -1,0 +1,9 @@
+#!/bin/bash
+# usage: sign-binaries 201512312359
+
+for file in dist/borg-*; do
+    gpg --armor --detach-sign $file
+done
+
+touch -t $1 dist/*
+

@@ -1,4 +1,5 @@
 .. include:: global.rst.inc
+.. highlight:: none
 .. _detailed_usage:
 
 Usage
@@ -79,6 +80,9 @@ General:
     BORG_RSH
         When set, use this command instead of ``ssh``. This can be used to specify ssh options, such as
         a custom identity file ``ssh -i /path/to/private/key``. See ``man ssh`` for other options.
+    BORG_REMOTE_PATH
+        When set, use the given path/filename as remote path (default is "borg").
+        Using ``--remote-path PATH`` commandline option overrides the environment variable.
     TMPDIR
         where temporary files are stored (might need a lot of temporary space for some operations)
 
@@ -446,14 +450,17 @@ prefix "foo" if you do not also want to match "foobar".
 It is strongly recommended to always run ``prune --dry-run ...`` first so you
 will see what it would do without it actually doing anything.
 
+There is also a visualized prune example in ``docs/misc/prune-example.txt``.
+
 ::
 
     # Keep 7 end of day and 4 additional end of week archives.
     # Do a dry-run without actually deleting anything.
     $ borg prune --dry-run --keep-daily=7 --keep-weekly=4 /path/to/repo
 
-    # Same as above but only apply to archive names starting with "foo":
-    $ borg prune --keep-daily=7 --keep-weekly=4 --prefix=foo /path/to/repo
+    # Same as above but only apply to archive names starting with the hostname
+    # of the machine followed by a "-" character:
+    $ borg prune --keep-daily=7 --keep-weekly=4 --prefix='{hostname}-' /path/to/repo
 
     # Keep 7 end of day, 4 additional end of week archives,
     # and an end of month archive for every month:
@@ -735,31 +742,33 @@ For more details, see :ref:`chunker_details`.
 --read-special
 ~~~~~~~~~~~~~~
 
-The option ``--read-special`` is not intended for normal, filesystem-level (full or
-partly-recursive) backups. You only give this option if you want to do something
-rather ... special -- and if you have hand-picked some files that you want to treat
-that way.
+The --read-special option is special - you do not want to use it for normal
+full-filesystem backups, but rather after carefully picking some targets for it.
 
-``borg create --read-special`` will open all files without doing any special
-treatment according to the file type (the only exception here are directories:
-they will be recursed into). Just imagine what happens if you do ``cat
-filename`` --- the content you will see there is what borg will backup for that
-filename.
+The option ``--read-special`` triggers special treatment for block and char
+device files as well as FIFOs. Instead of storing them as such a device (or
+FIFO), they will get opened, their content will be read and in the backup
+archive they will show up like a regular file.
 
-So, for example, symlinks will be followed, block device content will be read,
-named pipes / UNIX domain sockets will be read.
+Symlinks will also get special treatment if (and only if) they point to such
+a special file: instead of storing them as a symlink, the target special file
+will get processed as described above.
 
-You need to be careful with what you give as filename when using ``--read-special``,
-e.g. if you give ``/dev/zero``, your backup will never terminate.
+One intended use case of this is backing up the contents of one or multiple
+block devices, like e.g. LVM snapshots or inactive LVs or disk partitions.
 
-The given files' metadata is saved as it would be saved without
-``--read-special`` (e.g. its name, its size [might be 0], its mode, etc.) -- but
-additionally, also the content read from it will be saved for it.
+You need to be careful about what you include when using ``--read-special``,
+e.g. if you include ``/dev/zero``, your backup will never terminate.
 
 Restoring such files' content is currently only supported one at a time via
 ``--stdout`` option (and you have to redirect stdout to where ever it shall go,
 maybe directly into an existing device file of your choice or indirectly via
 ``dd``).
+
+To some extent, mounting a backup archive with the backups of special files
+via ``borg mount`` and then loop-mounting the image files from inside the mount
+point will work. If you plan to access a lot of data in there, it likely will
+scale and perform better if you do not work via the FUSE mount.
 
 Example
 +++++++
@@ -797,7 +806,7 @@ Now, let's see how to restore some LVs from such a backup. ::
     $ borg extract --stdout /path/to/repo::arch dev/vg0/home-snapshot > /dev/vg0/home
 
 
-.. _append-only-mode:
+.. _append_only_mode:
 
 Append-only mode
 ~~~~~~~~~~~~~~~~
@@ -813,6 +822,13 @@ To activate append-only mode, edit the repository ``config`` file and add a line
 
 In append-only mode Borg will create a transaction log in the ``transactions`` file,
 where each line is a transaction and a UTC timestamp.
+
+In addition, ``borg serve`` can act as if a repository is in append-only mode with
+its option ``--append-only``. This can be very useful for fine-tuning access control
+in ``.ssh/authorized_keys`` ::
+
+    command="borg serve --append-only ..." ssh-rsa <key used for not-always-trustable backup clients>
+    command="borg serve ..." ssh-rsa <key used for backup management>
 
 Example
 +++++++

@@ -23,7 +23,7 @@ except ImportError:
     pass
 
 from .. import xattr, helpers, platform
-from ..archive import Archive, ChunkBuffer, ArchiveRecreater
+from ..archive import Archive, ChunkBuffer, ArchiveRecreater, flags_noatime, flags_normal
 from ..archiver import Archiver
 from ..cache import Cache
 from ..constants import *  # NOQA
@@ -225,7 +225,8 @@ class ArchiverTestCaseBase(BaseTestCase):
 
     def tearDown(self):
         os.chdir(self._old_wd)
-        shutil.rmtree(self.tmpdir)
+        # note: ignore_errors=True as workaround for issue #862
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def cmd(self, *args, **kw):
         exit_code = kw.pop('exit_code', 0)
@@ -240,6 +241,13 @@ class ArchiverTestCaseBase(BaseTestCase):
 
     def create_src_archive(self, name):
         self.cmd('create', self.repository_location + '::' + name, src_dir)
+
+    def open_archive(self, name):
+        repository = Repository(self.repository_path)
+        with repository:
+            manifest, key = Manifest.load(repository)
+            archive = Archive(repository, key, manifest, name)
+        return archive, repository
 
     def create_regular_file(self, name, size=0, contents=None):
         filename = os.path.join(self.input_path, name)
@@ -294,9 +302,13 @@ class ArchiverTestCaseBase(BaseTestCase):
                 # File mode
                 os.chmod('input/dir2', 0o555)  # if we take away write perms, we need root to remove contents
                 # File owner
-                os.chown('input/file1', 100, 200)
+                os.chown('input/file1', 100, 200)  # raises OSError invalid argument on cygwin
                 have_root = True  # we have (fake)root
             except PermissionError:
+                have_root = False
+            except OSError as e:
+                if e.errno != errno.EINVAL:
+                    raise
                 have_root = False
             return have_root
         else:
@@ -389,8 +401,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert os.readlink('input/link1') == 'somewhere'
 
     def test_atime(self):
+        def has_noatime(some_file):
+            atime_before = os.stat(some_file).st_atime_ns
+            try:
+                os.close(os.open(some_file, flags_noatime))
+            except PermissionError:
+                return False
+            else:
+                atime_after = os.stat(some_file).st_atime_ns
+                noatime_used = flags_noatime != flags_normal
+                return noatime_used and atime_before == atime_after
+
         self.create_test_files()
         atime, mtime = 123456780, 234567890
+        have_noatime = has_noatime('input/file1')
         os.utime('input/file1', (atime, mtime))
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
@@ -399,7 +423,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         sti = os.stat('input/file1')
         sto = os.stat('output/input/file1')
         assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
-        if hasattr(os, 'O_NOATIME'):
+        if have_noatime:
             assert sti.st_atime_ns == sto.st_atime_ns == atime * 1e9
         else:
             # it touched the input file's atime while backing it up
@@ -419,11 +443,30 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             return repository.id
 
     def test_sparse_file(self):
-        # no sparse file support on Mac OS X
-        sparse_support = sys.platform != 'darwin'
+        def is_sparse(fn, total_size, hole_size):
+            st = os.stat(fn)
+            assert st.st_size == total_size
+            sparse = True
+            if sparse and hasattr(st, 'st_blocks') and st.st_blocks * 512 >= st.st_size:
+                sparse = False
+            if sparse and hasattr(os, 'SEEK_HOLE') and hasattr(os, 'SEEK_DATA'):
+                with open(fn, 'rb') as fd:
+                    # only check if the first hole is as expected, because the 2nd hole check
+                    # is problematic on xfs due to its "dynamic speculative EOF preallocation
+                    try:
+                        if fd.seek(0, os.SEEK_HOLE) != 0:
+                            sparse = False
+                        if fd.seek(0, os.SEEK_DATA) != hole_size:
+                            sparse = False
+                    except OSError:
+                        # OS/FS does not really support SEEK_HOLE/SEEK_DATA
+                        sparse = False
+            return sparse
+
         filename = os.path.join(self.input_path, 'sparse')
         content = b'foobar'
         hole_size = 5 * (1 << CHUNK_MAX_EXP)  # 5 full chunker buffers
+        total_size = hole_size + len(content) + hole_size
         with open(filename, 'wb') as fd:
             # create a file that has a hole at the beginning and end (if the
             # OS and filesystem supports sparse files)
@@ -432,26 +475,23 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.seek(hole_size, 1)
             pos = fd.tell()
             fd.truncate(pos)
-        total_len = hole_size + len(content) + hole_size
-        st = os.stat(filename)
-        self.assert_equal(st.st_size, total_len)
-        if sparse_support and hasattr(st, 'st_blocks'):
-            self.assert_true(st.st_blocks * 512 < total_len / 9)  # is input sparse?
-        self.cmd('init', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        with changedir('output'):
-            self.cmd('extract', '--sparse', self.repository_location + '::test')
-        self.assert_dirs_equal('input', 'output/input')
-        filename = os.path.join(self.output_path, 'input', 'sparse')
-        with open(filename, 'rb') as fd:
-            # check if file contents are as expected
-            self.assert_equal(fd.read(hole_size), b'\0' * hole_size)
-            self.assert_equal(fd.read(len(content)), content)
-            self.assert_equal(fd.read(hole_size), b'\0' * hole_size)
-        st = os.stat(filename)
-        self.assert_equal(st.st_size, total_len)
-        if sparse_support and hasattr(st, 'st_blocks'):
-            self.assert_true(st.st_blocks * 512 < total_len / 9)  # is output sparse?
+        # we first check if we could create a sparse input file:
+        sparse_support = is_sparse(filename, total_size, hole_size)
+        if sparse_support:
+            # we could create a sparse input file, so creating a backup of it and
+            # extracting it again (as sparse) should also work:
+            self.cmd('init', self.repository_location)
+            self.cmd('create', self.repository_location + '::test', 'input')
+            with changedir(self.output_path):
+                self.cmd('extract', '--sparse', self.repository_location + '::test')
+            self.assert_dirs_equal('input', 'output/input')
+            filename = os.path.join(self.output_path, 'input', 'sparse')
+            with open(filename, 'rb') as fd:
+                # check if file contents are as expected
+                self.assert_equal(fd.read(hole_size), b'\0' * hole_size)
+                self.assert_equal(fd.read(len(content)), content)
+                self.assert_equal(fd.read(hole_size), b'\0' * hole_size)
+            self.assert_true(is_sparse(filename, total_size, hole_size))
 
     def test_unusual_filenames(self):
         filenames = ['normal', 'with some blanks', '(with_parens)', ]
@@ -1168,6 +1208,18 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assertEqual(output_1, output_2)
         self.assertNotEqual(output_1, output_3)
 
+    def test_list_repository_format(self):
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test-1', src_dir)
+        self.cmd('create', self.repository_location + '::test-2', src_dir)
+        output_1 = self.cmd('list', self.repository_location)
+        output_2 = self.cmd('list', '--format', '{archive:<36} {time} [{id}]{NL}', self.repository_location)
+        self.assertEqual(output_1, output_2)
+        output_1 = self.cmd('list', '--short', self.repository_location)
+        self.assertEqual(output_1, 'test-1\ntest-2\n')
+        output_1 = self.cmd('list', '--format', '{barchive}/', self.repository_location)
+        self.assertEqual(output_1, 'test-1/test-2/')
+
     def test_list_hash(self):
         self.create_regular_file('empty_file', size=0)
         self.create_regular_file('amb', contents=b'a' * 1000000)
@@ -1278,52 +1330,96 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert 'This command initializes' not in self.cmd('help', 'init', '--usage-only')
 
     @unittest.skipUnless(has_llfuse and sys.platform != 'win32', 'llfuse not installed')
-    def test_fuse_mount_repository(self):
-        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
-        os.mkdir(mountpoint)
+    def test_fuse(self):
         self.cmd('init', self.repository_location)
         self.create_test_files()
         self.cmd('create', self.repository_location + '::archive', 'input')
         self.cmd('create', self.repository_location + '::archive2', 'input')
-        try:
-            self.cmd('mount', self.repository_location, mountpoint, fork=True)
-            self.wait_for_mount(mountpoint)
-            if has_lchflags:
-                # remove the file we did not backup, so input and output become equal
-                os.remove(os.path.join('input', 'flagfile'))
+        if has_lchflags:
+            # remove the file we did not backup, so input and output become equal
+            os.remove(os.path.join('input', 'flagfile'))
+        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
+        # mount the whole repository, archive contents shall show up in archivename subdirs of mountpoint:
+        with self.fuse_mount(self.repository_location, mountpoint):
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive', 'input'))
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive2', 'input'))
-        finally:
-            if sys.platform.startswith('linux'):
-                os.system('fusermount -u ' + mountpoint)
+        # mount only 1 archive, its contents shall show up directly in mountpoint:
+        with self.fuse_mount(self.repository_location + '::archive', mountpoint):
+            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'))
+            # regular file
+            in_fn = 'input/file1'
+            out_fn = os.path.join(mountpoint, 'input', 'file1')
+            # stat
+            sti1 = os.stat(in_fn)
+            sto1 = os.stat(out_fn)
+            assert sti1.st_mode == sto1.st_mode
+            assert sti1.st_uid == sto1.st_uid
+            assert sti1.st_gid == sto1.st_gid
+            assert sti1.st_size == sto1.st_size
+            assert sti1.st_atime == sto1.st_atime
+            assert sti1.st_ctime == sto1.st_ctime
+            assert sti1.st_mtime == sto1.st_mtime
+            # note: there is another hardlink to this, see below
+            assert sti1.st_nlink == sto1.st_nlink == 2
+            # read
+            with open(in_fn, 'rb') as in_f, open(out_fn, 'rb') as out_f:
+                assert in_f.read() == out_f.read()
+            # list/read xattrs
+            if xattr.is_enabled(self.input_path):
+                assert xattr.listxattr(out_fn) == ['user.foo', ]
+                assert xattr.getxattr(out_fn, 'user.foo') == b'bar'
             else:
-                os.system('umount ' + mountpoint)
-            os.rmdir(mountpoint)
-            # Give the daemon some time to exit
-            time.sleep(.2)
+                assert xattr.listxattr(out_fn) == []
+                try:
+                    xattr.getxattr(out_fn, 'user.foo')
+                except OSError as e:
+                    assert e.errno == llfuse.ENOATTR
+                else:
+                    assert False, "expected OSError(ENOATTR), but no error was raised"
+            # hardlink (to 'input/file1')
+            in_fn = 'input/hardlink'
+            out_fn = os.path.join(mountpoint, 'input', 'hardlink')
+            sti2 = os.stat(in_fn)
+            sto2 = os.stat(out_fn)
+            assert sti2.st_nlink == sto2.st_nlink == 2
+            assert sto1.st_ino == sto2.st_ino
+            # symlink
+            in_fn = 'input/link1'
+            out_fn = os.path.join(mountpoint, 'input', 'link1')
+            sti = os.stat(in_fn, follow_symlinks=False)
+            sto = os.stat(out_fn, follow_symlinks=False)
+            assert stat.S_ISLNK(sti.st_mode)
+            assert stat.S_ISLNK(sto.st_mode)
+            assert os.readlink(in_fn) == os.readlink(out_fn)
+            # FIFO
+            out_fn = os.path.join(mountpoint, 'input', 'fifo1')
+            sto = os.stat(out_fn)
+            assert stat.S_ISFIFO(sto.st_mode)
 
     @unittest.skipUnless(has_llfuse and sys.platform != 'win32', 'llfuse not installed')
-    def test_fuse_mount_archive(self):
-        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
-        os.mkdir(mountpoint)
+    def test_fuse_allow_damaged_files(self):
         self.cmd('init', self.repository_location)
-        self.create_test_files()
-        self.cmd('create', self.repository_location + '::archive', 'input')
-        try:
-            self.cmd('mount', self.repository_location + '::archive', mountpoint, fork=True)
-            self.wait_for_mount(mountpoint)
-            if has_lchflags:
-                # remove the file we did not backup, so input and output become equal
-                os.remove(os.path.join('input', 'flagfile'))
-            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'))
-        finally:
-            if sys.platform.startswith('linux'):
-                os.system('fusermount -u ' + mountpoint)
+        self.create_src_archive('archive')
+        # Get rid of a chunk and repair it
+        archive, repository = self.open_archive('archive')
+        with repository:
+            for item in archive.iter_items():
+                if item.path.endswith('testsuite/archiver.py'):
+                    repository.delete(item.chunks[-1].id)
+                    path = item.path  # store full path for later
+                    break
             else:
-                os.system('umount ' + mountpoint)
-            os.rmdir(mountpoint)
-            # Give the daemon some time to exit
-            time.sleep(.2)
+                assert False  # missed the file
+            repository.commit()
+        self.cmd('check', '--repair', self.repository_location, exit_code=0)
+
+        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
+        with self.fuse_mount(self.repository_location + '::archive', mountpoint):
+            with pytest.raises(OSError) as excinfo:
+                open(os.path.join(mountpoint, path))
+            assert excinfo.value.errno == errno.EIO
+        with self.fuse_mount(self.repository_location + '::archive', mountpoint, 'allow_damaged_files'):
+            open(os.path.join(mountpoint, path)).close()
 
     def verify_aes_counter_uniqueness(self, method):
         seen = set()  # Chunks already seen
@@ -1628,6 +1724,14 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
     def test_recreate_changed_source(self):
         pass
 
+    @unittest.skip('test_basic_functionality seems incompatible with fakeroot and/or the binary.')
+    def test_basic_functionality(self):
+        pass
+
+    @unittest.skip('test_overwrite seems incompatible with fakeroot and/or the binary.')
+    def test_overwrite(self):
+        pass
+
 
 class ArchiverCheckTestCase(ArchiverTestCaseBase):
 
@@ -1637,13 +1741,6 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             self.cmd('init', self.repository_location)
             self.create_src_archive('archive1')
             self.create_src_archive('archive2')
-
-    def open_archive(self, name):
-        repository = Repository(self.repository_path)
-        with repository:
-            manifest, key = Manifest.load(repository)
-            archive = Archive(repository, key, manifest, name)
-        return archive, repository
 
     def test_check_usage(self):
         output = self.cmd('check', '-v', '--progress', self.repository_location, exit_code=0)
@@ -1666,13 +1763,46 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         archive, repository = self.open_archive('archive1')
         with repository:
             for item in archive.iter_items():
-                if item[b'path'].endswith('testsuite/archiver.py'):
-                    repository.delete(item[b'chunks'][-1].id)
+                if item.path.endswith('testsuite/archiver.py'):
+                    valid_chunks = item.chunks
+                    killed_chunk = valid_chunks[-1]
+                    repository.delete(killed_chunk.id)
                     break
+            else:
+                self.assert_true(False)  # should not happen
             repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
-        self.cmd('check', '--repair', self.repository_location, exit_code=0)
+        output = self.cmd('check', '--repair', self.repository_location, exit_code=0)
+        self.assert_in('New missing file chunk detected', output)
         self.cmd('check', self.repository_location, exit_code=0)
+        # check that the file in the old archives has now a different chunk list without the killed chunk
+        for archive_name in ('archive1', 'archive2'):
+            archive, repository = self.open_archive(archive_name)
+            with repository:
+                for item in archive.iter_items():
+                    if item.path.endswith('testsuite/archiver.py'):
+                        self.assert_not_equal(valid_chunks, item.chunks)
+                        self.assert_not_in(killed_chunk, item.chunks)
+                        break
+                else:
+                    self.assert_true(False)  # should not happen
+        # do a fresh backup (that will include the killed chunk)
+        with patch.object(ChunkBuffer, 'BUFFER_SIZE', 10):
+            self.create_src_archive('archive3')
+        # check should be able to heal the file now:
+        output = self.cmd('check', '-v', '--repair', self.repository_location, exit_code=0)
+        self.assert_in('Healed previously missing file chunk', output)
+        self.assert_in('testsuite/archiver.py: Completely healed previously damaged file!', output)
+        # check that the file in the old archives has the correct chunks again
+        for archive_name in ('archive1', 'archive2'):
+            archive, repository = self.open_archive(archive_name)
+            with repository:
+                for item in archive.iter_items():
+                    if item.path.endswith('testsuite/archiver.py'):
+                        self.assert_equal(valid_chunks, item.chunks)
+                        break
+                else:
+                    self.assert_true(False)  # should not happen
 
     def test_missing_archive_item_chunk(self):
         archive, repository = self.open_archive('archive1')
@@ -1721,8 +1851,8 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         archive, repository = self.open_archive('archive1')
         with repository:
             for item in archive.iter_items():
-                if item[b'path'].endswith('testsuite/archiver.py'):
-                    chunk = item[b'chunks'][-1]
+                if item.path.endswith('testsuite/archiver.py'):
+                    chunk = item.chunks[-1]
                     data = repository.get(chunk.id) + b'1234'
                     repository.put(chunk.id, data)
                     break
@@ -1757,11 +1887,7 @@ class RemoteArchiverTestCase(ArchiverTestCase):
     # this was introduced because some tests expect stderr contents to show up
     # in "output" also. Also, the non-forking exec_cmd catches both, too.
     @unittest.skip('deadlock issues')
-    def test_fuse_mount_repository(self):
-        pass
-
-    @unittest.skip('deadlock issues')
-    def test_fuse_mount_archive(self):
+    def test_fuse(self):
         pass
 
     @unittest.skip('only works locally')

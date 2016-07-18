@@ -336,11 +336,8 @@ I am seeing 'A' (added) status for a unchanged file!?
 
 The files cache is used to determine whether |project_name| already
 "knows" / has backed up a file and if so, to skip the file from
-chunking. It does intentionally *not* contain files that:
-
-- have >= 10 as "entry age" (|project_name| has not seen this file for a while)
-- have a modification time (mtime) same as the newest mtime in the created
-  archive
+chunking. It does intentionally *not* contain files that have a modification
+time (mtime) same as the newest mtime in the created archive.
 
 So, if you see an 'A' status for unchanged file(s), they are likely the files
 with the most recent mtime in that archive.

@@ -429,7 +429,7 @@ Number of files: {0.stats.nfiles}'''.format(
                     sys.stdout.buffer.flush()
             if has_damaged_chunks:
                 logger.warning('File %s has damaged (all-zero) chunks. Try running borg check --repair.' %
-                               remove_surrogates(item[b'path']))
+                               remove_surrogates(item.path))
             return
 
         original_path = original_path or item.path

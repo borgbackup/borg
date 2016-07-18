@@ -14,6 +14,7 @@ import stat
 import sys
 import textwrap
 import traceback
+import collections
 
 from . import __version__
 from .helpers import Error, location_validator, archivename_validator, format_line, format_time, format_file_size, \
@@ -736,7 +737,7 @@ class Archiver:
         Cache.break_lock(repository)
         return self.exit_code
 
-    helptext = {}
+    helptext = collections.OrderedDict()
     helptext['patterns'] = textwrap.dedent('''
         Exclusion patterns support four separate styles, fnmatch, shell, regular
         expressions and path prefixes. By default, fnmatch is used. If followed

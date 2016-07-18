@@ -1047,7 +1047,7 @@ class Archiver:
         Cache.break_lock(repository)
         return self.exit_code
 
-    helptext = {}
+    helptext = collections.OrderedDict()
     helptext['patterns'] = textwrap.dedent('''
         Exclusion patterns support four separate styles, fnmatch, shell, regular
         expressions and path prefixes. By default, fnmatch is used. If followed

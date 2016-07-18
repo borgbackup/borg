@@ -1,18 +1,22 @@
 import argparse
+import getpass
 import hashlib
 import logging
 import os
 import os.path
 import platform
 import re
+import signal
 import socket
 import sys
 import stat
 import textwrap
 import time
 import unicodedata
+import uuid
 from binascii import hexlify
 from collections import namedtuple, deque
+from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from functools import wraps, partial
@@ -68,24 +72,20 @@ class ErrorWithTraceback(Error):
     traceback = True
 
 
-class InternalOSError(Error):
-    """Error while accessing repository: [Errno {}] {}: {}"""
-
-    def __init__(self, os_error):
-        self.errno = os_error.errno
-        self.strerror = os_error.strerror
-        self.filename = os_error.filename
-
-    def get_message(self):
-        return self.__doc__.format(self.errno, self.strerror, self.filename)
-
-
 class IntegrityError(ErrorWithTraceback):
     """Data integrity error"""
 
 
 class ExtensionModuleError(Error):
     """The Borg binary extension modules do not seem to be properly installed"""
+
+
+class NoManifestError(Error):
+    """Repository has no manifest."""
+
+
+class PlaceholderError(Error):
+    """Formatting Error: "{}".format({}): {}({})"""
 
 
 def check_extension_modules():
@@ -104,11 +104,12 @@ class Manifest:
 
     MANIFEST_ID = b'\0' * 32
 
-    def __init__(self, key, repository):
+    def __init__(self, key, repository, item_keys=None):
         self.archives = {}
         self.config = {}
         self.key = key
         self.repository = repository
+        self.item_keys = frozenset(item_keys) if item_keys is not None else ITEM_KEYS
 
     @property
     def id_str(self):
@@ -117,7 +118,11 @@ class Manifest:
     @classmethod
     def load(cls, repository, key=None):
         from .key import key_factory
-        cdata = repository.get(cls.MANIFEST_ID)
+        from .repository import Repository
+        try:
+            cdata = repository.get(cls.MANIFEST_ID)
+        except Repository.ObjectNotFound:
+            raise NoManifestError
         if not key:
             key = key_factory(repository, cdata)
         manifest = cls(key, repository)
@@ -131,6 +136,8 @@ class Manifest:
         if manifest.timestamp:
             manifest.timestamp = manifest.timestamp.decode('ascii')
         manifest.config = m[b'config']
+        # valid item keys are whatever is known in the repo or every key we know
+        manifest.item_keys = ITEM_KEYS | frozenset(key.decode() for key in m.get(b'item_keys', []))
         return manifest, key
 
     def write(self):
@@ -140,6 +147,7 @@ class Manifest:
             'archives': self.archives,
             'timestamp': self.timestamp,
             'config': self.config,
+            'item_keys': tuple(self.item_keys),
         }))
         self.id = self.key.id_hash(data)
         self.repository.put(self.MANIFEST_ID, self.key.encrypt(Chunk(data)))
@@ -516,6 +524,10 @@ def CompressionSpec(s):
     raise ValueError
 
 
+def PrefixSpec(s):
+    return replace_placeholders(s)
+
+
 def dir_is_cachedir(path):
     """Determines whether the specified path is a cache directory (and
     therefore should potentially be excluded from the backup) according to
@@ -567,18 +579,25 @@ def partial_format(format, mapping):
 
 
 def format_line(format, data):
-    # TODO: Filter out unwanted properties of str.format(), because "format" is user provided.
-
     try:
         return format.format(**data)
-    except (KeyError, ValueError) as e:
-        # this should catch format errors
-        print('Error in lineformat: "{}" - reason "{}"'.format(format, str(e)))
     except Exception as e:
-        # something unexpected, print error and raise exception
-        print('Error in lineformat: "{}" - reason "{}"'.format(format, str(e)))
-        raise
-    return ''
+        raise PlaceholderError(format, data, e.__class__.__name__, str(e))
+
+
+def replace_placeholders(text):
+    """Replace placeholders in text with their values."""
+    current_time = datetime.now()
+    data = {
+        'pid': os.getpid(),
+        'fqdn': socket.getfqdn(),
+        'hostname': socket.gethostname(),
+        'now': current_time.now(),
+        'utcnow': current_time.utcnow(),
+        'user': getpass.getuser(),
+        'uuid4': str(uuid.uuid4()),
+    }
+    return format_line(text, data)
 
 
 def safe_timestamp(item_timestamp_ns):
@@ -777,21 +796,8 @@ class Location:
         if not self.parse(self.orig):
             raise ValueError
 
-    def preformat_text(self, text):
-        """Format repository and archive path with common tags"""
-        current_time = datetime.now()
-        data = {
-            'pid': os.getpid(),
-            'fqdn': socket.getfqdn(),
-            'hostname': socket.gethostname(),
-            'now': current_time.now(),
-            'utcnow': current_time.utcnow(),
-            'user': uid2user(getuid(), getuid())
-            }
-        return format_line(text, data)
-
     def parse(self, text):
-        text = self.preformat_text(text)
+        text = replace_placeholders(text)
         valid = self._parse(text)
         if valid:
             return True
@@ -995,8 +1001,7 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
         retry_msg=None, invalid_msg=None, env_msg=None,
         falsish=FALSISH, truish=TRUISH, defaultish=DEFAULTISH,
         default=False, retry=True, env_var_override=None, ofile=None, input=input):
-    """
-    Output <msg> (usually a question) and let user input an answer.
+    """Output <msg> (usually a question) and let user input an answer.
     Qualifies the answer according to falsish, truish and defaultish as True, False or <default>.
     If it didn't qualify and retry_msg is None (no retries wanted),
     return the default [which defaults to False]. Otherwise let user retry
@@ -1180,7 +1185,7 @@ def log_multi(*msgs, level=logging.INFO, logger=logger):
     """
     log multiple lines of text, each line by a separate logging call for cosmetic reasons
 
-    each positional argument may be a single or multiple lines (separated by \n) of text.
+    each positional argument may be a single or multiple lines (separated by newlines) of text.
     """
     lines = []
     for msg in msgs:
@@ -1189,7 +1194,7 @@ def log_multi(*msgs, level=logging.INFO, logger=logger):
         logger.log(level, line)
 
 
-class ItemFormatter:
+class BaseFormatter:
     FIXED_KEYS = {
         # Formatting aids
         'LF': '\n',
@@ -1200,19 +1205,54 @@ class ItemFormatter:
         'NEWLINE': os.linesep,
         'NL': os.linesep,
     }
+
+    def get_item_data(self, item):
+        raise NotImplementedError
+
+    def format_item(self, item):
+        return self.format.format_map(self.get_item_data(item))
+
+    @staticmethod
+    def keys_help():
+        return " - NEWLINE: OS dependent line separator\n" \
+               " - NL: alias of NEWLINE\n" \
+               " - NUL: NUL character for creating print0 / xargs -0 like output, see barchive/bpath\n" \
+               " - SPACE\n" \
+               " - TAB\n" \
+               " - CR\n" \
+               " - LF"
+
+
+class ArchiveFormatter(BaseFormatter):
+
+    def __init__(self, format):
+        self.format = partial_format(format, self.FIXED_KEYS)
+
+    def get_item_data(self, archive):
+        return {
+            'barchive': archive.name,
+            'archive': remove_surrogates(archive.name),
+            'id': bin_to_hex(archive.id),
+            'time': format_time(to_localtime(archive.ts)),
+        }
+
+    @staticmethod
+    def keys_help():
+        return " - archive: archive name interpreted as text (might be missing non-text characters, see barchive)\n" \
+               " - barchive: verbatim archive name, can contain any character except NUL\n" \
+               " - time: time of creation of the archive\n" \
+               " - id: internal ID of the archive"
+
+
+class ItemFormatter(BaseFormatter):
     KEY_DESCRIPTIONS = {
         'bpath': 'verbatim POSIX path, can contain any character except NUL',
         'path': 'path interpreted as text (might be missing non-text characters, see bpath)',
         'source': 'link target for links (identical to linktarget)',
         'extra': 'prepends {source} with " -> " for soft links and " link to " for hard links',
-
         'csize': 'compressed size',
         'num_chunks': 'number of chunks in this file',
         'unique_chunks': 'number of unique chunks in this file',
-
-        'NEWLINE': 'OS dependent line separator',
-        'NL': 'alias of NEWLINE',
-        'NUL': 'NUL character for creating print0 / xargs -0 like ouput, see bpath',
     }
     KEY_GROUPS = (
         ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget', 'flags'),
@@ -1220,7 +1260,6 @@ class ItemFormatter:
         ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
         tuple(sorted(hashlib.algorithms_guaranteed)),
         ('archiveid', 'archivename', 'extra'),
-        ('NEWLINE', 'NL', 'NUL', 'SPACE', 'TAB', 'CR', 'LF'),
     )
 
     @classmethod
@@ -1228,10 +1267,8 @@ class ItemFormatter:
         class FakeArchive:
             fpr = name = ""
 
-        fake_item = {
-            b'mode': 0, b'path': '', b'user': '', b'group': '', b'mtime': 0,
-            b'uid': 0, b'gid': 0,
-        }
+        from .item import Item
+        fake_item = Item(mode=0, path='', user='', group='', mtime=0, uid=0, gid=0)
         formatter = cls(FakeArchive, "")
         keys = []
         keys.extend(formatter.call_keys.keys())
@@ -1242,6 +1279,9 @@ class ItemFormatter:
     def keys_help(cls):
         help = []
         keys = cls.available_keys()
+        for key in cls.FIXED_KEYS:
+            keys.remove(key)
+
         for group in cls.KEY_GROUPS:
             for key in group:
                 keys.remove(key)
@@ -1267,12 +1307,12 @@ class ItemFormatter:
             'csize': self.calculate_csize,
             'num_chunks': self.calculate_num_chunks,
             'unique_chunks': self.calculate_unique_chunks,
-            'isomtime': partial(self.format_time, b'mtime'),
-            'isoctime': partial(self.format_time, b'ctime'),
-            'isoatime': partial(self.format_time, b'atime'),
-            'mtime': partial(self.time, b'mtime'),
-            'ctime': partial(self.time, b'ctime'),
-            'atime': partial(self.time, b'atime'),
+            'isomtime': partial(self.format_time, 'mtime'),
+            'isoctime': partial(self.format_time, 'ctime'),
+            'isoatime': partial(self.format_time, 'atime'),
+            'mtime': partial(self.time, 'mtime'),
+            'ctime': partial(self.time, 'ctime'),
+            'atime': partial(self.time, 'atime'),
         }
         for hash_function in hashlib.algorithms_guaranteed:
             self.add_key(hash_function, partial(self.hash_item, hash_function))
@@ -1284,11 +1324,11 @@ class ItemFormatter:
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
     def get_item_data(self, item):
-        mode = stat.filemode(item[b'mode'])
+        mode = stat.filemode(item.mode)
         item_type = mode[0]
         item_data = self.item_data
 
-        source = item.get(b'source', '')
+        source = item.get('source', '')
         extra = ''
         if source:
             source = remove_surrogates(source)
@@ -1299,49 +1339,46 @@ class ItemFormatter:
                 extra = ' link to %s' % source
         item_data['type'] = item_type
         item_data['mode'] = mode
-        item_data['user'] = item[b'user'] or item[b'uid']
-        item_data['group'] = item[b'group'] or item[b'gid']
-        item_data['uid'] = item[b'uid']
-        item_data['gid'] = item[b'gid']
-        item_data['path'] = remove_surrogates(item[b'path'])
-        item_data['bpath'] = item[b'path']
+        item_data['user'] = item.user or item.uid
+        item_data['group'] = item.group or item.gid
+        item_data['uid'] = item.uid
+        item_data['gid'] = item.gid
+        item_data['path'] = remove_surrogates(item.path)
+        item_data['bpath'] = item.path
         item_data['source'] = source
         item_data['linktarget'] = source
         item_data['extra'] = extra
-        item_data['flags'] = item.get(b'bsdflags')
+        item_data['flags'] = item.get('bsdflags')
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)
         return item_data
 
-    def format_item(self, item):
-        return self.format.format_map(self.get_item_data(item))
-
     def calculate_num_chunks(self, item):
-        return len(item.get(b'chunks', []))
+        return len(item.get('chunks', []))
 
     def calculate_unique_chunks(self, item):
         chunk_index = self.archive.cache.chunks
-        return sum(1 for c in item.get(b'chunks', []) if chunk_index[c.id].refcount == 1)
+        return sum(1 for c in item.get('chunks', []) if chunk_index[c.id].refcount == 1)
 
     def calculate_size(self, item):
-        return sum(c.size for c in item.get(b'chunks', []))
+        return sum(c.size for c in item.get('chunks', []))
 
     def calculate_csize(self, item):
-        return sum(c.csize for c in item.get(b'chunks', []))
+        return sum(c.csize for c in item.get('chunks', []))
 
     def hash_item(self, hash_function, item):
-        if b'chunks' not in item:
+        if 'chunks' not in item:
             return ""
         hash = hashlib.new(hash_function)
-        for _, data in self.archive.pipeline.fetch_many([c.id for c in item[b'chunks']]):
+        for _, data in self.archive.pipeline.fetch_many([c.id for c in item.chunks]):
             hash.update(data)
         return hash.hexdigest()
 
     def format_time(self, key, item):
-        return format_time(safe_timestamp(item.get(key) or item[b'mtime']))
+        return format_time(safe_timestamp(item.get(key) or item.mtime))
 
     def time(self, key, item):
-        return safe_timestamp(item.get(key) or item[b'mtime'])
+        return safe_timestamp(item.get(key) or item.mtime)
 
 
 class ChunkIteratorFileWrapper:
@@ -1385,7 +1422,7 @@ class ChunkIteratorFileWrapper:
 
 def open_item(archive, item):
     """Return file-like object for archived item (with chunks)."""
-    chunk_iterator = archive.pipeline.fetch_many([c.id for c in item[b'chunks']])
+    chunk_iterator = archive.pipeline.fetch_many([c.id for c in item.chunks])
     return ChunkIteratorFileWrapper(chunk_iterator)
 
 
@@ -1572,3 +1609,12 @@ class CompressionDecider2:
         compr_args.update(compr_spec)
         logger.debug("len(data) == %d, len(lz4(data)) == %d, choosing %s", data_len, cdata_len, compr_spec)
         return compr_args, Chunk(data, **meta)
+
+
+@contextmanager
+def signal_handler(signo, handler):
+    old_signal_handler = signal.signal(signo, handler)
+    try:
+        yield
+    finally:
+        signal.signal(signo, old_signal_handler)

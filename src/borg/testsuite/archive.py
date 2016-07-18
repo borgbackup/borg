@@ -6,7 +6,9 @@ from unittest.mock import Mock
 import pytest
 import msgpack
 
-from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, Statistics
+from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_dict, ITEM_KEYS, Statistics
+from ..archive import BackupOSError, backup_io, backup_io_iter
+from ..item import Item
 from ..key import PlaintextKey
 from ..helpers import Manifest
 from . import BaseTestCase
@@ -38,12 +40,12 @@ def tests_stats_progress(stats, columns=80):
 
     out = StringIO()
     stats.update(10**3, 0, unique=False)
-    stats.show_progress(item={b'path': 'foo'}, final=False, stream=out)
+    stats.show_progress(item=Item(path='foo'), final=False, stream=out)
     s = '1.02 kB O 10 B C 10 B D 0 N foo'
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
     out = StringIO()
-    stats.show_progress(item={b'path': 'foo'*40}, final=False, stream=out)
+    stats.show_progress(item=Item(path='foo'*40), final=False, stream=out)
     s = '1.02 kB O 10 B C 10 B D 0 N foofoofoofoofoofoofoofo...oofoofoofoofoofoofoofoofoo'
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
@@ -93,7 +95,7 @@ class ArchiveTimestampTestCase(BaseTestCase):
 class ChunkBufferTestCase(BaseTestCase):
 
     def test(self):
-        data = [{b'foo': 1}, {b'bar': 2}]
+        data = [Item(path='p1'), Item(path='p2')]
         cache = MockCache()
         key = PlaintextKey(None)
         chunks = CacheChunkBuffer(cache, key, None)
@@ -105,11 +107,11 @@ class ChunkBufferTestCase(BaseTestCase):
         unpacker = msgpack.Unpacker()
         for id in chunks.chunks:
             unpacker.feed(cache.objects[id])
-        self.assert_equal(data, list(unpacker))
+        self.assert_equal(data, [Item(internal_dict=d) for d in unpacker])
 
     def test_partial(self):
-        big = b"0123456789" * 10000
-        data = [{b'full': 1, b'data': big}, {b'partial': 2, b'data': big}]
+        big = "0123456789" * 10000
+        data = [Item(path='full', source=big), Item(path='partial', source=big)]
         cache = MockCache()
         key = PlaintextKey(None)
         chunks = CacheChunkBuffer(cache, key, None)
@@ -126,7 +128,7 @@ class ChunkBufferTestCase(BaseTestCase):
         unpacker = msgpack.Unpacker()
         for id in chunks.chunks:
             unpacker.feed(cache.objects[id])
-        self.assert_equal(data, list(unpacker))
+        self.assert_equal(data, [Item(internal_dict=d) for d in unpacker])
 
 
 class RobustUnpackerTestCase(BaseTestCase):
@@ -138,7 +140,7 @@ class RobustUnpackerTestCase(BaseTestCase):
         return isinstance(value, dict) and value.get(b'path') in (b'foo', b'bar', b'boo', b'baz')
 
     def process(self, input):
-        unpacker = RobustUnpacker(validator=self._validator)
+        unpacker = RobustUnpacker(validator=self._validator, item_keys=ITEM_KEYS)
         result = []
         for should_sync, chunks in input:
             if should_sync:
@@ -183,3 +185,59 @@ class RobustUnpackerTestCase(BaseTestCase):
         input = [(False, chunks[:3]), (True, [b'gar', b'bage'] + chunks[3:])]
         result = self.process(input)
         self.assert_equal(result, [{b'path': b'foo'}, {b'path': b'boo'}, {b'path': b'baz'}])
+
+
+@pytest.fixture
+def item_keys_serialized():
+    return [msgpack.packb(name) for name in ITEM_KEYS]
+
+
+@pytest.mark.parametrize('packed',
+    [b'', b'x', b'foobar', ] +
+    [msgpack.packb(o) for o in (
+        [None, 0, 0.0, False, '', {}, [], ()] +
+        [42, 23.42, True, b'foobar', {b'foo': b'bar'}, [b'foo', b'bar'], (b'foo', b'bar')]
+    )])
+def test_invalid_msgpacked_item(packed, item_keys_serialized):
+    assert not valid_msgpacked_dict(packed, item_keys_serialized)
+
+
+@pytest.mark.parametrize('packed',
+    [msgpack.packb(o) for o in [
+        {b'path': b'/a/b/c'},  # small (different msgpack mapping type!)
+        dict((k, b'') for k in ITEM_KEYS),  # as big (key count) as it gets
+        dict((k, b'x' * 1000) for k in ITEM_KEYS),  # as big (key count and volume) as it gets
+    ]])
+def test_valid_msgpacked_items(packed, item_keys_serialized):
+    assert valid_msgpacked_dict(packed, item_keys_serialized)
+
+
+def test_key_length_msgpacked_items():
+    key = b'x' * 32  # 31 bytes is the limit for fixstr msgpack type
+    data = {key: b''}
+    item_keys_serialized = [msgpack.packb(key), ]
+    assert valid_msgpacked_dict(msgpack.packb(data), item_keys_serialized)
+
+
+def test_backup_io():
+    with pytest.raises(BackupOSError):
+        with backup_io():
+            raise OSError(123)
+
+
+def test_backup_io_iter():
+    class Iterator:
+        def __init__(self, exc):
+            self.exc = exc
+
+        def __next__(self):
+            raise self.exc()
+
+    oserror_iterator = Iterator(OSError)
+    with pytest.raises(BackupOSError):
+        for _ in backup_io_iter(oserror_iterator):
+            pass
+
+    normal_iterator = Iterator(StopIteration)
+    for _ in backup_io_iter(normal_iterator):
+        assert False, 'StopIteration handled incorrectly'

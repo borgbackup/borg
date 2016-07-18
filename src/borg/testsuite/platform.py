@@ -51,26 +51,26 @@ class PlatformLinuxTestCase(BaseTestCase):
         return item
 
     def set_acl(self, path, access=None, default=None, numeric_owner=False):
-        item = {b'acl_access': access, b'acl_default': default}
+        item = {'acl_access': access, 'acl_default': default}
         acl_set(path, item, numeric_owner=numeric_owner)
 
     def test_access_acl(self):
         file = tempfile.NamedTemporaryFile()
         self.assert_equal(self.get_acl(file.name), {})
         self.set_acl(file.name, access=b'user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-:9999\ngroup:root:rw-:9999\n', numeric_owner=False)
-        self.assert_in(b'user:root:rw-:0', self.get_acl(file.name)[b'acl_access'])
-        self.assert_in(b'group:root:rw-:0', self.get_acl(file.name)[b'acl_access'])
-        self.assert_in(b'user:0:rw-:0', self.get_acl(file.name, numeric_owner=True)[b'acl_access'])
+        self.assert_in(b'user:root:rw-:0', self.get_acl(file.name)['acl_access'])
+        self.assert_in(b'group:root:rw-:0', self.get_acl(file.name)['acl_access'])
+        self.assert_in(b'user:0:rw-:0', self.get_acl(file.name, numeric_owner=True)['acl_access'])
         file2 = tempfile.NamedTemporaryFile()
         self.set_acl(file2.name, access=b'user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-:9999\ngroup:root:rw-:9999\n', numeric_owner=True)
-        self.assert_in(b'user:9999:rw-:9999', self.get_acl(file2.name)[b'acl_access'])
-        self.assert_in(b'group:9999:rw-:9999', self.get_acl(file2.name)[b'acl_access'])
+        self.assert_in(b'user:9999:rw-:9999', self.get_acl(file2.name)['acl_access'])
+        self.assert_in(b'group:9999:rw-:9999', self.get_acl(file2.name)['acl_access'])
 
     def test_default_acl(self):
         self.assert_equal(self.get_acl(self.tmpdir), {})
         self.set_acl(self.tmpdir, access=ACCESS_ACL, default=DEFAULT_ACL)
-        self.assert_equal(self.get_acl(self.tmpdir)[b'acl_access'], ACCESS_ACL)
-        self.assert_equal(self.get_acl(self.tmpdir)[b'acl_default'], DEFAULT_ACL)
+        self.assert_equal(self.get_acl(self.tmpdir)['acl_access'], ACCESS_ACL)
+        self.assert_equal(self.get_acl(self.tmpdir)['acl_default'], DEFAULT_ACL)
 
     def test_non_ascii_acl(self):
         # Testing non-ascii ACL processing to see whether our code is robust.
@@ -86,18 +86,18 @@ class PlatformLinuxTestCase(BaseTestCase):
         group_entry_numeric = 'group:666:rw-:666'.encode('ascii')
         acl = b'\n'.join([nothing_special, user_entry, group_entry])
         self.set_acl(file.name, access=acl, numeric_owner=False)
-        acl_access = self.get_acl(file.name, numeric_owner=False)[b'acl_access']
+        acl_access = self.get_acl(file.name, numeric_owner=False)['acl_access']
         self.assert_in(user_entry, acl_access)
         self.assert_in(group_entry, acl_access)
-        acl_access_numeric = self.get_acl(file.name, numeric_owner=True)[b'acl_access']
+        acl_access_numeric = self.get_acl(file.name, numeric_owner=True)['acl_access']
         self.assert_in(user_entry_numeric, acl_access_numeric)
         self.assert_in(group_entry_numeric, acl_access_numeric)
         file2 = tempfile.NamedTemporaryFile()
         self.set_acl(file2.name, access=acl, numeric_owner=True)
-        acl_access = self.get_acl(file2.name, numeric_owner=False)[b'acl_access']
+        acl_access = self.get_acl(file2.name, numeric_owner=False)['acl_access']
         self.assert_in(user_entry, acl_access)
         self.assert_in(group_entry, acl_access)
-        acl_access_numeric = self.get_acl(file.name, numeric_owner=True)[b'acl_access']
+        acl_access_numeric = self.get_acl(file.name, numeric_owner=True)['acl_access']
         self.assert_in(user_entry_numeric, acl_access_numeric)
         self.assert_in(group_entry_numeric, acl_access_numeric)
 
@@ -125,7 +125,7 @@ class PlatformDarwinTestCase(BaseTestCase):
         return item
 
     def set_acl(self, path, acl, numeric_owner=False):
-        item = {b'acl_extended': acl}
+        item = {'acl_extended': acl}
         acl_set(path, item, numeric_owner=numeric_owner)
 
     def test_access_acl(self):
@@ -133,11 +133,11 @@ class PlatformDarwinTestCase(BaseTestCase):
         file2 = tempfile.NamedTemporaryFile()
         self.assert_equal(self.get_acl(file.name), {})
         self.set_acl(file.name, b'!#acl 1\ngroup:ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000000:staff:0:allow:read\nuser:FFFFEEEE-DDDD-CCCC-BBBB-AAAA00000000:root:0:allow:read\n', numeric_owner=False)
-        self.assert_in(b'group:ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000014:staff:20:allow:read', self.get_acl(file.name)[b'acl_extended'])
-        self.assert_in(b'user:FFFFEEEE-DDDD-CCCC-BBBB-AAAA00000000:root:0:allow:read', self.get_acl(file.name)[b'acl_extended'])
+        self.assert_in(b'group:ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000014:staff:20:allow:read', self.get_acl(file.name)['acl_extended'])
+        self.assert_in(b'user:FFFFEEEE-DDDD-CCCC-BBBB-AAAA00000000:root:0:allow:read', self.get_acl(file.name)['acl_extended'])
         self.set_acl(file2.name, b'!#acl 1\ngroup:ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000000:staff:0:allow:read\nuser:FFFFEEEE-DDDD-CCCC-BBBB-AAAA00000000:root:0:allow:read\n', numeric_owner=True)
-        self.assert_in(b'group:ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000000:wheel:0:allow:read', self.get_acl(file2.name)[b'acl_extended'])
-        self.assert_in(b'group:ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000000::0:allow:read', self.get_acl(file2.name, numeric_owner=True)[b'acl_extended'])
+        self.assert_in(b'group:ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000000:wheel:0:allow:read', self.get_acl(file2.name)['acl_extended'])
+        self.assert_in(b'group:ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000000::0:allow:read', self.get_acl(file2.name, numeric_owner=True)['acl_extended'])
 
 
 @unittest.skipUnless(sys.platform.startswith(('linux', 'freebsd', 'darwin')), 'POSIX only tests')

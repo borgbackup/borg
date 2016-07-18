@@ -26,3 +26,4 @@ borg.exe
 *.dll
 .coverage
 .vagrant
+.eggs

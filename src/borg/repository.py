@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 from .constants import *  # NOQA
 from .hashindex import NSIndex
-from .helpers import Error, ErrorWithTraceback, IntegrityError, InternalOSError
+from .helpers import Error, ErrorWithTraceback, IntegrityError
 from .helpers import Location
 from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
@@ -96,7 +96,7 @@ class Repository:
     class ObjectNotFound(ErrorWithTraceback):
         """Object with key {} not found in repository {}."""
 
-    def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True):
+    def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True, append_only=False):
         self.path = os.path.abspath(path)
         self._location = Location('file://%s' % self.path)
         self.io = None
@@ -107,6 +107,7 @@ class Repository:
         self.do_lock = lock
         self.do_create = create
         self.exclusive = exclusive
+        self.append_only = append_only
 
     def __del__(self):
         if self.lock:
@@ -125,6 +126,12 @@ class Repository:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
+            no_space_left_on_device = exc_type is OSError and exc_val.errno == errno.ENOSPC
+            # The ENOSPC could have originated somewhere else besides the Repository. The cleanup is always safe, unless
+            # EIO or FS corruption ensues, which is why we specifically check for ENOSPC.
+            if self._active_txn and no_space_left_on_device:
+                logger.warning('No space left on device, cleaning up partial transaction to free space.')
+                self.io.cleanup(self.io.get_segments_transaction_id())
             self.rollback()
         self.close()
 
@@ -176,7 +183,9 @@ class Repository:
         shutil.rmtree(self.path)
 
     def get_index_transaction_id(self):
-        indices = sorted((int(name[6:]) for name in os.listdir(self.path) if name.startswith('index.') and name[6:].isdigit()))
+        indices = sorted(int(fn[6:])
+                         for fn in os.listdir(self.path)
+                         if fn.startswith('index.') and fn[6:].isdigit() and os.stat(os.path.join(self.path, fn)).st_size != 0)
         if indices:
             return indices[-1]
         else:
@@ -217,7 +226,9 @@ class Repository:
             raise self.InvalidRepository(path)
         self.max_segment_size = self.config.getint('repository', 'max_segment_size')
         self.segments_per_dir = self.config.getint('repository', 'segments_per_dir')
-        self.append_only = self.config.getboolean('repository', 'append_only', fallback=False)
+        # append_only can be set in the constructor
+        # it shouldn't be overridden (True -> False) here
+        self.append_only = self.append_only or self.config.getboolean('repository', 'append_only', fallback=False)
         self.id = unhexlify(self.config.get('repository', 'id').strip())
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
 
@@ -247,18 +258,13 @@ class Repository:
         except RuntimeError as error:
             assert str(error) == 'hashindex_read failed'  # everything else means we're in *deep* trouble
             logger.warning('Repository index missing or corrupted, trying to recover')
-            try:
-                os.unlink(index_path)
-            except OSError as e:
-                raise InternalOSError(e) from None
+            os.unlink(index_path)
             if not auto_recover:
                 raise
             self.prepare_txn(self.get_transaction_id())
             # don't leave an open transaction around
             self.commit()
             return self.open_index(self.get_transaction_id())
-        except OSError as e:
-            raise InternalOSError(e) from None
 
     def prepare_txn(self, transaction_id, do_cleanup=True):
         self._active_txn = True
@@ -296,8 +302,6 @@ class Repository:
                 self.check_transaction()
                 self.prepare_txn(transaction_id)
                 return
-            except OSError as os_error:
-                raise InternalOSError(os_error) from None
             if hints[b'version'] == 1:
                 logger.debug('Upgrading from v1 hints.%d', transaction_id)
                 self.segments = hints[b'segments']

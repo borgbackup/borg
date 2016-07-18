@@ -1,3 +1,5 @@
+.. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
+
 .. _borg_create:
 
 borg create
@@ -47,7 +49,7 @@ Filesystem options
     ``--ignore-inode``
         | ignore inode data in the file metadata cache used to detect unchanged files.
     ``--read-special``
-        | open and read special files as if they were regular files
+        | open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
 
 Archive options
     ``--comment COMMENT``
@@ -55,17 +57,21 @@ Archive options
     ``--timestamp yyyy-mm-ddThh:mm:ss``
         | manually specify the archive creation date/time (UTC). alternatively, give a reference file/directory.
     ``-c SECONDS``, ``--checkpoint-interval SECONDS``
-        | write checkpoint every SECONDS seconds (Default: 300)
+        | write checkpoint every SECONDS seconds (Default: 1800)
     ``--chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE``
         | specify the chunker parameters. default: 19,23,21,4095
     ``-C COMPRESSION``, ``--compression COMPRESSION``
         | select compression algorithm (and level):
         | none == no compression (default),
+        | auto,C[,L] == built-in heuristic decides between none or C[,L] - with C[,L]
+        |               being any valid compression algorithm (and optional level),
         | lz4 == lz4,
         | zlib == zlib (default level 6),
         | zlib,0 .. zlib,9 == zlib (with level 0..9),
         | lzma == lzma (default level 6),
         | lzma,0 .. lzma,9 == lzma (with level 0..9).
+    ``--compression-from COMPRESSIONCONFIG``
+        | read compression patterns from COMPRESSIONCONFIG, one per line
 
 Description
 ~~~~~~~~~~~
@@ -79,7 +85,7 @@ The archive name needs to be unique. It must not end in '.checkpoint' or
 checkpoints and treated in special ways.
 
 In the archive name, you may use the following format tags:
-{now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}
+{now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}, {uuid4}
 
 To speed up pulling backups over sshfs and similar network file systems which do
 not provide correct inode information the --ignore-inode flag can be used. This
@@ -87,3 +93,4 @@ potentially decreases reliability of change detection, while avoiding always rea
 all files on these file systems.
 
 See the output of the "borg help patterns" command for more help on exclude patterns.
+See the output of the "borg help placeholders" command for more help on placeholders.

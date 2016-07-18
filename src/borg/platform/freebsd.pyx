@@ -57,10 +57,10 @@ def acl_get(path, item, st, numeric_owner=False):
         return
     flags |= ACL_TEXT_NUMERIC_IDS if numeric_owner else 0
     if ret > 0:
-        _get_acl(p, ACL_TYPE_NFS4, item, b'acl_nfs4', flags)
+        _get_acl(p, ACL_TYPE_NFS4, item, 'acl_nfs4', flags)
     else:
-        _get_acl(p, ACL_TYPE_ACCESS, item, b'acl_access', flags)
-        _get_acl(p, ACL_TYPE_DEFAULT, item, b'acl_default', flags)
+        _get_acl(p, ACL_TYPE_ACCESS, item, 'acl_access', flags)
+        _get_acl(p, ACL_TYPE_DEFAULT, item, 'acl_default', flags)
 
 
 cdef _set_acl(p, type, item, attribute, numeric_owner=False):
@@ -98,6 +98,6 @@ def acl_set(path, item, numeric_owner=False):
     of the user/group names
     """
     p = os.fsencode(path)
-    _set_acl(p, ACL_TYPE_NFS4, item, b'acl_nfs4', numeric_owner)
-    _set_acl(p, ACL_TYPE_ACCESS, item, b'acl_access', numeric_owner)
-    _set_acl(p, ACL_TYPE_DEFAULT, item, b'acl_default', numeric_owner)
+    _set_acl(p, ACL_TYPE_NFS4, item, 'acl_nfs4', numeric_owner)
+    _set_acl(p, ACL_TYPE_ACCESS, item, 'acl_access', numeric_owner)
+    _set_acl(p, ACL_TYPE_DEFAULT, item, 'acl_default', numeric_owner)

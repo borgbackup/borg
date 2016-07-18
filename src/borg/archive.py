@@ -4,6 +4,7 @@ import socket
 import stat
 import sys
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from getpass import getuser
 from io import BytesIO
@@ -33,6 +34,7 @@ from .helpers import ProgressIndicatorPercent, log_multi
 from .helpers import PathPrefixPattern, FnmatchPattern
 from .helpers import consume
 from .helpers import CompressionDecider1, CompressionDecider2, CompressionSpec
+from .item import Item
 from .key import key_factory
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth
 from .remote import cache_if_remote
@@ -89,7 +91,7 @@ class Statistics:
             columns, lines = get_terminal_size()
             if not final:
                 msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
-                path = remove_surrogates(item[b'path']) if item else ''
+                path = remove_surrogates(item.path) if item else ''
                 space = columns - swidth(msg)
                 if space < swidth('...') + swidth(path):
                     path = '%s...%s' % (path[:(space // 2) - swidth('...')], path[-space // 2:])
@@ -97,6 +99,50 @@ class Statistics:
             else:
                 msg = ' ' * columns
             print(msg, file=stream or sys.stderr, end="\r", flush=True)
+
+
+def is_special(mode):
+    # file types that get special treatment in --read-special mode
+    return stat.S_ISBLK(mode) or stat.S_ISCHR(mode) or stat.S_ISFIFO(mode)
+
+
+class BackupOSError(Exception):
+    """
+    Wrapper for OSError raised while accessing backup files.
+
+    Borg does different kinds of IO, and IO failures have different consequences.
+    This wrapper represents failures of input file or extraction IO.
+    These are non-critical and are only reported (exit code = 1, warning).
+
+    Any unwrapped IO error is critical and aborts execution (for example repository IO failure).
+    """
+    def __init__(self, os_error):
+        self.os_error = os_error
+        self.errno = os_error.errno
+        self.strerror = os_error.strerror
+        self.filename = os_error.filename
+
+    def __str__(self):
+        return str(self.os_error)
+
+
+@contextmanager
+def backup_io():
+    """Context manager changing OSError to BackupOSError."""
+    try:
+        yield
+    except OSError as os_error:
+        raise BackupOSError(os_error) from os_error
+
+
+def backup_io_iter(iterator):
+    while True:
+        try:
+            with backup_io():
+                item = next(iterator)
+        except StopIteration:
+            return
+        yield item
 
 
 class DownloadPipeline:
@@ -109,16 +155,16 @@ class DownloadPipeline:
         unpacker = msgpack.Unpacker(use_list=False)
         for _, data in self.fetch_many(ids):
             unpacker.feed(data)
-            items = [decode_dict(item, ITEM_TEXT_KEYS) for item in unpacker]
+            items = [Item(internal_dict=item) for item in unpacker]
             if filter:
                 items = [item for item in items if filter(item)]
             for item in items:
-                if b'chunks' in item:
-                    item[b'chunks'] = [ChunkListEntry(*e) for e in item[b'chunks']]
+                if 'chunks' in item:
+                    item.chunks = [ChunkListEntry(*e) for e in item.chunks]
             if preload:
                 for item in items:
-                    if b'chunks' in item:
-                        self.repository.preload([c.id for c in item[b'chunks']])
+                    if 'chunks' in item:
+                        self.repository.preload([c.id for c in item.chunks])
             for item in items:
                 yield item
 
@@ -138,7 +184,7 @@ class ChunkBuffer:
         self.chunker = Chunker(self.key.chunk_seed, *chunker_params)
 
     def add(self, item):
-        self.buffer.write(self.packer.pack(StableDict(item)))
+        self.buffer.write(self.packer.pack(item.as_dict()))
         if self.is_full():
             self.flush()
 
@@ -289,9 +335,6 @@ Number of files: {0.stats.nfiles}'''.format(
             yield item
 
     def add_item(self, item):
-        unknown_keys = set(item) - ITEM_KEYS
-        assert not unknown_keys, ('unknown item metadata keys detected, please update constants.ITEM_KEYS: %s',
-                                  ','.join(k.decode('ascii') for k in unknown_keys))
         if self.show_progress:
             self.stats.show_progress(item=item, dt=0.2)
         self.items_buffer.add(item)
@@ -359,9 +402,10 @@ Number of files: {0.stats.nfiles}'''.format(
             _, data = self.key.decrypt(id, chunk)
             unpacker.feed(data)
             for item in unpacker:
-                if b'chunks' in item:
+                item = Item(internal_dict=item)
+                if 'chunks' in item:
                     stats.nfiles += 1
-                    add_file_chunks(item[b'chunks'])
+                    add_file_chunks(item.chunks)
         cache.rollback()
         return stats
 
@@ -376,22 +420,26 @@ Number of files: {0.stats.nfiles}'''.format(
         :param stdout: write extracted data to stdout
         :param sparse: write sparse files (chunk-granularity, independent of the original being sparse)
         :param hardlink_masters: maps paths to (chunks, link_target) for extracting subtrees with hardlinks correctly
-        :param original_path: b'path' key as stored in archive
+        :param original_path: 'path' key as stored in archive
         """
+        has_damaged_chunks = 'chunks_healthy' in item
         if dry_run or stdout:
-            if b'chunks' in item:
-                for _, data in self.pipeline.fetch_many([c.id for c in item[b'chunks']], is_preloaded=True):
+            if 'chunks' in item:
+                for _, data in self.pipeline.fetch_many([c.id for c in item.chunks], is_preloaded=True):
                     if stdout:
                         sys.stdout.buffer.write(data)
                 if stdout:
                     sys.stdout.buffer.flush()
+            if has_damaged_chunks:
+                logger.warning('File %s has damaged (all-zero) chunks. Try running borg check --repair.' %
+                               remove_surrogates(item.path))
             return
 
-        original_path = original_path or item[b'path']
+        original_path = original_path or item.path
         dest = self.cwd
-        if item[b'path'].startswith('/') or item[b'path'].startswith('..') or (sys.platform == 'win32' and len(item[b'path']) > 1 and item[b'path'][1] == ':'):
+        if item.path.startswith('/') or item.path.startswith('..') or (sys.platform == 'win32' and len(item.path) > 1 and item.path[1] == ':'):
             raise Exception('Path should be relative and local')
-        path = os.path.join(dest, item[b'path'])
+        path = os.path.join(dest, item.path)
         # Attempt to remove existing files, ignore errors on failure
         try:
             st = os.lstat(path)
@@ -403,103 +451,118 @@ Number of files: {0.stats.nfiles}'''.format(
             raise self.IncompatibleFilesystemEncodingError(path, sys.getfilesystemencoding()) from None
         except OSError:
             pass
-        mode = item[b'mode']
+        mode = item.mode
         if stat.S_ISREG(mode):
-            if not os.path.exists(os.path.dirname(path)):
-                os.makedirs(os.path.dirname(path))
-
+            with backup_io():
+                if not os.path.exists(os.path.dirname(path)):
+                    os.makedirs(os.path.dirname(path))
             # Hard link?
-            if b'source' in item:
-                source = os.path.join(dest, item[b'source'])
-                if os.path.exists(path):
-                    os.unlink(path)
-                if not hardlink_masters:
-                    os.link(source, path)
-                    return
-                item[b'chunks'], link_target = hardlink_masters[item[b'source']]
+            if 'source' in item:
+                source = os.path.join(dest, item.source)
+                with backup_io():
+                    if os.path.exists(path):
+                        os.unlink(path)
+                    if not hardlink_masters:
+                        os.link(source, path)
+                        return
+                item.chunks, link_target = hardlink_masters[item.source]
                 if link_target:
                     # Hard link was extracted previously, just link
-                    os.link(link_target, path)
+                    with backup_io():
+                        os.link(link_target, path)
                     return
                 # Extract chunks, since the item which had the chunks was not extracted
-            with open(path, 'wb') as fd:
-                ids = [c.id for c in item[b'chunks']]
+            with backup_io():
+                fd = open(path, 'wb')
+            with fd:
+                ids = [c.id for c in item.chunks]
                 for _, data in self.pipeline.fetch_many(ids, is_preloaded=True):
-                    if sparse and self.zeros.startswith(data):
-                        # all-zero chunk: create a hole in a sparse file
-                        fd.seek(len(data), 1)
+                    with backup_io():
+                        if sparse and self.zeros.startswith(data):
+                            # all-zero chunk: create a hole in a sparse file
+                            fd.seek(len(data), 1)
+                        else:
+                            fd.write(data)
+                with backup_io():
+                    pos = fd.tell()
+                    fd.truncate(pos)
+                    fd.flush()
+                    if sys.platform != 'win32':
+                        self.restore_attrs(path, item, fd=fd.fileno())
                     else:
-                        fd.write(data)
-                pos = fd.tell()
-                fd.truncate(pos)
-                fd.flush()
-                if sys.platform != 'win32':
-                    self.restore_attrs(path, item, fd=fd.fileno())
-                else:
-                    # File needs to be closed or timestamps are rewritten at close
-                    fd.close()
-                    self.restore_attrs(path, item)
+                        # File needs to be closed or timestamps are rewritten at close
+                        fd.close()
+                        self.restore_attrs(path, item)
+            if has_damaged_chunks:
+                logger.warning('File %s has damaged (all-zero) chunks. Try running borg check --repair.' %
+                               remove_surrogates(item.path))
             if hardlink_masters:
                 # Update master entry with extracted file path, so that following hardlinks don't extract twice.
-                hardlink_masters[item.get(b'source') or original_path] = (None, path)
-        elif stat.S_ISDIR(mode):
-            if not os.path.exists(path):
-                os.makedirs(path)
-            if restore_attrs:
+                hardlink_masters[item.get('source') or original_path] = (None, path)
+            return
+        with backup_io():
+            # No repository access beyond this point.
+            if stat.S_ISDIR(mode):
+                if not os.path.exists(path):
+                    os.makedirs(path)
+                if restore_attrs:
+                    self.restore_attrs(path, item)
+            elif stat.S_ISLNK(mode):
+                if not os.path.exists(os.path.dirname(path)):
+                    os.makedirs(os.path.dirname(path))
+                source = item.source
+                if os.path.exists(path):
+                    os.unlink(path)
+                try:
+                    os.symlink(source, path)
+                except UnicodeEncodeError:
+                    raise self.IncompatibleFilesystemEncodingError(source, sys.getfilesystemencoding()) from None
+                self.restore_attrs(path, item, symlink=True)
+            elif stat.S_ISFIFO(mode):
+                if not os.path.exists(os.path.dirname(path)):
+                    os.makedirs(os.path.dirname(path))
+                os.mkfifo(path)
                 self.restore_attrs(path, item)
-        elif stat.S_ISLNK(mode):
-            if not os.path.exists(os.path.dirname(path)):
-                os.makedirs(os.path.dirname(path))
-            source = item[b'source']
-            if os.path.exists(path):
-                os.unlink(path)
-            try:
-                os.symlink(source, path)
-            except UnicodeEncodeError:
-                raise self.IncompatibleFilesystemEncodingError(source, sys.getfilesystemencoding()) from None
-            self.restore_attrs(path, item, symlink=True)
-        elif stat.S_ISFIFO(mode):
-            if not os.path.exists(os.path.dirname(path)):
-                os.makedirs(os.path.dirname(path))
-            os.mkfifo(path)
-            self.restore_attrs(path, item)
-        elif stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
-            os.mknod(path, item[b'mode'], item[b'rdev'])
-            self.restore_attrs(path, item)
-        else:
-            raise Exception('Unknown archive item type %r' % item[b'mode'])
+            elif stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
+                os.mknod(path, item.mode, item.rdev)
+                self.restore_attrs(path, item)
+            else:
+                raise Exception('Unknown archive item type %r' % item.mode)
 
     def restore_attrs(self, path, item, symlink=False, fd=None):
+        """
+        Restore filesystem attributes on *path* (*fd*) from *item*.
+
+        Does not access the repository.
+        """
         uid = gid = None
         if not self.numeric_owner:
-            uid = user2uid(item[b'user'])
-            gid = group2gid(item[b'group'])
-        uid = item[b'uid'] if uid is None else uid
-        gid = item[b'gid'] if gid is None else gid
+            uid = user2uid(item.user)
+            gid = group2gid(item.group)
+        uid = item.uid if uid is None else uid
+        gid = item.gid if gid is None else gid
         # This code is a bit of a mess due to os specific differences
         if sys.platform != 'win32':
             try:
                 if fd:
                     os.fchown(fd, uid, gid)
+                    os.fchmod(fd, item.mode)
                 else:
                     os.lchown(path, uid, gid)
+                if not symlink:
+                    os.chmod(path, item.mode)
+                elif has_lchmod:  # Not available on Linux
+                    os.lchmod(path, item.mode)
             except OSError:
                 pass
         else:
             try:
-                set_owner(path, item[b'user'], safe_decode(item[b'uid']))
+                set_owner(path, item.user, item.user_sid)
             except OSError:
                 pass
-        if sys.platform != 'win32':
-            if fd:
-                os.fchmod(fd, item[b'mode'])
-            elif not symlink:
-                os.chmod(path, item[b'mode'])
-            elif has_lchmod:  # Not available on Linux
-                os.lchmod(path, item[b'mode'])
-        mtime = bigint_to_int(item[b'mtime'])
-        if b'atime' in item:
-            atime = bigint_to_int(item[b'atime'])
+        mtime = item.mtime
+        if 'atime' in item:
+            atime = item.atime
         else:
             # old archives only had mtime in item metadata
             atime = mtime
@@ -510,14 +573,14 @@ Number of files: {0.stats.nfiles}'''.format(
         else:
             os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
         acl_set(path, item, self.numeric_owner)
-        if b'bsdflags' in item:
+        if 'bsdflags' in item:
             try:
-                set_flags(path, item[b'bsdflags'], fd=fd)
+                set_flags(path, item.bsdflags, fd=fd)
             except OSError:
                 pass
         # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
         # the Linux capabilities in the "security.capability" attribute.
-        xattrs = item.get(b'xattrs', {})
+        xattrs = item.get('xattrs', {})
         for k, v in xattrs.items():
             try:
                 xattr.setxattr(fd or path, k, v, follow_symlinks=False)
@@ -547,71 +610,107 @@ Number of files: {0.stats.nfiles}'''.format(
         self.set_meta(b'name', name)
         del self.manifest.archives[oldname]
 
-    def delete(self, stats, progress=False):
-        unpacker = msgpack.Unpacker(use_list=False)
-        items_ids = self.metadata[b'items']
-        pi = ProgressIndicatorPercent(total=len(items_ids), msg="Decrementing references %3.0f%%", same_line=True)
-        for (i, (items_id, data)) in enumerate(zip(items_ids, self.repository.get_many(items_ids))):
+    def delete(self, stats, progress=False, forced=False):
+        class ChunksIndexError(Error):
+            """Chunk ID {} missing from chunks index, corrupted chunks index - aborting transaction."""
+
+        def chunk_decref(id, stats):
+            nonlocal error
+            try:
+                self.cache.chunk_decref(id, stats)
+            except KeyError:
+                cid = bin_to_hex(id)
+                raise ChunksIndexError(cid)
+            except Repository.ObjectNotFound as e:
+                # object not in repo - strange, but we wanted to delete it anyway.
+                if not forced:
+                    raise
+                error = True
+
+        error = False
+        try:
+            unpacker = msgpack.Unpacker(use_list=False)
+            items_ids = self.metadata[b'items']
+            pi = ProgressIndicatorPercent(total=len(items_ids), msg="Decrementing references %3.0f%%", same_line=True)
+            for (i, (items_id, data)) in enumerate(zip(items_ids, self.repository.get_many(items_ids))):
+                if progress:
+                    pi.show(i)
+                _, data = self.key.decrypt(items_id, data)
+                unpacker.feed(data)
+                chunk_decref(items_id, stats)
+                try:
+                    for item in unpacker:
+                        item = Item(internal_dict=item)
+                        if 'chunks' in item:
+                            for chunk_id, size, csize in item.chunks:
+                                chunk_decref(chunk_id, stats)
+                except (TypeError, ValueError):
+                    # if items metadata spans multiple chunks and one chunk got dropped somehow,
+                    # it could be that unpacker yields bad types
+                    if not forced:
+                        raise
+                    error = True
             if progress:
-                pi.show(i)
-            _, data = self.key.decrypt(items_id, data)
-            unpacker.feed(data)
-            self.cache.chunk_decref(items_id, stats)
-            for item in unpacker:
-                if b'chunks' in item:
-                    for chunk_id, size, csize in item[b'chunks']:
-                        self.cache.chunk_decref(chunk_id, stats)
-        if progress:
-            pi.finish()
-        self.cache.chunk_decref(self.id, stats)
+                pi.finish()
+        except (msgpack.UnpackException, Repository.ObjectNotFound):
+            # items metadata corrupted
+            if not forced:
+                raise
+            error = True
+        # in forced delete mode, we try hard to delete at least the manifest entry,
+        # if possible also the archive superblock, even if processing the items raises
+        # some harmless exception.
+        chunk_decref(self.id, stats)
         del self.manifest.archives[self.name]
+        if error:
+            logger.warning('forced deletion succeeded, but the deleted archive was corrupted.')
+            logger.warning('borg check --repair is required to free all space.')
 
     def stat_attrs(self, st, path):
-        item = {}
+        attrs = dict(
+            mode=st.st_mode,
+
+            atime=st.st_atime_ns,
+            ctime=st.st_ctime_ns,
+            mtime=st.st_mtime_ns,
+        )
         if sys.platform == 'win32':
-            owner = get_owner(path)
-            item = {
-                b'mode': st.st_mode,
-                b'uid': owner[1], b'user': owner[0],
-                b'gid': st.st_gid, b'group': gid2group(st.st_gid),
-                b'atime': int_to_bigint(st.st_atime_ns),
-                b'ctime': int_to_bigint(st.st_ctime_ns),
-                b'mtime': int_to_bigint(st.st_mtime_ns),
-            }
+            user_name, user_sid = get_owner(path)
+            attrs.update({
+                'uid': 0, 'user_sid': user_sid, 'user': user_name,
+                'gid': st.st_gid, 'group': gid2group(st.st_gid),
+            })
         else:
-            item = {
-                b'mode': st.st_mode,
-                b'uid': st.st_uid, b'user': uid2user(st.st_uid),
-                b'gid': st.st_gid, b'group': gid2group(st.st_gid),
-                b'atime': int_to_bigint(st.st_atime_ns),
-                b'ctime': int_to_bigint(st.st_ctime_ns),
-                b'mtime': int_to_bigint(st.st_mtime_ns),
-            }
+            attrs.update({
+                'uid': st.st_uid, 'user': uid2user(st.st_uid),
+                'gid': st.st_gid, 'group': gid2group(st.st_gid),
+            })
         if self.numeric_owner:
-            item[b'user'] = item[b'group'] = None
-        xattrs = xattr.get_all(path, follow_symlinks=False)
+            attrs['user'] = attrs['group'] = None
+        with backup_io():
+            xattrs = xattr.get_all(path, follow_symlinks=False)
+            bsdflags = get_flags(path, st)
+            acl_get(path, attrs, st, self.numeric_owner)
         if xattrs:
-            item[b'xattrs'] = StableDict(xattrs)
-        bsdflags = get_flags(path, st)
+            attrs['xattrs'] = StableDict(xattrs)
         if bsdflags:
-            item[b'bsdflags'] = bsdflags
-        acl_get(path, item, st, self.numeric_owner)
-        return item
+            attrs['bsdflags'] = bsdflags
+        return attrs
 
     def process_dir(self, path, st):
-        item = {b'path': make_path_safe(path)}
+        item = Item(path=make_path_safe(path))
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
         return 'd'  # directory
 
     def process_fifo(self, path, st):
-        item = {b'path': make_path_safe(path)}
+        item = Item(path=make_path_safe(path))
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
         return 'f'  # fifo
 
     def process_dev(self, path, st):
-        item = {b'path': make_path_safe(path), b'rdev': st.st_rdev}
+        item = Item(path=make_path_safe(path), rdev=st.st_rdev)
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
         if stat.S_ISCHR(st.st_mode):
@@ -621,7 +720,7 @@ Number of files: {0.stats.nfiles}'''.format(
 
     def process_symlink(self, path, st):
         source = os.readlink(path)
-        item = {b'path': make_path_safe(path), b'source': source}
+        item = Item(path=make_path_safe(path), source=source)
         item.update(self.stat_attrs(st, path))
         self.add_item(item)
         return 's'  # symlink
@@ -630,18 +729,18 @@ Number of files: {0.stats.nfiles}'''.format(
         uid, gid = 0, 0
         fd = sys.stdin.buffer  # binary
         chunks = []
-        for data in self.chunker.chunkify(fd):
+        for data in backup_io_iter(self.chunker.chunkify(fd)):
             chunks.append(cache.add_chunk(self.key.id_hash(data), Chunk(data), self.stats))
         self.stats.nfiles += 1
-        t = int_to_bigint(int(time.time()) * 1000000000)
-        item = {
-            b'path': path,
-            b'chunks': chunks,
-            b'mode': 0o100660,  # regular file, ug=rw
-            b'uid': uid, b'user': uid2user(uid),
-            b'gid': gid, b'group': gid2group(gid),
-            b'mtime': t, b'atime': t, b'ctime': t,
-        }
+        t = int(time.time()) * 1000000000
+        item = Item(
+            path=path,
+            chunks=chunks,
+            mode=0o100660,  # regular file, ug=rw
+            uid=uid, user=uid2user(uid),
+            gid=gid, group=gid2group(gid),
+            mtime=t, atime=t, ctime=t,
+        )
         self.add_item(item)
         return 'i'  # stdin
 
@@ -652,19 +751,23 @@ Number of files: {0.stats.nfiles}'''.format(
         if st.st_nlink > 1:
             source = self.hard_links.get((st.st_ino, st.st_dev))
             if (st.st_ino, st.st_dev) in self.hard_links:
-                item = self.stat_attrs(st, path)
-                item.update({
-                    b'path': safe_path,
-                    b'source': source,
-                })
+                item = Item(path=safe_path, source=source)
+                item.update(self.stat_attrs(st, path))
                 self.add_item(item)
                 status = 'h'  # regular file, hardlink (to already seen inodes)
                 return status
             else:
                 self.hard_links[st.st_ino, st.st_dev] = safe_path
-        path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
+        is_special_file = is_special(st.st_mode)
+        if not is_special_file:
+            path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
+            ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode)
+        else:
+            # in --read-special mode, we may be called for special files.
+            # there should be no information in the cache about special files processed in
+            # read-special mode, but we better play safe as this was wrong in the past:
+            path_hash = ids = None
         first_run = not cache.files
-        ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode)
         if first_run:
             logger.debug('Processing files ...')
         chunks = None
@@ -678,27 +781,35 @@ Number of files: {0.stats.nfiles}'''.format(
                 status = 'U'  # regular file, unchanged
         else:
             status = 'A'  # regular file, added
-        item = {
-            b'path': safe_path,
-            b'hardlink_master': st.st_nlink > 1,  # item is a hard link and has the chunks
-        }
+        item = Item(
+            path=safe_path,
+            hardlink_master=st.st_nlink > 1,  # item is a hard link and has the chunks
+        )
         # Only chunkify the file if needed
         if chunks is None:
             compress = self.compression_decider1.decide(path)
             logger.debug('%s -> compression %s', path, compress['name'])
-            fh = Archive._open_rb(path)
+            with backup_io():
+                fh = Archive._open_rb(path)
             with os.fdopen(fh, 'rb') as fd:
                 chunks = []
-                for data in self.chunker.chunkify(fd, fh):
+                for data in backup_io_iter(self.chunker.chunkify(fd, fh)):
                     chunks.append(cache.add_chunk(self.key.id_hash(data),
                                                   Chunk(data, compress=compress),
                                                   self.stats))
                     if self.show_progress:
                         self.stats.show_progress(item=item, dt=0.2)
-            cache.memorize_file(path_hash, st, [c.id for c in chunks])
+            if not is_special_file:
+                # we must not memorize special files, because the contents of e.g. a
+                # block or char device will change without its mtime/size/inode changing.
+                cache.memorize_file(path_hash, st, [c.id for c in chunks])
             status = status or 'M'  # regular file, modified (if not 'A' already)
-        item[b'chunks'] = chunks
+        item.chunks = chunks
         item.update(self.stat_attrs(st, path))
+        if is_special_file:
+            # we processed a special file like a regular file. reflect that in mode,
+            # so it can be extracted / accessed in FUSE mount like a regular file:
+            item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
         self.stats.nfiles += 1
         self.add_item(item)
         return status
@@ -722,12 +833,40 @@ Number of files: {0.stats.nfiles}'''.format(
             return os.open(path, flags_normal)
 
 
+def valid_msgpacked_dict(d, keys_serialized):
+    """check if the data <d> looks like a msgpacked dict"""
+    d_len = len(d)
+    if d_len == 0:
+        return False
+    if d[0] & 0xf0 == 0x80:  # object is a fixmap (up to 15 elements)
+        offs = 1
+    elif d[0] == 0xde:  # object is a map16 (up to 2^16-1 elements)
+        offs = 3
+    else:
+        # object is not a map (dict)
+        # note: we must not have dicts with > 2^16-1 elements
+        return False
+    if d_len <= offs:
+        return False
+    # is the first dict key a bytestring?
+    if d[offs] & 0xe0 == 0xa0:  # key is a small bytestring (up to 31 chars)
+        pass
+    elif d[offs] in (0xd9, 0xda, 0xdb):  # key is a str8, str16 or str32
+        pass
+    else:
+        # key is not a bytestring
+        return False
+    # is the bytestring any of the expected key names?
+    key_serialized = d[offs:]
+    return any(key_serialized.startswith(pattern) for pattern in keys_serialized)
+
+
 class RobustUnpacker:
     """A restartable/robust version of the streaming msgpack unpacker
     """
-    def __init__(self, validator):
+    def __init__(self, validator, item_keys):
         super().__init__()
-        self.item_keys = [msgpack.packb(name) for name in ITEM_KEYS]
+        self.item_keys = [msgpack.packb(name.encode()) for name in item_keys]
         self.validator = validator
         self._buffered_data = []
         self._resync = False
@@ -752,18 +891,10 @@ class RobustUnpacker:
             while self._resync:
                 if not data:
                     raise StopIteration
-                # Abort early if the data does not look like a serialized dict
-                if len(data) < 2 or ((data[0] & 0xf0) != 0x80) or ((data[1] & 0xe0) != 0xa0):
+                # Abort early if the data does not look like a serialized item dict
+                if not valid_msgpacked_dict(data, self.item_keys):
                     data = data[1:]
                     continue
-                # Make sure it looks like an item dict
-                for pattern in self.item_keys:
-                    if data[1:].startswith(pattern):
-                        break
-                else:
-                    data = data[1:]
-                    continue
-
                 self._unpacker = msgpack.Unpacker(object_hook=StableDict)
                 self._unpacker.feed(data)
                 try:
@@ -825,7 +956,7 @@ class ArchiveChecker:
         """
         # Explicitly set the initial hash table capacity to avoid performance issues
         # due to hash table "resonance"
-        capacity = int(len(self.repository) * 1.2)
+        capacity = int(len(self.repository) * 1.35 + 1)  # > len * 1.0 / HASH_MAX_LOAD (see _hashindex.c)
         self.chunks = ChunkIndex(capacity)
         marker = None
         while True:
@@ -838,7 +969,12 @@ class ArchiveChecker:
                 self.chunks[id_] = init_entry
 
     def identify_key(self, repository):
-        cdata = repository.get(next(self.chunks.iteritems())[0])
+        try:
+            some_chunkid, _ = next(self.chunks.iteritems())
+        except StopIteration:
+            # repo is completely empty, no chunks
+            return None
+        cdata = repository.get(some_chunkid)
         return key_factory(repository, cdata)
 
     def verify_data(self):
@@ -866,13 +1002,26 @@ class ArchiveChecker:
 
         Iterates through all objects in the repository looking for archive metadata blocks.
         """
+        required_archive_keys = frozenset(key.encode() for key in REQUIRED_ARCHIVE_KEYS)
+
+        def valid_archive(obj):
+            if not isinstance(obj, dict):
+                return False
+            keys = set(obj)
+            return required_archive_keys.issubset(keys)
+
         logger.info('Rebuilding missing manifest, this might take some time...')
+        # as we have lost the manifest, we do not know any more what valid item keys we had.
+        # collecting any key we encounter in a damaged repo seems unwise, thus we just use
+        # the hardcoded list from the source code. thus, it is not recommended to rebuild a
+        # lost manifest on a older borg version than the most recent one that was ever used
+        # within this repository (assuming that newer borg versions support more item keys).
         manifest = Manifest(self.key, self.repository)
+        archive_keys_serialized = [msgpack.packb(name.encode()) for name in ARCHIVE_KEYS]
         for chunk_id, _ in self.chunks.iteritems():
             cdata = self.repository.get(chunk_id)
             _, data = self.key.decrypt(chunk_id, cdata)
-            # Some basic sanity checks of the payload before feeding it into msgpack
-            if len(data) < 2 or ((data[0] & 0xf0) != 0x80) or ((data[1] & 0xe0) != 0xa0):
+            if not valid_msgpacked_dict(data, archive_keys_serialized):
                 continue
             if b'cmdline' not in data or b'\xa7version\x01' not in data:
                 continue
@@ -882,7 +1031,7 @@ class ArchiveChecker:
             # msgpack with invalid data
             except (TypeError, ValueError, StopIteration):
                 continue
-            if isinstance(archive, dict) and b'items' in archive and b'cmdline' in archive:
+            if valid_archive(archive):
                 logger.info('Found archive %s', archive[b'name'].decode('utf-8'))
                 manifest.archives[archive[b'name'].decode('utf-8')] = {b'id': chunk_id, b'time': archive[b'time']}
         logger.info('Manifest rebuild complete.')
@@ -916,35 +1065,64 @@ class ArchiveChecker:
                     self.repository.put(id_, cdata)
 
         def verify_file_chunks(item):
-            """Verifies that all file chunks are present
+            """Verifies that all file chunks are present.
 
-            Missing file chunks will be replaced with new chunks of the same
-            length containing all zeros.
+            Missing file chunks will be replaced with new chunks of the same length containing all zeros.
+            If a previously missing file chunk re-appears, the replacement chunk is replaced by the correct one.
             """
             offset = 0
             chunk_list = []
-            for chunk_id, size, csize in item[b'chunks']:
+            chunks_replaced = False
+            has_chunks_healthy = 'chunks_healthy' in item
+            chunks_current = item.chunks
+            chunks_healthy = item.chunks_healthy if has_chunks_healthy else chunks_current
+            assert len(chunks_current) == len(chunks_healthy)
+            for chunk_current, chunk_healthy in zip(chunks_current, chunks_healthy):
+                chunk_id, size, csize = chunk_healthy
                 if chunk_id not in self.chunks:
-                    # If a file chunk is missing, create an all empty replacement chunk
-                    logger.error('{}: Missing file chunk detected (Byte {}-{})'.format(safe_decode(item[b'path']), offset, offset + size))
-                    self.error_found = True
-                    data = bytes(size)
-                    chunk_id = self.key.id_hash(data)
-                    cdata = self.key.encrypt(Chunk(data))
-                    csize = len(cdata)
-                    add_reference(chunk_id, size, csize, cdata)
+                    # a chunk of the healthy list is missing
+                    if chunk_current == chunk_healthy:
+                        logger.error('{}: New missing file chunk detected (Byte {}-{}). '
+                                     'Replacing with all-zero chunk.'.format(item.path, offset, offset + size))
+                        self.error_found = chunks_replaced = True
+                        data = bytes(size)
+                        chunk_id = self.key.id_hash(data)
+                        cdata = self.key.encrypt(Chunk(data))
+                        csize = len(cdata)
+                        add_reference(chunk_id, size, csize, cdata)
+                    else:
+                        logger.info('{}: Previously missing file chunk is still missing (Byte {}-{}). It has a '
+                                    'all-zero replacement chunk already.'.format(item.path, offset, offset + size))
+                        chunk_id, size, csize = chunk_current
+                        add_reference(chunk_id, size, csize)
                 else:
-                    add_reference(chunk_id, size, csize)
-                chunk_list.append((chunk_id, size, csize))
+                    if chunk_current == chunk_healthy:
+                        # normal case, all fine.
+                        add_reference(chunk_id, size, csize)
+                    else:
+                        logger.info('{}: Healed previously missing file chunk! '
+                                    '(Byte {}-{}).'.format(item.path, offset, offset + size))
+                        add_reference(chunk_id, size, csize)
+                        mark_as_possibly_superseded(chunk_current[0])  # maybe orphaned the all-zero replacement chunk
+                chunk_list.append([chunk_id, size, csize])  # list-typed element as chunks_healthy is list-of-lists
                 offset += size
-            item[b'chunks'] = chunk_list
+            if chunks_replaced and not has_chunks_healthy:
+                # if this is first repair, remember the correct chunk IDs, so we can maybe heal the file later
+                item.chunks_healthy = item.chunks
+            if has_chunks_healthy and chunk_list == chunks_healthy:
+                logger.info('{}: Completely healed previously damaged file!'.format(item.path))
+                del item.chunks_healthy
+            item.chunks = chunk_list
 
         def robust_iterator(archive):
             """Iterates through all archive items
 
             Missing item chunks will be skipped and the msgpack stream will be restarted
             """
-            unpacker = RobustUnpacker(lambda item: isinstance(item, dict) and b'path' in item)
+            item_keys = frozenset(key.encode() for key in self.manifest.item_keys)
+            required_item_keys = frozenset(key.encode() for key in REQUIRED_ITEM_KEYS)
+            unpacker = RobustUnpacker(lambda item: isinstance(item, dict) and 'path' in item,
+                                      self.manifest.item_keys)
             _state = 0
 
             def missing_chunk_detector(chunk_id):
@@ -958,6 +1136,12 @@ class ArchiveChecker:
                 msg += ' [chunk: %06d_%s]' % (chunk_no, cid)  # see debug-dump-archive-items
                 self.error_found = True
                 logger.error(msg)
+
+            def valid_item(obj):
+                if not isinstance(obj, StableDict):
+                    return False
+                keys = set(obj)
+                return required_item_keys.issubset(keys) and keys.issubset(item_keys)
 
             i = 0
             for state, items in groupby(archive[b'items'], missing_chunk_detector):
@@ -974,8 +1158,8 @@ class ArchiveChecker:
                     unpacker.feed(data)
                     try:
                         for item in unpacker:
-                            if isinstance(item, dict):
-                                yield item
+                            if valid_item(item):
+                                yield Item(internal_dict=item)
                             else:
                                 report('Did not get expected metadata dict when unpacking item metadata', chunk_id, i)
                     except Exception:
@@ -1019,7 +1203,7 @@ class ArchiveChecker:
                 items_buffer = ChunkBuffer(self.key)
                 items_buffer.write_chunk = add_callback
                 for item in robust_iterator(archive):
-                    if b'chunks' in item:
+                    if 'chunks' in item:
                         verify_file_chunks(item)
                     items_buffer.add(item)
                 items_buffer.flush(flush=True)
@@ -1122,38 +1306,38 @@ class ArchiveRecreater:
 
         def item_is_hardlink_master(item):
             return (target_is_subset and
-                    stat.S_ISREG(item[b'mode']) and
-                    item.get(b'hardlink_master', True) and
-                    b'source' not in item and
-                    not matcher.match(item[b'path']))
+                    stat.S_ISREG(item.mode) and
+                    item.get('hardlink_master', True) and
+                    'source' not in item and
+                    not matcher.match(item.path))
 
         for item in archive.iter_items():
             if item_is_hardlink_master(item):
                 # Re-visit all of these items in the archive even when fast-forwarding to rebuild hardlink_masters
-                hardlink_masters[item[b'path']] = (item.get(b'chunks'), None)
+                hardlink_masters[item.path] = (item.get('chunks'), None)
                 continue
             if resume_from:
                 # Fast forward to after the last processed file
-                if item[b'path'] == resume_from:
-                    logger.info('Fast-forwarded to %s', remove_surrogates(item[b'path']))
+                if item.path == resume_from:
+                    logger.info('Fast-forwarded to %s', remove_surrogates(item.path))
                     resume_from = None
                 continue
-            if not matcher.match(item[b'path']):
-                self.print_file_status('x', item[b'path'])
+            if not matcher.match(item.path):
+                self.print_file_status('x', item.path)
                 continue
-            if target_is_subset and stat.S_ISREG(item[b'mode']) and item.get(b'source') in hardlink_masters:
+            if target_is_subset and stat.S_ISREG(item.mode) and item.get('source') in hardlink_masters:
                 # master of this hard link is outside the target subset
-                chunks, new_source = hardlink_masters[item[b'source']]
+                chunks, new_source = hardlink_masters[item.source]
                 if new_source is None:
                     # First item to use this master, move the chunks
-                    item[b'chunks'] = chunks
-                    hardlink_masters[item[b'source']] = (None, item[b'path'])
-                    del item[b'source']
+                    item.chunks = chunks
+                    hardlink_masters[item.source] = (None, item.path)
+                    del item.source
                 else:
                     # Master was already moved, only update this item's source
-                    item[b'source'] = new_source
+                    item.source = new_source
             if self.dry_run:
-                self.print_file_status('-', item[b'path'])
+                self.print_file_status('-', item.path)
             else:
                 try:
                     self.process_item(archive, target, item)
@@ -1165,11 +1349,11 @@ class ArchiveRecreater:
             target.stats.show_progress(final=True)
 
     def process_item(self, archive, target, item):
-        if b'chunks' in item:
-            item[b'chunks'] = self.process_chunks(archive, target, item)
+        if 'chunks' in item:
+            item.chunks = self.process_chunks(archive, target, item)
             target.stats.nfiles += 1
         target.add_item(item)
-        self.print_file_status(file_status(item[b'mode']), item[b'path'])
+        self.print_file_status(file_status(item.mode), item.path)
         if self.interrupt:
             raise self.Interrupted
 
@@ -1177,9 +1361,9 @@ class ArchiveRecreater:
         """Return new chunk ID list for 'item'."""
         # TODO: support --compression-from
         if not self.recompress and not target.recreate_rechunkify:
-            for chunk_id, size, csize in item[b'chunks']:
+            for chunk_id, size, csize in item.chunks:
                 self.cache.chunk_incref(chunk_id, target.stats)
-            return item[b'chunks']
+            return item.chunks
         new_chunks = self.process_partial_chunks(target)
         chunk_iterator = self.create_chunk_iterator(archive, target, item)
         consume(chunk_iterator, len(new_chunks))
@@ -1210,7 +1394,7 @@ class ArchiveRecreater:
 
     def create_chunk_iterator(self, archive, target, item):
         """Return iterator of chunks to store for 'item' from 'archive' in 'target'."""
-        chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _, _ in item[b'chunks']])
+        chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _, _ in item.chunks])
         if target.recreate_rechunkify:
             # The target.chunker will read the file contents through ChunkIteratorFileWrapper chunk-by-chunk
             # (does not load the entire file into memory)
@@ -1272,7 +1456,7 @@ class ArchiveRecreater:
         """Add excludes to the matcher created by exclude_cache and exclude_if_present."""
         def exclude(dir, tag_item):
             if self.keep_tag_files:
-                tag_files.append(PathPrefixPattern(tag_item[b'path']))
+                tag_files.append(PathPrefixPattern(tag_item.path))
                 tagged_dirs.append(FnmatchPattern(dir + '/'))
             else:
                 tagged_dirs.append(PathPrefixPattern(dir))
@@ -1284,18 +1468,18 @@ class ArchiveRecreater:
         cachedir_masters = {}
 
         for item in archive.iter_items(
-                filter=lambda item: item[b'path'].endswith(CACHE_TAG_NAME) or matcher.match(item[b'path'])):
-            if item[b'path'].endswith(CACHE_TAG_NAME):
-                cachedir_masters[item[b'path']] = item
-            if stat.S_ISREG(item[b'mode']):
-                dir, tag_file = os.path.split(item[b'path'])
+                filter=lambda item: item.path.endswith(CACHE_TAG_NAME) or matcher.match(item.path)):
+            if item.path.endswith(CACHE_TAG_NAME):
+                cachedir_masters[item.path] = item
+            if stat.S_ISREG(item.mode):
+                dir, tag_file = os.path.split(item.path)
                 if tag_file in self.exclude_if_present:
                     exclude(dir, item)
                 if self.exclude_caches and tag_file == CACHE_TAG_NAME:
-                    if b'chunks' in item:
+                    if 'chunks' in item:
                         file = open_item(archive, item)
                     else:
-                        file = open_item(archive, cachedir_masters[item[b'source']])
+                        file = open_item(archive, cachedir_masters[item.source])
                     if file.read(len(CACHE_TAG_CONTENTS)).startswith(CACHE_TAG_CONTENTS):
                         exclude(dir, item)
         matcher.add(tag_files, True)
@@ -1336,13 +1520,13 @@ class ArchiveRecreater:
         logger.info('Replaying items from interrupted operation...')
         item = None
         for item in old_target.iter_items():
-            if b'chunks' in item:
-                for chunk in item[b'chunks']:
+            if 'chunks' in item:
+                for chunk in item.chunks:
                     self.cache.chunk_incref(chunk.id, target.stats)
                 target.stats.nfiles += 1
             target.add_item(item)
         if item:
-            resume_from = item[b'path']
+            resume_from = item.path
         else:
             resume_from = None
         if self.progress:

@@ -10,7 +10,7 @@ import msgpack
 import msgpack.fallback
 
 from ..helpers import Location
-from ..helpers import partial_format, format_file_size, format_timedelta
+from ..helpers import partial_format, format_file_size, format_timedelta, format_line, PlaceholderError
 from ..helpers import make_path_safe, clean_lines
 from ..helpers import prune_within, prune_split
 from ..helpers import get_cache_dir, get_keys_dir
@@ -22,6 +22,7 @@ from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
 from ..helpers import load_excludes
 from ..helpers import CompressionSpec, CompressionDecider1, CompressionDecider2
 from ..helpers import parse_pattern, PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern
+
 from . import BaseTestCase, environment_variable, FakeInputs
 
 if sys.platform == 'win32':
@@ -958,3 +959,18 @@ def test_compression_decider2():
     assert compr_spec['name'] == 'zlib'
     compr_spec, chunk = cd.decide(Chunk(None, compress=CompressionSpec('lzma')))
     assert compr_spec['name'] == 'lzma'
+
+
+def test_format_line():
+    data = dict(foo='bar baz')
+    assert format_line('', data) == ''
+    assert format_line('{foo}', data) == 'bar baz'
+    assert format_line('foo{foo}foo', data) == 'foobar bazfoo'
+
+
+def test_format_line_erroneous():
+    data = dict()
+    with pytest.raises(PlaceholderError):
+        assert format_line('{invalid}', data)
+    with pytest.raises(PlaceholderError):
+        assert format_line('{}', data)

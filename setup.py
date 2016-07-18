@@ -35,9 +35,9 @@ extras_require = {
 }
 
 if sys.platform.startswith('freebsd'):
-    # while llfuse 1.0 is the latest llfuse release right now,
-    # llfuse 0.41.1 is the latest release that actually builds on freebsd:
-    extras_require['fuse'] = ['llfuse==0.41.1', ]
+    # llfuse was frequently broken / did not build on freebsd
+    # llfuse 0.41.1, 1.1 are ok
+    extras_require['fuse'] = ['llfuse <2.0, !=0.42.*, !=0.43, !=1.0', ]
 
 from setuptools import setup, find_packages, Extension
 from setuptools.command.sdist import sdist
@@ -206,12 +206,13 @@ class build_usage(Command):
         for command, parser in choices.items():
             print('generating help for %s' % command)
             with open('docs/usage/%s.rst.inc' % command, 'w') as doc:
+                doc.write(".. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!\n\n")
                 if command == 'help':
                     for topic in Archiver.helptext:
                         params = {"topic": topic,
                                   "underline": '~' * len('borg help ' + topic)}
                         doc.write(".. _borg_{topic}:\n\n".format(**params))
-                        doc.write("borg help {topic}\n{underline}\n::\n\n".format(**params))
+                        doc.write("borg help {topic}\n{underline}\n\n".format(**params))
                         doc.write(Archiver.helptext[topic])
                 else:
                     params = {"command": command,

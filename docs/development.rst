@@ -1,4 +1,5 @@
 .. include:: global.rst.inc
+.. highlight:: bash
 .. _development:
 
 Development

@@ -21,25 +21,34 @@ class PropDict:
 
     __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 
-    def __init__(self, data_dict=None, **kw):
+    def __init__(self, data_dict=None, internal_dict=None, **kw):
         if data_dict is None:
             data = kw
         elif not isinstance(data_dict, dict):
             raise TypeError("data_dict must be dict")
         else:
             data = data_dict
-        # internally, we want an dict with only str-typed keys
-        _dict = {}
-        for k, v in data.items():
+        self._dict = {}
+        self.update_internal(internal_dict or {})
+        self.update(data)
+
+    def update(self, d):
+        for k, v in d.items():
             if isinstance(k, bytes):
                 k = k.decode()
-            elif not isinstance(k, str):
-                raise TypeError("dict keys must be str or bytes, not %r" % k)
-            _dict[k] = v
-        unknown_keys = set(_dict) - self.VALID_KEYS
-        if unknown_keys:
-            raise ValueError("dict contains unknown keys %s" % ','.join(unknown_keys))
-        self._dict = _dict
+            setattr(self, self._check_key(k), v)
+
+    def update_internal(self, d):
+        for k, v in d.items():
+            if isinstance(k, bytes):
+                k = k.decode()
+            self._dict[k] = v
+
+    def __eq__(self, other):
+        return self.as_dict() == other.as_dict()
+
+    def __repr__(self):
+        return '%s(internal_dict=%r)' % (self.__class__.__name__, self._dict)
 
     def as_dict(self):
         """return the internal dictionary"""
@@ -110,7 +119,7 @@ class Item(PropDict):
     If an Item shall be serialized, give as_dict() method output to msgpack packer.
     """
 
-    VALID_KEYS = set(key.decode() for key in ITEM_KEYS)  # we want str-typed keys
+    VALID_KEYS = ITEM_KEYS | {'deleted', 'nlink', }  # str-typed keys
 
     __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 
@@ -118,17 +127,19 @@ class Item(PropDict):
 
     path = PropDict._make_property('path', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
     source = PropDict._make_property('source', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    acl_access = PropDict._make_property('acl_access', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    acl_default = PropDict._make_property('acl_default', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    acl_extended = PropDict._make_property('acl_extended', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    acl_nfs4 = PropDict._make_property('acl_nfs4', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-
     user = PropDict._make_property('user', (str, type(None)), 'surrogate-escaped str or None', encode=safe_encode, decode=safe_decode)
     group = PropDict._make_property('group', (str, type(None)), 'surrogate-escaped str or None', encode=safe_encode, decode=safe_decode)
+
+    acl_access = PropDict._make_property('acl_access', bytes)
+    acl_default = PropDict._make_property('acl_default', bytes)
+    acl_extended = PropDict._make_property('acl_extended', bytes)
+    acl_nfs4 = PropDict._make_property('acl_nfs4', bytes)
+    win_dacl = PropDict._make_property('win_dacl', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
 
     mode = PropDict._make_property('mode', int)
     uid = PropDict._make_property('uid', int)
     gid = PropDict._make_property('gid', int)
+    user_sid = PropDict._make_property('user_sid', str, encode=safe_encode, decode=safe_decode)
     rdev = PropDict._make_property('rdev', int)
     bsdflags = PropDict._make_property('bsdflags', int)
 
@@ -138,6 +149,58 @@ class Item(PropDict):
 
     hardlink_master = PropDict._make_property('hardlink_master', bool)
 
-    chunks = PropDict._make_property('chunks', list)
+    chunks = PropDict._make_property('chunks', (list, type(None)), 'list or None')
+    chunks_healthy = PropDict._make_property('chunks_healthy', (list, type(None)), 'list or None')
 
     xattrs = PropDict._make_property('xattrs', StableDict)
+
+    deleted = PropDict._make_property('deleted', bool)
+    nlink = PropDict._make_property('nlink', int)
+
+
+class EncryptedKey(PropDict):
+    """
+    EncryptedKey abstraction that deals with validation and the low-level details internally:
+
+    A EncryptedKey is created either from msgpack unpacker output, from another dict, from kwargs or
+    built step-by-step by setting attributes.
+
+    msgpack gives us a dict with bytes-typed keys, just give it to EncryptedKey(d) and use enc_key.xxx later.
+
+    If a EncryptedKey shall be serialized, give as_dict() method output to msgpack packer.
+    """
+
+    VALID_KEYS = {'version', 'algorithm', 'iterations', 'salt', 'hash', 'data'}  # str-typed keys
+
+    __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
+
+    version = PropDict._make_property('version', int)
+    algorithm = PropDict._make_property('algorithm', str, encode=str.encode, decode=bytes.decode)
+    iterations = PropDict._make_property('iterations', int)
+    salt = PropDict._make_property('salt', bytes)
+    hash = PropDict._make_property('hash', bytes)
+    data = PropDict._make_property('data', bytes)
+
+
+class Key(PropDict):
+    """
+    Key abstraction that deals with validation and the low-level details internally:
+
+    A Key is created either from msgpack unpacker output, from another dict, from kwargs or
+    built step-by-step by setting attributes.
+
+    msgpack gives us a dict with bytes-typed keys, just give it to Key(d) and use key.xxx later.
+
+    If a Key shall be serialized, give as_dict() method output to msgpack packer.
+    """
+
+    VALID_KEYS = {'version', 'repository_id', 'enc_key', 'enc_hmac_key', 'id_key', 'chunk_seed'}  # str-typed keys
+
+    __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
+
+    version = PropDict._make_property('version', int)
+    repository_id = PropDict._make_property('repository_id', bytes)
+    enc_key = PropDict._make_property('enc_key', bytes)
+    enc_hmac_key = PropDict._make_property('enc_hmac_key', bytes)
+    id_key = PropDict._make_property('id_key', bytes)
+    chunk_seed = PropDict._make_property('chunk_seed', int)

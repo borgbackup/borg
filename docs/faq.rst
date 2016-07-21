@@ -241,7 +241,7 @@ If a backup stops mid-way, does the already-backed-up data stay there?
 Yes, |project_name| supports resuming backups.
 
 During a backup a special checkpoint archive named ``<archive-name>.checkpoint``
-is saved every checkpoint interval (the default value for this is 5
+is saved every checkpoint interval (the default value for this is 30
 minutes) containing all the data backed-up until that point.
 
 Checkpoints only happen between files (so they don't help for interruptions

@@ -225,10 +225,7 @@ During a backup a special checkpoint archive named ``<archive-name>.checkpoint``
 is saved every checkpoint interval (the default value for this is 30
 minutes) containing all the data backed-up until that point.
 
-Checkpoints only happen between files (so they don't help for interruptions
-happening while a very large file is being processed).
-
-This checkpoint archive is a valid archive (all files in it are valid and complete),
+This checkpoint archive is a valid archive,
 but it is only a partial backup (not all files that you wanted to backup are
 contained in it). Having it in the repo until a successful, full backup is
 completed is useful because it references all the transmitted chunks up

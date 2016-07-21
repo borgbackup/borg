@@ -231,7 +231,8 @@ class Archive:
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False, progress=False,
-                 chunker_params=CHUNKER_PARAMS, start=None, end=None, compression=None, compression_files=None):
+                 chunker_params=CHUNKER_PARAMS, start=None, end=None, compression=None, compression_files=None,
+                 consider_checkpoint_files=False):
         self.cwd = os.getcwd()
         self.key = key
         self.repository = repository
@@ -250,6 +251,7 @@ class Archive:
         if end is None:
             end = datetime.utcnow()
         self.end = end
+        self.consider_checkpoint_files = consider_checkpoint_files
         self.pipeline = DownloadPipeline(self.repository, self.key)
         if create:
             self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
@@ -328,7 +330,10 @@ Number of files: {0.stats.nfiles}'''.format(
         return 'Archive(%r)' % self.name
 
     def item_filter(self, item, filter=None):
-        return 'checkpoint' not in item and (filter(item) if filter else True)
+        if not self.consider_checkpoint_files and 'checkpoint' in item:
+            # this is a checkpoint (partial) file, we usually don't want to consider it.
+            return False
+        return filter(item) if filter else True
 
     def iter_items(self, filter=None, preload=False):
         for item in self.pipeline.unpack_many(self.metadata[b'items'], preload=preload,

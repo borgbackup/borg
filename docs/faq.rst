@@ -248,9 +248,9 @@ also care for deleting unneeded checkpoints.
 
 Note: the checkpointing mechanism creates hidden, partial files in an archive,
 so that checkpoints even work while a big file is being processed.
-They are named ``<filename>.checkpoint_<N>`` and all operations usually ignore
+They are named ``<filename>.borg_part_<N>`` and all operations usually ignore
 these files, but you can make them considered by giving the option
-``--consider-checkpoint-files``. You usually only need that option if you are
+``--consider-part-files``. You usually only need that option if you are
 really desperate (e.g. if you have no completed backup of that file and you'ld
 rather get a partial file extracted than nothing). You do **not** want to give
 that option under any normal circumstances.
@@ -264,7 +264,7 @@ How can I restore huge file(s) over a unstable connection?
 ----------------------------------------------------------
 
 If you can not manage to extract the whole big file in one go, you can extract
-all the checkpoint files (see above) and manually concatenate them together.
+all the part files (see above) and manually concatenate them together.
 
 If it crashes with a UnicodeError, what can I do?
 -------------------------------------------------

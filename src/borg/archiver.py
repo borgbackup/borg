@@ -101,7 +101,7 @@ def with_archive(method):
     def wrapper(self, args, repository, key, manifest, **kwargs):
         archive = Archive(repository, key, manifest, args.location.archive,
                           numeric_owner=getattr(args, 'numeric_owner', False), cache=kwargs.get('cache'),
-                          consider_checkpoint_files=args.consider_checkpoint_files)
+                          consider_part_files=args.consider_part_files)
         return method(self, args, repository=repository, manifest=manifest, key=key, archive=archive, **kwargs)
     return wrapper
 
@@ -670,7 +670,7 @@ class Archiver:
 
         archive1 = archive
         archive2 = Archive(repository, key, manifest, args.archive2,
-                           consider_checkpoint_files=args.consider_checkpoint_files)
+                           consider_part_files=args.consider_part_files)
 
         can_compare_chunk_ids = archive1.metadata.get(b'chunker_params', False) == archive2.metadata.get(
             b'chunker_params', True) or args.same_chunker_params
@@ -756,7 +756,7 @@ class Archiver:
         with cache_if_remote(repository) as cached_repo:
             if args.location.archive:
                 archive = Archive(repository, key, manifest, args.location.archive,
-                                  consider_checkpoint_files=args.consider_checkpoint_files)
+                                  consider_part_files=args.consider_part_files)
             else:
                 archive = None
             operations = FuseOperations(key, repository, manifest, archive, cached_repo)
@@ -783,7 +783,7 @@ class Archiver:
             matcher, _ = self.build_matcher(args.excludes, args.paths)
             with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
-                                  consider_checkpoint_files=args.consider_checkpoint_files)
+                                  consider_part_files=args.consider_part_files)
 
                 if args.format:
                     format = args.format
@@ -986,7 +986,7 @@ class Archiver:
     def do_debug_dump_archive_items(self, args, repository, manifest, key):
         """dump (decrypted, decompressed) archive items metadata (not: data)"""
         archive = Archive(repository, key, manifest, args.location.archive,
-                          consider_checkpoint_files=args.consider_checkpoint_files)
+                          consider_part_files=args.consider_part_files)
         for i, item_id in enumerate(archive.metadata[b'items']):
             _, data = key.decrypt(item_id, repository.get(item_id))
             filename = '%06d_%s.items' % (i, bin_to_hex(item_id))
@@ -1237,9 +1237,9 @@ class Archiver:
                                   help='set umask to M (local and remote, default: %(default)04o)')
         common_group.add_argument('--remote-path', dest='remote_path', metavar='PATH',
                                   help='set remote path to executable (default: "borg")')
-        common_group.add_argument('--consider-checkpoint-files', dest='consider_checkpoint_files',
+        common_group.add_argument('--consider-part-files', dest='consider_part_files',
                                   action='store_true', default=False,
-                                  help='treat checkpoint files like normal files (e.g. to list/extract them)')
+                                  help='treat part files like normal files (e.g. to list/extract them)')
 
         parser = argparse.ArgumentParser(prog=prog, description='Borg - Deduplicated Backups')
         parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,

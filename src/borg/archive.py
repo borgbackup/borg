@@ -232,7 +232,7 @@ class Archive:
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False, progress=False,
                  chunker_params=CHUNKER_PARAMS, start=None, end=None, compression=None, compression_files=None,
-                 consider_checkpoint_files=False):
+                 consider_part_files=False):
         self.cwd = os.getcwd()
         self.key = key
         self.repository = repository
@@ -251,7 +251,7 @@ class Archive:
         if end is None:
             end = datetime.utcnow()
         self.end = end
-        self.consider_checkpoint_files = consider_checkpoint_files
+        self.consider_part_files = consider_part_files
         self.pipeline = DownloadPipeline(self.repository, self.key)
         if create:
             self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
@@ -330,8 +330,8 @@ Number of files: {0.stats.nfiles}'''.format(
         return 'Archive(%r)' % self.name
 
     def item_filter(self, item, filter=None):
-        if not self.consider_checkpoint_files and 'checkpoint' in item:
-            # this is a checkpoint (partial) file, we usually don't want to consider it.
+        if not self.consider_part_files and 'part' in item:
+            # this is a part(ial) file, we usually don't want to consider it.
             return False
         return filter(item) if filter else True
 
@@ -724,13 +724,12 @@ Number of files: {0.stats.nfiles}'''.format(
             length = len(item.chunks)
             # the item should only have the *additional* chunks we processed after the last partial item:
             item.chunks = item.chunks[from_chunk:]
-            item.path += '.checkpoint_%d' % number
-            item.checkpoint = number
+            item.path += '.borg_part_%d' % number
+            item.part = number
             number += 1
             self.add_item(item, show_progress=False)
             self.write_checkpoint()
-            # we have saved the checkpoint file, but we will reference the same
-            # chunks also from the final, complete file:
+            # we have saved the part file, but we will reference the same chunks also from the final, complete file:
             for chunk in item.chunks:
                 cache.chunk_incref(chunk.id, stats)
             return length, number

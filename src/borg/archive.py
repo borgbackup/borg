@@ -719,24 +719,39 @@ Number of files: {0.stats.nfiles}'''.format(
         return 's'  # symlink
 
     def chunk_file(self, item, cache, stats, fd, fh=-1, **chunk_kw):
-        checkpoint_number = 1
+        def write_part(item, from_chunk, number):
+            item = Item(internal_dict=item.as_dict())
+            length = len(item.chunks)
+            # the item should only have the *additional* chunks we processed after the last partial item:
+            item.chunks = item.chunks[from_chunk:]
+            item.path += '.checkpoint_%d' % number
+            item.checkpoint = number
+            number += 1
+            self.add_item(item, show_progress=False)
+            self.write_checkpoint()
+            # we have saved the checkpoint file, but we will reference the same
+            # chunks also from the final, complete file:
+            for chunk in item.chunks:
+                cache.chunk_incref(chunk.id, stats)
+            return length, number
+
         item.chunks = []
+        from_chunk = 0
+        part_number = 1
         for data in backup_io_iter(self.chunker.chunkify(fd, fh)):
             item.chunks.append(cache.add_chunk(self.key.id_hash(data), Chunk(data, **chunk_kw), stats))
             if self.show_progress:
                 self.stats.show_progress(item=item, dt=0.2)
             if self.checkpoint_interval and time.time() - self.last_checkpoint > self.checkpoint_interval:
-                checkpoint_item = Item(internal_dict=item.as_dict())
-                checkpoint_item.path += '.checkpoint_%d' % checkpoint_number
-                checkpoint_item.checkpoint = checkpoint_number
-                checkpoint_number += 1
-                self.add_item(checkpoint_item, show_progress=False)
-                self.write_checkpoint()
+                from_chunk, part_number = write_part(item, from_chunk, part_number)
                 self.last_checkpoint = time.time()
-                # we have saved the checkpoint file, but we will reference the same
-                # chunks also from the checkpoint or the "real" file we save next
-                for chunk in checkpoint_item.chunks:
-                    cache.chunk_incref(chunk.id, stats)
+        else:
+            if part_number > 1 and item.chunks[from_chunk:]:
+                # if we already have created a part item inside this file, we want to put the final
+                # chunks (if any) into a part item also (so all parts can be concatenated to get
+                # the complete file):
+                from_chunk, part_number = write_part(item, from_chunk, part_number)
+                self.last_checkpoint = time.time()
 
     def process_stdin(self, path, cache):
         uid, gid = 0, 0

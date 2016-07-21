@@ -260,7 +260,11 @@ How can I backup huge file(s) over a unstable connection?
 
 This is not a problem any more, see previous FAQ item.
 
-But please note that this only helps you for backup, not for restore.
+How can I restore huge file(s) over a unstable connection?
+----------------------------------------------------------
+
+If you can not manage to extract the whole big file in one go, you can extract
+all the checkpoint files (see above) and manually concatenate them together.
 
 If it crashes with a UnicodeError, what can I do?
 -------------------------------------------------

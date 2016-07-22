@@ -154,7 +154,7 @@ class Repository:
         config.set('repository', 'version', '1')
         config.set('repository', 'segments_per_dir', str(DEFAULT_SEGMENTS_PER_DIR))
         config.set('repository', 'max_segment_size', str(DEFAULT_MAX_SEGMENT_SIZE))
-        config.set('repository', 'append_only', '0')
+        config.set('repository', 'append_only', str(int(self.append_only)))
         config.set('repository', 'id', bin_to_hex(os.urandom(32)))
         self.save_config(path, config)
 

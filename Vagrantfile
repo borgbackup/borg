@@ -29,6 +29,8 @@ def packages_debianoid
     apt-get install -y python3-dev python3-setuptools
     # for building python:
     apt-get install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev
+    # filesystem drivers
+    apt-get install -y ntfs-3g openssh-server sshfs xfsprogs samba cifs-utils
     # this way it works on older dists (like ubuntu 12.04) also:
     # for python 3.2 on ubuntu 12.04 we need pip<8 and virtualenv<14 as
     # newer versions are not compatible with py 3.2 any more.
@@ -50,6 +52,8 @@ def packages_redhatted
     yum install -y gcc-c++
     # for building python:
     yum install -y zlib-devel bzip2-devel ncurses-devel readline-devel xz xz-devel sqlite-devel
+    # filesystem drivers
+    yum install -y ntfs-3g openssh fuse-sshfs xfsprogs samba cifs-utils ntfsprogs
     #yum install -y python-pip
     #pip install virtualenv
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
@@ -86,6 +90,8 @@ def packages_freebsd
     pkg install -y fakeroot git bash
     # for building python:
     pkg install -y sqlite3
+    # filesystem drivers
+    pkg install -y openssh sshfs samba ntfs-3g
     # make bash default / work:
     chsh -s bash vagrant
     mount -t fdescfs fdesc /dev/fd
@@ -141,6 +147,7 @@ def packages_netbsd
     pkg_add pkg-config  # avoids some "pkg-config missing" error msg, even without fuse
     # pkg_add fuse  # llfuse supports netbsd, but is still buggy.
     # https://bitbucket.org/nikratio/python-llfuse/issues/70/perfuse_open-setsockopt-no-buffer-space
+    pkg_add samba
     pkg_add python34 py34-setuptools
     ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python
     ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python3
@@ -270,23 +277,7 @@ def build_binary_with_pyinstaller(boxname)
 end
 
 def run_tests(boxname)
-  return <<-EOF
-    . ~/.bash_profile
-    cd /vagrant/borg/borg
-    . ../borg-env/bin/activate
-    if which pyenv > /dev/null; then
-      # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.4.0 3.5.0
-    fi
-    # otherwise: just use the system python
-    if which fakeroot > /dev/null; then
-      echo "Running tox WITH fakeroot -u"
-      fakeroot -u tox --skip-missing-interpreters
-    else
-      echo "Running tox WITHOUT fakeroot -u"
-      tox --skip-missing-interpreters
-    fi
-  EOF
+  return "source /vagrant/borg/borg/vagrant-tools/run-tests.sh"
 end
 
 def fix_perms
@@ -309,7 +300,7 @@ Vagrant.configure(2) do |config|
   config.vm.synced_folder ".", "/vagrant", disabled: true
 
   # fix permissions on synced folder
-  config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
+  config.vm.provision "fix perms",                  :type => :shell, :privileged => true,  :inline => fix_perms
 
   config.vm.provider :virtualbox do |v|
     #v.gui = true
@@ -322,22 +313,22 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
-    b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos7_64")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos7_64")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos7_64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("centos7_64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos7_64")
+    b.vm.provision "install system packages",       :type => :shell, :privileged => true, :inline => packages_redhatted
+    b.vm.provision "install pyenv",                 :type => :shell, :privileged => true, :inline => install_pyenv("centos7_64")
+    b.vm.provision "install pythons",               :type => :shell, :privileged => true, :inline => install_pythons("centos7_64")
+    b.vm.provision "build env",                     :type => :shell, :privileged => true, :inline => build_pyenv_venv("centos7_64")
+    b.vm.provision "install borg",                  :type => :shell, :privileged => true, :inline => install_borg("centos7_64")
+    b.vm.provision "run tests",                     :type => :shell, :privileged => true, :inline => run_tests("centos7_64")
   end
 
   config.vm.define "centos6_32" do |b|
     b.vm.box = "centos6-32"
-    b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_32")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_32")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos6_32")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("centos6_32")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos6_32")
+    b.vm.provision "install system packages",       :type => :shell, :privileged => true, :inline => packages_redhatted
+    b.vm.provision "install pyenv",                 :type => :shell, :privileged => true, :inline => install_pyenv("centos6_32")
+    b.vm.provision "install pythons",               :type => :shell, :privileged => true, :inline => install_pythons("centos6_32")
+    b.vm.provision "build env",                     :type => :shell, :privileged => true, :inline => build_pyenv_venv("centos6_32")
+    b.vm.provision "install borg",                  :type => :shell, :privileged => true, :inline => install_borg_no_fuse("centos6_32")
+    b.vm.provision "run tests",                     :type => :shell, :privileged => true, :inline => run_tests("centos6_32")
   end
 
   config.vm.define "centos6_64" do |b|
@@ -345,12 +336,12 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
-    b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_64")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_64")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos6_64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("centos6_64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos6_64")
+    b.vm.provision "install system packages",       :type => :shell, :privileged => true, :inline => packages_redhatted
+    b.vm.provision "install pyenv",                 :type => :shell, :privileged => true, :inline => install_pyenv("centos6_64")
+    b.vm.provision "install pythons",               :type => :shell, :privileged => true, :inline => install_pythons("centos6_64")
+    b.vm.provision "build env",                     :type => :shell, :privileged => true, :inline => build_pyenv_venv("centos6_64")
+    b.vm.provision "install borg",                  :type => :shell, :privileged => true, :inline => install_borg_no_fuse("centos6_64")
+    b.vm.provision "run tests",                     :type => :shell, :privileged => true, :inline => run_tests("centos6_64")
   end
 
   config.vm.define "xenial64" do |b|
@@ -358,10 +349,10 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("xenial64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("xenial64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("xenial64")
+    b.vm.provision "packages debianoid",            :type => :shell, :privileged => true, :inline => packages_debianoid
+    b.vm.provision "build env",                     :type => :shell, :privileged => true, :inline => build_sys_venv("xenial64")
+    b.vm.provision "install borg",                  :type => :shell, :privileged => true, :inline => install_borg("xenial64")
+    b.vm.provision "run tests",                     :type => :shell, :privileged => true, :inline => run_tests("xenial64")
   end
 
   config.vm.define "trusty64" do |b|
@@ -369,10 +360,10 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("trusty64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("trusty64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("trusty64")
+    b.vm.provision "packages debianoid",            :type => :shell, :privileged => true, :inline => packages_debianoid
+    b.vm.provision "build env",                     :type => :shell, :privileged => true, :inline => build_sys_venv("trusty64")
+    b.vm.provision "install borg",                  :type => :shell, :privileged => true, :inline => install_borg("trusty64")
+    b.vm.provision "run tests",                     :type => :shell, :privileged => true, :inline => run_tests("trusty64")
   end
 
   config.vm.define "jessie64" do |b|
@@ -380,50 +371,51 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("jessie64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("jessie64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("jessie64")
+    b.vm.provision "packages debianoid",            :type => :shell, :privileged => true, :inline => packages_debianoid
+    b.vm.provision "build env",                     :type => :shell, :privileged => true, :inline => build_sys_venv("jessie64")
+    b.vm.provision "install borg",                  :type => :shell, :privileged => true, :inline => install_borg("jessie64")
+    b.vm.provision "run tests",                     :type => :shell, :privileged => true, :inline => run_tests("jessie64")
   end
 
   config.vm.define "wheezy32" do |b|
     b.vm.box = "boxcutter/debian79-i386"
-    b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy32")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("wheezy32")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("wheezy32")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("wheezy32")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller("wheezy32")
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("wheezy32")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("wheezy32")
+    b.vm.provision "packages prepare wheezy",       :type => :shell, :privileged => true, :inline => packages_prepare_wheezy
+    b.vm.provision "packages debianoid",            :type => :shell, :privileged => true, :inline => packages_debianoid
+    b.vm.provision "install pyenv",                 :type => :shell, :privileged => true, :inline => install_pyenv("wheezy32")
+    b.vm.provision "install pythons",               :type => :shell, :privileged => true, :inline => install_pythons("wheezy32")
+    b.vm.provision "build env",                     :type => :shell, :privileged => true, :inline => build_pyenv_venv("wheezy32")
+    b.vm.provision "install borg",                  :type => :shell, :privileged => true, :inline => install_borg("wheezy32")
+    # XXX https://github.com/borgbackup/borg/issues/1506
+    b.vm.provision "install pyinstaller",           :type => :shell, :privileged => true, :inline => install_pyinstaller("wheezy32")
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => true, :inline => build_binary_with_pyinstaller("wheezy32")
+    b.vm.provision "run tests",                     :type => :shell, :privileged => true, :inline => run_tests("wheezy32")
   end
 
   config.vm.define "wheezy64" do |b|
     b.vm.box = "boxcutter/debian79"
-    b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy64")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("wheezy64")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("wheezy64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("wheezy64")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller("wheezy64")
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("wheezy64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("wheezy64")
+    b.vm.provision "packages prepare wheezy",       :type => :shell, :privileged => true, :inline => packages_prepare_wheezy
+    b.vm.provision "packages debianoid",            :type => :shell, :privileged => true, :inline => packages_debianoid
+    b.vm.provision "install pyenv",                 :type => :shell, :privileged => true, :inline => install_pyenv("wheezy64")
+    b.vm.provision "install pythons",               :type => :shell, :privileged => true, :inline => install_pythons("wheezy64")
+    b.vm.provision "build env",                     :type => :shell, :privileged => true, :inline => build_pyenv_venv("wheezy64")
+    b.vm.provision "install borg",                  :type => :shell, :privileged => true, :inline => install_borg("wheezy64")
+    b.vm.provision "install pyinstaller",           :type => :shell, :privileged => true, :inline => install_pyinstaller("wheezy64")
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => true, :inline => build_binary_with_pyinstaller("wheezy64")
+    b.vm.provision "run tests",                     :type => :shell, :privileged => true, :inline => run_tests("wheezy64")
   end
 
   # OS X
   config.vm.define "darwin64" do |b|
     b.vm.box = "jhcook/yosemite-clitools"
-    b.vm.provision "packages darwin", :type => :shell, :privileged => false, :inline => packages_darwin
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("darwin64")
-    b.vm.provision "fix pyenv", :type => :shell, :privileged => false, :inline => fix_pyenv_darwin("darwin64")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("darwin64")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("darwin64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("darwin64")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller("darwin64")
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("darwin64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("darwin64")
+    b.vm.provision "packages darwin",               :type => :shell, :privileged => true, :inline => packages_darwin
+    b.vm.provision "install pyenv",                 :type => :shell, :privileged => true, :inline => install_pyenv("darwin64")
+    b.vm.provision "fix pyenv",                     :type => :shell, :privileged => true, :inline => fix_pyenv_darwin("darwin64")
+    b.vm.provision "install pythons",               :type => :shell, :privileged => true, :inline => install_pythons("darwin64")
+    b.vm.provision "build env",                     :type => :shell, :privileged => true, :inline => build_pyenv_venv("darwin64")
+    b.vm.provision "install borg",                  :type => :shell, :privileged => true, :inline => install_borg("darwin64")
+    b.vm.provision "install pyinstaller",           :type => :shell, :privileged => true, :inline => install_pyinstaller("darwin64")
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => true, :inline => build_binary_with_pyinstaller("darwin64")
+    b.vm.provision "run tests",                     :type => :shell, :privileged => true, :inline => run_tests("darwin64")
   end
 
   # BSD
@@ -432,14 +424,14 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
-    b.vm.provision "install system packages", :type => :shell, :inline => packages_freebsd
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("freebsd")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("freebsd")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("freebsd")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("freebsd")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller_bootloader("freebsd")
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("freebsd")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd")
+    b.vm.provision "install system packages",       :type => :shell, :privileged => true, :inline => packages_freebsd
+    b.vm.provision "install pyenv",                 :type => :shell, :privileged => true, :inline => install_pyenv("freebsd")
+    b.vm.provision "install pythons",               :type => :shell, :privileged => true, :inline => install_pythons("freebsd")
+    b.vm.provision "build env",                     :type => :shell, :privileged => true, :inline => build_pyenv_venv("freebsd")
+    b.vm.provision "install borg",                  :type => :shell, :privileged => true, :inline => install_borg("freebsd")
+    b.vm.provision "install pyinstaller",           :type => :shell, :privileged => true, :inline => install_pyinstaller_bootloader("freebsd")
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => true, :inline => build_binary_with_pyinstaller("freebsd")
+    b.vm.provision "run tests",                     :type => :shell, :privileged => true, :inline => run_tests("freebsd")
   end
 
   config.vm.define "openbsd64" do |b|
@@ -447,10 +439,10 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
-    b.vm.provision "packages openbsd", :type => :shell, :inline => packages_openbsd
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openbsd64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("openbsd64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openbsd64")
+    b.vm.provision "packages openbsd",              :type => :shell, :privileged => true, :inline => packages_openbsd
+    b.vm.provision "build env",                     :type => :shell, :privileged => true, :inline => build_sys_venv("openbsd64")
+    b.vm.provision "install borg",                  :type => :shell, :privileged => true, :inline => install_borg_no_fuse("openbsd64")
+    b.vm.provision "run tests",                     :type => :shell, :privileged => true, :inline => run_tests("openbsd64")
   end
 
   config.vm.define "netbsd64" do |b|
@@ -458,9 +450,9 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
-    b.vm.provision "packages netbsd", :type => :shell, :inline => packages_netbsd
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("netbsd64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd64")
+    b.vm.provision "packages netbsd",               :type => :shell, :privileged => true, :inline => packages_netbsd
+    b.vm.provision "build env",                     :type => :shell, :privileged => true, :inline => build_sys_venv("netbsd64")
+    b.vm.provision "install borg",                  :type => :shell, :privileged => true, :inline => install_borg_no_fuse("netbsd64")
+    b.vm.provision "run tests",                     :type => :shell, :privileged => true, :inline => run_tests("netbsd64")
   end
 end

@@ -113,7 +113,7 @@ class RepositoryServer:  # pragma: no cover
     def negotiate(self, versions):
         return RPC_PROTOCOL_VERSION
 
-    def open(self, path, create=False, lock_wait=None, lock=True):
+    def open(self, path, create=False, lock_wait=None, lock=True, append_only=False):
         path = os.fsdecode(path)
         if path.startswith('/~'):
             path = path[1:]
@@ -124,7 +124,7 @@ class RepositoryServer:  # pragma: no cover
                     break
             else:
                 raise PathNotAllowed(path)
-        self.repository = Repository(path, create, lock_wait=lock_wait, lock=lock, append_only=self.append_only)
+        self.repository = Repository(path, create, lock_wait=lock_wait, lock=lock, append_only=self.append_only or append_only)
         self.repository.__enter__()  # clean exit handled by serve() method
         return self.repository.id
 
@@ -133,10 +133,14 @@ class RemoteRepository:
     extra_test_args = []
 
     class RPCError(Exception):
-        def __init__(self, name):
+        def __init__(self, name, remote_type):
             self.name = name
+            self.remote_type = remote_type
 
-    def __init__(self, location, create=False, lock_wait=None, lock=True, args=None):
+    class NoAppendOnlyOnServer(Error):
+        """Server does not support --append-only."""
+
+    def __init__(self, location, create=False, lock_wait=None, lock=True, append_only=False, args=None):
         self.location = self._location = location
         self.preload_ids = []
         self.msgid = 0
@@ -172,7 +176,17 @@ class RemoteRepository:
         if version != RPC_PROTOCOL_VERSION:
             raise Exception('Server insisted on using unsupported protocol version %d' % version)
         try:
-            self.id = self.call('open', self.location.path, create, lock_wait, lock)
+            # Because of protocol versions, only send append_only if necessary
+            if append_only:
+                try:
+                    self.id = self.call('open', self.location.path, create, lock_wait, lock, append_only)
+                except self.RPCError as err:
+                    if err.remote_type == 'TypeError':
+                        raise self.NoAppendOnlyOnServer() from err
+                    else:
+                        raise
+            else:
+                self.id = self.call('open', self.location.path, create, lock_wait, lock)
         except Exception:
             self.close()
             raise
@@ -264,7 +278,7 @@ class RemoteRepository:
             elif error == b'InvalidRPCMethod':
                 raise InvalidRPCMethod(*res)
             else:
-                raise self.RPCError(res.decode('utf-8'))
+                raise self.RPCError(res.decode('utf-8'), error.decode('utf-8'))
 
         calls = list(calls)
         waiting_for = []

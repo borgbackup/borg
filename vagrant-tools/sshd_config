@@ -1,0 +1,25 @@
+Port 10022
+AddressFamily any
+ListenAddress 127.0.0.1
+ListenAddress ::1
+PidFile /var/tmp/borg-tests/sshd.pid
+
+# Try to keep this setup secure
+# This might be run in a chroot/docker instead of a VM
+# In which case root can escape the container
+
+AuthorizedKeysFile /var/tmp/borg-tests/ssh_key.pub
+ChallengeResponseAuthentication no
+PasswordAuthentication no
+PermitRootLogin no
+
+# TODO get ChrootDirectory working
+
+# For some reason, sshd checks /var/tmp's permissions.
+# Of course, those are loose.
+# The actual key is output by ssh-keygen with proper permissions.
+StrictModes no
+
+# sshfs uses sftp
+Subsystem sftp /usr/lib/ssh/sftp-server
+ForceCommand internal-sftp

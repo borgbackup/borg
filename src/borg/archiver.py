@@ -770,11 +770,31 @@ class Archiver:
 
     @with_repository(exclusive=True, manifest=False)
     def do_delete(self, args, repository):
-        """Delete an existing repository or archive"""
+        """Delete an existing repository or archives"""
+        if any((args.location.archive, args.first, args.last, args.prefix)):
+            return self._delete_archives(args, repository)
+        else:
+            return self._delete_repository(args, repository)
+
+    def _delete_archives(self, args, repository):
+        """Delete archives"""
+        manifest, key = Manifest.load(repository)
+
         if args.location.archive:
-            manifest, key = Manifest.load(repository)
-            with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
-                archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
+            archive_names = (args.location.archive,)
+        else:
+            archive_names = tuple(x.name for x in self._get_filtered_archives(args, manifest))
+            if not archive_names:
+                return self.exit_code
+
+        stats_logger = logging.getLogger('borg.output.stats')
+        if args.stats:
+            log_multi(DASHES, STATS_HEADER, logger=stats_logger)
+
+        with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
+            for i, archive_name in enumerate(archive_names, 1):
+                logger.info('Deleting {} ({}/{}):'.format(archive_name, i, len(archive_names)))
+                archive = Archive(repository, key, manifest, archive_name, cache=cache)
                 stats = Statistics()
                 archive.delete(stats, progress=args.progress, forced=args.forced)
                 manifest.write()
@@ -782,33 +802,41 @@ class Archiver:
                 cache.commit()
                 logger.info("Archive deleted.")
                 if args.stats:
-                    log_multi(DASHES,
-                              STATS_HEADER,
-                              stats.summary.format(label='Deleted data:', stats=stats),
-                              str(cache),
-                              DASHES, logger=logging.getLogger('borg.output.stats'))
-        else:
-            if not args.cache_only:
-                msg = []
-                try:
-                    manifest, key = Manifest.load(repository)
-                except NoManifestError:
-                    msg.append("You requested to completely DELETE the repository *including* all archives it may contain.")
-                    msg.append("This repository seems to have no manifest, so we can't tell anything about its contents.")
-                else:
-                    msg.append("You requested to completely DELETE the repository *including* all archives it contains:")
-                    for archive_info in manifest.archives.list(sort_by='ts'):
-                        msg.append(format_archive(archive_info))
-                msg.append("Type 'YES' if you understand this and want to continue: ")
-                msg = '\n'.join(msg)
-                if not yes(msg, false_msg="Aborting.", invalid_msg='Invalid answer, aborting.', truish=('YES', ),
-                           retry=False, env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'):
-                    self.exit_code = EXIT_ERROR
-                    return self.exit_code
-                repository.destroy()
-                logger.info("Repository deleted.")
-            Cache.destroy(repository)
-            logger.info("Cache deleted.")
+                    log_multi(stats.summary.format(label='Deleted data:', stats=stats),
+                              DASHES, logger=stats_logger)
+                if not args.forced and self.exit_code:
+                    break
+            if args.stats:
+                stats_logger.info(str(cache))
+
+        return self.exit_code
+
+    def _delete_repository(self, args, repository):
+        """Delete a repository"""
+        if not args.cache_only:
+            msg = []
+            try:
+                manifest, key = Manifest.load(repository)
+            except NoManifestError:
+                msg.append("You requested to completely DELETE the repository *including* all archives it may "
+                           "contain.")
+                msg.append("This repository seems to have no manifest, so we can't tell anything about its "
+                           "contents.")
+            else:
+                msg.append("You requested to completely DELETE the repository *including* all archives it "
+                           "contains:")
+                for archive_info in manifest.archives.list(sort_by='ts'):
+                    msg.append(format_archive(archive_info))
+            msg.append("Type 'YES' if you understand this and want to continue: ")
+            msg = '\n'.join(msg)
+            if not yes(msg, false_msg="Aborting.", invalid_msg='Invalid answer, aborting.', truish=('YES',),
+                       retry=False, env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'):
+                self.exit_code = EXIT_ERROR
+                return self.exit_code
+            repository.destroy()
+            logger.info("Repository deleted.")
+        Cache.destroy(repository)
+        logger.info("Cache deleted.")
         return self.exit_code
 
     @with_repository()
@@ -1969,6 +1997,7 @@ class Archiver:
         subparser.add_argument('location', metavar='TARGET', nargs='?', default='',
                                type=location_validator(),
                                help='archive or repository to delete')
+        self.add_archives_filters_args(subparser)
 
         list_epilog = textwrap.dedent("""
         This command lists the contents of a repository or an archive.

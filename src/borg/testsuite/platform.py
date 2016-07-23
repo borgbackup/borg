@@ -40,7 +40,7 @@ def user_exists(username):
     try:
         pwd.getpwnam(username)
         return True
-    except KeyError:
+    except (KeyError, ValueError):
         return False
 
 

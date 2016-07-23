@@ -730,8 +730,26 @@ class Archiver:
     @with_repository(exclusive=True, manifest=False)
     def do_delete(self, args, repository):
         """Delete an existing repository or archive"""
+        manifest = None
+
+        if args.oldest or args.latest:
+            if args.location.archive:
+                logger.error('The options --oldest and --latest have no effect on archive targets.')
+                return EXIT_ERROR
+            else:
+                manifest, key = Manifest.load(repository)
+                archives = manifest.list_archive_infos('ts', reverse=args.latest)
+                if archives:
+                    archive_name = archives[0].name
+                    logger.info('Resolved archive: %s' % archive_name)
+                    args.location.archive = archive_name
+                else:
+                    logger.error('There are no archives.')
+                    return EXIT_ERROR
+
         if args.location.archive:
-            manifest, key = Manifest.load(repository)
+            if manifest is None:
+                manifest, key = Manifest.load(repository)
             with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
                 stats = Statistics()
@@ -752,10 +770,13 @@ class Archiver:
                 try:
                     manifest, key = Manifest.load(repository)
                 except NoManifestError:
-                    msg.append("You requested to completely DELETE the repository *including* all archives it may contain.")
-                    msg.append("This repository seems to have no manifest, so we can't tell anything about its contents.")
+                    msg.append("You requested to completely DELETE the repository *including* all archives it may "
+                               "contain.")
+                    msg.append("This repository seems to have no manifest, so we can't tell anything about its "
+                               "contents.")
                 else:
-                    msg.append("You requested to completely DELETE the repository *including* all archives it contains:")
+                    msg.append("You requested to completely DELETE the repository *including* all archives it "
+                               "contains:")
                     for archive_info in manifest.archives.list(sort_by='ts'):
                         msg.append(format_archive(archive_info))
                 msg.append("Type 'YES' if you understand this and want to continue: ")

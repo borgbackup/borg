@@ -299,12 +299,17 @@ class UpgradableLock:
                 self._roster.modify(SHARED, REMOVE)
 
     def upgrade(self):
+        # WARNING: if multiple read-lockers want to upgrade, it will deadlock because they
+        # all will wait until the other read locks go away - and that won't happen.
         if not self.is_exclusive:
             self.acquire(exclusive=True, remove=SHARED)
 
     def downgrade(self):
         if self.is_exclusive:
             self.acquire(exclusive=False, remove=EXCLUSIVE)
+
+    def got_exclusive_lock(self):
+        return self.is_exclusive and self._lock.is_locked() and self._lock.by_me()
 
     def break_lock(self):
         self._roster.remove()

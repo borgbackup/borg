@@ -86,6 +86,14 @@ class TestUpgradableLock:
             assert len(lock._roster.get(SHARED)) == 1
             assert len(lock._roster.get(EXCLUSIVE)) == 0
 
+    def test_got_exclusive_lock(self, lockpath):
+        lock = UpgradableLock(lockpath, exclusive=True, id=ID1)
+        assert not lock.got_exclusive_lock()
+        lock.acquire()
+        assert lock.got_exclusive_lock()
+        lock.release()
+        assert not lock.got_exclusive_lock()
+
     def test_break(self, lockpath):
         lock = UpgradableLock(lockpath, exclusive=True, id=ID1).acquire()
         lock.break_lock()

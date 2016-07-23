@@ -207,14 +207,23 @@ class Repository:
 
     def prepare_txn(self, transaction_id, do_cleanup=True):
         self._active_txn = True
-        try:
-            self.lock.upgrade()
-        except (LockError, LockErrorT):
-            # if upgrading the lock to exclusive fails, we do not have an
-            # active transaction. this is important for "serve" mode, where
-            # the repository instance lives on - even if exceptions happened.
-            self._active_txn = False
-            raise
+        if not self.lock.got_exclusive_lock():
+            if self.exclusive is not None:
+                # self.exclusive is either True or False, thus a new client is active here.
+                # if it is False and we get here, the caller did not use exclusive=True although
+                # it is needed for a write operation. if it is True and we get here, something else
+                # went very wrong, because we should have a exclusive lock, but we don't.
+                raise AssertionError("bug in code, exclusive lock should exist here")
+            # if we are here, this is an old client talking to a new server (expecting lock upgrade).
+            # or we are replaying segments and might need a lock upgrade for that.
+            try:
+                self.lock.upgrade()
+            except (LockError, LockErrorT):
+                # if upgrading the lock to exclusive fails, we do not have an
+                # active transaction. this is important for "serve" mode, where
+                # the repository instance lives on - even if exceptions happened.
+                self._active_txn = False
+                raise
         if not self.index or transaction_id is None:
             self.index = self.open_index(transaction_id)
         if transaction_id is None:

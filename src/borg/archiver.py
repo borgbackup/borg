@@ -764,7 +764,8 @@ class Archiver:
             self.exit_code = EXIT_ERROR
         else:
             manifest, key = Manifest.load(repository)
-            archives = manifest.list_archive_infos('ts', reverse=args.latest)[0]
+            n = args.oldest or args.latest
+            archives = manifest.list_archive_infos('ts', reverse=args.latest)[:n]
             for archive in archives:
                 logger.info('Deleting %s' % archive.name)
                 args.location.archive = archive.name
@@ -1814,6 +1815,11 @@ class Archiver:
         subparser.add_argument('location', metavar='TARGET', nargs='?', default='',
                                type=location_validator(),
                                help='archive or repository to delete')
+        group = subparser.add_mutually_exclusive_group()
+        group.add_argument('--oldest', dest='oldest', metavar='n', default=0, type=int,
+                           help='delete n oldest archives')
+        group.add_argument('--latest', dest='latest', metavar='n', default=0, type=int,
+                           help='delete n latest archives')
 
         list_epilog = textwrap.dedent("""
         This command lists the contents of a repository or an archive.

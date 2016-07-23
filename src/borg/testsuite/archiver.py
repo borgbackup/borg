@@ -393,7 +393,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         def has_noatime(some_file):
             atime_before = os.stat(some_file).st_atime_ns
             try:
-                os.close(os.open(some_file, flags_noatime))
+                with open(os.open(some_file, flags_noatime)) as file:
+                    file.read()
             except PermissionError:
                 return False
             else:

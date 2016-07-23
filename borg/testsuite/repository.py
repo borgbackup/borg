@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from ..hashindex import NSIndex
 from ..helpers import Location, IntegrityError
-from ..locking import UpgradableLock, LockFailed
+from ..locking import Lock, LockFailed
 from ..remote import RemoteRepository, InvalidRPCMethod
 from ..repository import Repository, LoggedIO, TAG_COMMIT
 from . import BaseTestCase

@@ -217,7 +217,7 @@ class LockRoster:
         self.save(roster)
 
 
-class UpgradableLock:
+class Lock:
     """
     A Lock for a resource that can be accessed in a shared or exclusive way.
     Typically, write access to a resource needs an exclusive lock (1 writer,
@@ -226,7 +226,7 @@ class UpgradableLock:
 
     If possible, try to use the contextmanager here like::
 
-        with UpgradableLock(...) as lock:
+        with Lock(...) as lock:
             ...
 
     This makes sure the lock is released again if the block is left, no
@@ -242,7 +242,7 @@ class UpgradableLock:
         self._roster = LockRoster(path + '.roster', id=id)
         # an exclusive lock, used for:
         # - holding while doing roster queries / updates
-        # - holding while the UpgradableLock itself is exclusive
+        # - holding while the Lock instance itself is exclusive
         self._lock = ExclusiveLock(path + '.exclusive', id=id, timeout=timeout)
 
     def __enter__(self):

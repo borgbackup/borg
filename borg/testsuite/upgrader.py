@@ -23,7 +23,7 @@ def repo_valid(path):
     :param path: the path to the repository
     :returns: if borg can check the repository
     """
-    with Repository(str(path), create=False) as repository:
+    with Repository(str(path), exclusive=True, create=False) as repository:
         # can't check raises() because check() handles the error
         return repository.check()
 

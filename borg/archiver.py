@@ -134,7 +134,7 @@ class Archiver:
             pass
         return self.exit_code
 
-    @with_repository(exclusive='repair', manifest=False)
+    @with_repository(exclusive=True, manifest=False)
     def do_check(self, args, repository):
         """Check repository consistency"""
         if args.repair:
@@ -174,7 +174,7 @@ class Archiver:
         key_new.change_passphrase()  # option to change key protection passphrase, save
         return EXIT_SUCCESS
 
-    @with_repository(fake='dry_run')
+    @with_repository(fake='dry_run', exclusive=True)
     def do_create(self, args, repository, manifest=None, key=None):
         """Create new archive"""
         matcher = PatternMatcher(fallback=True)
@@ -595,7 +595,7 @@ class Archiver:
         print(str(cache))
         return self.exit_code
 
-    @with_repository()
+    @with_repository(exclusive=True)
     def do_prune(self, args, repository, manifest, key):
         """Prune repository archives according to specified rules"""
         if not any((args.hourly, args.daily,
@@ -722,7 +722,7 @@ class Archiver:
                 print("object %s fetched." % hex_id)
         return EXIT_SUCCESS
 
-    @with_repository(manifest=False)
+    @with_repository(manifest=False, exclusive=True)
     def do_debug_put_obj(self, args, repository):
         """put file(s) contents into the repository"""
         for path in args.paths:
@@ -734,7 +734,7 @@ class Archiver:
         repository.commit()
         return EXIT_SUCCESS
 
-    @with_repository(manifest=False)
+    @with_repository(manifest=False, exclusive=True)
     def do_debug_delete_obj(self, args, repository):
         """delete the objects with the given IDs from the repo"""
         modified = False

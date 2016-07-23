@@ -236,7 +236,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         self.cmd('create', self.repository_location + '::' + name, src_dir)
 
     def open_archive(self, name):
-        repository = Repository(self.repository_path)
+        repository = Repository(self.repository_path, exclusive=True)
         with repository:
             manifest, key = Manifest.load(repository)
             archive = Archive(repository, key, manifest, name)
@@ -1288,7 +1288,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 
     def test_extra_chunks(self):
         self.cmd('check', self.repository_location, exit_code=0)
-        with Repository(self.repository_location) as repository:
+        with Repository(self.repository_location, exclusive=True) as repository:
             repository.put(b'01234567890123456789012345678901', b'xxxx')
             repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)

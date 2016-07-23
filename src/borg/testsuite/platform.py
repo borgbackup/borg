@@ -2,6 +2,7 @@ import os
 import shutil
 import sys
 import tempfile
+import pwd
 import unittest
 
 from ..platform import acl_get, acl_set, swidth
@@ -33,6 +34,14 @@ other::r--
 
 def fakeroot_detected():
     return 'FAKEROOTKEY' in os.environ
+
+
+def user_exists(username):
+    try:
+        pwd.getpwnam(username)
+        return True
+    except KeyError:
+        return False
 
 
 @unittest.skipUnless(sys.platform.startswith('linux'), 'linux only test')
@@ -72,6 +81,7 @@ class PlatformLinuxTestCase(BaseTestCase):
         self.assert_equal(self.get_acl(self.tmpdir)['acl_access'], ACCESS_ACL)
         self.assert_equal(self.get_acl(self.tmpdir)['acl_default'], DEFAULT_ACL)
 
+    @unittest.skipIf(not user_exists('übel'), 'requires übel user')
     def test_non_ascii_acl(self):
         # Testing non-ascii ACL processing to see whether our code is robust.
         # I have no idea whether non-ascii ACLs are allowed by the standard,

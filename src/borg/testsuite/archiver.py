@@ -1493,7 +1493,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         verify_uniqueness()
         self.cmd('delete', self.repository_location + '::test.2')
         verify_uniqueness()
-        self.assert_equal(used, set(range(len(used))))
 
     def test_aes_counter_uniqueness_keyfile(self):
         self.verify_aes_counter_uniqueness('keyfile')

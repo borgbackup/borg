@@ -390,6 +390,48 @@ class RepositoryFreeSpaceTestCase(RepositoryTestCaseBase):
                 self.repository.commit()
 
 
+class NonceReservation(RepositoryTestCaseBase):
+    def test_get_free_nonce_asserts(self):
+        self.reopen(exclusive=False)
+        with pytest.raises(AssertionError):
+            with self.repository:
+                self.repository.get_free_nonce()
+
+    def test_get_free_nonce(self):
+        with self.repository:
+            assert self.repository.get_free_nonce() is None
+
+            with open(os.path.join(self.repository.path, "nonce"), "w") as fd:
+                fd.write("0000000000000000")
+            assert self.repository.get_free_nonce() == 0
+
+            with open(os.path.join(self.repository.path, "nonce"), "w") as fd:
+                fd.write("5000000000000000")
+            assert self.repository.get_free_nonce() == 0x5000000000000000
+
+    def test_commit_nonce_reservation_asserts(self):
+        self.reopen(exclusive=False)
+        with pytest.raises(AssertionError):
+            with self.repository:
+                self.repository.commit_nonce_reservation(0x200, 0x100)
+
+    def test_commit_nonce_reservation(self):
+        with self.repository:
+            with pytest.raises(Exception):
+                self.repository.commit_nonce_reservation(0x200, 15)
+
+            self.repository.commit_nonce_reservation(0x200, None)
+            with open(os.path.join(self.repository.path, "nonce"), "r") as fd:
+                assert fd.read() == "0000000000000200"
+
+            with pytest.raises(Exception):
+                self.repository.commit_nonce_reservation(0x200, 15)
+
+            self.repository.commit_nonce_reservation(0x400, 0x200)
+            with open(os.path.join(self.repository.path, "nonce"), "r") as fd:
+                assert fd.read() == "0000000000000400"
+
+
 class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
     def setUp(self):
         super().setUp()

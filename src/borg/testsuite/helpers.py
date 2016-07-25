@@ -14,7 +14,7 @@ from ..helpers import Buffer
 from ..helpers import partial_format, format_file_size, parse_file_size, format_timedelta, format_line, PlaceholderError
 from ..helpers import make_path_safe, clean_lines
 from ..helpers import prune_within, prune_split
-from ..helpers import get_cache_dir, get_keys_dir
+from ..helpers import get_cache_dir, get_keys_dir, get_nonces_dir
 from ..helpers import is_slow_msgpack
 from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
 from ..helpers import StableDict, int_to_bigint, bigint_to_int, bin_to_hex
@@ -634,6 +634,17 @@ def test_get_keys_dir():
     # reset old env
     if old_env is not None:
         os.environ['BORG_KEYS_DIR'] = old_env
+
+
+def test_get_nonces_dir(monkeypatch):
+    """test that get_nonces_dir respects environment"""
+    monkeypatch.delenv('XDG_CONFIG_HOME', raising=False)
+    monkeypatch.delenv('BORG_NONCES_DIR', raising=False)
+    assert get_nonces_dir() == os.path.join(os.path.expanduser('~'), '.config', 'borg', 'key-nonces')
+    monkeypatch.setenv('XDG_CONFIG_HOME', '/var/tmp/.config')
+    assert get_nonces_dir() == os.path.join('/var/tmp/.config', 'borg', 'key-nonces')
+    monkeypatch.setenv('BORG_NONCES_DIR', '/var/tmp')
+    assert get_nonces_dir() == '/var/tmp'
 
 
 def test_file_size():

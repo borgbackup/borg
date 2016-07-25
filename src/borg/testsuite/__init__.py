@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 import filecmp
+import functools
 import os
 import posix
 import stat
@@ -7,6 +8,7 @@ import sys
 import sysconfig
 import tempfile
 import time
+import uuid
 import unittest
 
 from ..xattr import get_all
@@ -52,6 +54,67 @@ else:
 
 if sys.platform.startswith('netbsd'):
     st_mtime_ns_round = -4  # only >1 microsecond resolution here?
+
+
+@contextmanager
+def unopened_tempfile():
+    with tempfile.TemporaryDirectory() as tempdir:
+        yield os.path.join(tempdir, "file")
+
+
+@functools.lru_cache()
+def are_symlinks_supported():
+    with unopened_tempfile() as filepath:
+        try:
+            os.symlink('somewhere', filepath)
+            if os.lstat(filepath) and os.readlink(filepath) == 'somewhere':
+                return True
+        except OSError:
+            pass
+    return False
+
+
+@functools.lru_cache()
+def are_hardlinks_supported():
+    with unopened_tempfile() as file1path, unopened_tempfile() as file2path:
+        open(file1path, 'w').close()
+        try:
+            os.link(file1path, file2path)
+            stat1 = os.stat(file1path)
+            stat2 = os.stat(file2path)
+            if stat1.st_nlink == stat2.st_nlink == 2 and stat1.st_ino == stat2.st_ino:
+                return True
+        except OSError:
+            pass
+    return False
+
+
+@functools.lru_cache()
+def are_fifos_supported():
+    with unopened_tempfile() as filepath:
+        try:
+            os.mkfifo(filepath)
+            return True
+        except OSError:
+            return False
+
+
+@functools.lru_cache()
+def is_utime_fully_supported():
+    with unopened_tempfile() as filepath:
+        # Some filesystems (such as SSHFS) don't support utime on symlinks
+        if are_symlinks_supported():
+            os.symlink('something', filepath)
+        else:
+            open(filepath, 'w').close()
+        try:
+            os.utime(filepath, (1000, 2000), follow_symlinks=False)
+            new_stats = os.lstat(filepath)
+            if new_stats.st_atime == 1000 and new_stats.st_mtime == 2000:
+                return True
+        except OSError as err:
+            pass
+        return False
 
 
 class BaseTestCase(unittest.TestCase):
@@ -103,13 +166,16 @@ class BaseTestCase(unittest.TestCase):
                 d1[4] = None
             if not stat.S_ISCHR(d2[1]) and not stat.S_ISBLK(d2[1]):
                 d2[4] = None
-            # Older versions of llfuse do not support ns precision properly
-            if fuse and not have_fuse_mtime_ns:
-                d1.append(round(s1.st_mtime_ns, -4))
-                d2.append(round(s2.st_mtime_ns, -4))
-            else:
-                d1.append(round(s1.st_mtime_ns, st_mtime_ns_round))
-                d2.append(round(s2.st_mtime_ns, st_mtime_ns_round))
+            # If utime isn't fully supported, borg can't set mtime.
+            # Therefore, we shouldn't test it in that case.
+            if is_utime_fully_supported():
+                # Older versions of llfuse do not support ns precision properly
+                if fuse and not have_fuse_mtime_ns:
+                    d1.append(round(s1.st_mtime_ns, -4))
+                    d2.append(round(s2.st_mtime_ns, -4))
+                else:
+                    d1.append(round(s1.st_mtime_ns, st_mtime_ns_round))
+                    d2.append(round(s2.st_mtime_ns, st_mtime_ns_round))
             d1.append(get_all(path1, follow_symlinks=False))
             d2.append(get_all(path2, follow_symlinks=False))
             self.assert_equal(d1, d2)

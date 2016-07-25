@@ -553,10 +553,14 @@ Number of files: {0.stats.nfiles}'''.format(
         else:
             # old archives only had mtime in item metadata
             atime = mtime
-        if fd:
-            os.utime(fd, None, ns=(atime, mtime))
-        else:
-            os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
+        try:
+            if fd:
+                os.utime(fd, None, ns=(atime, mtime))
+            else:
+                os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
+        except OSError:
+            # some systems don't support calling utime on a symlink
+            pass
         acl_set(path, item, self.numeric_owner)
         if 'bsdflags' in item:
             try:

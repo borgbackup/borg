@@ -1,10 +1,13 @@
+import os
+
 from borg.logger import setup_logging
 
 # Ensure that the loggers exist for all tests
 setup_logging()
 
-from borg.testsuite import has_lchflags, no_lchlfags_because, has_llfuse
-from borg.testsuite.platform import fakeroot_detected
+from borg.testsuite import has_lchflags, has_llfuse
+from borg.testsuite import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported
+from borg.testsuite.platform import fakeroot_detected, are_acls_working
 from borg import xattr, constants
 
 
@@ -14,10 +17,22 @@ def pytest_configure(config):
 
 
 def pytest_report_header(config, startdir):
-    yesno = ['no', 'yes']
-    flags = 'Testing BSD-style flags: %s %s' % (yesno[has_lchflags], no_lchlfags_because)
-    fakeroot = 'fakeroot: %s (>=1.20.2: %s)' % (
-        yesno[fakeroot_detected()],
-        yesno[xattr.XATTR_FAKEROOT])
-    llfuse = 'Testing fuse: %s' % yesno[has_llfuse]
-    return '\n'.join((flags, llfuse, fakeroot))
+    tests = {
+        "BSD flags": has_lchflags,
+        "fuse": has_llfuse,
+        "root": not fakeroot_detected(),
+        "symlinks": are_symlinks_supported(),
+        "hardlinks": are_hardlinks_supported(),
+        "atime/mtime": is_utime_fully_supported(),
+        "modes": "BORG_TESTS_IGNORE_MODES" not in os.environ
+    }
+    enabled = []
+    disabled = []
+    for test in tests:
+        if tests[test]:
+            enabled.append(test)
+        else:
+            disabled.append(test)
+    output = "Tests enabled: " + ", ".join(enabled) + "\n"
+    output += "Tests disabled: " + ", ".join(disabled)
+    return output

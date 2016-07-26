@@ -1,6 +1,8 @@
 import argparse
+import errno
 import grp
 import hashlib
+import io
 import logging
 import os
 import os.path
@@ -1546,3 +1548,31 @@ def signal_handler(signo, handler):
         yield
     finally:
         signal.signal(signo, old_signal_handler)
+
+
+class ErrorIgnoringTextIOWrapper(io.TextIOWrapper):
+    def read(self, n):
+        if not self.closed:
+            try:
+                return super(ErrorIgnoringTextIOWrapper, self).read(n)
+            except OSError as err:
+                if err.errno != errno.EPIPE:
+                    raise
+                try:
+                    super(ErrorIgnoringTextIOWrapper, self).close()
+                except OSError as err:
+                    pass
+        return ''
+
+    def write(self, s):
+        if not self.closed:
+            try:
+                return super(ErrorIgnoringTextIOWrapper, self).write(s)
+            except OSError as err:
+                if err.errno != errno.EPIPE:
+                    raise
+                try:
+                    super(ErrorIgnoringTextIOWrapper, self).close()
+                except OSError as err:
+                    pass
+        return len(s)

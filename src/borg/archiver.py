@@ -41,6 +41,7 @@ from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo
 from .helpers import log_multi
 from .helpers import parse_pattern, PatternMatcher, PathPrefixPattern
 from .helpers import signal_handler
+from .helpers import ErrorIgnoringTextIOWrapper
 from .item import Item
 from .key import key_creator, RepoKey, PassphraseKey
 from .platform import get_flags
@@ -2251,8 +2252,8 @@ def main():  # pragma: no cover
 
     # Make sure stdout and stderr have errors='replace' to avoid unicode
     # issues when print()-ing unicode file names
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=True)
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, sys.stderr.encoding, 'replace', line_buffering=True)
+    sys.stdout = ErrorIgnoringTextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=True)
+    sys.stderr = ErrorIgnoringTextIOWrapper(sys.stderr.buffer, sys.stderr.encoding, 'replace', line_buffering=True)
     setup_signal_handlers()
     archiver = Archiver()
     msg = None

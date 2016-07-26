@@ -137,7 +137,7 @@ class SaveFile:
         from .. import platform
         try:
             os.unlink(self.tmppath)
-        except OSError:
+        except FileNotFoundError:
             pass
         self.fd = platform.SyncFile(self.tmppath, self.binary)
         return self.fd

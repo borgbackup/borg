@@ -471,7 +471,7 @@ class KeyfileKey(KeyfileKeyBase):
 
     def save(self, target, passphrase):
         key_data = self._save(passphrase)
-        with SaveFile(target, binary=False) as fd:
+        with SaveFile(target) as fd:
             fd.write('%s %s\n' % (self.FILE_ID, bin_to_hex(self.repository_id)))
             fd.write(key_data)
             fd.write('\n')

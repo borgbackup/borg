@@ -142,11 +142,11 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         config.set('cache', 'version', '1')
         config.set('cache', 'repository', self.repository.id_str)
         config.set('cache', 'manifest', '')
-        with SaveFile(os.path.join(self.path, 'config'), binary=False) as fd:
+        with SaveFile(os.path.join(self.path, 'config')) as fd:
             config.write(fd)
         ChunkIndex().write(os.path.join(self.path, 'chunks').encode('utf-8'))
         os.makedirs(os.path.join(self.path, 'chunks.archive.d'))
-        with SaveFile(os.path.join(self.path, 'files')) as fd:
+        with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
             pass  # empty file
 
     def _do_open(self):
@@ -213,7 +213,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not self.txn_active:
             return
         if self.files is not None:
-            with SaveFile(os.path.join(self.path, 'files')) as fd:
+            with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
                 for path_hash, item in self.files.items():
                     # Discard cached files with the newest mtime to avoid
                     # issues with filesystem snapshots and mtime precision
@@ -224,7 +224,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         self.config.set('cache', 'timestamp', self.manifest.timestamp)
         self.config.set('cache', 'key_type', str(self.key.TYPE))
         self.config.set('cache', 'previous_location', self.repository._location.canonical_path())
-        with SaveFile(os.path.join(self.path, 'config'), binary=False) as fd:
+        with SaveFile(os.path.join(self.path, 'config')) as fd:
             self.config.write(fd)
         self.chunks.write(os.path.join(self.path, 'chunks').encode('utf-8'))
         os.rename(os.path.join(self.path, 'txn.active'),

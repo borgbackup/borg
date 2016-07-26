@@ -80,10 +80,8 @@ class SyncFile:
     TODO: A Windows implementation should use CreateFile with FILE_FLAG_WRITE_THROUGH.
     """
 
-    def __init__(self, path, binary=True):
-        mode = 'x'
-        if binary:
-            mode += 'b'
+    def __init__(self, path, binary=False):
+        mode = 'xb' if binary else 'x'
         self.fd = open(path, mode)
         self.fileno = self.fd.fileno()
 
@@ -122,13 +120,13 @@ class SaveFile:
     Must be used as a context manager (defining the scope of the transaction).
 
     On a journaling file system the file contents are always updated
-    atomically and won't become corrupted, even on pure failures or
+    atomically and won't become corrupted, even on power failures or
     crashes (for caveats see SyncFile).
     """
 
     SUFFIX = '.tmp'
 
-    def __init__(self, path, binary=True):
+    def __init__(self, path, binary=False):
         self.binary = binary
         self.path = path
         self.tmppath = self.path + self.SUFFIX

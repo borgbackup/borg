@@ -228,7 +228,7 @@ class SyncFile(BaseSyncFile):
     disk in the immediate future.
     """
 
-    def __init__(self, path, binary=True):
+    def __init__(self, path, binary=False):
         super().__init__(path, binary)
         self.offset = 0
         self.write_window = (16 * 1024 ** 2) & ~PAGE_MASK

@@ -160,7 +160,7 @@ class Repository:
 
     def save_config(self, path, config):
         config_path = os.path.join(path, 'config')
-        with SaveFile(config_path, binary=False) as fd:
+        with SaveFile(config_path) as fd:
             config.write(fd)
 
     def save_key(self, keydata):
@@ -731,7 +731,7 @@ class LoggedIO:
                 if not os.path.exists(dirname):
                     os.mkdir(dirname)
                     sync_dir(os.path.join(self.path, 'data'))
-            self._write_fd = SyncFile(self.segment_filename(self.segment))
+            self._write_fd = SyncFile(self.segment_filename(self.segment), binary=True)
             self._write_fd.write(MAGIC)
             self.offset = MAGIC_LEN
         return self._write_fd

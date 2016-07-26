@@ -148,7 +148,7 @@ class SaveFile:
         if exc_type is not None:
             os.unlink(self.tmppath)
             return
-        os.rename(self.tmppath, self.path)
+        os.replace(self.tmppath, self.path)
         platform.sync_dir(os.path.dirname(self.path))
 
 

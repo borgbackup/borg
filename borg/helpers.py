@@ -12,6 +12,8 @@ import sys
 import platform
 import time
 import unicodedata
+import io
+import errno
 
 import logging
 from .logger import create_logger
@@ -1089,3 +1091,27 @@ def log_multi(*msgs, level=logging.INFO):
         lines.extend(msg.splitlines())
     for line in lines:
         logger.log(level, line)
+
+
+class ErrorIgnoringTextIOWrapper(io.TextIOWrapper):
+    def read(self, n):
+        if not self.closed:
+            try:
+                return super().read(n)
+            except BrokenPipeError:
+                try:
+                    super().close()
+                except OSError:
+                    pass
+        return ''
+
+    def write(self, s):
+        if not self.closed:
+            try:
+                return super().write(s)
+            except BrokenPipeError:
+                try:
+                    super().close()
+                except OSError:
+                    pass
+        return len(s)

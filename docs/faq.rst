@@ -47,25 +47,6 @@ If you want to have 2 independent backups, it is better to do it like this:
 - client machine ---borg create---> repo1
 - client machine ---borg create---> repo2
 
-Which file types, attributes, etc. are preserved?
--------------------------------------------------
-
-    * Directories
-    * Regular files
-    * Hardlinks (considering all files in the same archive)
-    * Symlinks (stored as symlink, the symlink is not followed)
-    * Character and block device files
-    * FIFOs ("named pipes")
-    * Name
-    * Contents
-    * Timestamps in nanosecond precision: mtime, atime, ctime
-    * IDs of owning user and owning group
-    * Names of owning user and owning group (if the IDs can be resolved)
-    * Unix Mode/Permissions (u/g/o permissions, suid, sgid, sticky)
-    * Extended Attributes (xattrs) on Linux, OS X and FreeBSD
-    * Access Control Lists (ACL_) on Linux, OS X and FreeBSD
-    * BSD flags on OS X and FreeBSD
-
 Which file types, attributes, etc. are *not* preserved?
 -------------------------------------------------------
 

@@ -181,7 +181,7 @@ and commands to make fuse work for using the mount command.
      echo 'vfs.usermount=1' >> /etc/sysctl.conf
      kldload fuse
      sysctl vfs.usermount=1
-    
+
 
 Cygwin
 ++++++

@@ -177,7 +177,8 @@ def test_convert_all(tmpdir, attic_repo, attic_key_file, inplace):
             assert first_inode(repository.path) != first_inode(backup)
             # i have seen cases where the copied tree has world-readable
             # permissions, which is wrong
-            assert stat_segment(backup).st_mode & UMASK_DEFAULT == 0
+            if 'BORG_TESTS_IGNORE_MODES' not in os.environ:
+                assert stat_segment(backup).st_mode & UMASK_DEFAULT == 0
 
     assert key_valid(attic_key_file.path)
     assert repo_valid(tmpdir)

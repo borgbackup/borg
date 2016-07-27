@@ -988,6 +988,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # Restore permissions so shutil.rmtree is able to delete it
             os.system('chmod -R u+w ' + self.repository_path)
 
+    @pytest.mark.skipif('BORG_TESTS_IGNORE_MODES' in os.environ, reason='modes unreliable')
     def test_umask(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', self.repository_location)
@@ -1936,7 +1937,8 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             assert 'input/file_unchanged' not in output
 
             # Directory replaced with a regular file
-            assert '[drwxr-xr-x -> -rwxr-xr-x] input/dir_replaced_with_file' in output
+            if 'BORG_TESTS_IGNORE_MODES' not in os.environ:
+                assert '[drwxr-xr-x -> -rwxr-xr-x] input/dir_replaced_with_file' in output
 
             # Basic directory cases
             assert 'added directory     input/dir_added' in output

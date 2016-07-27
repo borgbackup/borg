@@ -2,6 +2,7 @@ import argparse
 import grp
 import hashlib
 import logging
+import io
 import os
 import os.path
 import platform
@@ -1546,3 +1547,27 @@ def signal_handler(signo, handler):
         yield
     finally:
         signal.signal(signo, old_signal_handler)
+
+
+class ErrorIgnoringTextIOWrapper(io.TextIOWrapper):
+    def read(self, n):
+        if not self.closed:
+            try:
+                return super().read(n)
+            except BrokenPipeError:
+                try:
+                    super().close()
+                except OSError:
+                    pass
+        return ''
+
+    def write(self, s):
+        if not self.closed:
+            try:
+                return super().write(s)
+            except BrokenPipeError:
+                try:
+                    super().close()
+                except OSError:
+                    pass
+        return len(s)

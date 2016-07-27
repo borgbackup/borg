@@ -383,7 +383,7 @@ Compatibility notes:
 - disambiguate -p option, #563:
 
   - -p now is same as --progress
-  - -P now is same as --prefix  
+  - -P now is same as --prefix
 - remove deprecated "borg verify",
   use "borg extract --dry-run" instead
 - cleanup environment variable semantics, #355
@@ -448,7 +448,7 @@ New features:
 - format options for location: user, pid, fqdn, hostname, now, utcnow, user
 - borg list --list-format
 - borg prune -v --list enables the keep/prune list output, #658
- 
+
 Bug fixes:
 
 - fix _open_rb noatime handling, #657
@@ -466,7 +466,7 @@ Other changes:
 - Vagrant: drop Ubuntu Precise (12.04) - does not have Python >= 3.4
 - Vagrant: use pyinstaller v3.1.1 to build binaries
 - docs:
- 
+
   - borg upgrade: add to docs that only LOCAL repos are supported
   - borg upgrade also handles borg 0.xx -> 1.0
   - use pip extras or requirements file to install llfuse

@@ -13,6 +13,7 @@ import msgpack
 from .archive import Archive
 from .helpers import daemonize, bigint_to_int
 from .logger import create_logger
+from .lrucache import LRUCache
 logger = create_logger()
 
 
@@ -62,6 +63,9 @@ class FuseOperations(llfuse.Operations):
         self.pending_archives = {}
         self.accounted_chunks = {}
         self.cache = ItemCache()
+        data_cache_capacity = int(os.environ.get('BORG_MOUNT_DATA_CACHE_ENTRIES', os.cpu_count() or 1))
+        logger.debug('mount data cache capacity: %d chunks', data_cache_capacity)
+        self.data_cache = LRUCache(capacity=data_cache_capacity, dispose=lambda _: None)
         if archive:
             self.process_archive(archive)
         else:
@@ -282,8 +286,17 @@ class FuseOperations(llfuse.Operations):
                 offset -= s
                 continue
             n = min(size, s - offset)
-            chunk = self.key.decrypt(id, self.repository.get(id))
-            parts.append(chunk[offset:offset + n])
+            if id in self.data_cache:
+                data = self.data_cache[id]
+                if offset + n == len(data):
+                    # evict fully read chunk from cache
+                    del self.data_cache[id]
+            else:
+                data = self.key.decrypt(id, self.repository.get(id))
+                if offset + n < len(data):
+                    # chunk was only partially read, cache it
+                    self.data_cache[id] = data
+            parts.append(data[offset:offset + n])
             offset = 0
             size -= n
             if not size:

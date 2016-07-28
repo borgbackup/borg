@@ -1275,6 +1275,11 @@ class Archiver:
         option is given the command will run in the background until the filesystem
         is ``umounted``.
 
+        The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
+        to tweak the performance. It sets the number of cached data chunks; additional
+        memory usage can be up to ~8 MiB times this number. The default is the number
+        of CPU cores.
+
         For mount options, see the fuse(8) manual page. Additional mount options
         supported by borg:
 

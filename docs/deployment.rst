@@ -157,7 +157,7 @@ Salt running on a Debian system.
 ::
 
   Install borg backup from pip:
-    pkg.installed: 
+    pkg.installed:
       - pkgs:
         - python3
         - python3-dev

@@ -909,6 +909,8 @@ class ArchiveChecker:
         self.repository = repository
         self.init_chunks()
         self.key = self.identify_key(repository)
+        if verify_data:
+            self.verify_data()
         if Manifest.MANIFEST_ID not in self.chunks:
             logger.error("Repository manifest not found!")
             self.error_found = True
@@ -916,8 +918,6 @@ class ArchiveChecker:
         else:
             self.manifest, _ = Manifest.load(repository, key=self.key)
         self.rebuild_refcounts(archive=archive, last=last, prefix=prefix)
-        if verify_data:
-            self.verify_data()
         self.orphan_chunks_check()
         self.finish(save_space=save_space)
         if self.error_found:
@@ -954,20 +954,25 @@ class ArchiveChecker:
 
     def verify_data(self):
         logger.info('Starting cryptographic data integrity verification...')
-        pi = ProgressIndicatorPercent(total=len(self.chunks), msg="Verifying data %6.2f%%", step=0.01, same_line=True)
-        count = errors = 0
+        count = len(self.chunks)
+        errors = 0
+        pi = ProgressIndicatorPercent(total=count, msg="Verifying data %6.2f%%", step=0.01, same_line=True)
         for chunk_id, (refcount, *_) in self.chunks.iteritems():
             pi.show()
-            if not refcount:
-                continue
-            encrypted_data = self.repository.get(chunk_id)
             try:
-                _, data = self.key.decrypt(chunk_id, encrypted_data)
+                encrypted_data = self.repository.get(chunk_id)
+            except Repository.ObjectNotFound:
+                self.error_found = True
+                errors += 1
+                logger.error('chunk %s not found', bin_to_hex(chunk_id))
+                continue
+            try:
+                _chunk_id = None if chunk_id == Manifest.MANIFEST_ID else chunk_id
+                _, data = self.key.decrypt(_chunk_id, encrypted_data)
             except IntegrityError as integrity_error:
                 self.error_found = True
                 errors += 1
                 logger.error('chunk %s, integrity error: %s', bin_to_hex(chunk_id), integrity_error)
-            count += 1
         pi.finish()
         log = logger.error if errors else logger.info
         log('Finished cryptographic data integrity verification, verified %d chunks with %d integrity errors.', count, errors)

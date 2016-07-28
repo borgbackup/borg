@@ -779,6 +779,14 @@ class RobustUnpacker:
         return self
 
     def __next__(self):
+        def unpack_next():
+            try:
+                return next(self._unpacker)
+            except (TypeError, ValueError) as err:
+                # transform exceptions that might be raised when feeding
+                # msgpack with invalid data to a more specific exception
+                raise self.UnpackerCrashed(str(err))
+
         if self._resync:
             data = b''.join(self._buffered_data)
             while self._resync:
@@ -791,10 +799,9 @@ class RobustUnpacker:
                 self._unpacker = msgpack.Unpacker(object_hook=StableDict)
                 self._unpacker.feed(data)
                 try:
-                    item = next(self._unpacker)
-                except (TypeError, ValueError, StopIteration):
-                    # Ignore exceptions that might be raised when feeding
-                    # msgpack with invalid data
+                    item = unpack_next()
+                except (self.UnpackerCrashed, StopIteration):
+                    # as long as we are resyncing, we also ignore StopIteration
                     pass
                 else:
                     if self.validator(item):
@@ -802,10 +809,7 @@ class RobustUnpacker:
                         return item
                 data = data[1:]
         else:
-            try:
-                return next(self._unpacker)
-            except (TypeError, ValueError) as err:
-                raise self.UnpackerCrashed(str(err))
+            return unpack_next()
 
 
 class ArchiveChecker:

@@ -15,6 +15,7 @@ from .helpers import Error, IntegrityError
 from .helpers import get_home_dir
 from .helpers import sysinfo
 from .helpers import bin_to_hex
+from .helpers import replace_placeholders
 from .repository import Repository
 
 RPC_PROTOCOL_VERSION = 2
@@ -229,11 +230,14 @@ class RemoteRepository:
             return [sys.executable, '-m', 'borg.archiver', 'serve'] + opts + self.extra_test_args
         else:  # pragma: no cover
             remote_path = args.remote_path or os.environ.get('BORG_REMOTE_PATH', 'borg')
+            remote_path = replace_placeholders(remote_path)
             return [remote_path, 'serve'] + opts
 
     def ssh_cmd(self, location):
         """return a ssh command line that can be prefixed to a borg command line"""
-        args = shlex.split(os.environ.get('BORG_RSH', 'ssh'))
+        cmdbase = os.environ.get('BORG_RSH', 'ssh')
+        cmdbase = replace_placeholders(cmdbase)
+        args = shlex.split(cmdbase)
         if location.port:
             args += ['-p', str(location.port)]
         if location.user:

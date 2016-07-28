@@ -6,7 +6,8 @@ borg help placeholders
 ~~~~~~~~~~~~~~~~~~~~~~
 
 
-Repository (or Archive) URLs and --prefix values support these placeholders:
+Repository (or Archive) URLs, --prefix, --remote-path values and the
+BORG_RSH environment variable support these placeholders:
 
 {hostname}
 
@@ -31,6 +32,10 @@ Repository (or Archive) URLs and --prefix values support these placeholders:
 {pid}
 
     The current process ID.
+
+{borgversion}
+
+    The version of borg.
 
 Examples::
 

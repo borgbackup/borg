@@ -792,13 +792,14 @@ class RobustUnpacker:
                 self._unpacker.feed(data)
                 try:
                     item = next(self._unpacker)
+                except (TypeError, ValueError, StopIteration):
+                    # Ignore exceptions that might be raised when feeding
+                    # msgpack with invalid data
+                    pass
+                else:
                     if self.validator(item):
                         self._resync = False
                         return item
-                # Ignore exceptions that might be raised when feeding
-                # msgpack with invalid data
-                except (TypeError, ValueError, StopIteration):
-                    pass
                 data = data[1:]
         else:
             try:

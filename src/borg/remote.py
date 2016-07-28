@@ -160,6 +160,7 @@ class RemoteRepository:
             # that the system's ssh binary picks up (non-matching) libraries from there
             env.pop('LD_LIBRARY_PATH', None)
         env.pop('BORG_PASSPHRASE', None)  # security: do not give secrets to subprocess
+        env['BORG_VERSION'] = __version__
         self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()

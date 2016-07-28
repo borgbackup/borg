@@ -57,7 +57,7 @@ New features:
 
 - borg check: will not produce the "Checking segments" output unless
   new --progress option is passed, #824.
-- options that imply output (--show-rc, --show-version, --list, --stats, 
+- options that imply output (--show-rc, --show-version, --list, --stats,
   --progress) don't need -v/--info to have that output displayed, #865
 - borg recreate: re-create existing archives, #787 #686 #630 #70, also see
   #757, #770.

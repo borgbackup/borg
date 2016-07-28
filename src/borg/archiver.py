@@ -73,13 +73,16 @@ def with_repository(fake=False, create=False, lock=True, exclusive=False, manife
         @functools.wraps(method)
         def wrapper(self, args, **kwargs):
             location = args.location  # note: 'location' must be always present in args
+            append_only = getattr(args, 'append_only', False)
             if argument(args, fake):
                 return method(self, args, repository=None, **kwargs)
             elif location.proto == 'ssh':
-                repository = RemoteRepository(location, create=create, lock_wait=self.lock_wait, lock=lock, args=args)
+                repository = RemoteRepository(location, create=create, lock_wait=self.lock_wait, lock=lock,
+                                              append_only=append_only, args=args)
             else:
                 repository = Repository(location.path, create=create, exclusive=argument(args, exclusive),
-                                        lock_wait=self.lock_wait, lock=lock)
+                                        lock_wait=self.lock_wait, lock=lock,
+                                        append_only=append_only)
             with repository:
                 if manifest or cache:
                     kwargs['manifest'], kwargs['key'] = Manifest.load(repository)
@@ -1304,6 +1307,8 @@ class Archiver:
         subparser.add_argument('-e', '--encryption', dest='encryption',
                                choices=('none', 'keyfile', 'repokey'), default='repokey',
                                help='select encryption key mode (default: "%(default)s")')
+        subparser.add_argument('-a', '--append-only', dest='append_only', action='store_true',
+                               help='create an append-only mode repository')
 
         check_epilog = textwrap.dedent("""
         The check command verifies the consistency of a repository and the corresponding archives.

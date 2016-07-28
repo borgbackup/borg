@@ -845,6 +845,8 @@ class ArchiveChecker:
         self.repository = repository
         self.init_chunks()
         self.key = self.identify_key(repository)
+        if verify_data:
+            self.verify_data()
         if Manifest.MANIFEST_ID not in self.chunks:
             logger.error("Repository manifest not found!")
             self.error_found = True
@@ -852,8 +854,6 @@ class ArchiveChecker:
         else:
             self.manifest, _ = Manifest.load(repository, key=self.key)
         self.rebuild_refcounts(archive=archive, last=last, prefix=prefix)
-        if verify_data:
-            self.verify_data()
         self.orphan_chunks_check()
         self.finish(save_space=save_space)
         if self.error_found:

@@ -729,9 +729,6 @@ Number of files: {0.stats.nfiles}'''.format(
             number += 1
             self.add_item(item, show_progress=False)
             self.write_checkpoint()
-            # we have saved the part file, but we will reference the same chunks also from the final, complete file:
-            for chunk in item.chunks:
-                cache.chunk_incref(chunk.id, stats)
             return length, number
 
         item.chunks = []
@@ -745,12 +742,18 @@ Number of files: {0.stats.nfiles}'''.format(
                 from_chunk, part_number = write_part(item, from_chunk, part_number)
                 self.last_checkpoint = time.time()
         else:
-            if part_number > 1 and item.chunks[from_chunk:]:
-                # if we already have created a part item inside this file, we want to put the final
-                # chunks (if any) into a part item also (so all parts can be concatenated to get
-                # the complete file):
-                from_chunk, part_number = write_part(item, from_chunk, part_number)
-                self.last_checkpoint = time.time()
+            if part_number > 1:
+                if item.chunks[from_chunk:]:
+                    # if we already have created a part item inside this file, we want to put the final
+                    # chunks (if any) into a part item also (so all parts can be concatenated to get
+                    # the complete file):
+                    from_chunk, part_number = write_part(item, from_chunk, part_number)
+                    self.last_checkpoint = time.time()
+
+                # if we created part files, we have referenced all chunks from the part files,
+                # but we also will reference the same chunks also from the final, complete file:
+                for chunk in item.chunks:
+                    cache.chunk_incref(chunk.id, stats)
 
     def process_stdin(self, path, cache):
         uid, gid = 0, 0

@@ -3,7 +3,6 @@ import collections
 import functools
 import hashlib
 import inspect
-import io
 import logging
 import os
 import re
@@ -41,6 +40,7 @@ from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo
 from .helpers import log_multi
 from .helpers import parse_pattern, PatternMatcher, PathPrefixPattern
 from .helpers import signal_handler
+from .helpers import ErrorIgnoringTextIOWrapper
 from .item import Item
 from .key import key_creator, RepoKey, PassphraseKey
 from .platform import get_flags
@@ -73,13 +73,16 @@ def with_repository(fake=False, create=False, lock=True, exclusive=False, manife
         @functools.wraps(method)
         def wrapper(self, args, **kwargs):
             location = args.location  # note: 'location' must be always present in args
+            append_only = getattr(args, 'append_only', False)
             if argument(args, fake):
                 return method(self, args, repository=None, **kwargs)
             elif location.proto == 'ssh':
-                repository = RemoteRepository(location, create=create, lock_wait=self.lock_wait, lock=lock, args=args)
+                repository = RemoteRepository(location, create=create, lock_wait=self.lock_wait, lock=lock,
+                                              append_only=append_only, args=args)
             else:
                 repository = Repository(location.path, create=create, exclusive=argument(args, exclusive),
-                                        lock_wait=self.lock_wait, lock=lock)
+                                        lock_wait=self.lock_wait, lock=lock,
+                                        append_only=append_only)
             with repository:
                 if manifest or cache:
                     kwargs['manifest'], kwargs['key'] = Manifest.load(repository)
@@ -1047,7 +1050,7 @@ class Archiver:
         Cache.break_lock(repository)
         return self.exit_code
 
-    helptext = {}
+    helptext = collections.OrderedDict()
     helptext['patterns'] = textwrap.dedent('''
         Exclusion patterns support four separate styles, fnmatch, shell, regular
         expressions and path prefixes. By default, fnmatch is used. If followed
@@ -1304,6 +1307,8 @@ class Archiver:
         subparser.add_argument('-e', '--encryption', dest='encryption',
                                choices=('none', 'keyfile', 'repokey'), default='repokey',
                                help='select encryption key mode (default: "%(default)s")')
+        subparser.add_argument('-a', '--append-only', dest='append_only', action='store_true',
+                               help='create an append-only mode repository')
 
         check_epilog = textwrap.dedent("""
         The check command verifies the consistency of a repository and the corresponding archives.
@@ -1796,7 +1801,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='break repository and cache locks')
         subparser.set_defaults(func=self.do_break_lock)
-        subparser.add_argument('location', metavar='REPOSITORY',
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository for which to break the locks')
 
@@ -2251,8 +2256,8 @@ def main():  # pragma: no cover
 
     # Make sure stdout and stderr have errors='replace' to avoid unicode
     # issues when print()-ing unicode file names
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=True)
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, sys.stderr.encoding, 'replace', line_buffering=True)
+    sys.stdout = ErrorIgnoringTextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=True)
+    sys.stderr = ErrorIgnoringTextIOWrapper(sys.stderr.buffer, sys.stderr.encoding, 'replace', line_buffering=True)
     setup_signal_handlers()
     archiver = Archiver()
     msg = None

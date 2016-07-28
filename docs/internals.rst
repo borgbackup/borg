@@ -371,7 +371,7 @@ repository_id
 
 enc_key
   the key used to encrypt data with AES (256 bits)
-  
+
 enc_hmac_key
   the key used to HMAC the encrypted data (256 bits)
 

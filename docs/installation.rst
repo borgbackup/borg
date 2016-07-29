@@ -148,7 +148,7 @@ On some platforms additional features are supported:
 | Platform         | ACLs     | xattr     | Flags      |
 |                  | [#acls]_ | [#xattr]_ | [#flags]_  |
 +==================+==========+===========+============+
-| Linux x86        | Yes      | Yes       | No         |
+| Linux x86        | Yes      | Yes       | Yes [1]_   |
 +------------------+          |           |            |
 | Linux PowerPC    |          |           |            |
 +------------------+          |           |            |
@@ -177,7 +177,8 @@ Other Unix-like operating systems may work as well, but have not been tested at 
 Note that most of the platform-dependent features also depend on the file system.
 For example, ntfs-3g on Linux isn't able to convey NTFS ACLs.
 
-
+.. [1] Only "nodump", "immutable", "compressed" and "append" are supported.
+    Feature request :issue:`618` for more flags.
 .. [2] Feature request :issue:`1332`
 .. [3] Feature request :issue:`1337`
 .. [4] Cygwin tries to map NTFS ACLs to permissions with varying degress of success.
@@ -186,7 +187,8 @@ For example, ntfs-3g on Linux isn't able to convey NTFS ACLs.
     non-native ACLs. For example, NTFS ACLs aren't completely accessible on Linux with ntfs-3g.
 .. [#xattr] extended attributes; key-value pairs attached to a file, mainly used by the OS.
     This includes resource forks on Mac OS X.
-.. [#flags] aka *BSD flags*.
+.. [#flags] aka *BSD flags*. The Linux set of flags [1]_ is portable across platforms.
+    The BSDs define additional flags.
 
 .. _source-install:
 

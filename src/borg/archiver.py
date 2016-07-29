@@ -39,7 +39,7 @@ from .helpers import Manifest
 from .helpers import update_excludes, check_extension_modules
 from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo
 from .helpers import log_multi
-from .helpers import parse_pattern, PatternMatcher, PathPrefixPattern
+from .helpers import parse_pattern, parse_inclexcl_pattern, PatternMatcher, PathPrefixPattern, InclExclPattern
 from .helpers import signal_handler
 from .item import Item
 from .key import key_creator, RepoKey, PassphraseKey
@@ -151,10 +151,10 @@ class Archiver:
             bi += slicelen
 
     @staticmethod
-    def build_matcher(excludes, paths):
+    def build_matcher(inclexcl_patterns, paths):
         matcher = PatternMatcher()
-        if excludes:
-            matcher.add(excludes, False)
+        if inclexcl_patterns:
+            matcher.add_inclexcl(inclexcl_patterns)
         include_patterns = []
         if paths:
             include_patterns.extend(parse_pattern(i, PathPrefixPattern) for i in paths)
@@ -233,7 +233,7 @@ class Archiver:
         """Create new archive"""
         matcher = PatternMatcher(fallback=True)
         if args.excludes:
-            matcher.add(args.excludes, False)
+            matcher.add_inclexcl(args.excludes)
 
         def create_inner(archive, cache):
             # Add cache dir to inode_skip list
@@ -1095,6 +1095,13 @@ class Archiver:
             This pattern style is useful to match whole sub-directories. The pattern
             `pp:/data/bar` matches `/data/bar` and everything therein.
 
+        Include prefix `+`:
+        It is also possible to define inclusion patterns. This is useful to e.g.
+        exclude the contents of a directory except for some important files in this
+        directory. The first matching pattern is used so if an include pattern
+        matches before an exclude pattern, the file is backed up. For consistency,
+        exclude patterns may be prefixed with '-'.
+        
         Exclusions can be passed via the command line option `--exclude`. When used
         from within a shell the patterns should be quoted to protect them from
         expansion.
@@ -1134,7 +1141,14 @@ class Archiver:
             re:^/home/[^/]\.tmp/
             sh:/home/*/.thumbnails
             EOF
-            $ borg create --exclude-from exclude.txt backup /\n\n''')
+            $ borg create --exclude-from exclude.txt backup /
+
+            # exclude the contents of /data/docs/ but not /data/docs/pdf
+            $ borg create -e +/data/docs/pdf -e /data/docs/ backup /
+            # equivalent:
+            $ borg create -e +pm:/data/docs/pdf -e -pm:/data/docs/ backup /
+
+\n\n''')
     helptext['placeholders'] = textwrap.dedent('''
         Repository (or Archive) URLs and --prefix values support these placeholders:
 
@@ -1478,7 +1492,7 @@ class Archiver:
 
         exclude_group = subparser.add_argument_group('Exclusion options')
         exclude_group.add_argument('-e', '--exclude', dest='excludes',
-                                   type=parse_pattern, action='append',
+                                   type=parse_inclexcl_pattern, action='append',
                                    metavar="PATTERN", help='exclude paths matching PATTERN')
         exclude_group.add_argument('--exclude-from', dest='exclude_files',
                                    type=argparse.FileType('r'), action='append',
@@ -1570,7 +1584,7 @@ class Archiver:
                                default=False, action='store_true',
                                help='do not actually change any files')
         subparser.add_argument('-e', '--exclude', dest='excludes',
-                               type=parse_pattern, action='append',
+                               type=parse_inclexcl_pattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
         subparser.add_argument('--exclude-from', dest='exclude_files',
                                type=argparse.FileType('r'), action='append',
@@ -1617,7 +1631,7 @@ class Archiver:
                                           help='find differences in archive contents')
         subparser.set_defaults(func=self.do_diff)
         subparser.add_argument('-e', '--exclude', dest='excludes',
-                               type=parse_pattern, action='append',
+                               type=parse_inclexcl_pattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
         subparser.add_argument('--exclude-from', dest='exclude_files',
                                type=argparse.FileType('r'), action='append',
@@ -1716,7 +1730,7 @@ class Archiver:
         subparser.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec,
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('-e', '--exclude', dest='excludes',
-                               type=parse_pattern, action='append',
+                               type=parse_inclexcl_pattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
         subparser.add_argument('--exclude-from', dest='exclude_files',
                                type=argparse.FileType('r'), action='append',
@@ -2002,7 +2016,7 @@ class Archiver:
 
         exclude_group = subparser.add_argument_group('Exclusion options')
         exclude_group.add_argument('-e', '--exclude', dest='excludes',
-                                   type=parse_pattern, action='append',
+                                   type=parse_inclexcl_pattern, action='append',
                                    metavar="PATTERN", help='exclude paths matching PATTERN')
         exclude_group.add_argument('--exclude-from', dest='exclude_files',
                                    type=argparse.FileType('r'), action='append',

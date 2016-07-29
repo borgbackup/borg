@@ -225,10 +225,7 @@ During a backup a special checkpoint archive named ``<archive-name>.checkpoint``
 is saved every checkpoint interval (the default value for this is 30
 minutes) containing all the data backed-up until that point.
 
-Checkpoints only happen between files (so they don't help for interruptions
-happening while a very large file is being processed).
-
-This checkpoint archive is a valid archive (all files in it are valid and complete),
+This checkpoint archive is a valid archive,
 but it is only a partial backup (not all files that you wanted to backup are
 contained in it). Having it in the repo until a successful, full backup is
 completed is useful because it references all the transmitted chunks up
@@ -249,27 +246,25 @@ Once your backup has finished successfully, you can delete all
 ``<archive-name>.checkpoint`` archives. If you run ``borg prune``, it will
 also care for deleting unneeded checkpoints.
 
+Note: the checkpointing mechanism creates hidden, partial files in an archive,
+so that checkpoints even work while a big file is being processed.
+They are named ``<filename>.borg_part_<N>`` and all operations usually ignore
+these files, but you can make them considered by giving the option
+``--consider-part-files``. You usually only need that option if you are
+really desperate (e.g. if you have no completed backup of that file and you'ld
+rather get a partial file extracted than nothing). You do **not** want to give
+that option under any normal circumstances.
+
 How can I backup huge file(s) over a unstable connection?
 ---------------------------------------------------------
 
-You can use this "split trick" as a workaround for the in-between-files-only
-checkpoints (see above), huge files and a instable connection to the repository:
+This is not a problem any more, see previous FAQ item.
 
-Split the huge file(s) into parts of manageable size (e.g. 100MB) and create
-a temporary archive of them. Borg will create checkpoints now more frequently
-than if you try to backup the files in their original form (e.g. 100GB).
+How can I restore huge file(s) over a unstable connection?
+----------------------------------------------------------
 
-After that, you can remove the parts again and backup the huge file(s) in
-their original form. This will now work a lot faster as a lot of content chunks
-are already in the repository.
-
-After you have successfully backed up the huge original file(s), you can remove
-the temporary archive you made from the parts.
-
-We realize that this is just a better-than-nothing workaround, see :issue:`1198`
-for a potential solution.
-
-Please note that this workaround only helps you for backup, not for restore.
+If you can not manage to extract the whole big file in one go, you can extract
+all the part files (see above) and manually concatenate them together.
 
 If it crashes with a UnicodeError, what can I do?
 -------------------------------------------------

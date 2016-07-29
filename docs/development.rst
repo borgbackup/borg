@@ -23,9 +23,10 @@ Continuous Integration
 ----------------------
 
 All pull requests go through Travis-CI_, which runs the tests on Linux
-and Mac OS X as well as the flake8 style checker. Additional Unix-like platforms
-are tested on Golem_.
+and Mac OS X as well as the flake8 style checker. Windows builds run on AppVeyor_,
+while additional Unix-like platforms are tested on Golem_.
 
+.. _AppVeyor: https://ci.appveyor.com/project/borgbackup/borg/
 .. _Golem: https://golem.enkore.de/view/Borg/
 .. _Travis-CI: https://travis-ci.org/borgbackup/borg
 

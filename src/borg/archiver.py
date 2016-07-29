@@ -39,7 +39,7 @@ from .helpers import Manifest
 from .helpers import update_excludes, check_extension_modules
 from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo
 from .helpers import log_multi
-from .helpers import parse_pattern, parse_inclexcl_pattern, PatternMatcher, PathPrefixPattern, InclExclPattern
+from .helpers import parse_pattern, parse_inclexcl_pattern, PatternMatcher, PathPrefixPattern
 from .helpers import signal_handler
 from .item import Item
 from .key import key_creator, RepoKey, PassphraseKey

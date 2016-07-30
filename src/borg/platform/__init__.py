@@ -8,7 +8,7 @@ Public APIs are documented in platform.base.
 
 from .base import acl_get, acl_set
 from .base import set_flags, get_flags
-from .base import SyncFile, sync_dir, fdatasync
+from .base import SaveFile, SyncFile, sync_dir, fdatasync
 from .base import swidth, API_VERSION
 
 if sys.platform.startswith('linux'):  # pragma: linux only

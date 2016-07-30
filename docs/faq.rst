@@ -345,6 +345,30 @@ those files are reported as being added when, really, chunks are
 already used.
 
 
+It always chunks all my files, even unchanged ones!
+---------------------------------------------------
+
+|project_name| maintains a files cache where it remembers the mtime, size and
+inode of files. When |project_name| does a new backup and starts processing a
+file, it first looks whether the file has changed (compared to the values
+stored in the files cache). If the values are the same, the file is assumed
+unchanged and thus its contents won't get chunked (again).
+
+|project_name| can't keep an infinite history of files of course, thus entries
+in the files cache have a "maximum time to live" which is set via the
+environment variable BORG_FILES_CACHE_TTL (and defaults to 20).
+Every time you do a backup (on the same machine, using the same user), the
+cache entries' ttl values of files that were not "seen" are incremented by 1
+and if they reach BORG_FILES_CACHE_TTL, the entry is removed from the cache.
+
+So, for example, if you do daily backups of 26 different data sets A, B,
+C, ..., Z on one machine (using the default TTL), the files from A will be
+already forgotten when you repeat the same backups on the next day and it
+will be slow because it would chunk all the files each time. If you set
+BORG_FILES_CACHE_TTL to at least 26 (or maybe even a small multiple of that),
+it would be much faster.
+
+
 Is there a way to limit bandwidth with |project_name|?
 ------------------------------------------------------
 

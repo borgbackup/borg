@@ -193,12 +193,13 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not self.txn_active:
             return
         if self.files is not None:
+            ttl = int(os.environ.get('BORG_FILES_CACHE_TTL', 20))
             with open(os.path.join(self.path, 'files'), 'wb') as fd:
                 for path_hash, item in self.files.items():
                     # Discard cached files with the newest mtime to avoid
                     # issues with filesystem snapshots and mtime precision
                     item = msgpack.unpackb(item)
-                    if item[0] < 10 and bigint_to_int(item[3]) < self._newest_mtime:
+                    if item[0] < ttl and bigint_to_int(item[3]) < self._newest_mtime:
                         msgpack.pack((path_hash, item), fd)
         self.config.set('cache', 'manifest', hexlify(self.manifest.id).decode('ascii'))
         self.config.set('cache', 'timestamp', self.manifest.timestamp)

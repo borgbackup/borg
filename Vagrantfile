@@ -72,7 +72,7 @@ def packages_darwin
     brew install xz  # required for python lzma module
     brew install fakeroot
     brew install git
-    brew install pkgconfig
+    brew install pkg-config
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
   EOF
 end

@@ -228,6 +228,7 @@ Assuming you have installed homebrew_, the following steps will install all the
 dependencies::
 
     brew install python3 lz4 openssl
+    brew install pkg-config                            # optional, for FUSE support
     pip3 install virtualenv
 
 For FUSE support to mount the backup archives, you need at least version 3.0 of

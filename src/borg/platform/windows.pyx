@@ -372,7 +372,7 @@ def get_ads(path):
         ret.append(PyUnicode_FromWideChar(data.cStreamName, -1))
     errno = GetLastError()
     if errno != 38:
-        print(errno)
+        raise_error('FindNextStreamW', path)
 
     FindClose(searchHandle)
     PyMem_Free(cstrPath)

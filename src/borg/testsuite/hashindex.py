@@ -122,6 +122,21 @@ class HashIndexTestCase(BaseTestCase):
         assert unique_chunks == 3
 
 
+class HashIndexSizeTestCase(BaseTestCase):
+    def test_size_on_disk(self):
+        idx = ChunkIndex()
+        assert idx.size() == 18 + 1031 * (32 + 3 * 4)
+
+    def test_size_on_disk_accurate(self):
+        idx = ChunkIndex()
+        for i in range(1234):
+            idx[H(i)] = i, i**2, i**3
+        with tempfile.NamedTemporaryFile() as file:
+            idx.write(file.name)
+            size = os.path.getsize(file.name)
+        assert idx.size() == size
+
+
 class HashIndexRefcountingTestCase(BaseTestCase):
     def test_chunkindex_limit(self):
         idx = ChunkIndex()

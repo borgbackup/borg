@@ -170,12 +170,12 @@ class RemoteRepository:
         self.x_fds = [self.stdin_fd, self.stdout_fd, self.stderr_fd]
 
         try:
-            version = self.call('negotiate', RPC_PROTOCOL_VERSION)
-        except ConnectionClosed:
-            raise ConnectionClosedWithHint('Is borg working on the server?') from None
-        if version != RPC_PROTOCOL_VERSION:
-            raise Exception('Server insisted on using unsupported protocol version %d' % version)
-        try:
+            try:
+                version = self.call('negotiate', RPC_PROTOCOL_VERSION)
+            except ConnectionClosed:
+                raise ConnectionClosedWithHint('Is borg working on the server?') from None
+            if version != RPC_PROTOCOL_VERSION:
+                raise Exception('Server insisted on using unsupported protocol version %d' % version)
             # Because of protocol versions, only send append_only if necessary
             if append_only:
                 try:

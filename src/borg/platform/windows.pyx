@@ -3,7 +3,7 @@
 import json
 import os.path
 from libc.stddef cimport wchar_t
-from libc.stdint cimport uint16_t, uint32_t, uint64_t
+from libc.stdint cimport uint16_t, uint32_t, uint64_t, int64_t
 cimport cpython.array
 import array
 
@@ -34,6 +34,7 @@ cdef extern from 'windows.h':
     ctypedef DWORD* LPDWORD
     ctypedef int BOOL
     ctypedef BYTE* PSID
+    ctypedef void* HANDLE
     struct _ACL:
         uint16_t AceCount
         
@@ -49,12 +50,24 @@ cdef extern from 'windows.h':
         SidTypeComputer,
         SidTypeLabel
 
+    cdef enum _STREAM_INFO_LEVELS:
+        FindStreamInfoStandard
+
+    struct _LARGE_INTEGER:
+        int64_t QuadPart
+    struct _WIN32_FIND_STREAM_DATA:
+        _LARGE_INTEGER StreamSize
+        wchar_t[296] cStreamName # MAX_PATH + 36
+
     HLOCAL LocalFree(HLOCAL)
     DWORD GetLastError();
     void SetLastError(DWORD)
 
     DWORD FormatMessageW(DWORD, void*, DWORD, DWORD, wchar_t*, DWORD, void*)
 
+    HANDLE FindFirstStreamW(wchar_t*, _STREAM_INFO_LEVELS, void*, DWORD)
+    BOOL FindNextStreamW(HANDLE, void*)
+    BOOL FindClose(HANDLE)
 
     BOOL InitializeSecurityDescriptor(BYTE*, DWORD)
 
@@ -84,6 +97,7 @@ cdef extern from 'windows.h':
     cdef extern int FORMAT_MESSAGE_FROM_SYSTEM
     cdef extern int FORMAT_MESSAGE_IGNORE_INSERTS
 
+    cdef extern int INVALID_HANDLE_VALUE
 
 cdef extern from 'accctrl.h':
     ctypedef enum _SE_OBJECT_TYPE:
@@ -345,3 +359,21 @@ def sync_dir(path):
     # TODO
     pass
 
+def get_ads(path):
+    ret = []
+    cdef _WIN32_FIND_STREAM_DATA data
+    cdef wchar_t* cstrPath = PyUnicode_AsWideCharString(path, NULL)
+    cdef HANDLE searchHandle = FindFirstStreamW(cstrPath, FindStreamInfoStandard, <void*>&data, 0)
+    if searchHandle == <HANDLE>INVALID_HANDLE_VALUE:
+        PyMem_Free(cstrPath)
+        return []
+    ret.append(PyUnicode_FromWideChar(data.cStreamName, -1))
+    while FindNextStreamW(searchHandle, <void*>&data) != 0:
+        ret.append(PyUnicode_FromWideChar(data.cStreamName, -1))
+    errno = GetLastError()
+    if errno != 38:
+        print(errno)
+
+    FindClose(searchHandle)
+    PyMem_Free(cstrPath)
+    return ret

@@ -1101,7 +1101,7 @@ class Archiver:
         directory. The first matching pattern is used so if an include pattern
         matches before an exclude pattern, the file is backed up. For consistency,
         exclude patterns may be prefixed with '-'.
-        
+
         Exclusions can be passed via the command line option `--exclude`. When used
         from within a shell the patterns should be quoted to protect them from
         expansion.

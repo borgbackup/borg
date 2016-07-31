@@ -31,7 +31,7 @@ Can I copy or synchronize my repo to another location?
 ------------------------------------------------------
 
 Yes, you could just copy all the files. Make sure you do that while no
-backup is running. So what you get here is this:
+backup is running (use `borg with-lock ...`). So what you get here is this:
 
 - client machine ---borg create---> repo1
 - repo1 ---copy---> repo2

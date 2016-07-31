@@ -367,17 +367,6 @@ Examples
     -rw-rw-r-- user   user    1416192 Sun, 2015-02-01 11:00:00 code/myproject/file.ext
     ...
 
-    # see what is changed between archives, based on file modification time, size and file path
-    $ borg list /path/to/repo::archiveA --list-format="{mtime:%s}{TAB}{size}{TAB}{path}{LF}" |sort -n > /tmp/list.archiveA
-    $ borg list /path/to/repo::archiveB --list-format="{mtime:%s}{TAB}{size}{TAB}{path}{LF}" |sort -n > /tmp/list.archiveB
-    $ diff -y /tmp/list.archiveA /tmp/list.archiveB
-    1422781200      0       .                                       1422781200      0       .
-    1422781200      0       code                                    1422781200      0       code
-    1422781200      0       code/myproject                          1422781200      0       code/myproject
-    1422781200      1416192 code/myproject/file.ext               | 1454664653      1416192 code/myproject/file.ext
-    ...
-
-
 
 .. include:: usage/diff.rst.inc
 

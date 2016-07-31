@@ -19,6 +19,7 @@ logger = create_logger()
 from . import xattr
 from .cache import ChunkListEntry
 from .chunker import Chunker
+from .compress import Compressor
 from .constants import *  # NOQA
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Manifest
@@ -1298,7 +1299,7 @@ class ArchiveRecreater:
 
     def __init__(self, repository, manifest, key, cache, matcher,
                  exclude_caches=False, exclude_if_present=None, keep_tag_files=False,
-                 chunker_params=None, compression=None, compression_files=None,
+                 chunker_params=None, compression=None, compression_files=None, always_recompress=False,
                  dry_run=False, stats=False, progress=False, file_status_printer=None):
         self.repository = repository
         self.key = key
@@ -1312,10 +1313,11 @@ class ArchiveRecreater:
 
         self.chunker_params = chunker_params or CHUNKER_PARAMS
         self.recompress = bool(compression)
+        self.always_recompress = always_recompress
         self.compression = compression or CompressionSpec('none')
         self.seen_chunks = set()
         self.compression_decider1 = CompressionDecider1(compression or CompressionSpec('none'),
-                                                            compression_files or [])
+                                                        compression_files or [])
         key.compression_decider2 = CompressionDecider2(compression or CompressionSpec('none'))
 
         self.autocommit_threshold = max(self.AUTOCOMMIT_THRESHOLD, self.cache.chunks_stored_size() / 100)
@@ -1404,7 +1406,6 @@ class ArchiveRecreater:
 
     def process_chunks(self, archive, target, item):
         """Return new chunk ID list for 'item'."""
-        # TODO: support --compression-from
         if not self.recompress and not target.recreate_rechunkify:
             for chunk_id, size, csize in item.chunks:
                 self.cache.chunk_incref(chunk_id, target.stats)
@@ -1412,13 +1413,22 @@ class ArchiveRecreater:
         new_chunks = self.process_partial_chunks(target)
         chunk_iterator = self.create_chunk_iterator(archive, target, item)
         consume(chunk_iterator, len(new_chunks))
+        compress = self.compression_decider1.decide(item.path)
         for chunk in chunk_iterator:
+            chunk.meta['compress'] = compress
             chunk_id = self.key.id_hash(chunk.data)
             if chunk_id in self.seen_chunks:
                 new_chunks.append(self.cache.chunk_incref(chunk_id, target.stats))
             else:
-                # TODO: detect / skip / --always-recompress
-                chunk_id, size, csize = self.cache.add_chunk(chunk_id, chunk, target.stats, overwrite=self.recompress)
+                compression_spec, chunk = self.key.compression_decider2.decide(chunk)
+                overwrite = self.recompress
+                if self.recompress and not self.always_recompress and chunk_id in self.cache.chunks:
+                    # Check if this chunk is already compressed the way we want it
+                    old_chunk = self.key.decrypt(None, self.repository.get(chunk_id), decompress=False)
+                    if Compressor.detect(old_chunk.data).name == compression_spec['name']:
+                        # Stored chunk has the same compression we wanted
+                        overwrite = False
+                chunk_id, size, csize = self.cache.add_chunk(chunk_id, chunk, target.stats, overwrite=overwrite)
                 new_chunks.append((chunk_id, size, csize))
                 self.seen_chunks.add(chunk_id)
                 if self.recompress:

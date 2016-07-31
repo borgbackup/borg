@@ -957,6 +957,7 @@ class Archiver:
                                      exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
                                      keep_tag_files=args.keep_tag_files, chunker_params=args.chunker_params,
                                      compression=args.compression, compression_files=args.compression_files,
+                                     always_recompress=args.always_recompress,
                                      progress=args.progress, stats=args.stats,
                                      file_status_printer=self.print_file_status,
                                      dry_run=args.dry_run)
@@ -2098,6 +2099,9 @@ class Archiver:
                                         'zlib,0 .. zlib,9 == zlib (with level 0..9),\n'
                                         'lzma == lzma (default level 6),\n'
                                         'lzma,0 .. lzma,9 == lzma (with level 0..9).')
+        archive_group.add_argument('--always-recompress', dest='always_recompress', action='store_true',
+                                   help='always recompress chunks, don\'t skip chunks already compressed with the same'
+                                        'algorithm.')
         archive_group.add_argument('--compression-from', dest='compression_files',
                                    type=argparse.FileType('r'), action='append',
                                    metavar='COMPRESSIONCONFIG', help='read compression patterns from COMPRESSIONCONFIG, one per line')

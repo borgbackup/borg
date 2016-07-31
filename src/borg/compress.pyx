@@ -194,9 +194,14 @@ class Compressor:
         return self.compressor.compress(data)
 
     def decompress(self, data):
+        compressor_cls = self.detect(data)
+        return compressor_cls(**self.params).decompress(data)
+
+    @staticmethod
+    def detect(data):
         hdr = bytes(data[:2])  # detect() does not work with memoryview
         for cls in COMPRESSOR_LIST:
             if cls.detect(hdr):
-                return cls(**self.params).decompress(data)
+                return cls
         else:
             raise ValueError('No decompressor for this data found: %r.', data[:2])

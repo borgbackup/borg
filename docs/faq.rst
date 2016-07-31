@@ -414,6 +414,25 @@ If you can reproduce the issue with the proven filesystem, please file an
 issue in the |project_name| issue tracker about that.
 
 
+Requirements for the borg single-file binary, esp. (g)libc?
+-----------------------------------------------------------
+
+We try to build the binary on old, but still supported systems - to keep the
+minimum requirement for the (g)libc low. The (g)libc can't be bundled into
+the binary as it needs to fit your kernel and OS, but Python and all other
+required libraries will be bundled into the binary.
+
+If your system fulfills the minimum (g)libc requirement (see the README that
+is released with the binary), there should be no problem. If you are slightly
+below the required version, maybe just try. Due to the dynamic loading (or not
+loading) of some shared libraries, it might still work depending on what
+libraries are actually loaded and used.
+
+In the borg git repository, there is scripts/glibc_check.py that can determine
+(based on the symbols' versions they want to link to) whether a set of given
+(Linux) binaries works with a given glibc version.
+
+
 Why was Borg forked from Attic?
 -------------------------------
 

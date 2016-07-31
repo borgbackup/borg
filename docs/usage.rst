@@ -86,6 +86,9 @@ General:
     BORG_REMOTE_PATH
         When set, use the given path/filename as remote path (default is "borg").
         Using ``--remote-path PATH`` commandline option overrides the environment variable.
+    BORG_FILES_CACHE_TTL
+        When set to a numeric value, this determines the maximum "time to live" for the files cache
+        entries (default: 20). The files cache is used to quickly determine whether a file is unchanged.
     TMPDIR
         where temporary files are stored (might need a lot of temporary space for some operations)
 

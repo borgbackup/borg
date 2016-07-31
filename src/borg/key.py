@@ -105,7 +105,7 @@ class KeyBase:
     def encrypt(self, chunk):
         pass
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, decompress=True):
         pass
 
 
@@ -130,10 +130,13 @@ class PlaintextKey(KeyBase):
         chunk = self.compress(chunk)
         return b''.join([self.TYPE_STR, chunk.data])
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, decompress=True):
         if data[0] != self.TYPE:
             raise IntegrityError('Invalid encryption envelope')
-        data = self.compressor.decompress(memoryview(data)[1:])
+        payload = memoryview(data)[1:]
+        if not decompress:
+            return Chunk(payload)
+        data = self.compressor.decompress(payload)
         if id and sha256(data).digest() != id:
             raise IntegrityError('Chunk id verification failed')
         return Chunk(data)
@@ -166,7 +169,7 @@ class AESKeyBase(KeyBase):
         hmac = hmac_sha256(self.enc_hmac_key, data)
         return b''.join((self.TYPE_STR, hmac, data))
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, decompress=True):
         if not (data[0] == self.TYPE or
             data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             raise IntegrityError('Invalid encryption envelope')
@@ -176,7 +179,10 @@ class AESKeyBase(KeyBase):
         if not compare_digest(hmac_computed, hmac_given):
             raise IntegrityError('Encryption envelope checksum mismatch')
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
-        data = self.compressor.decompress(self.dec_cipher.decrypt(data_view[41:]))
+        payload = self.dec_cipher.decrypt(data_view[41:])
+        if not decompress:
+            return Chunk(payload)
+        data = self.compressor.decompress(payload)
         if id:
             hmac_given = id
             hmac_computed = hmac_sha256(self.id_key, data)

@@ -345,9 +345,6 @@ class RemoteRepository:
             self.name = name
             self.remote_type = remote_type
 
-    class NoAppendOnlyOnServer(Error):
-        """Server does not support --append-only."""
-
     class RPCServerOutdated(Error):
         """Borg server is too old for {}. Required version {}"""
 
@@ -412,13 +409,20 @@ class RemoteRepository:
             else:
                 raise Exception('Server insisted on using unsupported protocol version %s' % version)
 
-            try:
-                self.id = self.call('open', {'path': self.location.path, 'create': create, 'lock_wait': lock_wait,
-                                              'lock': lock, 'exclusive': exclusive, 'append_only': append_only})
-            except self.RPCError as err:
-                if self.dictFormat or err.remote_type != 'TypeError':
-                    raise
-                msg = """\
+            def do_open():
+                self.id = self.open(path=self.location.path, create=create, lock_wait=lock_wait,
+                                lock=lock, exclusive=exclusive, append_only=append_only)
+
+            if self.dictFormat:
+                do_open()
+            else:
+                # Ugly detection of versions prior to 1.0.7: If open throws it has to be 1.0.6 or lower
+                try:
+                    do_open()
+                except self.RPCError as err:
+                    if err.remote_type != 'TypeError':
+                        raise
+                    msg = """\
 Please note:
 If you see a TypeError complaining about the number of positional arguments
 given to open(), you can ignore it if it comes from a borg version < 1.0.7.
@@ -426,13 +430,12 @@ This TypeError is a cosmetic side effect of the compatibility code borg
 clients >= 1.0.7 have to support older borg servers.
 This problem will go away as soon as the server has been upgraded to 1.0.7+.
 """
-                # emit this msg in the same way as the 'Remote: ...' lines that show the remote TypeError
-                sys.stderr.write(msg)
-                if append_only:
-                    raise self.NoAppendOnlyOnServer()
-                compatMap['open'] = ('path', 'create', 'lock_wait', 'lock', )
-                self.id = self.call('open', {'path': self.location.path, 'create': create, 'lock_wait': lock_wait,
-                                              'lock': lock, 'exclusive': exclusive, 'append_only': append_only})
+                    # emit this msg in the same way as the 'Remote: ...' lines that show the remote TypeError
+                    sys.stderr.write(msg)
+                    self.server_version = parse_version('1.0.6')
+                    compatMap['open'] = ('path', 'create', 'lock_wait', 'lock', ),
+                    # try again with corrected version and compatMap
+                    do_open()
         except Exception:
             self.close()
             raise
@@ -629,6 +632,11 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                         if e.errno != errno.EAGAIN:
                             raise
         self.ignore_responses |= set(waiting_for)
+
+    @api(since=parse_version('1.0.0'),
+         append_only={'since': parse_version('1.0.7'), 'previously': False})
+    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=False, append_only=False):
+        """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version('1.0.0'))
     def check(self, repair=False, save_space=False):

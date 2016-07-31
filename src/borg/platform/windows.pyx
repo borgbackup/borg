@@ -77,6 +77,7 @@ cdef extern from 'windows.h':
     cdef extern int ERROR_INSUFFICIENT_BUFFER
     cdef extern int ERROR_INVALID_SID
     cdef extern int ERROR_NONE_MAPPED
+    cdef extern int ERROR_HANDLE_EOF
 
     cdef extern int OWNER_SECURITY_INFORMATION
     cdef extern int GROUP_SECURITY_INFORMATION
@@ -359,6 +360,7 @@ def sync_dir(path):
     # TODO
     pass
 
+
 def get_ads(path):
     ret = []
     cdef _WIN32_FIND_STREAM_DATA data
@@ -371,7 +373,7 @@ def get_ads(path):
     while FindNextStreamW(searchHandle, <void*>&data) != 0:
         ret.append(PyUnicode_FromWideChar(data.cStreamName, -1))
     errno = GetLastError()
-    if errno != 38:
+    if errno != ERROR_HANDLE_EOF:
         raise_error('FindNextStreamW', path)
 
     FindClose(searchHandle)

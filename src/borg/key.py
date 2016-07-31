@@ -108,6 +108,12 @@ class KeyBase:
     def decrypt(self, id, data, decompress=True):
         pass
 
+    def assert_id(self, id, data):
+        if id:
+            id_computed = self.id_hash(data)
+            if not compare_digest(id_computed, id):
+                raise IntegrityError('Chunk id verification failed')
+
 
 class PlaintextKey(KeyBase):
     TYPE = 0x02
@@ -137,8 +143,7 @@ class PlaintextKey(KeyBase):
         if not decompress:
             return Chunk(payload)
         data = self.compressor.decompress(payload)
-        if id and sha256(data).digest() != id:
-            raise IntegrityError('Chunk id verification failed')
+        self.assert_id(id, data)
         return Chunk(data)
 
 
@@ -183,11 +188,7 @@ class AESKeyBase(KeyBase):
         if not decompress:
             return Chunk(payload)
         data = self.compressor.decompress(payload)
-        if id:
-            hmac_given = id
-            hmac_computed = hmac_sha256(self.id_key, data)
-            if not compare_digest(hmac_computed, hmac_given):
-                raise IntegrityError('Chunk id verification failed')
+        self.assert_id(id, data)
         return Chunk(data)
 
     def extract_nonce(self, payload):

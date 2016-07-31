@@ -169,6 +169,18 @@ class TestKey:
         assert key.decrypt(None, encrypted, decompress=False) != plaintext
         assert key.decrypt(None, encrypted) == plaintext
 
+    def test_assert_id(self, key):
+        plaintext = b'123456789'
+        id = key.id_hash(plaintext)
+        key.assert_id(id, plaintext)
+        id_changed = bytearray(id)
+        id_changed[0] += 1
+        with pytest.raises(IntegrityError):
+            key.assert_id(id_changed, plaintext)
+        plaintext_changed = plaintext + b'1'
+        with pytest.raises(IntegrityError):
+            key.assert_id(id, plaintext_changed)
+
 
 class TestPassphrase:
     def test_passphrase_new_verification(self, capsys, monkeypatch):

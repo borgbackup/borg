@@ -324,9 +324,10 @@ class Archiver:
                 return
         if (st.st_ino, st.st_dev) in skip_inodes:
             return
-        # Entering a new filesystem?
-        if restrict_dev is not None and st.st_dev != restrict_dev:
-            return
+        # if restrict_dev is given, we do not want to recurse into a new filesystem,
+        # but we WILL save the mountpoint directory (or more precise: the root
+        # directory of the mounted filesystem that shadows the mountpoint dir).
+        recurse = restrict_dev is None or st.st_dev == restrict_dev
         status = None
         # Ignore if nodump flag is set
         try:
@@ -344,28 +345,30 @@ class Archiver:
                     status = 'E'
                     self.print_warning('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
-            tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)
-            if tag_paths:
-                if keep_tag_files and not dry_run:
-                    archive.process_dir(path, st)
-                    for tag_path in tag_paths:
-                        self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
-                                      keep_tag_files, skip_inodes, tag_path, restrict_dev,
-                                      read_special=read_special, dry_run=dry_run)
-                return
+            if recurse:
+                tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)
+                if tag_paths:
+                    if keep_tag_files and not dry_run:
+                        archive.process_dir(path, st)
+                        for tag_path in tag_paths:
+                            self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
+                                          keep_tag_files, skip_inodes, tag_path, restrict_dev,
+                                          read_special=read_special, dry_run=dry_run)
+                    return
             if not dry_run:
                 status = archive.process_dir(path, st)
-            try:
-                entries = helpers.scandir_inorder(path)
-            except OSError as e:
-                status = 'E'
-                self.print_warning('%s: %s', path, e)
-            else:
-                for dirent in entries:
-                    normpath = os.path.normpath(dirent.path)
-                    self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
-                                  keep_tag_files, skip_inodes, normpath, restrict_dev,
-                                  read_special=read_special, dry_run=dry_run)
+            if recurse:
+                try:
+                    entries = helpers.scandir_inorder(path)
+                except OSError as e:
+                    status = 'E'
+                    self.print_warning('%s: %s', path, e)
+                else:
+                    for dirent in entries:
+                        normpath = os.path.normpath(dirent.path)
+                        self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
+                                      keep_tag_files, skip_inodes, normpath, restrict_dev,
+                                      read_special=read_special, dry_run=dry_run)
         elif stat.S_ISLNK(st.st_mode):
             if not dry_run:
                 if not read_special:

@@ -15,6 +15,7 @@ from .helpers import Error, IntegrityError
 from .helpers import get_home_dir
 from .helpers import sysinfo
 from .helpers import bin_to_hex
+from .helpers import replace_placeholders
 from .repository import Repository
 
 RPC_PROTOCOL_VERSION = 2
@@ -163,6 +164,7 @@ class RemoteRepository:
             # that the system's ssh binary picks up (non-matching) libraries from there
             env.pop('LD_LIBRARY_PATH', None)
         env.pop('BORG_PASSPHRASE', None)  # security: do not give secrets to subprocess
+        env['BORG_VERSION'] = __version__
         self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()
@@ -243,6 +245,7 @@ class RemoteRepository:
             return [sys.executable, '-m', 'borg.archiver', 'serve'] + opts + self.extra_test_args
         else:  # pragma: no cover
             remote_path = args.remote_path or os.environ.get('BORG_REMOTE_PATH', 'borg')
+            remote_path = replace_placeholders(remote_path)
             return [remote_path, 'serve'] + opts
 
     def ssh_cmd(self, location):

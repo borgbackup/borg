@@ -118,6 +118,78 @@ the old version using the same steps as shown above.
 .. _pyinstaller: http://www.pyinstaller.org
 .. _releases: https://github.com/borgbackup/borg/releases
 
+.. _platforms:
+
+Features & platforms
+--------------------
+
+Besides regular file and directory structures, |project_name| can preserve
+
+    * Hardlinks (considering all files in the same archive)
+    * Symlinks (stored as symlink, the symlink is not followed)
+    * Special files:
+
+        * Character and block device files (restored via mknod)
+        * FIFOs ("named pipes")
+        * Special file *contents* can be backed up in ``--read-special`` mode.
+          By default the metadata to create them with mknod(2), mkfifo(2) etc. is stored.
+    * Timestamps in nanosecond precision: mtime, atime, ctime
+    * Permissions:
+
+        * IDs of owning user and owning group
+        * Names of owning user and owning group (if the IDs can be resolved)
+        * Unix Mode/Permissions (u/g/o permissions, suid, sgid, sticky)
+
+On some platforms additional features are supported:
+
+.. Yes/No's are grouped by reason/mechanism/reference.
+
++------------------+----------+-----------+------------+
+| Platform         | ACLs     | xattr     | Flags      |
+|                  | [#acls]_ | [#xattr]_ | [#flags]_  |
++==================+==========+===========+============+
+| Linux x86        | Yes      | Yes       | Yes [1]_   |
++------------------+          |           |            |
+| Linux PowerPC    |          |           |            |
++------------------+          |           |            |
+| Linux ARM        |          |           |            |
++------------------+----------+-----------+------------+
+| Mac OS X         | Yes      | Yes       | Yes (all)  |
++------------------+----------+-----------+            |
+| FreeBSD          | Yes      | Yes       |            |
++------------------+----------+-----------+            |
+| OpenBSD          | n/a      | n/a       |            |
++------------------+----------+-----------+            |
+| NetBSD           | n/a      | No [2]_   |            |
++------------------+----------+-----------+------------+
+| Solaris 11       | No [3]_              | n/a        |
++------------------+                      |            |
+| OpenIndiana      |                      |            |
++------------------+----------+-----------+------------+
+| Windows (cygwin) | No [4]_  | No        | No         |
++------------------+----------+-----------+------------+
+
+Some Distributions (e.g. Debian) run additional tests after each release, these
+are not reflected here.
+
+Other Unix-like operating systems may work as well, but have not been tested at all.
+
+Note that most of the platform-dependent features also depend on the file system.
+For example, ntfs-3g on Linux isn't able to convey NTFS ACLs.
+
+.. [1] Only "nodump", "immutable", "compressed" and "append" are supported.
+    Feature request :issue:`618` for more flags.
+.. [2] Feature request :issue:`1332`
+.. [3] Feature request :issue:`1337`
+.. [4] Cygwin tries to map NTFS ACLs to permissions with varying degress of success.
+
+.. [#acls] The native access control list mechanism of the OS. This normally limits access to
+    non-native ACLs. For example, NTFS ACLs aren't completely accessible on Linux with ntfs-3g.
+.. [#xattr] extended attributes; key-value pairs attached to a file, mainly used by the OS.
+    This includes resource forks on Mac OS X.
+.. [#flags] aka *BSD flags*. The Linux set of flags [1]_ is portable across platforms.
+    The BSDs define additional flags.
+
 .. _source-install:
 
 From Source
@@ -211,7 +283,7 @@ and commands to make fuse work for using the mount command.
      echo 'vfs.usermount=1' >> /etc/sysctl.conf
      kldload fuse
      sysctl vfs.usermount=1
-    
+
 
 Cygwin
 ++++++

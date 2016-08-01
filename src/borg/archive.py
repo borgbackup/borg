@@ -231,7 +231,8 @@ class Archive:
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False, progress=False,
-                 chunker_params=CHUNKER_PARAMS, start=None, end=None, compression=None, compression_files=None):
+                 chunker_params=CHUNKER_PARAMS, start=None, end=None, compression=None, compression_files=None,
+                 consider_part_files=False):
         self.cwd = os.getcwd()
         self.key = key
         self.repository = repository
@@ -250,6 +251,7 @@ class Archive:
         if end is None:
             end = datetime.utcnow()
         self.end = end
+        self.consider_part_files = consider_part_files
         self.pipeline = DownloadPipeline(self.repository, self.key)
         if create:
             self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
@@ -327,17 +329,21 @@ Number of files: {0.stats.nfiles}'''.format(
     def __repr__(self):
         return 'Archive(%r)' % self.name
 
+    def item_filter(self, item, filter=None):
+        if not self.consider_part_files and 'part' in item:
+            # this is a part(ial) file, we usually don't want to consider it.
+            return False
+        return filter(item) if filter else True
+
     def iter_items(self, filter=None, preload=False):
-        for item in self.pipeline.unpack_many(self.metadata[b'items'], filter=filter, preload=preload):
+        for item in self.pipeline.unpack_many(self.metadata[b'items'], preload=preload,
+                                              filter=lambda item: self.item_filter(item, filter)):
             yield item
 
-    def add_item(self, item):
-        if self.show_progress:
+    def add_item(self, item, show_progress=True):
+        if show_progress and self.show_progress:
             self.stats.show_progress(item=item, dt=0.2)
         self.items_buffer.add(item)
-        if self.checkpoint_interval and time.time() - self.last_checkpoint > self.checkpoint_interval:
-            self.write_checkpoint()
-            self.last_checkpoint = time.time()
 
     def write_checkpoint(self):
         self.save(self.checkpoint_name)
@@ -651,17 +657,24 @@ Number of files: {0.stats.nfiles}'''.format(
             logger.warning('forced deletion succeeded, but the deleted archive was corrupted.')
             logger.warning('borg check --repair is required to free all space.')
 
-    def stat_attrs(self, st, path):
+    def stat_simple_attrs(self, st):
         attrs = dict(
             mode=st.st_mode,
-            uid=st.st_uid, user=uid2user(st.st_uid),
-            gid=st.st_gid, group=gid2group(st.st_gid),
+            uid=st.st_uid,
+            gid=st.st_gid,
             atime=st.st_atime_ns,
             ctime=st.st_ctime_ns,
             mtime=st.st_mtime_ns,
         )
         if self.numeric_owner:
             attrs['user'] = attrs['group'] = None
+        else:
+            attrs['user'] = uid2user(st.st_uid)
+            attrs['group'] = gid2group(st.st_gid)
+        return attrs
+
+    def stat_ext_attrs(self, st, path):
+        attrs = {}
         with backup_io():
             xattrs = xattr.get_all(path, follow_symlinks=False)
             bsdflags = get_flags(path, st)
@@ -670,6 +683,11 @@ Number of files: {0.stats.nfiles}'''.format(
             attrs['xattrs'] = StableDict(xattrs)
         if bsdflags:
             attrs['bsdflags'] = bsdflags
+        return attrs
+
+    def stat_attrs(self, st, path):
+        attrs = self.stat_simple_attrs(st)
+        attrs.update(self.stat_ext_attrs(st, path))
         return attrs
 
     def process_dir(self, path, st):
@@ -700,22 +718,56 @@ Number of files: {0.stats.nfiles}'''.format(
         self.add_item(item)
         return 's'  # symlink
 
+    def chunk_file(self, item, cache, stats, fd, fh=-1, **chunk_kw):
+        def write_part(item, from_chunk, number):
+            item = Item(internal_dict=item.as_dict())
+            length = len(item.chunks)
+            # the item should only have the *additional* chunks we processed after the last partial item:
+            item.chunks = item.chunks[from_chunk:]
+            item.path += '.borg_part_%d' % number
+            item.part = number
+            number += 1
+            self.add_item(item, show_progress=False)
+            self.write_checkpoint()
+            return length, number
+
+        item.chunks = []
+        from_chunk = 0
+        part_number = 1
+        for data in backup_io_iter(self.chunker.chunkify(fd, fh)):
+            item.chunks.append(cache.add_chunk(self.key.id_hash(data), Chunk(data, **chunk_kw), stats))
+            if self.show_progress:
+                self.stats.show_progress(item=item, dt=0.2)
+            if self.checkpoint_interval and time.time() - self.last_checkpoint > self.checkpoint_interval:
+                from_chunk, part_number = write_part(item, from_chunk, part_number)
+                self.last_checkpoint = time.time()
+        else:
+            if part_number > 1:
+                if item.chunks[from_chunk:]:
+                    # if we already have created a part item inside this file, we want to put the final
+                    # chunks (if any) into a part item also (so all parts can be concatenated to get
+                    # the complete file):
+                    from_chunk, part_number = write_part(item, from_chunk, part_number)
+                    self.last_checkpoint = time.time()
+
+                # if we created part files, we have referenced all chunks from the part files,
+                # but we also will reference the same chunks also from the final, complete file:
+                for chunk in item.chunks:
+                    cache.chunk_incref(chunk.id, stats)
+
     def process_stdin(self, path, cache):
         uid, gid = 0, 0
-        fd = sys.stdin.buffer  # binary
-        chunks = []
-        for data in backup_io_iter(self.chunker.chunkify(fd)):
-            chunks.append(cache.add_chunk(self.key.id_hash(data), Chunk(data), self.stats))
-        self.stats.nfiles += 1
         t = int(time.time()) * 1000000000
         item = Item(
             path=path,
-            chunks=chunks,
             mode=0o100660,  # regular file, ug=rw
             uid=uid, user=uid2user(uid),
             gid=gid, group=gid2group(gid),
             mtime=t, atime=t, ctime=t,
         )
+        fd = sys.stdin.buffer  # binary
+        self.chunk_file(item, cache, self.stats, fd)
+        self.stats.nfiles += 1
         self.add_item(item)
         return 'i'  # stdin
 
@@ -760,26 +812,22 @@ Number of files: {0.stats.nfiles}'''.format(
             path=safe_path,
             hardlink_master=st.st_nlink > 1,  # item is a hard link and has the chunks
         )
+        item.update(self.stat_simple_attrs(st))
         # Only chunkify the file if needed
-        if chunks is None:
+        if chunks is not None:
+            item.chunks = chunks
+        else:
             compress = self.compression_decider1.decide(path)
             logger.debug('%s -> compression %s', path, compress['name'])
             with backup_io():
                 fh = Archive._open_rb(path)
             with os.fdopen(fh, 'rb') as fd:
-                chunks = []
-                for data in backup_io_iter(self.chunker.chunkify(fd, fh)):
-                    chunks.append(cache.add_chunk(self.key.id_hash(data),
-                                                  Chunk(data, compress=compress),
-                                                  self.stats))
-                    if self.show_progress:
-                        self.stats.show_progress(item=item, dt=0.2)
+                self.chunk_file(item, cache, self.stats, fd, fh, compress=compress)
             if not is_special_file:
                 # we must not memorize special files, because the contents of e.g. a
                 # block or char device will change without its mtime/size/inode changing.
-                cache.memorize_file(path_hash, st, [c.id for c in chunks])
+                cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
             status = status or 'M'  # regular file, modified (if not 'A' already)
-        item.chunks = chunks
         item.update(self.stat_attrs(st, path))
         if is_special_file:
             # we processed a special file like a regular file. reflect that in mode,
@@ -909,6 +957,8 @@ class ArchiveChecker:
         self.repository = repository
         self.init_chunks()
         self.key = self.identify_key(repository)
+        if verify_data:
+            self.verify_data()
         if Manifest.MANIFEST_ID not in self.chunks:
             logger.error("Repository manifest not found!")
             self.error_found = True
@@ -916,8 +966,6 @@ class ArchiveChecker:
         else:
             self.manifest, _ = Manifest.load(repository, key=self.key)
         self.rebuild_refcounts(archive=archive, last=last, prefix=prefix)
-        if verify_data:
-            self.verify_data()
         self.orphan_chunks_check()
         self.finish(save_space=save_space)
         if self.error_found:
@@ -954,20 +1002,25 @@ class ArchiveChecker:
 
     def verify_data(self):
         logger.info('Starting cryptographic data integrity verification...')
-        pi = ProgressIndicatorPercent(total=len(self.chunks), msg="Verifying data %6.2f%%", step=0.01, same_line=True)
-        count = errors = 0
+        count = len(self.chunks)
+        errors = 0
+        pi = ProgressIndicatorPercent(total=count, msg="Verifying data %6.2f%%", step=0.01, same_line=True)
         for chunk_id, (refcount, *_) in self.chunks.iteritems():
             pi.show()
-            if not refcount:
-                continue
-            encrypted_data = self.repository.get(chunk_id)
             try:
-                _, data = self.key.decrypt(chunk_id, encrypted_data)
+                encrypted_data = self.repository.get(chunk_id)
+            except Repository.ObjectNotFound:
+                self.error_found = True
+                errors += 1
+                logger.error('chunk %s not found', bin_to_hex(chunk_id))
+                continue
+            try:
+                _chunk_id = None if chunk_id == Manifest.MANIFEST_ID else chunk_id
+                _, data = self.key.decrypt(_chunk_id, encrypted_data)
             except IntegrityError as integrity_error:
                 self.error_found = True
                 errors += 1
                 logger.error('chunk %s, integrity error: %s', bin_to_hex(chunk_id), integrity_error)
-            count += 1
         pi.finish()
         log = logger.error if errors else logger.info
         log('Finished cryptographic data integrity verification, verified %d chunks with %d integrity errors.', count, errors)

@@ -17,13 +17,20 @@ a good amount of free space on the filesystem that has your backup repository
 (and also on ~/.cache). A few GB should suffice for most hard-drive sized
 repositories. See also :ref:`cache-memory-usage`.
 
+Borg doesn't use space reserved for root on repository disks (even when run as root),
+on file systems which do not support this mechanism (e.g. XFS) we recommend to
+reserve some space in Borg itself just to be safe by adjusting the
+``additional_free_space`` setting in the ``[repository]`` section of a repositories
+``config`` file. A good starting point is ``2G``.
+
 If |project_name| runs out of disk space, it tries to free as much space as it
 can while aborting the current operation safely, which allows to free more space
-by deleting/pruning archives. This mechanism is not bullet-proof though.
+by deleting/pruning archives. This mechanism is not bullet-proof in some
+circumstances [1]_.
+
 If you *really* run out of disk space, it can be hard or impossible to free space,
 because |project_name| needs free space to operate - even to delete backup
-archives. There is a ``--save-space`` option for some commands, but even with
-that |project_name| will need free space to operate.
+archives.
 
 You can use some monitoring process or just include the free space information
 in your backup log files (you check them regularly anyway, right?).
@@ -35,6 +42,13 @@ Also helpful:
   some unallocated PEs you can add to the LV.
 - consider using quotas
 - use `prune` regularly
+
+.. [1] This failsafe can fail in these circumstances:
+
+    - The underlying file system doesn't support statvfs(2), or returns incorrect
+      data, or the repository doesn't reside on a single file system
+    - Other tasks fill the disk simultaneously
+    - Hard quotas (which may not be reflected in statvfs(2))
 
 
 A step by step example

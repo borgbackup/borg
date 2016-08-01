@@ -22,6 +22,7 @@ from .helpers import get_keys_dir
 from .helpers import bin_to_hex
 from .helpers import CompressionDecider2, CompressionSpec
 from .item import Key, EncryptedKey
+from .platform import SaveFile
 
 
 PREFIX = b'\0' * 8
@@ -470,7 +471,7 @@ class KeyfileKey(KeyfileKeyBase):
 
     def save(self, target, passphrase):
         key_data = self._save(passphrase)
-        with open(target, 'w') as fd:
+        with SaveFile(target) as fd:
             fd.write('%s %s\n' % (self.FILE_ID, bin_to_hex(self.repository_id)))
             fd.write(key_data)
             fd.write('\n')

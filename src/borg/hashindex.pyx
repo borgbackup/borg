@@ -8,7 +8,7 @@ from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
 from libc.errno cimport errno
 from cpython.exc cimport PyErr_SetFromErrnoWithFilename
 
-API_VERSION = 2
+API_VERSION = 3
 
 
 cdef extern from "_hashindex.c":
@@ -18,7 +18,8 @@ cdef extern from "_hashindex.c":
     HashIndex *hashindex_read(char *path)
     HashIndex *hashindex_init(int capacity, int key_size, int value_size)
     void hashindex_free(HashIndex *index)
-    int hashindex_get_size(HashIndex *index)
+    int hashindex_len(HashIndex *index)
+    int hashindex_size(HashIndex *index)
     int hashindex_write(HashIndex *index, char *path)
     void *hashindex_get(HashIndex *index, void *key)
     void *hashindex_next_key(HashIndex *index, void *key)
@@ -119,7 +120,11 @@ cdef class IndexBase:
             raise
 
     def __len__(self):
-        return hashindex_get_size(self.index)
+        return hashindex_len(self.index)
+
+    def size(self):
+        """Return size (bytes) of hash table."""
+        return hashindex_size(self.index)
 
 
 cdef class NSIndex(IndexBase):

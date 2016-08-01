@@ -3,7 +3,6 @@ import collections
 import functools
 import hashlib
 import inspect
-import io
 import logging
 import os
 import re
@@ -41,6 +40,7 @@ from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo
 from .helpers import log_multi
 from .helpers import parse_pattern, PatternMatcher, PathPrefixPattern
 from .helpers import signal_handler
+from .helpers import ErrorIgnoringTextIOWrapper
 from .item import Item
 from .key import key_creator, RepoKey, PassphraseKey
 from .platform import get_flags
@@ -73,13 +73,16 @@ def with_repository(fake=False, create=False, lock=True, exclusive=False, manife
         @functools.wraps(method)
         def wrapper(self, args, **kwargs):
             location = args.location  # note: 'location' must be always present in args
+            append_only = getattr(args, 'append_only', False)
             if argument(args, fake):
                 return method(self, args, repository=None, **kwargs)
             elif location.proto == 'ssh':
-                repository = RemoteRepository(location, create=create, lock_wait=self.lock_wait, lock=lock, args=args)
+                repository = RemoteRepository(location, create=create, lock_wait=self.lock_wait, lock=lock,
+                                              append_only=append_only, args=args)
             else:
                 repository = Repository(location.path, create=create, exclusive=argument(args, exclusive),
-                                        lock_wait=self.lock_wait, lock=lock)
+                                        lock_wait=self.lock_wait, lock=lock,
+                                        append_only=append_only)
             with repository:
                 if manifest or cache:
                     kwargs['manifest'], kwargs['key'] = Manifest.load(repository)
@@ -97,7 +100,8 @@ def with_archive(method):
     @functools.wraps(method)
     def wrapper(self, args, repository, key, manifest, **kwargs):
         archive = Archive(repository, key, manifest, args.location.archive,
-                          numeric_owner=getattr(args, 'numeric_owner', False), cache=kwargs.get('cache'))
+                          numeric_owner=getattr(args, 'numeric_owner', False), cache=kwargs.get('cache'),
+                          consider_part_files=args.consider_part_files)
         return method(self, args, repository=repository, manifest=manifest, key=key, archive=archive, **kwargs)
     return wrapper
 
@@ -665,7 +669,8 @@ class Archiver:
                 print_output(line)
 
         archive1 = archive
-        archive2 = Archive(repository, key, manifest, args.archive2)
+        archive2 = Archive(repository, key, manifest, args.archive2,
+                           consider_part_files=args.consider_part_files)
 
         can_compare_chunk_ids = archive1.metadata.get(b'chunker_params', False) == archive2.metadata.get(
             b'chunker_params', True) or args.same_chunker_params
@@ -750,7 +755,8 @@ class Archiver:
 
         with cache_if_remote(repository) as cached_repo:
             if args.location.archive:
-                archive = Archive(repository, key, manifest, args.location.archive)
+                archive = Archive(repository, key, manifest, args.location.archive,
+                                  consider_part_files=args.consider_part_files)
             else:
                 archive = None
             operations = FuseOperations(key, repository, manifest, archive, cached_repo)
@@ -776,7 +782,8 @@ class Archiver:
         if args.location.archive:
             matcher, _ = self.build_matcher(args.excludes, args.paths)
             with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
-                archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
+                archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
+                                  consider_part_files=args.consider_part_files)
 
                 if args.format:
                     format = args.format
@@ -978,7 +985,8 @@ class Archiver:
     @with_repository()
     def do_debug_dump_archive_items(self, args, repository, manifest, key):
         """dump (decrypted, decompressed) archive items metadata (not: data)"""
-        archive = Archive(repository, key, manifest, args.location.archive)
+        archive = Archive(repository, key, manifest, args.location.archive,
+                          consider_part_files=args.consider_part_files)
         for i, item_id in enumerate(archive.metadata[b'items']):
             _, data = key.decrypt(item_id, repository.get(item_id))
             filename = '%06d_%s.items' % (i, bin_to_hex(item_id))
@@ -1047,7 +1055,7 @@ class Archiver:
         Cache.break_lock(repository)
         return self.exit_code
 
-    helptext = {}
+    helptext = collections.OrderedDict()
     helptext['patterns'] = textwrap.dedent('''
         Exclusion patterns support four separate styles, fnmatch, shell, regular
         expressions and path prefixes. By default, fnmatch is used. If followed
@@ -1229,6 +1237,9 @@ class Archiver:
                                   help='set umask to M (local and remote, default: %(default)04o)')
         common_group.add_argument('--remote-path', dest='remote_path', metavar='PATH',
                                   help='set remote path to executable (default: "borg")')
+        common_group.add_argument('--consider-part-files', dest='consider_part_files',
+                                  action='store_true', default=False,
+                                  help='treat part files like normal files (e.g. to list/extract them)')
 
         parser = argparse.ArgumentParser(prog=prog, description='Borg - Deduplicated Backups')
         parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,
@@ -1304,6 +1315,8 @@ class Archiver:
         subparser.add_argument('-e', '--encryption', dest='encryption',
                                choices=('none', 'keyfile', 'repokey'), default='repokey',
                                help='select encryption key mode (default: "%(default)s")')
+        subparser.add_argument('-a', '--append-only', dest='append_only', action='store_true',
+                               help='create an append-only mode repository')
 
         check_epilog = textwrap.dedent("""
         The check command verifies the consistency of a repository and the corresponding archives.
@@ -1528,7 +1541,8 @@ class Archiver:
                                    type=CompressionSpec, default=dict(name='none'), metavar='COMPRESSION',
                                    help='select compression algorithm (and level):\n'
                                         'none == no compression (default),\n'
-                                        'auto,C[,L] == built-in heuristic decides between none or C[,L] - with C[,L]\n'
+                                        'auto,C[,L] == built-in heuristic (try with lz4 whether the data is\n'
+                                        '              compressible) decides between none or C[,L] - with C[,L]\n'
                                         '              being any valid compression algorithm (and optional level),\n'
                                         'lz4 == lz4,\n'
                                         'zlib == zlib (default level 6),\n'
@@ -1796,7 +1810,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='break repository and cache locks')
         subparser.set_defaults(func=self.do_break_lock)
-        subparser.add_argument('location', metavar='REPOSITORY',
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository for which to break the locks')
 
@@ -2251,8 +2265,8 @@ def main():  # pragma: no cover
 
     # Make sure stdout and stderr have errors='replace' to avoid unicode
     # issues when print()-ing unicode file names
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=True)
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, sys.stderr.encoding, 'replace', line_buffering=True)
+    sys.stdout = ErrorIgnoringTextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=True)
+    sys.stderr = ErrorIgnoringTextIOWrapper(sys.stderr.buffer, sys.stderr.encoding, 'replace', line_buffering=True)
     setup_signal_handlers()
     archiver = Archiver()
     msg = None

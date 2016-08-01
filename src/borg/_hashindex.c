@@ -441,7 +441,13 @@ hashindex_next_key(HashIndex *index, const void *key)
 }
 
 static int
-hashindex_get_size(HashIndex *index)
+hashindex_len(HashIndex *index)
 {
     return index->num_entries;
+}
+
+static int
+hashindex_size(HashIndex *index)
+{
+    return sizeof(HashHeader) + index->num_buckets * index->bucket_size;
 }

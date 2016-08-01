@@ -1,7 +1,8 @@
 # this set must be kept complete, otherwise the RobustUnpacker might malfunction:
 ITEM_KEYS = frozenset(['path', 'source', 'rdev', 'chunks', 'chunks_healthy', 'hardlink_master',
                        'mode', 'user', 'group', 'uid', 'gid', 'mtime', 'atime', 'ctime',
-                       'xattrs', 'bsdflags', 'acl_nfs4', 'acl_access', 'acl_default', 'acl_extended', ])
+                       'xattrs', 'bsdflags', 'acl_nfs4', 'acl_access', 'acl_default', 'acl_extended',
+                       'part'])
 
 # this is the set of keys that are always present in items:
 REQUIRED_ITEM_KEYS = frozenset(['path', 'mtime', ])

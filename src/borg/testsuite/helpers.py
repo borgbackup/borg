@@ -10,7 +10,7 @@ import msgpack
 import msgpack.fallback
 
 from ..helpers import Location
-from ..helpers import partial_format, format_file_size, format_timedelta, format_line, PlaceholderError
+from ..helpers import partial_format, format_file_size, parse_file_size, format_timedelta, format_line, PlaceholderError
 from ..helpers import make_path_safe, clean_lines
 from ..helpers import prune_within, prune_split
 from ..helpers import get_cache_dir, get_keys_dir
@@ -680,6 +680,26 @@ def test_file_size_sign():
     }
     for size, fmt in si_size_map.items():
         assert format_file_size(size, sign=True) == fmt
+
+
+@pytest.mark.parametrize('string,value', (
+    ('1', 1),
+    ('20', 20),
+    ('5K', 5000),
+    ('1.75M', 1750000),
+    ('1e+9', 1e9),
+    ('-1T', -1e12),
+))
+def test_parse_file_size(string, value):
+    assert parse_file_size(string) == int(value)
+
+
+@pytest.mark.parametrize('string', (
+    '', '5 Äpfel', '4E', '2229 bit', '1B',
+))
+def test_parse_file_size_invalid(string):
+    with pytest.raises(ValueError):
+        parse_file_size(string)
 
 
 def test_is_slow_msgpack():

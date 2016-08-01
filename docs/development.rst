@@ -19,6 +19,17 @@ instead of 79. We do *not* use form-feed (``^L``) characters to
 separate sections either. Compliance is tested automatically when
 you run the tests.
 
+Continuous Integration
+----------------------
+
+All pull requests go through Travis-CI_, which runs the tests on Linux
+and Mac OS X as well as the flake8 style checker. Windows builds run on AppVeyor_,
+while additional Unix-like platforms are tested on Golem_.
+
+.. _AppVeyor: https://ci.appveyor.com/project/borgbackup/borg/
+.. _Golem: https://golem.enkore.de/view/Borg/
+.. _Travis-CI: https://travis-ci.org/borgbackup/borg
+
 Output and Logging
 ------------------
 When writing logger calls, always use correct log level (debug only for

@@ -250,9 +250,7 @@ class RemoteRepository:
 
     def ssh_cmd(self, location):
         """return a ssh command line that can be prefixed to a borg command line"""
-        cmdbase = os.environ.get('BORG_RSH', 'ssh')
-        cmdbase = replace_placeholders(cmdbase)
-        args = shlex.split(cmdbase)
+        args = shlex.split(os.environ.get('BORG_RSH', 'ssh'))
         if location.port:
             args += ['-p', str(location.port)]
         if location.user:

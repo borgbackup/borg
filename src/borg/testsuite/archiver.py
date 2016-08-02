@@ -912,6 +912,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('test.3', manifest.archives)
         self.assert_in('test.4', manifest.archives)
 
+    def test_info(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        info_repo = self.cmd('info', self.repository_location)
+        assert 'All archives:' in info_repo
+        info_archive = self.cmd('info', self.repository_location + '::test')
+        assert 'Archive name: test\n' in info_archive
+
     def test_comment(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', self.repository_location)

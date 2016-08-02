@@ -50,6 +50,9 @@ from .selftest import selftest
 from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 
 
+STATS_HEADER = "                       Original size      Compressed size    Deduplicated size"
+
+
 def argument(args, str_or_bool):
     """If bool is passed, return it. If str is passed, retrieve named attribute from args."""
     if isinstance(str_or_bool, str):
@@ -289,6 +292,7 @@ class Archiver:
                     log_multi(DASHES,
                               str(archive),
                               DASHES,
+                              STATS_HEADER,
                               str(archive.stats),
                               str(cache),
                               DASHES, logger=logging.getLogger('borg.output.stats'))
@@ -716,6 +720,7 @@ class Archiver:
                 logger.info("Archive deleted.")
                 if args.stats:
                     log_multi(DASHES,
+                              STATS_HEADER,
                               stats.summary.format(label='Deleted data:', stats=stats),
                               str(cache),
                               DASHES, logger=logging.getLogger('borg.output.stats'))
@@ -815,26 +820,32 @@ class Archiver:
         return self.exit_code
 
     @with_repository(cache=True)
-    @with_archive
-    def do_info(self, args, repository, manifest, key, archive, cache):
+    def do_info(self, args, repository, manifest, key, cache):
         """Show archive details such as disk space used"""
         def format_cmdline(cmdline):
             return remove_surrogates(' '.join(shlex.quote(x) for x in cmdline))
 
-        stats = archive.calc_stats(cache)
-        print('Archive name: %s' % archive.name)
-        print('Archive fingerprint: %s' % archive.fpr)
-        print('Comment: %s' % archive.metadata.get(b'comment', ''))
-        print('Hostname: %s' % archive.metadata[b'hostname'])
-        print('Username: %s' % archive.metadata[b'username'])
-        print('Time (start): %s' % format_time(to_localtime(archive.ts)))
-        print('Time (end):   %s' % format_time(to_localtime(archive.ts_end)))
-        print('Duration: %s' % archive.duration_from_meta)
-        print('Number of files: %d' % stats.nfiles)
-        print('Command line: %s' % format_cmdline(archive.metadata[b'cmdline']))
-        print(DASHES)
-        print(str(stats))
-        print(str(cache))
+        if args.location.archive:
+            archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
+                              consider_part_files=args.consider_part_files)
+            stats = archive.calc_stats(cache)
+            print('Archive name: %s' % archive.name)
+            print('Archive fingerprint: %s' % archive.fpr)
+            print('Comment: %s' % archive.metadata.get(b'comment', ''))
+            print('Hostname: %s' % archive.metadata[b'hostname'])
+            print('Username: %s' % archive.metadata[b'username'])
+            print('Time (start): %s' % format_time(to_localtime(archive.ts)))
+            print('Time (end):   %s' % format_time(to_localtime(archive.ts_end)))
+            print('Duration: %s' % archive.duration_from_meta)
+            print('Number of files: %d' % stats.nfiles)
+            print('Command line: %s' % format_cmdline(archive.metadata[b'cmdline']))
+            print(DASHES)
+            print(STATS_HEADER)
+            print(str(stats))
+            print(str(cache))
+        else:
+            print(STATS_HEADER)
+            print(str(cache))
         return self.exit_code
 
     @with_repository()
@@ -899,6 +910,7 @@ class Archiver:
                 cache.commit()
             if args.stats:
                 log_multi(DASHES,
+                          STATS_HEADER,
                           stats.summary.format(label='Deleted data:', stats=stats),
                           str(cache),
                           DASHES, logger=logging.getLogger('borg.output.stats'))
@@ -1786,21 +1798,23 @@ class Archiver:
                                help='Extra mount options')
 
         info_epilog = textwrap.dedent("""
-        This command displays some detailed information about the specified archive.
+        This command displays detailed information about the specified archive or repository.
 
-        The "This archive" line refers exclusively to this archive:
-        "Deduplicated size" is the size of the unique chunks stored only for this
-        archive. Non-unique / common chunks show up under "All archives".
+        The "This archive" line refers exclusively to the given archive:
+        "Deduplicated size" is the size of the unique chunks stored only for the
+        given archive.
+
+        The "All archives" line shows global statistics (all chunks).
         """)
         subparser = subparsers.add_parser('info', parents=[common_parser], add_help=False,
                                           description=self.do_info.__doc__,
                                           epilog=info_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='show archive information')
+                                          help='show repository or archive information')
         subparser.set_defaults(func=self.do_info)
-        subparser.add_argument('location', metavar='ARCHIVE',
-                               type=location_validator(archive=True),
-                               help='archive to display information about')
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE',
+                               type=location_validator(),
+                               help='archive or repository to display information about')
 
         break_lock_epilog = textwrap.dedent("""
         This command breaks the repository and cache locks.

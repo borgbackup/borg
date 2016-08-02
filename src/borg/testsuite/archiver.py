@@ -877,6 +877,53 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.mkdir('input/cache3')
         os.link('input/cache1/%s' % CACHE_TAG_NAME, 'input/cache3/%s' % CACHE_TAG_NAME)
 
+    def test_create_without_root(self):
+        """test create without a root"""
+        self.cmd('init', self.repository_location)
+        args = ['create', self.repository_location + '::test']
+        if self.FORK_DEFAULT:
+            self.cmd(*args, exit_code=2)
+        else:
+            self.assert_raises(SystemExit, lambda: self.cmd(*args))
+
+    def test_create_pattern_root(self):
+        """test create with only a root pattern"""
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('file1', size=1024 * 80)
+        self.create_regular_file('file2', size=1024 * 80)
+        output = self.cmd('create', '-v', '--list', '--pattern=R input', self.repository_location + '::test')
+        self.assert_in("A input/file1", output)
+        self.assert_in("A input/file2", output)
+
+    def test_create_pattern(self):
+        """test file patterns during create"""
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('file1', size=1024 * 80)
+        self.create_regular_file('file2', size=1024 * 80)
+        self.create_regular_file('file_important', size=1024 * 80)
+        output = self.cmd('create', '-v', '--list',
+                          '--pattern=+input/file_important', '--pattern=-input/file*',
+                          self.repository_location + '::test', 'input')
+        self.assert_in("A input/file_important", output)
+        self.assert_in("A input/file_important", output)
+        self.assert_in('x input/file1', output)
+        self.assert_in('x input/file2', output)
+
+    def test_extract_pattern_opt(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('file1', size=1024 * 80)
+        self.create_regular_file('file2', size=1024 * 80)
+        self.create_regular_file('file_important', size=1024 * 80)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract',
+                     '--pattern=+input/file_important', '--pattern=-input/file*',
+                     self.repository_location + '::test')
+        self.assert_equal(sorted(os.listdir('output/input')), ['file_important'])
+
+    def test_exclude_caches(self):
+        self.cmd('init', self.repository_location)
+
     def _assert_test_caches(self):
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')

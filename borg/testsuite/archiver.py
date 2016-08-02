@@ -1305,12 +1305,21 @@ class RemoteArchiverTestCase(ArchiverTestCase):
     prefix = '__testsuite__:'
 
     def test_remote_repo_restrict_to_path(self):
-        self.cmd('init', self.repository_location)
-        path_prefix = os.path.dirname(self.repository_path)
+        # restricted to repo directory itself:
+        with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', self.repository_path]):
+            self.cmd('init', self.repository_location)
+        # restricted to repo directory itself, fail for other directories with same prefix:
+        with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', self.repository_path]):
+            self.assert_raises(PathNotAllowed, lambda: self.cmd('init', self.repository_location + '_0'))
+
+        # restricted to a completely different path:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo']):
             self.assert_raises(PathNotAllowed, lambda: self.cmd('init', self.repository_location + '_1'))
+        path_prefix = os.path.dirname(self.repository_path)
+        # restrict to repo directory's parent directory:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', path_prefix]):
             self.cmd('init', self.repository_location + '_2')
+        # restrict to repo directory's parent directory and another directory:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo', '--restrict-to-path', path_prefix]):
             self.cmd('init', self.repository_location + '_3')
 

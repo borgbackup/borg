@@ -312,17 +312,37 @@ def load_excludes(fh):
     both line ends are ignored.
     """
     patterns = (line for line in (i.strip() for i in fh) if not line.startswith('#'))
-    return [parse_pattern(pattern) for pattern in patterns if pattern]
+    return [parse_exclude_pattern(pattern)
+            for pattern in patterns if pattern]
 
 
-def update_excludes(args):
-    """Merge exclude patterns from files with those on command line."""
-    if hasattr(args, 'exclude_files') and args.exclude_files:
-        if not hasattr(args, 'excludes') or args.excludes is None:
-            args.excludes = []
-        for file in args.exclude_files:
-            args.excludes += load_excludes(file)
-            file.close()
+def load_patterns(fh):
+    """Load and parse include/exclude/root patterns from file object.
+    Lines empty or starting with '#' after stripping whitespace on both line ends are ignored.
+    """
+    patternlines = (line for line in (i.strip() for i in fh) if not line.startswith('#'))
+    roots = []
+    inclexclpatterns = []
+    for patternline in patternlines:
+        pattern = parse_inclexcl_pattern(patternline)
+        if pattern:
+            if pattern.ptype is RootPath:
+                roots.append(pattern.pattern)
+            else:
+                inclexclpatterns.append(pattern)
+    return roots, inclexclpatterns
+
+
+def update_patterns(args):
+    """Merge patterns from exclude- and pattern-files with those on command line."""
+    for file in args.pattern_files:
+        roots, inclexclpatterns = load_patterns(file)
+        args.paths += roots
+        args.pattern += inclexclpatterns
+        file.close()
+    for file in args.exclude_files:
+        args.pattern += load_excludes(file)
+        file.close()
 
 
 class PatternMatcher:
@@ -337,6 +357,12 @@ class PatternMatcher:
         given patterns matches.
         """
         self._items.extend((i, value) for i in patterns)
+
+    def add_inclexcl(self, patterns):
+        """Add list of patterns (of type InclExclPattern) to internal list. The patterns ptype member is returned from
+        the match function when one of the given patterns matches.
+        """
+        self._items.extend(patterns)
 
     def match(self, path):
         for (pattern, value) in self._items:
@@ -489,6 +515,8 @@ _PATTERN_STYLES = set([
 
 _PATTERN_STYLE_BY_PREFIX = dict((i.PREFIX, i) for i in _PATTERN_STYLES)
 
+InclExclPattern = namedtuple('InclExclPattern', 'pattern ptype')
+RootPath = object()
 
 def parse_pattern(pattern, fallback=FnmatchPattern):
     """Read pattern from string and return an instance of the appropriate implementation class.
@@ -504,6 +532,34 @@ def parse_pattern(pattern, fallback=FnmatchPattern):
         cls = fallback
 
     return cls(pattern)
+
+
+def parse_exclude_pattern(pattern, fallback=FnmatchPattern):
+    """Read pattern from string and return an instance of the appropriate implementation class.
+    """
+    epattern = parse_pattern(pattern, fallback)
+    return InclExclPattern(epattern, False)
+
+
+def parse_inclexcl_pattern(pattern, fallback=ShellPattern):
+    """Read pattern from string and return a InclExclPattern object."""
+    type_prefix_map = {
+        '-': False,
+        '+': True,
+        'R': RootPath,
+        'r': RootPath,
+    }
+    ptype = None
+    if len(pattern) > 1 and pattern[0] in type_prefix_map:
+        (ptype, pattern) = (type_prefix_map[pattern[0]], pattern[1:])
+        pattern = pattern.lstrip()
+    if ptype is None or not pattern:
+        raise argparse.ArgumentTypeError("Unable to parse pattern: {}".format(pattern))
+    if ptype is RootPath:
+        pobj = pattern
+    else:
+        pobj = parse_pattern(pattern, fallback)
+    return InclExclPattern(pobj, ptype)
 
 
 def timestamp(s):

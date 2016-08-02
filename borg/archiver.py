@@ -18,9 +18,9 @@ import collections
 
 from . import __version__
 from .helpers import Error, location_validator, archivename_validator, format_line, format_time, format_file_size, \
-    parse_pattern, PathPrefixPattern, to_localtime, timestamp, safe_timestamp, bin_to_hex, \
-    get_cache_dir, prune_within, prune_split, \
-    Manifest, NoManifestError, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
+    parse_pattern, parse_exclude_pattern, parse_inclexcl_pattern, PathPrefixPattern, to_localtime, timestamp, \
+    safe_timestamp, bin_to_hex, get_cache_dir, prune_within, prune_split, \
+    Manifest, NoManifestError, remove_surrogates, update_patterns, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, PrefixSpec, is_slow_msgpack, yes, sysinfo, \
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ErrorIgnoringTextIOWrapper
 from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
@@ -120,6 +120,18 @@ class Archiver:
     def print_file_status(self, status, path):
         if self.output_list and (self.output_filter is None or status in self.output_filter):
             logger.info("%1s %s", status, remove_surrogates(path))
+
+    @staticmethod
+    def build_matcher(inclexcl_patterns, paths):
+        matcher = PatternMatcher()
+        if inclexcl_patterns:
+            matcher.add_inclexcl(inclexcl_patterns)
+        include_patterns = []
+        if paths:
+            include_patterns.extend(parse_pattern(i, PathPrefixPattern) for i in paths)
+            matcher.add(include_patterns, True)
+        matcher.fallback = not include_patterns
+        return matcher, include_patterns
 
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
@@ -233,8 +245,7 @@ class Archiver:
     def do_create(self, args, repository, manifest=None, key=None):
         """Create new archive"""
         matcher = PatternMatcher(fallback=True)
-        if args.excludes:
-            matcher.add(args.excludes, False)
+        matcher.add_inclexcl(args.pattern)
 
         def create_inner(archive, cache):
             # Add cache dir to inode_skip list
@@ -424,17 +435,7 @@ class Archiver:
             if sys.platform.startswith(('linux', 'freebsd', 'netbsd', 'openbsd', 'darwin', )):
                 logger.warning('Hint: You likely need to fix your locale setup. E.g. install locales and use: LANG=en_US.UTF-8')
 
-        matcher = PatternMatcher()
-        if args.excludes:
-            matcher.add(args.excludes, False)
-
-        include_patterns = []
-
-        if args.paths:
-            include_patterns.extend(parse_pattern(i, PathPrefixPattern) for i in args.paths)
-            matcher.add(include_patterns, True)
-
-        matcher.fallback = not include_patterns
+        matcher, include_patterns = self.build_matcher(args.pattern, args.paths)
 
         output_list = args.output_list
         dry_run = args.dry_run
@@ -893,8 +894,9 @@ class Archiver:
 
     helptext = collections.OrderedDict()
     helptext['patterns'] = textwrap.dedent('''
-        Exclusion patterns support four separate styles, fnmatch, shell, regular
-        expressions and path prefixes. By default, fnmatch is used. If followed
+        File patterns support four separate styles, fnmatch, shell, regular
+        expressions and path prefixes. By default, fnmatch is used for 
+        `--exclude` patterns and shell-style is used for `--pattern`. If followed
         by a colon (':') the first two characters of a pattern are used as a
         style selector. Explicit style selection is necessary when a
         non-default style is desired or when the desired pattern starts with
@@ -902,12 +904,12 @@ class Archiver:
 
         `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_, selector `fm:`
 
-            This is the default style.  These patterns use a variant of shell
-            pattern syntax, with '*' matching any number of characters, '?'
-            matching any single character, '[...]' matching any single
-            character specified, including ranges, and '[!...]' matching any
-            character not specified. For the purpose of these patterns, the
-            path separator ('\\' for Windows and '/' on other systems) is not
+            This is the default style for --exclude and --exclude-from.
+            These patterns use a variant of shell pattern syntax, with '*' matching
+            any number of characters, '?' matching any single character, '[...]'
+            matching any single character specified, including ranges, and '[!...]'
+            matching any character not specified. For the purpose of these patterns,
+            the path separator ('\\' for Windows and '/' on other systems) is not
             treated specially. Wrap meta-characters in brackets for a literal
             match (i.e. `[?]` to match the literal character `?`). For a path
             to match a pattern, it must completely match from start to end, or
@@ -918,6 +920,7 @@ class Archiver:
 
         Shell-style patterns, selector `sh:`
 
+            This is the default style for --pattern and --patterns-from.
             Like fnmatch patterns these are similar to shell patterns. The difference
             is that the pattern may include `**/` for matching zero or more directory
             levels, `*` for matching zero or more arbitrary characters with the
@@ -978,7 +981,44 @@ class Archiver:
             re:^/home/[^/]\.tmp/
             sh:/home/*/.thumbnails
             EOF
-            $ borg create --exclude-from exclude.txt backup /\n\n''')
+            $ borg create --exclude-from exclude.txt backup /
+
+            # exclude the contents of /data/docs/ but not /data/docs/pdf
+            $ borg create -e +/data/docs/pdf -e /data/docs/ backup /
+            # equivalent:
+            $ borg create -e +pm:/data/docs/pdf -e -pm:/data/docs/ backup /
+
+
+        A more general way to define filename matching patterns may be passed via
+        `--pattern` and `--patterns-from`. Using these options, you may specify the
+        backup roots (starting points) and patterns for inclusion/exclusion. A
+        root path starts with the prefix `R`, followed by a path (a plain path, not a
+        file pattern). An include rule is specified by `+` followed by a pattern.
+        Exclude rules start with a `-`.
+        Inclusion patterns are useful to e.g. exclude the contents of a directory
+        except for some important files in this directory. The first matching pattern
+        is used so if an include pattern matches before an exclude pattern, the file
+        is backed up.
+
+        Note that the default pattern style for `--pattern` and `--patterns-from` is
+        shell style (`sh:`), so those patterns behave like rsync include/exclude patterns.
+
+        An example `--patterns-from` file could look like that::
+
+            R /
+            # can be rebuild
+            - /home/*/.cache
+            # they're downloads for a reason
+            - /home/*/Downloads
+            # susan is a nice person
+            # include susans home
+            + /home/susan
+            # ... and its contents
+            + /home/susan/*
+            # don't backup the other home directories
+            - /home/*
+
+\n\n''')
     helptext['placeholders'] = textwrap.dedent('''
         Repository (or Archive) URLs, --prefix and --remote-path values support these
         placeholders:
@@ -1339,10 +1379,10 @@ class Archiver:
         subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
                                help='only display items with the given status characters')
         subparser.add_argument('-e', '--exclude', dest='excludes',
-                               type=parse_pattern, action='append',
+                               type=parse_exclude_pattern, action='append', dest='pattern',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
         subparser.add_argument('--exclude-from', dest='exclude_files',
-                               type=argparse.FileType('r'), action='append',
+                               type=argparse.FileType('r'), action='append', default=[],
                                metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
         subparser.add_argument('--exclude-caches', dest='exclude_caches',
                                action='store_true', default=False,
@@ -1353,6 +1393,13 @@ class Archiver:
         subparser.add_argument('--keep-tag-files', dest='keep_tag_files',
                                action='store_true', default=False,
                                help='keep tag files of excluded caches/directories')
+        subparser.add_argument('--pattern', dest='pattern',
+                               type=parse_inclexcl_pattern, action='append',
+                               metavar="PATTERN", help='include/exclude paths matching PATTERN')
+        subparser.set_defaults(pattern=[])
+        subparser.add_argument('--patterns-from', dest='pattern_files',
+                               type=argparse.FileType('r'), action='append', default=[],
+                               metavar='PATTERNFILE', help='read include/exclude patterns from PATTERNFILE, one per line')
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                type=int, default=300, metavar='SECONDS',
                                help='write checkpoint every SECONDS seconds (Default: 300)')
@@ -1423,11 +1470,18 @@ class Archiver:
                                default=False, action='store_true',
                                help='do not actually change any files')
         subparser.add_argument('-e', '--exclude', dest='excludes',
-                               type=parse_pattern, action='append',
+                               type=parse_exclude_pattern, action='append', dest='pattern',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
         subparser.add_argument('--exclude-from', dest='exclude_files',
-                               type=argparse.FileType('r'), action='append',
+                               type=argparse.FileType('r'), action='append', default=[],
                                metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
+        subparser.add_argument('--pattern', dest='pattern',
+                               type=parse_inclexcl_pattern, action='append',
+                               metavar="PATTERN", help='include/exclude paths matching PATTERN')
+        subparser.set_defaults(pattern=[])
+        subparser.add_argument('--patterns-from', dest='pattern_files',
+                               type=argparse.FileType('r'), action='append', default=[],
+                               metavar='PATTERNFILE', help='read include/exclude patterns from PATTERNFILE, one per line')
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,
                                help='only obey numeric user and group identifiers')
@@ -1982,7 +2036,7 @@ class Archiver:
             args = self.preprocess_args(args)
         parser = self.build_parser(args)
         args = parser.parse_args(args or ['-h'])
-        update_excludes(args)
+        update_patterns(args)
         return args
 
     def run(self, args):

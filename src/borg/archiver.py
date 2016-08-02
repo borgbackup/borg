@@ -969,8 +969,11 @@ class Archiver:
                 if recreater.is_temporary_archive(name):
                     self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
                     return self.exit_code
-                recreater.recreate(name, args.comment)
+                recreater.recreate(name, args.comment, args.target)
             else:
+                if args.target is not None:
+                    self.print_error('--target: Need to specify single archive')
+                    return self.exit_code
                 for archive in manifest.list_archive_infos(sort_by='ts'):
                     name = archive.name
                     if recreater.is_temporary_archive(name):
@@ -2036,6 +2039,8 @@ class Archiver:
         archive that is built during the operation exists at the same time at
         "<ARCHIVE>.recreate". The new archive will have a different archive ID.
 
+        With --target the original archive is not replaced, instead a new archive is created.
+
         When rechunking space usage can be substantial, expect at least the entire
         deduplicated size of the archives using the previous chunker params.
         When recompressing approximately 1 % of the repository size or 512 MB
@@ -2081,6 +2086,10 @@ class Archiver:
                                    help='keep tag files of excluded caches/directories')
 
         archive_group = subparser.add_argument_group('Archive options')
+        archive_group.add_argument('--target', dest='target', metavar='TARGET', default=None,
+                                   type=archivename_validator(),
+                                   help='create a new archive with the name ARCHIVE, do not replace existing archive '
+                                        '(only applies for a single archive)')
         archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default=None,
                                    help='add a comment text to the archive')
         archive_group.add_argument('--timestamp', dest='timestamp',

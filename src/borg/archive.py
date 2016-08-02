@@ -1331,10 +1331,10 @@ class ArchiveRecreater:
         self.interrupt = False
         self.errors = False
 
-    def recreate(self, archive_name, comment=None):
+    def recreate(self, archive_name, comment=None, target_name=None):
         assert not self.is_temporary_archive(archive_name)
         archive = self.open_archive(archive_name)
-        target, resume_from = self.create_target_or_resume(archive)
+        target, resume_from = self.create_target_or_resume(archive, target_name)
         if self.exclude_if_present or self.exclude_caches:
             self.matcher_add_tagged_dirs(archive)
         if self.matcher.empty() and not self.recompress and not target.recreate_rechunkify and comment is None:
@@ -1344,7 +1344,8 @@ class ArchiveRecreater:
             self.process_items(archive, target, resume_from)
         except self.Interrupted as e:
             return self.save(archive, target, completed=False, metadata=e.metadata)
-        return self.save(archive, target, comment)
+        replace_original = target_name is None
+        return self.save(archive, target, comment, replace_original=replace_original)
 
     def process_items(self, archive, target, resume_from=None):
         matcher = self.matcher
@@ -1475,7 +1476,7 @@ class ArchiveRecreater:
         logger.debug('Copied %d chunks from a partially processed item', len(partial_chunks))
         return partial_chunks
 
-    def save(self, archive, target, comment=None, completed=True, metadata=None):
+    def save(self, archive, target, comment=None, completed=True, metadata=None, replace_original=True):
         """Save target archive. If completed, replace source. If not, save temporary with additional 'metadata' dict."""
         if self.dry_run:
             return completed
@@ -1487,8 +1488,9 @@ class ArchiveRecreater:
                 'cmdline': archive.metadata[b'cmdline'],
                 'recreate_cmdline': sys.argv,
             })
-            archive.delete(Statistics(), progress=self.progress)
-            target.rename(archive.name)
+            if replace_original:
+                archive.delete(Statistics(), progress=self.progress)
+                target.rename(archive.name)
             if self.stats:
                 target.end = datetime.utcnow()
                 log_multi(DASHES,
@@ -1540,11 +1542,11 @@ class ArchiveRecreater:
         matcher.add(tag_files, True)
         matcher.add(tagged_dirs, False)
 
-    def create_target_or_resume(self, archive):
+    def create_target_or_resume(self, archive, target_name=None):
         """Create new target archive or resume from temporary archive, if it exists. Return archive, resume from path"""
         if self.dry_run:
             return self.FakeTargetArchive(), None
-        target_name = archive.name + '.recreate'
+        target_name = target_name or archive.name + '.recreate'
         resume = target_name in self.manifest.archives
         target, resume_from = None, None
         if resume:

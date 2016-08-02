@@ -120,8 +120,13 @@ class RepositoryServer:  # pragma: no cover
             path = path[1:]
         path = os.path.realpath(os.path.expanduser(path))
         if self.restrict_to_paths:
+            # if --restrict-to-path P is given, we make sure that we only operate in/below path P.
+            # for the prefix check, it is important that the compared pathes both have trailing slashes,
+            # so that a path /foobar will NOT be accepted with --restrict-to-path /foo option.
+            path_with_sep = os.path.join(path, '')  # make sure there is a trailing slash (os.sep)
             for restrict_to_path in self.restrict_to_paths:
-                if path.startswith(os.path.realpath(restrict_to_path)):
+                restrict_to_path_with_sep = os.path.join(os.path.realpath(restrict_to_path), '')  # trailing slash
+                if path_with_sep.startswith(restrict_to_path_with_sep):
                     break
             else:
                 raise PathNotAllowed(path)

@@ -114,7 +114,7 @@ class RepositoryServer:  # pragma: no cover
     def negotiate(self, versions):
         return RPC_PROTOCOL_VERSION
 
-    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=False, append_only=False):
+    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=None, append_only=False):
         path = os.fsdecode(path)
         if path.startswith('/~'):
             path = path[1:]

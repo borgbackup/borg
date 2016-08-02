@@ -79,7 +79,7 @@ class Repository:
         if self.do_create:
             self.do_create = False
             self.create(self.path)
-        self.open(self.path, self.exclusive, lock_wait=self.lock_wait, lock=self.do_lock)
+        self.open(self.path, bool(self.exclusive), lock_wait=self.lock_wait, lock=self.do_lock)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -317,6 +317,9 @@ class Repository:
         self.compact = set()
 
     def replay_segments(self, index_transaction_id, segments_transaction_id):
+        # fake an old client, so that in case we do not have an exclusive lock yet, prepare_txn will upgrade the lock:
+        remember_exclusive = self.exclusive
+        self.exclusive = None
         self.prepare_txn(index_transaction_id, do_cleanup=False)
         try:
             segment_count = sum(1 for _ in self.io.segment_iterator())
@@ -332,6 +335,7 @@ class Repository:
             pi.finish()
             self.write_index()
         finally:
+            self.exclusive = remember_exclusive
             self.rollback()
 
     def _update_index(self, segment, objects, report=None):

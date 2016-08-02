@@ -68,7 +68,7 @@ static int hash_sizes[] = {
 };
 
 #define HASH_MIN_LOAD .25
-#define HASH_MAX_LOAD .75  /* don't go higher than 0.75, otherwise performance severely suffers! */
+#define HASH_MAX_LOAD 0.95  /* don't go higher than 0.75, otherwise performance severely suffers! */
 
 #define MAX(x, y) ((x) > (y) ? (x): (y))
 #define NELEMS(x) (sizeof(x) / sizeof((x)[0]))
@@ -111,7 +111,7 @@ hashindex_index(HashIndex *index, const void *key)
 static int
 hashindex_lookup(HashIndex *index, const void *key)
 {
-    int didx = -1;
+    int didx = -1;  // deleted index
     int start = hashindex_index(index, key);
     int idx = start;
     for(;;) {
@@ -126,6 +126,7 @@ hashindex_lookup(HashIndex *index, const void *key)
         }
         else if(BUCKET_MATCHES_KEY(index, idx, key)) {
             if (didx != -1) {
+                /* we found a toombstone earlier, so we can move this key on top of it */
                 memcpy(BUCKET_ADDR(index, didx), BUCKET_ADDR(index, idx), index->bucket_size);
                 BUCKET_MARK_DELETED(index, idx);
                 idx = didx;
@@ -376,31 +377,69 @@ hashindex_get(HashIndex *index, const void *key)
     return BUCKET_ADDR(index, idx) + index->key_size;
 }
 
+inline
+int
+distance(HashIndex  *index, int current_idx, int ideal_idx)
+{
+    /* If the current index is smaller than the ideal index we've wrapped
+       around the end of the bucket array and need to compensate for that. */
+    return current_idx - ideal_idx + ( (current_idx < ideal_idx) ? index->num_buckets : 0 );
+}
+
 static int
 hashindex_set(HashIndex *index, const void *key, const void *value)
 {
     int idx = hashindex_lookup(index, key);
-    uint8_t *ptr;
+    uint8_t *bucket_ptr;
+    int offset = 0;
+    int other_offset;
+    void *bucket = malloc(index->key_size + index->value_size);
+    void *buffer = malloc(index->key_size + index->value_size);
     if(idx < 0)
     {
+        /* we don't have the key in the index
+           we need to find an appropriate address */
         if(index->num_entries > index->upper_limit) {
+            /* we need to grow the hashindex */
             if(!hashindex_resize(index, grow_size(index->num_buckets))) {
                 return 0;
             }
         }
         idx = hashindex_index(index, key);
+        memcpy(bucket, key, index->key_size);
+        memcpy(bucket + index->key_size, value, index->value_size);
+        bucket_ptr = BUCKET_ADDR(index, idx);
         while(!BUCKET_IS_EMPTY(index, idx) && !BUCKET_IS_DELETED(index, idx)) {
+            /* we have a collision */
+            other_offset = distance(
+                index, idx, hashindex_index(index, bucket_ptr));
+            if ( other_offset < offset) {
+                /* Swap the bucket at idx with the current key/value pair.
+                   This is the gist of hobin-hood hashing, we rob from
+                   the key with the lower distance to it's optimal address
+                   by swaping places with it.
+                 */
+                memcpy(buffer, bucket_ptr, (index->key_size + index->value_size));
+                memcpy(bucket_ptr, bucket, (index->key_size + index->value_size));
+                memcpy(bucket , buffer, (index->key_size + index->value_size));
+                offset = other_offset;
+            } else {
+                offset++;
+            }
             idx = (idx + 1) % index->num_buckets;
+            bucket_ptr = BUCKET_ADDR(index, idx);
         }
-        ptr = BUCKET_ADDR(index, idx);
-        memcpy(ptr, key, index->key_size);
-        memcpy(ptr + index->key_size, value, index->value_size);
+        memcpy(bucket_ptr, bucket, (index->key_size + index->value_size));
         index->num_entries += 1;
     }
     else
     {
+        /* we already have the key in the index
+           we just need to update it's value */
         memcpy(BUCKET_ADDR(index, idx) + index->key_size, value, index->value_size);
     }
+    free(buffer);
+    free(bucket);
     return 1;
 }
 

@@ -829,7 +829,8 @@ class Archiver:
             EOF
             $ borg create --exclude-from exclude.txt backup /\n\n''')
     helptext['placeholders'] = textwrap.dedent('''
-        Repository (or Archive) URLs and --prefix values support these placeholders:
+        Repository (or Archive) URLs, --prefix and --remote-path values support these
+        placeholders:
 
         {hostname}
 
@@ -855,7 +856,11 @@ class Archiver:
 
             The current process ID.
 
-        Examples::
+        {borgversion}
+
+            The version of borg.
+
+       Examples::
 
             borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
             borg create /path/to/repo::{hostname}-{now:%Y-%m-%d_%H:%M:%S} ...
@@ -1069,7 +1074,7 @@ class Archiver:
         checkpoints and treated in special ways.
 
         In the archive name, you may use the following format tags:
-        {now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}
+        {now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}, {borgversion}
 
         To speed up pulling backups over sshfs and similar network file systems which do
         not provide correct inode information the --ignore-inode flag can be used. This

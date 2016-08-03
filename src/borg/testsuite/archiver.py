@@ -36,6 +36,7 @@ from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import has_lchflags, has_llfuse
 from . import BaseTestCase, changedir, environment_variable
+from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported
 
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -274,10 +275,12 @@ class ArchiverTestCaseBase(BaseTestCase):
         # File mode
         os.chmod('input/file1', 0o4755)
         # Hard link
-        os.link(os.path.join(self.input_path, 'file1'),
-                os.path.join(self.input_path, 'hardlink'))
+        if are_hardlinks_supported():
+            os.link(os.path.join(self.input_path, 'file1'),
+                    os.path.join(self.input_path, 'hardlink'))
         # Symlink
-        os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
+        if are_symlinks_supported():
+            os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
         if xattr.is_enabled(self.input_path):
             xattr.setxattr(os.path.join(self.input_path, 'file1'), 'user.foo', b'bar')
             # XXX this always fails for me
@@ -287,7 +290,8 @@ class ArchiverTestCaseBase(BaseTestCase):
             # so that the test setup for all tests using it does not fail here always for others.
             # xattr.setxattr(os.path.join(self.input_path, 'link1'), 'user.foo_symlink', b'bar_symlink', follow_symlinks=False)
         # FIFO node
-        os.mkfifo(os.path.join(self.input_path, 'fifo1'))
+        if are_fifos_supported():
+            os.mkfifo(os.path.join(self.input_path, 'fifo1'))
         if has_lchflags:
             platform.set_flags(os.path.join(self.input_path, 'flagfile'), stat.UF_NODUMP)
         try:
@@ -332,12 +336,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             'input/dir2',
             'input/dir2/file2',
             'input/empty',
-            'input/fifo1',
             'input/file1',
             'input/flagfile',
-            'input/hardlink',
-            'input/link1',
         ]
+        if are_fifos_supported():
+            expected.append('input/fifo1')
+        if are_symlinks_supported():
+            expected.append('input/link1')
+        if are_hardlinks_supported():
+            expected.append('input/hardlink')
         if not have_root:
             # we could not create these device files without (fake)root
             expected.remove('input/bdev')
@@ -373,14 +380,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_unix_socket(self):
         self.cmd('init', self.repository_location)
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.bind(os.path.join(self.input_path, 'unix-socket'))
+        try:
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.bind(os.path.join(self.input_path, 'unix-socket'))
+        except PermissionError as err:
+            if err.errno == errno.EPERM:
+                pytest.skip('unix sockets disabled or not supported')
+            elif err.errno == errno.EACCES:
+                pytest.skip('permission denied to create unix sockets')
         self.cmd('create', self.repository_location + '::test', 'input')
         sock.close()
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
             assert not os.path.exists('input/unix-socket')
 
+    @pytest.mark.skipif(not are_symlinks_supported(), reason='symlinks not supported')
     def test_symlink_extract(self):
         self.create_test_files()
         self.cmd('init', self.repository_location)
@@ -389,6 +403,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
             assert os.readlink('input/link1') == 'somewhere'
 
+    @pytest.mark.skipif(not is_utime_fully_supported(), reason='cannot properly setup and execute test without utime')
     def test_atime(self):
         def has_noatime(some_file):
             atime_before = os.stat(some_file).st_atime_ns
@@ -557,6 +572,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
 
+    @pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
     def test_strip_components_links(self):
         self._extract_hardlinks_setup()
         with changedir('output'):
@@ -569,6 +585,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
             assert os.stat('input/dir1/hardlink').st_nlink == 4
 
+    @pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
     def test_extract_hardlinks(self):
         self._extract_hardlinks_setup()
         with changedir('output'):
@@ -997,6 +1014,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # Restore permissions so shutil.rmtree is able to delete it
             os.system('chmod -R u+w ' + self.repository_path)
 
+    @pytest.mark.skipif('BORG_TESTS_IGNORE_MODES' in os.environ, reason='modes unreliable')
     def test_umask(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', self.repository_location)
@@ -1362,24 +1380,27 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 else:
                     assert False, "expected OSError(ENOATTR), but no error was raised"
             # hardlink (to 'input/file1')
-            in_fn = 'input/hardlink'
-            out_fn = os.path.join(mountpoint, 'input', 'hardlink')
-            sti2 = os.stat(in_fn)
-            sto2 = os.stat(out_fn)
-            assert sti2.st_nlink == sto2.st_nlink == 2
-            assert sto1.st_ino == sto2.st_ino
+            if are_hardlinks_supported():
+                in_fn = 'input/hardlink'
+                out_fn = os.path.join(mountpoint, 'input', 'hardlink')
+                sti2 = os.stat(in_fn)
+                sto2 = os.stat(out_fn)
+                assert sti2.st_nlink == sto2.st_nlink == 2
+                assert sto1.st_ino == sto2.st_ino
             # symlink
-            in_fn = 'input/link1'
-            out_fn = os.path.join(mountpoint, 'input', 'link1')
-            sti = os.stat(in_fn, follow_symlinks=False)
-            sto = os.stat(out_fn, follow_symlinks=False)
-            assert stat.S_ISLNK(sti.st_mode)
-            assert stat.S_ISLNK(sto.st_mode)
-            assert os.readlink(in_fn) == os.readlink(out_fn)
+            if are_symlinks_supported():
+                in_fn = 'input/link1'
+                out_fn = os.path.join(mountpoint, 'input', 'link1')
+                sti = os.stat(in_fn, follow_symlinks=False)
+                sto = os.stat(out_fn, follow_symlinks=False)
+                assert stat.S_ISLNK(sti.st_mode)
+                assert stat.S_ISLNK(sto.st_mode)
+                assert os.readlink(in_fn) == os.readlink(out_fn)
             # FIFO
-            out_fn = os.path.join(mountpoint, 'input', 'fifo1')
-            sto = os.stat(out_fn)
-            assert stat.S_ISFIFO(sto.st_mode)
+            if are_fifos_supported():
+                out_fn = os.path.join(mountpoint, 'input', 'fifo1')
+                sto = os.stat(out_fn)
+                assert stat.S_ISFIFO(sto.st_mode)
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
     def test_fuse_allow_damaged_files(self):
@@ -1490,6 +1511,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert 'dir2/file2' in listing
         assert 'dir2/file3' not in listing
 
+    @pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
     def test_recreate_subtree_hardlinks(self):
         # This is essentially the same problem set as in test_extract_hardlinks
         self._extract_hardlinks_setup()
@@ -1893,17 +1915,19 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file_replaced', size=1024)
         os.mkdir('input/dir_replaced_with_file')
         os.chmod('input/dir_replaced_with_file', stat.S_IFDIR | 0o755)
-        os.mkdir('input/dir_replaced_with_link')
         os.mkdir('input/dir_removed')
-        os.symlink('input/dir_replaced_with_file', 'input/link_changed')
-        os.symlink('input/file_unchanged', 'input/link_removed')
-        os.symlink('input/file_removed2', 'input/link_target_removed')
-        os.symlink('input/empty', 'input/link_target_contents_changed')
-        os.symlink('input/empty', 'input/link_replaced_by_file')
-        os.link('input/empty', 'input/hardlink_contents_changed')
-        os.link('input/file_removed', 'input/hardlink_removed')
-        os.link('input/file_removed2', 'input/hardlink_target_removed')
-        os.link('input/file_replaced', 'input/hardlink_target_replaced')
+        if are_symlinks_supported():
+            os.mkdir('input/dir_replaced_with_link')
+            os.symlink('input/dir_replaced_with_file', 'input/link_changed')
+            os.symlink('input/file_unchanged', 'input/link_removed')
+            os.symlink('input/file_removed2', 'input/link_target_removed')
+            os.symlink('input/empty', 'input/link_target_contents_changed')
+            os.symlink('input/empty', 'input/link_replaced_by_file')
+        if are_hardlinks_supported():
+            os.link('input/empty', 'input/hardlink_contents_changed')
+            os.link('input/file_removed', 'input/hardlink_removed')
+            os.link('input/file_removed2', 'input/hardlink_target_removed')
+            os.link('input/file_replaced', 'input/hardlink_target_replaced')
 
         # Create the first snapshot
         self.cmd('create', self.repository_location + '::test0', 'input')
@@ -1919,16 +1943,18 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         os.chmod('input/dir_replaced_with_file', stat.S_IFREG | 0o755)
         os.mkdir('input/dir_added')
         os.rmdir('input/dir_removed')
-        os.rmdir('input/dir_replaced_with_link')
-        os.symlink('input/dir_added', 'input/dir_replaced_with_link')
-        os.unlink('input/link_changed')
-        os.symlink('input/dir_added', 'input/link_changed')
-        os.symlink('input/dir_added', 'input/link_added')
-        os.unlink('input/link_removed')
-        os.unlink('input/link_replaced_by_file')
-        self.create_regular_file('link_replaced_by_file', size=16384)
-        os.unlink('input/hardlink_removed')
-        os.link('input/file_added', 'input/hardlink_added')
+        if are_symlinks_supported():
+            os.rmdir('input/dir_replaced_with_link')
+            os.symlink('input/dir_added', 'input/dir_replaced_with_link')
+            os.unlink('input/link_changed')
+            os.symlink('input/dir_added', 'input/link_changed')
+            os.symlink('input/dir_added', 'input/link_added')
+            os.unlink('input/link_replaced_by_file')
+            self.create_regular_file('link_replaced_by_file', size=16384)
+            os.unlink('input/link_removed')
+        if are_hardlinks_supported():
+            os.unlink('input/hardlink_removed')
+            os.link('input/file_added', 'input/hardlink_added')
 
         with open('input/empty', 'ab') as fd:
             fd.write(b'appended_data')
@@ -1945,49 +1971,57 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             assert 'input/file_unchanged' not in output
 
             # Directory replaced with a regular file
-            assert '[drwxr-xr-x -> -rwxr-xr-x] input/dir_replaced_with_file' in output
+            if 'BORG_TESTS_IGNORE_MODES' not in os.environ:
+                assert '[drwxr-xr-x -> -rwxr-xr-x] input/dir_replaced_with_file' in output
 
             # Basic directory cases
             assert 'added directory     input/dir_added' in output
             assert 'removed directory   input/dir_removed' in output
 
-            # Basic symlink cases
-            assert 'changed link        input/link_changed' in output
-            assert 'added link          input/link_added' in output
-            assert 'removed link        input/link_removed' in output
+            if are_symlinks_supported():
+                # Basic symlink cases
+                assert 'changed link        input/link_changed' in output
+                assert 'added link          input/link_added' in output
+                assert 'removed link        input/link_removed' in output
 
-            # Symlink replacing or being replaced
-            assert '] input/dir_replaced_with_link' in output
-            assert '] input/link_replaced_by_file' in output
+                # Symlink replacing or being replaced
+                assert '] input/dir_replaced_with_link' in output
+                assert '] input/link_replaced_by_file' in output
 
-            # Symlink target removed. Should not affect the symlink at all.
-            assert 'input/link_target_removed' not in output
+                # Symlink target removed. Should not affect the symlink at all.
+                assert 'input/link_target_removed' not in output
 
             # The inode has two links and the file contents changed. Borg
             # should notice the changes in both links. However, the symlink
             # pointing to the file is not changed.
             assert '0 B input/empty' in output
-            assert '0 B input/hardlink_contents_changed' in output
-            assert 'input/link_target_contents_changed' not in output
+            if are_hardlinks_supported():
+                assert '0 B input/hardlink_contents_changed' in output
+            if are_symlinks_supported():
+                assert 'input/link_target_contents_changed' not in output
 
             # Added a new file and a hard link to it. Both links to the same
             # inode should appear as separate files.
             assert 'added       2.05 kB input/file_added' in output
-            assert 'added       2.05 kB input/hardlink_added' in output
+            if are_hardlinks_supported():
+                assert 'added       2.05 kB input/hardlink_added' in output
 
             # The inode has two links and both of them are deleted. They should
             # appear as two deleted files.
             assert 'removed       256 B input/file_removed' in output
-            assert 'removed       256 B input/hardlink_removed' in output
+            if are_hardlinks_supported():
+                assert 'removed       256 B input/hardlink_removed' in output
 
             # Another link (marked previously as the source in borg) to the
             # same inode was removed. This should not change this link at all.
-            assert 'input/hardlink_target_removed' not in output
+            if are_hardlinks_supported():
+                assert 'input/hardlink_target_removed' not in output
 
             # Another link (marked previously as the source in borg) to the
             # same inode was replaced with a new regular file. This should not
             # change this link at all.
-            assert 'input/hardlink_target_replaced' not in output
+            if are_hardlinks_supported():
+                assert 'input/hardlink_target_replaced' not in output
 
         do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1a'), '1a')
         # We expect exit_code=1 due to the chunker params warning

@@ -10,6 +10,15 @@ This chapter will get you started with |project_name| development.
 |project_name| is written in Python (with a little bit of Cython and C for
 the performance critical parts).
 
+Code and issues
+---------------
+
+Code is stored on Github, in the `Borgbackup organization
+<https://github.com/borgbackup/borg/>`_. `Issues
+<https://github.com/borgbackup/borg/issues>`_ and `pull requests
+<https://github.com/borgbackup/borg/pulls>`_ should be sent there as
+well. See also the :ref:`support` section for more details.
+
 Style guide
 -----------
 

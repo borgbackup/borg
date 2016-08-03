@@ -103,6 +103,18 @@ leaving the local machine. We do not mean the transport layer encryption
 by that, but the data/metadata itself. Transport layer encryption (e.g.
 when ssh is used as a transport) applies additionally.
 
+Why are files always transferred when doing a pull backup mounting remote shares?
+---------------------------------------------------------------------------------
+
+Check that the filesystem you are mounting support reading the remote file
+inode numbers and use stable mount points (not random generated temporary
+directories for example). If the directory where you mount the remote host
+filesystem is different for each backup, borgbackup assume it is a different
+file even if it hasn't changed so it will need to check all file segments
+and transfer data over the remote filesystem protocol consumming time and
+network resources. It will not use more backup disk space since segments
+are there from previous backups.
+
 When backing up to remote servers, do I have to trust the remote server?
 ------------------------------------------------------------------------
 

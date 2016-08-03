@@ -196,10 +196,13 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             ttl = int(os.environ.get('BORG_FILES_CACHE_TTL', 20))
             with open(os.path.join(self.path, 'files'), 'wb') as fd:
                 for path_hash, item in self.files.items():
-                    # Discard cached files with the newest mtime to avoid
-                    # issues with filesystem snapshots and mtime precision
+                    # Only keep files seen in this backup that are older than newest mtime seen in this backup -
+                    # this is to avoid issues with filesystem snapshots and mtime granularity.
+                    # Also keep files from older backups that have not reached BORG_FILES_CACHE_TTL yet.
                     item = msgpack.unpackb(item)
-                    if item[0] < ttl and bigint_to_int(item[3]) < self._newest_mtime:
+                    age = item[0]
+                    if age == 0 and bigint_to_int(item[3]) < self._newest_mtime or \
+                       age > 0 and age < ttl:
                         msgpack.pack((path_hash, item), fd)
         self.config.set('cache', 'manifest', hexlify(self.manifest.id).decode('ascii'))
         self.config.set('cache', 'timestamp', self.manifest.timestamp)

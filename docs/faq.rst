@@ -368,6 +368,11 @@ will be slow because it would chunk all the files each time. If you set
 BORG_FILES_CACHE_TTL to at least 26 (or maybe even a small multiple of that),
 it would be much faster.
 
+Another possible reason is that files don't always have the same path, for
+example if you mount a filesystem without stable mount points for each backup.
+If the directory where you mount a filesystem is different every time, Borg
+assume they are different files even if they haven't changed.
+
 
 Is there a way to limit bandwidth with |project_name|?
 ------------------------------------------------------

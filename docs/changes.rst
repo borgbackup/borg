@@ -58,8 +58,8 @@ Security fixes:
 - fix security issue with remote repository access, #1428
 
 
-Version 1.0.7rc1 (not released yet)
------------------------------------
+Version 1.0.7rc1 (2016-08-05)
+-----------------------------
 
 Bug fixes:
 

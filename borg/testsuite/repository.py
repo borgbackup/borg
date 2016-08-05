@@ -6,17 +6,23 @@ from unittest.mock import patch
 
 from ..hashindex import NSIndex
 from ..helpers import Location, IntegrityError
-from ..locking import UpgradableLock, LockFailed
+from ..locking import Lock, LockFailed
 from ..remote import RemoteRepository, InvalidRPCMethod
 from ..repository import Repository, LoggedIO, TAG_COMMIT
 from . import BaseTestCase
 
 
+UNSPECIFIED = object()  # for default values where we can't use None
+
+
 class RepositoryTestCaseBase(BaseTestCase):
     key_size = 32
+    exclusive = True
 
-    def open(self, create=False):
-        return Repository(os.path.join(self.tmppath, 'repository'), create=create)
+    def open(self, create=False, exclusive=UNSPECIFIED):
+        if exclusive is UNSPECIFIED:
+            exclusive = self.exclusive
+        return Repository(os.path.join(self.tmppath, 'repository'), exclusive=exclusive, create=create)
 
     def setUp(self):
         self.tmppath = tempfile.mkdtemp()
@@ -27,10 +33,10 @@ class RepositoryTestCaseBase(BaseTestCase):
         self.repository.close()
         shutil.rmtree(self.tmppath)
 
-    def reopen(self):
+    def reopen(self, exclusive=UNSPECIFIED):
         if self.repository:
             self.repository.close()
-        self.repository = self.open()
+        self.repository = self.open(exclusive=exclusive)
 
 
 class RepositoryTestCase(RepositoryTestCaseBase):
@@ -156,17 +162,6 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
             self.assert_equal(len(self.repository), 3)
             self.assert_equal(self.repository.check(), True)
 
-    def test_replay_of_readonly_repository(self):
-        self.add_keys()
-        for name in os.listdir(self.repository.path):
-            if name.startswith('index.'):
-                os.unlink(os.path.join(self.repository.path, name))
-        with patch.object(UpgradableLock, 'upgrade', side_effect=LockFailed) as upgrade:
-            self.reopen()
-            with self.repository:
-                self.assert_raises(LockFailed, lambda: len(self.repository))
-                upgrade.assert_called_once_with()
-
     def test_crash_before_write_index(self):
         self.add_keys()
         self.repository.write_index = None
@@ -178,6 +173,32 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         with self.repository:
             self.assert_equal(len(self.repository), 3)
             self.assert_equal(self.repository.check(), True)
+
+    def test_replay_lock_upgrade_old(self):
+        self.add_keys()
+        for name in os.listdir(self.repository.path):
+            if name.startswith('index.'):
+                os.unlink(os.path.join(self.repository.path, name))
+        with patch.object(Lock, 'upgrade', side_effect=LockFailed) as upgrade:
+            self.reopen(exclusive=None)  # simulate old client that always does lock upgrades
+            with self.repository:
+                # the repo is only locked by a shared read lock, but to replay segments,
+                # we need an exclusive write lock - check if the lock gets upgraded.
+                self.assert_raises(LockFailed, lambda: len(self.repository))
+                upgrade.assert_called_once_with()
+
+    def test_replay_lock_upgrade(self):
+        self.add_keys()
+        for name in os.listdir(self.repository.path):
+            if name.startswith('index.'):
+                os.unlink(os.path.join(self.repository.path, name))
+        with patch.object(Lock, 'upgrade', side_effect=LockFailed) as upgrade:
+            self.reopen(exclusive=False)  # current client usually does not do lock upgrade, except for replay
+            with self.repository:
+                # the repo is only locked by a shared read lock, but to replay segments,
+                # we need an exclusive write lock - check if the lock gets upgraded.
+                self.assert_raises(LockFailed, lambda: len(self.repository))
+                upgrade.assert_called_once_with()
 
     def test_crash_before_deleting_compacted_segments(self):
         self.add_keys()
@@ -202,7 +223,7 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
 
 class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
     def open(self, create=False):
-        return Repository(os.path.join(self.tmppath, 'repository'), create=create, append_only=True)
+        return Repository(os.path.join(self.tmppath, 'repository'), exclusive=True, create=create, append_only=True)
 
     def test_destroy_append_only(self):
         # Can't destroy append only repo (via the API)
@@ -365,7 +386,8 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
 class RemoteRepositoryTestCase(RepositoryTestCase):
 
     def open(self, create=False):
-        return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')), create=create)
+        return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')),
+                                exclusive=True, create=create)
 
     def test_invalid_rpc(self):
         self.assert_raises(InvalidRPCMethod, lambda: self.repository.call('__init__', None))
@@ -394,7 +416,8 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
 class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
 
     def open(self, create=False):
-        return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')), create=create)
+        return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')),
+                                exclusive=True, create=create)
 
     def test_crash_before_compact(self):
         # skip this test, we can't mock-patch a Repository class in another process!

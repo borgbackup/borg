@@ -11,7 +11,7 @@ from .logger import create_logger
 logger = create_logger()
 from .helpers import Error, get_cache_dir, decode_dict, int_to_bigint, \
     bigint_to_int, format_file_size, yes
-from .locking import UpgradableLock
+from .locking import Lock
 from .hashindex import ChunkIndex
 
 import msgpack
@@ -35,7 +35,7 @@ class Cache:
     @staticmethod
     def break_lock(repository, path=None):
         path = path or os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
-        UpgradableLock(os.path.join(path, 'lock'), exclusive=True).break_lock()
+        Lock(os.path.join(path, 'lock'), exclusive=True).break_lock()
 
     @staticmethod
     def destroy(repository, path=None):
@@ -152,7 +152,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
     def open(self, lock_wait=None):
         if not os.path.isdir(self.path):
             raise Exception('%s Does not look like a Borg cache' % self.path)
-        self.lock = UpgradableLock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait).acquire()
+        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait).acquire()
         self.rollback()
 
     def close(self):

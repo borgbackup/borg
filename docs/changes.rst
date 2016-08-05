@@ -50,6 +50,70 @@ The best check that everything is ok is to run a dry-run extraction::
     borg extract -v --dry-run REPO::ARCHIVE
 
 
+Version 1.0.7 (not released yet)
+--------------------------------
+
+Security fixes:
+
+- fix security issue with remote repository access, #1428
+
+
+Version 1.0.7rc1 (not released yet)
+-----------------------------------
+
+Bug fixes:
+
+- fix repo lock deadlocks (related to lock upgrade), #1220
+- catch unpacker exceptions, resync, #1351
+- fix borg break-lock ignoring BORG_REPO env var, #1324
+- files cache performance fixes (fixes unneccessary re-reading/chunking/
+  hashing of unmodified files for some use cases):
+
+  - fix unintended file cache eviction, #1430
+  - implement BORG_FILES_CACHE_TTL, update FAQ, raise default TTL from 10
+    to 20, #1338
+- FUSE:
+
+  - cache partially read data chunks (performance), #965, #966
+  - always create a root dir, #1125
+- use an OrderedDict for helptext, making the build reproducible, #1346
+- RemoteRepository init: always call close on exceptions, #1370 (cosmetic)
+- ignore stdout/stderr broken pipe errors (cosmetic), #1116
+
+New features:
+
+- better borg versions management support (useful esp. for borg servers
+  wanting to offer multiple borg versions and for clients wanting to choose
+  a specific server borg version), #1392:
+
+  - add BORG_VERSION environment variable before executing "borg serve" via ssh
+  - add new placeholder {borgversion}
+  - substitute placeholders in --remote-path
+
+- borg init --append-only option (makes using the more secure append-only mode
+  more convenient. when used remotely, this requires 1.0.7+ also on the borg
+  server), #1291.
+
+Other changes:
+
+- Vagrantfile:
+
+  - darwin64: upgrade to FUSE for macOS 3.4.1 (aka osxfuse), #1378
+  - xenial64: use user "ubuntu", not "vagrant" (as usual), #1331
+- tests:
+
+  - fix fuse tests on OS X, #1433
+- docs:
+
+  - FAQ: add backup using stable filesystem names recommendation
+  - FAQ about glibc compatibility added, #491, glibc-check improved
+  - FAQ: 'A' unchanged file; remove ambiguous entry age sentence.
+  - OS X: install pkg-config to build with FUSE support, fixes #1400
+  - add notes about shell/sudo pitfalls with env. vars, #1380
+  - added platform feature matrix
+- implement borg debug-dump-repo-objs
+
+
 Version 1.0.6 (2016-07-12)
 --------------------------
 

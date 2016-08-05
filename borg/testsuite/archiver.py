@@ -1130,6 +1130,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert len(output_dir) > 0 and output_dir[0].startswith('000000_')
         assert 'Done.' in output
 
+    def test_debug_dump_repo_objs(self):
+        self.create_test_files()
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            output = self.cmd('debug-dump-repo-objs', self.repository_location)
+        output_dir = sorted(os.listdir('output'))
+        assert len(output_dir) > 0 and output_dir[0].startswith('000000_')
+        assert 'Done.' in output
+
     def test_debug_put_get_delete_obj(self):
         self.cmd('init', self.repository_location)
         data = b'some data'

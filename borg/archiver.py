@@ -681,6 +681,28 @@ class Archiver:
         print('Done.')
         return EXIT_SUCCESS
 
+    @with_repository()
+    def do_debug_dump_repo_objs(self, args, repository, manifest, key):
+        """dump (decrypted, decompressed) repo objects"""
+        marker = None
+        i = 0
+        while True:
+            result = repository.list(limit=10000, marker=marker)
+            if not result:
+                break
+            marker = result[-1]
+            for id in result:
+                cdata = repository.get(id)
+                give_id = id if id != Manifest.MANIFEST_ID else None
+                data = key.decrypt(give_id, cdata)
+                filename = '%06d_%s.obj' % (i, hexlify(id).decode('ascii'))
+                print('Dumping', filename)
+                with open(filename, 'wb') as fd:
+                    fd.write(data)
+                i += 1
+        print('Done.')
+        return EXIT_SUCCESS
+
     @with_repository(manifest=False)
     def do_debug_get_obj(self, args, repository):
         """get object contents from the repository and write it into file"""
@@ -1479,6 +1501,19 @@ class Archiver:
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to dump')
+
+        debug_dump_repo_objs_epilog = textwrap.dedent("""
+        This command dumps raw (but decrypted and decompressed) repo objects to files.
+        """)
+        subparser = subparsers.add_parser('debug-dump-repo-objs', parents=[common_parser],
+                                          description=self.do_debug_dump_repo_objs.__doc__,
+                                          epilog=debug_dump_repo_objs_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='dump repo objects (debug)')
+        subparser.set_defaults(func=self.do_debug_dump_repo_objs)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repo to dump')
 
         debug_get_obj_epilog = textwrap.dedent("""
         This command gets an object from the repository.

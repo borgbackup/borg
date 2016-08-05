@@ -80,8 +80,8 @@ def with_repository(fake=False, create=False, lock=True, exclusive=False, manife
             if argument(args, fake):
                 return method(self, args, repository=None, **kwargs)
             elif location.proto == 'ssh':
-                repository = RemoteRepository(location, create=create, lock_wait=self.lock_wait, lock=lock,
-                                              append_only=append_only, args=args)
+                repository = RemoteRepository(location, create=create, exclusive=argument(args, exclusive),
+                                              lock_wait=self.lock_wait, lock=lock, append_only=append_only, args=args)
             else:
                 repository = Repository(location.path, create=create, exclusive=argument(args, exclusive),
                                         lock_wait=self.lock_wait, lock=lock,
@@ -191,7 +191,7 @@ class Archiver:
             pass
         return self.exit_code
 
-    @with_repository(exclusive='repair', manifest=False)
+    @with_repository(exclusive=True, manifest=False)
     def do_check(self, args, repository):
         """Check repository consistency"""
         if args.repair:
@@ -235,7 +235,7 @@ class Archiver:
         key_new.change_passphrase()  # option to change key protection passphrase, save
         return EXIT_SUCCESS
 
-    @with_repository(fake='dry_run')
+    @with_repository(fake='dry_run', exclusive=True)
     def do_create(self, args, repository, manifest=None, key=None):
         """Create new archive"""
         matcher = PatternMatcher(fallback=True)
@@ -848,7 +848,7 @@ class Archiver:
             print(str(cache))
         return self.exit_code
 
-    @with_repository()
+    @with_repository(exclusive=True)
     def do_prune(self, args, repository, manifest, key):
         """Prune repository archives according to specified rules"""
         if not any((args.secondly, args.minutely, args.hourly, args.daily,
@@ -982,9 +982,12 @@ class Archiver:
             cache.commit()
             return self.exit_code
 
-    @with_repository(manifest=False)
+    @with_repository(manifest=False, exclusive=True)
     def do_with_lock(self, args, repository):
         """run a user specified command with the repository lock held"""
+        # for a new server, this will immediately take an exclusive lock.
+        # to support old servers, that do not have "exclusive" arg in open()
+        # RPC API, we also do it the old way:
         # re-write manifest to start a repository transaction - this causes a
         # lock upgrade to exclusive for remote (and also for local) repositories.
         # by using manifest=False in the decorator, we avoid having to require
@@ -1011,6 +1014,28 @@ class Archiver:
         print('Done.')
         return EXIT_SUCCESS
 
+    @with_repository()
+    def do_debug_dump_repo_objs(self, args, repository, manifest, key):
+        """dump (decrypted, decompressed) repo objects"""
+        marker = None
+        i = 0
+        while True:
+            result = repository.list(limit=10000, marker=marker)
+            if not result:
+                break
+            marker = result[-1]
+            for id in result:
+                cdata = repository.get(id)
+                give_id = id if id != Manifest.MANIFEST_ID else None
+                _, data = key.decrypt(give_id, cdata)
+                filename = '%06d_%s.obj' % (i, bin_to_hex(id))
+                print('Dumping', filename)
+                with open(filename, 'wb') as fd:
+                    fd.write(data)
+                i += 1
+        print('Done.')
+        return EXIT_SUCCESS
+
     @with_repository(manifest=False)
     def do_debug_get_obj(self, args, repository):
         """get object contents from the repository and write it into file"""
@@ -1030,7 +1055,7 @@ class Archiver:
                 print("object %s fetched." % hex_id)
         return EXIT_SUCCESS
 
-    @with_repository(manifest=False)
+    @with_repository(manifest=False, exclusive=True)
     def do_debug_put_obj(self, args, repository):
         """put file(s) contents into the repository"""
         for path in args.paths:
@@ -1042,7 +1067,7 @@ class Archiver:
         repository.commit()
         return EXIT_SUCCESS
 
-    @with_repository(manifest=False)
+    @with_repository(manifest=False, exclusive=True)
     def do_debug_delete_obj(self, args, repository):
         """delete the objects with the given IDs from the repo"""
         modified = False
@@ -1159,7 +1184,8 @@ class Archiver:
             EOF
             $ borg create --exclude-from exclude.txt backup /\n\n''')
     helptext['placeholders'] = textwrap.dedent('''
-        Repository (or Archive) URLs and --prefix values support these placeholders:
+        Repository (or Archive) URLs, --prefix and --remote-path values support these
+        placeholders:
 
         {hostname}
 
@@ -1185,7 +1211,11 @@ class Archiver:
 
             The current process ID.
 
-        Examples::
+        {borgversion}
+
+            The version of borg.
+
+       Examples::
 
             borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
             borg create /path/to/repo::{hostname}-{now:%Y-%m-%d_%H:%M:%S} ...
@@ -1468,7 +1498,7 @@ class Archiver:
         checkpoints and treated in special ways.
 
         In the archive name, you may use the following format tags:
-        {now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}, {uuid4}
+        {now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}, {uuid4}, {borgversion}
 
         To speed up pulling backups over sshfs and similar network file systems which do
         not provide correct inode information the --ignore-inode flag can be used. This
@@ -2130,6 +2160,19 @@ class Archiver:
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to dump')
+
+        debug_dump_repo_objs_epilog = textwrap.dedent("""
+        This command dumps raw (but decrypted and decompressed) repo objects to files.
+        """)
+        subparser = subparsers.add_parser('debug-dump-repo-objs', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_dump_repo_objs.__doc__,
+                                          epilog=debug_dump_repo_objs_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='dump repo objects (debug)')
+        subparser.set_defaults(func=self.do_debug_dump_repo_objs)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repo to dump')
 
         debug_get_obj_epilog = textwrap.dedent("""
         This command gets an object from the repository.

@@ -341,6 +341,35 @@ those files are reported as being added when, really, chunks are
 already used.
 
 
+It always chunks all my files, even unchanged ones!
+---------------------------------------------------
+
+|project_name| maintains a files cache where it remembers the mtime, size and
+inode of files. When |project_name| does a new backup and starts processing a
+file, it first looks whether the file has changed (compared to the values
+stored in the files cache). If the values are the same, the file is assumed
+unchanged and thus its contents won't get chunked (again).
+
+|project_name| can't keep an infinite history of files of course, thus entries
+in the files cache have a "maximum time to live" which is set via the
+environment variable BORG_FILES_CACHE_TTL (and defaults to 20).
+Every time you do a backup (on the same machine, using the same user), the
+cache entries' ttl values of files that were not "seen" are incremented by 1
+and if they reach BORG_FILES_CACHE_TTL, the entry is removed from the cache.
+
+So, for example, if you do daily backups of 26 different data sets A, B,
+C, ..., Z on one machine (using the default TTL), the files from A will be
+already forgotten when you repeat the same backups on the next day and it
+will be slow because it would chunk all the files each time. If you set
+BORG_FILES_CACHE_TTL to at least 26 (or maybe even a small multiple of that),
+it would be much faster.
+
+Another possible reason is that files don't always have the same path, for
+example if you mount a filesystem without stable mount points for each backup.
+If the directory where you mount a filesystem is different every time,
+|project_name| assume they are different files.
+
+
 Is there a way to limit bandwidth with |project_name|?
 ------------------------------------------------------
 
@@ -384,6 +413,25 @@ maybe open an issue in their issue tracker. Do not file an issue in the
 
 If you can reproduce the issue with the proven filesystem, please file an
 issue in the |project_name| issue tracker about that.
+
+
+Requirements for the borg single-file binary, esp. (g)libc?
+-----------------------------------------------------------
+
+We try to build the binary on old, but still supported systems - to keep the
+minimum requirement for the (g)libc low. The (g)libc can't be bundled into
+the binary as it needs to fit your kernel and OS, but Python and all other
+required libraries will be bundled into the binary.
+
+If your system fulfills the minimum (g)libc requirement (see the README that
+is released with the binary), there should be no problem. If you are slightly
+below the required version, maybe just try. Due to the dynamic loading (or not
+loading) of some shared libraries, it might still work depending on what
+libraries are actually loaded and used.
+
+In the borg git repository, there is scripts/glibc_check.py that can determine
+(based on the symbols' versions they want to link to) whether a set of given
+(Linux) binaries works with a given glibc version.
 
 
 Why was Borg forked from Attic?

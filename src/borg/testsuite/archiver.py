@@ -242,7 +242,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         self.cmd('create', self.repository_location + '::' + name, src_dir)
 
     def open_archive(self, name):
-        repository = Repository(self.repository_path)
+        repository = Repository(self.repository_path, exclusive=True)
         with repository:
             manifest, key = Manifest.load(repository)
             archive = Archive(repository, key, manifest, name)
@@ -1334,8 +1334,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
     def test_fuse(self):
+        def has_noatime(some_file):
+            atime_before = os.stat(some_file).st_atime_ns
+            try:
+                os.close(os.open(some_file, flags_noatime))
+            except PermissionError:
+                return False
+            else:
+                atime_after = os.stat(some_file).st_atime_ns
+                noatime_used = flags_noatime != flags_normal
+                return noatime_used and atime_before == atime_after
+
         self.cmd('init', self.repository_location)
         self.create_test_files()
+        have_noatime = has_noatime('input/file1')
         self.cmd('create', self.repository_location + '::archive', 'input')
         self.cmd('create', self.repository_location + '::archive2', 'input')
         if has_lchflags:
@@ -1359,7 +1371,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert sti1.st_uid == sto1.st_uid
             assert sti1.st_gid == sto1.st_gid
             assert sti1.st_size == sto1.st_size
-            assert sti1.st_atime == sto1.st_atime
+            if have_noatime:
+                assert sti1.st_atime == sto1.st_atime
             assert sti1.st_ctime == sto1.st_ctime
             assert sti1.st_mtime == sto1.st_mtime
             # note: there is another hardlink to this, see below
@@ -1468,6 +1481,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test', 'input')
         with changedir('output'):
             output = self.cmd('debug-dump-archive-items', self.repository_location + '::test')
+        output_dir = sorted(os.listdir('output'))
+        assert len(output_dir) > 0 and output_dir[0].startswith('000000_')
+        assert 'Done.' in output
+
+    def test_debug_dump_repo_objs(self):
+        self.create_test_files()
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            output = self.cmd('debug-dump-repo-objs', self.repository_location)
         output_dir = sorted(os.listdir('output'))
         assert len(output_dir) > 0 and output_dir[0].startswith('000000_')
         assert 'Done.' in output
@@ -1842,7 +1865,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 
     def test_extra_chunks(self):
         self.cmd('check', self.repository_location, exit_code=0)
-        with Repository(self.repository_location) as repository:
+        with Repository(self.repository_location, exclusive=True) as repository:
             repository.put(b'01234567890123456789012345678901', b'xxxx')
             repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)

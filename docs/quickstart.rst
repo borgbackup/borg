@@ -149,6 +149,33 @@ certain number of old archives:
     borg prune -v --prefix '{hostname}-' \
         --keep-daily=7 --keep-weekly=4 --keep-monthly=6
 
+Pitfalls with shell variables and environment variables
+-------------------------------------------------------
+
+This applies to all environment variables you want borg to see, not just
+``BORG_PASSPHRASE``. The short explanation is: always ``export`` your variable,
+and use single quotes if you're unsure of the details of your shell's expansion
+behavior. E.g.::
+
+    export BORG_PASSPHRASE='complicated & long'
+
+This is because ``export`` exposes variables to subprocesses, which borg may be
+one of. More on ``export`` can be found in the "ENVIRONMENT" section of the
+bash(1) man page.
+
+Beware of how ``sudo`` interacts with environment variables. For example, you
+may be surprised that the following ``export`` has no effect on your command::
+
+   export BORG_PASSPHRASE='complicated & long'
+   sudo ./yourborgwrapper.sh  # still prompts for password
+
+For more information, see sudo(8) man page. Hint: see ``env_keep`` in
+sudoers(5), or try ``sudo BORG_PASSPHRASE='yourphrase' borg`` syntax.
+
+.. Tip::
+    To debug what your borg process is actually seeing, find its PID
+    (``ps aux|grep borg``) and then look into ``/proc/<PID>/environ``.
+
 .. backup_compression:
 
 Backup compression

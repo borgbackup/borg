@@ -576,6 +576,7 @@ def replace_placeholders(text):
         'utcnow': current_time.utcnow(),
         'user': uid2user(os.getuid(), os.getuid()),
         'uuid4': str(uuid.uuid4()),
+        'borgversion': borg_version,
     }
     return format_line(text, data)
 

@@ -11,6 +11,7 @@ import llfuse
 import msgpack
 
 from .logger import create_logger
+from .lrucache import LRUCache
 logger = create_logger()
 
 from .archive import Archive
@@ -68,17 +69,13 @@ class FuseOperations(llfuse.Operations):
         data_cache_capacity = int(os.environ.get('BORG_MOUNT_DATA_CACHE_ENTRIES', os.cpu_count() or 1))
         logger.debug('mount data cache capacity: %d chunks', data_cache_capacity)
         self.data_cache = LRUCache(capacity=data_cache_capacity, dispose=lambda _: None)
+        self._create_dir(parent=1)  # first call, create root dir (inode == 1)
         if archive:
             self.process_archive(archive)
         else:
-            # Create root inode
-            self.parent[1] = self.allocate_inode()
-            self.items[1] = self.default_dir
             for archive_name in manifest.archives:
                 # Create archive placeholder inode
-                archive_inode = self.allocate_inode()
-                self.items[archive_inode] = self.default_dir
-                self.parent[archive_inode] = 1
+                archive_inode = self._create_dir(parent=1)
                 self.contents[1][os.fsencode(archive_name)] = archive_inode
                 self.pending_archives[archive_inode] = Archive(repository, key, manifest, archive_name)
 
@@ -108,6 +105,14 @@ class FuseOperations(llfuse.Operations):
         finally:
             llfuse.close(umount)
 
+    def _create_dir(self, parent):
+        """Create directory
+        """
+        ino = self.allocate_inode()
+        self.items[ino] = self.default_dir
+        self.parent[ino] = parent
+        return ino
+
     def process_archive(self, archive, prefix=[]):
         """Build fuse inode hierarchy from archive metadata
         """
@@ -132,11 +137,6 @@ class FuseOperations(llfuse.Operations):
                 num_segments = len(segments)
                 parent = 1
                 for i, segment in enumerate(segments, 1):
-                    # Insert a default root inode if needed
-                    if self._inode_count == 0 and segment:
-                        archive_inode = self.allocate_inode()
-                        self.items[archive_inode] = self.default_dir
-                        self.parent[archive_inode] = parent
                     # Leaf segment?
                     if i == num_segments:
                         if 'source' in item and stat.S_ISREG(item.mode):
@@ -152,9 +152,7 @@ class FuseOperations(llfuse.Operations):
                     elif segment in self.contents[parent]:
                         parent = self.contents[parent][segment]
                     else:
-                        inode = self.allocate_inode()
-                        self.items[inode] = self.default_dir
-                        self.parent[inode] = parent
+                        inode = self._create_dir(parent)
                         if segment:
                             self.contents[parent][segment] = inode
                         parent = inode
@@ -282,6 +280,7 @@ class FuseOperations(llfuse.Operations):
                     # evict fully read chunk from cache
                     del self.data_cache[id]
             else:
+                # XXX
                 _, data = self.key.decrypt(id, self.repository.get(id))
                 if offset + n < len(data):
                     # chunk was only partially read, cache it

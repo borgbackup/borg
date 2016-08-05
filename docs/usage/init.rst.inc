@@ -8,7 +8,7 @@ borg init
 
     usage: borg init [-h] [--critical] [--error] [--warning] [--info] [--debug]
                      [--lock-wait N] [--show-rc] [--no-files-cache] [--umask M]
-                     [--remote-path PATH] [-e {none,keyfile,repokey}]
+                     [--remote-path PATH] [-e {none,keyfile,repokey}] [-a]
                      [REPOSITORY]
     
     Initialize an empty repository
@@ -32,6 +32,7 @@ borg init
       --remote-path PATH    set remote path to executable (default: "borg")
       -e {none,keyfile,repokey}, --encryption {none,keyfile,repokey}
                             select encryption key mode (default: "repokey")
+      -a, --append-only     create an append-only mode repository
     
 Description
 ~~~~~~~~~~~

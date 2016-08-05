@@ -9,7 +9,7 @@ borg break-lock
     usage: borg break-lock [-h] [--critical] [--error] [--warning] [--info]
                            [--debug] [--lock-wait N] [--show-rc]
                            [--no-files-cache] [--umask M] [--remote-path PATH]
-                           REPOSITORY
+                           [REPOSITORY]
     
     Break the repository lock (e.g. in case it was left by a dead borg.
     

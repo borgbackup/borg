@@ -371,12 +371,13 @@ class Archiver:
         sparse = args.sparse
         strip_components = args.strip_components
         dirs = []
-        for item in archive.iter_items(lambda item: matcher.match(item[b'path']), preload=True):
+        filter = lambda item: matcher.match(item[b'path'])
+        if strip_components:
+            filter = lambda item: matcher.match(item[b'path']) and os.sep.join(item[b'path'].split(os.sep)[strip_components:])
+        for item in archive.iter_items(filter, preload=True):
             orig_path = item[b'path']
             if strip_components:
                 item[b'path'] = os.sep.join(orig_path.split(os.sep)[strip_components:])
-                if not item[b'path']:
-                    continue
             if not args.dry_run:
                 while dirs and not item[b'path'].startswith(dirs[-1][b'path']):
                     dir_item = dirs.pop(-1)

@@ -424,6 +424,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 while not self.to_send and (calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT:
                     if calls:
                         if is_preloaded:
+                            assert cmd == "get", "is_preload is only supported for 'get'"
                             if calls[0] in self.cache:
                                 waiting_for.append(fetch_from_cache(calls.pop(0)))
                         else:
@@ -438,7 +439,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                         args = (self.preload_ids.pop(0),)
                         self.msgid += 1
                         self.cache.setdefault(args, []).append(self.msgid)
-                        self.to_send = msgpack.packb((1, self.msgid, cmd, args))
+                        self.to_send = msgpack.packb((1, self.msgid, 'get', args))
 
                 if self.to_send:
                     try:

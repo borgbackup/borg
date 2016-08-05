@@ -998,10 +998,25 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
     def test_fuse(self):
+        def has_noatime(some_file):
+            atime_before = os.stat(some_file).st_atime_ns
+            try:
+                os.close(os.open(some_file, flags_noatime))
+            except PermissionError:
+                return False
+            else:
+                atime_after = os.stat(some_file).st_atime_ns
+                noatime_used = flags_noatime != flags_normal
+                return noatime_used and atime_before == atime_after
+
         self.cmd('init', self.repository_location)
         self.create_test_files()
+        have_noatime = has_noatime('input/file1')
         self.cmd('create', self.repository_location + '::archive', 'input')
         self.cmd('create', self.repository_location + '::archive2', 'input')
+        if has_lchflags:
+            # remove the file we did not backup, so input and mount become equal
+            os.remove(os.path.join('input', 'flagfile'))
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
         # mount the whole repository, archive contents shall show up in archivename subdirs of mountpoint:
         with self.fuse_mount(self.repository_location, mountpoint):
@@ -1020,7 +1035,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert sti1.st_uid == sto1.st_uid
             assert sti1.st_gid == sto1.st_gid
             assert sti1.st_size == sto1.st_size
-            assert sti1.st_atime == sto1.st_atime
+            if have_noatime:
+                assert sti1.st_atime == sto1.st_atime
             assert sti1.st_ctime == sto1.st_ctime
             assert sti1.st_mtime == sto1.st_mtime
             # note: there is another hardlink to this, see below

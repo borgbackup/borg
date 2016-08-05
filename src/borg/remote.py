@@ -425,20 +425,21 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     if calls:
                         if is_preloaded:
                             assert cmd == "get", "is_preload is only supported for 'get'"
-                            if calls[0] in self.cache:
-                                waiting_for.append(fetch_from_cache(calls.pop(0)))
+                            if calls[0][0] in self.cache:
+                                waiting_for.append(fetch_from_cache(calls.pop(0)[0]))
                         else:
                             args = calls.pop(0)
-                            if cmd == 'get' and args in self.cache:
-                                waiting_for.append(fetch_from_cache(args))
+                            if cmd == 'get' and args[0] in self.cache:
+                                waiting_for.append(fetch_from_cache(args[0]))
                             else:
                                 self.msgid += 1
                                 waiting_for.append(self.msgid)
                                 self.to_send = msgpack.packb((1, self.msgid, cmd, args))
                     if not self.to_send and self.preload_ids:
-                        args = (self.preload_ids.pop(0),)
+                        chunk_id = self.preload_ids.pop(0)
+                        args = (chunk_id,)
                         self.msgid += 1
-                        self.cache.setdefault(args, []).append(self.msgid)
+                        self.cache.setdefault(chunk_id, []).append(self.msgid)
                         self.to_send = msgpack.packb((1, self.msgid, 'get', args))
 
                 if self.to_send:

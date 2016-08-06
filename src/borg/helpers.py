@@ -597,8 +597,7 @@ def format_time(t):
 def format_timedelta(td):
     """Format timedelta in a human friendly format
     """
-    # Since td.total_seconds() requires python 2.7
-    ts = (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10 ** 6) / float(10 ** 6)
+    ts = td.total_seconds()
     s = ts % 60
     m = int(ts / 60) % 60
     h = int(ts / 3600) % 24

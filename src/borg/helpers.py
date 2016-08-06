@@ -1527,6 +1527,8 @@ class CompressionDecider1:
 
 
 class CompressionDecider2:
+    logger = create_logger('borg.debug.file-compression')
+
     def __init__(self, compression):
         self.compression = compression
 
@@ -1556,7 +1558,7 @@ class CompressionDecider2:
             # that marks such data as uncompressible via compression-type metadata.
             compr_spec = CompressionSpec('none')
         compr_args.update(compr_spec)
-        logger.debug("len(data) == %d, len(lz4(data)) == %d, choosing %s", data_len, cdata_len, compr_spec)
+        self.logger.debug("len(data) == %d, len(lz4(data)) == %d, choosing %s", data_len, cdata_len, compr_spec)
         return compr_args, Chunk(data, **meta)
 
 

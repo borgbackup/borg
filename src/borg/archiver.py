@@ -1225,6 +1225,10 @@ class Archiver:
         common_group.add_argument('--debug', dest='log_level',
                                   action='store_const', const='debug', default='warning',
                                   help='enable debug output, work on log level DEBUG')
+        common_group.add_argument('--debug-topic', dest='debug_topics',
+                                  action='append', metavar='TOPIC', default=[],
+                                  help='enable TOPIC debugging (can be specified multiple times). '
+                                       'The logger path is borg.debug.<TOPIC> if TOPIC is not fully qualified.')
         common_group.add_argument('--lock-wait', dest='lock_wait', type=int, metavar='N', default=1,
                                   help='wait for the lock, but max. N seconds (default: %(default)d).')
         common_group.add_argument('--show-version', dest='show_version', action='store_true', default=False,
@@ -2202,11 +2206,20 @@ class Archiver:
             if args.get(option, False):
                 logging.getLogger(logger_name).setLevel('INFO')
 
+    def _setup_topic_debugging(self, args):
+        """Turn on DEBUG level logging for specified --debug-topics."""
+        for topic in args.debug_topics:
+            if '.' not in topic:
+                topic = 'borg.debug.' + topic
+            logger.debug('Enabling debug topic %s', topic)
+            logging.getLogger(topic).setLevel('DEBUG')
+
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
         setup_logging(level=args.log_level, is_serve=args.func == self.do_serve)  # do not use loggers before this!
         self._setup_implied_logging(vars(args))
+        self._setup_topic_debugging(args)
         if args.show_version:
             logging.getLogger('borg.output.show-version').info('borgbackup version %s' % __version__)
         self.prerun_checks(logger)

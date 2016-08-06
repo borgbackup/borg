@@ -795,7 +795,7 @@ Number of files: {0.stats.nfiles}'''.format(
             # there should be no information in the cache about special files processed in
             # read-special mode, but we better play safe as this was wrong in the past:
             path_hash = ids = None
-        first_run = not cache.files
+        first_run = not cache.files and cache.do_files
         if first_run:
             logger.debug('Processing files ...')
         chunks = None

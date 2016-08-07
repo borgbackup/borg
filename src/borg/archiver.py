@@ -1368,10 +1368,6 @@ class Archiver:
         tamper-resistant as well, unless the attacker has access to the keys.
 
         It is also very slow.
-
-        --verify-data only verifies data used by the archives specified with --last,
-        --prefix or an explicitly named archive. If none of these are passed,
-        all data in the repository is verified.
         """)
         subparser = subparsers.add_parser('check', parents=[common_parser], add_help=False,
                                           description=self.do_check.__doc__,

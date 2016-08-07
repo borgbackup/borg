@@ -887,7 +887,7 @@ def test_progress_percentage_multiline(capfd):
 
 
 def test_progress_percentage_sameline(capfd):
-    pi = ProgressIndicatorPercent(1000, step=5, start=0, same_line=True, msg="%3.0f%%")
+    pi = ProgressIndicatorPercent(1000, step=5, start=0, msg="%3.0f%%")
     pi.show(0)
     out, err = capfd.readouterr()
     assert err == '  0%\r'

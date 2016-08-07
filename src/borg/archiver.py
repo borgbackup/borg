@@ -492,7 +492,7 @@ class Archiver:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 
         if not args.dry_run:
-            pi = ProgressIndicatorPercent(total=len(dirs), msg='Setting directory permissions %3.0f%%', same_line=True)
+            pi = ProgressIndicatorPercent(total=len(dirs), msg='Setting directory permissions %3.0f%%')
             while dirs:
                 pi.show()
                 dir_item = dirs.pop(-1)

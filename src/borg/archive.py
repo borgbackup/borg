@@ -640,7 +640,7 @@ Number of files: {0.stats.nfiles}'''.format(
         try:
             unpacker = msgpack.Unpacker(use_list=False)
             items_ids = self.metadata.items
-            pi = ProgressIndicatorPercent(total=len(items_ids), msg="Decrementing references %3.0f%%", same_line=True)
+            pi = ProgressIndicatorPercent(total=len(items_ids), msg="Decrementing references %3.0f%%")
             for (i, (items_id, data)) in enumerate(zip(items_ids, self.repository.get_many(items_ids))):
                 if progress:
                     pi.show(i)
@@ -1033,7 +1033,7 @@ class ArchiveChecker:
         logger.info('Starting cryptographic data integrity verification...')
         count = len(self.chunks)
         errors = 0
-        pi = ProgressIndicatorPercent(total=count, msg="Verifying data %6.2f%%", step=0.01, same_line=True)
+        pi = ProgressIndicatorPercent(total=count, msg="Verifying data %6.2f%%", step=0.01)
         for chunk_id, (refcount, *_) in self.chunks.iteritems():
             pi.show()
             try:

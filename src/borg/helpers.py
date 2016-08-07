@@ -1105,7 +1105,7 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
 
 
 class ProgressIndicatorPercent:
-    def __init__(self, total, step=5, start=0, same_line=False, msg="%3.0f%%"):
+    def __init__(self, total, step=5, start=0, same_line=True, msg="%3.0f%%"):
         """
         Percentage-based progress indicator
 

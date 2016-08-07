@@ -751,6 +751,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             output = self.cmd('extract', '--list', '--info', self.repository_location + '::test')
         self.assert_in("input/file", output)
 
+    def test_extract_progress(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('file', size=1024 * 80)
+        self.cmd('create', self.repository_location + '::test', 'input')
+
+        with changedir('output'):
+            output = self.cmd('extract', self.repository_location + '::test', '--progress')
+            assert 'Extracting files' in output
+
     def _create_test_caches(self):
         self.cmd('init', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)

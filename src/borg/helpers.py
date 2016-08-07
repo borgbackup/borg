@@ -1142,17 +1142,17 @@ class ProgressIndicatorPercent:
             self.logger.removeHandler(self.handler)
             self.handler.close()
 
-    def progress(self, current=None):
+    def progress(self, current=None, increase=1):
         if current is not None:
             self.counter = current
         pct = self.counter * 100 / self.total
-        self.counter += 1
+        self.counter += increase
         if pct >= self.trigger_at:
             self.trigger_at += self.step
             return pct
 
-    def show(self, current=None):
-        pct = self.progress(current)
+    def show(self, current=None, increase=1):
+        pct = self.progress(current, increase)
         if pct is not None:
             return self.output(pct)
 

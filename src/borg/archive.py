@@ -1537,10 +1537,7 @@ class ArchiveRecreater:
         target = self.create_target_archive(target_name + '.temp')
         logger.info('Replaying items from interrupted operation...')
         last_old_item = self.copy_items(old_target, target)
-        if last_old_item:
-            resume_from = last_old_item.path
-        else:
-            resume_from = None
+        resume_from = getattr(last_old_item, 'path', None)
         self.incref_partial_chunks(old_target, target)
         old_target.delete(Statistics(), progress=self.progress)
         logger.info('Done replaying items')
@@ -1552,7 +1549,10 @@ class ArchiveRecreater:
             if not self.cache.seen_chunk(chunk_id):
                 try:
                     # Repository has __contains__, RemoteRepository doesn't
-                    self.repository.get(chunk_id)
+                    # `chunk_id in repo` doesn't read the data though, so we try to use that if possible.
+                    get_or_in = getattr(self.repository, '__contains__', self.repository.get)
+                    if get_or_in(chunk_id) is False:
+                        raise Repository.ObjectNotFound(chunk_id, self.repository)
                 except Repository.ObjectNotFound:
                     # delete/prune/check between invocations: these chunks are gone.
                     target_archive.recreate_partial_chunks = None

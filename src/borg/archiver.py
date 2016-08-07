@@ -766,15 +766,15 @@ class Archiver:
             manifest, key = Manifest.load(repository)
             n = args.oldest or args.latest
             archives = manifest.list_archive_infos('ts', reverse=args.latest)[:n]
+            if not archives:
+                logger.error('There are no archives.')
+                self.exit_code = EXIT_ERROR
             for archive in archives:
                 logger.info('Deleting %s' % archive.name)
                 args.location.archive = archive.name
                 self._delete_archive(args, repository, manifest)
                 if self.exit_code:
                     break
-            else:
-                logger.error('There are no archives.')
-                self.exit_code = EXIT_ERROR
         return self.exit_code
 
     def _delete_repository(self, args, repository):
@@ -1816,9 +1816,9 @@ class Archiver:
                                type=location_validator(),
                                help='archive or repository to delete')
         group = subparser.add_mutually_exclusive_group()
-        group.add_argument('--oldest', dest='oldest', metavar='n', default=0, type=int,
+        group.add_argument('--oldest', dest='oldest', metavar='N', default=0, type=int,
                            help='delete n oldest archives')
-        group.add_argument('--latest', dest='latest', metavar='n', default=0, type=int,
+        group.add_argument('--latest', dest='latest', metavar='N', default=0, type=int,
                            help='delete n latest archives')
 
         list_epilog = textwrap.dedent("""

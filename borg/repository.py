@@ -731,8 +731,12 @@ class LoggedIO:
         return size, tag, key, data
 
     def write_put(self, id, data, raise_full=False):
+        data_size = len(data)
+        if data_size > MAX_DATA_SIZE:
+            # this would push the segment entry size beyond MAX_OBJECT_SIZE.
+            raise IntegrityError('More than allowed put data [{} > {}]'.format(data_size, MAX_DATA_SIZE))
         fd = self.get_write_fd(raise_full=raise_full)
-        size = len(data) + self.put_header_fmt.size
+        size = data_size + self.put_header_fmt.size
         offset = self.offset
         header = self.header_no_crc_fmt.pack(size, TAG_PUT)
         crc = self.crc_fmt.pack(crc32(data, crc32(id, crc32(header))) & 0xffffffff)
@@ -771,3 +775,6 @@ class LoggedIO:
             self._write_fd.close()
             sync_dir(os.path.dirname(self._write_fd.name))
             self._write_fd = None
+
+
+MAX_DATA_SIZE = MAX_OBJECT_SIZE - LoggedIO.put_header_fmt.size

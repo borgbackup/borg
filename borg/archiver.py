@@ -25,7 +25,7 @@ from .helpers import Error, location_validator, archivename_validator, format_li
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ErrorIgnoringTextIOWrapper
 from .logger import create_logger, setup_logging
 logger = create_logger()
-from .compress import Compressor, COMPR_BUFFER
+from .compress import Compressor
 from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache
@@ -240,9 +240,7 @@ class Archiver:
         dry_run = args.dry_run
         t0 = datetime.utcnow()
         if not dry_run:
-            compr_args = dict(buffer=COMPR_BUFFER)
-            compr_args.update(args.compression)
-            key.compressor = Compressor(**compr_args)
+            key.compressor = Compressor(**args.compression)
             with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,

@@ -18,7 +18,7 @@ from .helpers import format_file_size
 from .helpers import yes
 from .item import Item
 from .key import PlaintextKey
-from .locking import UpgradableLock
+from .locking import Lock
 from .platform import SaveFile
 from .remote import cache_if_remote
 
@@ -44,7 +44,7 @@ class Cache:
     @staticmethod
     def break_lock(repository, path=None):
         path = path or os.path.join(get_cache_dir(), repository.id_str)
-        UpgradableLock(os.path.join(path, 'lock'), exclusive=True).break_lock()
+        Lock(os.path.join(path, 'lock'), exclusive=True).break_lock()
 
     @staticmethod
     def destroy(repository, path=None):
@@ -172,7 +172,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
     def open(self, lock_wait=None):
         if not os.path.isdir(self.path):
             raise Exception('%s Does not look like a Borg cache' % self.path)
-        self.lock = UpgradableLock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait).acquire()
+        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait).acquire()
         self.rollback()
 
     def close(self):
@@ -213,12 +213,15 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not self.txn_active:
             return
         if self.files is not None:
+            ttl = int(os.environ.get('BORG_FILES_CACHE_TTL', 20))
             with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
                 for path_hash, item in self.files.items():
-                    # Discard cached files with the newest mtime to avoid
-                    # issues with filesystem snapshots and mtime precision
+                    # Only keep files seen in this backup that are older than newest mtime seen in this backup -
+                    # this is to avoid issues with filesystem snapshots and mtime granularity.
+                    # Also keep files from older backups that have not reached BORG_FILES_CACHE_TTL yet.
                     entry = FileCacheEntry(*msgpack.unpackb(item))
-                    if entry.age < 10 and bigint_to_int(entry.mtime) < self._newest_mtime:
+                    if entry.age == 0 and bigint_to_int(entry.mtime) < self._newest_mtime or \
+                       entry.age > 0 and entry.age < ttl:
                         msgpack.pack((path_hash, entry), fd)
         self.config.set('cache', 'manifest', self.manifest.id_str)
         self.config.set('cache', 'timestamp', self.manifest.timestamp)

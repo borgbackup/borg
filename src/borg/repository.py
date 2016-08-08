@@ -21,7 +21,7 @@ from .helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size
 from .helpers import Location
 from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
-from .locking import UpgradableLock, LockError, LockErrorT
+from .locking import Lock, LockError, LockErrorT
 from .lrucache import LRUCache
 from .platform import SaveFile, SyncFile, sync_dir
 
@@ -129,7 +129,7 @@ class Repository:
         if self.do_create:
             self.do_create = False
             self.create(self.path)
-        self.open(self.path, self.exclusive, lock_wait=self.lock_wait, lock=self.do_lock)
+        self.open(self.path, bool(self.exclusive), lock_wait=self.lock_wait, lock=self.do_lock)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -221,14 +221,14 @@ class Repository:
         return self.get_index_transaction_id()
 
     def break_lock(self):
-        UpgradableLock(os.path.join(self.path, 'lock')).break_lock()
+        Lock(os.path.join(self.path, 'lock')).break_lock()
 
     def open(self, path, exclusive, lock_wait=None, lock=True):
         self.path = path
         if not os.path.isdir(path):
             raise self.DoesNotExist(path)
         if lock:
-            self.lock = UpgradableLock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait).acquire()
+            self.lock = Lock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait).acquire()
         else:
             self.lock = None
         self.config = ConfigParser(interpolation=None)
@@ -282,14 +282,23 @@ class Repository:
 
     def prepare_txn(self, transaction_id, do_cleanup=True):
         self._active_txn = True
-        try:
-            self.lock.upgrade()
-        except (LockError, LockErrorT):
-            # if upgrading the lock to exclusive fails, we do not have an
-            # active transaction. this is important for "serve" mode, where
-            # the repository instance lives on - even if exceptions happened.
-            self._active_txn = False
-            raise
+        if not self.lock.got_exclusive_lock():
+            if self.exclusive is not None:
+                # self.exclusive is either True or False, thus a new client is active here.
+                # if it is False and we get here, the caller did not use exclusive=True although
+                # it is needed for a write operation. if it is True and we get here, something else
+                # went very wrong, because we should have a exclusive lock, but we don't.
+                raise AssertionError("bug in code, exclusive lock should exist here")
+            # if we are here, this is an old client talking to a new server (expecting lock upgrade).
+            # or we are replaying segments and might need a lock upgrade for that.
+            try:
+                self.lock.upgrade()
+            except (LockError, LockErrorT):
+                # if upgrading the lock to exclusive fails, we do not have an
+                # active transaction. this is important for "serve" mode, where
+                # the repository instance lives on - even if exceptions happened.
+                self._active_txn = False
+                raise
         if not self.index or transaction_id is None:
             try:
                 self.index = self.open_index(transaction_id, False)
@@ -449,6 +458,9 @@ class Repository:
         complete_xfer(intermediate=False)
 
     def replay_segments(self, index_transaction_id, segments_transaction_id):
+        # fake an old client, so that in case we do not have an exclusive lock yet, prepare_txn will upgrade the lock:
+        remember_exclusive = self.exclusive
+        self.exclusive = None
         self.prepare_txn(index_transaction_id, do_cleanup=False)
         try:
             segment_count = sum(1 for _ in self.io.segment_iterator())
@@ -464,6 +476,7 @@ class Repository:
             pi.finish()
             self.write_index()
         finally:
+            self.exclusive = remember_exclusive
             self.rollback()
 
     def _update_index(self, segment, objects, report=None):

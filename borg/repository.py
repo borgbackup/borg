@@ -712,9 +712,14 @@ class LoggedIO:
             key = None
         else:
             raise TypeError("_read called with unsupported format")
-        if size > MAX_OBJECT_SIZE or size < fmt.size:
-            raise IntegrityError('Invalid segment entry size [segment {}, offset {}]'.format(
-                segment, offset))
+        if size > MAX_OBJECT_SIZE:
+            # if you get this on an archive made with borg < 1.0.7 and millions of files and
+            # you need to restore it, you can disable this check by using "if False:" above.
+            raise IntegrityError('Invalid segment entry size {} - too big [segment {}, offset {}]'.format(
+                size, segment, offset))
+        if size < fmt.size:
+            raise IntegrityError('Invalid segment entry size {} - too small [segment {}, offset {}]'.format(
+                size, segment, offset))
         length = size - fmt.size
         data = fd.read(length)
         if len(data) != length:

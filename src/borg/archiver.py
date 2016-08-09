@@ -2011,6 +2011,9 @@ class Archiver:
         as in "borg create". If PATHs are specified the resulting archive
         will only contain files from these PATHs.
 
+        Note that all paths in an archive are relative, therefore absolute patterns/paths
+        will *not* match (--exclude, --exclude-from, --compression-from, PATHs).
+
         --compression: all chunks seen will be stored using the given method.
         Due to how Borg stores compressed size information this might display
         incorrect information for archives that were not recreated at the same time.

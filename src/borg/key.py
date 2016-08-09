@@ -13,7 +13,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from .constants import *  # NOQA
-from .compress import Compressor, COMPR_BUFFER, get_compressor
+from .compress import Compressor, get_compressor
 from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks, hmac_sha256
 from .helpers import Chunk
 from .helpers import Error, IntegrityError
@@ -89,7 +89,7 @@ class KeyBase:
         self.repository = repository
         self.target = None  # key location file path / repo obj
         self.compression_decider2 = CompressionDecider2(CompressionSpec('none'))
-        self.compressor = Compressor('none', buffer=COMPR_BUFFER)  # for decompression
+        self.compressor = Compressor('none')  # for decompression
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key

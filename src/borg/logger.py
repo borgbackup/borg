@@ -149,7 +149,12 @@ def create_logger(name=None):
                 if not configured:
                     raise Exception("tried to call a logger before setup_logging() was called")
                 self.__real_logger = logging.getLogger(self.__name)
+                if self.__name.startswith('borg.debug.') and self.__real_logger.level == logging.NOTSET:
+                    self.__real_logger.setLevel('WARNING')
             return self.__real_logger
+
+        def getChild(self, suffix):
+            return LazyLogger(self.__name + '.' + suffix)
 
         def setLevel(self, *args, **kw):
             return self.__logger.setLevel(*args, **kw)

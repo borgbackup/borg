@@ -252,6 +252,7 @@ class Archive:
         self.consider_part_files = consider_part_files
         self.pipeline = DownloadPipeline(self.repository, self.key)
         if create:
+            self.file_compression_logger = create_logger('borg.debug.file-compression')
             self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
             self.chunker = Chunker(self.key.chunk_seed, *chunker_params)
             self.compression_decider1 = CompressionDecider1(compression or CompressionSpec('none'),
@@ -796,7 +797,7 @@ Number of files: {0.stats.nfiles}'''.format(
             # there should be no information in the cache about special files processed in
             # read-special mode, but we better play safe as this was wrong in the past:
             path_hash = ids = None
-        first_run = not cache.files
+        first_run = not cache.files and cache.do_files
         if first_run:
             logger.debug('Processing files ...')
         chunks = None
@@ -820,7 +821,7 @@ Number of files: {0.stats.nfiles}'''.format(
             item.chunks = chunks
         else:
             compress = self.compression_decider1.decide(path)
-            logger.debug('%s -> compression %s', path, compress['name'])
+            self.file_compression_logger.debug('%s -> compression %s', path, compress['name'])
             with backup_io():
                 fh = Archive._open_rb(path)
             with os.fdopen(fh, 'rb') as fd:

@@ -598,8 +598,7 @@ def format_time(t):
 def format_timedelta(td):
     """Format timedelta in a human friendly format
     """
-    # Since td.total_seconds() requires python 2.7
-    ts = (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10 ** 6) / float(10 ** 6)
+    ts = td.total_seconds()
     s = ts % 60
     m = int(ts / 60) % 60
     h = int(ts / 3600) % 24
@@ -1528,6 +1527,8 @@ class CompressionDecider1:
 
 
 class CompressionDecider2:
+    logger = create_logger('borg.debug.file-compression')
+
     def __init__(self, compression):
         self.compression = compression
 
@@ -1557,7 +1558,7 @@ class CompressionDecider2:
             # that marks such data as uncompressible via compression-type metadata.
             compr_spec = CompressionSpec('none')
         compr_args.update(compr_spec)
-        logger.debug("len(data) == %d, len(lz4(data)) == %d, choosing %s", data_len, cdata_len, compr_spec)
+        self.logger.debug("len(data) == %d, len(lz4(data)) == %d, choosing %s", data_len, cdata_len, compr_spec)
         return compr_args, Chunk(data, **meta)
 
 

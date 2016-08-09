@@ -1327,6 +1327,29 @@ class RemoteArchiverTestCase(ArchiverTestCase):
     def test_debug_put_get_delete_obj(self):
         pass
 
+    def test_strip_components_doesnt_leak(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('dir/file', contents=b"test file contents 123")
+        self.create_regular_file('dir/file2', contents=b"test file contents 345")
+        self.create_regular_file('skipped', contents=b"test file contents 567")
+        self.create_regular_file('skipped2', contents=b"test file contentsasdasd")
+        self.create_regular_file('skipped4', contents=b"sdfdsgdgfhttztu")
+        self.cmd('create', self.repository_location + '::test', 'input')
+        marker = 'cached responses left in RemoteRepository'
+        with changedir('output'):
+            #import rpdb2; rpdb2.start_embedded_debugger("nopass")
+            res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '3')
+            self.assert_true(marker not in res)
+            with self.assert_creates_file('file'):
+                res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '2')
+                self.assert_true(marker not in res)
+            with self.assert_creates_file('dir/file'):
+                res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '1')
+                self.assert_true(marker not in res)
+            with self.assert_creates_file('input/dir/file'):
+                res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '0')
+                self.assert_true(marker not in res)
+
 
 def test_get_args():
     archiver = Archiver()

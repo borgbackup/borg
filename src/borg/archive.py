@@ -1573,7 +1573,7 @@ class ArchiveRecreater:
                     target_archive.stats.nfiles += 1
             target_archive.add_item(item)
         if self.progress:
-            source_archive.stats.show_progress(final=True)  # XXX target_archive.stats?
+            target_archive.stats.show_progress(final=True)
         return item
 
     def can_resume(self, archive, old_target, target_name):

@@ -160,10 +160,7 @@ class Item(PropDict):
     def file_size(self):
         if 'chunks' not in self:
             return 0
-        total_size = 0
-        for chunk_id, size, csize in self.chunks:
-            total_size += size
-        return total_size
+        return sum(chunk.size for chunk in self.chunks)
 
 
 class EncryptedKey(PropDict):

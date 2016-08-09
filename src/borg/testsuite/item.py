@@ -1,5 +1,6 @@
 import pytest
 
+from ..cache import ChunkListEntry
 from ..item import Item
 from ..helpers import StableDict
 
@@ -145,3 +146,16 @@ def test_unknown_property():
     item = Item()
     with pytest.raises(AttributeError):
         item.unknown_attribute = None
+
+
+def test_item_file_size():
+    item = Item(chunks=[
+        ChunkListEntry(csize=1, size=1000, id=None),
+        ChunkListEntry(csize=1, size=2000, id=None),
+    ])
+    assert item.file_size() == 3000
+
+
+def test_item_file_size_no_chunks():
+    item = Item()
+    assert item.file_size() == 0

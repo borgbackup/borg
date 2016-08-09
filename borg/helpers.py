@@ -492,8 +492,6 @@ def timestamp(s):
 def ChunkerParams(s):
     chunk_min, chunk_max, chunk_mask, window_size = s.split(',')
     if int(chunk_max) > 23:
-        # do not go beyond 2**23 (8MB) chunk size now,
-        # COMPR_BUFFER can only cope with up to this size
         raise ValueError('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)')
     return int(chunk_min), int(chunk_max), int(chunk_mask), int(window_size)
 

@@ -1,3 +1,4 @@
+import os
 import zlib
 try:
     import lzma
@@ -11,13 +12,13 @@ from ..compress import get_compressor, Compressor, CNONE, ZLIB, LZ4
 
 buffer = bytes(2**16)
 data = b'fooooooooobaaaaaaaar' * 10
-params = dict(name='zlib', level=6, buffer=buffer)
+params = dict(name='zlib', level=6)
 
 
 def test_get_compressor():
     c = get_compressor(name='none')
     assert isinstance(c, CNONE)
-    c = get_compressor(name='lz4', buffer=buffer)
+    c = get_compressor(name='lz4')
     assert isinstance(c, LZ4)
     c = get_compressor(name='zlib')
     assert isinstance(c, ZLIB)
@@ -35,11 +36,19 @@ def test_cnull():
 
 
 def test_lz4():
-    c = get_compressor(name='lz4', buffer=buffer)
+    c = get_compressor(name='lz4')
     cdata = c.compress(data)
     assert len(cdata) < len(data)
     assert data == c.decompress(cdata)
     assert data == Compressor(**params).decompress(cdata)  # autodetect
+
+
+def test_lz4_buffer_allocation():
+    # test with a rather huge data object to see if buffer allocation / resizing works
+    data = os.urandom(50 * 2**20)  # 50MiB incompressible data
+    c = get_compressor(name='lz4')
+    cdata = c.compress(data)
+    assert data == c.decompress(cdata)
 
 
 def test_zlib():
@@ -83,16 +92,16 @@ def test_zlib_compat():
 
 def test_compressor():
     params_list = [
-        dict(name='none', buffer=buffer),
-        dict(name='lz4', buffer=buffer),
-        dict(name='zlib', level=0, buffer=buffer),
-        dict(name='zlib', level=6, buffer=buffer),
-        dict(name='zlib', level=9, buffer=buffer),
+        dict(name='none'),
+        dict(name='lz4'),
+        dict(name='zlib', level=0),
+        dict(name='zlib', level=6),
+        dict(name='zlib', level=9),
     ]
     if lzma:
         params_list += [
-            dict(name='lzma', level=0, buffer=buffer),
-            dict(name='lzma', level=6, buffer=buffer),
+            dict(name='lzma', level=0),
+            dict(name='lzma', level=6),
             # we do not test lzma on level 9 because of the huge memory needs
         ]
     for params in params_list:

@@ -12,7 +12,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
-from .compress import Compressor, COMPR_BUFFER
+from .compress import Compressor
 import msgpack
 
 PREFIX = b'\0' * 8
@@ -70,7 +70,7 @@ class KeyBase:
         self.TYPE_STR = bytes([self.TYPE])
         self.repository = repository
         self.target = None  # key location file path / repo obj
-        self.compressor = Compressor('none', buffer=COMPR_BUFFER)
+        self.compressor = Compressor('none')
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key

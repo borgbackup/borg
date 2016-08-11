@@ -18,6 +18,7 @@ logger = create_logger()
 def get_buffer(size=None, init=False):
     if size is not None:
         size = int(size)
+        assert size < 2 ** 24
         if init or len(thread_local.buffer) < size:
             thread_local.buffer = create_string_buffer(size)
     return thread_local.buffer
@@ -96,10 +97,12 @@ class BufferTooSmallError(Exception):
     """the buffer given to an xattr function was too small for the result"""
 
 
-def _check(rv, path=None):
+def _check(rv, path=None, detect_buffer_too_small=False):
     if rv < 0:
         e = get_errno()
-        if e == errno.ERANGE:
+        if detect_buffer_too_small and e == errno.ERANGE:
+            # listxattr and getxattr signal with ERANGE that they need a bigger result buffer.
+            # setxattr signals this way that e.g. a xattr key name is too long / inacceptable.
             raise BufferTooSmallError
         else:
             try:
@@ -119,10 +122,9 @@ def _listxattr_inner(func, path):
     while True:
         buf = get_buffer(size)
         try:
-            n = _check(func(path, buf, size), path)
+            n = _check(func(path, buf, size), path, detect_buffer_too_small=True)
         except BufferTooSmallError:
             size *= 2
-            assert size < 2 ** 20
         else:
             return n, buf.raw
 
@@ -135,7 +137,7 @@ def _getxattr_inner(func, path, name):
     while True:
         buf = get_buffer(size)
         try:
-            n = _check(func(path, name, buf, size), path)
+            n = _check(func(path, name, buf, size), path, detect_buffer_too_small=True)
         except BufferTooSmallError:
             size *= 2
         else:
@@ -148,7 +150,7 @@ def _setxattr_inner(func, path, name, value):
     name = os.fsencode(name)
     value = value and os.fsencode(value)
     size = len(value) if value else 0
-    _check(func(path, name, value, size), path)
+    _check(func(path, name, value, size), path, detect_buffer_too_small=False)
 
 
 if sys.platform.startswith('linux'):  # pragma: linux only

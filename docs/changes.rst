@@ -130,6 +130,14 @@ Security fixes:
 
 - fix security issue with remote repository access, #1428
 
+Bug fixes:
+
+- do not write objects to repository that are bigger than the allowed size,
+  borg will reject reading them, #1451.
+  IMPORTANT: if you created archives with many millions of files or
+             directories, please verify if you can open them successfully,
+             e.g. try a "borg list REPO::ARCHIVE".
+
 
 Version 1.0.7rc1 (2016-08-05)
 -----------------------------

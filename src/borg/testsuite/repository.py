@@ -13,7 +13,7 @@ from ..helpers import Location
 from ..helpers import IntegrityError
 from ..locking import Lock, LockFailed
 from ..remote import RemoteRepository, InvalidRPCMethod, ConnectionClosedWithHint, handle_remote_line
-from ..repository import Repository, LoggedIO, MAGIC
+from ..repository import Repository, LoggedIO, MAGIC, MAX_DATA_SIZE
 from . import BaseTestCase
 
 
@@ -141,6 +141,13 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         self.assert_equal(len(second_half), 50)
         self.assert_equal(second_half, all[50:])
         self.assert_equal(len(self.repository.list(limit=50)), 50)
+
+    def test_max_data_size(self):
+        max_data = b'x' * MAX_DATA_SIZE
+        self.repository.put(b'00000000000000000000000000000000', max_data)
+        self.assert_equal(self.repository.get(b'00000000000000000000000000000000'), max_data)
+        self.assert_raises(IntegrityError,
+                           lambda: self.repository.put(b'00000000000000000000000000000001', max_data + b'x'))
 
 
 class LocalRepositoryTestCase(RepositoryTestCaseBase):

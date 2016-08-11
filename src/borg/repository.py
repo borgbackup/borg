@@ -909,9 +909,14 @@ class LoggedIO:
             key = None
         else:
             raise TypeError("_read called with unsupported format")
-        if size > MAX_OBJECT_SIZE or size < fmt.size:
-            raise IntegrityError('Invalid segment entry size [segment {}, offset {}]'.format(
-                segment, offset))
+        if size > MAX_OBJECT_SIZE:
+            # if you get this on an archive made with borg < 1.0.7 and millions of files and
+            # you need to restore it, you can disable this check by using "if False:" above.
+            raise IntegrityError('Invalid segment entry size {} - too big [segment {}, offset {}]'.format(
+                size, segment, offset))
+        if size < fmt.size:
+            raise IntegrityError('Invalid segment entry size {} - too small [segment {}, offset {}]'.format(
+                size, segment, offset))
         length = size - fmt.size
         if read_data:
             data = fd.read(length)
@@ -942,8 +947,12 @@ class LoggedIO:
         return size, tag, key, data
 
     def write_put(self, id, data, raise_full=False):
+        data_size = len(data)
+        if data_size > MAX_DATA_SIZE:
+            # this would push the segment entry size beyond MAX_OBJECT_SIZE.
+            raise IntegrityError('More than allowed put data [{} > {}]'.format(data_size, MAX_DATA_SIZE))
         fd = self.get_write_fd(raise_full=raise_full)
-        size = len(data) + self.put_header_fmt.size
+        size = data_size + self.put_header_fmt.size
         offset = self.offset
         header = self.header_no_crc_fmt.pack(size, TAG_PUT)
         crc = self.crc_fmt.pack(crc32(data, crc32(id, crc32(header))) & 0xffffffff)
@@ -972,3 +981,6 @@ class LoggedIO:
         crc = self.crc_fmt.pack(crc32(header) & 0xffffffff)
         fd.write(b''.join((crc, header)))
         self.close_segment()
+
+
+MAX_DATA_SIZE = MAX_OBJECT_SIZE - LoggedIO.put_header_fmt.size

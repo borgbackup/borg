@@ -38,7 +38,7 @@ from . import crypto
 from . import hashindex
 from . import shellpattern
 from .constants import *  # NOQA
-from .compress import COMPR_BUFFER, get_compressor
+from .compress import get_compressor
 
 # meta dict, data bytes
 _Chunk = namedtuple('_Chunk', 'meta data')
@@ -470,8 +470,6 @@ def ChunkerParams(s):
         return CHUNKER_PARAMS
     chunk_min, chunk_max, chunk_mask, window_size = s.split(',')
     if int(chunk_max) > 23:
-        # do not go beyond 2**23 (8MB) chunk size now,
-        # COMPR_BUFFER can only cope with up to this size
         raise ValueError('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)')
     return int(chunk_min), int(chunk_max), int(chunk_mask), int(window_size)
 
@@ -1538,16 +1536,14 @@ class CompressionDecider2:
         # if we compress the data here to decide, we can even update the chunk data
         # and modify the metadata as desired.
         compr_spec = chunk.meta.get('compress', self.compression)
-        compr_args = dict(buffer=COMPR_BUFFER)
-        compr_args.update(compr_spec)
-        if compr_args['name'] == 'auto':
+        if compr_spec['name'] == 'auto':
             # we did not decide yet, use heuristic:
-            compr_args, chunk = self.heuristic_lz4(compr_args, chunk)
-        return compr_args, chunk
+            compr_spec, chunk = self.heuristic_lz4(compr_spec, chunk)
+        return compr_spec, chunk
 
     def heuristic_lz4(self, compr_args, chunk):
         meta, data = chunk
-        lz4 = get_compressor('lz4', buffer=compr_args['buffer'])
+        lz4 = get_compressor('lz4')
         cdata = lz4.compress(data)
         data_len = len(data)
         cdata_len = len(cdata)

@@ -15,6 +15,13 @@ from .logger import create_logger
 logger = create_logger()
 
 
+try:
+    ENOATTR = errno.ENOATTR
+except AttributeError:
+    # on some platforms, ENOATTR is missing, use ENODATA there
+    ENOATTR = errno.ENODATA
+
+
 def get_buffer(size=None, init=False):
     if size is not None:
         size = int(size)
@@ -41,8 +48,17 @@ def is_enabled(path=None):
 
 def get_all(path, follow_symlinks=True):
     try:
-        return dict((name, getxattr(path, name, follow_symlinks=follow_symlinks))
-                    for name in listxattr(path, follow_symlinks=follow_symlinks))
+        result = {}
+        names = listxattr(path, follow_symlinks=follow_symlinks)
+        for name in names:
+            try:
+                result[name] = getxattr(path, name, follow_symlinks=follow_symlinks)
+            except OSError as e:
+                # if we get ENOATTR, a race has happened: xattr names were deleted after list.
+                # we just ignore the now missing ones. if you want consistency, do snapshots.
+                if e.errno != ENOATTR:
+                    raise
+        return result
     except OSError as e:
         if e.errno in (errno.ENOTSUP, errno.EPERM):
             return {}

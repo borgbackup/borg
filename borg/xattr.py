@@ -102,7 +102,13 @@ def _check(rv, path=None):
         if e == errno.ERANGE:
             raise BufferTooSmallError
         else:
-            raise OSError(e, path)
+            try:
+                msg = os.strerror(e)
+            except ValueError:
+                msg = ''
+            if isinstance(path, int):
+                path = '<FD %d>' % path
+            raise OSError(e, msg, path)
     return rv
 
 

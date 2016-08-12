@@ -57,6 +57,10 @@ Security fixes:
 
 - fix security issue with remote repository access, #1428
 
+
+Version 1.0.7rc2 (not released yet)
+-----------------------------------
+
 Bug fixes:
 
 - do not write objects to repository that are bigger than the allowed size,
@@ -64,6 +68,11 @@ Bug fixes:
   IMPORTANT: if you created archives with many millions of files or
              directories, please verify if you can open them successfully,
              e.g. try a "borg list REPO::ARCHIVE".
+- fixed a race condition in extended attributes querying that led to the
+  entire file not being backed up (while logging the error, exit code = 1),
+  #1469
+- fixed a race condition in extended attributes querying that led to a crash,
+  #1462
 
 
 Version 1.0.7rc1 (2016-08-05)

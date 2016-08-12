@@ -912,7 +912,7 @@ DEFAULTISH = ('Default', 'DEFAULT', 'default', 'D', 'd', '', )
 
 
 def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
-        retry_msg=None, invalid_msg=None, env_msg=None,
+        retry_msg=None, invalid_msg=None, env_msg='{} (from {})',
         falsish=FALSISH, truish=TRUISH, defaultish=DEFAULTISH,
         default=False, retry=True, env_var_override=None, ofile=None, input=input):
     """Output <msg> (usually a question) and let user input an answer.
@@ -933,8 +933,8 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
     :param true_msg: message to output before returning True [None]
     :param default_msg: message to output before returning a <default> [None]
     :param invalid_msg: message to output after a invalid answer was given [None]
-    :param env_msg: message to output when using input from env_var_override [None],
-           needs to have 2 placeholders for answer and env var name, e.g.: "{} (from {})"
+    :param env_msg: message to output when using input from env_var_override ['{} (from {})'],
+           needs to have 2 placeholders for answer and env var name
     :param falsish: sequence of answers qualifying as False
     :param truish: sequence of answers qualifying as True
     :param defaultish: sequence of answers qualifying as <default>

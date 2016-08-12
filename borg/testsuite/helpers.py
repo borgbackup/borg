@@ -805,6 +805,16 @@ def test_yes_output(capfd):
     assert 'false-msg' in err
 
 
+def test_yes_env_output(capfd, monkeypatch):
+    env_var = 'OVERRIDE_SOMETHING'
+    monkeypatch.setenv(env_var, 'yes')
+    assert yes(env_var_override=env_var)
+    out, err = capfd.readouterr()
+    assert out == ''
+    assert env_var in err
+    assert 'yes' in err
+
+
 def test_progress_percentage_multiline(capfd):
     pi = ProgressIndicatorPercent(1000, step=5, start=0, same_line=False, msg="%3.0f%%", file=sys.stderr)
     pi.show(0)

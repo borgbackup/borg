@@ -128,6 +128,12 @@ def _check(rv, path=None, detect_buffer_too_small=False):
             if isinstance(path, int):
                 path = '<FD %d>' % path
             raise OSError(e, msg, path)
+    if detect_buffer_too_small and rv >= len(get_buffer()):
+        # freebsd does not error with ERANGE if the buffer is too small,
+        # it just fills the buffer, truncates and returns.
+        # so, we play sure and just assume that result is truncated if
+        # it happens to be a full buffer.
+        raise BufferTooSmallError
     return rv
 
 
@@ -323,7 +329,7 @@ elif sys.platform.startswith('freebsd'):  # pragma: freebsd only
         if n == 0:
             return []
         names = []
-        mv = memoryview(buf)
+        mv = memoryview(buf)[:n]
         while mv:
             length = mv[0]
             names.append(os.fsdecode(bytes(mv[1:1 + length])))

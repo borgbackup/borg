@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from ..xattr import is_enabled, getxattr, setxattr, listxattr, get_buffer
+from ..xattr import is_enabled, getxattr, setxattr, listxattr, buffer
 from . import BaseTestCase
 
 
@@ -41,20 +41,20 @@ class XattrTestCase(BaseTestCase):
 
     def test_listxattr_buffer_growth(self):
         # make it work even with ext4, which imposes rather low limits
-        get_buffer(size=64, init=True)
+        buffer.resize(size=64, init=True)
         # xattr raw key list will be size 9 * (10 + 1), which is > 64
         keys = ['user.attr%d' % i for i in range(9)]
         for key in keys:
             setxattr(self.tmpfile.name, key, b'x')
         got_keys = listxattr(self.tmpfile.name)
         self.assert_equal_se(got_keys, keys)
-        self.assert_equal(len(get_buffer()), 128)
+        self.assert_equal(len(buffer), 128)
 
     def test_getxattr_buffer_growth(self):
         # make it work even with ext4, which imposes rather low limits
-        get_buffer(size=64, init=True)
+        buffer.resize(size=64, init=True)
         value = b'x' * 126
         setxattr(self.tmpfile.name, 'user.big', value)
         got_value = getxattr(self.tmpfile.name, 'user.big')
         self.assert_equal(value, got_value)
-        self.assert_equal(len(get_buffer()), 128)
+        self.assert_equal(len(buffer), 128)

@@ -6,10 +6,11 @@ import re
 import subprocess
 import sys
 import tempfile
-import threading
 from ctypes import CDLL, create_string_buffer, c_ssize_t, c_size_t, c_char_p, c_int, c_uint32, get_errno
 from ctypes.util import find_library
 from distutils.version import LooseVersion
+
+from .helpers import Buffer
 
 from .logger import create_logger
 logger = create_logger()
@@ -22,17 +23,7 @@ except AttributeError:
     ENOATTR = errno.ENODATA
 
 
-def get_buffer(size=None, init=False):
-    if size is not None:
-        size = int(size)
-        assert size < 2 ** 24
-        if init or len(thread_local.buffer) < size:
-            thread_local.buffer = create_string_buffer(size)
-    return thread_local.buffer
-
-
-thread_local = threading.local()
-get_buffer(size=4096, init=True)
+buffer = Buffer(create_string_buffer, limit=2**24)
 
 
 def is_enabled(path=None):
@@ -144,7 +135,7 @@ def _check(rv, path=None, detect_buffer_too_small=False):
             if isinstance(path, int):
                 path = '<FD %d>' % path
             raise OSError(e, msg, path)
-    if detect_buffer_too_small and rv >= len(get_buffer()):
+    if detect_buffer_too_small and rv >= len(buffer):
         # freebsd does not error with ERANGE if the buffer is too small,
         # it just fills the buffer, truncates and returns.
         # so, we play sure and just assume that result is truncated if
@@ -156,9 +147,9 @@ def _check(rv, path=None, detect_buffer_too_small=False):
 def _listxattr_inner(func, path):
     if isinstance(path, str):
         path = os.fsencode(path)
-    size = len(get_buffer())
+    size = len(buffer)
     while True:
-        buf = get_buffer(size)
+        buf = buffer.get(size)
         try:
             n = _check(func(path, buf, size), path, detect_buffer_too_small=True)
         except BufferTooSmallError:
@@ -171,9 +162,9 @@ def _getxattr_inner(func, path, name):
     if isinstance(path, str):
         path = os.fsencode(path)
     name = os.fsencode(name)
-    size = len(get_buffer())
+    size = len(buffer)
     while True:
-        buf = get_buffer(size)
+        buf = buffer.get(size)
         try:
             n = _check(func(path, name, buf, size), path, detect_buffer_too_small=True)
         except BufferTooSmallError:

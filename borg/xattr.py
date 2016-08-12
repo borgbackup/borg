@@ -109,6 +109,22 @@ except OSError as e:
     raise Exception(msg)
 
 
+def split_string0(buf):
+    """split a list of zero-terminated strings into python not-zero-terminated bytes"""
+    return buf.split(b'\0')[:-1]
+
+
+def split_lstring(buf):
+    """split a list of length-prefixed strings into python not-length-prefixed bytes"""
+    result = []
+    mv = memoryview(buf)
+    while mv:
+        length = mv[0]
+        result.append(bytes(mv[1:1 + length]))
+        mv = mv[1 + length:]
+    return result
+
+
 class BufferTooSmallError(Exception):
     """the buffer given to an xattr function was too small for the result"""
 
@@ -200,10 +216,7 @@ if sys.platform.startswith('linux'):  # pragma: linux only
                     return libc.llistxattr(path, buf, size)
 
         n, buf = _listxattr_inner(func, path)
-        if n == 0:
-            return []
-        names = buf[:n].split(b'\0')[:-1]
-        return [os.fsdecode(name) for name in names
+        return [os.fsdecode(name) for name in split_string0(buf[:n])
                 if not name.startswith(b'system.posix_acl_')]
 
     def getxattr(path, name, *, follow_symlinks=True):
@@ -217,9 +230,7 @@ if sys.platform.startswith('linux'):  # pragma: linux only
                     return libc.lgetxattr(path, name, buf, size)
 
         n, buf = _getxattr_inner(func, path, name)
-        if n == 0:
-            return
-        return buf[:n]
+        return buf[:n] or None
 
     def setxattr(path, name, value, *, follow_symlinks=True):
         def func(path, name, value, size):
@@ -262,10 +273,7 @@ elif sys.platform == 'darwin':  # pragma: darwin only
                     return libc.listxattr(path, buf, size, XATTR_NOFOLLOW)
 
         n, buf = _listxattr_inner(func, path)
-        if n == 0:
-            return []
-        names = buf[:n].split(b'\0')[:-1]
-        return [os.fsdecode(name) for name in names]
+        return [os.fsdecode(name) for name in split_string0(buf[:n])]
 
     def getxattr(path, name, *, follow_symlinks=True):
         def func(path, name, buf, size):
@@ -278,9 +286,7 @@ elif sys.platform == 'darwin':  # pragma: darwin only
                     return libc.getxattr(path, name, buf, size, 0, XATTR_NOFOLLOW)
 
         n, buf = _getxattr_inner(func, path, name)
-        if n == 0:
-            return
-        return buf[:n]
+        return buf[:n] or None
 
     def setxattr(path, name, value, *, follow_symlinks=True):
         def func(path, name, value, size):
@@ -326,15 +332,7 @@ elif sys.platform.startswith('freebsd'):  # pragma: freebsd only
                     return libc.extattr_list_link(path, ns, buf, size)
 
         n, buf = _listxattr_inner(func, path)
-        if n == 0:
-            return []
-        names = []
-        mv = memoryview(buf)[:n]
-        while mv:
-            length = mv[0]
-            names.append(os.fsdecode(bytes(mv[1:1 + length])))
-            mv = mv[1 + length:]
-        return names
+        return [os.fsdecode(name) for name in split_lstring(buf[:n])]
 
     def getxattr(path, name, *, follow_symlinks=True):
         def func(path, name, buf, size):
@@ -347,9 +345,7 @@ elif sys.platform.startswith('freebsd'):  # pragma: freebsd only
                     return libc.extattr_get_link(path, ns, name, buf, size)
 
         n, buf = _getxattr_inner(func, path, name)
-        if n == 0:
-            return
-        return buf[:n]
+        return buf[:n] or None
 
     def setxattr(path, name, value, *, follow_symlinks=True):
         def func(path, name, value, size):

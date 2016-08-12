@@ -62,6 +62,17 @@ Which file types, attributes, etc. are *not* preserved?
       holes in a sparse file.
     * filesystem specific attributes, like ext4 immutable bit, see :issue:`618`.
 
+Are there other known limitations?
+----------------------------------
+
+- A single archive can only reference a limited volume of file/dir metadata,
+  usually corresponding to tens or hundreds of millions of files/dirs.
+  When trying to go beyond that limit, you will get a fatal IntegrityError
+  exception telling that the (archive) object is too big.
+  An easy workaround is to create multiple archives with less items each.
+  See also the :ref:`archive_limitation` and :issue:`1452`.
+
+
 Why is my backup bigger than with attic? Why doesn't |project_name| do compression by default?
 ----------------------------------------------------------------------------------------------
 

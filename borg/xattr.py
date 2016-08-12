@@ -1,5 +1,5 @@
-"""A basic extended attributes (xattr) implementation for Linux and MacOS X
-"""
+"""A basic extended attributes (xattr) implementation for Linux, FreeBSD and MacOS X."""
+
 import errno
 import os
 import re

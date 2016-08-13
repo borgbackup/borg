@@ -16,6 +16,7 @@ import traceback
 from binascii import unhexlify
 from datetime import datetime
 from itertools import zip_longest
+from operator import attrgetter
 
 from .logger import create_logger, setup_logging
 logger = create_logger()
@@ -28,7 +29,8 @@ from .cache import Cache
 from .constants import *  # NOQA
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError
-from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec, PrefixSpec
+from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
+from .helpers import PrefixSpec, sort_by_spec, HUMAN_SORT_KEYS
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter, format_time, format_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex
 from .helpers import prune_within, prune_split
@@ -2549,6 +2551,23 @@ class Archiver:
 
         return parser
 
+    @staticmethod
+    def add_archives_filters_args(subparser):
+        filters_group = subparser.add_argument_group('filters', 'Archive filters can be applied to repository targets.')
+        filters_group.add_argument('-P', '--prefix', dest='prefix', type=prefix_spec, default='',
+                                   help='only consider archive names starting with this prefix')
+
+        sort_by_default = 'timestamp'
+        filters_group.add_argument('--sort-by', dest='sort_by', type=sort_by_spec, default=sort_by_default,
+                               help='Comma-separated list of sorting keys; valid keys are: {}; default is: {}'
+                               .format(', '.join(HUMAN_SORT_KEYS), sort_by_default))
+
+        group = filters_group.add_mutually_exclusive_group()
+        group.add_argument('--first', dest='first', metavar='N', default=0, type=int,
+                           help='select first N archives')
+        group.add_argument('--last', dest='last', metavar='N', default=0, type=int,
+                           help='delete last N archives')
+
     def get_args(self, argv, cmd):
         """usually, just returns argv, except if we deal with a ssh forced command for borg serve."""
         result = self.parse_args(argv[1:])
@@ -2610,6 +2629,25 @@ class Archiver:
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
         return args.func(args)
+
+    def _get_filtered_archives(self, args, manifest):
+        if args.location.archive:
+            raise Error('The options --first, --last and --prefix can only be used on repository targets.')
+
+        archives = manifest.archives.list()
+        if not archives:
+            logger.critical('There are no archives.')
+            self.exit_code = self.exit_code or EXIT_WARNING
+            return []
+
+        for sortkey in reversed(args.sort_by.split(',')):
+            archives.sort(key=attrgetter(sortkey))
+        if args.last:
+            archives.reverse()
+
+        n = args.first or args.last
+
+        return archives[:n]
 
 
 def sig_info_handler(sig_no, stack):  # pragma: no cover

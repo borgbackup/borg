@@ -879,34 +879,38 @@ class Archiver:
             write = sys.stdout.buffer.write
 
         if args.location.archive:
-            matcher, _ = self.build_matcher(args.excludes, args.paths)
-            with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
-                archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
-                                  consider_part_files=args.consider_part_files)
-
-                if args.format is not None:
-                    format = args.format
-                elif args.short:
-                    format = "{path}{NL}"
-                else:
-                    format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
-                formatter = ItemFormatter(archive, format)
-
-                for item in archive.iter_items(lambda item: matcher.match(item.path)):
-                    write(safe_encode(formatter.format_item(item)))
+            return self._list_archive(args, repository, manifest, key, write)
         else:
+            return self._list_repository(args, manifest, write)
+
+    def _list_archive(self, args, repository, manifest, key, write):
+        matcher, _ = self.build_matcher(args.excludes, args.paths)
+        with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
+            archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
+                              consider_part_files=args.consider_part_files)
             if args.format is not None:
                 format = args.format
             elif args.short:
-                format = "{archive}{NL}"
+                format = "{path}{NL}"
             else:
-                format = "{archive:<36} {time} [{id}]{NL}"
-            formatter = ArchiveFormatter(format)
+                format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
+            formatter = ItemFormatter(archive, format)
 
-            for archive_info in manifest.archives.list(sort_by='ts'):
-                if args.prefix and not archive_info.name.startswith(args.prefix):
-                    continue
-                write(safe_encode(formatter.format_item(archive_info)))
+            for item in archive.iter_items(lambda item: matcher.match(item.path)):
+                write(safe_encode(formatter.format_item(item)))
+        return self.exit_code
+
+    def _list_repository(self, args, manifest, write):
+        if args.format is not None:
+            format = args.format
+        elif args.short:
+            format = "{archive}{NL}"
+        else:
+            format = "{archive:<36} {time} [{id}]{NL}"
+        formatter = ArchiveFormatter(format)
+
+        for archive_info in self._get_filtered_archives(args, manifest):
+            write(safe_encode(formatter.format_item(archive_info)))
 
         return self.exit_code
 
@@ -2043,8 +2047,6 @@ class Archiver:
         subparser.add_argument('--format', '--list-format', dest='format', type=str,
                                help="""specify format for file listing
                                 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")""")
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=prefix_spec,
-                               help='only consider archive names starting with this prefix')
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=parse_pattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
@@ -2056,6 +2058,7 @@ class Archiver:
                                help='repository/archive to list contents of')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to list; patterns are supported')
+        self.add_archives_filters_args(subparser)
 
         mount_epilog = textwrap.dedent("""
         This command mounts an archive as a FUSE filesystem. This can be useful for

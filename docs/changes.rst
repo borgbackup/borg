@@ -65,13 +65,17 @@ Bug fixes:
 
 - do not write objects to repository that are bigger than the allowed size,
   borg will reject reading them, #1451.
-  IMPORTANT: if you created archives with many millions of files or
-             directories, please verify if you can open them successfully,
-             e.g. try a "borg list REPO::ARCHIVE".
+
+  Important: if you created archives with many millions of files or
+  directories, please verify if you can open them successfully,
+  e.g. try a "borg list REPO::ARCHIVE".
 - lz4 compression: dynamically enlarge the (de)compression buffer, the static
   buffer was not big enough for archives with extremely many items, #1453
-- larger item metadata stream chunks, raise archive limit by 8x, #1452
+- larger item metadata stream chunks, raise archive item limit by 8x, #1452
 - fix untracked segments made by moved DELETEs, #1442
+
+  Impact: Previously (metadata) segments could become untracked when deleting data,
+  these would never be cleaned up.
 - extended attributes (xattrs) related fixes:
 
   - fixed a race condition in xattrs querying that led to the entire file not

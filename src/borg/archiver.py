@@ -913,11 +913,24 @@ class Archiver:
     @with_repository(cache=True)
     def do_info(self, args, repository, manifest, key, cache):
         """Show archive details such as disk space used"""
+        if any((args.location.archive, args.first, args.last, args.prefix)):
+            return self._info_archives(args, repository, manifest, key, cache)
+        else:
+            return self._info_repository(cache)
+
+    def _info_archives(self, args, repository, manifest, key, cache):
         def format_cmdline(cmdline):
             return remove_surrogates(' '.join(shlex.quote(x) for x in cmdline))
 
         if args.location.archive:
-            archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
+            archive_names = (args.location.archive,)
+        else:
+            archive_names = tuple(x.name for x in self._get_filtered_archives(args, manifest))
+            if not archive_names:
+                return self.exit_code
+
+        for i, archive_name in enumerate(archive_names, 1):
+            archive = Archive(repository, key, manifest, archive_name, cache=cache,
                               consider_part_files=args.consider_part_files)
             stats = archive.calc_stats(cache)
             print('Archive name: %s' % archive.name)
@@ -934,9 +947,15 @@ class Archiver:
             print(STATS_HEADER)
             print(str(stats))
             print(str(cache))
-        else:
-            print(STATS_HEADER)
-            print(str(cache))
+            if self.exit_code:
+                break
+            if len(archive_names) - i:
+                print()
+        return self.exit_code
+
+    def _info_repository(self, cache):
+        print(STATS_HEADER)
+        print(str(cache))
         return self.exit_code
 
     @with_repository(exclusive=True)
@@ -2102,6 +2121,7 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE',
                                type=location_validator(),
                                help='archive or repository to display information about')
+        self.add_archives_filters_args(subparser)
 
         break_lock_epilog = textwrap.dedent("""
         This command breaks the repository and cache locks.

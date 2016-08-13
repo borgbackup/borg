@@ -964,6 +964,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert 'All archives:' in info_repo
         info_archive = self.cmd('info', self.repository_location + '::test')
         assert 'Archive name: test\n' in info_archive
+        info_archive = self.cmd('info', '--first', '1', self.repository_location)
+        assert 'Archive name: test\n' in info_archive
 
     def test_comment(self):
         self.create_regular_file('file1', size=1024 * 80)

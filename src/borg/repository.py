@@ -22,6 +22,7 @@ from .helpers import Location
 from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
 from .locking import Lock, LockError, LockErrorT
+from .logger import create_logger
 from .lrucache import LRUCache
 from .platform import SaveFile, SyncFile, sync_dir
 
@@ -413,29 +414,36 @@ class Repository:
         index_transaction_id = self.get_index_transaction_id()
         segments = self.segments
         unused = []  # list of segments, that are not used anymore
+        logger = create_logger('borg.debug.compact_segments')
 
         def complete_xfer(intermediate=True):
             # complete the current transfer (when some target segment is full)
             nonlocal unused
             # commit the new, compact, used segments
             self.io.write_commit(intermediate=intermediate)
+            logger.debug('complete_xfer: wrote %scommit at segment %d', 'intermediate ' if intermediate else '',
+                         self.io.get_latest_segment())
             # get rid of the old, sparse, unused segments. free space.
             for segment in unused:
+                logger.debug('complete_xfer: deleting unused segment %d', segment)
                 assert self.segments.pop(segment) == 0
                 self.io.delete_segment(segment)
                 del self.compact[segment]
             unused = []
 
+        logger.debug('compaction started.')
         for segment, freeable_space in sorted(self.compact.items()):
             if not self.io.segment_exists(segment):
+                logger.warning('segment %d not found, but listed in compaction data', segment)
                 del self.compact[segment]
                 continue
             segment_size = self.io.segment_size(segment)
             if segment_size > 0.2 * self.max_segment_size and freeable_space < 0.15 * segment_size:
-                logger.debug('not compacting segment %d for later (only %d bytes are sparse)',
-                             segment, freeable_space)
+                logger.debug('not compacting segment %d (only %d bytes are sparse)', segment, freeable_space)
                 continue
             segments.setdefault(segment, 0)
+            logger.debug('compacting segment %d with usage count %d and %d freeable bytes',
+                         segment, segments[segment], freeable_space)
             for tag, key, offset, data in self.io.iter_objects(segment, include_data=True):
                 if tag == TAG_PUT and self.index.get(key, (-1, -1)) == (segment, offset):
                     try:
@@ -492,6 +500,7 @@ class Repository:
             assert segments[segment] == 0
             unused.append(segment)
         complete_xfer(intermediate=False)
+        logger.debug('compaction completed.')
 
     def replay_segments(self, index_transaction_id, segments_transaction_id):
         # fake an old client, so that in case we do not have an exclusive lock yet, prepare_txn will upgrade the lock:

@@ -117,7 +117,7 @@ class FuseOperations(llfuse.Operations):
         """Build fuse inode hierarchy from archive metadata
         """
         unpacker = msgpack.Unpacker()
-        for key, chunk in zip(archive.metadata[b'items'], self.repository.get_many(archive.metadata[b'items'])):
+        for key, chunk in zip(archive.metadata.items, self.repository.get_many(archive.metadata.items)):
             _, data = self.key.decrypt(key, chunk)
             unpacker.feed(data)
             for item in unpacker:

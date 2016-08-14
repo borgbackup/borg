@@ -16,7 +16,7 @@ from .helpers import get_cache_dir
 from .helpers import decode_dict, int_to_bigint, bigint_to_int, bin_to_hex
 from .helpers import format_file_size
 from .helpers import yes
-from .item import Item
+from .item import Item, ArchiveItem
 from .key import PlaintextKey
 from .locking import Lock
 from .platform import SaveFile
@@ -290,12 +290,11 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             cdata = repository.get(archive_id)
             _, data = key.decrypt(archive_id, cdata)
             chunk_idx.add(archive_id, 1, len(data), len(cdata))
-            archive = msgpack.unpackb(data)
-            if archive[b'version'] != 1:
+            archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
+            if archive.version != 1:
                 raise Exception('Unknown archive metadata version')
-            decode_dict(archive, (b'name',))
             unpacker = msgpack.Unpacker()
-            for item_id, chunk in zip(archive[b'items'], repository.get_many(archive[b'items'])):
+            for item_id, chunk in zip(archive.items, repository.get_many(archive.items)):
                 _, data = key.decrypt(item_id, chunk)
                 chunk_idx.add(item_id, 1, len(data), len(chunk))
                 unpacker.feed(data)

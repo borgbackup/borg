@@ -679,8 +679,8 @@ class Archiver:
         archive2 = Archive(repository, key, manifest, args.archive2,
                            consider_part_files=args.consider_part_files)
 
-        can_compare_chunk_ids = archive1.metadata.get(b'chunker_params', False) == archive2.metadata.get(
-            b'chunker_params', True) or args.same_chunker_params
+        can_compare_chunk_ids = archive1.metadata.get('chunker_params', False) == archive2.metadata.get(
+            'chunker_params', True) or args.same_chunker_params
         if not can_compare_chunk_ids:
             self.print_warning('--chunker-params might be different between archives, diff will be slow.\n'
                                'If you know for certain that they are the same, pass --same-chunker-params '
@@ -831,14 +831,14 @@ class Archiver:
             stats = archive.calc_stats(cache)
             print('Archive name: %s' % archive.name)
             print('Archive fingerprint: %s' % archive.fpr)
-            print('Comment: %s' % archive.metadata.get(b'comment', ''))
-            print('Hostname: %s' % archive.metadata[b'hostname'])
-            print('Username: %s' % archive.metadata[b'username'])
+            print('Comment: %s' % archive.metadata.get('comment', ''))
+            print('Hostname: %s' % archive.metadata.hostname)
+            print('Username: %s' % archive.metadata.username)
             print('Time (start): %s' % format_time(to_localtime(archive.ts)))
             print('Time (end):   %s' % format_time(to_localtime(archive.ts_end)))
             print('Duration: %s' % archive.duration_from_meta)
             print('Number of files: %d' % stats.nfiles)
-            print('Command line: %s' % format_cmdline(archive.metadata[b'cmdline']))
+            print('Command line: %s' % format_cmdline(archive.metadata.cmdline))
             print(DASHES)
             print(STATS_HEADER)
             print(str(stats))
@@ -1009,7 +1009,7 @@ class Archiver:
         """dump (decrypted, decompressed) archive items metadata (not: data)"""
         archive = Archive(repository, key, manifest, args.location.archive,
                           consider_part_files=args.consider_part_files)
-        for i, item_id in enumerate(archive.metadata[b'items']):
+        for i, item_id in enumerate(archive.metadata.items):
             _, data = key.decrypt(item_id, repository.get(item_id))
             filename = '%06d_%s.items' % (i, bin_to_hex(item_id))
             print('Dumping', filename)

@@ -220,7 +220,8 @@ class ArchiveItem(PropDict):
 
     VALID_KEYS = {'version', 'name', 'items', 'cmdline', 'hostname', 'username', 'time', 'time_end',
                   'comment', 'chunker_params',
-                  'recreate_cmdline', 'recreate_source_id', 'recreate_args'}  # str-typed keys
+                  'recreate_cmdline', 'recreate_source_id', 'recreate_args', 'recreate_partial_chunks',
+                  }  # str-typed keys
 
     __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 
@@ -237,3 +238,4 @@ class ArchiveItem(PropDict):
     recreate_source_id = PropDict._make_property('recreate_source_id', bytes)
     recreate_cmdline = PropDict._make_property('recreate_cmdline', list)  # list of s-e-str
     recreate_args = PropDict._make_property('recreate_args', list)  # list of s-e-str
+    recreate_partial_chunks = PropDict._make_property('recreate_partial_chunks', list)  # list of tuples

@@ -8,7 +8,7 @@ import msgpack
 
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_dict, ITEM_KEYS, Statistics
 from ..archive import BackupOSError, backup_io, backup_io_iter
-from ..item import Item
+from ..item import Item, ArchiveItem
 from ..key import PlaintextKey
 from ..helpers import Manifest
 from . import BaseTestCase
@@ -77,7 +77,7 @@ class ArchiveTimestampTestCase(BaseTestCase):
         key = PlaintextKey(repository)
         manifest = Manifest(repository, key)
         a = Archive(repository, key, manifest, 'test', create=True)
-        a.metadata = {b'time': isoformat}
+        a.metadata = ArchiveItem(time=isoformat)
         self.assert_equal(a.ts, expected)
 
     def test_with_microseconds(self):

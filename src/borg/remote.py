@@ -189,6 +189,16 @@ class RemoteRepository:
             except self.RPCError as err:
                 if err.remote_type != 'TypeError':
                     raise
+                msg = """\
+Please note:
+If you see a TypeError complaining about the number of positional arguments
+given to open(), you can ignore it if it comes from a borg version < 1.0.7.
+This TypeError is a cosmetic side effect of the compatibility code borg
+clients >= 1.0.7 have to support older borg servers.
+This problem will go away as soon as the server has been upgraded to 1.0.7+.
+"""
+                # emit this msg in the same way as the "Remote: ..." lines that show the remote TypeError
+                sys.stderr.write(msg)
                 if append_only:
                     raise self.NoAppendOnlyOnServer()
                 self.id = self.call('open', self.location.path, create, lock_wait, lock)

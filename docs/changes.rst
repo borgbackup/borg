@@ -130,13 +130,48 @@ Security fixes:
 
 - fix security issue with remote repository access, #1428
 
+
+Version 1.0.7rc2 (2016-08-13)
+-----------------------------
+
 Bug fixes:
 
 - do not write objects to repository that are bigger than the allowed size,
   borg will reject reading them, #1451.
-  IMPORTANT: if you created archives with many millions of files or
-             directories, please verify if you can open them successfully,
-             e.g. try a "borg list REPO::ARCHIVE".
+
+  Important: if you created archives with many millions of files or
+  directories, please verify if you can open them successfully,
+  e.g. try a "borg list REPO::ARCHIVE".
+- lz4 compression: dynamically enlarge the (de)compression buffer, the static
+  buffer was not big enough for archives with extremely many items, #1453
+- larger item metadata stream chunks, raise archive item limit by 8x, #1452
+- fix untracked segments made by moved DELETEs, #1442
+
+  Impact: Previously (metadata) segments could become untracked when deleting data,
+  these would never be cleaned up.
+- extended attributes (xattrs) related fixes:
+
+  - fixed a race condition in xattrs querying that led to the entire file not
+    being backed up (while logging the error, exit code = 1), #1469
+  - fixed a race condition in xattrs querying that led to a crash, #1462
+  - raise OSError including the error message derived from errno, deal with
+    path being a integer FD
+
+Other changes:
+
+- print active env var override by default, #1467
+- xattr module: refactor code, deduplicate, clean up
+- repository: split object size check into too small and too big
+- add a transaction_id assertion, so borg init on a broken (inconsistent)
+  filesystem does not look like a coding error in borg, but points to the
+  real problem.
+- explain confusing TypeError caused by compat support for old servers, #1456
+- add forgotten usage help file from build_usage
+- refactor/unify buffer code into helpers.Buffer class, add tests
+- docs:
+
+  - document archive limitation, #1452
+  - improve prune examples
 
 
 Version 1.0.7rc1 (2016-08-05)

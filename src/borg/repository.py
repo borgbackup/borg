@@ -449,11 +449,46 @@ class Repository:
                     segments[segment] -= 1
                 elif tag == TAG_DELETE:
                     if index_transaction_id is None or segment > index_transaction_id:
+                        # (introduced in 6425d16aa84be1eaaf88)
+                        # This is needed to avoid object un-deletion if we crash between the commit and the deletion
+                        # of old segments in complete_xfer().
+                        #
+                        # However, this only happens if the crash also affects the FS to the effect that file deletions
+                        # did not materialize consistently after journal recovery. If they always materialize in-order
+                        # then this is not a problem, because the old segment containing a deleted object would be deleted
+                        # before the segment containing the delete.
+                        #
+                        # Consider the following series of operations if we would not do this, ie. this entire if:
+                        # would be removed.
+                        # Columns are segments, lines are different keys (line 1 = some key, line 2 = some other key)
+                        # Legend: P=TAG_PUT, D=TAG_DELETE, c=commit, i=index is written for latest commit
+                        #
+                        # Segment | 1     | 2   | 3
+                        # --------+-------+-----+------
+                        # Key 1   | P     | D   |
+                        # Key 2   | P     |     | P
+                        # commits |   c i |   c |   c i
+                        # --------+-------+-----+------
+                        #                       ^- compact_segments starts
+                        #                           ^- complete_xfer commits, after that complete_xfer deletes
+                        #                              segments 1 and 2 (and then the index would be written).
+                        #
+                        # Now we crash. But only segment 2 gets deleted, while segment 1 is still around. Now key 1
+                        # is suddenly undeleted (because the delete in segment 2 is now missing).
+                        # Again, note the requirement here. We delete these in the correct order that this doesn't happen,
+                        # and only if the FS materialization of these deletes is reordered or parts dropped this can happen.
+                        # In this case it doesn't cause outright corruption, 'just' an index count mismatch, which will be
+                        # fixed by borg-check --repair.
+                        #
+                        # Note that in this check the index state is the proxy for a "most definitely settled" repository state,
+                        # ie. the assumption is that *all* operations on segments <= index state are completed and stable.
                         try:
-                            self.io.write_delete(key, raise_full=True)
+                            new_segment, size = self.io.write_delete(key, raise_full=True)
                         except LoggedIO.SegmentFull:
                             complete_xfer()
-                            self.io.write_delete(key)
+                            new_segment, size = self.io.write_delete(key)
+                        self.compact[new_segment] += size
+                        segments.setdefault(new_segment, 0)
             assert segments[segment] == 0
             unused.append(segment)
         complete_xfer(intermediate=False)

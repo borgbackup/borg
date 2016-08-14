@@ -13,8 +13,9 @@ from ..helpers import Location
 from ..helpers import IntegrityError
 from ..locking import Lock, LockFailed
 from ..remote import RemoteRepository, InvalidRPCMethod, ConnectionClosedWithHint, handle_remote_line
-from ..repository import Repository, LoggedIO, MAGIC, MAX_DATA_SIZE
+from ..repository import Repository, LoggedIO, MAGIC, MAX_DATA_SIZE, TAG_DELETE
 from . import BaseTestCase
+from .hashindex import H
 
 
 UNSPECIFIED = object()  # for default values where we can't use None
@@ -271,6 +272,28 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         with self.repository:
             io = self.repository.io
             assert not io.is_committed_segment(io.get_latest_segment())
+
+    def test_moved_deletes_are_tracked(self):
+        self.repository.put(H(1), b'1')
+        self.repository.put(H(2), b'2')
+        self.repository.commit()
+        self.repository.delete(H(1))
+        self.repository.commit()
+        last_segment = self.repository.io.get_latest_segment() - 1
+        num_deletes = 0
+        for tag, key, offset, size in self.repository.io.iter_objects(last_segment):
+            if tag == TAG_DELETE:
+                assert key == H(1)
+                num_deletes += 1
+        assert num_deletes == 1
+        assert last_segment in self.repository.compact
+        self.repository.put(H(3), b'3')
+        self.repository.commit()
+        assert last_segment not in self.repository.compact
+        assert not self.repository.io.segment_exists(last_segment)
+        for segment, _ in self.repository.io.segment_iterator():
+            for tag, key, offset, size in self.repository.io.iter_objects(segment):
+                assert tag != TAG_DELETE
 
 
 class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):

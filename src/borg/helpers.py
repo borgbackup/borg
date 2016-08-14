@@ -39,7 +39,6 @@ from . import crypto
 from . import hashindex
 from . import shellpattern
 from .constants import *  # NOQA
-from .compress import get_compressor
 
 # meta dict, data bytes
 _Chunk = namedtuple('_Chunk', 'meta data')
@@ -1584,6 +1583,7 @@ class CompressionDecider2:
         return compr_spec, chunk
 
     def heuristic_lz4(self, compr_args, chunk):
+        from .compress import get_compressor
         meta, data = chunk
         lz4 = get_compressor('lz4')
         cdata = lz4.compress(data)

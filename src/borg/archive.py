@@ -169,7 +169,7 @@ class DownloadPipeline:
 
 
 class ChunkBuffer:
-    BUFFER_SIZE = 1 * 1024 * 1024
+    BUFFER_SIZE = 8 * 1024 * 1024
 
     def __init__(self, key, chunker_params=ITEMS_CHUNKER_PARAMS):
         self.buffer = BytesIO()

@@ -109,7 +109,7 @@ class ChunkBufferTestCase(BaseTestCase):
         self.assert_equal(data, [Item(internal_dict=d) for d in unpacker])
 
     def test_partial(self):
-        big = "0123456789" * 10000
+        big = "0123456789abcdefghijklmnopqrstuvwxyz" * 25000
         data = [Item(path='full', source=big), Item(path='partial', source=big)]
         cache = MockCache()
         key = PlaintextKey(None)

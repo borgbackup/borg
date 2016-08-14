@@ -160,12 +160,40 @@ object that contains:
 
 * version
 * name
-* list of chunks containing item metadata
+* list of chunks containing item metadata (size: count * ~40B)
 * cmdline
 * hostname
 * username
 * time
 
+.. _archive_limitation:
+
+Note about archive limitations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The archive is currently stored as a single object in the repository
+and thus limited in size to MAX_OBJECT_SIZE (20MiB).
+
+As one chunk list entry is ~40B, that means we can reference ~500.000 item
+metadata stream chunks per archive.
+
+Each item metadata stream chunk is ~128kiB (see hardcoded ITEMS_CHUNKER_PARAMS).
+
+So that means the whole item metadata stream is limited to ~64GiB chunks.
+If compression is used, the amount of storable metadata is bigger - by the
+compression factor.
+
+If the medium size of an item entry is 100B (small size file, no ACLs/xattrs),
+that means a limit of ~640 million files/directories per archive.
+
+If the medium size of an item entry is 2kB (~100MB size files or more
+ACLs/xattrs), the limit will be ~32 million files/directories per archive.
+
+If one tries to create an archive object bigger than MAX_OBJECT_SIZE, a fatal
+IntegrityError will be raised.
+
+A workaround is to create multiple archives with less items each, see
+also :issue:`1452`.
 
 The Item
 --------
@@ -174,7 +202,7 @@ Each item represents a file, directory or other fs item and is stored as an
 ``item`` dictionary that contains:
 
 * path
-* list of data chunks
+* list of data chunks (size: count * ~40B)
 * user
 * group
 * uid

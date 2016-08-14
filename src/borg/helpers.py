@@ -10,9 +10,10 @@ import pwd
 import re
 import signal
 import socket
-import sys
 import stat
+import sys
 import textwrap
+import threading
 import time
 import unicodedata
 import uuid
@@ -680,6 +681,47 @@ def memoize(function):
     return decorated_function
 
 
+class Buffer:
+    """
+    provide a thread-local buffer
+    """
+    def __init__(self, allocator, size=4096, limit=None):
+        """
+        Initialize the buffer: use allocator(size) call to allocate a buffer.
+        Optionally, set the upper <limit> for the buffer size.
+        """
+        assert callable(allocator), 'must give alloc(size) function as first param'
+        assert limit is None or size <= limit, 'initial size must be <= limit'
+        self._thread_local = threading.local()
+        self.allocator = allocator
+        self.limit = limit
+        self.resize(size, init=True)
+
+    def __len__(self):
+        return len(self._thread_local.buffer)
+
+    def resize(self, size, init=False):
+        """
+        resize the buffer - to avoid frequent reallocation, we usually always grow (if needed).
+        giving init=True it is possible to first-time initialize or shrink the buffer.
+        if a buffer size beyond the limit is requested, raise ValueError.
+        """
+        size = int(size)
+        if self.limit is not None and size > self.limit:
+            raise ValueError('Requested buffer size %d is above the limit of %d.' % (size, self.limit))
+        if init or len(self) < size:
+            self._thread_local.buffer = self.allocator(size)
+
+    def get(self, size=None, init=False):
+        """
+        return a buffer of at least the requested size (None: any current size).
+        init=True can be given to trigger shrinking of the buffer to the given size.
+        """
+        if size is not None:
+            self.resize(size, init)
+        return self._thread_local.buffer
+
+
 @memoize
 def uid2user(uid, default=None):
     try:
@@ -945,7 +987,7 @@ DEFAULTISH = ('Default', 'DEFAULT', 'default', 'D', 'd', '', )
 
 
 def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
-        retry_msg=None, invalid_msg=None, env_msg=None,
+        retry_msg=None, invalid_msg=None, env_msg='{} (from {})',
         falsish=FALSISH, truish=TRUISH, defaultish=DEFAULTISH,
         default=False, retry=True, env_var_override=None, ofile=None, input=input):
     """Output <msg> (usually a question) and let user input an answer.
@@ -966,8 +1008,8 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
     :param true_msg: message to output before returning True [None]
     :param default_msg: message to output before returning a <default> [None]
     :param invalid_msg: message to output after a invalid answer was given [None]
-    :param env_msg: message to output when using input from env_var_override [None],
-           needs to have 2 placeholders for answer and env var name, e.g.: "{} (from {})"
+    :param env_msg: message to output when using input from env_var_override ['{} (from {})'],
+           needs to have 2 placeholders for answer and env var name
     :param falsish: sequence of answers qualifying as False
     :param truish: sequence of answers qualifying as True
     :param defaultish: sequence of answers qualifying as <default>

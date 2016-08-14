@@ -41,7 +41,7 @@ HASH_MASK_BITS = 21  # results in ~2MiB chunks statistically
 CHUNKER_PARAMS = (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
 
 # chunker params for the items metadata stream, finer granularity
-ITEMS_CHUNKER_PARAMS = (12, 16, 14, HASH_WINDOW_SIZE)
+ITEMS_CHUNKER_PARAMS = (15, 19, 17, HASH_WINDOW_SIZE)
 
 # return codes returned by borg command
 # when borg is killed by signal N, rc = 128 + N

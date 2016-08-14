@@ -344,6 +344,7 @@ class Repository:
                  b'segments': self.segments,
                  b'compact': self.compact}
         transaction_id = self.io.get_segments_transaction_id()
+        assert transaction_id is not None
         hints_file = os.path.join(self.path, 'hints.%d' % transaction_id)
         with open(hints_file + '.tmp', 'wb') as fd:
             msgpack.pack(hints, fd)

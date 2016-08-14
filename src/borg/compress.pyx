@@ -1,9 +1,10 @@
-import threading
 import zlib
 try:
     import lzma
 except ImportError:
     lzma = None
+
+from .helpers import Buffer
 
 cdef extern from "lz4.h":
     int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
@@ -11,15 +12,7 @@ cdef extern from "lz4.h":
     int LZ4_compressBound(int inputSize) nogil
 
 
-thread_local = threading.local()
-thread_local.buffer = bytes()
-
-
-cdef char *get_buffer(size):
-    size = int(size)
-    if len(thread_local.buffer) < size:
-        thread_local.buffer = bytes(size)
-    return <char *> thread_local.buffer
+buffer = Buffer(bytearray, size=0)
 
 
 cdef class CompressorBase:
@@ -88,7 +81,8 @@ class LZ4(CompressorBase):
         cdef char *source = idata
         cdef char *dest
         osize = LZ4_compressBound(isize)
-        dest = get_buffer(osize)
+        buf = buffer.get(osize)
+        dest = <char *> buf
         with nogil:
             osize = LZ4_compress_limitedOutput(source, dest, isize, osize)
         if not osize:
@@ -108,7 +102,8 @@ class LZ4(CompressorBase):
         # allocate more if isize * 3 is already bigger, to avoid having to resize often.
         osize = max(int(1.1 * 2**23), isize * 3)
         while True:
-            dest = get_buffer(osize)
+            buf = buffer.get(osize)
+            dest = <char *> buf
             with nogil:
                 rsize = LZ4_decompress_safe(source, dest, isize, osize)
             if rsize >= 0:

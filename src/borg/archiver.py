@@ -957,6 +957,7 @@ class Archiver:
                                      exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
                                      keep_tag_files=args.keep_tag_files, chunker_params=args.chunker_params,
                                      compression=args.compression, compression_files=args.compression_files,
+                                     always_recompress=args.always_recompress,
                                      progress=args.progress, stats=args.stats,
                                      file_status_printer=self.print_file_status,
                                      dry_run=args.dry_run)
@@ -968,8 +969,11 @@ class Archiver:
                 if recreater.is_temporary_archive(name):
                     self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
                     return self.exit_code
-                recreater.recreate(name, args.comment)
+                recreater.recreate(name, args.comment, args.target)
             else:
+                if args.target is not None:
+                    self.print_error('--target: Need to specify single archive')
+                    return self.exit_code
                 for archive in manifest.list_archive_infos(sort_by='ts'):
                     name = archive.name
                     if recreater.is_temporary_archive(name):
@@ -2007,6 +2011,9 @@ class Archiver:
         as in "borg create". If PATHs are specified the resulting archive
         will only contain files from these PATHs.
 
+        Note that all paths in an archive are relative, therefore absolute patterns/paths
+        will *not* match (--exclude, --exclude-from, --compression-from, PATHs).
+
         --compression: all chunks seen will be stored using the given method.
         Due to how Borg stores compressed size information this might display
         incorrect information for archives that were not recreated at the same time.
@@ -2034,6 +2041,8 @@ class Archiver:
         The archive being recreated is only removed after the operation completes. The
         archive that is built during the operation exists at the same time at
         "<ARCHIVE>.recreate". The new archive will have a different archive ID.
+
+        With --target the original archive is not replaced, instead a new archive is created.
 
         When rechunking space usage can be substantial, expect at least the entire
         deduplicated size of the archives using the previous chunker params.
@@ -2080,6 +2089,10 @@ class Archiver:
                                    help='keep tag files of excluded caches/directories')
 
         archive_group = subparser.add_argument_group('Archive options')
+        archive_group.add_argument('--target', dest='target', metavar='TARGET', default=None,
+                                   type=archivename_validator(),
+                                   help='create a new archive with the name ARCHIVE, do not replace existing archive '
+                                        '(only applies for a single archive)')
         archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default=None,
                                    help='add a comment text to the archive')
         archive_group.add_argument('--timestamp', dest='timestamp',
@@ -2098,6 +2111,9 @@ class Archiver:
                                         'zlib,0 .. zlib,9 == zlib (with level 0..9),\n'
                                         'lzma == lzma (default level 6),\n'
                                         'lzma,0 .. lzma,9 == lzma (with level 0..9).')
+        archive_group.add_argument('--always-recompress', dest='always_recompress', action='store_true',
+                                   help='always recompress chunks, don\'t skip chunks already compressed with the same'
+                                        'algorithm.')
         archive_group.add_argument('--compression-from', dest='compression_files',
                                    type=argparse.FileType('r'), action='append',
                                    metavar='COMPRESSIONCONFIG', help='read compression patterns from COMPRESSIONCONFIG, one per line')

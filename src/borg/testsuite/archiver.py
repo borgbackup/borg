@@ -1522,6 +1522,28 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('init', self.repository_location, exit_code=1)
         assert not os.path.exists(self.repository_location)
 
+    def test_recreate_target_rc(self):
+        self.cmd('init', self.repository_location)
+        output = self.cmd('recreate', self.repository_location, '--target=asdf', exit_code=2)
+        assert 'Need to specify single archive' in output
+
+    def test_recreate_target(self):
+        self.create_test_files()
+        self.cmd('init', self.repository_location)
+        archive = self.repository_location + '::test0'
+        self.cmd('create', archive, 'input')
+        original_archive = self.cmd('list', self.repository_location)
+        self.cmd('recreate', archive, 'input/dir2', '-e', 'input/dir2/file3', '--target=new-archive')
+        archives = self.cmd('list', self.repository_location)
+        assert original_archive in archives
+        assert 'new-archive' in archives
+
+        archive = self.repository_location + '::new-archive'
+        listing = self.cmd('list', '--short', archive)
+        assert 'file1' not in listing
+        assert 'dir2/file2' in listing
+        assert 'dir2/file3' not in listing
+
     def test_recreate_basic(self):
         self.create_test_files()
         self.create_regular_file('dir2/file3', size=1024 * 80)

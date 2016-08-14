@@ -43,6 +43,14 @@ class TestKey:
         monkeypatch.setenv('BORG_KEYS_DIR', tmpdir)
         return tmpdir
 
+    @pytest.fixture(params=(
+        KeyfileKey,
+        PlaintextKey
+    ))
+    def key(self, request, monkeypatch):
+        monkeypatch.setenv('BORG_PASSPHRASE', 'test')
+        return request.param.create(self.MockRepository(), self.MockArgs())
+
     class MockRepository:
         class _Location:
             orig = '/some/place'
@@ -154,6 +162,24 @@ class TestKey:
             id = bytearray(key.id_hash(data))  # corrupt chunk id
             id[12] = 0
             key.decrypt(id, data)
+
+    def test_decrypt_decompress(self, key):
+        plaintext = Chunk(b'123456789')
+        encrypted = key.encrypt(plaintext)
+        assert key.decrypt(None, encrypted, decompress=False) != plaintext
+        assert key.decrypt(None, encrypted) == plaintext
+
+    def test_assert_id(self, key):
+        plaintext = b'123456789'
+        id = key.id_hash(plaintext)
+        key.assert_id(id, plaintext)
+        id_changed = bytearray(id)
+        id_changed[0] += 1
+        with pytest.raises(IntegrityError):
+            key.assert_id(id_changed, plaintext)
+        plaintext_changed = plaintext + b'1'
+        with pytest.raises(IntegrityError):
+            key.assert_id(id, plaintext_changed)
 
 
 class TestPassphrase:

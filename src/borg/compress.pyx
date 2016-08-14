@@ -6,6 +6,8 @@ except ImportError:
 
 from .helpers import Buffer
 
+API_VERSION = 2
+
 cdef extern from "lz4.h":
     int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
     int LZ4_decompress_safe(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
@@ -194,9 +196,14 @@ class Compressor:
         return self.compressor.compress(data)
 
     def decompress(self, data):
+        compressor_cls = self.detect(data)
+        return compressor_cls(**self.params).decompress(data)
+
+    @staticmethod
+    def detect(data):
         hdr = bytes(data[:2])  # detect() does not work with memoryview
         for cls in COMPRESSOR_LIST:
             if cls.detect(hdr):
-                return cls(**self.params).decompress(data)
+                return cls
         else:
             raise ValueError('No decompressor for this data found: %r.', data[:2])

@@ -105,8 +105,14 @@ class KeyBase:
     def encrypt(self, chunk):
         pass
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, decompress=True):
         pass
+
+    def assert_id(self, id, data):
+        if id:
+            id_computed = self.id_hash(data)
+            if not compare_digest(id_computed, id):
+                raise IntegrityError('Chunk id verification failed')
 
 
 class PlaintextKey(KeyBase):
@@ -130,12 +136,14 @@ class PlaintextKey(KeyBase):
         chunk = self.compress(chunk)
         return b''.join([self.TYPE_STR, chunk.data])
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, decompress=True):
         if data[0] != self.TYPE:
             raise IntegrityError('Invalid encryption envelope')
-        data = self.compressor.decompress(memoryview(data)[1:])
-        if id and sha256(data).digest() != id:
-            raise IntegrityError('Chunk id verification failed')
+        payload = memoryview(data)[1:]
+        if not decompress:
+            return Chunk(payload)
+        data = self.compressor.decompress(payload)
+        self.assert_id(id, data)
         return Chunk(data)
 
 
@@ -166,7 +174,7 @@ class AESKeyBase(KeyBase):
         hmac = hmac_sha256(self.enc_hmac_key, data)
         return b''.join((self.TYPE_STR, hmac, data))
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, decompress=True):
         if not (data[0] == self.TYPE or
             data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             raise IntegrityError('Invalid encryption envelope')
@@ -176,12 +184,11 @@ class AESKeyBase(KeyBase):
         if not compare_digest(hmac_computed, hmac_given):
             raise IntegrityError('Encryption envelope checksum mismatch')
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
-        data = self.compressor.decompress(self.dec_cipher.decrypt(data_view[41:]))
-        if id:
-            hmac_given = id
-            hmac_computed = hmac_sha256(self.id_key, data)
-            if not compare_digest(hmac_computed, hmac_given):
-                raise IntegrityError('Chunk id verification failed')
+        payload = self.dec_cipher.decrypt(data_view[41:])
+        if not decompress:
+            return Chunk(payload)
+        data = self.compressor.decompress(payload)
+        self.assert_id(id, data)
         return Chunk(data)
 
     def extract_nonce(self, payload):

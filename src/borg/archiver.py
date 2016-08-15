@@ -734,7 +734,7 @@ class Archiver:
                     msg.append("This repository seems to have no manifest, so we can't tell anything about its contents.")
                 else:
                     msg.append("You requested to completely DELETE the repository *including* all archives it contains:")
-                    for archive_info in manifest.list_archive_infos(sort_by='ts'):
+                    for archive_info in manifest.archives.list(sort_by='ts'):
                         msg.append(format_archive(archive_info))
                 msg.append("Type 'YES' if you understand this and want to continue: ")
                 msg = '\n'.join(msg)
@@ -812,7 +812,7 @@ class Archiver:
                 format = "{archive:<36} {time} [{id}]{NL}"
             formatter = ArchiveFormatter(format)
 
-            for archive_info in manifest.list_archive_infos(sort_by='ts'):
+            for archive_info in manifest.archives.list(sort_by='ts'):
                 if args.prefix and not archive_info.name.startswith(args.prefix):
                     continue
                 write(safe_encode(formatter.format_item(archive_info)))
@@ -857,7 +857,7 @@ class Archiver:
                              '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
                              '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.')
             return self.exit_code
-        archives_checkpoints = manifest.list_archive_infos(sort_by='ts', reverse=True)  # just a ArchiveInfo list
+        archives_checkpoints = manifest.archives.list(sort_by='ts', reverse=True)  # just a ArchiveInfo list
         if args.prefix:
             archives_checkpoints = [arch for arch in archives_checkpoints if arch.name.startswith(args.prefix)]
         is_checkpoint = re.compile(r'\.checkpoint(\.\d+)?$').search
@@ -974,7 +974,7 @@ class Archiver:
                 if args.target is not None:
                     self.print_error('--target: Need to specify single archive')
                     return self.exit_code
-                for archive in manifest.list_archive_infos(sort_by='ts'):
+                for archive in manifest.archives.list(sort_by='ts'):
                     name = archive.name
                     if recreater.is_temporary_archive(name):
                         continue

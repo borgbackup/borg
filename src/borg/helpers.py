@@ -18,7 +18,7 @@ import time
 import unicodedata
 import uuid
 from binascii import hexlify
-from collections import namedtuple, deque
+from collections import namedtuple, deque, abc
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
@@ -97,12 +97,76 @@ def check_extension_modules():
         raise ExtensionModuleError
 
 
+ArchiveInfo = namedtuple('ArchiveInfo', 'name id ts')
+
+
+class Archives(abc.MutableMapping):
+    """
+    Nice wrapper around the archives dict, making sure only valid types/values get in
+    and we can deal with str keys (and it internally encodes to byte keys) and eiter
+    str timestamps or datetime timestamps.
+    """
+    def __init__(self):
+        # key: encoded archive name, value: dict(b'id': bytes_id, b'time': bytes_iso_ts)
+        self._archives = {}
+
+    def __len__(self):
+        return len(self._archives)
+
+    def __iter__(self):
+        return iter(safe_decode(name) for name in self._archives)
+
+    def __getitem__(self, name):
+        assert isinstance(name, str)
+        _name = safe_encode(name)
+        values = self._archives.get(_name)
+        if values is None:
+            raise KeyError
+        ts = parse_timestamp(values[b'time'].decode('utf-8'))
+        return ArchiveInfo(name=name, id=values[b'id'], ts=ts)
+
+    def __setitem__(self, name, info):
+        assert isinstance(name, str)
+        name = safe_encode(name)
+        assert isinstance(info, tuple)
+        id, ts = info
+        assert isinstance(id, bytes)
+        if isinstance(ts, datetime):
+            ts = ts.replace(tzinfo=None).isoformat()
+        assert isinstance(ts, str)
+        ts = ts.encode()
+        self._archives[name] = {b'id': id, b'time': ts}
+
+    def __delitem__(self, name):
+        assert isinstance(name, str)
+        name = safe_encode(name)
+        del self._archives[name]
+
+    def list(self, sort_by=None, reverse=False):
+        # inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
+        archives = self.values()  # [self[name] for name in self]
+        if sort_by is not None:
+            archives = sorted(archives, key=attrgetter(sort_by), reverse=reverse)
+        return archives
+
+    def set_raw_dict(self, d):
+        """set the dict we get from the msgpack unpacker"""
+        for k, v in d.items():
+            assert isinstance(k, bytes)
+            assert isinstance(v, dict) and b'id' in v and b'time' in v
+            self._archives[k] = v
+
+    def get_raw_dict(self):
+        """get the dict we can give to the msgpack packer"""
+        return self._archives
+
+
 class Manifest:
 
     MANIFEST_ID = b'\0' * 32
 
     def __init__(self, key, repository, item_keys=None):
-        self.archives = {}
+        self.archives = Archives()
         self.config = {}
         self.key = key
         self.repository = repository
@@ -129,7 +193,7 @@ class Manifest:
         m = ManifestItem(internal_dict=msgpack.unpackb(data))
         if m.get('version') != 1:
             raise ValueError('Invalid manifest version')
-        manifest.archives = {safe_decode(k): v for k, v in m.archives.items()}
+        manifest.archives.set_raw_dict(m.archives)
         manifest.timestamp = m.get('timestamp')
         manifest.config = m.config
         # valid item keys are whatever is known in the repo or every key we know
@@ -141,7 +205,7 @@ class Manifest:
         self.timestamp = datetime.utcnow().isoformat()
         manifest = ManifestItem(
             version=1,
-            archives=self.archives,
+            archives=self.archives.get_raw_dict(),
             timestamp=self.timestamp,
             config=self.config,
             item_keys=tuple(self.item_keys),
@@ -149,18 +213,6 @@ class Manifest:
         data = msgpack.packb(manifest.as_dict())
         self.id = self.key.id_hash(data)
         self.repository.put(self.MANIFEST_ID, self.key.encrypt(Chunk(data)))
-
-    def list_archive_infos(self, sort_by=None, reverse=False):
-        # inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
-        ArchiveInfo = namedtuple('ArchiveInfo', 'name id ts')
-        archives = []
-        for name, values in self.archives.items():
-            ts = parse_timestamp(values[b'time'].decode('utf-8'))
-            id = values[b'id']
-            archives.append(ArchiveInfo(name=name, id=id, ts=ts))
-        if sort_by is not None:
-            archives = sorted(archives, key=attrgetter(sort_by), reverse=reverse)
-        return archives
 
 
 def prune_within(archives, within):

@@ -279,7 +279,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 return set()
 
         def repo_archives():
-            return set(info[b'id'] for info in self.manifest.archives.values())
+            return set(info.id for info in self.manifest.archives.list())
 
         def cleanup_outdated(ids):
             for id in ids:
@@ -318,9 +318,9 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             return chunk_idx
 
         def lookup_name(archive_id):
-            for name, info in self.manifest.archives.items():
-                if info[b'id'] == archive_id:
-                    return name
+            for info in self.manifest.archives.list():
+                if info.id == archive_id:
+                    return info.name
 
         def create_master_idx(chunk_idx):
             logger.info('Synchronizing chunks cache...')

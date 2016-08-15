@@ -73,11 +73,11 @@ class FuseOperations(llfuse.Operations):
         if archive:
             self.process_archive(archive)
         else:
-            for archive_name in manifest.archives:
+            for name in manifest.archives:
                 # Create archive placeholder inode
                 archive_inode = self._create_dir(parent=1)
-                self.contents[1][os.fsencode(archive_name)] = archive_inode
-                self.pending_archives[archive_inode] = Archive(repository, key, manifest, archive_name)
+                self.contents[1][os.fsencode(name)] = archive_inode
+                self.pending_archives[archive_inode] = Archive(repository, key, manifest, name)
 
     def mount(self, mountpoint, mount_options, foreground=False):
         """Mount filesystem on *mountpoint* with *mount_options*."""

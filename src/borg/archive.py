@@ -269,10 +269,10 @@ class Archive:
                     break
                 i += 1
         else:
-            if name not in self.manifest.archives:
+            info = self.manifest.archives.get(name)
+            if info is None:
                 raise self.DoesNotExist(name)
-            info = self.manifest.archives[name]
-            self.load(info[b'id'])
+            self.load(info.id)
             self.zeros = b'\0' * (1 << chunker_params[1])
 
     def _load_meta(self, id):
@@ -379,7 +379,7 @@ Number of files: {0.stats.nfiles}'''.format(
         data = msgpack.packb(metadata.as_dict(), unicode_errors='surrogateescape')
         self.id = self.key.id_hash(data)
         self.cache.add_chunk(self.id, Chunk(data), self.stats)
-        self.manifest.archives[name] = {'id': self.id, 'time': metadata.time}
+        self.manifest.archives[name] = (self.id, metadata.time)
         self.manifest.write()
         self.repository.commit()
         self.cache.commit()
@@ -593,7 +593,7 @@ Number of files: {0.stats.nfiles}'''.format(
         data = msgpack.packb(metadata.as_dict(), unicode_errors='surrogateescape')
         new_id = self.key.id_hash(data)
         self.cache.add_chunk(new_id, Chunk(data), self.stats)
-        self.manifest.archives[self.name] = {'id': new_id, 'time': metadata.time}
+        self.manifest.archives[self.name] = (new_id, metadata.time)
         self.cache.chunk_decref(self.id, self.stats)
         self.id = new_id
 
@@ -844,7 +844,7 @@ Number of files: {0.stats.nfiles}'''.format(
     @staticmethod
     def list_archives(repository, key, manifest, cache=None):
         # expensive! see also Manifest.list_archive_infos.
-        for name, info in manifest.archives.items():
+        for name in manifest.archives:
             yield Archive(repository, key, manifest, name, cache=cache)
 
     @staticmethod
@@ -1077,7 +1077,7 @@ class ArchiveChecker:
             if valid_archive(archive):
                 archive = ArchiveItem(internal_dict=archive)
                 logger.info('Found archive %s', archive.name)
-                manifest.archives[archive.name] = {b'id': chunk_id, b'time': archive.time}
+                manifest.archives[archive.name] = (chunk_id, archive.time)
         logger.info('Manifest rebuild complete.')
         return manifest
 
@@ -1216,28 +1216,30 @@ class ArchiveChecker:
 
         if archive is None:
             # we need last N or all archives
-            archive_items = sorted(self.manifest.archives.items(), reverse=True,
-                                   key=lambda name_info: name_info[1][b'time'])
+            archive_infos = self.manifest.archives.list(sort_by='ts', reverse=True)
             if prefix is not None:
-                archive_items = [item for item in archive_items if item[0].startswith(prefix)]
-            num_archives = len(archive_items)
+                archive_infos = [info for info in archive_infos if info.name.startswith(prefix)]
+            num_archives = len(archive_infos)
             end = None if last is None else min(num_archives, last)
         else:
             # we only want one specific archive
-            archive_items = [item for item in self.manifest.archives.items() if item[0] == archive]
-            if not archive_items:
+            info = self.manifest.archives.get(archive)
+            if info is None:
                 logger.error("Archive '%s' not found.", archive)
+                archive_infos = []
+            else:
+                archive_infos = [info]
             num_archives = 1
             end = 1
 
         with cache_if_remote(self.repository) as repository:
-            for i, (name, info) in enumerate(archive_items[:end]):
-                logger.info('Analyzing archive {} ({}/{})'.format(name, num_archives - i, num_archives))
-                archive_id = info[b'id']
+            for i, info in enumerate(archive_infos[:end]):
+                logger.info('Analyzing archive {} ({}/{})'.format(info.name, num_archives - i, num_archives))
+                archive_id = info.id
                 if archive_id not in self.chunks:
                     logger.error('Archive metadata block is missing!')
                     self.error_found = True
-                    del self.manifest.archives[name]
+                    del self.manifest.archives[info.name]
                     continue
                 mark_as_possibly_superseded(archive_id)
                 cdata = self.repository.get(archive_id)
@@ -1260,7 +1262,7 @@ class ArchiveChecker:
                 new_archive_id = self.key.id_hash(data)
                 cdata = self.key.encrypt(Chunk(data))
                 add_reference(new_archive_id, len(data), len(cdata), cdata)
-                info[b'id'] = new_archive_id
+                self.manifest.archives[info.name] = (new_archive_id, info.ts)
 
     def orphan_chunks_check(self):
         if self.check_all:

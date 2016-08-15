@@ -15,8 +15,6 @@ ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'hostname', 'us
 # this is the set of keys that are always present in archives:
 REQUIRED_ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'time', ])
 
-ARCHIVE_TEXT_KEYS = (b'name', b'comment', b'hostname', b'username', b'time', b'time_end')
-
 # default umask, overriden by --umask, defaults to read/write only for owner
 UMASK_DEFAULT = 0o077
 

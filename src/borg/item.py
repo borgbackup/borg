@@ -204,3 +204,61 @@ class Key(PropDict):
     enc_hmac_key = PropDict._make_property('enc_hmac_key', bytes)
     id_key = PropDict._make_property('id_key', bytes)
     chunk_seed = PropDict._make_property('chunk_seed', int)
+
+
+class ArchiveItem(PropDict):
+    """
+    ArchiveItem abstraction that deals with validation and the low-level details internally:
+
+    An ArchiveItem is created either from msgpack unpacker output, from another dict, from kwargs or
+    built step-by-step by setting attributes.
+
+    msgpack gives us a dict with bytes-typed keys, just give it to ArchiveItem(d) and use arch.xxx later.
+
+    If a ArchiveItem shall be serialized, give as_dict() method output to msgpack packer.
+    """
+
+    VALID_KEYS = {'version', 'name', 'items', 'cmdline', 'hostname', 'username', 'time', 'time_end',
+                  'comment', 'chunker_params',
+                  'recreate_cmdline', 'recreate_source_id', 'recreate_args', 'recreate_partial_chunks',
+                  }  # str-typed keys
+
+    __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
+
+    version = PropDict._make_property('version', int)
+    name = PropDict._make_property('name', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    items = PropDict._make_property('items', list)
+    cmdline = PropDict._make_property('cmdline', list)  # list of s-e-str
+    hostname = PropDict._make_property('hostname', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    username = PropDict._make_property('username', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    time = PropDict._make_property('time', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    time_end = PropDict._make_property('time_end', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    comment = PropDict._make_property('comment', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    chunker_params = PropDict._make_property('chunker_params', tuple)
+    recreate_source_id = PropDict._make_property('recreate_source_id', bytes)
+    recreate_cmdline = PropDict._make_property('recreate_cmdline', list)  # list of s-e-str
+    recreate_args = PropDict._make_property('recreate_args', list)  # list of s-e-str
+    recreate_partial_chunks = PropDict._make_property('recreate_partial_chunks', list)  # list of tuples
+
+
+class ManifestItem(PropDict):
+    """
+    ManifestItem abstraction that deals with validation and the low-level details internally:
+
+    A ManifestItem is created either from msgpack unpacker output, from another dict, from kwargs or
+    built step-by-step by setting attributes.
+
+    msgpack gives us a dict with bytes-typed keys, just give it to ManifestItem(d) and use manifest.xxx later.
+
+    If a ManifestItem shall be serialized, give as_dict() method output to msgpack packer.
+    """
+
+    VALID_KEYS = {'version', 'archives', 'timestamp', 'config', 'item_keys', }  # str-typed keys
+
+    __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
+
+    version = PropDict._make_property('version', int)
+    archives = PropDict._make_property('archives', dict)  # name -> dict
+    timestamp = PropDict._make_property('time', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    config = PropDict._make_property('config', dict)
+    item_keys = PropDict._make_property('item_keys', tuple)

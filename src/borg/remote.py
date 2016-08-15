@@ -283,22 +283,23 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             return msgid
 
         def handle_error(error, res):
-            if error == b'DoesNotExist':
+            error = error.decode('utf-8')
+            if error == 'DoesNotExist':
                 raise Repository.DoesNotExist(self.location.orig)
-            elif error == b'AlreadyExists':
+            elif error == 'AlreadyExists':
                 raise Repository.AlreadyExists(self.location.orig)
-            elif error == b'CheckNeeded':
+            elif error == 'CheckNeeded':
                 raise Repository.CheckNeeded(self.location.orig)
-            elif error == b'IntegrityError':
+            elif error == 'IntegrityError':
                 raise IntegrityError(res)
-            elif error == b'PathNotAllowed':
+            elif error == 'PathNotAllowed':
                 raise PathNotAllowed(*res)
-            elif error == b'ObjectNotFound':
+            elif error == 'ObjectNotFound':
                 raise Repository.ObjectNotFound(res[0], self.location.orig)
-            elif error == b'InvalidRPCMethod':
+            elif error == 'InvalidRPCMethod':
                 raise InvalidRPCMethod(*res)
             else:
-                raise self.RPCError(res.decode('utf-8'), error.decode('utf-8'))
+                raise self.RPCError(res.decode('utf-8'), error)
 
         calls = list(calls)
         waiting_for = []

@@ -666,6 +666,11 @@ class Archiver:
             print("warning: %s" % e)
         return self.exit_code
 
+    def do_debug_info(self, args):
+        """display system information for debugging / bug reports"""
+        print(sysinfo())
+        return EXIT_SUCCESS
+
     @with_repository()
     def do_debug_dump_archive_items(self, args, repository, manifest, key):
         """dump (decrypted, decompressed) archive items metadata (not: data)"""
@@ -1486,6 +1491,18 @@ class Archiver:
         subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
         subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
                                help='additional help on TOPIC')
+
+        debug_info_epilog = textwrap.dedent("""
+        This command displays some system information that might be useful for bug
+        reports and debugging problems. If a traceback happens, this information is
+        already appended at the end of the traceback.
+        """)
+        subparser = subparsers.add_parser('debug-info', parents=[common_parser],
+                                          description=self.do_debug_info.__doc__,
+                                          epilog=debug_info_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='show system infos for debugging / bug reports (debug)')
+        subparser.set_defaults(func=self.do_debug_info)
 
         debug_dump_archive_items_epilog = textwrap.dedent("""
         This command dumps raw (but decrypted and decompressed) archive items (only metadata) to files.

@@ -239,3 +239,26 @@ class ArchiveItem(PropDict):
     recreate_cmdline = PropDict._make_property('recreate_cmdline', list)  # list of s-e-str
     recreate_args = PropDict._make_property('recreate_args', list)  # list of s-e-str
     recreate_partial_chunks = PropDict._make_property('recreate_partial_chunks', list)  # list of tuples
+
+
+class ManifestItem(PropDict):
+    """
+    ManifestItem abstraction that deals with validation and the low-level details internally:
+
+    A ManifestItem is created either from msgpack unpacker output, from another dict, from kwargs or
+    built step-by-step by setting attributes.
+
+    msgpack gives us a dict with bytes-typed keys, just give it to ManifestItem(d) and use manifest.xxx later.
+
+    If a ManifestItem shall be serialized, give as_dict() method output to msgpack packer.
+    """
+
+    VALID_KEYS = {'version', 'archives', 'timestamp', 'config', 'item_keys', }  # str-typed keys
+
+    __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
+
+    version = PropDict._make_property('version', int)
+    archives = PropDict._make_property('archives', dict)  # name -> dict
+    timestamp = PropDict._make_property('time', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    config = PropDict._make_property('config', dict)
+    item_keys = PropDict._make_property('item_keys', tuple)

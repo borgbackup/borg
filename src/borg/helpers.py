@@ -114,6 +114,7 @@ class Manifest:
 
     @classmethod
     def load(cls, repository, key=None):
+        from .item import ManifestItem
         from .key import key_factory
         from .repository import Repository
         try:
@@ -125,27 +126,27 @@ class Manifest:
         manifest = cls(key, repository)
         _, data = key.decrypt(None, cdata)
         manifest.id = key.id_hash(data)
-        m = msgpack.unpackb(data)
-        if not m.get(b'version') == 1:
+        m = ManifestItem(internal_dict=msgpack.unpackb(data))
+        if m.get('version') != 1:
             raise ValueError('Invalid manifest version')
-        manifest.archives = dict((k.decode('utf-8'), v) for k, v in m[b'archives'].items())
-        manifest.timestamp = m.get(b'timestamp')
-        if manifest.timestamp:
-            manifest.timestamp = manifest.timestamp.decode('ascii')
-        manifest.config = m[b'config']
+        manifest.archives = {safe_decode(k): v for k, v in m.archives.items()}
+        manifest.timestamp = m.get('timestamp')
+        manifest.config = m.config
         # valid item keys are whatever is known in the repo or every key we know
-        manifest.item_keys = ITEM_KEYS | frozenset(key.decode() for key in m.get(b'item_keys', []))
+        manifest.item_keys = ITEM_KEYS | frozenset(key.decode() for key in m.get('item_keys', []))
         return manifest, key
 
     def write(self):
+        from .item import ManifestItem
         self.timestamp = datetime.utcnow().isoformat()
-        data = msgpack.packb(StableDict({
-            'version': 1,
-            'archives': self.archives,
-            'timestamp': self.timestamp,
-            'config': self.config,
-            'item_keys': tuple(self.item_keys),
-        }))
+        manifest = ManifestItem(
+            version=1,
+            archives=self.archives,
+            timestamp=self.timestamp,
+            config=self.config,
+            item_keys=tuple(self.item_keys),
+        )
+        data = msgpack.packb(manifest.as_dict())
         self.id = self.key.id_hash(data)
         self.repository.put(self.MANIFEST_ID, self.key.encrypt(Chunk(data)))
 

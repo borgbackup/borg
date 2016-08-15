@@ -69,9 +69,9 @@ class TestKey:
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
         key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
         assert bytes_to_long(key.enc_cipher.iv, 8) == 0
-        manifest = key.encrypt(Chunk(b'XXX'))
+        manifest = key.encrypt(Chunk(b'ABC'))
         assert key.extract_nonce(manifest) == 0
-        manifest2 = key.encrypt(Chunk(b'XXX'))
+        manifest2 = key.encrypt(Chunk(b'ABC'))
         assert manifest != manifest2
         assert key.decrypt(None, manifest) == key.decrypt(None, manifest2)
         assert key.extract_nonce(manifest2) == 1
@@ -91,7 +91,7 @@ class TestKey:
         assert not keyfile.exists()
         key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
         assert keyfile.exists()
-        chunk = Chunk(b'XXX')
+        chunk = Chunk(b'ABC')
         chunk_id = key.id_hash(chunk.data)
         chunk_cdata = key.encrypt(chunk)
         key = KeyfileKey.detect(self.MockRepository(), chunk_cdata)
@@ -124,9 +124,9 @@ class TestKey:
         assert hexlify(key.enc_hmac_key) == b'b885a05d329a086627412a6142aaeb9f6c54ab7950f996dd65587251f6bc0901'
         assert hexlify(key.enc_key) == b'2ff3654c6daf7381dbbe718d2b20b4f1ea1e34caa6cc65f6bb3ac376b93fed2a'
         assert key.chunk_seed == -775740477
-        manifest = key.encrypt(Chunk(b'XXX'))
+        manifest = key.encrypt(Chunk(b'ABC'))
         assert key.extract_nonce(manifest) == 0
-        manifest2 = key.encrypt(Chunk(b'XXX'))
+        manifest2 = key.encrypt(Chunk(b'ABC'))
         assert manifest != manifest2
         assert key.decrypt(None, manifest) == key.decrypt(None, manifest2)
         assert key.extract_nonce(manifest2) == 1

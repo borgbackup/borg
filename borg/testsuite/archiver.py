@@ -362,6 +362,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # the interesting parts of info_output2 and info_output should be same
         self.assert_equal(filter(info_output), filter(info_output2))
 
+    # Search for O_NOATIME there: https://www.gnu.org/software/hurd/contributing.html - we just
+    # skip the test on Hurd, it is not critical anyway, just testing a performance optimization.
+    @pytest.mark.skipif(sys.platform == 'gnu0', reason="O_NOATIME is strangely broken on GNU Hurd")
     def test_atime(self):
         def has_noatime(some_file):
             atime_before = os.stat(some_file).st_atime_ns

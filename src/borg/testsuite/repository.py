@@ -293,8 +293,7 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         assert not self.repository.io.segment_exists(last_segment)
         for segment, _ in self.repository.io.segment_iterator():
             for tag, key, offset, size in self.repository.io.iter_objects(segment):
-                if tag == TAG_DELETE:
-                    assert segment in self.repository.compact
+                assert tag != TAG_DELETE
 
     def test_shadowed_entries_are_preserved(self):
         get_latest_segment = self.repository.io.get_latest_segment
@@ -329,6 +328,22 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         os.unlink(os.path.join(self.repository.path, 'index.%d' % get_latest_segment()))
         # Must not reappear
         assert H(1) not in self.repository
+
+    def test_shadow_index_rollback(self):
+        self.repository.put(H(1), b'1')
+        self.repository.delete(H(1))
+        assert self.repository.shadow_index[H(1)] == [0]
+        self.repository.commit()
+        # note how an empty list means that nothing is shadowed for sure
+        assert self.repository.shadow_index[H(1)] == []
+        self.repository.put(H(1), b'1')
+        self.repository.delete(H(1))
+        # 0 put/delete; 1 commit; 2 compacted; 3 commit; 4 put/delete
+        assert self.repository.shadow_index[H(1)] == [4]
+        self.repository.rollback()
+        self.repository.put(H(2), b'1')
+        # After the rollback segment 4 shouldn't be considered anymore
+        assert self.repository.shadow_index[H(1)] == []
 
 
 class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):

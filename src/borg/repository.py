@@ -111,7 +111,12 @@ class Repository:
         self.io = None
         self.lock = None
         self.index = None
+        # This is an index of shadowed log entries during this transaction. Consider the following sequence:
+        # segment_n PUT A, segment_x DELETE A
+        # After the "DELETE A" in segment_x the shadow index will contain "A -> (n,)".
+        self.shadow_index = defaultdict(list)
         self._active_txn = False
+
         self.lock_wait = lock_wait
         self.do_lock = lock
         self.do_create = create
@@ -306,13 +311,10 @@ class Repository:
             except RuntimeError:
                 self.check_transaction()
                 self.index = self.open_index(transaction_id, False)
-        # This is an index of shadowed log entries during this transaction. Consider the following sequence:
-        # segment_n PUT A, segment_x DELETE A
-        # After the "DELETE A" in segment_x the shadow index will contain "A -> (n,)".
-        self.shadow_index = defaultdict(list)
         if transaction_id is None:
             self.segments = {}  # XXX bad name: usage_count_of_segment_x = self.segments[x]
             self.compact = FreeSpace()  # XXX bad name: freeable_space_of_segment_x = self.compact[x]
+            self.shadow_index.clear()
         else:
             if do_cleanup:
                 self.io.cleanup(transaction_id)
@@ -343,6 +345,11 @@ class Repository:
             else:
                 self.segments = hints[b'segments']
                 self.compact = FreeSpace(hints[b'compact'])
+            # Drop uncommitted segments in the shadow index
+            for key, shadowed_segments in self.shadow_index.items():
+                for segment in list(shadowed_segments):
+                    if segment > transaction_id:
+                        shadowed_segments.remove(segment)
 
     def write_index(self):
         hints = {b'version': 2,

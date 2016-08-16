@@ -259,6 +259,6 @@ class ManifestItem(PropDict):
 
     version = PropDict._make_property('version', int)
     archives = PropDict._make_property('archives', dict)  # name -> dict
-    timestamp = PropDict._make_property('time', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    timestamp = PropDict._make_property('timestamp', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
     config = PropDict._make_property('config', dict)
     item_keys = PropDict._make_property('item_keys', tuple)

@@ -293,7 +293,42 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         assert not self.repository.io.segment_exists(last_segment)
         for segment, _ in self.repository.io.segment_iterator():
             for tag, key, offset, size in self.repository.io.iter_objects(segment):
-                assert tag != TAG_DELETE
+                if tag == TAG_DELETE:
+                    assert segment in self.repository.compact
+
+    def test_shadowed_entries_are_preserved(self):
+        get_latest_segment = self.repository.io.get_latest_segment
+        self.repository.put(H(1), b'1')
+        # This is the segment with our original PUT of interest
+        put_segment = get_latest_segment()
+        self.repository.commit()
+
+        # We now delete H(1), and force this segment to not be compacted, which can happen
+        # if it's not sparse enough (symbolized by H(2) here).
+        self.repository.delete(H(1))
+        self.repository.put(H(2), b'1')
+        delete_segment = get_latest_segment()
+
+        # We pretend these are mostly dense (not sparse) and won't be compacted
+        del self.repository.compact[put_segment]
+        del self.repository.compact[delete_segment]
+
+        self.repository.commit()
+
+        # Now we perform an unrelated operation on the segment containing the DELETE,
+        # causing it to be compacted.
+        self.repository.delete(H(2))
+        self.repository.commit()
+
+        assert self.repository.io.segment_exists(put_segment)
+        assert not self.repository.io.segment_exists(delete_segment)
+
+        # Basic case, since the index survived this must be ok
+        assert H(1) not in self.repository
+        # Nuke index, force replay
+        os.unlink(os.path.join(self.repository.path, 'index.%d' % get_latest_segment()))
+        # Must not reappear
+        assert H(1) not in self.repository
 
 
 class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):

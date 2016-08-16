@@ -113,10 +113,9 @@ class Repository:
         self.index = None
         # This is an index of shadowed log entries during this transaction. Consider the following sequence:
         # segment_n PUT A, segment_x DELETE A
-        # After the "DELETE A" in segment_x the shadow index will contain "A -> (n,)".
-        self.shadow_index = defaultdict(list)
+        # After the "DELETE A" in segment_x the shadow index will contain "A -> [n]".
+        self.shadow_index = {}
         self._active_txn = False
-
         self.lock_wait = lock_wait
         self.do_lock = lock
         self.do_create = create
@@ -741,7 +740,7 @@ class Repository:
             segment, offset = self.index.pop(id)
         except KeyError:
             raise self.ObjectNotFound(id, self.path) from None
-        self.shadow_index[id].append(segment)
+        self.shadow_index.setdefault(id, []).append(segment)
         self.segments[segment] -= 1
         size = self.io.read(segment, offset, id, read_data=False)
         self.compact[segment] += size

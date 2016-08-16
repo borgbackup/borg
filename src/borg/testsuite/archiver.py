@@ -1203,7 +1203,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', self.repository_location)
         test_archive = self.repository_location + '::test'
         self.cmd('create', test_archive, src_dir)
-        self.cmd('list', '--list-format', '-', test_archive, exit_code=1)
+        self.cmd('list', '--list-format', '-', test_archive)
         self.archiver.exit_code = 0  # reset exit code for following tests
         output_1 = self.cmd('list', test_archive)
         output_2 = self.cmd('list', '--format', '{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}', test_archive)

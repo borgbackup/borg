@@ -1247,7 +1247,7 @@ class Archiver:
             for old_name, new_name, warning in deprecations:
                 if arg.startswith(old_name):
                     args[i] = arg.replace(old_name, new_name)
-                    self.print_warning(warning)
+                    print(warning, file=sys.stderr)
         return args
 
     def build_parser(self, prog=None):

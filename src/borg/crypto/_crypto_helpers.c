@@ -1,4 +1,4 @@
-/* add missing HMAC functions, so OpenSSL 1.0.x can be used like 1.1 */
+/* some helpers, so our code also works with OpenSSL 1.0.x */
 
 #include <string.h>
 #include <openssl/opensslv.h>
@@ -22,6 +22,14 @@ void HMAC_CTX_free(HMAC_CTX *ctx)
        HMAC_CTX_cleanup(ctx);
        OPENSSL_free(ctx);
    }
+}
+
+const EVP_CIPHER *EVP_aes_256_ocb(void){  /* dummy, so that code compiles */
+    return NULL;
+}
+
+const EVP_CIPHER *EVP_chacha20_poly1305(void){  /* dummy, so that code compiles */
+    return NULL;
 }
 
 #endif

@@ -1,7 +1,5 @@
 """An AEAD style OpenSSL wrapper
 
-Note: AES-GCM mode needs OpenSSL >= 1.0.1d due to bug fixes in OpenSSL.
-
 API:
 
     encrypt(data, header=b'', aad_offset=0) -> envelope
@@ -79,6 +77,8 @@ cdef extern from "openssl/evp.h":
 
     const EVP_CIPHER *EVP_aes_256_ctr()
     const EVP_CIPHER *EVP_aes_256_gcm()
+    const EVP_CIPHER *EVP_aes_256_ocb()
+    const EVP_CIPHER *EVP_chacha20_poly1305()
 
     void EVP_CIPHER_CTX_init(EVP_CIPHER_CTX *a)
     void EVP_CIPHER_CTX_cleanup(EVP_CIPHER_CTX *a)
@@ -124,11 +124,19 @@ cdef extern from "openssl/hmac.h":
                     unsigned char *md, unsigned int *md_len) nogil
 
 cdef extern from "_crypto_helpers.h":
+    long OPENSSL_VERSION_NUMBER
+
     ctypedef struct HMAC_CTX:
         pass
 
     HMAC_CTX *HMAC_CTX_new()
     void HMAC_CTX_free(HMAC_CTX *a)
+
+    const EVP_CIPHER *EVP_aes_256_ocb()  # dummy
+    const EVP_CIPHER *EVP_chacha20_poly1305()  # dummy
+
+
+openssl10 = OPENSSL_VERSION_NUMBER < 0x10100000
 
 
 import struct
@@ -331,9 +339,13 @@ cdef class AES256_CTR_HMAC_SHA256:
             iv_out[i] = iv[8+i]
 
 
-cdef class AES256_GCM:
-    # Layout: HEADER + GMAC 16 + IV 12 + CT
+ctypedef const EVP_CIPHER * (* CIPHER)()
 
+
+cdef class _AEAD_BASE:
+    # Layout: HEADER + MAC 16 + IV 12 + CT
+
+    cdef CIPHER cipher
     cdef EVP_CIPHER_CTX *ctx
     cdef unsigned char *enc_key
     cdef unsigned char iv[12]
@@ -376,7 +388,7 @@ cdef class AES256_GCM:
             offset += hlen
             offset += 16
             self.store_iv(odata+offset, self.iv)
-            rc = EVP_EncryptInit_ex(self.ctx, EVP_aes_256_gcm(), NULL, NULL, NULL)
+            rc = EVP_EncryptInit_ex(self.ctx, self.cipher(), NULL, NULL, NULL)
             if not rc:
                 raise CryptoError('EVP_EncryptInit_ex failed')
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_SET_IVLEN, 12, NULL):
@@ -422,7 +434,7 @@ cdef class AES256_GCM:
         cdef int offset
         cdef Py_buffer idata = ro_buffer(envelope)
         try:
-            if not EVP_DecryptInit_ex(self.ctx, EVP_aes_256_gcm(), NULL, NULL, NULL):
+            if not EVP_DecryptInit_ex(self.ctx, self.cipher(), NULL, NULL, NULL):
                 raise CryptoError('EVP_DecryptInit_ex failed')
             iv = self.fetch_iv(<unsigned char *> idata.buf+hlen+16)
             self.set_iv(iv)
@@ -445,7 +457,7 @@ cdef class AES256_GCM:
             rc = EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen)
             if rc <= 0:
                 # a failure here means corrupted or tampered tag (mac) or data.
-                raise IntegrityError('GCM Authentication / EVP_DecryptFinal_ex failed')
+                raise IntegrityError('Authentication / EVP_DecryptFinal_ex failed')
             offset += olen
             self.blocks += num_aes_blocks(offset)
             return odata[:offset]
@@ -454,7 +466,7 @@ cdef class AES256_GCM:
             PyBuffer_Release(&idata)
 
     def set_iv(self, iv):
-        self.blocks = 0  # number of AES blocks encrypted with this IV
+        self.blocks = 0  # number of cipher blocks encrypted with this IV
         for i in range(12):
             self.iv[i] = iv[i]
 
@@ -474,6 +486,30 @@ cdef class AES256_GCM:
         cdef int i
         for i in range(12):
             iv_out[i] = iv[i]
+
+
+cdef class AES256_GCM(_AEAD_BASE):
+    def __init__(self, mac_key, enc_key, iv=None):
+        if OPENSSL_VERSION_NUMBER < 0x10001040:
+            raise ValueError('AES GCM requires OpenSSL >= 1.0.1d. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
+        self.cipher = EVP_aes_256_gcm
+        super().__init__(mac_key, enc_key, iv=iv)
+
+
+cdef class AES256_OCB(_AEAD_BASE):
+    def __init__(self, mac_key, enc_key, iv=None):
+        if OPENSSL_VERSION_NUMBER < 0x10100000:
+            raise ValueError('AES OCB requires OpenSSL >= 1.1.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
+        self.cipher = EVP_aes_256_ocb
+        super().__init__(mac_key, enc_key, iv=iv)
+
+
+cdef class CHACHA20_POLY1305(_AEAD_BASE):
+    def __init__(self, mac_key, enc_key, iv=None):
+        if OPENSSL_VERSION_NUMBER < 0x10100000:
+            raise ValueError('CHACHA20-POLY1305 requires OpenSSL >= 1.1.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
+        self.cipher = EVP_chacha20_poly1305
+        super().__init__(mac_key, enc_key, iv=iv)
 
 
 def hmac_sha256(key, data):

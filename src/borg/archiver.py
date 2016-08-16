@@ -793,7 +793,7 @@ class Archiver:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   consider_part_files=args.consider_part_files)
 
-                if args.format:
+                if args.format is not None:
                     format = args.format
                 elif args.short:
                     format = "{path}{NL}"
@@ -804,7 +804,7 @@ class Archiver:
                 for item in archive.iter_items(lambda item: matcher.match(item.path)):
                     write(safe_encode(formatter.format_item(item)))
         else:
-            if args.format:
+            if args.format is not None:
                 format = args.format
             elif args.short:
                 format = "{archive}{NL}"
@@ -1251,7 +1251,7 @@ class Archiver:
             for old_name, new_name, warning in deprecations:
                 if arg.startswith(old_name):
                     args[i] = arg.replace(old_name, new_name)
-                    self.print_warning(warning)
+                    print(warning, file=sys.stderr)
         return args
 
     def build_parser(self, prog=None):

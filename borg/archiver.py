@@ -343,6 +343,16 @@ class Archiver:
                 status = '-'  # dry run, item was not backed up
         self.print_file_status(status, path)
 
+    @staticmethod
+    def build_filter(matcher, strip_components=0):
+        if strip_components:
+            def item_filter(item):
+                return matcher.match(item[b'path']) and os.sep.join(item[b'path'].split(os.sep)[strip_components:])
+        else:
+            def item_filter(item):
+                return matcher.match(item[b'path'])
+        return item_filter
+
     @with_repository()
     @with_archive
     def do_extract(self, args, repository, manifest, key, archive):
@@ -371,9 +381,7 @@ class Archiver:
         sparse = args.sparse
         strip_components = args.strip_components
         dirs = []
-        filter = lambda item: matcher.match(item[b'path'])
-        if strip_components:
-            filter = lambda item: matcher.match(item[b'path']) and os.sep.join(item[b'path'].split(os.sep)[strip_components:])
+        filter = self.build_filter(matcher, strip_components)
         for item in archive.iter_items(filter, preload=True):
             orig_path = item[b'path']
             if strip_components:

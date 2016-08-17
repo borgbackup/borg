@@ -21,7 +21,7 @@ from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP, flags_noatime, flags_
 from ..archiver import Archiver
 from ..cache import Cache
 from ..crypto import bytes_to_long, num_aes_blocks
-from ..helpers import Manifest, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
+from ..helpers import Manifest, PatternMatcher, parse_pattern, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import BaseTestCase, changedir, environment_variable
@@ -1337,7 +1337,6 @@ class RemoteArchiverTestCase(ArchiverTestCase):
         self.cmd('create', self.repository_location + '::test', 'input')
         marker = 'cached responses left in RemoteRepository'
         with changedir('output'):
-            #import rpdb2; rpdb2.start_embedded_debugger("nopass")
             res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '3')
             self.assert_true(marker not in res)
             with self.assert_creates_file('file'):
@@ -1370,3 +1369,26 @@ def test_get_args():
     args = archiver.get_args(['borg', 'serve', '--restrict-to-path=/p1', '--restrict-to-path=/p2', ],
                              'borg init /')
     assert args.func == archiver.do_serve
+
+
+class TestBuildFilter:
+    def test_basic(self):
+        matcher = PatternMatcher()
+        matcher.add([parse_pattern('included')], True)
+        filter = Archiver.build_filter(matcher)
+        assert filter({b'path': 'included'})
+        assert filter({b'path': 'included/file'})
+        assert not filter({b'path': 'something else'})
+
+    def test_empty(self):
+        matcher = PatternMatcher(fallback=True)
+        filter = Archiver.build_filter(matcher)
+        assert filter({b'path': 'anything'})
+
+    def test_strip_components(self):
+        matcher = PatternMatcher(fallback=True)
+        filter = Archiver.build_filter(matcher, strip_components=1)
+        assert not filter({b'path': 'shallow'})
+        assert not filter({b'path': 'shallow/'})  # can this even happen? paths are normalized...
+        assert filter({b'path': 'deep enough/file'})
+        assert filter({b'path': 'something/dir/file'})

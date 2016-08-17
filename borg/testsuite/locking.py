@@ -64,6 +64,8 @@ class TestLock:
         lock2 = Lock(lockpath, exclusive=False, id=ID2).acquire()
         assert len(lock1._roster.get(SHARED)) == 2
         assert len(lock1._roster.get(EXCLUSIVE)) == 0
+        assert not lock1._roster.empty(SHARED, EXCLUSIVE)
+        assert lock1._roster.empty(EXCLUSIVE)
         lock1.release()
         lock2.release()
 
@@ -71,6 +73,7 @@ class TestLock:
         with Lock(lockpath, exclusive=True, id=ID1) as lock:
             assert len(lock._roster.get(SHARED)) == 0
             assert len(lock._roster.get(EXCLUSIVE)) == 1
+            assert not lock._roster.empty(SHARED, EXCLUSIVE)
 
     def test_upgrade(self, lockpath):
         with Lock(lockpath, exclusive=False) as lock:
@@ -78,6 +81,7 @@ class TestLock:
             lock.upgrade()  # NOP
             assert len(lock._roster.get(SHARED)) == 0
             assert len(lock._roster.get(EXCLUSIVE)) == 1
+            assert not lock._roster.empty(SHARED, EXCLUSIVE)
 
     def test_downgrade(self, lockpath):
         with Lock(lockpath, exclusive=True) as lock:

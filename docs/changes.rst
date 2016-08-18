@@ -50,12 +50,29 @@ The best check that everything is ok is to run a dry-run extraction::
     borg extract -v --dry-run REPO::ARCHIVE
 
 
-Version 1.0.7 (not released yet)
---------------------------------
+Version 1.0.7 (2016-08-19)
+--------------------------
 
 Security fixes:
 
-- fix security issue with remote repository access, #1428
+- borg serve: fix security issue with remote repository access, #1428
+  If you used e.g. --restrict-to-path /path/client1/ (with or without trailing
+  slash does not make a difference), it acted like a path prefix match using
+  /path/client1 (note the missing trailing slash) - the code then also allowed
+  working in e.g. /path/client13 or /path/client1000.
+
+  As this could accidentally lead to major security/privacy issues depending on
+  the pathes you use, the behaviour was changed to be a strict directory match.
+  That means --restrict-to-path /path/client1 (with or without trailing slash
+  does not make a difference) now uses /path/client1/ internally (note the
+  trailing slash here!) for matching and allows precisely that path AND any
+  path below it. So, /path/client1 is allowed, /path/client1/repo1 is allowed,
+  but not /path/client13 or /path/client1000.
+
+  If you willingly used the undocumented (dangerous) previous behaviour, you
+  may need to rearrange your --restrict-to-path pathes now. We are sorry if
+  that causes work for you, but we did not want a potentially dangerous
+  behaviour in the software (not even using a for-backwards-compat option).
 
 Bug fixes:
 

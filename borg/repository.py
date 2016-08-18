@@ -174,6 +174,7 @@ class Repository:
         self.config = ConfigParser(interpolation=None)
         self.config.read(os.path.join(self.path, 'config'))
         if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:
+            self.close()
             raise self.InvalidRepository(path)
         self.max_segment_size = self.config.getint('repository', 'max_segment_size')
         self.segments_per_dir = self.config.getint('repository', 'segments_per_dir')

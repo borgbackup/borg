@@ -137,9 +137,11 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             cache_version = self.config.getint('cache', 'version')
             wanted_version = 1
             if cache_version != wanted_version:
+                self.close()
                 raise Exception('%s has unexpected cache version %d (wanted: %d).' % (
                     config_path, cache_version, wanted_version))
         except configparser.NoSectionError:
+            self.close()
             raise Exception('%s does not look like a Borg cache.' % config_path) from None
         self.id = self.config.get('cache', 'repository')
         self.manifest_id = unhexlify(self.config.get('cache', 'manifest'))

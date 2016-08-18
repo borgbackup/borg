@@ -57,6 +57,30 @@ Security fixes:
 
 - fix security issue with remote repository access, #1428
 
+Bug fixes:
+
+- fixed repeated LockTimeout exceptions when borg serve tried to write into
+  a already write-locked repo (e.g. by a borg mount), #502 part b)
+  This was solved by the fix for #1220 in 1.0.7rc1 already.
+- fix cosmetics + file leftover for "not a valid borg repository", #1490
+- Cache: release lock if cache is invalid, #1501
+- borg extract --strip-components: fix leak of preloaded chunk contents
+- Repository, when a InvalidRepository exception happens:
+
+  - fix spurious, empty lock.roster
+  - fix repo not closed cleanly
+
+New features:
+
+- implement borg debug-info, fixes #1122
+  (just calls already existing code via cli, same output as below tracebacks)
+
+Other changes:
+
+- skip the O_NOATIME test on GNU Hurd, fixes #1315
+  (this is a very minor issue and the GNU Hurd project knows the bug)
+- document using a clean repo to test / build the release
+
 
 Version 1.0.7rc2 (2016-08-13)
 -----------------------------

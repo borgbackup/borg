@@ -1329,11 +1329,11 @@ class RemoteArchiverTestCase(ArchiverTestCase):
 
     def test_strip_components_doesnt_leak(self):
         self.cmd('init', self.repository_location)
-        self.create_regular_file('dir/file', contents=b"test file contents 123")
-        self.create_regular_file('dir/file2', contents=b"test file contents 345")
-        self.create_regular_file('skipped', contents=b"test file contents 567")
-        self.create_regular_file('skipped2', contents=b"test file contentsasdasd")
-        self.create_regular_file('skipped4', contents=b"sdfdsgdgfhttztu")
+        self.create_regular_file('dir/file', contents=b"test file contents 1")
+        self.create_regular_file('dir/file2', contents=b"test file contents 2")
+        self.create_regular_file('skipped-file1', contents=b"test file contents 3")
+        self.create_regular_file('skipped-file2', contents=b"test file contents 4")
+        self.create_regular_file('skipped-file3', contents=b"test file contents 5")
         self.cmd('create', self.repository_location + '::test', 'input')
         marker = 'cached responses left in RemoteRepository'
         with changedir('output'):

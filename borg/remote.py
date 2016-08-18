@@ -203,6 +203,8 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             raise
 
     def __del__(self):
+        if len(self.responses):
+            logging.debug("still %d cached responses left in RemoteRepository" % (len(self.responses),))
         if self.p:
             self.close()
             assert False, "cleanup happened in Repository.__del__"

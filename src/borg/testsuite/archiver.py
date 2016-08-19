@@ -1203,7 +1203,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', self.repository_location)
         test_archive = self.repository_location + '::test'
         self.cmd('create', test_archive, src_dir)
-        self.cmd('list', '--list-format', '-', test_archive)
+        output_warn = self.cmd('list', '--list-format', '-', test_archive)
+        self.assert_in('--list-format" has been deprecated.', output_warn)
         output_1 = self.cmd('list', test_archive)
         output_2 = self.cmd('list', '--format', '{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}', test_archive)
         output_3 = self.cmd('list', '--format', '{mtime:%s} {path}{NL}', test_archive)

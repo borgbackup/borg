@@ -415,6 +415,18 @@ class Archiver:
                 status = '-'  # dry run, item was not backed up
         self.print_file_status(status, path)
 
+    @staticmethod
+    def build_filter(matcher, is_hardlink_master, strip_components=0):
+        if strip_components:
+            def item_filter(item):
+                return (is_hardlink_master(item) or
+                        matcher.match(item.path) and os.sep.join(item.path.split(os.sep)[strip_components:]))
+        else:
+            def item_filter(item):
+                return (is_hardlink_master(item) or
+                        matcher.match(item.path))
+        return item_filter
+
     @with_repository()
     @with_archive
     def do_extract(self, args, repository, manifest, key, archive):
@@ -440,8 +452,8 @@ class Archiver:
             return (partial_extract and stat.S_ISREG(item.mode) and
                     item.get('hardlink_master', True) and 'source' not in item)
 
-        for item in archive.iter_items(preload=True,
-                filter=lambda item: item_is_hardlink_master(item) or matcher.match(item.path)):
+        filter = self.build_filter(matcher, item_is_hardlink_master, strip_components)
+        for item in archive.iter_items(filter, preload=True):
             orig_path = item.path
             if item_is_hardlink_master(item):
                 hardlink_masters[orig_path] = (item.get('chunks'), None)
@@ -449,8 +461,6 @@ class Archiver:
                 continue
             if strip_components:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])
-                if not item.path:
-                    continue
             if not args.dry_run:
                 while dirs and not item.path.startswith(dirs[-1].path):
                     dir_item = dirs.pop(-1)
@@ -1003,6 +1013,11 @@ class Archiver:
             return subprocess.call([args.command] + args.args)
         finally:
             repository.rollback()
+
+    def do_debug_info(self, args):
+        """display system information for debugging / bug reports"""
+        print(sysinfo())
+        return EXIT_SUCCESS
 
     @with_repository()
     def do_debug_dump_archive_items(self, args, repository, manifest, key):
@@ -2163,6 +2178,18 @@ class Archiver:
         subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
         subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
                                help='additional help on TOPIC')
+
+        debug_info_epilog = textwrap.dedent("""
+        This command displays some system information that might be useful for bug
+        reports and debugging problems. If a traceback happens, this information is
+        already appended at the end of the traceback.
+        """)
+        subparser = subparsers.add_parser('debug-info', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_info.__doc__,
+                                          epilog=debug_info_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='show system infos for debugging / bug reports (debug)')
+        subparser.set_defaults(func=self.do_debug_info)
 
         debug_dump_archive_items_epilog = textwrap.dedent("""
         This command dumps raw (but decrypted and decompressed) archive items (only metadata) to files.

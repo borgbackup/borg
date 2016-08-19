@@ -192,6 +192,14 @@ Checklist:
 
     git tag -s -m "tagged/signed release X.Y.Z" X.Y.Z
 
+- create a clean repo and use it for the following steps::
+
+    git clone borg borg-clean
+
+  This makes sure no uncommitted files get into the release archive.
+  It also will find if you forgot to commit something that is needed.
+  It also makes sure the vagrant machines only get committed files and
+  do a fresh start based on that.
 - run tox and/or binary builds on all supported platforms via vagrant,
   check for test failures
 - create a release on PyPi::

@@ -28,9 +28,11 @@ from ..archiver import Archiver
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto import bytes_to_long, num_aes_blocks
+from ..helpers import PatternMatcher, parse_pattern
 from ..helpers import Chunk, Manifest
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
+from ..item import Item
 from ..key import KeyfileKeyBase
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
@@ -403,6 +405,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
             assert os.readlink('input/link1') == 'somewhere'
 
+    # Search for O_NOATIME there: https://www.gnu.org/software/hurd/contributing.html - we just
+    # skip the test on Hurd, it is not critical anyway, just testing a performance optimization.
+    @pytest.mark.skipif(sys.platform == 'gnu0', reason="O_NOATIME is strangely broken on GNU Hurd")
     @pytest.mark.skipif(not is_utime_fully_supported(), reason='cannot properly setup and execute test without utime')
     def test_atime(self):
         def has_noatime(some_file):
@@ -1928,12 +1933,21 @@ class RemoteArchiverTestCase(ArchiverTestCase):
     prefix = '__testsuite__:'
 
     def test_remote_repo_restrict_to_path(self):
-        self.cmd('init', self.repository_location)
-        path_prefix = os.path.dirname(self.repository_path)
+        # restricted to repo directory itself:
+        with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', self.repository_path]):
+            self.cmd('init', self.repository_location)
+        # restricted to repo directory itself, fail for other directories with same prefix:
+        with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', self.repository_path]):
+            self.assert_raises(PathNotAllowed, lambda: self.cmd('init', self.repository_location + '_0'))
+
+        # restricted to a completely different path:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo']):
             self.assert_raises(PathNotAllowed, lambda: self.cmd('init', self.repository_location + '_1'))
+        path_prefix = os.path.dirname(self.repository_path)
+        # restrict to repo directory's parent directory:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', path_prefix]):
             self.cmd('init', self.repository_location + '_2')
+        # restrict to repo directory's parent directory and another directory:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo', '--restrict-to-path', path_prefix]):
             self.cmd('init', self.repository_location + '_3')
 
@@ -1949,6 +1963,28 @@ class RemoteArchiverTestCase(ArchiverTestCase):
     @unittest.skip('only works locally')
     def test_debug_put_get_delete_obj(self):
         pass
+
+    def test_strip_components_doesnt_leak(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('dir/file', contents=b"test file contents 1")
+        self.create_regular_file('dir/file2', contents=b"test file contents 2")
+        self.create_regular_file('skipped-file1', contents=b"test file contents 3")
+        self.create_regular_file('skipped-file2', contents=b"test file contents 4")
+        self.create_regular_file('skipped-file3', contents=b"test file contents 5")
+        self.cmd('create', self.repository_location + '::test', 'input')
+        marker = 'cached responses left in RemoteRepository'
+        with changedir('output'):
+            res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '3')
+            self.assert_true(marker not in res)
+            with self.assert_creates_file('file'):
+                res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '2')
+                self.assert_true(marker not in res)
+            with self.assert_creates_file('dir/file'):
+                res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '1')
+                self.assert_true(marker not in res)
+            with self.assert_creates_file('input/dir/file'):
+                res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '0')
+                self.assert_true(marker not in res)
 
 
 class DiffArchiverTestCase(ArchiverTestCaseBase):
@@ -2160,3 +2196,30 @@ def test_compare_chunk_contents():
     ], [
         b'1234', b'565'
     ])
+
+
+class TestBuildFilter:
+    @staticmethod
+    def item_is_hardlink_master(item):
+        return False
+
+    def test_basic(self):
+        matcher = PatternMatcher()
+        matcher.add([parse_pattern('included')], True)
+        filter = Archiver.build_filter(matcher, self.item_is_hardlink_master)
+        assert filter(Item(path='included'))
+        assert filter(Item(path='included/file'))
+        assert not filter(Item(path='something else'))
+
+    def test_empty(self):
+        matcher = PatternMatcher(fallback=True)
+        filter = Archiver.build_filter(matcher, self.item_is_hardlink_master)
+        assert filter(Item(path='anything'))
+
+    def test_strip_components(self):
+        matcher = PatternMatcher(fallback=True)
+        filter = Archiver.build_filter(matcher, self.item_is_hardlink_master, strip_components=1)
+        assert not filter(Item(path='shallow'))
+        assert not filter(Item(path='shallow/'))  # can this even happen? paths are normalized...
+        assert filter(Item(path='deep enough/file'))
+        assert filter(Item(path='something/dir/file'))

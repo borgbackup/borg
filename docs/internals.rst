@@ -48,7 +48,7 @@ Lock files
 the repository.
 
 The locking system is based on creating a directory `lock.exclusive` (for
-exclusive locks). Inside the lock directory, there is a file indication
+exclusive locks). Inside the lock directory, there is a file indicating
 hostname, process id and thread id of the lock holder.
 
 There is also a json file `lock.roster` that keeps a directory of all shared
@@ -338,7 +338,7 @@ more chunks than estimated above, because 1 file is at least 1 chunk).
 
 If a remote repository is used the repo index will be allocated on the remote side.
 
-E.g. backing up a total count of 1 Mi (IEC binary prefix e.g. 2^20) files with a total size of 1TiB.
+E.g. backing up a total count of 1 Mi (IEC binary prefix i.e. 2^20) files with a total size of 1TiB.
 
 a) with ``create --chunker-params 10,23,16,4095`` (custom, like borg < 1.0 or attic):
 

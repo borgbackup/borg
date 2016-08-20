@@ -2397,7 +2397,7 @@ def main():  # pragma: no cover
         exit_code = EXIT_ERROR
     if msg:
         logger.error(msg)
-    if traceback:
+    if tb:
         logger.log(tb_log_level, tb)
     if args.show_rc:
         rc_logger = logging.getLogger('borg.output.show-rc')

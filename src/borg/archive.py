@@ -148,6 +148,15 @@ class DownloadPipeline:
         self.key = key
 
     def unpack_many(self, ids, filter=None, preload=False):
+        """
+        Return iterator of items.
+
+        *ids* is a chunk ID list of an item stream. *filter* is a callable
+        to decide whether an item will be yielded. *preload* preloads the data chunks of every yielded item.
+
+        Warning: if *preload* is True then all data chunks of every yielded item have to be retrieved,
+        otherwise preloaded chunks will accumulate in RemoteRepository and create a memory leak.
+        """
         unpacker = msgpack.Unpacker(use_list=False)
         for _, data in self.fetch_many(ids):
             unpacker.feed(data)

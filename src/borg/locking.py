@@ -201,6 +201,9 @@ class LockRoster:
         roster = self.load()
         return set(tuple(e) for e in roster.get(key, []))
 
+    def empty(self, *keys):
+        return all(not self.get(key) for key in keys)
+
     def modify(self, key, op):
         roster = self.load()
         try:
@@ -293,10 +296,14 @@ class Lock:
     def release(self):
         if self.is_exclusive:
             self._roster.modify(EXCLUSIVE, REMOVE)
+            if self._roster.empty(EXCLUSIVE, SHARED):
+                self._roster.remove()
             self._lock.release()
         else:
             with self._lock:
                 self._roster.modify(SHARED, REMOVE)
+                if self._roster.empty(EXCLUSIVE, SHARED):
+                    self._roster.remove()
 
     def upgrade(self):
         # WARNING: if multiple read-lockers want to upgrade, it will deadlock because they

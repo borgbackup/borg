@@ -123,12 +123,53 @@ Other changes:
   - ChunkBuffer: add test for leaving partial chunk in buffer, fixes #945
 
 
-Version 1.0.7 (not released yet)
---------------------------------
+Version 1.0.7 (2016-08-19)
+--------------------------
 
 Security fixes:
 
-- fix security issue with remote repository access, #1428
+- borg serve: fix security issue with remote repository access, #1428
+  If you used e.g. --restrict-to-path /path/client1/ (with or without trailing
+  slash does not make a difference), it acted like a path prefix match using
+  /path/client1 (note the missing trailing slash) - the code then also allowed
+  working in e.g. /path/client13 or /path/client1000.
+
+  As this could accidentally lead to major security/privacy issues depending on
+  the pathes you use, the behaviour was changed to be a strict directory match.
+  That means --restrict-to-path /path/client1 (with or without trailing slash
+  does not make a difference) now uses /path/client1/ internally (note the
+  trailing slash here!) for matching and allows precisely that path AND any
+  path below it. So, /path/client1 is allowed, /path/client1/repo1 is allowed,
+  but not /path/client13 or /path/client1000.
+
+  If you willingly used the undocumented (dangerous) previous behaviour, you
+  may need to rearrange your --restrict-to-path pathes now. We are sorry if
+  that causes work for you, but we did not want a potentially dangerous
+  behaviour in the software (not even using a for-backwards-compat option).
+
+Bug fixes:
+
+- fixed repeated LockTimeout exceptions when borg serve tried to write into
+  a already write-locked repo (e.g. by a borg mount), #502 part b)
+  This was solved by the fix for #1220 in 1.0.7rc1 already.
+- fix cosmetics + file leftover for "not a valid borg repository", #1490
+- Cache: release lock if cache is invalid, #1501
+- borg extract --strip-components: fix leak of preloaded chunk contents
+- Repository, when a InvalidRepository exception happens:
+
+  - fix spurious, empty lock.roster
+  - fix repo not closed cleanly
+
+New features:
+
+- implement borg debug-info, fixes #1122
+  (just calls already existing code via cli, same output as below tracebacks)
+
+Other changes:
+
+- skip the O_NOATIME test on GNU Hurd, fixes #1315
+  (this is a very minor issue and the GNU Hurd project knows the bug)
+- document using a clean repo to test / build the release
 
 
 Version 1.0.7rc2 (2016-08-13)

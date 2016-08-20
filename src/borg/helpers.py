@@ -22,7 +22,7 @@ from collections import namedtuple, deque, abc
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
-from functools import wraps, partial
+from functools import wraps, partial, lru_cache
 from itertools import islice
 from operator import attrgetter
 from string import Formatter
@@ -722,19 +722,6 @@ def format_archive(archive):
     )
 
 
-def memoize(function):
-    cache = {}
-
-    def decorated_function(*args):
-        try:
-            return cache[args]
-        except KeyError:
-            val = function(*args)
-            cache[args] = val
-            return val
-    return decorated_function
-
-
 class Buffer:
     """
     provide a thread-local buffer
@@ -776,7 +763,7 @@ class Buffer:
         return self._thread_local.buffer
 
 
-@memoize
+@lru_cache(maxsize=None)
 def uid2user(uid, default=None):
     try:
         return pwd.getpwuid(uid).pw_name
@@ -784,7 +771,7 @@ def uid2user(uid, default=None):
         return default
 
 
-@memoize
+@lru_cache(maxsize=None)
 def user2uid(user, default=None):
     try:
         return user and pwd.getpwnam(user).pw_uid
@@ -792,7 +779,7 @@ def user2uid(user, default=None):
         return default
 
 
-@memoize
+@lru_cache(maxsize=None)
 def gid2group(gid, default=None):
     try:
         return grp.getgrgid(gid).gr_name
@@ -800,7 +787,7 @@ def gid2group(gid, default=None):
         return default
 
 
-@memoize
+@lru_cache(maxsize=None)
 def group2gid(group, default=None):
     try:
         return group and grp.getgrnam(group).gr_gid

@@ -162,9 +162,15 @@ class RemoteRepository:
         env = dict(os.environ)
         if not testing:
             borg_cmd = self.ssh_cmd(location) + borg_cmd
-            # pyinstaller binary adds LD_LIBRARY_PATH=/tmp/_ME... but we do not want
-            # that the system's ssh binary picks up (non-matching) libraries from there
-            env.pop('LD_LIBRARY_PATH', None)
+            # pyinstaller binary modifies LD_LIBRARY_PATH=/tmp/_ME... but we do not want
+            # that the system's ssh binary picks up (non-matching) libraries from there.
+            # thus we install the original LDLP, before pyinstaller has modified it:
+            lp_key = 'LD_LIBRARY_PATH'
+            lp_orig = env.get(lp_key + '_ORIG')  # pyinstaller >= 20160820 has this
+            if lp_orig is not None:
+                env[lp_key] = lp_orig
+            else:
+                env.pop(lp_key, None)
         env.pop('BORG_PASSPHRASE', None)  # security: do not give secrets to subprocess
         env['BORG_VERSION'] = __version__
         self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)

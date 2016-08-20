@@ -722,9 +722,6 @@ def format_archive(archive):
     )
 
 
-memoize = lru_cache(maxsize=None)
-
-
 class Buffer:
     """
     provide a thread-local buffer
@@ -766,7 +763,7 @@ class Buffer:
         return self._thread_local.buffer
 
 
-@memoize
+@lru_cache(maxsize=None)
 def uid2user(uid, default=None):
     try:
         return pwd.getpwuid(uid).pw_name
@@ -774,7 +771,7 @@ def uid2user(uid, default=None):
         return default
 
 
-@memoize
+@lru_cache(maxsize=None)
 def user2uid(user, default=None):
     try:
         return user and pwd.getpwnam(user).pw_uid
@@ -782,7 +779,7 @@ def user2uid(user, default=None):
         return default
 
 
-@memoize
+@lru_cache(maxsize=None)
 def gid2group(gid, default=None):
     try:
         return grp.getgrgid(gid).gr_name
@@ -790,7 +787,7 @@ def gid2group(gid, default=None):
         return default
 
 
-@memoize
+@lru_cache(maxsize=None)
 def group2gid(group, default=None):
     try:
         return group and grp.getgrnam(group).gr_gid

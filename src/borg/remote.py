@@ -6,6 +6,7 @@ import select
 import shlex
 import sys
 import tempfile
+import traceback
 from subprocess import Popen, PIPE
 
 import msgpack
@@ -101,12 +102,21 @@ class RepositoryServer:  # pragma: no cover
                             f = getattr(self.repository, method)
                         res = f(*args)
                     except BaseException as e:
-                        # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
-                        # and will be handled just like locally raised exceptions. Suppress the remote traceback
-                        # for these, except ErrorWithTraceback, which should always display a traceback.
-                        if not isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
-                            logging.exception('Borg %s: exception in RPC call:', __version__)
-                            logging.error(sysinfo())
+                        if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
+                            # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
+                            # and will be handled just like locally raised exceptions. Suppress the remote traceback
+                            # for these, except ErrorWithTraceback, which should always display a traceback.
+                            pass
+                        else:
+                            if isinstance(e, Error):
+                                tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
+                                msg = e.get_message()
+                            else:
+                                tb_log_level = logging.ERROR
+                                msg = '%s Exception in RPC call' % e.__class__.__name__
+                            tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
+                            logging.error(msg)
+                            logging.log(tb_log_level, tb)
                         exc = "Remote Exception (see remote log for the traceback)"
                         os.write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc)))
                     else:

@@ -271,6 +271,14 @@ Examples
     # use zlib compression (good, but slow) - default is no compression
     $ borg create -C zlib,6 /path/to/repo::root-{now:%Y-%m-%d} / --one-file-system
 
+    # Backup a remote host locally ("pull" style) using sshfs
+    $ mkdir sshfs-mount
+    $ sshfs root@example.com:/ sshfs-mount
+    $ cd sshfs-mount
+    $ borg create /path/to/repo::example.com-root-{now:%Y-%m-%d} .
+    $ cd ..
+    $ fusermount -u sshfs-mount
+
     # Make a big effort in fine granular deduplication (big chunk management
     # overhead, needs a lot of RAM and disk space, see formula in internals
     # docs - same parameters as borg < 1.0 or attic):

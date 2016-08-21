@@ -761,8 +761,8 @@ class Archiver:
         """Delete multiple archives"""
         manifest, key = Manifest.load(repository)
         archives = self._get_archives_slice(args, manifest)
-        for i, archive in enumerate(archives):
-            logger.info('Deleting {} ({}/{}):'.format(archive.name, i+1, len(archives)))
+        for i, archive in enumerate(archives, 1):
+            logger.info('Deleting {} ({}/{}):'.format(archive.name, i, len(archives)))
             args.location.archive = archive.name
             self._delete_archive(args, repository, manifest)
             if self.exit_code:
@@ -862,14 +862,14 @@ class Archiver:
 
     def _list_archives(self, args, repository, manifest, key, write):
         archives = self._get_archives_slice(args, manifest)
-        for i, archive in enumerate(archives):
-            write('Contents of {} ({}/{}):'.format(archive.name, i+1, len(archives)))
+        for i, archive in enumerate(archives, 1):
+            write('Contents of {} ({}/{}):'.format(archive.name, i, len(archives)))
             args.location.archive = archive.name
             self._list_archive(args, repository, manifest, key, write)
             if self.exit_code:
                 break
             if len(archives) - i > 1:
-                write('\n')
+                write()
         return self.exit_code
 
     def _list_repository(self, args, manifest, write):
@@ -881,10 +881,10 @@ class Archiver:
             format = "{archive:<36} {time} [{id}]{NL}"
         formatter = ArchiveFormatter(format)
 
-            for archive_info in manifest.archives.list(sort_by='ts'):
-                if args.prefix and not archive_info.name.startswith(args.prefix):
-                    continue
-                write(safe_encode(formatter.format_item(archive_info)))
+        for archive_info in manifest.archives.list(sort_by='ts'):
+            if args.prefix and not archive_info.name.startswith(args.prefix):
+                continue
+            write(safe_encode(formatter.format_item(archive_info)))
 
         return self.exit_code
 
@@ -923,13 +923,13 @@ class Archiver:
 
     def _info_archives(self, args, repository, manifest, key, cache):
         archives = self._get_archives_slice(args, manifest)
-        for i, archive in enumerate(archives):
+        for i, archive in enumerate(archives, 1):
             args.location.archive = archive.name
             self._info_archive(args, repository, manifest, key, cache)
             if self.exit_code:
                 break
-            if len(archives) - i > 1:
-                print('\n')
+            if len(archives) - i:
+                print()
         return self.exit_code
 
     def _info_repository(self, cache):
@@ -2354,9 +2354,9 @@ class Archiver:
     def add_archives_slice_selection_args(subparser):
         group = subparser.add_mutually_exclusive_group()
         group.add_argument('--oldest', dest='oldest', metavar='N', default=0, type=int,
-                           help='delete n oldest archives')
+                           help='delete N oldest archives')
         group.add_argument('--latest', dest='latest', metavar='N', default=0, type=int,
-                           help='delete n latest archives')
+                           help='delete N latest archives')
 
     def get_args(self, argv, cmd):
         """usually, just returns argv, except if we deal with a ssh forced command for borg serve."""
@@ -2422,11 +2422,12 @@ class Archiver:
 
     def _get_archives_slice(self, args, manifest):
         if args.location.archive:
-            logger.error('The options --oldest and --latest must not be used on archive targets.')
+            logger.error('The options --oldest and --latest can only used on repository targets.')
             self.exit_code = EXIT_ERROR
             return []
         n = args.oldest or args.latest
-        archives = manifest.list_archive_infos('ts', reverse=args.latest)[:n]
+        assert n > 0
+        archives = manifest.list_archive_infos('ts', reverse=bool(args.latest))[:n]
         if not archives:
             logger.error('There are no archives.')
             self.exit_code = EXIT_ERROR

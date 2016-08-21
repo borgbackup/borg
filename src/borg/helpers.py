@@ -1105,6 +1105,8 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
 
 
 class ProgressIndicatorPercent:
+    LOGGER = 'borg.output.progress'
+
     def __init__(self, total, step=5, start=0, same_line=True, msg="%3.0f%%"):
         """
         Percentage-based progress indicator
@@ -1122,7 +1124,7 @@ class ProgressIndicatorPercent:
         self.msg = msg
         self.same_line = same_line
         self.handler = None
-        self.logger = logging.getLogger('borg.output.progress')
+        self.logger = logging.getLogger(self.LOGGER)
 
         # If there are no handlers, set one up explicitly because the
         # terminator and propagation needs to be set.  If there are,

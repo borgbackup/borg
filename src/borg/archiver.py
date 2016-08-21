@@ -456,6 +456,8 @@ class Archiver:
 
         filter = self.build_filter(matcher, item_is_hardlink_master, strip_components)
         if progress:
+            progress_logger = logging.getLogger(ProgressIndicatorPercent.LOGGER)
+            progress_logger.info('Calculating size')
             extracted_size = sum(item.file_size() for item in archive.iter_items(filter))
             pi = ProgressIndicatorPercent(total=extracted_size, msg='Extracting files %5.1f%%', step=0.1)
         else:

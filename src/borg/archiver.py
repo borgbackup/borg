@@ -15,7 +15,8 @@ import textwrap
 import traceback
 from binascii import unhexlify
 from datetime import datetime
-from itertools import zip_longest
+from itertools import permutations, zip_longest
+from operator import attrgetter
 
 from .logger import create_logger, setup_logging
 logger = create_logger()
@@ -28,7 +29,8 @@ from .cache import Cache
 from .constants import *  # NOQA
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError
-from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec, PrefixSpec
+from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
+from .helpers import PrefixSpec, sort_by_spec
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter, format_time, format_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex
 from .helpers import prune_within, prune_split
@@ -730,7 +732,7 @@ class Archiver:
     @with_repository(exclusive=True, manifest=False)
     def do_delete(self, args, repository):
         """Delete an existing repository or archives"""
-        if args.oldest or args.latest:
+        if args.first or args.last:
             return self._delete_archives(args, repository)
         if args.location.archive:
             return self._delete_archive(args, repository)
@@ -759,7 +761,7 @@ class Archiver:
 
     def _delete_archives(self, args, repository):
         """Delete multiple archives"""
-        manifest, key = Manifest.load(repository)
+        manifest, _ = Manifest.load(repository)
         archives = self._get_archives_slice(args, manifest)
         for i, archive in enumerate(archives, 1):
             logger.info('Deleting {} ({}/{}):'.format(archive.name, i, len(archives)))
@@ -836,7 +838,7 @@ class Archiver:
         else:
             write = sys.stdout.buffer.write
 
-        if args.oldest or args.latest:
+        if args.first or args.last:
             return self._list_archives(args, repository, manifest, key, write)
         elif args.location.archive:
             return self._list_archive(args, repository, manifest, key, write)
@@ -881,9 +883,7 @@ class Archiver:
             format = "{archive:<36} {time} [{id}]{NL}"
         formatter = ArchiveFormatter(format)
 
-        for archive_info in manifest.archives.list(sort_by='ts'):
-            if args.prefix and not archive_info.name.startswith(args.prefix):
-                continue
+        for archive_info in manifest.archives.list(sort_by=args.sort_by):
             write(safe_encode(formatter.format_item(archive_info)))
 
         return self.exit_code
@@ -891,7 +891,7 @@ class Archiver:
     @with_repository(cache=True)
     def do_info(self, args, repository, manifest, key, cache):
         """Show archive details such as disk space used"""
-        if args.oldest or args.latest:
+        if args.first or args.last:
             return self._info_archives(args, repository, manifest, key, cache)
         elif args.location.archive:
             return self._info_archive(args, repository, manifest, key, cache)
@@ -1537,10 +1537,7 @@ class Archiver:
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
                                help='work slower, but using less space')
-        subparser.add_argument('--last', dest='last',
-                               type=int, default=None, metavar='N',
-                               help='only check last N archives (Default: all)')
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec,
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=prefix_spec, default='',
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('-p', '--progress', dest='progress',
                                action='store_true', default=False,
@@ -2352,11 +2349,21 @@ class Archiver:
 
     @staticmethod
     def add_archives_slice_selection_args(subparser):
+        valid_sort_keys = ('timestamp', 'name')
+        sort_by_default = 'timestamp'
+        sort_by_choices = []
+        for r in range(len(valid_sort_keys)):
+            sort_by_choices.extend([','.join(x) for x in permutations(valid_sort_keys, r+1)])
+
+        subparser.add_argument('--sort-by', dest='sort_by', type=sort_by_spec,
+                               choices=sort_by_choices, default=sort_by_default,
+                               help='Comma-separated list of sorting keys; valid keys are: {}; default is: {}'
+                                    .format(valid_sort_keys, sort_by_default))
         group = subparser.add_mutually_exclusive_group()
-        group.add_argument('--oldest', dest='oldest', metavar='N', default=0, type=int,
-                           help='delete N oldest archives')
-        group.add_argument('--latest', dest='latest', metavar='N', default=0, type=int,
-                           help='delete N latest archives')
+        group.add_argument('--first', dest='first', metavar='N', default=0, type=int,
+                           help='delete N first archives')
+        group.add_argument('--last', dest='last', metavar='N', default=0, type=int,
+                           help='delete N last archives')
 
     def get_args(self, argv, cmd):
         """usually, just returns argv, except if we deal with a ssh forced command for borg serve."""
@@ -2422,16 +2429,24 @@ class Archiver:
 
     def _get_archives_slice(self, args, manifest):
         if args.location.archive:
-            logger.error('The options --oldest and --latest can only used on repository targets.')
+            logger.error('The options --first and --last can only used on repository targets.')
             self.exit_code = EXIT_ERROR
             return []
-        n = args.oldest or args.latest
+        n = args.first or args.last
         assert n > 0
-        archives = manifest.list_archive_infos('ts', reverse=bool(args.latest))[:n]
+
+        archives = manifest.archives.list()
+
         if not archives:
             logger.error('There are no archives.')
             self.exit_code = EXIT_ERROR
-        return archives
+            return []
+
+        for sortkey in reversed(args.sort_by.split(',')):
+            archives.sort(key=attrgetter(sortkey))
+        if args.last:
+            archives.reverse()
+        return archives[:n]
 
 
 def sig_info_handler(signum, stack):  # pragma: no cover

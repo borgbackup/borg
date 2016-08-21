@@ -144,7 +144,7 @@ class Archives(abc.MutableMapping):
 
     def list(self, sort_by=None, reverse=False):
         # inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
-        archives = self.values()  # [self[name] for name in self]
+        archives = list(self.values())  # [self[name] for name in self]
         if sort_by is not None:
             archives = sorted(archives, key=attrgetter(sort_by), reverse=reverse)
         return archives
@@ -632,6 +632,10 @@ def replace_placeholders(text):
         'borgversion': borg_version,
     }
     return format_line(text, data)
+
+
+def sort_by_spec(text):
+    return text.replace('timestamp', 'ts')
 
 
 def safe_timestamp(item_timestamp_ns):

@@ -442,14 +442,17 @@ class Repository:
             unused = []
 
         logger.debug('compaction started.')
+        pi = ProgressIndicatorPercent(total=len(self.compact), msg='Compacting segments %3.0f%%', step=1)
         for segment, freeable_space in sorted(self.compact.items()):
             if not self.io.segment_exists(segment):
                 logger.warning('segment %d not found, but listed in compaction data', segment)
                 del self.compact[segment]
+                pi.show()
                 continue
             segment_size = self.io.segment_size(segment)
             if segment_size > 0.2 * self.max_segment_size and freeable_space < 0.15 * segment_size:
                 logger.debug('not compacting segment %d (only %d bytes are sparse)', segment, freeable_space)
+                pi.show()
                 continue
             segments.setdefault(segment, 0)
             logger.debug('compacting segment %d with usage count %d and %d freeable bytes',
@@ -526,6 +529,8 @@ class Repository:
                         segments.setdefault(new_segment, 0)
             assert segments[segment] == 0
             unused.append(segment)
+            pi.show()
+        pi.finish()
         complete_xfer(intermediate=False)
         logger.debug('compaction completed.')
 

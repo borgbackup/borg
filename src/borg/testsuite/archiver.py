@@ -228,6 +228,8 @@ class ArchiverTestCaseBase(BaseTestCase):
         os.chdir(self._old_wd)
         # note: ignore_errors=True as workaround for issue #862
         shutil.rmtree(self.tmpdir, ignore_errors=True)
+        # destroy logging configuration
+        logging.Logger.manager.loggerDict.clear()
 
     def cmd(self, *args, **kw):
         exit_code = kw.pop('exit_code', 0)
@@ -1044,13 +1046,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             manifest, key = Manifest.load(repository)
         self.assert_equal(len(manifest.archives), 0)
 
-    def test_progress(self):
+    def test_progress_on(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', self.repository_location)
-        # progress forced on
         output = self.cmd('create', '--progress', self.repository_location + '::test4', 'input')
         self.assert_in("\r", output)
-        # progress forced off
+
+    def test_progress_off(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', self.repository_location)
         output = self.cmd('create', self.repository_location + '::test5', 'input')
         self.assert_not_in("\r", output)
 

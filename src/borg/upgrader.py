@@ -77,7 +77,7 @@ class AtticRepositoryUpgrader(Repository):
         replace the 8 first bytes of all regular files in there."""
         logger.info("converting %d segments..." % len(segments))
         segment_count = len(segments)
-        pi = ProgressIndicatorPercent(total=segment_count, msg="Converting segments %3.0f%%", same_line=True)
+        pi = ProgressIndicatorPercent(total=segment_count, msg="Converting segments %3.0f%%")
         for i, filename in enumerate(segments):
             if progress:
                 pi.show(i)

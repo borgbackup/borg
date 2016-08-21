@@ -1105,14 +1105,15 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
 
 
 class ProgressIndicatorPercent:
-    def __init__(self, total, step=5, start=0, same_line=False, msg="%3.0f%%"):
+    LOGGER = 'borg.output.progress'
+
+    def __init__(self, total, step=5, start=0, msg="%3.0f%%"):
         """
         Percentage-based progress indicator
 
         :param total: total amount of items
         :param step: step size in percent
         :param start: at which percent value to start
-        :param same_line: if True, emit output always on same line
         :param msg: output message, must contain one %f placeholder for the percentage
         """
         self.counter = 0  # 0 .. (total-1)
@@ -1120,9 +1121,8 @@ class ProgressIndicatorPercent:
         self.trigger_at = start  # output next percentage value when reaching (at least) this
         self.step = step
         self.msg = msg
-        self.same_line = same_line
         self.handler = None
-        self.logger = logging.getLogger('borg.output.progress')
+        self.logger = logging.getLogger(self.LOGGER)
 
         # If there are no handlers, set one up explicitly because the
         # terminator and propagation needs to be set.  If there are,
@@ -1130,7 +1130,7 @@ class ProgressIndicatorPercent:
         if not self.logger.handlers:
             self.handler = logging.StreamHandler(stream=sys.stderr)
             self.handler.setLevel(logging.INFO)
-            self.handler.terminator = '\r' if self.same_line else '\n'
+            self.handler.terminator = '\r'
 
             self.logger.addHandler(self.handler)
             if self.logger.level == logging.NOTSET:
@@ -1142,17 +1142,17 @@ class ProgressIndicatorPercent:
             self.logger.removeHandler(self.handler)
             self.handler.close()
 
-    def progress(self, current=None):
+    def progress(self, current=None, increase=1):
         if current is not None:
             self.counter = current
         pct = self.counter * 100 / self.total
-        self.counter += 1
+        self.counter += increase
         if pct >= self.trigger_at:
             self.trigger_at += self.step
             return pct
 
-    def show(self, current=None):
-        pct = self.progress(current)
+    def show(self, current=None, increase=1):
+        pct = self.progress(current, increase)
         if pct is not None:
             return self.output(pct)
 
@@ -1160,8 +1160,7 @@ class ProgressIndicatorPercent:
         self.logger.info(self.msg % percent)
 
     def finish(self):
-        if self.same_line:
-            self.logger.info(" " * len(self.msg % 100.0))
+        self.logger.info(" " * len(self.msg % 100.0))
 
 
 class ProgressIndicatorEndless:

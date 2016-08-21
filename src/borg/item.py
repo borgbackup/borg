@@ -157,6 +157,11 @@ class Item(PropDict):
 
     part = PropDict._make_property('part', int)
 
+    def file_size(self):
+        if 'chunks' not in self:
+            return 0
+        return sum(chunk.size for chunk in self.chunks)
+
 
 class EncryptedKey(PropDict):
     """

@@ -41,6 +41,7 @@ from .helpers import log_multi
 from .helpers import parse_pattern, PatternMatcher, PathPrefixPattern
 from .helpers import signal_handler
 from .helpers import ErrorIgnoringTextIOWrapper
+from .helpers import ProgressIndicatorPercent
 from .item import Item
 from .key import key_creator, RepoKey, PassphraseKey
 from .platform import get_flags
@@ -439,6 +440,7 @@ class Archiver:
 
         matcher, include_patterns = self.build_matcher(args.excludes, args.paths)
 
+        progress = args.progress
         output_list = args.output_list
         dry_run = args.dry_run
         stdout = args.stdout
@@ -453,6 +455,14 @@ class Archiver:
                     item.get('hardlink_master', True) and 'source' not in item)
 
         filter = self.build_filter(matcher, item_is_hardlink_master, strip_components)
+        if progress:
+            progress_logger = logging.getLogger(ProgressIndicatorPercent.LOGGER)
+            progress_logger.info('Calculating size')
+            extracted_size = sum(item.file_size() for item in archive.iter_items(filter))
+            pi = ProgressIndicatorPercent(total=extracted_size, msg='Extracting files %5.1f%%', step=0.1)
+        else:
+            pi = None
+
         for item in archive.iter_items(filter, preload=True):
             orig_path = item.path
             if item_is_hardlink_master(item):
@@ -472,19 +482,21 @@ class Archiver:
                 logging.getLogger('borg.output.list').info(remove_surrogates(orig_path))
             try:
                 if dry_run:
-                    archive.extract_item(item, dry_run=True)
+                    archive.extract_item(item, dry_run=True, pi=pi)
                 else:
                     if stat.S_ISDIR(item.mode):
                         dirs.append(item)
                         archive.extract_item(item, restore_attrs=False)
                     else:
                         archive.extract_item(item, stdout=stdout, sparse=sparse, hardlink_masters=hardlink_masters,
-                                             original_path=orig_path)
+                                             original_path=orig_path, pi=pi)
             except BackupOSError as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 
         if not args.dry_run:
+            pi = ProgressIndicatorPercent(total=len(dirs), msg='Setting directory permissions %3.0f%%')
             while dirs:
+                pi.show()
                 dir_item = dirs.pop(-1)
                 try:
                     archive.extract_item(dir_item)
@@ -1641,6 +1653,9 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='extract archive contents')
         subparser.set_defaults(func=self.do_extract)
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help='show progress while extracting (may be slower)')
         subparser.add_argument('--list', dest='output_list',
                                action='store_true', default=False,
                                help='output verbose list of items (files, dirs, ...)')

@@ -422,7 +422,7 @@ Number of files: {0.stats.nfiles}'''.format(
         return stats
 
     def extract_item(self, item, restore_attrs=True, dry_run=False, stdout=False, sparse=False,
-                     hardlink_masters=None, original_path=None):
+                     hardlink_masters=None, original_path=None, pi=None):
         """
         Extract archive item.
 
@@ -433,11 +433,14 @@ Number of files: {0.stats.nfiles}'''.format(
         :param sparse: write sparse files (chunk-granularity, independent of the original being sparse)
         :param hardlink_masters: maps paths to (chunks, link_target) for extracting subtrees with hardlinks correctly
         :param original_path: 'path' key as stored in archive
+        :param pi: ProgressIndicatorPercent (or similar) for file extraction progress (in bytes)
         """
         has_damaged_chunks = 'chunks_healthy' in item
         if dry_run or stdout:
             if 'chunks' in item:
                 for _, data in self.pipeline.fetch_many([c.id for c in item.chunks], is_preloaded=True):
+                    if pi:
+                        pi.show(increase=len(data))
                     if stdout:
                         sys.stdout.buffer.write(data)
                 if stdout:
@@ -489,6 +492,8 @@ Number of files: {0.stats.nfiles}'''.format(
             with fd:
                 ids = [c.id for c in item.chunks]
                 for _, data in self.pipeline.fetch_many(ids, is_preloaded=True):
+                    if pi:
+                        pi.show(increase=len(data))
                     with backup_io():
                         if sparse and self.zeros.startswith(data):
                             # all-zero chunk: create a hole in a sparse file
@@ -635,7 +640,7 @@ Number of files: {0.stats.nfiles}'''.format(
         try:
             unpacker = msgpack.Unpacker(use_list=False)
             items_ids = self.metadata.items
-            pi = ProgressIndicatorPercent(total=len(items_ids), msg="Decrementing references %3.0f%%", same_line=True)
+            pi = ProgressIndicatorPercent(total=len(items_ids), msg="Decrementing references %3.0f%%")
             for (i, (items_id, data)) in enumerate(zip(items_ids, self.repository.get_many(items_ids))):
                 if progress:
                     pi.show(i)
@@ -1028,7 +1033,7 @@ class ArchiveChecker:
         logger.info('Starting cryptographic data integrity verification...')
         count = len(self.chunks)
         errors = 0
-        pi = ProgressIndicatorPercent(total=count, msg="Verifying data %6.2f%%", step=0.01, same_line=True)
+        pi = ProgressIndicatorPercent(total=count, msg="Verifying data %6.2f%%", step=0.01)
         for chunk_id, (refcount, *_) in self.chunks.iteritems():
             pi.show()
             try:

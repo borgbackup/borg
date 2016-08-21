@@ -1323,15 +1323,6 @@ class RemoteArchiverTestCase(ArchiverTestCase):
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo', '--restrict-to-path', path_prefix]):
             self.cmd('init', self.repository_location + '_3')
 
-    # skip fuse tests here, they deadlock since this change in exec_cmd:
-    # -output = subprocess.check_output(borg + args, stderr=None)
-    # +output = subprocess.check_output(borg + args, stderr=subprocess.STDOUT)
-    # this was introduced because some tests expect stderr contents to show up
-    # in "output" also. Also, the non-forking exec_cmd catches both, too.
-    @unittest.skip('deadlock issues')
-    def test_fuse(self):
-        pass
-
     @unittest.skip('only works locally')
     def test_debug_put_get_delete_obj(self):
         pass

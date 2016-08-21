@@ -10,12 +10,15 @@ matrix:
     include:
         - python: 3.4
           os: linux
+          dist: trusty
           env: TOXENV=py34
         - python: 3.5
           os: linux
+          dist: trusty
           env: TOXENV=py35
         - python: 3.5
           os: linux
+          dist: trusty
           env: TOXENV=flake8
         - language: generic
           os: osx

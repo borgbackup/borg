@@ -16,6 +16,8 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
 
     brew install lz4
     brew outdated pyenv || brew upgrade pyenv
+    brew install pkg-config
+    brew install Caskroom/versions/osxfuse-beta
 
     case "${TOXENV}" in
         py34)
@@ -31,14 +33,14 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
     python -m pip install --user 'virtualenv<14.0'
 else
     pip install 'virtualenv<14.0'
-    sudo add-apt-repository -y ppa:gezakovacs/lz4
     sudo apt-get update
     sudo apt-get install -y liblz4-dev
     sudo apt-get install -y libacl1-dev
+    sudo apt-get install -y libfuse-dev fuse pkg-config  # optional, for FUSE support
 fi
 
 python -m virtualenv ~/.venv
 source ~/.venv/bin/activate
 pip install -r requirements.d/development.txt
 pip install codecov
-pip install -e .
+pip install -e .[fuse]

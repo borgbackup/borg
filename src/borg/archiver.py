@@ -2381,37 +2381,51 @@ def main():  # pragma: no cover
     sys.stderr = ErrorIgnoringTextIOWrapper(sys.stderr.buffer, sys.stderr.encoding, 'replace', line_buffering=True)
     setup_signal_handlers()
     archiver = Archiver()
-    msg = None
+    msg = tb = None
+    tb_log_level = logging.ERROR
     try:
         args = archiver.get_args(sys.argv, os.environ.get('SSH_ORIGINAL_COMMAND'))
     except Error as e:
         msg = e.get_message()
-        if e.traceback:
-            msg += "\n%s\n%s" % (traceback.format_exc(), sysinfo())
+        tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
+        tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
         # we might not have logging setup yet, so get out quickly
         print(msg, file=sys.stderr)
+        if tb_log_level == logging.ERROR:
+            print(tb, file=sys.stderr)
         sys.exit(e.exit_code)
     try:
         exit_code = archiver.run(args)
     except Error as e:
         msg = e.get_message()
-        if e.traceback:
-            msg += "\n%s\n%s" % (traceback.format_exc(), sysinfo())
+        tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
+        tb = "%s\n%s" % (traceback.format_exc(), sysinfo())
         exit_code = e.exit_code
     except RemoteRepository.RPCError as e:
-        msg = '%s\n%s' % (str(e), sysinfo())
+        msg = "%s %s" % (e.remote_type, e.name)
+        important = e.remote_type not in ('LockTimeout', )
+        tb_log_level = logging.ERROR if important else logging.DEBUG
+        tb = sysinfo()
         exit_code = EXIT_ERROR
     except Exception:
-        msg = 'Local Exception.\n%s\n%s' % (traceback.format_exc(), sysinfo())
+        msg = 'Local Exception'
+        tb_log_level = logging.ERROR
+        tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
         exit_code = EXIT_ERROR
     except KeyboardInterrupt:
-        msg = 'Keyboard interrupt.\n%s\n%s' % (traceback.format_exc(), sysinfo())
+        msg = 'Keyboard interrupt'
+        tb_log_level = logging.DEBUG
+        tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
         exit_code = EXIT_ERROR
     except SIGTERMReceived:
-        msg = 'Received SIGTERM.'
+        msg = 'Received SIGTERM'
+        tb_log_level = logging.DEBUG
+        tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
         exit_code = EXIT_ERROR
     if msg:
         logger.error(msg)
+    if tb:
+        logger.log(tb_log_level, tb)
     if args.show_rc:
         rc_logger = logging.getLogger('borg.output.show-rc')
         exit_msg = 'terminating with %s status, rc %d'

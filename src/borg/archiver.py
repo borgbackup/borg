@@ -30,7 +30,7 @@ from .constants import *  # NOQA
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError
 from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
-from .helpers import PrefixSpec, sort_by_spec, HUMAN_SORT_KEYS
+from .helpers import prefix_spec, sort_by_spec, HUMAN_SORT_KEYS
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter, format_time, format_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex
 from .helpers import prune_within, prune_split
@@ -1605,7 +1605,7 @@ class Archiver:
         subparser.add_argument('--last', dest='last',
                                type=int, default=None, metavar='N',
                                help='only check last N archives (Default: all)')
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec,
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=prefix_spec,
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('-p', '--progress', dest='progress',
                                action='store_true', default=False,
@@ -1995,7 +1995,7 @@ class Archiver:
         subparser.add_argument('--format', '--list-format', dest='format', type=str,
                                help="""specify format for file listing
                                 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")""")
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec,
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=prefix_spec,
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=parse_pattern, action='append',
@@ -2161,7 +2161,7 @@ class Archiver:
                                help='number of monthly archives to keep')
         subparser.add_argument('-y', '--keep-yearly', dest='yearly', type=int, default=0,
                                help='number of yearly archives to keep')
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec,
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=prefix_spec,
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
@@ -2634,7 +2634,7 @@ class Archiver:
         if args.location.archive:
             raise Error('The options --first, --last and --prefix can only be used on repository targets.')
 
-        archives = manifest.archives.list()
+        archives = manifest.archives.list(prefix=args.prefix)
         if not archives:
             logger.critical('There are no archives.')
             self.exit_code = self.exit_code or EXIT_WARNING
@@ -2645,7 +2645,7 @@ class Archiver:
         if args.last:
             archives.reverse()
 
-        n = args.first or args.last
+        n = args.first or args.last or len(archives)
 
         return archives[:n]
 

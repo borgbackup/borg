@@ -142,9 +142,9 @@ class Archives(abc.MutableMapping):
         name = safe_encode(name)
         del self._archives[name]
 
-    def list(self, sort_by=None, reverse=False):
+    def list(self, sort_by=None, reverse=False, prefix=''):
         # inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
-        archives = list(self.values())  # [self[name] for name in self]
+        archives = [x for x in self.values() if x.name.startswith(prefix)]
         if sort_by is not None:
             archives = sorted(archives, key=attrgetter(sort_by), reverse=reverse)
         return archives
@@ -557,10 +557,6 @@ def CompressionSpec(s):
     raise ValueError
 
 
-def PrefixSpec(s):
-    return replace_placeholders(s)
-
-
 def dir_is_cachedir(path):
     """Determines whether the specified path is a cache directory (and
     therefore should potentially be excluded from the backup) according to
@@ -632,6 +628,8 @@ def replace_placeholders(text):
         'borgversion': borg_version,
     }
     return format_line(text, data)
+
+prefix_spec = replace_placeholders
 
 
 def sort_by_spec(text):

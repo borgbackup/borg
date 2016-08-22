@@ -45,13 +45,13 @@ class RepositoryTestCaseBase(BaseTestCase):
         self.repository = self.open(exclusive=exclusive)
 
     def add_keys(self):
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
-        self.repository.put(b'00000000000000000000000000000001', b'bar')
-        self.repository.put(b'00000000000000000000000000000003', b'bar')
+        self.repository.put(H(0), b'foo')
+        self.repository.put(H(1), b'bar')
+        self.repository.put(H(3), b'bar')
         self.repository.commit()
-        self.repository.put(b'00000000000000000000000000000001', b'bar2')
-        self.repository.put(b'00000000000000000000000000000002', b'boo')
-        self.repository.delete(b'00000000000000000000000000000003')
+        self.repository.put(H(1), b'bar2')
+        self.repository.put(H(2), b'boo')
+        self.repository.delete(H(3))
 
 
 class RepositoryTestCase(RepositoryTestCaseBase):
@@ -75,59 +75,59 @@ class RepositoryTestCase(RepositoryTestCaseBase):
     def test2(self):
         """Test multiple sequential transactions
         """
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
-        self.repository.put(b'00000000000000000000000000000001', b'foo')
+        self.repository.put(H(0), b'foo')
+        self.repository.put(H(1), b'foo')
         self.repository.commit()
-        self.repository.delete(b'00000000000000000000000000000000')
-        self.repository.put(b'00000000000000000000000000000001', b'bar')
+        self.repository.delete(H(0))
+        self.repository.put(H(1), b'bar')
         self.repository.commit()
-        self.assert_equal(self.repository.get(b'00000000000000000000000000000001'), b'bar')
+        self.assert_equal(self.repository.get(H(1)), b'bar')
 
     def test_consistency(self):
         """Test cache consistency
         """
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
-        self.assert_equal(self.repository.get(b'00000000000000000000000000000000'), b'foo')
-        self.repository.put(b'00000000000000000000000000000000', b'foo2')
-        self.assert_equal(self.repository.get(b'00000000000000000000000000000000'), b'foo2')
-        self.repository.put(b'00000000000000000000000000000000', b'bar')
-        self.assert_equal(self.repository.get(b'00000000000000000000000000000000'), b'bar')
-        self.repository.delete(b'00000000000000000000000000000000')
-        self.assert_raises(Repository.ObjectNotFound, lambda: self.repository.get(b'00000000000000000000000000000000'))
+        self.repository.put(H(0), b'foo')
+        self.assert_equal(self.repository.get(H(0)), b'foo')
+        self.repository.put(H(0), b'foo2')
+        self.assert_equal(self.repository.get(H(0)), b'foo2')
+        self.repository.put(H(0), b'bar')
+        self.assert_equal(self.repository.get(H(0)), b'bar')
+        self.repository.delete(H(0))
+        self.assert_raises(Repository.ObjectNotFound, lambda: self.repository.get(H(0)))
 
     def test_consistency2(self):
         """Test cache consistency2
         """
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
-        self.assert_equal(self.repository.get(b'00000000000000000000000000000000'), b'foo')
+        self.repository.put(H(0), b'foo')
+        self.assert_equal(self.repository.get(H(0)), b'foo')
         self.repository.commit()
-        self.repository.put(b'00000000000000000000000000000000', b'foo2')
-        self.assert_equal(self.repository.get(b'00000000000000000000000000000000'), b'foo2')
+        self.repository.put(H(0), b'foo2')
+        self.assert_equal(self.repository.get(H(0)), b'foo2')
         self.repository.rollback()
-        self.assert_equal(self.repository.get(b'00000000000000000000000000000000'), b'foo')
+        self.assert_equal(self.repository.get(H(0)), b'foo')
 
     def test_overwrite_in_same_transaction(self):
         """Test cache consistency2
         """
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
-        self.repository.put(b'00000000000000000000000000000000', b'foo2')
+        self.repository.put(H(0), b'foo')
+        self.repository.put(H(0), b'foo2')
         self.repository.commit()
-        self.assert_equal(self.repository.get(b'00000000000000000000000000000000'), b'foo2')
+        self.assert_equal(self.repository.get(H(0)), b'foo2')
 
     def test_single_kind_transactions(self):
         # put
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.put(H(0), b'foo')
         self.repository.commit()
         self.repository.close()
         # replace
         self.repository = self.open()
         with self.repository:
-            self.repository.put(b'00000000000000000000000000000000', b'bar')
+            self.repository.put(H(0), b'bar')
             self.repository.commit()
         # delete
         self.repository = self.open()
         with self.repository:
-            self.repository.delete(b'00000000000000000000000000000000')
+            self.repository.delete(H(0))
             self.repository.commit()
 
     def test_list(self):
@@ -145,10 +145,10 @@ class RepositoryTestCase(RepositoryTestCaseBase):
 
     def test_max_data_size(self):
         max_data = b'x' * MAX_DATA_SIZE
-        self.repository.put(b'00000000000000000000000000000000', max_data)
-        self.assert_equal(self.repository.get(b'00000000000000000000000000000000'), max_data)
+        self.repository.put(H(0), max_data)
+        self.assert_equal(self.repository.get(H(0)), max_data)
         self.assert_raises(IntegrityError,
-                           lambda: self.repository.put(b'00000000000000000000000000000001', max_data + b'x'))
+                           lambda: self.repository.put(H(1), max_data + b'x'))
 
 
 class LocalRepositoryTestCase(RepositoryTestCaseBase):
@@ -163,22 +163,22 @@ class LocalRepositoryTestCase(RepositoryTestCaseBase):
         assert self.repository.compact[0] == 41 + 9
 
     def test_sparse1(self):
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
-        self.repository.put(b'00000000000000000000000000000001', b'123456789')
+        self.repository.put(H(0), b'foo')
+        self.repository.put(H(1), b'123456789')
         self.repository.commit()
-        self.repository.put(b'00000000000000000000000000000001', b'bar')
+        self.repository.put(H(1), b'bar')
         self._assert_sparse()
 
     def test_sparse2(self):
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
-        self.repository.put(b'00000000000000000000000000000001', b'123456789')
+        self.repository.put(H(0), b'foo')
+        self.repository.put(H(1), b'123456789')
         self.repository.commit()
-        self.repository.delete(b'00000000000000000000000000000001')
+        self.repository.delete(H(1))
         self._assert_sparse()
 
     def test_sparse_delete(self):
-        self.repository.put(b'00000000000000000000000000000000', b'1245')
-        self.repository.delete(b'00000000000000000000000000000000')
+        self.repository.put(H(0), b'1245')
+        self.repository.delete(H(0))
         self.repository.io._write_fd.sync()
 
         # The on-line tracking works on a per-object basis...
@@ -359,19 +359,19 @@ class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
     def test_append_only(self):
         def segments_in_repository():
             return len(list(self.repository.io.segment_iterator()))
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.put(H(0), b'foo')
         self.repository.commit()
 
         self.repository.append_only = False
         assert segments_in_repository() == 2
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.put(H(0), b'foo')
         self.repository.commit()
         # normal: compact squashes the data together, only one segment
         assert segments_in_repository() == 4
 
         self.repository.append_only = True
         assert segments_in_repository() == 4
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.put(H(0), b'foo')
         self.repository.commit()
         # append only: does not compact, only new segments written
         assert segments_in_repository() == 6
@@ -385,7 +385,7 @@ class RepositoryFreeSpaceTestCase(RepositoryTestCaseBase):
         self.reopen()
 
         with self.repository:
-            self.repository.put(b'00000000000000000000000000000000', b'foobar')
+            self.repository.put(H(0), b'foobar')
             with pytest.raises(Repository.InsufficientFreeSpaceError):
                 self.repository.commit()
 
@@ -393,13 +393,13 @@ class RepositoryFreeSpaceTestCase(RepositoryTestCaseBase):
 class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
     def setUp(self):
         super().setUp()
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.put(H(0), b'foo')
         self.repository.commit()
         self.repository.close()
 
     def do_commit(self):
         with self.repository:
-            self.repository.put(b'00000000000000000000000000000000', b'fox')
+            self.repository.put(H(0), b'fox')
             self.repository.commit()
 
     def test_corrupted_hints(self):

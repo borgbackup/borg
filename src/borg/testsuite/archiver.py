@@ -2204,25 +2204,25 @@ def test_compare_chunk_contents():
 
 class TestBuildFilter:
     @staticmethod
-    def item_is_hardlink_master(item):
+    def peek_and_store_hardlink_masters(item):
         return False
 
     def test_basic(self):
         matcher = PatternMatcher()
         matcher.add([parse_pattern('included')], True)
-        filter = Archiver.build_filter(matcher, self.item_is_hardlink_master, 0)
+        filter = Archiver.build_filter(matcher, self.peek_and_store_hardlink_masters, 0)
         assert filter(Item(path='included'))
         assert filter(Item(path='included/file'))
         assert not filter(Item(path='something else'))
 
     def test_empty(self):
         matcher = PatternMatcher(fallback=True)
-        filter = Archiver.build_filter(matcher, self.item_is_hardlink_master, 0)
+        filter = Archiver.build_filter(matcher, self.peek_and_store_hardlink_masters, 0)
         assert filter(Item(path='anything'))
 
     def test_strip_components(self):
         matcher = PatternMatcher(fallback=True)
-        filter = Archiver.build_filter(matcher, self.item_is_hardlink_master, strip_components=1)
+        filter = Archiver.build_filter(matcher, self.peek_and_store_hardlink_masters, strip_components=1)
         assert not filter(Item(path='shallow'))
         assert not filter(Item(path='shallow/'))  # can this even happen? paths are normalized...
         assert filter(Item(path='deep enough/file'))

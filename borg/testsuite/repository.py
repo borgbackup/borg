@@ -44,8 +44,8 @@ class RepositoryTestCase(RepositoryTestCaseBase):
 
     def test1(self):
         for x in range(100):
-            self.repository.put(('%-32d' % x).encode('ascii'), b'SOMEDATA')
-        key50 = ('%-32d' % 50).encode('ascii')
+            self.repository.put(H(x), b'SOMEDATA')
+        key50 = H(50)
         self.assert_equal(self.repository.get(key50), b'SOMEDATA')
         self.repository.delete(key50)
         self.assert_raises(Repository.ObjectNotFound, lambda: self.repository.get(key50))
@@ -56,7 +56,7 @@ class RepositoryTestCase(RepositoryTestCaseBase):
             for x in range(100):
                 if x == 50:
                     continue
-                self.assert_equal(repository2.get(('%-32d' % x).encode('ascii')), b'SOMEDATA')
+                self.assert_equal(repository2.get(H(x)), b'SOMEDATA')
 
     def test2(self):
         """Test multiple sequential transactions
@@ -118,7 +118,7 @@ class RepositoryTestCase(RepositoryTestCaseBase):
 
     def test_list(self):
         for x in range(100):
-            self.repository.put(('%-32d' % x).encode('ascii'), b'SOMEDATA')
+            self.repository.put(H(x), b'SOMEDATA')
         all = self.repository.list()
         self.assert_equal(len(all), 100)
         first_half = self.repository.list(limit=50)
@@ -222,7 +222,7 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
             self.assert_equal(len(self.repository), 3)
 
     def test_ignores_commit_tag_in_data(self):
-        self.repository.put(b'0' * 32, LoggedIO.COMMIT)
+        self.repository.put(H(0), LoggedIO.COMMIT)
         self.reopen()
         with self.repository:
             io = self.repository.io
@@ -294,12 +294,12 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
     def get_objects(self, *ids):
         for id_ in ids:
-            self.repository.get(('%032d' % id_).encode('ascii'))
+            self.repository.get(H(id_))
 
     def add_objects(self, segments):
         for ids in segments:
             for id_ in ids:
-                self.repository.put(('%032d' % id_).encode('ascii'), b'data')
+                self.repository.put(H(id_), b'data')
             self.repository.commit()
 
     def get_head(self):
@@ -310,7 +310,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
     def corrupt_object(self, id_):
         idx = self.open_index()
-        segment, offset = idx[('%032d' % id_).encode('ascii')]
+        segment, offset = idx[H(id_)]
         with open(os.path.join(self.tmppath, 'repository', 'data', '0', str(segment)), 'r+b') as fd:
             fd.seek(offset)
             fd.write(b'BOOM')
@@ -401,8 +401,8 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
 
     def test_crash_before_compact(self):
-        self.repository.put(bytes(32), b'data')
-        self.repository.put(bytes(32), b'data2')
+        self.repository.put(H(0), b'data')
+        self.repository.put(H(0), b'data2')
         # Simulate a crash before compact
         with patch.object(Repository, 'compact_segments') as compact:
             self.repository.commit()
@@ -410,7 +410,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.reopen()
         with self.repository:
             self.check(repair=True)
-            self.assert_equal(self.repository.get(bytes(32)), b'data2')
+            self.assert_equal(self.repository.get(H(0)), b'data2')
 
 
 class RemoteRepositoryTestCase(RepositoryTestCase):

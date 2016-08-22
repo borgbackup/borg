@@ -89,6 +89,9 @@ class RepositoryServer:  # pragma: no cover
                 if not data:
                     if self.repository is not None:
                         self.repository.close()
+                    else:
+                        os.write(stderr_fd, "Borg {}: Got connection close before repository was opened.\n"
+                                 .format(__version__).encode())
                     return
                 unpacker.feed(data)
                 for unpacked in unpacker:

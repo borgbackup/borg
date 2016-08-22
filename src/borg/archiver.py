@@ -204,18 +204,55 @@ class Archiver:
             if not yes(msg, false_msg="Aborting.", truish=('YES', ),
                        env_var_override='BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
                 return EXIT_ERROR
-        if args.repo_only and args.verify_data:
-            self.print_error("--repository-only and --verify-data contradict each other. Please select one.")
+
+        if args.repo_only and any((args.verify_data, args.first, args.last)):
+            self.print_error("--repository-only contradicts --first, --last "
+                             "and --verify-data arguments.")
             return EXIT_ERROR
+
         if not args.archives_only:
             if not repository.check(repair=args.repair, save_space=args.save_space):
                 return EXIT_WARNING
-        if not args.repo_only and not ArchiveChecker().check(
-                repository, repair=args.repair, archive=args.location.archive,
-                last=args.last, prefix=args.prefix, verify_data=args.verify_data,
-                save_space=args.save_space):
-            return EXIT_WARNING
-        return EXIT_SUCCESS
+
+        if not args.repo_only:
+            logger.info('Starting archive consistency check...')
+            with ArchiveChecker(args, repository) as archive_checker:
+                manifest = archive_checker.manifest
+                all_archives_count = len(manifest.archives.list())
+
+                if args.verify_data:
+                    archive_checker.verify_data()
+
+                if args.location.archive:
+                    archive_info = manifest.archives.get(args.location.archive)
+                    if archive_info is None:
+                        logger.error('Archive %s not found.' % args.location.archive)
+                        return EXIT_ERROR
+                    archives = (archive_info,)
+                elif any((args.first, args.last, args.prefix)):
+                    archives = self._get_archives_slice(args, manifest)
+                else:
+                    archives = manifest.archives.list(prefix=args.prefix)
+
+                for i, archive_info in enumerate(archives, 1):
+                    logger.info('Analyzing archive {} ({}/{}):'.format(archive_info.name, i, len(archives)))
+                    archive_checker.check(archive_info)
+
+                if len(archives) == all_archives_count:
+                    logger.info('Looking for orphaned chunks...')
+                    archive_checker.orphan_chunks_check()
+
+                if archive_checker.error_found:
+                    msg = 'Archive consistency check complete, problems found.'
+                    if args.repair:
+                        logger.info(msg[:-1] + ' and fixed.')
+                    else:
+                        logger.error(msg)
+                        self.exit_code = EXIT_WARNING
+                else:
+                    logger.info('Archive consistency check complete, no problems found.')
+
+        return self.exit_code
 
     @with_repository()
     def do_change_passphrase(self, args, repository, manifest, key):
@@ -1537,14 +1574,10 @@ class Archiver:
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
                                help='work slower, but using less space')
-        subparser.add_argument('--last', dest='last',
-                               type=int, default=None, metavar='N',
-                               help='only check last N archives (Default: all)')
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=prefix_spec,
-                               help='only consider archive names starting with this prefix')
         subparser.add_argument('-p', '--progress', dest='progress',
                                action='store_true', default=False,
                                help="""show progress display while checking""")
+        self.add_archives_filter_args(subparser)
 
         change_passphrase_epilog = textwrap.dedent("""
         The key files used for repository encryption are optionally passphrase
@@ -1847,7 +1880,7 @@ class Archiver:
         subparser.add_argument('location', metavar='TARGET', nargs='?', default='',
                                type=location_validator(),
                                help='archive or repository to delete')
-        self.add_archives_slice_selection_args(subparser)
+        self.add_archives_filter_args(subparser)
 
         list_epilog = textwrap.dedent("""
         This command lists the contents of a repository or an archive.
@@ -1874,8 +1907,6 @@ class Archiver:
         subparser.add_argument('--format', '--list-format', dest='format', type=str,
                                help="""specify format for file listing
                                 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")""")
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=prefix_spec, default='',
-                               help='only consider archive names starting with this prefix')
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=parse_pattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
@@ -1887,7 +1918,7 @@ class Archiver:
                                help='repository/archive to list contents of')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to list; patterns are supported')
-        self.add_archives_slice_selection_args(subparser)
+        self.add_archives_filter_args(subparser)
 
         mount_epilog = textwrap.dedent("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -1948,7 +1979,7 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE',
                                type=location_validator(),
                                help='archive or repository to display information about')
-        self.add_archives_slice_selection_args(subparser)
+        self.add_archives_filter_args(subparser)
 
         break_lock_epilog = textwrap.dedent("""
         This command breaks the repository and cache locks.
@@ -2351,17 +2382,20 @@ class Archiver:
         return parser
 
     @staticmethod
-    def add_archives_slice_selection_args(subparser):
+    def add_archives_filter_args(subparser):
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=prefix_spec, default='',
+                               help='only consider archive names starting with this prefix')
+
         valid_sort_keys = ('timestamp', 'name')
         sort_by_default = 'timestamp'
         sort_by_choices = []
         for r in range(len(valid_sort_keys)):
             sort_by_choices.extend([','.join(x) for x in permutations(valid_sort_keys, r+1)])
-
         subparser.add_argument('--sort-by', dest='sort_by', type=sort_by_spec,
                                choices=sort_by_choices, default=sort_by_default,
                                help='Comma-separated list of sorting keys; valid keys are: {}; default is: {}'
                                     .format(valid_sort_keys, sort_by_default))
+
         group = subparser.add_mutually_exclusive_group()
         group.add_argument('--first', dest='first', metavar='N', default=0, type=int,
                            help='delete N first archives')
@@ -2432,11 +2466,9 @@ class Archiver:
 
     def _get_archives_slice(self, args, manifest):
         if args.location.archive:
-            logger.error('The options --first and --last can only used on repository targets.')
+            logger.error('The options --prefix, --first and --last can only used on repository targets.')
             self.exit_code = EXIT_ERROR
             return []
-        n = args.first or args.last
-        assert n > 0
 
         archives = manifest.archives.list(prefix=args.prefix)
 
@@ -2449,6 +2481,9 @@ class Archiver:
             archives.sort(key=attrgetter(sortkey))
         if args.last:
             archives.reverse()
+
+        n = args.first or args.last or len(archives)
+
         return archives[:n]
 
 

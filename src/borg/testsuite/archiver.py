@@ -1817,21 +1817,26 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             self.create_src_archive('archive2')
 
     def test_check_usage(self):
-        output = self.cmd('check', '-v', '--progress', self.repository_location, exit_code=0)
+        output = self.cmd('check', '-v', '--progress', self.repository_location)
         self.assert_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)
         self.assert_in('Checking segments', output)
         # reset logging to new process default to avoid need for fork=True on next check
         logging.getLogger('borg.output.progress').setLevel(logging.NOTSET)
-        output = self.cmd('check', '-v', '--repository-only', self.repository_location, exit_code=0)
+        output = self.cmd('check', '-v', '--repository-only', self.repository_location)
         self.assert_in('Starting repository check', output)
         self.assert_not_in('Starting archive consistency check', output)
         self.assert_not_in('Checking segments', output)
-        output = self.cmd('check', '-v', '--archives-only', self.repository_location, exit_code=0)
+        output = self.cmd('check', '-v', '--archives-only', self.repository_location)
         self.assert_not_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)
-        output = self.cmd('check', '-v', '--archives-only', '--prefix=archive2', self.repository_location, exit_code=0)
+        output = self.cmd('check', '--repository-only', '--verify-data', self.repository_location, exit_code=2)
+        self.assert_in('contradicts', output)
+        output = self.cmd('check', '-v', '--archives-only', '--prefix=archive2', self.repository_location)
         self.assert_not_in('archive1', output)
+        output = self.cmd('check', '-v', self.repository_location + '::archive1')
+        self.assert_in('Starting archive consistency check', output)
+        self.assert_not_in('archive2', output)
 
     def test_missing_file_chunk(self):
         archive, repository = self.open_archive('archive1')

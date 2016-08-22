@@ -2210,14 +2210,14 @@ class TestBuildFilter:
     def test_basic(self):
         matcher = PatternMatcher()
         matcher.add([parse_pattern('included')], True)
-        filter = Archiver.build_filter(matcher, self.item_is_hardlink_master)
+        filter = Archiver.build_filter(matcher, self.item_is_hardlink_master, 0)
         assert filter(Item(path='included'))
         assert filter(Item(path='included/file'))
         assert not filter(Item(path='something else'))
 
     def test_empty(self):
         matcher = PatternMatcher(fallback=True)
-        filter = Archiver.build_filter(matcher, self.item_is_hardlink_master)
+        filter = Archiver.build_filter(matcher, self.item_is_hardlink_master, 0)
         assert filter(Item(path='anything'))
 
     def test_strip_components(self):

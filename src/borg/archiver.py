@@ -417,7 +417,7 @@ class Archiver:
         self.print_file_status(status, path)
 
     @staticmethod
-    def build_filter(matcher, peek_and_store_hardlink_masters, strip_components=0):
+    def build_filter(matcher, peek_and_store_hardlink_masters, strip_components):
         if strip_components:
             def item_filter(item):
                 peek_and_store_hardlink_masters(item)

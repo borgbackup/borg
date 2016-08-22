@@ -79,12 +79,14 @@ class RepositoryServer:  # pragma: no cover
             if r:
                 data = os.read(stdin_fd, BUFSIZE)
                 if not data:
-                    self.repository.close()
+                    if self.repository is not None:
+                        self.repository.close()
                     return
                 unpacker.feed(data)
                 for unpacked in unpacker:
                     if not (isinstance(unpacked, tuple) and len(unpacked) == 4):
-                        self.repository.close()
+                        if self.repository is not None:
+                            self.repository.close()
                         raise Exception("Unexpected RPC data format.")
                     type, msgid, method, args = unpacked
                     method = method.decode('ascii')

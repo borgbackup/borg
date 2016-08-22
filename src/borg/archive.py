@@ -161,11 +161,11 @@ class DownloadPipeline:
         for _, data in self.fetch_many(ids):
             unpacker.feed(data)
             items = [Item(internal_dict=item) for item in unpacker]
-            if filter:
-                items = [item for item in items if filter(item)]
             for item in items:
                 if 'chunks' in item:
                     item.chunks = [ChunkListEntry(*e) for e in item.chunks]
+            if filter:
+                items = [item for item in items if filter(item)]
             if preload:
                 for item in items:
                     if 'chunks' in item:

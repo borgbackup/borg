@@ -417,15 +417,15 @@ class Archiver:
         self.print_file_status(status, path)
 
     @staticmethod
-    def build_filter(matcher, is_hardlink_master, strip_components=0):
+    def build_filter(matcher, peek_and_store_hardlink_masters, strip_components=0):
         if strip_components:
             def item_filter(item):
-                return (is_hardlink_master(item) or
-                        matcher.match(item.path) and os.sep.join(item.path.split(os.sep)[strip_components:]))
+                peek_and_store_hardlink_masters(item)
+                return matcher.match(item.path) and os.sep.join(item.path.split(os.sep)[strip_components:])
         else:
             def item_filter(item):
-                return (is_hardlink_master(item) or
-                        matcher.match(item.path))
+                peek_and_store_hardlink_masters(item)
+                return matcher.match(item.path)
         return item_filter
 
     @with_repository()
@@ -450,11 +450,12 @@ class Archiver:
         partial_extract = not matcher.empty() or strip_components
         hardlink_masters = {} if partial_extract else None
 
-        def item_is_hardlink_master(item):
-            return (partial_extract and stat.S_ISREG(item.mode) and
-                    item.get('hardlink_master', True) and 'source' not in item)
+        def peek_and_store_hardlink_masters(item):
+            if (partial_extract and stat.S_ISREG(item.mode) and
+                    item.get('hardlink_master', True) and 'source' not in item):
+                hardlink_masters[item.get('path')] = (item.get('chunks'), None)
 
-        filter = self.build_filter(matcher, item_is_hardlink_master, strip_components)
+        filter = self.build_filter(matcher, peek_and_store_hardlink_masters, strip_components)
         if progress:
             progress_logger = logging.getLogger(ProgressIndicatorPercent.LOGGER)
             progress_logger.info('Calculating size')
@@ -465,10 +466,6 @@ class Archiver:
 
         for item in archive.iter_items(filter, preload=True):
             orig_path = item.path
-            if item_is_hardlink_master(item):
-                hardlink_masters[orig_path] = (item.get('chunks'), None)
-            if not matcher.match(item.path):
-                continue
             if strip_components:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])
             if not args.dry_run:

@@ -769,7 +769,7 @@ class Archiver:
     @with_repository(exclusive=True, manifest=False)
     def do_delete(self, args, repository):
         """Delete an existing repository or archives"""
-        if args.first or args.last:
+        if any((args.first, args.last, args.prefix)):
             return self._delete_archives(args, repository)
         if args.location.archive:
             return self._delete_archive(args, repository)
@@ -875,7 +875,7 @@ class Archiver:
         else:
             write = sys.stdout.buffer.write
 
-        if args.first or args.last:
+        if any((args.first, args.last, args.prefix)):
             return self._list_archives(args, repository, manifest, key, write)
         elif args.location.archive:
             return self._list_archive(args, repository, manifest, key, write)
@@ -901,14 +901,14 @@ class Archiver:
 
     def _list_archives(self, args, repository, manifest, key, write):
         archives = self._get_archives_slice(args, manifest)
-        for i, archive in enumerate(archives, 1):
-            write('Contents of {} ({}/{}):'.format(archive.name, i, len(archives)))
-            args.location.archive = archive.name
+        for i, archive_info in enumerate(archives, 1):
+            write('Contents of {} ({}/{}):'.format(archive_info.name, i, len(archives)).encode())
+            args.location.archive = archive_info.name
             self._list_archive(args, repository, manifest, key, write)
             if self.exit_code:
                 break
-            if len(archives) - i > 1:
-                write()
+            if len(archives) - i > 0:
+                write(b'\n')
         return self.exit_code
 
     def _list_repository(self, args, manifest, write):
@@ -928,7 +928,7 @@ class Archiver:
     @with_repository(cache=True)
     def do_info(self, args, repository, manifest, key, cache):
         """Show archive details such as disk space used"""
-        if args.first or args.last:
+        if any((args.first, args.last, args.prefix)):
             return self._info_archives(args, repository, manifest, key, cache)
         elif args.location.archive:
             return self._info_archive(args, repository, manifest, key, cache)
@@ -960,12 +960,12 @@ class Archiver:
 
     def _info_archives(self, args, repository, manifest, key, cache):
         archives = self._get_archives_slice(args, manifest)
-        for i, archive in enumerate(archives, 1):
-            args.location.archive = archive.name
+        for i, archive_info in enumerate(archives, 1):
+            args.location.archive = archive_info.name
             self._info_archive(args, repository, manifest, key, cache)
             if self.exit_code:
                 break
-            if len(archives) - i:
+            if len(archives) - i > 0:
                 print()
         return self.exit_code
 

@@ -29,8 +29,8 @@ from .helpers import uid2user, user2uid, gid2group, group2gid
 from .helpers import parse_timestamp, to_localtime
 from .helpers import format_time, format_timedelta, format_file_size, file_status
 from .helpers import safe_encode, safe_decode, make_path_safe, remove_surrogates
-from .helpers import decode_dict, StableDict
-from .helpers import int_to_bigint, bigint_to_int, bin_to_hex
+from .helpers import StableDict
+from .helpers import bin_to_hex
 from .helpers import ProgressIndicatorPercent, log_multi
 from .helpers import PathPrefixPattern, FnmatchPattern
 from .helpers import consume

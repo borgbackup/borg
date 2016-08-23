@@ -143,7 +143,10 @@ class Archives(abc.MutableMapping):
         del self._archives[name]
 
     def list(self, sort_by=None, reverse=False, prefix=''):
-        # inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
+        """ Inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
+
+        :rtype: A :class:`list` of :class:`borg.helpers.ArchiveInfo` instances
+        """
         archives = [x for x in self.values() if x.name.startswith(prefix)]
         if sort_by is not None:
             archives = sorted(archives, key=attrgetter(sort_by), reverse=reverse)

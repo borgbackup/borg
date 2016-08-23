@@ -57,6 +57,9 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
         except subprocess.CalledProcessError as e:
             output = e.output
             ret = e.returncode
+        except SystemExit as e:
+            output = ''
+            ret = e.code
         return ret, os.fsdecode(output)
     else:
         stdin, stdout, stderr = sys.stdin, sys.stdout, sys.stderr
@@ -1776,6 +1779,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('recreate', '--info', self.repository_location + '::test', '-e', 'input/file5')
         self.assert_not_in("input/file1", output)
         self.assert_not_in("x input/file5", output)
+
+    def test_bad_filters(self):
+        self.cmd('init', self.repository_location)
+        self.cmd('delete', '--last', '1', self.repository_location, exit_code=2)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('delete', '--first', '1', '--last', '1', self.repository_location, fork=True, exit_code=2)
+        self.cmd('delete', '--last', '1', self.repository_location + '::test', exit_code=2)
 
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')

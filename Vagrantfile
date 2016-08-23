@@ -236,7 +236,8 @@ def install_pyinstaller(boxname)
     . borg-env/bin/activate
     git clone https://github.com/pyinstaller/pyinstaller.git
     cd pyinstaller
-    git checkout v3.1.1
+    # develop branch, with rebuilt bootloaders, with ThomasWaldmann/do-not-overwrite-LD_LP
+    git checkout fd3df7796afa367e511c881dac983cad0697b9a3
     pip install -e .
   EOF
 end
@@ -248,13 +249,11 @@ def install_pyinstaller_bootloader(boxname)
     . borg-env/bin/activate
     git clone https://github.com/pyinstaller/pyinstaller.git
     cd pyinstaller
-    # develop branch, merge commit of ThomasWaldmann/do-not-overwrite-LD_LP
-    git checkout 639fcec992d753db2058314b843bccc37b815265
+    # develop branch, with rebuilt bootloaders, with ThomasWaldmann/do-not-overwrite-LD_LP
+    git checkout fd3df7796afa367e511c881dac983cad0697b9a3
     # build bootloader, if it is not included
     cd bootloader
-    # XXX temporarily use --no-lsb as we have no LSB environment
-    # XXX https://github.com/borgbackup/borg/issues/1506
-    python ./waf --no-lsb all
+    python ./waf all
     cd ..
     pip install -e .
   EOF
@@ -395,8 +394,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("wheezy32")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("wheezy32")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("wheezy32")
-    # XXX https://github.com/borgbackup/borg/issues/1506
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller_bootloader("wheezy32")
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller("wheezy32")
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("wheezy32")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("wheezy32")
   end
@@ -409,8 +407,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("wheezy64")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("wheezy64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("wheezy64")
-    # XXX https://github.com/borgbackup/borg/issues/1506
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller_bootloader("wheezy64")
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller("wheezy64")
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("wheezy64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("wheezy64")
   end

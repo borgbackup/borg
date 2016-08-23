@@ -776,7 +776,7 @@ class Archiver:
         else:
             return self._delete_repository(args, repository)
 
-    def _delete_archive(self, args, repository, manifest=None):
+    def _delete_archive(self, args, repository, manifest=None, key=None):
         """Delete a single archive"""
         if manifest is None:
             manifest, key = Manifest.load(repository)
@@ -798,12 +798,12 @@ class Archiver:
 
     def _delete_archives(self, args, repository):
         """Delete multiple archives"""
-        manifest, _ = Manifest.load(repository)
+        manifest, key = Manifest.load(repository)
         archives = self._get_archives_slice(args, manifest)
-        for i, archive in enumerate(archives, 1):
-            logger.info('Deleting {} ({}/{}):'.format(archive.name, i, len(archives)))
-            args.location.archive = archive.name
-            self._delete_archive(args, repository, manifest)
+        for i, archive_info in enumerate(archives, 1):
+            logger.info('Deleting {} ({}/{}):'.format(archive_info.name, i, len(archives)))
+            args.location.archive = archive_info.name
+            self._delete_archive(args, repository, manifest, key)
             if self.exit_code:
                 break
         return self.exit_code

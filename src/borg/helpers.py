@@ -635,7 +635,13 @@ def replace_placeholders(text):
 prefix_spec = replace_placeholders
 
 
+HUMAN_SORT_KEYS = ['timestamp'] + list(ArchiveInfo._fields)
+HUMAN_SORT_KEYS.remove('ts')
+
 def sort_by_spec(text):
+    for token in text.split(','):
+        if token not in HUMAN_SORT_KEYS:
+            raise ValueError('Invalid sort key: %s' % token)
     return text.replace('timestamp', 'ts')
 
 

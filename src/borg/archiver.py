@@ -15,7 +15,7 @@ import textwrap
 import traceback
 from binascii import unhexlify
 from datetime import datetime
-from itertools import permutations, zip_longest
+from itertools import zip_longest
 from operator import attrgetter
 
 from .logger import create_logger, setup_logging
@@ -30,7 +30,7 @@ from .constants import *  # NOQA
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError
 from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
-from .helpers import prefix_spec, sort_by_spec
+from .helpers import prefix_spec, sort_by_spec, HUMAN_SORT_KEYS
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter, format_time, format_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex
 from .helpers import prune_within, prune_split
@@ -2386,15 +2386,10 @@ class Archiver:
         subparser.add_argument('-P', '--prefix', dest='prefix', type=prefix_spec, default='',
                                help='only consider archive names starting with this prefix')
 
-        valid_sort_keys = ('timestamp', 'name')
         sort_by_default = 'timestamp'
-        sort_by_choices = []
-        for r in range(len(valid_sort_keys)):
-            sort_by_choices.extend([','.join(x) for x in permutations(valid_sort_keys, r+1)])
-        subparser.add_argument('--sort-by', dest='sort_by', type=sort_by_spec,
-                               choices=sort_by_choices, default=sort_by_default,
+        subparser.add_argument('--sort-by', dest='sort_by', type=sort_by_spec, default=sort_by_default,
                                help='Comma-separated list of sorting keys; valid keys are: {}; default is: {}'
-                                    .format(valid_sort_keys, sort_by_default))
+                               .format(HUMAN_SORT_KEYS, sort_by_default))
 
         group = subparser.add_mutually_exclusive_group()
         group.add_argument('--first', dest='first', metavar='N', default=0, type=int,

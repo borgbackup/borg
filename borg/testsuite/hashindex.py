@@ -23,19 +23,19 @@ class HashIndexTestCase(BaseTestCase):
         self.assert_equal(len(idx), 0)
         # Test set
         for x in range(100):
-            idx[bytes('%-32d' % x, 'ascii')] = make_value(x)
+            idx[H(x)] = make_value(x)
         self.assert_equal(len(idx), 100)
         for x in range(100):
-            self.assert_equal(idx[bytes('%-32d' % x, 'ascii')], make_value(x))
+            self.assert_equal(idx[H(x)], make_value(x))
         # Test update
         for x in range(100):
-            idx[bytes('%-32d' % x, 'ascii')] = make_value(x * 2)
+            idx[H(x)] = make_value(x * 2)
         self.assert_equal(len(idx), 100)
         for x in range(100):
-            self.assert_equal(idx[bytes('%-32d' % x, 'ascii')], make_value(x * 2))
+            self.assert_equal(idx[H(x)], make_value(x * 2))
         # Test delete
         for x in range(50):
-            del idx[bytes('%-32d' % x, 'ascii')]
+            del idx[H(x)]
         self.assert_equal(len(idx), 50)
         idx_name = tempfile.NamedTemporaryFile()
         idx.write(idx_name.name)
@@ -47,7 +47,7 @@ class HashIndexTestCase(BaseTestCase):
         idx = cls.read(idx_name.name)
         self.assert_equal(len(idx), 50)
         for x in range(50, 100):
-            self.assert_equal(idx[bytes('%-32d' % x, 'ascii')], make_value(x * 2))
+            self.assert_equal(idx[H(x)], make_value(x * 2))
         idx.clear()
         self.assert_equal(len(idx), 0)
         idx.write(idx_name.name)
@@ -56,11 +56,11 @@ class HashIndexTestCase(BaseTestCase):
 
     def test_nsindex(self):
         self._generic_test(NSIndex, lambda x: (x, x),
-                           '80fba5b40f8cf12f1486f1ba33c9d852fb2b41a5b5961d3b9d1228cf2aa9c4c9')
+                           'b96ec1ddabb4278cc92261ee171f7efc979dc19397cc5e89b778f05fa25bf93f')
 
     def test_chunkindex(self):
         self._generic_test(ChunkIndex, lambda x: (x, x, x),
-                           '1d71865e72e3c3af18d3c7216b6fa7b014695eaa3ed7f14cf9cd02fba75d1c95')
+                           '9d437a1e145beccc790c69e66ba94fc17bd982d83a401c9c6e524609405529d8')
 
     def test_resize(self):
         n = 2000  # Must be >= MIN_BUCKETS
@@ -70,11 +70,11 @@ class HashIndexTestCase(BaseTestCase):
         initial_size = os.path.getsize(idx_name.name)
         self.assert_equal(len(idx), 0)
         for x in range(n):
-            idx[bytes('%-32d' % x, 'ascii')] = x, x
+            idx[H(x)] = x, x
         idx.write(idx_name.name)
         self.assert_true(initial_size < os.path.getsize(idx_name.name))
         for x in range(n):
-            del idx[bytes('%-32d' % x, 'ascii')]
+            del idx[H(x)]
         self.assert_equal(len(idx), 0)
         idx.write(idx_name.name)
         self.assert_equal(initial_size, os.path.getsize(idx_name.name))
@@ -82,7 +82,7 @@ class HashIndexTestCase(BaseTestCase):
     def test_iteritems(self):
         idx = NSIndex()
         for x in range(100):
-            idx[bytes('%-0.32d' % x, 'ascii')] = x, x
+            idx[H(x)] = x, x
         all = list(idx.iteritems())
         self.assert_equal(len(all), 100)
         second_half = list(idx.iteritems(marker=all[49][0]))

@@ -459,7 +459,7 @@ class Archiver:
         if progress:
             progress_logger = logging.getLogger(ProgressIndicatorPercent.LOGGER)
             progress_logger.info('Calculating size')
-            extracted_size = sum(item.file_size() for item in archive.iter_items(filter))
+            extracted_size = sum(item.file_size(hardlink_masters) for item in archive.iter_items(filter))
             pi = ProgressIndicatorPercent(total=extracted_size, msg='Extracting files %5.1f%%', step=0.1)
         else:
             pi = None

@@ -37,6 +37,14 @@ class InvalidRPCMethod(Error):
     """RPC method {} is not valid"""
 
 
+class UnexpectedRPCDataFormatFromClient(Error):
+    """Borg {}: Got unexpected RPC data format from client."""
+
+
+class UnexpectedRPCDataFormatFromServer(Error):
+    """Got unexpected RPC data format from server."""
+
+
 class RepositoryServer:  # pragma: no cover
     rpc_methods = (
         '__len__',
@@ -79,13 +87,18 @@ class RepositoryServer:  # pragma: no cover
             if r:
                 data = os.read(stdin_fd, BUFSIZE)
                 if not data:
-                    self.repository.close()
+                    if self.repository is not None:
+                        self.repository.close()
+                    else:
+                        os.write(stderr_fd, "Borg {}: Got connection close before repository was opened.\n"
+                                 .format(__version__).encode())
                     return
                 unpacker.feed(data)
                 for unpacked in unpacker:
                     if not (isinstance(unpacked, tuple) and len(unpacked) == 4):
-                        self.repository.close()
-                        raise Exception("Unexpected RPC data format.")
+                        if self.repository is not None:
+                            self.repository.close()
+                        raise UnexpectedRPCDataFormatFromClient(__version__)
                     type, msgid, method, args = unpacked
                     method = method.decode('ascii')
                     try:
@@ -326,7 +339,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     self.unpacker.feed(data)
                     for unpacked in self.unpacker:
                         if not (isinstance(unpacked, tuple) and len(unpacked) == 4):
-                            raise Exception("Unexpected RPC data format.")
+                            raise UnexpectedRPCDataFormatFromServer()
                         type, msgid, error, res = unpacked
                         if msgid in self.ignore_responses:
                             self.ignore_responses.remove(msgid)

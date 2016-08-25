@@ -420,12 +420,14 @@ class Archiver:
     def build_filter(matcher, peek_and_store_hardlink_masters, strip_components):
         if strip_components:
             def item_filter(item):
-                peek_and_store_hardlink_masters(item)
-                return matcher.match(item.path) and os.sep.join(item.path.split(os.sep)[strip_components:])
+                matched = matcher.match(item.path) and os.sep.join(item.path.split(os.sep)[strip_components:])
+                peek_and_store_hardlink_masters(item, matched)
+                return matched
         else:
             def item_filter(item):
-                peek_and_store_hardlink_masters(item)
-                return matcher.match(item.path)
+                matched = matcher.match(item.path)
+                peek_and_store_hardlink_masters(item, matched)
+                return matched
         return item_filter
 
     @with_repository()
@@ -450,8 +452,8 @@ class Archiver:
         partial_extract = not matcher.empty() or strip_components
         hardlink_masters = {} if partial_extract else None
 
-        def peek_and_store_hardlink_masters(item):
-            if (partial_extract and stat.S_ISREG(item.mode) and
+        def peek_and_store_hardlink_masters(item, matched):
+            if (partial_extract and not matched and stat.S_ISREG(item.mode) and
                     item.get('hardlink_master', True) and 'source' not in item):
                 hardlink_masters[item.get('path')] = (item.get('chunks'), None)
 
@@ -486,7 +488,7 @@ class Archiver:
                         archive.extract_item(item, restore_attrs=False)
                     else:
                         archive.extract_item(item, stdout=stdout, sparse=sparse, hardlink_masters=hardlink_masters,
-                                             original_path=orig_path, pi=pi)
+                                             stripped_components=strip_components, original_path=orig_path, pi=pi)
             except BackupOSError as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 

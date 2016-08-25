@@ -2204,8 +2204,8 @@ def test_compare_chunk_contents():
 
 class TestBuildFilter:
     @staticmethod
-    def peek_and_store_hardlink_masters(item):
-        return False
+    def peek_and_store_hardlink_masters(item, matched):
+        pass
 
     def test_basic(self):
         matcher = PatternMatcher()

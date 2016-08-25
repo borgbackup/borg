@@ -422,7 +422,7 @@ Number of files: {0.stats.nfiles}'''.format(
         return stats
 
     def extract_item(self, item, restore_attrs=True, dry_run=False, stdout=False, sparse=False,
-                     hardlink_masters=None, original_path=None, pi=None):
+                     hardlink_masters=None, stripped_components=0, original_path=None, pi=None):
         """
         Extract archive item.
 
@@ -432,9 +432,11 @@ Number of files: {0.stats.nfiles}'''.format(
         :param stdout: write extracted data to stdout
         :param sparse: write sparse files (chunk-granularity, independent of the original being sparse)
         :param hardlink_masters: maps paths to (chunks, link_target) for extracting subtrees with hardlinks correctly
+        :param stripped_components: stripped leading path components to correct hard link extraction
         :param original_path: 'path' key as stored in archive
         :param pi: ProgressIndicatorPercent (or similar) for file extraction progress (in bytes)
         """
+        hardlink_masters = hardlink_masters or {}
         has_damaged_chunks = 'chunks_healthy' in item
         if dry_run or stdout:
             if 'chunks' in item:
@@ -473,11 +475,11 @@ Number of files: {0.stats.nfiles}'''.format(
                     os.makedirs(os.path.dirname(path))
             # Hard link?
             if 'source' in item:
-                source = os.path.join(dest, item.source)
+                source = os.path.join(dest, *item.source.split(os.sep)[stripped_components:])
                 with backup_io():
                     if os.path.exists(path):
                         os.unlink(path)
-                    if not hardlink_masters:
+                    if item.source not in hardlink_masters:
                         os.link(source, path)
                         return
                 item.chunks, link_target = hardlink_masters[item.source]

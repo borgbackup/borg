@@ -276,8 +276,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 os.path.join(self.input_path, 'hardlink'))
         # Symlink
         os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
-        if xattr.is_enabled(self.input_path):
-            xattr.setxattr(os.path.join(self.input_path, 'file1'), 'user.foo', b'bar')
+        self.create_regular_file('fusexattr', size=1)
+        if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
+            # ironically, due to the way how fakeroot works, comparing fuse file xattrs to orig file xattrs
+            # will FAIL if fakeroot supports xattrs, thus we only set the xattr if XATTR_FAKEROOT is False.
+            # This is because fakeroot with xattr-support does not propagate xattrs of the underlying file
+            # into "fakeroot space". Because the xattrs exposed by borgfs are these of an underlying file
+            # (from fakeroots point of view) they are invisible to the test process inside the fakeroot.
+            xattr.setxattr(os.path.join(self.input_path, 'fusexattr'), 'user.foo', b'bar')
             # XXX this always fails for me
             # ubuntu 14.04, on a TMP dir filesystem with user_xattr, using fakeroot
             # same for newer ubuntu and centos.
@@ -342,7 +348,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.assert_in(name, list_output)
         self.assert_dirs_equal('input', 'output/input')
         info_output = self.cmd('info', self.repository_location + '::test')
-        item_count = 3 if has_lchflags else 4  # one file is UF_NODUMP
+        item_count = 4 if has_lchflags else 5  # one file is UF_NODUMP
         self.assert_in('Number of files: %d' % item_count, info_output)
         shutil.rmtree(self.cache_path)
         with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='yes'):
@@ -1048,7 +1054,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             with open(in_fn, 'rb') as in_f, open(out_fn, 'rb') as out_f:
                 assert in_f.read() == out_f.read()
             # list/read xattrs
-            if xattr.is_enabled(self.input_path):
+            in_fn = 'input/fusexattr'
+            out_fn = os.path.join(mountpoint, 'input', 'fusexattr')
+            if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
                 assert xattr.listxattr(out_fn) == ['user.foo', ]
                 assert xattr.getxattr(out_fn, 'user.foo') == b'bar'
             else:

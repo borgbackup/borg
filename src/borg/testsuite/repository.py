@@ -163,22 +163,22 @@ class LocalRepositoryTestCase(RepositoryTestCaseBase):
         assert self.repository.compact[0] == 41 + 9
 
     def test_sparse1(self):
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
-        self.repository.put(b'00000000000000000000000000000001', b'123456789')
+        self.repository.put(H(0), b'foo')
+        self.repository.put(H(1), b'123456789')
         self.repository.commit()
-        self.repository.put(b'00000000000000000000000000000001', b'bar')
+        self.repository.put(H(1), b'bar')
         self._assert_sparse()
 
     def test_sparse2(self):
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
-        self.repository.put(b'00000000000000000000000000000001', b'123456789')
+        self.repository.put(H(0), b'foo')
+        self.repository.put(H(1), b'123456789')
         self.repository.commit()
-        self.repository.delete(b'00000000000000000000000000000001')
+        self.repository.delete(H(1))
         self._assert_sparse()
 
     def test_sparse_delete(self):
-        self.repository.put(b'00000000000000000000000000000000', b'1245')
-        self.repository.delete(b'00000000000000000000000000000000')
+        self.repository.put(H(0), b'1245')
+        self.repository.delete(H(0))
         self.repository.io._write_fd.sync()
 
         # The on-line tracking works on a per-object basis...
@@ -385,7 +385,7 @@ class RepositoryFreeSpaceTestCase(RepositoryTestCaseBase):
         self.reopen()
 
         with self.repository:
-            self.repository.put(b'00000000000000000000000000000000', b'foobar')
+            self.repository.put(H(0), b'foobar')
             with pytest.raises(Repository.InsufficientFreeSpaceError):
                 self.repository.commit()
 
@@ -393,13 +393,13 @@ class RepositoryFreeSpaceTestCase(RepositoryTestCaseBase):
 class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
     def setUp(self):
         super().setUp()
-        self.repository.put(b'00000000000000000000000000000000', b'foo')
+        self.repository.put(H(0), b'foo')
         self.repository.commit()
         self.repository.close()
 
     def do_commit(self):
         with self.repository:
-            self.repository.put(b'00000000000000000000000000000000', b'fox')
+            self.repository.put(H(0), b'fox')
             self.repository.commit()
 
     def test_corrupted_hints(self):

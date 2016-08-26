@@ -2422,6 +2422,17 @@ def main():  # pragma: no cover
         tb_log_level = logging.ERROR if important else logging.DEBUG
         tb = sysinfo()
         exit_code = EXIT_ERROR
+    except OSError as e:
+        at_frame = traceback.extract_tb(e.__traceback__, limit=-1)[0]
+        msg = textwrap.dedent("""
+        I/O error: {error}
+
+        At: {frame.filename}:{frame.lineno} ({frame.name})
+        {sysinfo}
+        """).strip().format(error=e, frame=at_frame, sysinfo=sysinfo(short=True))
+        tb_log_level = logging.DEBUG
+        tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
+        exit_code = EXIT_ERROR
     except Exception:
         msg = 'Local Exception'
         tb_log_level = logging.ERROR

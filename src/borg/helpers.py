@@ -1107,7 +1107,7 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
 class ProgressIndicatorPercent:
     LOGGER = 'borg.output.progress'
 
-    def __init__(self, total, step=5, start=0, msg="%3.0f%%"):
+    def __init__(self, total=0, step=5, start=0, msg="%3.0f%%"):
         """
         Percentage-based progress indicator
 
@@ -1121,6 +1121,7 @@ class ProgressIndicatorPercent:
         self.trigger_at = start  # output next percentage value when reaching (at least) this
         self.step = step
         self.msg = msg
+        self.output_len = len(self.msg % 100.0)
         self.handler = None
         self.logger = logging.getLogger(self.LOGGER)
 
@@ -1154,13 +1155,15 @@ class ProgressIndicatorPercent:
     def show(self, current=None, increase=1):
         pct = self.progress(current, increase)
         if pct is not None:
-            return self.output(pct)
+            return self.output(self.msg % pct)
 
-    def output(self, percent):
-        self.logger.info(self.msg % percent)
+    def output(self, message):
+        self.output_len = max(len(message), self.output_len)
+        message = message.ljust(self.output_len)
+        self.logger.info(message)
 
     def finish(self):
-        self.logger.info(" " * len(self.msg % 100.0))
+        self.output('')
 
 
 class ProgressIndicatorEndless:

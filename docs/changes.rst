@@ -50,7 +50,7 @@ The best check that everything is ok is to run a dry-run extraction::
     borg extract -v --dry-run REPO::ARCHIVE
 
 
-Version 1.1.0b1 (2016-08-27)
+Version 1.1.0b1 (2016-08-28)
 ----------------------------
 
 New features:

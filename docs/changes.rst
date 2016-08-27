@@ -108,6 +108,11 @@ New features:
 - borg info:
 
   - output is now more similar to borg create --stats, #977
+- borg mount:
+
+  - provide "borgfs" wrapper for borg mount, enables usage via fstab, #743
+  - "versions" mount option - when used with a repository mount, this gives
+    a merged, versioned view of the files in all archives, #729
 - repository:
 
   - added progress information to commit/compaction phase (often takes some time when deleting/pruning), #1519
@@ -123,7 +128,6 @@ New features:
 - options that imply output (--show-rc, --show-version, --list, --stats,
   --progress) don't need -v/--info to have that output displayed, #865
 - add archive comments (via borg (re)create --comment), #842
-- provide "borgfs" wrapper for borg mount, enables usage via fstab, #743
 - borg list/prune/delete: also output archive id, #731
 - --show-version: shows/logs the borg version, #725
 - added --debug-topic for granular debug logging, #1447

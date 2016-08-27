@@ -66,6 +66,8 @@ class RepositoryServer:  # pragma: no cover
         'save_key',
         'load_key',
         'break_lock',
+        'get_free_nonce',
+        'commit_nonce_reservation'
     )
 
     def __init__(self, restrict_to_paths, append_only):
@@ -449,6 +451,12 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
 
     def load_key(self):
         return self.call('load_key')
+
+    def get_free_nonce(self):
+        return self.call('get_free_nonce')
+
+    def commit_nonce_reservation(self, next_unreserved, start_nonce):
+        return self.call('commit_nonce_reservation', next_unreserved, start_nonce)
 
     def break_lock(self):
         return self.call('break_lock')

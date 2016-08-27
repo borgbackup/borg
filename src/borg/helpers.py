@@ -269,6 +269,17 @@ def get_keys_dir():
     return keys_dir
 
 
+def get_nonces_dir():
+    """Determine where to store the local nonce high watermark"""
+
+    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(get_home_dir(), '.config'))
+    nonces_dir = os.environ.get('BORG_NONCES_DIR', os.path.join(xdg_config, 'borg', 'key-nonces'))
+    if not os.path.exists(nonces_dir):
+        os.makedirs(nonces_dir)
+        os.chmod(nonces_dir, stat.S_IRWXU)
+    return nonces_dir
+
+
 def get_cache_dir():
     """Determine where to repository keys and cache"""
     xdg_cache = os.environ.get('XDG_CACHE_HOME', os.path.join(get_home_dir(), '.cache'))

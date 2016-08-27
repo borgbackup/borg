@@ -189,6 +189,27 @@ class Repository:
         keydata = self.config.get('repository', 'key')
         return keydata.encode('utf-8')  # remote repo: msgpack issue #99, returning bytes
 
+    def get_free_nonce(self):
+        if not self.lock.got_exclusive_lock():
+            raise AssertionError("bug in code, exclusive lock should exist here")
+
+        nonce_path = os.path.join(self.path, 'nonce')
+        try:
+            with open(nonce_path, 'r') as fd:
+                return int.from_bytes(unhexlify(fd.read()), byteorder='big')
+        except FileNotFoundError:
+            return None
+
+    def commit_nonce_reservation(self, next_unreserved, start_nonce):
+        if not self.lock.got_exclusive_lock():
+            raise AssertionError("bug in code, exclusive lock should exist here")
+
+        if self.get_free_nonce() != start_nonce:
+            raise Exception("nonce space reservation with mismatched previous state")
+        nonce_path = os.path.join(self.path, 'nonce')
+        with SaveFile(nonce_path, binary=False) as fd:
+            fd.write(bin_to_hex(next_unreserved.to_bytes(8, byteorder='big')))
+
     def destroy(self):
         """Destroy the repository at `self.path`
         """

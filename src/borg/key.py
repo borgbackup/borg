@@ -3,7 +3,7 @@ import getpass
 import os
 import sys
 import textwrap
-from binascii import a2b_base64, b2a_base64, hexlify
+from binascii import a2b_base64, b2a_base64, hexlify, unhexlify
 from hashlib import sha256, pbkdf2_hmac
 from hmac import compare_digest
 
@@ -23,6 +23,7 @@ from .helpers import bin_to_hex
 from .helpers import CompressionDecider2, CompressionSpec
 from .item import Key, EncryptedKey
 from .platform import SaveFile
+from .nonces import NonceManager
 
 
 PREFIX = b'\0' * 8
@@ -169,6 +170,7 @@ class AESKeyBase(KeyBase):
 
     def encrypt(self, chunk):
         chunk = self.compress(chunk)
+        self.nonce_manager.ensure_reservation(num_aes_blocks(len(chunk.data)))
         self.enc_cipher.reset()
         data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(chunk.data)))
         hmac = hmac_sha256(self.enc_hmac_key, data)
@@ -207,8 +209,9 @@ class AESKeyBase(KeyBase):
         if self.chunk_seed & 0x80000000:
             self.chunk_seed = self.chunk_seed - 0xffffffff - 1
 
-    def init_ciphers(self, enc_iv=b''):
-        self.enc_cipher = AES(is_encrypt=True, key=self.enc_key, iv=enc_iv)
+    def init_ciphers(self, manifest_nonce=0):
+        self.enc_cipher = AES(is_encrypt=True, key=self.enc_key, iv=manifest_nonce.to_bytes(16, byteorder='big'))
+        self.nonce_manager = NonceManager(self.repository, self.enc_cipher, manifest_nonce)
         self.dec_cipher = AES(is_encrypt=False, key=self.enc_key)
 
 
@@ -299,7 +302,7 @@ class PassphraseKey(AESKeyBase):
             try:
                 key.decrypt(None, manifest_data)
                 num_blocks = num_aes_blocks(len(manifest_data) - 41)
-                key.init_ciphers(PREFIX + long_to_bytes(key.extract_nonce(manifest_data) + num_blocks))
+                key.init_ciphers(key.extract_nonce(manifest_data) + num_blocks)
                 return key
             except IntegrityError:
                 passphrase = Passphrase.getpass(prompt)
@@ -337,7 +340,7 @@ class KeyfileKeyBase(AESKeyBase):
             if not key.load(target, passphrase):
                 raise PassphraseWrong
         num_blocks = num_aes_blocks(len(manifest_data) - 41)
-        key.init_ciphers(PREFIX + long_to_bytes(key.extract_nonce(manifest_data) + num_blocks))
+        key.init_ciphers(key.extract_nonce(manifest_data) + num_blocks)
         return key
 
     def find_key(self):

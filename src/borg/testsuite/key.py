@@ -1,6 +1,7 @@
 import getpass
 import re
 import tempfile
+import os.path
 from binascii import hexlify, unhexlify
 
 import pytest
@@ -9,6 +10,7 @@ from ..crypto import bytes_to_long, num_aes_blocks
 from ..helpers import Location
 from ..helpers import Chunk
 from ..helpers import IntegrityError
+from ..helpers import get_nonces_dir
 from ..key import PlaintextKey, PassphraseKey, KeyfileKey, Passphrase, PasswordRetriesExceeded, bin_to_hex
 
 
@@ -16,6 +18,11 @@ from ..key import PlaintextKey, PassphraseKey, KeyfileKey, Passphrase, PasswordR
 def clean_env(monkeypatch):
     # Workaround for some tests (testsuite/archiver) polluting the environment
     monkeypatch.delenv('BORG_PASSPHRASE', False)
+
+
+@pytest.fixture(autouse=True)
+def nonce_dir(tmpdir_factory, monkeypatch):
+    monkeypatch.setenv('XDG_CONFIG_HOME', tmpdir_factory.mktemp('xdg-config-home'))
 
 
 class TestKey:
@@ -59,6 +66,12 @@ class TestKey:
         id = bytes(32)
         id_str = bin_to_hex(id)
 
+        def get_free_nonce(self):
+            return None
+
+        def commit_nonce_reservation(self, next_unreserved, start_nonce):
+            pass
+
     def test_plaintext(self):
         key = PlaintextKey.create(None, None)
         chunk = Chunk(b'foo')
@@ -77,12 +90,22 @@ class TestKey:
         assert key.extract_nonce(manifest2) == 1
         iv = key.extract_nonce(manifest)
         key2 = KeyfileKey.detect(self.MockRepository(), manifest)
-        assert bytes_to_long(key2.enc_cipher.iv, 8) == iv + num_aes_blocks(len(manifest) - KeyfileKey.PAYLOAD_OVERHEAD)
+        assert bytes_to_long(key2.enc_cipher.iv, 8) >= iv + num_aes_blocks(len(manifest) - KeyfileKey.PAYLOAD_OVERHEAD)
         # Key data sanity check
         assert len({key2.id_key, key2.enc_key, key2.enc_hmac_key}) == 3
         assert key2.chunk_seed != 0
         chunk = Chunk(b'foo')
         assert chunk == key2.decrypt(key.id_hash(chunk.data), key.encrypt(chunk))
+
+    def test_keyfile_nonce_rollback_protection(self, monkeypatch, keys_dir):
+        monkeypatch.setenv('BORG_PASSPHRASE', 'test')
+        repository = self.MockRepository()
+        with open(os.path.join(get_nonces_dir(), repository.id_str), "w") as fd:
+            fd.write("0000000000002000")
+        key = KeyfileKey.create(repository, self.MockArgs())
+        data = key.encrypt(Chunk(b'ABC'))
+        assert key.extract_nonce(data) == 0x2000
+        assert key.decrypt(None, data).data == b'ABC'
 
     def test_keyfile_kfenv(self, tmpdir, monkeypatch):
         keyfile = tmpdir.join('keyfile')

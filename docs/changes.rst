@@ -50,62 +50,115 @@ The best check that everything is ok is to run a dry-run extraction::
     borg extract -v --dry-run REPO::ARCHIVE
 
 
-Version 1.1.0 (not released yet)
---------------------------------
+Version 1.1.0b1 (2016-08-27)
+----------------------------
 
 New features:
 
-- borg check: will not produce the "Checking segments" output unless
-  new --progress option is passed, #824.
-- options that imply output (--show-rc, --show-version, --list, --stats,
-  --progress) don't need -v/--info to have that output displayed, #865
-- borg recreate: re-create existing archives, #787 #686 #630 #70, also see
-  #757, #770.
+- new commands:
 
-  - selectively remove files/dirs from old archives
-  - re-compress data
-  - re-chunkify data, e.g. to have upgraded Attic / Borg 0.xx archives
-    deduplicate with Borg 1.x archives or to experiment with chunker-params.
-- create: visit files in inode order (better speed, esp. for large directories
-  and rotating disks)
-- borg diff: show differences between archives
-- borg list improved:
+  - borg recreate: re-create existing archives, #787 #686 #630 #70, also see
+    #757, #770.
+
+    - selectively remove files/dirs from old archives
+    - re-compress data
+    - re-chunkify data, e.g. to have upgraded Attic / Borg 0.xx archives
+      deduplicate with Borg 1.x archives or to experiment with chunker-params.
+  - borg diff: show differences between archives
+  - borg with-lock: execute a command with the repository locked, #990
+- borg create:
+
+  - Flexible compression with pattern matching on path/filename,
+    and LZ4 heuristic for deciding compressibility, #810, #1007
+  - visit files in inode order (better speed, esp. for large directories and rotating disks)
+  - in-file checkpoints, #1217
+  - increased default checkpoint interval to 30 minutes (was 5 minutes), #896
+  - added uuid archive format tag, #1151
+  - save mountpoint directories with --one-file-system, makes system restore easier, #1033
+  - Linux: added support for some BSD flags, #1050
+  - add 'x' status for excluded paths, #814
+
+    - also means files excluded via UF_NODUMP, #1080
+- borg check:
+
+  - will not produce the "Checking segments" output unless new --progress option is passed, #824.
+  - --verify-data to verify data cryptographically on the client, #975
+- borg list, #751, #1179
 
   - removed {formatkeys}, see "borg list --help"
   - --list-format is deprecated, use --format instead
+  - --format now also applies to listing archives, not only archive contents, #1179
   - now supports the usual [PATH [PATHS…]] syntax and excludes
   - new keys: csize, num_chunks, unique_chunks, NUL
   - supports guaranteed_available hashlib hashes
-    (to avoid varying functionality depending on environment)
-- prune:
+    (to avoid varying functionality depending on environment),
+    which includes the SHA1 and SHA2 family as well as MD5
+- borg prune:
 
   - to better visualize the "thinning out", we now list all archives in
     reverse time order. rephrase and reorder help text.
   - implement --keep-last N via --keep-secondly N, also --keep-minutely.
     assuming that there is not more than 1 backup archive made in 1s,
     --keep-last N and --keep-secondly N are equivalent, #537
-- borg comment: add archive comments, #842
+  - cleanup checkpoints except the latest, #1008
+- borg extract:
+
+  - added --progress, #1449
+  - Linux: limited support for BSD flags, #1050
+- borg info:
+
+  - output is now more similar to borg create --stats, #977
+- repository:
+
+  - added progress information to commit/compaction phase (often takes some time when deleting/pruning), #1519
+  - automatic recovery for some forms of repository inconsistency, #858
+  - check free space before going forward with a commit, #1336
+  - improved write performance (esp. for rotating media), #985
+
+    - new IO code for Linux
+    - raised default segment size to approx 512 MiB
+  - improved compaction performance, #1041
+  - reduced client CPU load and improved performance for remote repositories, #940
+
+- options that imply output (--show-rc, --show-version, --list, --stats,
+  --progress) don't need -v/--info to have that output displayed, #865
+- add archive comments (via borg (re)create --comment), #842
 - provide "borgfs" wrapper for borg mount, enables usage via fstab, #743
-- create: add 'x' status for excluded paths, #814
-- --show-version: shows/logs the borg version, #725
 - borg list/prune/delete: also output archive id, #731
+- --show-version: shows/logs the borg version, #725
+- added --debug-topic for granular debug logging, #1447
+- use atomic file writing/updating for configuration and key files, #1377
+- BORG_KEY_FILE environment variable, #1001
+- self-testing module, #970
+
 
 Bug fixes:
 
+- list: fixed default output being produced if --format is given with empty parameter, #1489
+- create: fixed overflowing progress line with CJK and similar characters, #1051
+- prune: fixed crash if --prefix resulted in no matches, #1029
 - init: clean up partial repo if passphrase input is aborted, #850
 - info: quote cmdline arguments that have spaces in them
-- failing hashindex tests on netbsd, #804
-- fix links failing for extracting subtrees, #761
+- fix hardlinks failing in some cases for extracting subtrees, #761
 
 Other changes:
 
 - replace stdlib hmac with OpenSSL, zero-copy decrypt (10-15% increase in
   performance of hash-lists and extract).
+- improved chunker performance, #1021
+- open repository segment files in exclusive mode (fail-safe), #1134
+- improved error logging, #1440
 - Source:
 
   - pass meta-data around, #765
   - move some constants to new constants module
   - better readability and less errors with namedtuples, #823
+  - moved source tree into src/ subdirectory, #1016
+  - made borg.platform a package, #1113
+  - removed dead crypto code, #1032
+  - improved and ported parts of the test suite to py.test, #912
+  - created data classes instead of passing dictionaries around, #981, #1158, #1161
+  - cleaned up imports, #1112
 - Docs:
 
   - better help texts and sphinx reproduction of usage help:
@@ -116,6 +169,8 @@ Other changes:
   - chunker: added some insights by "Voltara", #903
   - clarify what "deduplicated size" means
   - fix / update / add package list entries
+  - added a SaltStack usage example, #956
+  - expanded FAQ
   - new contributors in AUTHORS!
 - Tests:
 

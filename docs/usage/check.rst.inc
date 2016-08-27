@@ -81,7 +81,3 @@ which will detect (accidental) corruption. For encrypted repositories it is
 tamper-resistant as well, unless the attacker has access to the keys.
 
 It is also very slow.
-
---verify-data only verifies data used by the archives specified with --last,
---prefix or an explicitly named archive. If none of these are passed,
-all data in the repository is verified.

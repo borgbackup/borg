@@ -6,11 +6,11 @@ borg info
 ---------
 ::
 
-    borg info <options> ARCHIVE
+    borg info <options> REPOSITORY_OR_ARCHIVE
 
 positional arguments
-    ARCHIVE
-        archive to display information about
+    REPOSITORY_OR_ARCHIVE
+        archive or repository to display information about
 
 `Common options`_
     |
@@ -18,8 +18,10 @@ positional arguments
 Description
 ~~~~~~~~~~~
 
-This command displays some detailed information about the specified archive.
+This command displays detailed information about the specified archive or repository.
 
-The "This archive" line refers exclusively to this archive:
-"Deduplicated size" is the size of the unique chunks stored only for this
-archive. Non-unique / common chunks show up under "All archives".
+The "This archive" line refers exclusively to the given archive:
+"Deduplicated size" is the size of the unique chunks stored only for the
+given archive.
+
+The "All archives" line shows global statistics (all chunks).

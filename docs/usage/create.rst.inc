@@ -63,7 +63,8 @@ Archive options
     ``-C COMPRESSION``, ``--compression COMPRESSION``
         | select compression algorithm (and level):
         | none == no compression (default),
-        | auto,C[,L] == built-in heuristic decides between none or C[,L] - with C[,L]
+        | auto,C[,L] == built-in heuristic (try with lz4 whether the data is
+        |               compressible) decides between none or C[,L] - with C[,L]
         |               being any valid compression algorithm (and optional level),
         | lz4 == lz4,
         | zlib == zlib (default level 6),
@@ -85,7 +86,7 @@ The archive name needs to be unique. It must not end in '.checkpoint' or
 checkpoints and treated in special ways.
 
 In the archive name, you may use the following format tags:
-{now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}, {uuid4}
+{now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}, {uuid4}, {borgversion}
 
 To speed up pulling backups over sshfs and similar network file systems which do
 not provide correct inode information the --ignore-inode flag can be used. This

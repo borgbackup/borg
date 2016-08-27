@@ -1450,7 +1450,7 @@ class ArchiveRecreater:
                 chunk_id, size, csize = self.cache.add_chunk(chunk_id, chunk, target.stats, overwrite=overwrite)
                 new_chunks.append((chunk_id, size, csize))
                 self.seen_chunks.add(chunk_id)
-                if self.recompress:
+                if self.recompress and self.cache.seen_chunk(chunk_id) == 1:
                     # This tracks how many bytes are uncommitted but compactable, since we are recompressing
                     # existing chunks.
                     target.recreate_uncomitted_bytes += csize

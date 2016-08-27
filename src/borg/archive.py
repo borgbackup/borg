@@ -1572,7 +1572,7 @@ class ArchiveRecreater:
         if not target:
             target = self.create_target_archive(target_name)
         # If the archives use the same chunker params, then don't rechunkify
-        target.recreate_rechunkify = tuple(archive.metadata.get('chunker_params')) != self.chunker_params
+        target.recreate_rechunkify = tuple(archive.metadata.get('chunker_params', [])) != self.chunker_params
         return target, resume_from
 
     def try_resume(self, archive, target_name):

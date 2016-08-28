@@ -34,20 +34,11 @@ IV handling:
     (repeat)
 """
 
-# TODO: get rid of small malloc
-# as @enkore mentioned on github:
-# "Since we do many small-object allocations here it is probably better to use
-# PyMem_Alloc/Free instead of malloc/free (PyMem has many optimizations for
-# small allocs)."
-#
-# Small mallocs currently happen if the total input file length is small, so
-# the 1 chunk's size is less than what the chunker would produce for big files.
-
 import hashlib
 import hmac
 from math import ceil
 
-from libc.stdlib cimport malloc, free
+from cpython cimport PyMem_Malloc, PyMem_Free
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 from cpython.bytes cimport PyBytes_FromStringAndSize
 
@@ -234,7 +225,7 @@ cdef class AES256_CTR_HMAC_SHA256:
         cdef int hlen = len(header)
         cdef int aoffset = aad_offset
         cdef int alen = hlen - aoffset
-        cdef unsigned char *odata = <unsigned char *>malloc(hlen + 32 + 8 + ilen + 16)
+        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + 32 + 8 + ilen + 16)
         if not odata:
             raise MemoryError
         cdef int olen
@@ -271,7 +262,7 @@ cdef class AES256_CTR_HMAC_SHA256:
             self.blocks += num_aes_blocks(ilen)
             return odata[:offset]
         finally:
-            free(odata)
+            PyMem_Free(odata)
             PyBuffer_Release(&hdata)
             PyBuffer_Release(&idata)
 
@@ -283,7 +274,7 @@ cdef class AES256_CTR_HMAC_SHA256:
         cdef int hlen = header_len
         cdef int aoffset = aad_offset
         cdef int alen = hlen - aoffset
-        cdef unsigned char *odata = <unsigned char *>malloc(ilen + 16)
+        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + 16)
         if not odata:
             raise MemoryError
         cdef int olen
@@ -317,7 +308,7 @@ cdef class AES256_CTR_HMAC_SHA256:
             self.blocks += num_aes_blocks(offset)
             return odata[:offset]
         finally:
-            free(odata)
+            PyMem_Free(odata)
             PyBuffer_Release(&idata)
 
     def set_iv(self, iv):
@@ -374,7 +365,7 @@ cdef class _AEAD_BASE:
         cdef int hlen = len(header)
         cdef int aoffset = aad_offset
         cdef int alen = hlen - aoffset
-        cdef unsigned char *odata = <unsigned char *>malloc(hlen + 16 + 12 + ilen + 16)
+        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + 16 + 12 + ilen + 16)
         if not odata:
             raise MemoryError
         cdef int olen
@@ -415,7 +406,7 @@ cdef class _AEAD_BASE:
             self.blocks += num_aes_blocks(ilen)
             return odata[:offset]
         finally:
-            free(odata)
+            PyMem_Free(odata)
             PyBuffer_Release(&hdata)
             PyBuffer_Release(&idata)
 
@@ -427,7 +418,7 @@ cdef class _AEAD_BASE:
         cdef int hlen = header_len
         cdef int aoffset = aad_offset
         cdef int alen = hlen - aoffset
-        cdef unsigned char *odata = <unsigned char *>malloc(ilen + 16)
+        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + 16)
         if not odata:
             raise MemoryError
         cdef int olen
@@ -462,7 +453,7 @@ cdef class _AEAD_BASE:
             self.blocks += num_aes_blocks(offset)
             return odata[:offset]
         finally:
-            free(odata)
+            PyMem_Free(odata)
             PyBuffer_Release(&idata)
 
     def set_iv(self, iv):

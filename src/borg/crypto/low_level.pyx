@@ -196,6 +196,7 @@ cdef class AES256_CTR_HMAC_SHA256:
     cdef HMAC_CTX *hmac_ctx
     cdef unsigned char *mac_key
     cdef unsigned char *enc_key
+    cdef int cipher_blk_len
     cdef int iv_len, iv_len_short
     cdef int mac_len
     cdef unsigned char iv[16]  # XXX use self.iv_len or some MAX_IV_LEN?
@@ -204,6 +205,7 @@ cdef class AES256_CTR_HMAC_SHA256:
     def __init__(self, mac_key, enc_key, iv=None):
         assert isinstance(mac_key, bytes) and len(mac_key) == 32
         assert isinstance(enc_key, bytes) and len(enc_key) == 32
+        self.cipher_blk_len = 16
         self.iv_len = 16
         self.iv_len_short = 8
         self.mac_len = 32
@@ -230,7 +232,8 @@ cdef class AES256_CTR_HMAC_SHA256:
         cdef int hlen = len(header)
         cdef int aoffset = aad_offset
         cdef int alen = hlen - aoffset
-        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len + self.iv_len_short + ilen + 16)
+        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len + self.iv_len_short +
+                                                                  ilen + self.cipher_blk_len)  # play safe, 1 extra blk
         if not odata:
             raise MemoryError
         cdef int olen
@@ -264,7 +267,7 @@ cdef class AES256_CTR_HMAC_SHA256:
                 raise CryptoError('HMAC_Update failed')
             if not HMAC_Final(self.hmac_ctx, odata+hlen, NULL):
                 raise CryptoError('HMAC_Final failed')
-            self.blocks += num_aes_blocks(ilen)
+            self.blocks += self.block_count(ilen)
             return odata[:offset]
         finally:
             PyMem_Free(odata)
@@ -279,7 +282,7 @@ cdef class AES256_CTR_HMAC_SHA256:
         cdef int hlen = header_len
         cdef int aoffset = aad_offset
         cdef int alen = hlen - aoffset
-        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + 16)
+        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)  # play safe, 1 extra blk
         if not odata:
             raise MemoryError
         cdef int olen
@@ -312,11 +315,15 @@ cdef class AES256_CTR_HMAC_SHA256:
             if rc <= 0:
                 raise CryptoError('EVP_DecryptFinal_ex failed')
             offset += olen
-            self.blocks += num_aes_blocks(offset)
+            self.blocks += self.block_count(offset)
             return odata[:offset]
         finally:
             PyMem_Free(odata)
             PyBuffer_Release(&idata)
+
+    def block_count(self, length):
+        # number of cipher blocks needed for data of length bytes
+        return (length + self.cipher_blk_len - 1) // self.cipher_blk_len
 
     def set_iv(self, iv):
         self.blocks = 0  # how many AES blocks got encrypted with this IV?
@@ -346,6 +353,7 @@ cdef class _AEAD_BASE:
     cdef CIPHER cipher
     cdef EVP_CIPHER_CTX *ctx
     cdef unsigned char *enc_key
+    cdef int cipher_blk_len
     cdef int iv_len
     cdef int mac_len
     cdef unsigned char iv[12]  # XXX use self.iv_len or some MAX_IV_LEN?
@@ -376,7 +384,8 @@ cdef class _AEAD_BASE:
         cdef int hlen = len(header)
         cdef int aoffset = aad_offset
         cdef int alen = hlen - aoffset
-        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len + self.iv_len + ilen + 16)
+        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len + self.iv_len +
+                                                                  ilen + self.cipher_blk_len)
         if not odata:
             raise MemoryError
         cdef int olen
@@ -414,7 +423,7 @@ cdef class _AEAD_BASE:
             offset += olen
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_GET_TAG, self.mac_len, odata+hlen):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl GET TAG failed')
-            self.blocks += num_aes_blocks(ilen)
+            self.blocks += self.block_count(ilen)
             return odata[:offset]
         finally:
             PyMem_Free(odata)
@@ -429,7 +438,7 @@ cdef class _AEAD_BASE:
         cdef int hlen = header_len
         cdef int aoffset = aad_offset
         cdef int alen = hlen - aoffset
-        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + 16)
+        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)
         if not odata:
             raise MemoryError
         cdef int olen
@@ -464,11 +473,15 @@ cdef class _AEAD_BASE:
                 # a failure here means corrupted or tampered tag (mac) or data.
                 raise IntegrityError('Authentication / EVP_DecryptFinal_ex failed')
             offset += olen
-            self.blocks += num_aes_blocks(offset)
+            self.blocks += self.block_count(offset)
             return odata[:offset]
         finally:
             PyMem_Free(odata)
             PyBuffer_Release(&idata)
+
+    def block_count(self, length):
+        # number of cipher blocks needed for data of length bytes
+        return (length + self.cipher_blk_len - 1) // self.cipher_blk_len
 
     def set_iv(self, iv):
         self.blocks = 0  # number of cipher blocks encrypted with this IV
@@ -494,7 +507,19 @@ cdef class _AEAD_BASE:
             iv_out[i] = iv[i]
 
 
-cdef class AES256_GCM(_AEAD_BASE):
+cdef class _AES_BASE(_AEAD_BASE):
+    def __init__(self, mac_key, enc_key, iv=None):
+        self.cipher_blk_len = 16
+        super().__init__(mac_key, enc_key, iv=iv)
+
+
+cdef class _CHACHA_BASE(_AEAD_BASE):
+    def __init__(self, mac_key, enc_key, iv=None):
+        self.cipher_blk_len = 64
+        super().__init__(mac_key, enc_key, iv=iv)
+
+
+cdef class AES256_GCM(_AES_BASE):
     def __init__(self, mac_key, enc_key, iv=None):
         if OPENSSL_VERSION_NUMBER < 0x10001040:
             raise ValueError('AES GCM requires OpenSSL >= 1.0.1d. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
@@ -502,7 +527,7 @@ cdef class AES256_GCM(_AEAD_BASE):
         super().__init__(mac_key, enc_key, iv=iv)
 
 
-cdef class AES256_OCB(_AEAD_BASE):
+cdef class AES256_OCB(_AES_BASE):
     def __init__(self, mac_key, enc_key, iv=None):
         if OPENSSL_VERSION_NUMBER < 0x10100000:
             raise ValueError('AES OCB requires OpenSSL >= 1.1.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
@@ -510,7 +535,7 @@ cdef class AES256_OCB(_AEAD_BASE):
         super().__init__(mac_key, enc_key, iv=iv)
 
 
-cdef class CHACHA20_POLY1305(_AEAD_BASE):
+cdef class CHACHA20_POLY1305(_CHACHA_BASE):
     def __init__(self, mac_key, enc_key, iv=None):
         if OPENSSL_VERSION_NUMBER < 0x10100000:
             raise ValueError('CHACHA20-POLY1305 requires OpenSSL >= 1.1.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)

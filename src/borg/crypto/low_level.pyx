@@ -213,6 +213,8 @@ cdef class AES256_CTR_HMAC_SHA256:
         self.enc_key = enc_key
         if iv is not None:
             self.set_iv(iv)
+        else:
+            self.blocks = -1  # make sure set_iv is called before encrypt
 
     def __cinit__(self, mac_key, enc_key, iv=None):
         self.ctx = EVP_CIPHER_CTX_new()
@@ -227,6 +229,7 @@ cdef class AES256_CTR_HMAC_SHA256:
         encrypt data, compute mac over aad + iv + cdata, prepend header.
         aad_offset is the offset into the header where aad starts.
         """
+        assert self.blocks == 0, 'set_iv needs to be called before encrypt'
         cdef int ilen = len(data)
         cdef int hlen = len(header)
         cdef int aoffset = aad_offset
@@ -326,12 +329,14 @@ cdef class AES256_CTR_HMAC_SHA256:
         return (length + self.cipher_blk_len - 1) // self.cipher_blk_len
 
     def set_iv(self, iv):
+        # set_iv needs to be called before each encrypt() call
         assert isinstance(iv, bytes) and len(iv) == self.iv_len
         self.blocks = 0  # how many AES blocks got encrypted with this IV?
         for i in range(self.iv_len):
             self.iv[i] = iv[i]
 
     def next_iv(self):
+        # call this after encrypt() to get the next iv for the next encrypt() call
         return increment_iv(self.iv[:self.iv_len], self.blocks)
 
     cdef fetch_iv(self, unsigned char * iv_in):
@@ -368,6 +373,8 @@ cdef class _AEAD_BASE:
         self.enc_key = enc_key
         if iv is not None:
             self.set_iv(iv)
+        else:
+            self.blocks = -1  # make sure set_iv is called before encrypt
 
     def __cinit__(self, mac_key, enc_key, iv=None):
         self.ctx = EVP_CIPHER_CTX_new()
@@ -380,6 +387,7 @@ cdef class _AEAD_BASE:
         encrypt data, compute mac over aad + iv + cdata, prepend header.
         aad_offset is the offset into the header where aad starts.
         """
+        assert self.blocks == 0, 'set_iv needs to be called before encrypt'
         cdef int ilen = len(data)
         cdef int hlen = len(header)
         cdef int aoffset = aad_offset
@@ -423,7 +431,7 @@ cdef class _AEAD_BASE:
             offset += olen
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_GET_TAG, self.mac_len, odata+hlen):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl GET TAG failed')
-            self.blocks += self.block_count(ilen)
+            self.blocks = self.block_count(ilen)
             return odata[:offset]
         finally:
             PyMem_Free(odata)
@@ -473,7 +481,7 @@ cdef class _AEAD_BASE:
                 # a failure here means corrupted or tampered tag (mac) or data.
                 raise IntegrityError('Authentication / EVP_DecryptFinal_ex failed')
             offset += olen
-            self.blocks += self.block_count(offset)
+            self.blocks = self.block_count(offset)
             return odata[:offset]
         finally:
             PyMem_Free(odata)
@@ -484,12 +492,15 @@ cdef class _AEAD_BASE:
         return (length + self.cipher_blk_len - 1) // self.cipher_blk_len
 
     def set_iv(self, iv):
+        # set_iv needs to be called before each encrypt() call,
+        # because encrypt does a full initialisation of the cipher context.
         assert isinstance(iv, bytes) and len(iv) == self.iv_len
         self.blocks = 0  # number of cipher blocks encrypted with this IV
         for i in range(self.iv_len):
             self.iv[i] = iv[i]
 
     def next_iv(self):
+        # call this after encrypt() to get the next iv for the next encrypt() call
         # AES-GCM, AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit
         # (12 byte) IV we provide, thus we only need to increment the IV by 1 (and we must
         # not encrypt more than 2^32 cipher blocks with same IV):

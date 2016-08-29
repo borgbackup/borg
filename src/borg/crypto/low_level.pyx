@@ -196,13 +196,18 @@ cdef class AES256_CTR_HMAC_SHA256:
     cdef HMAC_CTX *hmac_ctx
     cdef unsigned char *mac_key
     cdef unsigned char *enc_key
-    cdef unsigned char iv[16]
+    cdef int iv_len, iv_len_short
+    cdef int mac_len
+    cdef unsigned char iv[16]  # XXX use self.iv_len or some MAX_IV_LEN?
     cdef long long blocks
 
     def __init__(self, mac_key, enc_key, iv=None):
         assert isinstance(mac_key, bytes) and len(mac_key) == 32
         assert isinstance(enc_key, bytes) and len(enc_key) == 32
-        assert iv is None or isinstance(iv, bytes) and len(iv) == 16
+        self.iv_len = 16
+        self.iv_len_short = 8
+        self.mac_len = 32
+        assert iv is None or isinstance(iv, bytes) and len(iv) == self.iv_len
         self.mac_key = mac_key
         self.enc_key = enc_key
         if iv is not None:
@@ -225,7 +230,7 @@ cdef class AES256_CTR_HMAC_SHA256:
         cdef int hlen = len(header)
         cdef int aoffset = aad_offset
         cdef int alen = hlen - aoffset
-        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + 32 + 8 + ilen + 16)
+        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len + self.iv_len_short + ilen + 16)
         if not odata:
             raise MemoryError
         cdef int olen
@@ -237,9 +242,9 @@ cdef class AES256_CTR_HMAC_SHA256:
             for i in range(hlen):
                 odata[offset+i] = header[i]
             offset += hlen
-            offset += 32
+            offset += self.mac_len
             self.store_iv(odata+offset, self.iv)
-            offset += 8
+            offset += self.iv_len_short
             rc = EVP_EncryptInit_ex(self.ctx, EVP_aes_256_ctr(), NULL, self.enc_key, self.iv)
             if not rc:
                 raise CryptoError('EVP_EncryptInit_ex failed')
@@ -251,11 +256,11 @@ cdef class AES256_CTR_HMAC_SHA256:
             if not rc:
                 raise CryptoError('EVP_EncryptFinal_ex failed')
             offset += olen
-            if not HMAC_Init_ex(self.hmac_ctx, self.mac_key, 32, EVP_sha256(), NULL):
+            if not HMAC_Init_ex(self.hmac_ctx, self.mac_key, self.mac_len, EVP_sha256(), NULL):
                 raise CryptoError('HMAC_Init_ex failed')
             if not HMAC_Update(self.hmac_ctx, <const unsigned char *> hdata.buf+aoffset, alen):
                 raise CryptoError('HMAC_Update failed')
-            if not HMAC_Update(self.hmac_ctx, odata+hlen+32, offset-hlen-32):
+            if not HMAC_Update(self.hmac_ctx, odata+hlen+self.mac_len, offset-hlen-self.mac_len):
                 raise CryptoError('HMAC_Update failed')
             if not HMAC_Final(self.hmac_ctx, odata+hlen, NULL):
                 raise CryptoError('HMAC_Final failed')
@@ -279,25 +284,27 @@ cdef class AES256_CTR_HMAC_SHA256:
             raise MemoryError
         cdef int olen
         cdef int offset
-        cdef unsigned char hmac_buf[32]
+        cdef unsigned char hmac_buf[32]  # XXX use self.mac_len or some MAX_HMAC_LEN?
         cdef Py_buffer idata = ro_buffer(envelope)
         try:
-            if not HMAC_Init_ex(self.hmac_ctx, self.mac_key, 32, EVP_sha256(), NULL):
+            if not HMAC_Init_ex(self.hmac_ctx, self.mac_key, self.mac_len, EVP_sha256(), NULL):
                 raise CryptoError('HMAC_Init_ex failed')
             if not HMAC_Update(self.hmac_ctx, <const unsigned char *> idata.buf+aoffset, alen):
                 raise CryptoError('HMAC_Update failed')
-            if not HMAC_Update(self.hmac_ctx, <const unsigned char *> idata.buf+hlen+32, ilen-hlen-32):
+            if not HMAC_Update(self.hmac_ctx, <const unsigned char *> idata.buf+hlen+self.mac_len, ilen-hlen-self.mac_len):
                 raise CryptoError('HMAC_Update failed')
             if not HMAC_Final(self.hmac_ctx, hmac_buf, NULL):
                 raise CryptoError('HMAC_Final failed')
-            if CRYPTO_memcmp(hmac_buf, idata.buf+hlen, 32):
+            if CRYPTO_memcmp(hmac_buf, idata.buf+hlen, self.mac_len):
                 raise IntegrityError('HMAC Authentication failed')
-            iv = self.fetch_iv(<unsigned char *> idata.buf+hlen+32)
+            iv = self.fetch_iv(<unsigned char *> idata.buf+hlen+self.mac_len)
             self.set_iv(iv)
             if not EVP_DecryptInit_ex(self.ctx, EVP_aes_256_ctr(), NULL, self.enc_key, iv):
                 raise CryptoError('EVP_DecryptInit_ex failed')
             offset = 0
-            rc = EVP_DecryptUpdate(self.ctx, odata+offset, &olen, <const unsigned char*> idata.buf+hlen+32+8, ilen-hlen-32-8)
+            rc = EVP_DecryptUpdate(self.ctx, odata+offset, &olen,
+                                   <const unsigned char*> idata.buf+hlen+self.mac_len+self.iv_len_short,
+                                   ilen-hlen-self.mac_len-self.iv_len_short)
             if not rc:
                 raise CryptoError('EVP_DecryptUpdate failed')
             offset += olen
@@ -313,21 +320,21 @@ cdef class AES256_CTR_HMAC_SHA256:
 
     def set_iv(self, iv):
         self.blocks = 0  # how many AES blocks got encrypted with this IV?
-        for i in range(16):
+        for i in range(self.iv_len):
             self.iv[i] = iv[i]
 
     def next_iv(self):
-        return increment_iv(self.iv[:16], self.blocks)
+        return increment_iv(self.iv[:self.iv_len], self.blocks)
 
     cdef fetch_iv(self, unsigned char * iv_in):
-        # fetch lower 8 bytes of iv and add upper 8 zero bytes
-        return b"\0" * 8 + iv_in[0:8]
+        # fetch lower self.iv_len_short bytes of iv and add upper zero bytes
+        return b'\0' * (self.iv_len - self.iv_len_short) + iv_in[0:self.iv_len_short]
 
     cdef store_iv(self, unsigned char * iv_out, unsigned char * iv):
-        # store only lower 8 bytes, upper 8 bytes are assumed to be 0
+        # store only lower self.iv_len_short bytes, upper bytes are assumed to be 0
         cdef int i
-        for i in range(8):
-            iv_out[i] = iv[8+i]
+        for i in range(self.iv_len_short):
+            iv_out[i] = iv[(self.iv_len-self.iv_len_short)+i]
 
 
 ctypedef const EVP_CIPHER * (* CIPHER)()
@@ -339,13 +346,17 @@ cdef class _AEAD_BASE:
     cdef CIPHER cipher
     cdef EVP_CIPHER_CTX *ctx
     cdef unsigned char *enc_key
-    cdef unsigned char iv[12]
+    cdef int iv_len
+    cdef int mac_len
+    cdef unsigned char iv[12]  # XXX use self.iv_len or some MAX_IV_LEN?
     cdef long long blocks
 
     def __init__(self, mac_key, enc_key, iv=None):
         assert mac_key is None
         assert isinstance(enc_key, bytes) and len(enc_key) == 32
-        assert iv is None or isinstance(iv, bytes) and len(iv) == 12
+        self.iv_len = 12
+        self.mac_len = 16
+        assert iv is None or isinstance(iv, bytes) and len(iv) == self.iv_len
         self.enc_key = enc_key
         if iv is not None:
             self.set_iv(iv)
@@ -365,7 +376,7 @@ cdef class _AEAD_BASE:
         cdef int hlen = len(header)
         cdef int aoffset = aad_offset
         cdef int alen = hlen - aoffset
-        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + 16 + 12 + ilen + 16)
+        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len + self.iv_len + ilen + 16)
         if not odata:
             raise MemoryError
         cdef int olen
@@ -377,12 +388,12 @@ cdef class _AEAD_BASE:
             for i in range(hlen):
                 odata[offset+i] = header[i]
             offset += hlen
-            offset += 16
+            offset += self.mac_len
             self.store_iv(odata+offset, self.iv)
             rc = EVP_EncryptInit_ex(self.ctx, self.cipher(), NULL, NULL, NULL)
             if not rc:
                 raise CryptoError('EVP_EncryptInit_ex failed')
-            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_SET_IVLEN, 12, NULL):
+            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_SET_IVLEN, self.iv_len, NULL):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
             rc = EVP_EncryptInit_ex(self.ctx, NULL, NULL, self.enc_key, self.iv)
             if not rc:
@@ -390,9 +401,9 @@ cdef class _AEAD_BASE:
             rc = EVP_EncryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> hdata.buf+aoffset, alen)
             if not rc:
                 raise CryptoError('EVP_EncryptUpdate failed')
-            if not EVP_EncryptUpdate(self.ctx, NULL, &olen, odata+offset, 12):
+            if not EVP_EncryptUpdate(self.ctx, NULL, &olen, odata+offset, self.iv_len):
                 raise CryptoError('EVP_EncryptUpdate failed')
-            offset += 12
+            offset += self.iv_len
             rc = EVP_EncryptUpdate(self.ctx, odata+offset, &olen, <const unsigned char*> idata.buf, ilen)
             if not rc:
                 raise CryptoError('EVP_EncryptUpdate failed')
@@ -401,7 +412,7 @@ cdef class _AEAD_BASE:
             if not rc:
                 raise CryptoError('EVP_EncryptFinal_ex failed')
             offset += olen
-            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_GET_TAG, 16, odata+hlen):
+            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_GET_TAG, self.mac_len, odata+hlen):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl GET TAG failed')
             self.blocks += num_aes_blocks(ilen)
             return odata[:offset]
@@ -427,21 +438,24 @@ cdef class _AEAD_BASE:
         try:
             if not EVP_DecryptInit_ex(self.ctx, self.cipher(), NULL, NULL, NULL):
                 raise CryptoError('EVP_DecryptInit_ex failed')
-            iv = self.fetch_iv(<unsigned char *> idata.buf+hlen+16)
+            iv = self.fetch_iv(<unsigned char *> idata.buf+hlen+self.mac_len)
             self.set_iv(iv)
-            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_SET_IVLEN, 12, NULL):
+            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_SET_IVLEN, self.iv_len, NULL):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
             if not EVP_DecryptInit_ex(self.ctx, NULL, NULL, self.enc_key, iv):
                 raise CryptoError('EVP_DecryptInit_ex failed')
-            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_SET_TAG, 16, <void *> idata.buf+hlen):
+            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_SET_TAG, self.mac_len, <void *> idata.buf+hlen):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET TAG failed')
             rc = EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> idata.buf+aoffset, alen)
             if not rc:
                 raise CryptoError('EVP_DecryptUpdate failed')
-            if not EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> idata.buf+hlen+16, 12):
+            if not EVP_DecryptUpdate(self.ctx, NULL, &olen,
+                                     <const unsigned char*> idata.buf+hlen+self.mac_len, self.iv_len):
                 raise CryptoError('EVP_DecryptUpdate failed')
             offset = 0
-            rc = EVP_DecryptUpdate(self.ctx, odata+offset, &olen, <const unsigned char*> idata.buf+hlen+16+12, ilen-hlen-16-12)
+            rc = EVP_DecryptUpdate(self.ctx, odata+offset, &olen,
+                                   <const unsigned char*> idata.buf+hlen+self.mac_len+self.iv_len,
+                                   ilen-hlen-self.mac_len-self.iv_len)
             if not rc:
                 raise CryptoError('EVP_DecryptUpdate failed')
             offset += olen
@@ -458,24 +472,24 @@ cdef class _AEAD_BASE:
 
     def set_iv(self, iv):
         self.blocks = 0  # number of cipher blocks encrypted with this IV
-        for i in range(12):
+        for i in range(self.iv_len):
             self.iv[i] = iv[i]
 
     def next_iv(self):
         assert self.blocks < 2**32
         # we need 16 bytes for increment_iv:
-        last_iv = b'\0\0\0\0' + self.iv[:12]
+        last_iv = b'\0' * (16 - self.iv_len) + self.iv[:self.iv_len]
         # gcm mode is special: it appends a internal 32bit counter to the 96bit (12 byte) we provide, thus we only
         # need to increment the 96bit counter by 1 (and we must not encrypt more than 2^32 AES blocks with same IV):
         next_iv = increment_iv(last_iv, 1)
-        return next_iv[-12:]
+        return next_iv[-self.iv_len:]
 
     cdef fetch_iv(self, unsigned char * iv_in):
-        return iv_in[0:12]
+        return iv_in[0:self.iv_len]
 
     cdef store_iv(self, unsigned char * iv_out, unsigned char * iv):
         cdef int i
-        for i in range(12):
+        for i in range(self.iv_len):
             iv_out[i] = iv[i]
 
 

@@ -224,12 +224,14 @@ cdef class AES256_CTR_HMAC_SHA256:
         EVP_CIPHER_CTX_free(self.ctx)
         HMAC_CTX_free(self.hmac_ctx)
 
-    def encrypt(self, data, header=b'', aad_offset=0):
+    def encrypt(self, data, header=b'', aad_offset=0, iv=None):
         """
         encrypt data, compute mac over aad + iv + cdata, prepend header.
         aad_offset is the offset into the header where aad starts.
         """
-        assert self.blocks == 0, 'set_iv needs to be called before encrypt'
+        if iv is not None:
+            self.set_iv(iv)
+        assert self.blocks == 0, 'iv needs to be set before encrypt is called'
         cdef int ilen = len(data)
         cdef int hlen = len(header)
         cdef int aoffset = aad_offset
@@ -382,12 +384,14 @@ cdef class _AEAD_BASE:
     def __dealloc__(self):
         EVP_CIPHER_CTX_free(self.ctx)
 
-    def encrypt(self, data, header=b'', aad_offset=0):
+    def encrypt(self, data, header=b'', aad_offset=0, iv=None):
         """
         encrypt data, compute mac over aad + iv + cdata, prepend header.
         aad_offset is the offset into the header where aad starts.
         """
-        assert self.blocks == 0, 'set_iv needs to be called before encrypt'
+        if iv is not None:
+            self.set_iv(iv)
+        assert self.blocks == 0, 'iv needs to be set before encrypt is called'
         cdef int ilen = len(data)
         cdef int hlen = len(header)
         cdef int aoffset = aad_offset

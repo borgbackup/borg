@@ -199,14 +199,14 @@ cdef class AES256_CTR_HMAC_SHA256:
     cdef int cipher_blk_len
     cdef int iv_len, iv_len_short
     cdef int mac_len
-    cdef unsigned char iv[16]  # XXX use self.iv_len or some MAX_IV_LEN?
+    cdef unsigned char iv[16]
     cdef long long blocks
 
     def __init__(self, mac_key, enc_key, iv=None):
         assert isinstance(mac_key, bytes) and len(mac_key) == 32
         assert isinstance(enc_key, bytes) and len(enc_key) == 32
         self.cipher_blk_len = 16
-        self.iv_len = 16
+        self.iv_len = sizeof(self.iv)
         self.iv_len_short = 8
         self.mac_len = 32
         self.mac_key = mac_key
@@ -286,7 +286,8 @@ cdef class AES256_CTR_HMAC_SHA256:
             raise MemoryError
         cdef int olen
         cdef int offset
-        cdef unsigned char hmac_buf[32]  # XXX use self.mac_len or some MAX_HMAC_LEN?
+        cdef unsigned char hmac_buf[32]
+        assert sizeof(hmac_buf) == self.mac_len
         cdef Py_buffer idata = ro_buffer(envelope)
         try:
             if not HMAC_Init_ex(self.hmac_ctx, self.mac_key, self.mac_len, EVP_sha256(), NULL):
@@ -356,13 +357,13 @@ cdef class _AEAD_BASE:
     cdef int cipher_blk_len
     cdef int iv_len
     cdef int mac_len
-    cdef unsigned char iv[12]  # XXX use self.iv_len or some MAX_IV_LEN?
+    cdef unsigned char iv[12]
     cdef long long blocks
 
     def __init__(self, mac_key, enc_key, iv=None):
         assert mac_key is None
         assert isinstance(enc_key, bytes) and len(enc_key) == 32
-        self.iv_len = 12
+        self.iv_len = sizeof(self.iv)
         self.mac_len = 16
         self.enc_key = enc_key
         if iv is not None:

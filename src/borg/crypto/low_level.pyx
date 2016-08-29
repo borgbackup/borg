@@ -476,11 +476,12 @@ cdef class _AEAD_BASE:
             self.iv[i] = iv[i]
 
     def next_iv(self):
+        # AES-GCM, AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit
+        # (12 byte) IV we provide, thus we only need to increment the IV by 1 (and we must
+        # not encrypt more than 2^32 cipher blocks with same IV):
         assert self.blocks < 2**32
         # we need 16 bytes for increment_iv:
         last_iv = b'\0' * (16 - self.iv_len) + self.iv[:self.iv_len]
-        # gcm mode is special: it appends a internal 32bit counter to the 96bit (12 byte) we provide, thus we only
-        # need to increment the 96bit counter by 1 (and we must not encrypt more than 2^32 AES blocks with same IV):
         next_iv = increment_iv(last_iv, 1)
         return next_iv[-self.iv_len:]
 

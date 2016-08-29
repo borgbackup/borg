@@ -29,8 +29,8 @@ from .helpers import uid2user, user2uid, gid2group, group2gid
 from .helpers import parse_timestamp, to_localtime
 from .helpers import format_time, format_timedelta, format_file_size, file_status
 from .helpers import safe_encode, safe_decode, make_path_safe, remove_surrogates
-from .helpers import decode_dict, StableDict
-from .helpers import int_to_bigint, bigint_to_int, bin_to_hex
+from .helpers import StableDict
+from .helpers import bin_to_hex
 from .helpers import ProgressIndicatorPercent, log_multi
 from .helpers import PathPrefixPattern, FnmatchPattern
 from .helpers import consume
@@ -966,44 +966,37 @@ class RobustUnpacker:
 
 
 class ArchiveChecker:
+    def __init__(self, args, repository):
+        self.args = args
+        self.repository = repository
 
-    def __init__(self):
         self.error_found = False
         self.possibly_superseded = set()
 
-    def check(self, repository, repair=False, archive=None, last=None, prefix=None, verify_data=False,
-              save_space=False):
-        """Perform a set of checks on 'repository'
-
-        :param repair: enable repair mode, write updated or corrected data into repository
-        :param archive: only check this archive
-        :param last: only check this number of recent archives
-        :param prefix: only check archives with this prefix
-        :param verify_data: integrity verification of data referenced by archives
-        :param save_space: Repository.commit(save_space)
-        """
-        logger.info('Starting archive consistency check...')
-        self.check_all = archive is None and last is None and prefix is None
-        self.repair = repair
-        self.repository = repository
-        self.init_chunks()
-        self.key = self.identify_key(repository)
-        if verify_data:
-            self.verify_data()
+        self.chunks = self.init_chunks()
+        self.key = self.identify_key(self.repository)
         if Manifest.MANIFEST_ID not in self.chunks:
             logger.error("Repository manifest not found!")
             self.error_found = True
             self.manifest = self.rebuild_manifest()
         else:
-            self.manifest, _ = Manifest.load(repository, key=self.key)
-        self.rebuild_refcounts(archive=archive, last=last, prefix=prefix)
-        self.orphan_chunks_check()
-        self.finish(save_space=save_space)
-        if self.error_found:
-            logger.error('Archive consistency check complete, problems found.')
-        else:
-            logger.info('Archive consistency check complete, no problems found.')
-        return self.repair or not self.error_found
+            self.manifest, _ = Manifest.load(self.repository, key=self.key)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None and self.args.repair:
+            self.manifest.write()
+            self.repository.commit(save_space=self.args.save_space)
+
+    def check(self, archive_info):
+        """Perform a set of checks on 'repository'
+
+        :param archive_info: check this archive
+        :type archive_info: :class:`borg.helpers.ArchiveInfo`
+        """
+        self.rebuild_refcounts(archive_info)
 
     def init_chunks(self):
         """Fetch a list of all object keys from repository
@@ -1011,7 +1004,7 @@ class ArchiveChecker:
         # Explicitly set the initial hash table capacity to avoid performance issues
         # due to hash table "resonance"
         capacity = int(len(self.repository) * 1.35 + 1)  # > len * 1.0 / HASH_MAX_LOAD (see _hashindex.c)
-        self.chunks = ChunkIndex(capacity)
+        chunks = ChunkIndex(capacity)
         marker = None
         while True:
             result = self.repository.list(limit=10000, marker=marker)
@@ -1020,7 +1013,8 @@ class ArchiveChecker:
             marker = result[-1]
             init_entry = ChunkIndexEntry(refcount=0, size=0, csize=0)
             for id_ in result:
-                self.chunks[id_] = init_entry
+                chunks[id_] = init_entry
+        return chunks
 
     def identify_key(self, repository):
         try:
@@ -1041,7 +1035,6 @@ class ArchiveChecker:
             try:
                 encrypted_data = self.repository.get(chunk_id)
             except Repository.ObjectNotFound:
-                self.error_found = True
                 errors += 1
                 logger.error('chunk %s not found', bin_to_hex(chunk_id))
                 continue
@@ -1049,12 +1042,12 @@ class ArchiveChecker:
                 _chunk_id = None if chunk_id == Manifest.MANIFEST_ID else chunk_id
                 _, data = self.key.decrypt(_chunk_id, encrypted_data)
             except IntegrityError as integrity_error:
-                self.error_found = True
                 errors += 1
                 logger.error('chunk %s, integrity error: %s', bin_to_hex(chunk_id), integrity_error)
         pi.finish()
         log = logger.error if errors else logger.info
         log('Finished cryptographic data integrity verification, verified %d chunks with %d integrity errors.', count, errors)
+        self.error_found |= bool(errors)
 
     def rebuild_manifest(self):
         """Rebuild the manifest object if it is missing
@@ -1097,10 +1090,11 @@ class ArchiveChecker:
         logger.info('Manifest rebuild complete.')
         return manifest
 
-    def rebuild_refcounts(self, archive=None, last=None, prefix=None):
+    def rebuild_refcounts(self, archive_info):
         """Rebuild object reference counts by walking the metadata
 
         Missing and/or incorrect data is repaired when detected
+        :type archive_info: :class:`borg.helpers.ArchiveInfo`
         """
         # Exclude the manifest from chunks
         del self.chunks[Manifest.MANIFEST_ID]
@@ -1121,7 +1115,7 @@ class ArchiveChecker:
             except KeyError:
                 assert cdata is not None
                 self.chunks[id_] = ChunkIndexEntry(refcount=1, size=size, csize=csize)
-                if self.repair:
+                if self.args.repair:
                     self.repository.put(id_, cdata)
 
         def verify_file_chunks(item):
@@ -1230,73 +1224,45 @@ class ArchiveChecker:
                         raise
                     i += 1
 
-        if archive is None:
-            # we need last N or all archives
-            archive_infos = self.manifest.archives.list(sort_by='ts', reverse=True)
-            if prefix is not None:
-                archive_infos = [info for info in archive_infos if info.name.startswith(prefix)]
-            num_archives = len(archive_infos)
-            end = None if last is None else min(num_archives, last)
-        else:
-            # we only want one specific archive
-            info = self.manifest.archives.get(archive)
-            if info is None:
-                logger.error("Archive '%s' not found.", archive)
-                archive_infos = []
-            else:
-                archive_infos = [info]
-            num_archives = 1
-            end = 1
-
         with cache_if_remote(self.repository) as repository:
-            for i, info in enumerate(archive_infos[:end]):
-                logger.info('Analyzing archive {} ({}/{})'.format(info.name, num_archives - i, num_archives))
-                archive_id = info.id
-                if archive_id not in self.chunks:
-                    logger.error('Archive metadata block is missing!')
-                    self.error_found = True
-                    del self.manifest.archives[info.name]
-                    continue
-                mark_as_possibly_superseded(archive_id)
-                cdata = self.repository.get(archive_id)
-                _, data = self.key.decrypt(archive_id, cdata)
-                archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
-                if archive.version != 1:
-                    raise Exception('Unknown archive metadata version')
-                archive.cmdline = [safe_decode(arg) for arg in archive.cmdline]
-                items_buffer = ChunkBuffer(self.key)
-                items_buffer.write_chunk = add_callback
-                for item in robust_iterator(archive):
-                    if 'chunks' in item:
-                        verify_file_chunks(item)
-                    items_buffer.add(item)
-                items_buffer.flush(flush=True)
-                for previous_item_id in archive.items:
-                    mark_as_possibly_superseded(previous_item_id)
-                archive.items = items_buffer.chunks
-                data = msgpack.packb(archive.as_dict(), unicode_errors='surrogateescape')
-                new_archive_id = self.key.id_hash(data)
-                cdata = self.key.encrypt(Chunk(data))
-                add_reference(new_archive_id, len(data), len(cdata), cdata)
-                self.manifest.archives[info.name] = (new_archive_id, info.ts)
+            archive_id = archive_info.id
+            if archive_id not in self.chunks:
+                logger.error('Archive metadata block is missing!')
+                self.error_found = True
+                del self.manifest.archives[archive_info.name]
+                return
+            mark_as_possibly_superseded(archive_id)
+            cdata = self.repository.get(archive_id)
+            _, data = self.key.decrypt(archive_id, cdata)
+            archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
+            if archive.version != 1:
+                raise Exception('Unknown archive metadata version')
+            archive.cmdline = [safe_decode(arg) for arg in archive.cmdline]
+            items_buffer = ChunkBuffer(self.key)
+            items_buffer.write_chunk = add_callback
+            for item in robust_iterator(archive):
+                if 'chunks' in item:
+                    verify_file_chunks(item)
+                items_buffer.add(item)
+            items_buffer.flush(flush=True)
+            for previous_item_id in archive.items:
+                mark_as_possibly_superseded(previous_item_id)
+            archive.items = items_buffer.chunks
+            data = msgpack.packb(archive.as_dict(), unicode_errors='surrogateescape')
+            new_archive_id = self.key.id_hash(data)
+            cdata = self.key.encrypt(Chunk(data))
+            add_reference(new_archive_id, len(data), len(cdata), cdata)
+            self.manifest.archives[archive_info.name] = (new_archive_id, archive_info.ts)
 
     def orphan_chunks_check(self):
-        if self.check_all:
-            unused = {id_ for id_, entry in self.chunks.iteritems() if entry.refcount == 0}
-            orphaned = unused - self.possibly_superseded
-            if orphaned:
-                logger.error('{} orphaned objects found!'.format(len(orphaned)))
-                self.error_found = True
-            if self.repair:
-                for id_ in unused:
-                    self.repository.delete(id_)
-        else:
-            logger.info('Orphaned objects check skipped (needs all archives checked).')
-
-    def finish(self, save_space=False):
-        if self.repair:
-            self.manifest.write()
-            self.repository.commit(save_space=save_space)
+        unused = {id_ for id_, entry in self.chunks.iteritems() if entry.refcount == 0}
+        orphaned = unused - self.possibly_superseded
+        if orphaned:
+            logger.error('{} orphaned objects found!'.format(len(orphaned)))
+            self.error_found = True
+        if self.args.repair:
+            for id_ in unused:
+                self.repository.delete(id_)
 
 
 class ArchiveRecreater:

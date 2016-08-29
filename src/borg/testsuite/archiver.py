@@ -57,6 +57,9 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
         except subprocess.CalledProcessError as e:
             output = e.output
             ret = e.returncode
+        except SystemExit as e:
+            output = ''
+            ret = e.code
         return ret, os.fsdecode(output)
     else:
         stdin, stdout, stderr = sys.stdin, sys.stdout, sys.stderr
@@ -959,6 +962,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert 'All archives:' in info_repo
         info_archive = self.cmd('info', self.repository_location + '::test')
         assert 'Archive name: test\n' in info_archive
+        info_archive = self.cmd('info', '--first', '1', self.repository_location)
+        assert 'Archive name: test\n' in info_archive
 
     def test_comment(self):
         self.create_regular_file('file1', size=1024 * 80)
@@ -985,8 +990,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
         self.cmd('create', self.repository_location + '::test.2', 'input')
+        self.cmd('create', self.repository_location + '::test.3', 'input')
+        self.cmd('create', self.repository_location + '::another_test.1', 'input')
+        self.cmd('create', self.repository_location + '::another_test.2', 'input')
         self.cmd('extract', '--dry-run', self.repository_location + '::test')
         self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
+        self.cmd('delete', '--prefix', 'another_', self.repository_location)
+        self.cmd('delete', '--last', '1', self.repository_location)
         self.cmd('delete', self.repository_location + '::test')
         self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
         output = self.cmd('delete', '--stats', self.repository_location + '::test.2')
@@ -1794,6 +1804,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_not_in("input/file1", output)
         self.assert_not_in("x input/file5", output)
 
+    def test_bad_filters(self):
+        self.cmd('init', self.repository_location)
+        self.cmd('delete', '--last', '1', self.repository_location, exit_code=2)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('delete', '--first', '1', '--last', '1', self.repository_location, fork=True, exit_code=2)
+        self.cmd('delete', '--last', '1', self.repository_location + '::test', exit_code=2)
+
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
 class ArchiverTestCaseBinary(ArchiverTestCase):
@@ -1839,21 +1856,26 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             self.create_src_archive('archive2')
 
     def test_check_usage(self):
-        output = self.cmd('check', '-v', '--progress', self.repository_location, exit_code=0)
+        output = self.cmd('check', '-v', '--progress', self.repository_location)
         self.assert_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)
         self.assert_in('Checking segments', output)
         # reset logging to new process default to avoid need for fork=True on next check
         logging.getLogger('borg.output.progress').setLevel(logging.NOTSET)
-        output = self.cmd('check', '-v', '--repository-only', self.repository_location, exit_code=0)
+        output = self.cmd('check', '-v', '--repository-only', self.repository_location)
         self.assert_in('Starting repository check', output)
         self.assert_not_in('Starting archive consistency check', output)
         self.assert_not_in('Checking segments', output)
-        output = self.cmd('check', '-v', '--archives-only', self.repository_location, exit_code=0)
+        output = self.cmd('check', '-v', '--archives-only', self.repository_location)
         self.assert_not_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)
-        output = self.cmd('check', '-v', '--archives-only', '--prefix=archive2', self.repository_location, exit_code=0)
+        output = self.cmd('check', '--repository-only', '--verify-data', self.repository_location, exit_code=2)
+        self.assert_in('contradicts', output)
+        output = self.cmd('check', '-v', '--archives-only', '--prefix=archive2', self.repository_location)
         self.assert_not_in('archive1', output)
+        output = self.cmd('check', '-v', self.repository_location + '::archive1')
+        self.assert_in('Starting archive consistency check', output)
+        self.assert_not_in('archive2', output)
 
     def test_missing_file_chunk(self):
         archive, repository = self.open_archive('archive1')

@@ -706,8 +706,6 @@ class Repository:
         return not error_found or repair
 
     def rollback(self, cleanup=False):
-        """
-        """
         if cleanup:
             self.io.cleanup(self.io.get_segments_transaction_id())
         self.index = None

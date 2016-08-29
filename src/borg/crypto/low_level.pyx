@@ -508,15 +508,15 @@ cdef class _AEAD_BASE:
 
 
 cdef class _AES_BASE(_AEAD_BASE):
-    def __init__(self, mac_key, enc_key, iv=None):
+    def __init__(self, *args, **kwargs):
         self.cipher_blk_len = 16
-        super().__init__(mac_key, enc_key, iv=iv)
+        super().__init__(*args, **kwargs)
 
 
 cdef class _CHACHA_BASE(_AEAD_BASE):
-    def __init__(self, mac_key, enc_key, iv=None):
+    def __init__(self, *args, **kwargs):
         self.cipher_blk_len = 64
-        super().__init__(mac_key, enc_key, iv=iv)
+        super().__init__(*args, **kwargs)
 
 
 cdef class AES256_GCM(_AES_BASE):

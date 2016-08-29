@@ -209,7 +209,6 @@ cdef class AES256_CTR_HMAC_SHA256:
         self.iv_len = 16
         self.iv_len_short = 8
         self.mac_len = 32
-        assert iv is None or isinstance(iv, bytes) and len(iv) == self.iv_len
         self.mac_key = mac_key
         self.enc_key = enc_key
         if iv is not None:
@@ -326,6 +325,7 @@ cdef class AES256_CTR_HMAC_SHA256:
         return (length + self.cipher_blk_len - 1) // self.cipher_blk_len
 
     def set_iv(self, iv):
+        assert isinstance(iv, bytes) and len(iv) == self.iv_len
         self.blocks = 0  # how many AES blocks got encrypted with this IV?
         for i in range(self.iv_len):
             self.iv[i] = iv[i]
@@ -364,7 +364,6 @@ cdef class _AEAD_BASE:
         assert isinstance(enc_key, bytes) and len(enc_key) == 32
         self.iv_len = 12
         self.mac_len = 16
-        assert iv is None or isinstance(iv, bytes) and len(iv) == self.iv_len
         self.enc_key = enc_key
         if iv is not None:
             self.set_iv(iv)
@@ -484,6 +483,7 @@ cdef class _AEAD_BASE:
         return (length + self.cipher_blk_len - 1) // self.cipher_blk_len
 
     def set_iv(self, iv):
+        assert isinstance(iv, bytes) and len(iv) == self.iv_len
         self.blocks = 0  # number of cipher blocks encrypted with this IV
         for i in range(self.iv_len):
             self.iv[i] = iv[i]

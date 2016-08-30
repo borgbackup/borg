@@ -590,7 +590,7 @@ class KeyfileKeyBase(AESKeyBase):
         assert enc_key.version == 1
         assert enc_key.algorithm == 'sha256'
         key = passphrase.kdf(enc_key.salt, enc_key.iterations, 32)
-        data = AES(is_encrypt=False, key=key).decrypt(enc_key.data)
+        data = AES(key, b'\0'*16).decrypt(enc_key.data)
         if hmac_sha256(key, data) == enc_key.hash:
             return data
 
@@ -599,7 +599,7 @@ class KeyfileKeyBase(AESKeyBase):
         iterations = PBKDF2_ITERATIONS
         key = passphrase.kdf(salt, iterations, 32)
         hash = hmac_sha256(key, data)
-        cdata = AES(is_encrypt=True, key=key).encrypt(data)
+        cdata = AES(key, b'\0'*16).encrypt(data)
         enc_key = EncryptedKey(
             version=1,
             salt=salt,

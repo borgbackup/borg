@@ -358,7 +358,7 @@ class AESKeyBase(KeyBase):
 
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)
-        self.nonce_manager.ensure_reservation(num_aes_blocks(len(data)))
+        self.nonce_manager.ensure_reservation(self.cipher.block_count(len(data)))
         return self.cipher.encrypt(data, header=self.TYPE_STR, aad_offset=1)
 
     def decrypt(self, id, data, decompress=True):

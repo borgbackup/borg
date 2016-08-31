@@ -189,6 +189,42 @@ cdef Py_buffer ro_buffer(object data) except *:
     return view
 
 
+class UNENCRYPTED:
+    # Layout: HEADER + PlainText
+
+    def __init__(self, mac_key, enc_key, iv=None):
+        assert mac_key is None
+        assert enc_key is None
+        self.set_iv(iv)
+
+    def encrypt(self, data, header=b'', aad_offset=0, iv=None):
+        """
+        IMPORTANT: it is called encrypt to satisfy the crypto api naming convention,
+        but this does NOT encrypt and it does NOT compute and store a MAC either.
+        """
+        if iv is not None:
+            self.set_iv(iv)
+        assert self.iv is not None, 'iv needs to be set before encrypt is called'
+        return header + data
+
+    def decrypt(self, envelope, header_len=0, aad_offset=0):
+        """
+        IMPORTANT: it is called decrypt to satisfy the crypto api naming convention,
+        but this does NOT decrypt and it does NOT verify a MAC either, because data
+        is not encrypted and there is no MAC.
+        """
+        return memoryview(envelope)[header_len:]
+
+    def block_count(self, length):
+        return 0
+
+    def set_iv(self, iv):
+        self.iv = iv
+
+    def next_iv(self):
+        return self.iv
+
+
 cdef class AES256_CTR_HMAC_SHA256:
     # Layout: HEADER + HMAC 32 + IV 8 + CT (same as attic / borg < 1.2 IF HEADER = TYPE_BYTE, no AAD)
 

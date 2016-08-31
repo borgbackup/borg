@@ -1,6 +1,6 @@
 from binascii import hexlify, unhexlify
 
-from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_GCM, AES256_OCB, CHACHA20_POLY1305, \
+from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_GCM, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, \
                      IntegrityError, hmac_sha256, blake2b_256, openssl10
 from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes, bytes16_to_int, int_to_bytes16, increment_iv
 from ..crypto.low_level import hkdf_hmac_sha512
@@ -40,6 +40,16 @@ class CryptoTestCase(BaseTestCase):
         self.assert_equal(increment_iv(iva, 1), ivb)
         self.assert_equal(increment_iv(iva, 2), ivc)
         self.assert_equal(increment_iv(iv0, 2**64), ivb)
+
+    def test_UNENCRYPTED(self):
+        iv = b''  # any IV is ok, it just must be set and not None
+        data = b'data'
+        header = b'header'
+        cs = UNENCRYPTED(None, None, iv)
+        envelope = cs.encrypt(data, header=header)
+        self.assert_equal(envelope, header + data)
+        got_data = cs.decrypt(envelope, header_len=len(header))
+        self.assert_equal(got_data, data)
 
     def test_AES256_CTR_HMAC_SHA256(self):
         # this tests the layout as in attic / borg < 1.2 (1 type byte, no aad)

@@ -182,15 +182,15 @@ class FuseOperations(llfuse.Operations):
         if name:
             self.contents[parent][name] = inode
 
-    def process_inner(self, name, parent):
-        if name in self.contents[parent]:
-            parent = self.contents[parent][name]
+    def process_inner(self, name, parent_inode):
+        dir = self.contents[parent_inode]
+        if name in dir:
+            inode = dir[name]
         else:
-            inode = self._create_dir(parent)
+            inode = self._create_dir(parent_inode)
             if name:
-                self.contents[parent][name] = inode
-            parent = inode
-        return parent
+                dir[name] = inode
+        return inode
 
     def allocate_inode(self):
         self._inode_count += 1

@@ -654,14 +654,14 @@ def replace_placeholders(text):
     }
     return format_line(text, data)
 
-prefix_spec = replace_placeholders
+PrefixSpec = replace_placeholders
 
 
 HUMAN_SORT_KEYS = ['timestamp'] + list(ArchiveInfo._fields)
 HUMAN_SORT_KEYS.remove('ts')
 
 
-def sort_by_spec(text):
+def SortBySpec(text):
     for token in text.split(','):
         if token not in HUMAN_SORT_KEYS:
             raise ValueError('Invalid sort key: %s' % token)

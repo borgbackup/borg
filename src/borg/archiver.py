@@ -30,7 +30,7 @@ from .constants import *  # NOQA
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError
 from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
-from .helpers import prefix_spec, sort_by_spec, HUMAN_SORT_KEYS
+from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter, format_time, format_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex
 from .helpers import prune_within, prune_split
@@ -1656,7 +1656,7 @@ class Archiver:
         subparser.add_argument('--last', dest='last',
                                type=int, default=None, metavar='N',
                                help='only check last N archives (Default: all)')
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=prefix_spec,
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec,
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('-p', '--progress', dest='progress',
                                action='store_true', default=False,
@@ -2213,7 +2213,7 @@ class Archiver:
                                help='number of monthly archives to keep')
         subparser.add_argument('-y', '--keep-yearly', dest='yearly', type=int, default=0,
                                help='number of yearly archives to keep')
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=prefix_spec,
+        subparser.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec,
                                help='only consider archive names starting with this prefix')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
@@ -2606,19 +2606,19 @@ class Archiver:
     @staticmethod
     def add_archives_filters_args(subparser):
         filters_group = subparser.add_argument_group('filters', 'Archive filters can be applied to repository targets.')
-        filters_group.add_argument('-P', '--prefix', dest='prefix', type=prefix_spec, default='',
+        filters_group.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec, default='',
                                    help='only consider archive names starting with this prefix')
 
         sort_by_default = 'timestamp'
-        filters_group.add_argument('--sort-by', dest='sort_by', type=sort_by_spec, default=sort_by_default,
-                               help='Comma-separated list of sorting keys; valid keys are: {}; default is: {}'
-                               .format(', '.join(HUMAN_SORT_KEYS), sort_by_default))
+        filters_group.add_argument('--sort-by', dest='sort_by', type=SortBySpec, default=sort_by_default,
+                                   help='Comma-separated list of sorting keys; valid keys are: {}; default is: {}'
+                                   .format(', '.join(HUMAN_SORT_KEYS), sort_by_default))
 
         group = filters_group.add_mutually_exclusive_group()
         group.add_argument('--first', dest='first', metavar='N', default=0, type=int,
-                           help='select first N archives')
+                           help='consider first N archives after other filter args were applied')
         group.add_argument('--last', dest='last', metavar='N', default=0, type=int,
-                           help='delete last N archives')
+                           help='consider last N archives after other filter args were applied')
 
     def get_args(self, argv, cmd):
         """usually, just returns argv, except if we deal with a ssh forced command for borg serve."""

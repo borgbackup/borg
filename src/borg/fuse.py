@@ -145,8 +145,7 @@ class FuseOperations(llfuse.Operations):
                         # This can happen if an archive was created with a command line like
                         # $ borg create ... dir1/file dir1
                         # In this case the code below will have created a default_dir inode for dir1 already.
-                        path = safe_encode(item.path)
-                        inode = self._find_inode(path, prefix)
+                        inode = self._find_inode(item.path, prefix)
                     except KeyError:
                         pass
                     else:

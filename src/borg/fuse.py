@@ -153,13 +153,10 @@ class FuseOperations(llfuse.Operations):
                         continue
                 segments = prefix + os.fsencode(os.path.normpath(item.path)).split(b'/')
                 del item.path
-                num_segments = len(segments)
                 parent = 1
-                for i, segment in enumerate(segments, 1):
-                    if i == num_segments:
-                        self.process_leaf(segment, item, parent, prefix, is_dir)
-                    else:
-                        parent = self.process_inner(segment, parent)
+                for segment in segments[:-1]:
+                    parent = self.process_inner(segment, parent)
+                self.process_leaf(segments[-1], item, parent, prefix, is_dir)
 
     def process_leaf(self, name, item, parent, prefix, is_dir):
         def version_name(name, item):

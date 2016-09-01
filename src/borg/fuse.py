@@ -140,20 +140,18 @@ class FuseOperations(llfuse.Operations):
             for item in unpacker:
                 item = Item(internal_dict=item)
                 is_dir = stat.S_ISDIR(item.mode)
-                try:
-                    # This can happen if an archive was created with a command line like
-                    # $ borg create ... dir1/file dir1
-                    # In this case the code below will have created a default_dir inode for dir1 already.
-                    path = safe_encode(item.path)
-                    if not is_dir:
-                        # not a directory -> no lookup needed
-                        raise KeyError
-                    inode = self._find_inode(path, prefix)
-                except KeyError:
-                    pass
-                else:
-                    self.items[inode] = item
-                    continue
+                if is_dir:
+                    try:
+                        # This can happen if an archive was created with a command line like
+                        # $ borg create ... dir1/file dir1
+                        # In this case the code below will have created a default_dir inode for dir1 already.
+                        path = safe_encode(item.path)
+                        inode = self._find_inode(path, prefix)
+                    except KeyError:
+                        pass
+                    else:
+                        self.items[inode] = item
+                        continue
                 segments = prefix + os.fsencode(os.path.normpath(item.path)).split(b'/')
                 del item.path
                 num_segments = len(segments)

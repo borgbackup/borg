@@ -173,9 +173,7 @@ class FuseOperations(llfuse.Operations):
         if self.versions and not is_dir:
             parent = self.process_inner(name, parent)
             name = version_name(name, item)
-        self.process_real_leaf(name, item, parent, prefix)
 
-    def process_real_leaf(self, name, item, parent, prefix):
         if 'source' in item and stat.S_ISREG(item.mode):
             inode = self._find_inode(item.source, prefix)
             item = self.cache.get(inode)

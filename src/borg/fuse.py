@@ -140,29 +140,23 @@ class FuseOperations(llfuse.Operations):
             for item in unpacker:
                 item = Item(internal_dict=item)
                 is_dir = stat.S_ISDIR(item.mode)
-                try:
-                    # This can happen if an archive was created with a command line like
-                    # $ borg create ... dir1/file dir1
-                    # In this case the code below will have created a default_dir inode for dir1 already.
-                    path = safe_encode(item.path)
-                    if not is_dir:
-                        # not a directory -> no lookup needed
-                        raise KeyError
-                    inode = self._find_inode(path, prefix)
-                except KeyError:
-                    pass
-                else:
-                    self.items[inode] = item
-                    continue
+                if is_dir:
+                    try:
+                        # This can happen if an archive was created with a command line like
+                        # $ borg create ... dir1/file dir1
+                        # In this case the code below will have created a default_dir inode for dir1 already.
+                        inode = self._find_inode(item.path, prefix)
+                    except KeyError:
+                        pass
+                    else:
+                        self.items[inode] = item
+                        continue
                 segments = prefix + os.fsencode(os.path.normpath(item.path)).split(b'/')
                 del item.path
-                num_segments = len(segments)
                 parent = 1
-                for i, segment in enumerate(segments, 1):
-                    if i == num_segments:
-                        self.process_leaf(segment, item, parent, prefix, is_dir)
-                    else:
-                        parent = self.process_inner(segment, parent)
+                for segment in segments[:-1]:
+                    parent = self.process_inner(segment, parent)
+                self.process_leaf(segments[-1], item, parent, prefix, is_dir)
 
     def process_leaf(self, name, item, parent, prefix, is_dir):
         def version_name(name, item):
@@ -176,9 +170,7 @@ class FuseOperations(llfuse.Operations):
         if self.versions and not is_dir:
             parent = self.process_inner(name, parent)
             name = version_name(name, item)
-        self.process_real_leaf(name, item, parent, prefix)
 
-    def process_real_leaf(self, name, item, parent, prefix):
         if 'source' in item and stat.S_ISREG(item.mode):
             inode = self._find_inode(item.source, prefix)
             item = self.cache.get(inode)
@@ -190,15 +182,15 @@ class FuseOperations(llfuse.Operations):
         if name:
             self.contents[parent][name] = inode
 
-    def process_inner(self, name, parent):
-        if name in self.contents[parent]:
-            parent = self.contents[parent][name]
+    def process_inner(self, name, parent_inode):
+        dir = self.contents[parent_inode]
+        if name in dir:
+            inode = dir[name]
         else:
-            inode = self._create_dir(parent)
+            inode = self._create_dir(parent_inode)
             if name:
-                self.contents[parent][name] = inode
-            parent = inode
-        return parent
+                dir[name] = inode
+        return inode
 
     def allocate_inode(self):
         self._inode_count += 1

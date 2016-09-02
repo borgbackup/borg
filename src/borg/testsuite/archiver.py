@@ -36,7 +36,7 @@ from ..archive import Archive, ChunkBuffer, flags_noatime, flags_normal
 from ..archiver import Archiver, parse_storage_quota
 from ..cache import Cache, LocalCache
 from ..constants import *  # NOQA
-from ..crypto.low_level import bytes_to_long, num_aes_blocks
+from ..crypto.low_level import bytes_to_long, num_cipher_blocks
 from ..crypto.key import KeyfileKeyBase, RepoKey, KeyfileKey, Passphrase, TAMRequiredError
 from ..crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..crypto.file_integrity import FileIntegrityError
@@ -2169,7 +2169,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                     hash = sha256(data).digest()
                     if hash not in seen:
                         seen.add(hash)
-                        num_blocks = num_aes_blocks(len(data) - 41)
+                        num_blocks = num_cipher_blocks(len(data) - 41)
                         nonce = bytes_to_long(data[33:41])
                         for counter in range(nonce, nonce + num_blocks):
                             self.assert_not_in(counter, used)

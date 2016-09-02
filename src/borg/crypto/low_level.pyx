@@ -168,11 +168,20 @@ def increment_iv(iv, amount=1):
     return iv
 
 
-def num_aes_blocks(length):
-    """Return the number of AES blocks required to encrypt/decrypt *length* bytes of data.
-       Note: this is only correct for modes without padding, like AES-CTR.
+def num_cipher_blocks(length, blocksize=16):
+    """Return the number of cipher blocks required to encrypt/decrypt <length> bytes of data.
+
+    For a precise computation, <blocksize> must be the used cipher's block size (AES: 16, CHACHA20: 64).
+
+    For a safe-upper-boundary computation, <blocksize> must be the MINIMUM of the block sizes (in
+    bytes) of ALL supported ciphers. This can be used to adjust a counter if the used cipher is not
+    known (yet).
+    The default value of blocksize must be adjusted so it reflects this minimum, so a call of this
+    function without a blocksize is "safe-upper-boundary by default".
+
+    Padding cipher modes are not supported.
     """
-    return (length + 15) // 16
+    return (length + blocksize - 1) // blocksize
 
 
 class CryptoError(Exception):
@@ -363,8 +372,7 @@ cdef class AES256_CTR_HMAC_SHA256:
             PyBuffer_Release(&idata)
 
     def block_count(self, length):
-        # number of cipher blocks needed for data of length bytes
-        return (length + self.cipher_blk_len - 1) // self.cipher_blk_len
+        return num_cipher_blocks(length, self.cipher_blk_len)
 
     def set_iv(self, iv):
         # set_iv needs to be called before each encrypt() call
@@ -528,8 +536,7 @@ cdef class _AEAD_BASE:
             PyBuffer_Release(&idata)
 
     def block_count(self, length):
-        # number of cipher blocks needed for data of length bytes
-        return (length + self.cipher_blk_len - 1) // self.cipher_blk_len
+        return num_cipher_blocks(length, self.cipher_blk_len)
 
     def set_iv(self, iv):
         # set_iv needs to be called before each encrypt() call,
@@ -679,8 +686,7 @@ cdef class AES:
             PyBuffer_Release(&idata)
 
     def block_count(self, length):
-        # number of cipher blocks needed for data of length bytes
-        return (length + self.cipher_blk_len - 1) // self.cipher_blk_len
+        return num_cipher_blocks(length, self.cipher_blk_len)
 
     def set_iv(self, iv):
         # set_iv needs to be called before each encrypt() call,

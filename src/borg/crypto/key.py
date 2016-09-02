@@ -27,7 +27,7 @@ from ..item import Key, EncryptedKey
 from ..platform import SaveFile
 
 from .nonces import NonceManager
-from .low_level import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
+from .low_level import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
 from .low_level import AES256_CTR_HMAC_SHA256 as CIPHERSUITE
 
 
@@ -514,7 +514,7 @@ class PassphraseKey(ID_HMAC_SHA_256, AESKeyBase):
             key.init(repository, passphrase)
             try:
                 key.decrypt(None, manifest_data)
-                num_blocks = num_aes_blocks(len(manifest_data) - 41)
+                num_blocks = num_cipher_blocks(len(manifest_data) - 41)
                 key.init_ciphers(key.extract_nonce(manifest_data) + num_blocks)
                 key._passphrase = passphrase
                 return key
@@ -554,7 +554,7 @@ class KeyfileKeyBase(AESKeyBase):
         else:
             if not key.load(target, passphrase):
                 raise PassphraseWrong
-        num_blocks = num_aes_blocks(len(manifest_data) - 41)
+        num_blocks = num_cipher_blocks(len(manifest_data) - 41)
         key.init_ciphers(key.extract_nonce(manifest_data) + num_blocks)
         key._passphrase = passphrase
         return key

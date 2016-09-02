@@ -233,6 +233,9 @@ class UNENCRYPTED:
     def next_iv(self):
         return self.iv
 
+    def extract_iv(self, envelope):
+        return 0
+
 
 cdef class AES256_CTR_HMAC_SHA256:
     # Layout: HEADER + HMAC 32 + IV 8 + CT (same as attic / borg < 1.2 IF HEADER = TYPE_BYTE, no AAD)
@@ -394,6 +397,10 @@ cdef class AES256_CTR_HMAC_SHA256:
         cdef int i
         for i in range(self.iv_len_short):
             iv_out[i] = iv[(self.iv_len-self.iv_len_short)+i]
+
+    def extract_iv(self, envelope):
+        offset = 1 + self.mac_len
+        return bytes_to_long(envelope[offset:offset+self.iv_len_short])
 
 
 ctypedef const EVP_CIPHER * (* CIPHER)()
@@ -564,6 +571,10 @@ cdef class _AEAD_BASE:
         cdef int i
         for i in range(self.iv_len):
             iv_out[i] = iv[i]
+
+    def extract_iv(self, envelope):
+        offset = 1 + self.mac_len  # XXX 1 -> self.header_len
+        return bytes_to_long(envelope[offset:offset+self.iv_len])
 
 
 cdef class _AES_BASE(_AEAD_BASE):

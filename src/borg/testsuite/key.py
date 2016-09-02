@@ -119,12 +119,12 @@ class TestKey:
         key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
         assert bytes_to_long(key.cipher.next_iv(), 8) == 0
         manifest = key.encrypt(b'ABC')
-        assert key.extract_nonce(manifest) == 0
+        assert key.cipher.extract_iv(manifest) == 0
         manifest2 = key.encrypt(b'ABC')
         assert manifest != manifest2
         assert key.decrypt(None, manifest) == key.decrypt(None, manifest2)
-        assert key.extract_nonce(manifest2) == 1
-        iv = key.extract_nonce(manifest)
+        assert key.cipher.extract_iv(manifest2) == 1
+        iv = key.cipher.extract_iv(manifest)
         key2 = KeyfileKey.detect(self.MockRepository(), manifest)
         assert bytes_to_long(key2.cipher.next_iv(), 8) >= iv + key2.cipher.block_count(len(manifest) - KeyfileKey.PAYLOAD_OVERHEAD)
         # Key data sanity check
@@ -140,7 +140,7 @@ class TestKey:
             fd.write("0000000000002000")
         key = KeyfileKey.create(repository, self.MockArgs())
         data = key.encrypt(b'ABC')
-        assert key.extract_nonce(data) == 0x2000
+        assert key.cipher.extract_iv(data) == 0x2000
         assert key.decrypt(None, data) == b'ABC'
 
     def test_keyfile_kfenv(self, tmpdir, monkeypatch):
@@ -192,14 +192,14 @@ class TestKey:
         assert hexlify(key.enc_key) == b'2ff3654c6daf7381dbbe718d2b20b4f1ea1e34caa6cc65f6bb3ac376b93fed2a'
         assert key.chunk_seed == -775740477
         manifest = key.encrypt(b'ABC')
-        assert key.extract_nonce(manifest) == 0
+        assert key.cipher.extract_iv(manifest) == 0
         manifest2 = key.encrypt(b'ABC')
         assert manifest != manifest2
         assert key.decrypt(None, manifest) == key.decrypt(None, manifest2)
-        assert key.extract_nonce(manifest2) == 1
-        iv = key.extract_nonce(manifest)
+        assert key.cipher.extract_iv(manifest2) == 1
+        iv = key.cipher.extract_iv(manifest)
         key2 = PassphraseKey.detect(self.MockRepository(), manifest)
-        assert bytes_to_long(key2.cipher.next_iv(), 8) == iv + key2.cipher.block_count(len(manifest) - PassphraseKey.PAYLOAD_OVERHEAD)
+        assert bytes_to_long(key2.cipher.next_iv(), 8) == iv + key2.cipher.block_count(len(manifest))
         assert key.id_key == key2.id_key
         assert key.enc_hmac_key == key2.enc_hmac_key
         assert key.enc_key == key2.enc_key

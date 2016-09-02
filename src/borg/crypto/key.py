@@ -373,13 +373,6 @@ class AESKeyBase(KeyBase):
         self.assert_id(id, data)
         return data
 
-    def extract_nonce(self, payload):
-        if not (payload[0] == self.TYPE or
-            payload[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
-            raise IntegrityError('Manifest: Invalid encryption envelope')
-        nonce = bytes_to_long(payload[33:41])
-        return nonce
-
     def init_from_random_data(self, data=None):
         if data is None:
             data = os.urandom(100)
@@ -391,10 +384,21 @@ class AESKeyBase(KeyBase):
         if self.chunk_seed & 0x80000000:
             self.chunk_seed = self.chunk_seed - 0xffffffff - 1
 
-    def init_ciphers(self, manifest_nonce=0):
-        self.cipher = CIPHERSUITE(mac_key=self.enc_hmac_key, enc_key=self.enc_key,
-                                  iv=manifest_nonce.to_bytes(16, byteorder='big'))
-        self.nonce_manager = NonceManager(self.repository, self.cipher, manifest_nonce)
+    def init_ciphers(self, manifest_data=None):
+        self.cipher = CIPHERSUITE(mac_key=self.enc_hmac_key, enc_key=self.enc_key)
+        if manifest_data is None:
+            nonce = 0
+        else:
+            if not (manifest_data[0] == self.TYPE or
+                    manifest_data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
+                raise IntegrityError('Invalid encryption envelope')
+            # manifest_blocks is a safe upper bound on the amount of cipher blocks needed
+            # to encrypt the manifest. depending on the ciphersuite and overhead, it might
+            # be a bit too high, but that does not matter.
+            manifest_blocks = num_cipher_blocks(len(manifest_data))
+            nonce = self.cipher.extract_iv(manifest_data) + manifest_blocks
+        self.cipher.set_iv(nonce.to_bytes(16, byteorder='big'))
+        self.nonce_manager = NonceManager(self.repository, self.cipher, nonce)
 
 
 class Passphrase(str):
@@ -514,8 +518,7 @@ class PassphraseKey(ID_HMAC_SHA_256, AESKeyBase):
             key.init(repository, passphrase)
             try:
                 key.decrypt(None, manifest_data)
-                num_blocks = num_cipher_blocks(len(manifest_data) - 41)
-                key.init_ciphers(key.extract_nonce(manifest_data) + num_blocks)
+                key.init_ciphers(manifest_data)
                 key._passphrase = passphrase
                 return key
             except IntegrityError:
@@ -554,8 +557,7 @@ class KeyfileKeyBase(AESKeyBase):
         else:
             if not key.load(target, passphrase):
                 raise PassphraseWrong
-        num_blocks = num_cipher_blocks(len(manifest_data) - 41)
-        key.init_ciphers(key.extract_nonce(manifest_data) + num_blocks)
+        key.init_ciphers(manifest_data)
         key._passphrase = passphrase
         return key
 

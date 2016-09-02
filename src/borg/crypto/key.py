@@ -359,14 +359,14 @@ class AESKeyBase(KeyBase):
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)
         self.nonce_manager.ensure_reservation(self.cipher.block_count(len(data)))
-        return self.cipher.encrypt(data, header=self.TYPE_STR, aad_offset=1)
+        return self.cipher.encrypt(data, header=self.TYPE_STR)
 
     def decrypt(self, id, data, decompress=True):
         if not (data[0] == self.TYPE or
             data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             id_str = bin_to_hex(id) if id is not None else '(unknown)'
             raise IntegrityError('Chunk %s: Invalid encryption envelope' % id_str)
-        payload = self.cipher.decrypt(data, header_len=1, aad_offset=1)
+        payload = self.cipher.decrypt(data)
         if not decompress:
             return payload
         data = self.decompress(payload)
@@ -385,7 +385,7 @@ class AESKeyBase(KeyBase):
             self.chunk_seed = self.chunk_seed - 0xffffffff - 1
 
     def init_ciphers(self, manifest_data=None):
-        self.cipher = CIPHERSUITE(mac_key=self.enc_hmac_key, enc_key=self.enc_key)
+        self.cipher = CIPHERSUITE(mac_key=self.enc_hmac_key, enc_key=self.enc_key, header_len=1, aad_offset=1)
         if manifest_data is None:
             nonce = 0
         else:

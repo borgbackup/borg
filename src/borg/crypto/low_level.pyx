@@ -201,12 +201,13 @@ cdef Py_buffer ro_buffer(object data) except *:
 class UNENCRYPTED:
     # Layout: HEADER + PlainText
 
-    def __init__(self, mac_key, enc_key, iv=None):
+    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         assert mac_key is None
         assert enc_key is None
+        self.header_len = header_len
         self.set_iv(iv)
 
-    def encrypt(self, data, header=b'', aad_offset=0, iv=None):
+    def encrypt(self, data, header=b'', iv=None):
         """
         IMPORTANT: it is called encrypt to satisfy the crypto api naming convention,
         but this does NOT encrypt and it does NOT compute and store a MAC either.
@@ -216,13 +217,13 @@ class UNENCRYPTED:
         assert self.iv is not None, 'iv needs to be set before encrypt is called'
         return header + data
 
-    def decrypt(self, envelope, header_len=0, aad_offset=0):
+    def decrypt(self, envelope):
         """
         IMPORTANT: it is called decrypt to satisfy the crypto api naming convention,
         but this does NOT decrypt and it does NOT verify a MAC either, because data
         is not encrypted and there is no MAC.
         """
-        return memoryview(envelope)[header_len:]
+        return memoryview(envelope)[self.header_len:]
 
     def block_count(self, length):
         return 0
@@ -246,16 +247,21 @@ cdef class AES256_CTR_HMAC_SHA256:
     cdef unsigned char *enc_key
     cdef int cipher_blk_len
     cdef int iv_len, iv_len_short
+    cdef int aad_offset
+    cdef int header_len
     cdef int mac_len
     cdef unsigned char iv[16]
     cdef long long blocks
 
-    def __init__(self, mac_key, enc_key, iv=None):
+    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         assert isinstance(mac_key, bytes) and len(mac_key) == 32
         assert isinstance(enc_key, bytes) and len(enc_key) == 32
         self.cipher_blk_len = 16
         self.iv_len = sizeof(self.iv)
         self.iv_len_short = 8
+        assert aad_offset <= header_len
+        self.aad_offset = aad_offset
+        self.header_len = header_len
         self.mac_len = 32
         self.mac_key = mac_key
         self.enc_key = enc_key
@@ -264,7 +270,7 @@ cdef class AES256_CTR_HMAC_SHA256:
         else:
             self.blocks = -1  # make sure set_iv is called before encrypt
 
-    def __cinit__(self, mac_key, enc_key, iv=None):
+    def __cinit__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         self.ctx = EVP_CIPHER_CTX_new()
         self.hmac_ctx = HMAC_CTX_new()
 
@@ -272,7 +278,7 @@ cdef class AES256_CTR_HMAC_SHA256:
         EVP_CIPHER_CTX_free(self.ctx)
         HMAC_CTX_free(self.hmac_ctx)
 
-    def encrypt(self, data, header=b'', aad_offset=0, iv=None):
+    def encrypt(self, data, header=b'', iv=None):
         """
         encrypt data, compute mac over aad + iv + cdata, prepend header.
         aad_offset is the offset into the header where aad starts.
@@ -282,7 +288,8 @@ cdef class AES256_CTR_HMAC_SHA256:
         assert self.blocks == 0, 'iv needs to be set before encrypt is called'
         cdef int ilen = len(data)
         cdef int hlen = len(header)
-        cdef int aoffset = aad_offset
+        assert hlen == self.header_len
+        cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
         cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len + self.iv_len_short +
                                                                   ilen + self.cipher_blk_len)  # play safe, 1 extra blk
@@ -326,13 +333,14 @@ cdef class AES256_CTR_HMAC_SHA256:
             PyBuffer_Release(&hdata)
             PyBuffer_Release(&idata)
 
-    def decrypt(self, envelope, header_len=0, aad_offset=0):
+    def decrypt(self, envelope):
         """
         authenticate aad + iv + cdata, decrypt cdata, ignore header bytes up to aad_offset.
         """
         cdef int ilen = len(envelope)
-        cdef int hlen = header_len
-        cdef int aoffset = aad_offset
+        cdef int hlen = self.header_len
+        assert hlen == self.header_len
+        cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
         cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)  # play safe, 1 extra blk
         if not odata:
@@ -399,7 +407,7 @@ cdef class AES256_CTR_HMAC_SHA256:
             iv_out[i] = iv[(self.iv_len-self.iv_len_short)+i]
 
     def extract_iv(self, envelope):
-        offset = 1 + self.mac_len
+        offset = self.header_len + self.mac_len
         return bytes_to_long(envelope[offset:offset+self.iv_len_short])
 
 
@@ -414,14 +422,20 @@ cdef class _AEAD_BASE:
     cdef unsigned char *enc_key
     cdef int cipher_blk_len
     cdef int iv_len
+    cdef int aad_offset
+    cdef int header_len
     cdef int mac_len
     cdef unsigned char iv[12]
     cdef long long blocks
 
-    def __init__(self, mac_key, enc_key, iv=None):
+    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         assert mac_key is None
         assert isinstance(enc_key, bytes) and len(enc_key) == 32
         self.iv_len = sizeof(self.iv)
+        self.header_len = 1
+        assert aad_offset <= header_len
+        self.aad_offset = aad_offset
+        self.header_len = header_len
         self.mac_len = 16
         self.enc_key = enc_key
         if iv is not None:
@@ -429,13 +443,13 @@ cdef class _AEAD_BASE:
         else:
             self.blocks = -1  # make sure set_iv is called before encrypt
 
-    def __cinit__(self, mac_key, enc_key, iv=None):
+    def __cinit__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         self.ctx = EVP_CIPHER_CTX_new()
 
     def __dealloc__(self):
         EVP_CIPHER_CTX_free(self.ctx)
 
-    def encrypt(self, data, header=b'', aad_offset=0, iv=None):
+    def encrypt(self, data, header=b'', iv=None):
         """
         encrypt data, compute mac over aad + iv + cdata, prepend header.
         aad_offset is the offset into the header where aad starts.
@@ -445,7 +459,8 @@ cdef class _AEAD_BASE:
         assert self.blocks == 0, 'iv needs to be set before encrypt is called'
         cdef int ilen = len(data)
         cdef int hlen = len(header)
-        cdef int aoffset = aad_offset
+        assert hlen == self.header_len
+        cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
         cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len + self.iv_len +
                                                                   ilen + self.cipher_blk_len)
@@ -493,13 +508,14 @@ cdef class _AEAD_BASE:
             PyBuffer_Release(&hdata)
             PyBuffer_Release(&idata)
 
-    def decrypt(self, envelope, header_len=0, aad_offset=0):
+    def decrypt(self, envelope):
         """
         authenticate aad + iv + cdata, decrypt cdata, ignore header bytes up to aad_offset.
         """
         cdef int ilen = len(envelope)
-        cdef int hlen = header_len
-        cdef int aoffset = aad_offset
+        cdef int hlen = self.header_len
+        assert hlen == self.header_len
+        cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
         cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)
         if not odata:
@@ -573,7 +589,7 @@ cdef class _AEAD_BASE:
             iv_out[i] = iv[i]
 
     def extract_iv(self, envelope):
-        offset = 1 + self.mac_len  # XXX 1 -> self.header_len
+        offset = self.header_len + self.mac_len
         return bytes_to_long(envelope[offset:offset+self.iv_len])
 
 
@@ -590,27 +606,27 @@ cdef class _CHACHA_BASE(_AEAD_BASE):
 
 
 cdef class AES256_GCM(_AES_BASE):
-    def __init__(self, mac_key, enc_key, iv=None):
+    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         if OPENSSL_VERSION_NUMBER < 0x10001040:
             raise ValueError('AES GCM requires OpenSSL >= 1.0.1d. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
         self.cipher = EVP_aes_256_gcm
-        super().__init__(mac_key, enc_key, iv=iv)
+        super().__init__(mac_key, enc_key, iv=iv, header_len=header_len, aad_offset=aad_offset)
 
 
 cdef class AES256_OCB(_AES_BASE):
-    def __init__(self, mac_key, enc_key, iv=None):
+    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         if OPENSSL_VERSION_NUMBER < 0x10100000:
             raise ValueError('AES OCB requires OpenSSL >= 1.1.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
         self.cipher = EVP_aes_256_ocb
-        super().__init__(mac_key, enc_key, iv=iv)
+        super().__init__(mac_key, enc_key, iv=iv, header_len=header_len, aad_offset=aad_offset)
 
 
 cdef class CHACHA20_POLY1305(_CHACHA_BASE):
-    def __init__(self, mac_key, enc_key, iv=None):
+    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         if OPENSSL_VERSION_NUMBER < 0x10100000:
             raise ValueError('CHACHA20-POLY1305 requires OpenSSL >= 1.1.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
         self.cipher = EVP_chacha20_poly1305
-        super().__init__(mac_key, enc_key, iv=iv)
+        super().__init__(mac_key, enc_key, iv=iv, header_len=header_len, aad_offset=aad_offset)
 
 
 cdef class AES:

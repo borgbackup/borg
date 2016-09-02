@@ -45,10 +45,10 @@ class CryptoTestCase(BaseTestCase):
         iv = b''  # any IV is ok, it just must be set and not None
         data = b'data'
         header = b'header'
-        cs = UNENCRYPTED(None, None, iv)
+        cs = UNENCRYPTED(None, None, iv, header_len=6)
         envelope = cs.encrypt(data, header=header)
         self.assert_equal(envelope, header + data)
-        got_data = cs.decrypt(envelope, header_len=len(header))
+        got_data = cs.decrypt(envelope)
         self.assert_equal(got_data, data)
 
     def test_AES256_CTR_HMAC_SHA256(self):
@@ -59,8 +59,8 @@ class CryptoTestCase(BaseTestCase):
         data = b'foo' * 10
         header = b'\x42'
         # encrypt-then-mac
-        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, iv)
-        hdr_mac_iv_cdata = cs.encrypt(data, header=header, aad_offset=1)
+        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, iv, header_len=1, aad_offset=1)
+        hdr_mac_iv_cdata = cs.encrypt(data, header=header)
         hdr = hdr_mac_iv_cdata[0:1]
         mac = hdr_mac_iv_cdata[1:33]
         iv = hdr_mac_iv_cdata[33:41]
@@ -71,15 +71,15 @@ class CryptoTestCase(BaseTestCase):
         self.assert_equal(hexlify(cdata), b'c6efb702de12498f34a2c2bbc8149e759996d08bf6dc5c610aefc0c3a466')
         self.assert_equal(hexlify(cs.next_iv()), b'00000000000000000000000000000002')
         # auth-then-decrypt
-        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key)
-        pdata = cs.decrypt(hdr_mac_iv_cdata, header_len=len(header), aad_offset=1)
+        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, header_len=len(header), aad_offset=1)
+        pdata = cs.decrypt(hdr_mac_iv_cdata)
         self.assert_equal(data, pdata)
         self.assert_equal(hexlify(cs.next_iv()), b'00000000000000000000000000000002')
         # auth-failure due to corruption (corrupted data)
-        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key)
+        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, header_len=len(header), aad_offset=1)
         hdr_mac_iv_cdata_corrupted = hdr_mac_iv_cdata[:41] + b'\0' + hdr_mac_iv_cdata[42:]
         self.assert_raises(IntegrityError,
-                           lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted, header_len=len(header), aad_offset=1))
+                           lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))
 
     def test_AES256_CTR_HMAC_SHA256_aad(self):
         mac_key = b'Y' * 32
@@ -88,8 +88,8 @@ class CryptoTestCase(BaseTestCase):
         data = b'foo' * 10
         header = b'\x12\x34\x56'
         # encrypt-then-mac
-        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, iv)
-        hdr_mac_iv_cdata = cs.encrypt(data, header=header, aad_offset=1)
+        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, iv, header_len=3, aad_offset=1)
+        hdr_mac_iv_cdata = cs.encrypt(data, header=header)
         hdr = hdr_mac_iv_cdata[0:3]
         mac = hdr_mac_iv_cdata[3:35]
         iv = hdr_mac_iv_cdata[35:43]
@@ -100,15 +100,15 @@ class CryptoTestCase(BaseTestCase):
         self.assert_equal(hexlify(cdata), b'c6efb702de12498f34a2c2bbc8149e759996d08bf6dc5c610aefc0c3a466')
         self.assert_equal(hexlify(cs.next_iv()), b'00000000000000000000000000000002')
         # auth-then-decrypt
-        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key)
-        pdata = cs.decrypt(hdr_mac_iv_cdata, header_len=len(header), aad_offset=1)
+        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, header_len=len(header), aad_offset=1)
+        pdata = cs.decrypt(hdr_mac_iv_cdata)
         self.assert_equal(data, pdata)
         self.assert_equal(hexlify(cs.next_iv()), b'00000000000000000000000000000002')
         # auth-failure due to corruption (corrupted aad)
-        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key)
+        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, header_len=len(header), aad_offset=1)
         hdr_mac_iv_cdata_corrupted = hdr_mac_iv_cdata[:1] + b'\0' + hdr_mac_iv_cdata[2:]
         self.assert_raises(IntegrityError,
-                           lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted, header_len=len(header), aad_offset=1))
+                           lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))
 
     def test_AE(self):
         # used in legacy-like layout (1 type byte, no aad)
@@ -134,8 +134,8 @@ class CryptoTestCase(BaseTestCase):
             ]
         for cs_cls, exp_mac, exp_cdata in tests:
             # encrypt/mac
-            cs = cs_cls(mac_key, enc_key, iv)
-            hdr_mac_iv_cdata = cs.encrypt(data, header=header, aad_offset=1)
+            cs = cs_cls(mac_key, enc_key, iv, header_len=1, aad_offset=1)
+            hdr_mac_iv_cdata = cs.encrypt(data, header=header)
             hdr = hdr_mac_iv_cdata[0:1]
             mac = hdr_mac_iv_cdata[1:17]
             iv = hdr_mac_iv_cdata[17:29]
@@ -146,15 +146,15 @@ class CryptoTestCase(BaseTestCase):
             self.assert_equal(hexlify(cdata), exp_cdata)
             self.assert_equal(hexlify(cs.next_iv()), b'000000000000000000000001')
             # auth/decrypt
-            cs = cs_cls(mac_key, enc_key)
-            pdata = cs.decrypt(hdr_mac_iv_cdata, header_len=len(header), aad_offset=1)
+            cs = cs_cls(mac_key, enc_key, header_len=len(header), aad_offset=1)
+            pdata = cs.decrypt(hdr_mac_iv_cdata)
             self.assert_equal(data, pdata)
             self.assert_equal(hexlify(cs.next_iv()), b'000000000000000000000001')
             # auth-failure due to corruption (corrupted data)
-            cs = cs_cls(mac_key, enc_key)
+            cs = cs_cls(mac_key, enc_key, header_len=len(header), aad_offset=1)
             hdr_mac_iv_cdata_corrupted = hdr_mac_iv_cdata[:29] + b'\0' + hdr_mac_iv_cdata[30:]
             self.assert_raises(IntegrityError,
-                               lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted, header_len=len(header), aad_offset=1))
+                               lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))
 
     def test_AEAD(self):
         # test with aad
@@ -180,8 +180,8 @@ class CryptoTestCase(BaseTestCase):
             ]
         for cs_cls, exp_mac, exp_cdata in tests:
             # encrypt/mac
-            cs = cs_cls(mac_key, enc_key, iv)
-            hdr_mac_iv_cdata = cs.encrypt(data, header=header, aad_offset=1)
+            cs = cs_cls(mac_key, enc_key, iv, header_len=3, aad_offset=1)
+            hdr_mac_iv_cdata = cs.encrypt(data, header=header)
             hdr = hdr_mac_iv_cdata[0:3]
             mac = hdr_mac_iv_cdata[3:19]
             iv = hdr_mac_iv_cdata[19:31]
@@ -192,15 +192,15 @@ class CryptoTestCase(BaseTestCase):
             self.assert_equal(hexlify(cdata), exp_cdata)
             self.assert_equal(hexlify(cs.next_iv()), b'000000000000000000000001')
             # auth/decrypt
-            cs = cs_cls(mac_key, enc_key)
-            pdata = cs.decrypt(hdr_mac_iv_cdata, header_len=len(header), aad_offset=1)
+            cs = cs_cls(mac_key, enc_key, header_len=len(header), aad_offset=1)
+            pdata = cs.decrypt(hdr_mac_iv_cdata)
             self.assert_equal(data, pdata)
             self.assert_equal(hexlify(cs.next_iv()), b'000000000000000000000001')
             # auth-failure due to corruption (corrupted aad)
-            cs = cs_cls(mac_key, enc_key)
+            cs = cs_cls(mac_key, enc_key, header_len=len(header), aad_offset=1)
             hdr_mac_iv_cdata_corrupted = hdr_mac_iv_cdata[:1] + b'\0' + hdr_mac_iv_cdata[2:]
             self.assert_raises(IntegrityError,
-                               lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted, header_len=len(header), aad_offset=1))
+                               lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))
 
     def test_hmac_sha256(self):
         # RFC 4231 test vectors

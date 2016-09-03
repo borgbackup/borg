@@ -356,6 +356,8 @@ those files are reported as being added when, really, chunks are
 already used.
 
 
+.. _always_chunking:
+
 It always chunks all my files, even unchanged ones!
 ---------------------------------------------------
 

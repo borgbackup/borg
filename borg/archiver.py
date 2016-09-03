@@ -1344,6 +1344,15 @@ class Archiver:
 
         info_epilog = textwrap.dedent("""
         This command displays some detailed information about the specified archive.
+
+        Please note that the deduplicated sizes of the individual archives do not add
+        up to the deduplicated size of the repository ("all archives"), because the two
+        are meaning different things:
+
+        This archive / deduplicated size = amount of data stored ONLY for this archive
+                                         = unique chunks of this archive.
+        All archives / deduplicated size = amount of data stored in the repo
+                                         = all chunks in the repository.
         """)
         subparser = subparsers.add_parser('info', parents=[common_parser],
                                           description=self.do_info.__doc__,

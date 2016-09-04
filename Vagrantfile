@@ -25,6 +25,8 @@ def packages_debianoid
     # for building borgbackup and dependencies:
     apt-get install -y libssl-dev libacl1-dev liblz4-dev libfuse-dev fuse pkg-config
     usermod -a -G fuse $username
+    chgrp fuse /dev/fuse
+    chmod 666 /dev/fuse
     apt-get install -y fakeroot build-essential git
     apt-get install -y python3-dev python3-setuptools
     # for building python:
@@ -45,6 +47,8 @@ def packages_redhatted
     # for building borgbackup and dependencies:
     yum install -y openssl-devel openssl libacl-devel libacl lz4-devel fuse-devel fuse pkgconfig
     usermod -a -G fuse vagrant
+    chgrp fuse /dev/fuse
+    chmod 666 /dev/fuse
     yum install -y fakeroot gcc git patch
     # needed to compile msgpack-python (otherwise it will use slow fallback code):
     yum install -y gcc-c++
@@ -96,6 +100,8 @@ def packages_freebsd
     kldload fuse
     sysctl vfs.usermount=1
     pw groupmod operator -M vagrant
+    # /dev/fuse has group operator
+    chmod 666 /dev/fuse
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
     # install all the (security and other) updates, packages
     pkg update

@@ -27,6 +27,7 @@ from ..keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import BaseTestCase, changedir, environment_variable
+from .platform import fakeroot_detected
 
 try:
     import llfuse
@@ -1315,6 +1316,12 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
     @unittest.skip('test_overwrite seems incompatible with fakeroot and/or the binary.')
     def test_overwrite(self):
         pass
+
+    def test_fuse(self):
+        if fakeroot_detected():
+            unittest.skip('test_fuse with the binary is not compatible with fakeroot')
+        else:
+            super().test_fuse()
 
 
 class ArchiverCheckTestCase(ArchiverTestCaseBase):

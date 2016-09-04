@@ -185,7 +185,7 @@ THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
 
 Borg is distributed under a 3-clause BSD license, see `License`_ for the complete license.
 
-|doc| |build| |coverage|
+|doc| |build| |coverage| |bestpractices|
 
 .. |doc| image:: https://readthedocs.org/projects/borgbackup/badge/?version=stable
         :alt: Documentation
@@ -202,3 +202,7 @@ Borg is distributed under a 3-clause BSD license, see `License`_ for the complet
 .. |screencast| image:: https://asciinema.org/a/28691.png
         :alt: BorgBackup Installation and Basic Usage
         :target: https://asciinema.org/a/28691?autoplay=1&speed=2
+
+.. |bestpractices| image:: https://bestpractices.coreinfrastructure.org/projects/271/badge
+        :alt: Best Practices Score
+        :target: https://bestpractices.coreinfrastructure.org/projects/271

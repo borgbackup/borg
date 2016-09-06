@@ -92,7 +92,6 @@ Initialize a new backup repository and create a backup archive::
 Now doing another backup, just to show off the great deduplication:
 
 .. code-block:: none
-   :emphasize-lines: 11
 
     $ borg create -v --stats /path/to/repo::Saturday2 ~/Documents
     -----------------------------------------------------------------------------

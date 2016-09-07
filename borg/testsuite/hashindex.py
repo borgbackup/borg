@@ -276,3 +276,8 @@ def test_nsindex_segment_limit():
     assert H(1) not in idx
     idx[H(2)] = hashindex.MAX_VALUE, 0
     assert H(2) in idx
+
+
+def test_max_load_factor():
+    assert NSIndex.MAX_LOAD_FACTOR < 1
+    assert ChunkIndex.MAX_LOAD_FACTOR < 1

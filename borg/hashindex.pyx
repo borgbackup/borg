@@ -23,6 +23,8 @@ cdef extern from "_hashindex.c":
     uint32_t _htole32(uint32_t v)
     uint32_t _le32toh(uint32_t v)
 
+    double HASH_MAX_LOAD
+
 
 cdef _NoDefault = object()
 
@@ -54,6 +56,7 @@ cdef class IndexBase:
     cdef HashIndex *index
     cdef int key_size
 
+    MAX_LOAD_FACTOR = HASH_MAX_LOAD
     def __cinit__(self, capacity=0, path=None, key_size=32):
         self.key_size = key_size
         if path:

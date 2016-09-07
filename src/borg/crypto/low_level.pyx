@@ -253,7 +253,13 @@ cdef class AES256_CTR_HMAC_SHA256:
     cdef unsigned char iv[16]
     cdef long long blocks
 
+    @staticmethod
+    def requirements_check():
+        if OPENSSL_VERSION_NUMBER < 0x10000000:
+            raise ValueError('AES CTR requires OpenSSL >= 1.0.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
+
     def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+        self.requirements_check()
         assert isinstance(mac_key, bytes) and len(mac_key) == 32
         assert isinstance(enc_key, bytes) and len(enc_key) == 32
         self.cipher_blk_len = 16
@@ -427,6 +433,11 @@ cdef class _AEAD_BASE:
     cdef int mac_len
     cdef unsigned char iv[12]
     cdef long long blocks
+
+    @staticmethod
+    def requirements_check():
+        """check whether library requirements for this ciphersuite are satisfied"""
+        raise NotImplemented  # override / implement in child class
 
     def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         assert mac_key is None
@@ -606,25 +617,37 @@ cdef class _CHACHA_BASE(_AEAD_BASE):
 
 
 cdef class AES256_GCM(_AES_BASE):
-    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+    @staticmethod
+    def requirements_check():
         if OPENSSL_VERSION_NUMBER < 0x10001040:
             raise ValueError('AES GCM requires OpenSSL >= 1.0.1d. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
+
+    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+        self.requirements_check()
         self.cipher = EVP_aes_256_gcm
         super().__init__(mac_key, enc_key, iv=iv, header_len=header_len, aad_offset=aad_offset)
 
 
 cdef class AES256_OCB(_AES_BASE):
-    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+    @staticmethod
+    def requirements_check():
         if OPENSSL_VERSION_NUMBER < 0x10100000:
             raise ValueError('AES OCB requires OpenSSL >= 1.1.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
+
+    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+        self.requirements_check()
         self.cipher = EVP_aes_256_ocb
         super().__init__(mac_key, enc_key, iv=iv, header_len=header_len, aad_offset=aad_offset)
 
 
 cdef class CHACHA20_POLY1305(_CHACHA_BASE):
-    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+    @staticmethod
+    def requirements_check():
         if OPENSSL_VERSION_NUMBER < 0x10100000:
             raise ValueError('CHACHA20-POLY1305 requires OpenSSL >= 1.1.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
+
+    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+        self.requirements_check()
         self.cipher = EVP_chacha20_poly1305
         super().__init__(mac_key, enc_key, iv=iv, header_len=header_len, aad_offset=aad_offset)
 

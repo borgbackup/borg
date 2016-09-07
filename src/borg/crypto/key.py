@@ -366,7 +366,10 @@ class AESKeyBase(KeyBase):
             data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             id_str = bin_to_hex(id) if id is not None else '(unknown)'
             raise IntegrityError('Chunk %s: Invalid encryption envelope' % id_str)
-        payload = self.cipher.decrypt(data)
+        try:
+            payload = self.cipher.decrypt(data)
+        except IntegrityError as e:
+            raise IntegrityError("Chunk %s: Could not decrypt [%s]" % (bin_to_hex(id), str(e)))
         if not decompress:
             return payload
         data = self.decompress(payload)
@@ -391,7 +394,7 @@ class AESKeyBase(KeyBase):
         else:
             if not (manifest_data[0] == self.TYPE or
                     manifest_data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
-                raise IntegrityError('Invalid encryption envelope')
+                raise IntegrityError('Manifest: Invalid encryption envelope')
             # manifest_blocks is a safe upper bound on the amount of cipher blocks needed
             # to encrypt the manifest. depending on the ciphersuite and overhead, it might
             # be a bit too high, but that does not matter.

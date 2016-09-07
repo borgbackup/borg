@@ -68,7 +68,7 @@ static int hash_sizes[] = {
 };
 
 #define HASH_MIN_LOAD .25
-#define HASH_MAX_LOAD 0.95  /* don't go higher than 0.75, otherwise performance severely suffers! */
+#define HASH_MAX_LOAD 0.99  /* don't go higher than 0.75, otherwise performance severely suffers! */
 
 #define MAX(x, y) ((x) > (y) ? (x): (y))
 #define NELEMS(x) (sizeof(x) / sizeof((x)[0]))

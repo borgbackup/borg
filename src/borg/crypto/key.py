@@ -358,8 +358,10 @@ class AESKeyBase(KeyBase):
 
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)
-        self.nonce_manager.ensure_reservation(self.cipher.block_count(len(data)))
-        return self.cipher.encrypt(data, header=self.TYPE_STR)
+        next_nonce = int.from_bytes(self.cipher.next_iv(), byteorder='big')
+        next_nonce = self.nonce_manager.ensure_reservation(next_nonce, self.cipher.block_count(len(data)))
+        iv = next_nonce.to_bytes(self.cipher.iv_len, byteorder='big')
+        return self.cipher.encrypt(data, header=self.TYPE_STR, iv=iv)
 
     def decrypt(self, id, data, decompress=True):
         if not (data[0] == self.TYPE or
@@ -401,7 +403,7 @@ class AESKeyBase(KeyBase):
             manifest_blocks = num_cipher_blocks(len(manifest_data))
             nonce = self.cipher.extract_iv(manifest_data) + manifest_blocks
         self.cipher.set_iv(nonce.to_bytes(16, byteorder='big'))
-        self.nonce_manager = NonceManager(self.repository, self.cipher, nonce)
+        self.nonce_manager = NonceManager(self.repository, nonce)
 
 
 class Passphrase(str):

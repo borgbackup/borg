@@ -13,6 +13,7 @@ import pytest
 
 from .archiver import changedir, cmd
 from .hashindex import ChunkIndex
+from .hashindex import H
 
 
 @pytest.yield_fixture
@@ -110,7 +111,7 @@ def test_chunk_indexer_setitem(benchmark):
     def do_inserts(index):
         for key in range(max_key):
             # we want 32 byte keys, since that's what we use day to day
-            key = sha256(bytes(key)).digest()
+            key = sha256(H(key)).digest()
             index[key] = (0, 0, 0)
     benchmark.pedantic(do_inserts, rounds=3, setup=setup)
 
@@ -121,11 +122,11 @@ def test_chunk_indexer_getitem(benchmark):
     key = 0
     for key in range(max_key):
         # we want 32 byte keys, since that's what we use day to day
-        key = sha256(bytes(key)).digest()
+        key = sha256(H(key)).digest()
         index[key] = (0, 0, 0)
     def do_gets():
         for key in range(max_key):
             # we want 32 byte keys, since that's what we use day to day
-            key = sha256(bytes(key)).digest()
+            key = sha256(H(key)).digest()
             val = index[key]
     benchmark.pedantic(do_gets, rounds=3)

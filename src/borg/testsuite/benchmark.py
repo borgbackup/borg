@@ -7,10 +7,12 @@ Usage:
 """
 
 import os
+from hashlib import sha256
 
 import pytest
 
 from .archiver import changedir, cmd
+from .hashindex import ChunkIndex
 
 
 @pytest.yield_fixture
@@ -97,3 +99,33 @@ def test_check(benchmark, cmd, archive):
 def test_help(benchmark, cmd):
     result, out = benchmark(cmd, 'help')
     assert result == 0
+
+
+def test_chunk_indexer_setitem(benchmark):
+    max_key = 2**17
+    def setup():
+        # return *args, **kwargs for the benchmarked function
+        return [ChunkIndex(max_key), ], dict()
+    key = 0
+    def do_inserts(index):
+        for key in range(max_key):
+            # we want 32 byte keys, since that's what we use day to day
+            key = sha256(bytes(key)).digest()
+            index[key] = (0, 0, 0)
+    benchmark.pedantic(do_inserts, rounds=3, setup=setup)
+
+
+def test_chunk_indexer_getitem(benchmark):
+    max_key = 2**17
+    index = ChunkIndex(max_key)
+    key = 0
+    for key in range(max_key):
+        # we want 32 byte keys, since that's what we use day to day
+        key = sha256(bytes(key)).digest()
+        index[key] = (0, 0, 0)
+    def do_gets():
+        for key in range(max_key):
+            # we want 32 byte keys, since that's what we use day to day
+            key = sha256(bytes(key)).digest()
+            val = index[key]
+    benchmark.pedantic(do_gets, rounds=3)

@@ -153,21 +153,6 @@ def int_to_bytes16(i):
     return _2long.pack(h, l)
 
 
-def increment_iv(iv, amount=1):
-    """
-    Increment the IV by the given amount (default 1).
-
-    :param iv: input IV, 16 bytes (128 bit)
-    :param amount: increment value
-    :return: input_IV + amount, 16 bytes (128 bit)
-    """
-    assert len(iv) == 16
-    iv = bytes16_to_int(iv)
-    iv += amount
-    iv = int_to_bytes16(iv)
-    return iv
-
-
 def num_cipher_blocks(length, blocksize=16):
     """Return the number of cipher blocks required to encrypt/decrypt <length> bytes of data.
 
@@ -393,14 +378,17 @@ cdef class AES256_CTR_HMAC_SHA256:
 
     def set_iv(self, iv):
         # set_iv needs to be called before each encrypt() call
+        if isinstance(iv, int):
+            iv = iv.to_bytes(self.iv_len, byteorder='big')
         assert isinstance(iv, bytes) and len(iv) == self.iv_len
         self.blocks = 0  # how many AES blocks got encrypted with this IV?
         for i in range(self.iv_len):
             self.iv[i] = iv[i]
 
     def next_iv(self):
-        # call this after encrypt() to get the next iv for the next encrypt() call
-        return increment_iv(self.iv[:self.iv_len], self.blocks)
+        # call this after encrypt() to get the next iv (int) for the next encrypt() call
+        iv = int.from_bytes(self.iv[:self.iv_len], byteorder='big')
+        return iv + self.blocks
 
     cdef fetch_iv(self, unsigned char * iv_in):
         # fetch lower self.iv_len_short bytes of iv and add upper zero bytes
@@ -575,21 +563,21 @@ cdef class _AEAD_BASE:
     def set_iv(self, iv):
         # set_iv needs to be called before each encrypt() call,
         # because encrypt does a full initialisation of the cipher context.
+        if isinstance(iv, int):
+            iv = iv.to_bytes(self.iv_len, byteorder='big')
         assert isinstance(iv, bytes) and len(iv) == self.iv_len
         self.blocks = 0  # number of cipher blocks encrypted with this IV
         for i in range(self.iv_len):
             self.iv[i] = iv[i]
 
     def next_iv(self):
-        # call this after encrypt() to get the next iv for the next encrypt() call
+        # call this after encrypt() to get the next iv (int) for the next encrypt() call
         # AES-GCM, AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit
         # (12 byte) IV we provide, thus we only need to increment the IV by 1 (and we must
         # not encrypt more than 2^32 cipher blocks with same IV):
         assert self.blocks < 2**32
-        # we need 16 bytes for increment_iv:
-        last_iv = b'\0' * (16 - self.iv_len) + self.iv[:self.iv_len]
-        next_iv = increment_iv(last_iv, 1)
-        return next_iv[-self.iv_len:]
+        iv = int.from_bytes(self.iv[:self.iv_len], byteorder='big')
+        return iv + 1
 
     cdef fetch_iv(self, unsigned char * iv_in):
         return iv_in[0:self.iv_len]
@@ -741,14 +729,18 @@ cdef class AES:
     def set_iv(self, iv):
         # set_iv needs to be called before each encrypt() call,
         # because encrypt does a full initialisation of the cipher context.
+        if isinstance(iv, int):
+            iv = iv.to_bytes(self.iv_len, byteorder='big')
         assert isinstance(iv, bytes) and len(iv) == self.iv_len
         self.blocks = 0  # number of cipher blocks encrypted with this IV
         for i in range(self.iv_len):
             self.iv[i] = iv[i]
 
     def next_iv(self):
-        # call this after encrypt() to get the next iv for the next encrypt() call
-        return increment_iv(self.iv[:self.iv_len], self.blocks)
+        # call this after encrypt() to get the next iv (int) for the next encrypt() call
+        iv = int.from_bytes(self.iv[:self.iv_len], byteorder='big')
+        return iv + self.blocks
+
 
 
 def hmac_sha256(key, data):

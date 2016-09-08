@@ -358,10 +358,9 @@ class AESKeyBase(KeyBase):
 
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)
-        next_nonce = int.from_bytes(self.cipher.next_iv(), byteorder='big')
-        next_nonce = self.nonce_manager.ensure_reservation(next_nonce, self.cipher.block_count(len(data)))
-        iv = next_nonce.to_bytes(self.cipher.iv_len, byteorder='big')
-        return self.cipher.encrypt(data, header=self.TYPE_STR, iv=iv)
+        next_iv = self.nonce_manager.ensure_reservation(self.cipher.next_iv(),
+                                                        self.cipher.block_count(len(data)))
+        return self.cipher.encrypt(data, header=self.TYPE_STR, iv=next_iv)
 
     def decrypt(self, id, data, decompress=True):
         if not (data[0] == self.TYPE or
@@ -402,7 +401,7 @@ class AESKeyBase(KeyBase):
             # be a bit too high, but that does not matter.
             manifest_blocks = num_cipher_blocks(len(manifest_data))
             nonce = self.cipher.extract_iv(manifest_data) + manifest_blocks
-        self.cipher.set_iv(nonce.to_bytes(16, byteorder='big'))
+        self.cipher.set_iv(nonce)
         self.nonce_manager = NonceManager(self.repository, nonce)
 
 

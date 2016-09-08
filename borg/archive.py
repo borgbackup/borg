@@ -610,7 +610,8 @@ Number of files: {0.stats.nfiles}'''.format(
             return 'b'  # block device
 
     def process_symlink(self, path, st):
-        source = os.readlink(path)
+        with backup_io():
+            source = os.readlink(path)
         item = {b'path': make_path_safe(path), b'source': source}
         item.update(self.stat_attrs(st, path))
         self.add_item(item)

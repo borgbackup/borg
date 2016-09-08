@@ -306,8 +306,13 @@ class Archiver:
                 if not read_special:
                     status = archive.process_symlink(path, st)
                 else:
-                    st_target = os.stat(path)
-                    if is_special(st_target.st_mode):
+                    try:
+                        st_target = os.stat(path)
+                    except OSError:
+                        special = False
+                    else:
+                        special = is_special(st_target.st_mode)
+                    if special:
                         status = archive.process_file(path, st_target, cache)
                     else:
                         status = archive.process_symlink(path, st)

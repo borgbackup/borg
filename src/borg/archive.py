@@ -1035,6 +1035,7 @@ class ArchiveChecker:
         logger.info('Starting cryptographic data integrity verification...')
         count = len(self.chunks)
         errors = 0
+        defect_chunks = []
         pi = ProgressIndicatorPercent(total=count, msg="Verifying data %6.2f%%", step=0.01)
         for chunk_id, (refcount, *_) in self.chunks.iteritems():
             pi.show()
@@ -1052,7 +1053,39 @@ class ArchiveChecker:
                 self.error_found = True
                 errors += 1
                 logger.error('chunk %s, integrity error: %s', bin_to_hex(chunk_id), integrity_error)
+                defect_chunks.append(chunk_id)
         pi.finish()
+        if defect_chunks:
+            if self.repair:
+                # if we kill the defect chunk here, subsequent actions within this "borg check"
+                # run will find missing chunks and replace them with all-zero replacement
+                # chunks and flag the files as "repaired".
+                # if another backup is done later and the missing chunks get backupped again,
+                # a "borg check" afterwards can heal all files where this chunk was missing.
+                logger.warning('Found defect chunks. They will be deleted now, so affected files can '
+                               'get repaired now and maybe healed later.')
+                for defect_chunk in defect_chunks:
+                    # remote repo (ssh): retry might help for strange network / NIC / RAM errors
+                    # as the chunk will be retransmitted from remote server.
+                    # local repo (fs): as chunks.iteritems loop usually pumps a lot of data through,
+                    # a defect chunk is likely not in the fs cache any more and really gets re-read
+                    # from the underlying media.
+                    encrypted_data = self.repository.get(defect_chunk)
+                    try:
+                        _chunk_id = None if defect_chunk == Manifest.MANIFEST_ID else defect_chunk
+                        self.key.decrypt(_chunk_id, encrypted_data)
+                    except IntegrityError:
+                        # failed twice -> get rid of this chunk
+                        del self.chunks[defect_chunk]
+                        self.repository.delete(defect_chunk)
+                        logger.debug('chunk %s deleted.', bin_to_hex(defect_chunk))
+                    else:
+                        logger.warning('chunk %s not deleted, did not consistently fail.')
+            else:
+                logger.warning('Found defect chunks. With --repair, they would get deleted, so affected '
+                               'files could get repaired then and maybe healed later.')
+                for defect_chunk in defect_chunks:
+                    logger.debug('chunk %s is defect.', bin_to_hex(defect_chunk))
         log = logger.error if errors else logger.info
         log('Finished cryptographic data integrity verification, verified %d chunks with %d integrity errors.', count, errors)
 

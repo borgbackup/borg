@@ -1956,6 +1956,10 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.cmd('check', self.repository_location, exit_code=0)
         output = self.cmd('check', '--verify-data', self.repository_location, exit_code=1)
         assert bin_to_hex(chunk.id) + ', integrity error' in output
+        # repair (heal is tested in another test)
+        output = self.cmd('check', '--repair', '--verify-data', self.repository_location, exit_code=0)
+        assert bin_to_hex(chunk.id) + ', integrity error' in output
+        assert 'testsuite/archiver.py: New missing file chunk detected' in output
 
     def test_verify_data(self):
         self._test_verify_data('--encryption', 'repokey')

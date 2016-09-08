@@ -68,7 +68,9 @@ static int hash_sizes[] = {
 };
 
 #define HASH_MIN_LOAD .25
-#define HASH_MAX_LOAD 0.99  /* don't go higher than 0.75, otherwise performance severely suffers! */
+#define HASH_MAX_LOAD .93  /* use testsuite.benchmark.test_chunk_indexer_* to find
+                              an appropriate value; also don't forget to update this
+                              value in archive.py */
 
 #define MAX(x, y) ((x) > (y) ? (x): (y))
 #define NELEMS(x) (sizeof(x) / sizeof((x)[0]))

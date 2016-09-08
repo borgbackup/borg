@@ -55,13 +55,13 @@ class HashIndexTestCase(BaseTestCase):
         del idx
         self.assert_equal(len(cls.read(idx_name.name)), 0)
 
-    # def test_nsindex(self):
-    #     self._generic_test(NSIndex, lambda x: (x, x),
-    #                        '80fba5b40f8cf12f1486f1ba33c9d852fb2b41a5b5961d3b9d1228cf2aa9c4c9')
+    def test_nsindex(self):
+        self._generic_test(NSIndex, lambda x: (x, x),
+                           '87a97fa40f6a4ad0dca5afb1368f25e93da3bbe1ebecf62a4f1b566c325dc098')
 
-    # def test_chunkindex(self):
-    #     self._generic_test(ChunkIndex, lambda x: (x, x, x),
-    #                        '1d71865e72e3c3af18d3c7216b6fa7b014695eaa3ed7f14cf9cd02fba75d1c95')
+    def test_chunkindex(self):
+        self._generic_test(ChunkIndex, lambda x: (x, x, x),
+                           'e4557b1aa64ee1ad421998d8eeb047b3f55d23bc8005e7977141b8eb525278f4')
 
     def test_resize(self):
         n = 2000  # Must be >= MIN_BUCKETS

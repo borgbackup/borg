@@ -107,9 +107,11 @@ def test_chunk_indexer_setitem(benchmark):
     # we want 32 byte keys, since that's what we use day to day
     keys = [sha256(H(k)).digest() for k in range(max_key)]
     bucket_val = (0, 0, 0)
+
     def setup():
         # return *args, **kwargs for the benchmarked function
         return [ChunkIndex(max_key), ], dict()
+
     def do_inserts(index):
         for key in keys:
             index[key] = bucket_val
@@ -124,8 +126,9 @@ def test_chunk_indexer_getitem(benchmark):
     for key in keys:
         # we want 32 byte keys, since that's what we use day to day
         index[key] = bucket_val
+
     def do_gets():
         for key in keys:
             # we want 32 byte keys, since that's what we use day to day
-            val = index[key]
+            index[key]  # noqa
     benchmark.pedantic(do_gets, rounds=100)

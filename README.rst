@@ -33,14 +33,14 @@ Main features
 
   Compared to other deduplication approaches, this method does NOT depend on:
 
-  * file/directory names staying the same: So you can move your stuff around 
+  * file/directory names staying the same: So you can move your stuff around
     without killing the deduplication, even between machines sharing a repo.
 
-  * complete files or time stamps staying the same: If a big file changes a 
-    little, only a few new chunks need to be stored - this is great for VMs or 
+  * complete files or time stamps staying the same: If a big file changes a
+    little, only a few new chunks need to be stored - this is great for VMs or
     raw disks.
 
-  * The absolute position of a data chunk inside a file: Stuff may get shifted 
+  * The absolute position of a data chunk inside a file: Stuff may get shifted
     and will still be found by the deduplication algorithm.
 
 **Speed**

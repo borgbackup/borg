@@ -31,7 +31,7 @@ Can I copy or synchronize my repo to another location?
 ------------------------------------------------------
 
 Yes, you could just copy all the files. Make sure you do that while no
-backup is running. So what you get here is this:
+backup is running (use `borg with-lock ...`). So what you get here is this:
 
 - client machine ---borg create---> repo1
 - repo1 ---copy---> repo2
@@ -47,25 +47,6 @@ If you want to have 2 independent backups, it is better to do it like this:
 - client machine ---borg create---> repo1
 - client machine ---borg create---> repo2
 
-Which file types, attributes, etc. are preserved?
--------------------------------------------------
-
-    * Directories
-    * Regular files
-    * Hardlinks (considering all files in the same archive)
-    * Symlinks (stored as symlink, the symlink is not followed)
-    * Character and block device files
-    * FIFOs ("named pipes")
-    * Name
-    * Contents
-    * Timestamps in nanosecond precision: mtime, atime, ctime
-    * IDs of owning user and owning group
-    * Names of owning user and owning group (if the IDs can be resolved)
-    * Unix Mode/Permissions (u/g/o permissions, suid, sgid, sticky)
-    * Extended Attributes (xattrs) on Linux, OS X and FreeBSD
-    * Access Control Lists (ACL_) on Linux, OS X and FreeBSD
-    * BSD flags on OS X and FreeBSD
-
 Which file types, attributes, etc. are *not* preserved?
 -------------------------------------------------------
 
@@ -80,6 +61,17 @@ Which file types, attributes, etc. are *not* preserved?
       Archive extraction has optional support to extract all-zero chunks as
       holes in a sparse file.
     * filesystem specific attributes, like ext4 immutable bit, see :issue:`618`.
+
+Are there other known limitations?
+----------------------------------
+
+- A single archive can only reference a limited volume of file/dir metadata,
+  usually corresponding to tens or hundreds of millions of files/dirs.
+  When trying to go beyond that limit, you will get a fatal IntegrityError
+  exception telling that the (archive) object is too big.
+  An easy workaround is to create multiple archives with less items each.
+  See also the :ref:`archive_limitation` and :issue:`1452`.
+
 
 Why is my backup bigger than with attic? Why doesn't |project_name| do compression by default?
 ----------------------------------------------------------------------------------------------
@@ -241,13 +233,10 @@ If a backup stops mid-way, does the already-backed-up data stay there?
 Yes, |project_name| supports resuming backups.
 
 During a backup a special checkpoint archive named ``<archive-name>.checkpoint``
-is saved every checkpoint interval (the default value for this is 5
+is saved every checkpoint interval (the default value for this is 30
 minutes) containing all the data backed-up until that point.
 
-Checkpoints only happen between files (so they don't help for interruptions
-happening while a very large file is being processed).
-
-This checkpoint archive is a valid archive (all files in it are valid and complete),
+This checkpoint archive is a valid archive,
 but it is only a partial backup (not all files that you wanted to backup are
 contained in it). Having it in the repo until a successful, full backup is
 completed is useful because it references all the transmitted chunks up
@@ -268,27 +257,25 @@ Once your backup has finished successfully, you can delete all
 ``<archive-name>.checkpoint`` archives. If you run ``borg prune``, it will
 also care for deleting unneeded checkpoints.
 
+Note: the checkpointing mechanism creates hidden, partial files in an archive,
+so that checkpoints even work while a big file is being processed.
+They are named ``<filename>.borg_part_<N>`` and all operations usually ignore
+these files, but you can make them considered by giving the option
+``--consider-part-files``. You usually only need that option if you are
+really desperate (e.g. if you have no completed backup of that file and you'ld
+rather get a partial file extracted than nothing). You do **not** want to give
+that option under any normal circumstances.
+
 How can I backup huge file(s) over a unstable connection?
 ---------------------------------------------------------
 
-You can use this "split trick" as a workaround for the in-between-files-only
-checkpoints (see above), huge files and a instable connection to the repository:
+This is not a problem any more, see previous FAQ item.
 
-Split the huge file(s) into parts of manageable size (e.g. 100MB) and create
-a temporary archive of them. Borg will create checkpoints now more frequently
-than if you try to backup the files in their original form (e.g. 100GB).
+How can I restore huge file(s) over a unstable connection?
+----------------------------------------------------------
 
-After that, you can remove the parts again and backup the huge file(s) in
-their original form. This will now work a lot faster as a lot of content chunks
-are already in the repository.
-
-After you have successfully backed up the huge original file(s), you can remove
-the temporary archive you made from the parts.
-
-We realize that this is just a better-than-nothing workaround, see :issue:`1198`
-for a potential solution.
-
-Please note that this workaround only helps you for backup, not for restore.
+If you can not manage to extract the whole big file in one go, you can extract
+all the part files (see above) and manually concatenate them together.
 
 If it crashes with a UnicodeError, what can I do?
 -------------------------------------------------
@@ -337,11 +324,8 @@ I am seeing 'A' (added) status for a unchanged file!?
 
 The files cache is used to determine whether |project_name| already
 "knows" / has backed up a file and if so, to skip the file from
-chunking. It does intentionally *not* contain files that:
-
-- have >= 10 as "entry age" (|project_name| has not seen this file for a while)
-- have a modification time (mtime) same as the newest mtime in the created
-  archive
+chunking. It does intentionally *not* contain files that have a modification
+time (mtime) same as the newest mtime in the created archive.
 
 So, if you see an 'A' status for unchanged file(s), they are likely the files
 with the most recent mtime in that archive.
@@ -366,6 +350,35 @@ that.
 Since only the files cache is used in the display of files status,
 those files are reported as being added when, really, chunks are
 already used.
+
+
+It always chunks all my files, even unchanged ones!
+---------------------------------------------------
+
+|project_name| maintains a files cache where it remembers the mtime, size and
+inode of files. When |project_name| does a new backup and starts processing a
+file, it first looks whether the file has changed (compared to the values
+stored in the files cache). If the values are the same, the file is assumed
+unchanged and thus its contents won't get chunked (again).
+
+|project_name| can't keep an infinite history of files of course, thus entries
+in the files cache have a "maximum time to live" which is set via the
+environment variable BORG_FILES_CACHE_TTL (and defaults to 20).
+Every time you do a backup (on the same machine, using the same user), the
+cache entries' ttl values of files that were not "seen" are incremented by 1
+and if they reach BORG_FILES_CACHE_TTL, the entry is removed from the cache.
+
+So, for example, if you do daily backups of 26 different data sets A, B,
+C, ..., Z on one machine (using the default TTL), the files from A will be
+already forgotten when you repeat the same backups on the next day and it
+will be slow because it would chunk all the files each time. If you set
+BORG_FILES_CACHE_TTL to at least 26 (or maybe even a small multiple of that),
+it would be much faster.
+
+Another possible reason is that files don't always have the same path, for
+example if you mount a filesystem without stable mount points for each backup.
+If the directory where you mount a filesystem is different every time,
+|project_name| assume they are different files.
 
 
 Is there a way to limit bandwidth with |project_name|?
@@ -411,6 +424,25 @@ maybe open an issue in their issue tracker. Do not file an issue in the
 
 If you can reproduce the issue with the proven filesystem, please file an
 issue in the |project_name| issue tracker about that.
+
+
+Requirements for the borg single-file binary, esp. (g)libc?
+-----------------------------------------------------------
+
+We try to build the binary on old, but still supported systems - to keep the
+minimum requirement for the (g)libc low. The (g)libc can't be bundled into
+the binary as it needs to fit your kernel and OS, but Python and all other
+required libraries will be bundled into the binary.
+
+If your system fulfills the minimum (g)libc requirement (see the README that
+is released with the binary), there should be no problem. If you are slightly
+below the required version, maybe just try. Due to the dynamic loading (or not
+loading) of some shared libraries, it might still work depending on what
+libraries are actually loaded and used.
+
+In the borg git repository, there is scripts/glibc_check.py that can determine
+(based on the symbols' versions they want to link to) whether a set of given
+(Linux) binaries works with a given glibc version.
 
 
 Why was Borg forked from Attic?

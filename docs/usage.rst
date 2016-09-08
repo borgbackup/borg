@@ -83,6 +83,9 @@ General:
     BORG_REMOTE_PATH
         When set, use the given path/filename as remote path (default is "borg").
         Using ``--remote-path PATH`` commandline option overrides the environment variable.
+    BORG_FILES_CACHE_TTL
+        When set to a numeric value, this determines the maximum "time to live" for the files cache
+        entries (default: 20). The files cache is used to quickly determine whether a file is unchanged.
     TMPDIR
         where temporary files are stored (might need a lot of temporary space for some operations)
 
@@ -268,6 +271,14 @@ Examples
     # use zlib compression (good, but slow) - default is no compression
     $ borg create -C zlib,6 /path/to/repo::root-{now:%Y-%m-%d} / --one-file-system
 
+    # Backup a remote host locally ("pull" style) using sshfs
+    $ mkdir sshfs-mount
+    $ sshfs root@example.com:/ sshfs-mount
+    $ cd sshfs-mount
+    $ borg create /path/to/repo::example.com-root-{now:%Y-%m-%d} .
+    $ cd ..
+    $ fusermount -u sshfs-mount
+
     # Make a big effort in fine granular deduplication (big chunk management
     # overhead, needs a lot of RAM and disk space, see formula in internals
     # docs - same parameters as borg < 1.0 or attic):
@@ -367,17 +378,6 @@ Examples
     -rw-rw-r-- user   user    1416192 Sun, 2015-02-01 11:00:00 code/myproject/file.ext
     ...
 
-    # see what is changed between archives, based on file modification time, size and file path
-    $ borg list /path/to/repo::archiveA --list-format="{mtime:%s}{TAB}{size}{TAB}{path}{LF}" |sort -n > /tmp/list.archiveA
-    $ borg list /path/to/repo::archiveB --list-format="{mtime:%s}{TAB}{size}{TAB}{path}{LF}" |sort -n > /tmp/list.archiveB
-    $ diff -y /tmp/list.archiveA /tmp/list.archiveB
-    1422781200      0       .                                       1422781200      0       .
-    1422781200      0       code                                    1422781200      0       code
-    1422781200      0       code/myproject                          1422781200      0       code/myproject
-    1422781200      1416192 code/myproject/file.ext               | 1454664653      1416192 code/myproject/file.ext
-    ...
-
-
 
 .. include:: usage/diff.rst.inc
 
@@ -447,8 +447,8 @@ you restrict its operation to a subset of the archives using ``--prefix``.
 When using ``--prefix``, be careful to choose a good prefix - e.g. do not use a
 prefix "foo" if you do not also want to match "foobar".
 
-It is strongly recommended to always run ``prune --dry-run ...`` first so you
-will see what it would do without it actually doing anything.
+It is strongly recommended to always run ``prune -v --list --dry-run ...``
+first so you will see what it would do without it actually doing anything.
 
 There is also a visualized prune example in ``docs/misc/prune-example.txt``.
 
@@ -456,19 +456,19 @@ There is also a visualized prune example in ``docs/misc/prune-example.txt``.
 
     # Keep 7 end of day and 4 additional end of week archives.
     # Do a dry-run without actually deleting anything.
-    $ borg prune --dry-run --keep-daily=7 --keep-weekly=4 /path/to/repo
+    $ borg prune -v --list --dry-run --keep-daily=7 --keep-weekly=4 /path/to/repo
 
     # Same as above but only apply to archive names starting with the hostname
     # of the machine followed by a "-" character:
-    $ borg prune --keep-daily=7 --keep-weekly=4 --prefix='{hostname}-' /path/to/repo
+    $ borg prune -v --list --keep-daily=7 --keep-weekly=4 --prefix='{hostname}-' /path/to/repo
 
     # Keep 7 end of day, 4 additional end of week archives,
     # and an end of month archive for every month:
-    $ borg prune --keep-daily=7 --keep-weekly=4 --keep-monthly=-1 /path/to/repo
+    $ borg prune -v --list --keep-daily=7 --keep-weekly=4 --keep-monthly=-1 /path/to/repo
 
     # Keep all backups in the last 10 days, 4 additional end of week archives,
     # and an end of month archive for every month:
-    $ borg prune --keep-within=10d --keep-weekly=4 --keep-monthly=-1 /path/to/repo
+    $ borg prune -v --list --keep-within=10d --keep-weekly=4 --keep-monthly=-1 /path/to/repo
 
 
 .. include:: usage/info.rst.inc
@@ -499,13 +499,22 @@ Examples
 
 Examples
 ~~~~~~~~
-borg mount/borgfs
-+++++++++++++++++
+borg mount
+++++++++++
 ::
 
     $ borg mount /path/to/repo::root-2016-02-15 /tmp/mymountpoint
     $ ls /tmp/mymountpoint
     bin  boot  etc	home  lib  lib64  lost+found  media  mnt  opt  root  sbin  srv  tmp  usr  var
+    $ fusermount -u /tmp/mymountpoint
+
+::
+
+    $ borg mount -o versions /path/to/repo /tmp/mymountpoint
+    $ ls -l /tmp/mymountpoint/home/user/doc.txt/
+    total 24
+    -rw-rw-r-- 1 user group 12357 Aug 26 21:19 doc.txt.cda00bc9
+    -rw-rw-r-- 1 user group 12204 Aug 26 21:04 doc.txt.fa760f28
     $ fusermount -u /tmp/mymountpoint
 
 borgfs

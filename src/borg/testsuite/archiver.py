@@ -28,14 +28,17 @@ from ..archiver import Archiver
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto import bytes_to_long, num_aes_blocks
+from ..helpers import PatternMatcher, parse_pattern
 from ..helpers import Chunk, Manifest
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
+from ..item import Item
 from ..key import KeyfileKeyBase
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import has_lchflags, has_llfuse
 from . import BaseTestCase, changedir, environment_variable
+from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported
 
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -225,6 +228,8 @@ class ArchiverTestCaseBase(BaseTestCase):
         os.chdir(self._old_wd)
         # note: ignore_errors=True as workaround for issue #862
         shutil.rmtree(self.tmpdir, ignore_errors=True)
+        # destroy logging configuration
+        logging.Logger.manager.loggerDict.clear()
 
     def cmd(self, *args, **kw):
         exit_code = kw.pop('exit_code', 0)
@@ -241,7 +246,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         self.cmd('create', self.repository_location + '::' + name, src_dir)
 
     def open_archive(self, name):
-        repository = Repository(self.repository_path)
+        repository = Repository(self.repository_path, exclusive=True)
         with repository:
             manifest, key = Manifest.load(repository)
             archive = Archive(repository, key, manifest, name)
@@ -274,12 +279,20 @@ class ArchiverTestCaseBase(BaseTestCase):
         # File mode
         os.chmod('input/file1', 0o4755)
         # Hard link
-        os.link(os.path.join(self.input_path, 'file1'),
-                os.path.join(self.input_path, 'hardlink'))
+        if are_hardlinks_supported():
+            os.link(os.path.join(self.input_path, 'file1'),
+                    os.path.join(self.input_path, 'hardlink'))
         # Symlink
-        os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
-        if xattr.is_enabled(self.input_path):
-            xattr.setxattr(os.path.join(self.input_path, 'file1'), 'user.foo', b'bar')
+        if are_symlinks_supported():
+            os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
+        self.create_regular_file('fusexattr', size=1)
+        if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
+            # ironically, due to the way how fakeroot works, comparing fuse file xattrs to orig file xattrs
+            # will FAIL if fakeroot supports xattrs, thus we only set the xattr if XATTR_FAKEROOT is False.
+            # This is because fakeroot with xattr-support does not propagate xattrs of the underlying file
+            # into "fakeroot space". Because the xattrs exposed by borgfs are these of an underlying file
+            # (from fakeroots point of view) they are invisible to the test process inside the fakeroot.
+            xattr.setxattr(os.path.join(self.input_path, 'fusexattr'), 'user.foo', b'bar')
             # XXX this always fails for me
             # ubuntu 14.04, on a TMP dir filesystem with user_xattr, using fakeroot
             # same for newer ubuntu and centos.
@@ -287,7 +300,8 @@ class ArchiverTestCaseBase(BaseTestCase):
             # so that the test setup for all tests using it does not fail here always for others.
             # xattr.setxattr(os.path.join(self.input_path, 'link1'), 'user.foo_symlink', b'bar_symlink', follow_symlinks=False)
         # FIFO node
-        os.mkfifo(os.path.join(self.input_path, 'fifo1'))
+        if are_fifos_supported():
+            os.mkfifo(os.path.join(self.input_path, 'fifo1'))
         if has_lchflags:
             platform.set_flags(os.path.join(self.input_path, 'flagfile'), stat.UF_NODUMP)
         try:
@@ -332,12 +346,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             'input/dir2',
             'input/dir2/file2',
             'input/empty',
-            'input/fifo1',
             'input/file1',
             'input/flagfile',
-            'input/hardlink',
-            'input/link1',
         ]
+        if are_fifos_supported():
+            expected.append('input/fifo1')
+        if are_symlinks_supported():
+            expected.append('input/link1')
+        if are_hardlinks_supported():
+            expected.append('input/hardlink')
         if not have_root:
             # we could not create these device files without (fake)root
             expected.remove('input/bdev')
@@ -351,7 +368,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.assert_in(name, list_output)
         self.assert_dirs_equal('input', 'output/input')
         info_output = self.cmd('info', self.repository_location + '::test')
-        item_count = 3 if has_lchflags else 4  # one file is UF_NODUMP
+        item_count = 4 if has_lchflags else 5  # one file is UF_NODUMP
         self.assert_in('Number of files: %d' % item_count, info_output)
         shutil.rmtree(self.cache_path)
         with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='yes'):
@@ -373,14 +390,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_unix_socket(self):
         self.cmd('init', self.repository_location)
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.bind(os.path.join(self.input_path, 'unix-socket'))
+        try:
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.bind(os.path.join(self.input_path, 'unix-socket'))
+        except PermissionError as err:
+            if err.errno == errno.EPERM:
+                pytest.skip('unix sockets disabled or not supported')
+            elif err.errno == errno.EACCES:
+                pytest.skip('permission denied to create unix sockets')
         self.cmd('create', self.repository_location + '::test', 'input')
         sock.close()
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
             assert not os.path.exists('input/unix-socket')
 
+    @pytest.mark.skipif(not are_symlinks_supported(), reason='symlinks not supported')
     def test_symlink_extract(self):
         self.create_test_files()
         self.cmd('init', self.repository_location)
@@ -389,11 +413,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
             assert os.readlink('input/link1') == 'somewhere'
 
+    # Search for O_NOATIME there: https://www.gnu.org/software/hurd/contributing.html - we just
+    # skip the test on Hurd, it is not critical anyway, just testing a performance optimization.
+    @pytest.mark.skipif(sys.platform == 'gnu0', reason="O_NOATIME is strangely broken on GNU Hurd")
+    @pytest.mark.skipif(not is_utime_fully_supported(), reason='cannot properly setup and execute test without utime')
     def test_atime(self):
         def has_noatime(some_file):
             atime_before = os.stat(some_file).st_atime_ns
             try:
-                os.close(os.open(some_file, flags_noatime))
+                with open(os.open(some_file, flags_noatime)) as file:
+                    file.read()
             except PermissionError:
                 return False
             else:
@@ -556,6 +585,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
 
+    @pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
     def test_strip_components_links(self):
         self._extract_hardlinks_setup()
         with changedir('output'):
@@ -568,6 +598,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
             assert os.stat('input/dir1/hardlink').st_nlink == 4
 
+    @pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
     def test_extract_hardlinks(self):
         self._extract_hardlinks_setup()
         with changedir('output'):
@@ -727,6 +758,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir('output'):
             output = self.cmd('extract', '--list', '--info', self.repository_location + '::test')
         self.assert_in("input/file", output)
+
+    def test_extract_progress(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('file', size=1024 * 80)
+        self.cmd('create', self.repository_location + '::test', 'input')
+
+        with changedir('output'):
+            output = self.cmd('extract', self.repository_location + '::test', '--progress')
+            assert 'Extracting files' in output
 
     def _create_test_caches(self):
         self.cmd('init', self.repository_location)
@@ -911,6 +951,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('test.3', manifest.archives)
         self.assert_in('test.4', manifest.archives)
 
+    def test_info(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        info_repo = self.cmd('info', self.repository_location)
+        assert 'All archives:' in info_repo
+        info_archive = self.cmd('info', self.repository_location + '::test')
+        assert 'Archive name: test\n' in info_archive
+
     def test_comment(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', self.repository_location)
@@ -987,6 +1036,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # Restore permissions so shutil.rmtree is able to delete it
             os.system('chmod -R u+w ' + self.repository_path)
 
+    @pytest.mark.skipif('BORG_TESTS_IGNORE_MODES' in os.environ, reason='modes unreliable')
     def test_umask(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', self.repository_location)
@@ -1002,13 +1052,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             manifest, key = Manifest.load(repository)
         self.assert_equal(len(manifest.archives), 0)
 
-    def test_progress(self):
+    def test_progress_on(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', self.repository_location)
-        # progress forced on
         output = self.cmd('create', '--progress', self.repository_location + '::test4', 'input')
         self.assert_in("\r", output)
-        # progress forced off
+
+    def test_progress_off(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', self.repository_location)
         output = self.cmd('create', self.repository_location + '::test5', 'input')
         self.assert_not_in("\r", output)
 
@@ -1175,8 +1227,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', self.repository_location)
         test_archive = self.repository_location + '::test'
         self.cmd('create', test_archive, src_dir)
-        self.cmd('list', '--list-format', '-', test_archive, exit_code=1)
-        self.archiver.exit_code = 0  # reset exit code for following tests
+        output_warn = self.cmd('list', '--list-format', '-', test_archive)
+        self.assert_in('--list-format" has been deprecated.', output_warn)
         output_1 = self.cmd('list', test_archive)
         output_2 = self.cmd('list', '--format', '{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}', test_archive)
         output_3 = self.cmd('list', '--format', '{mtime:%s} {path}{NL}', test_archive)
@@ -1306,8 +1358,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
     def test_fuse(self):
+        def has_noatime(some_file):
+            atime_before = os.stat(some_file).st_atime_ns
+            try:
+                os.close(os.open(some_file, flags_noatime))
+            except PermissionError:
+                return False
+            else:
+                atime_after = os.stat(some_file).st_atime_ns
+                noatime_used = flags_noatime != flags_normal
+                return noatime_used and atime_before == atime_after
+
         self.cmd('init', self.repository_location)
         self.create_test_files()
+        have_noatime = has_noatime('input/file1')
         self.cmd('create', self.repository_location + '::archive', 'input')
         self.cmd('create', self.repository_location + '::archive2', 'input')
         if has_lchflags:
@@ -1331,7 +1395,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert sti1.st_uid == sto1.st_uid
             assert sti1.st_gid == sto1.st_gid
             assert sti1.st_size == sto1.st_size
-            assert sti1.st_atime == sto1.st_atime
+            if have_noatime:
+                assert sti1.st_atime == sto1.st_atime
             assert sti1.st_ctime == sto1.st_ctime
             assert sti1.st_mtime == sto1.st_mtime
             # note: there is another hardlink to this, see below
@@ -1340,7 +1405,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             with open(in_fn, 'rb') as in_f, open(out_fn, 'rb') as out_f:
                 assert in_f.read() == out_f.read()
             # list/read xattrs
-            if xattr.is_enabled(self.input_path):
+            in_fn = 'input/fusexattr'
+            out_fn = os.path.join(mountpoint, 'input', 'fusexattr')
+            if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
                 assert xattr.listxattr(out_fn) == ['user.foo', ]
                 assert xattr.getxattr(out_fn, 'user.foo') == b'bar'
             else:
@@ -1352,24 +1419,42 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 else:
                     assert False, "expected OSError(ENOATTR), but no error was raised"
             # hardlink (to 'input/file1')
-            in_fn = 'input/hardlink'
-            out_fn = os.path.join(mountpoint, 'input', 'hardlink')
-            sti2 = os.stat(in_fn)
-            sto2 = os.stat(out_fn)
-            assert sti2.st_nlink == sto2.st_nlink == 2
-            assert sto1.st_ino == sto2.st_ino
+            if are_hardlinks_supported():
+                in_fn = 'input/hardlink'
+                out_fn = os.path.join(mountpoint, 'input', 'hardlink')
+                sti2 = os.stat(in_fn)
+                sto2 = os.stat(out_fn)
+                assert sti2.st_nlink == sto2.st_nlink == 2
+                assert sto1.st_ino == sto2.st_ino
             # symlink
-            in_fn = 'input/link1'
-            out_fn = os.path.join(mountpoint, 'input', 'link1')
-            sti = os.stat(in_fn, follow_symlinks=False)
-            sto = os.stat(out_fn, follow_symlinks=False)
-            assert stat.S_ISLNK(sti.st_mode)
-            assert stat.S_ISLNK(sto.st_mode)
-            assert os.readlink(in_fn) == os.readlink(out_fn)
+            if are_symlinks_supported():
+                in_fn = 'input/link1'
+                out_fn = os.path.join(mountpoint, 'input', 'link1')
+                sti = os.stat(in_fn, follow_symlinks=False)
+                sto = os.stat(out_fn, follow_symlinks=False)
+                assert stat.S_ISLNK(sti.st_mode)
+                assert stat.S_ISLNK(sto.st_mode)
+                assert os.readlink(in_fn) == os.readlink(out_fn)
             # FIFO
-            out_fn = os.path.join(mountpoint, 'input', 'fifo1')
-            sto = os.stat(out_fn)
-            assert stat.S_ISFIFO(sto.st_mode)
+            if are_fifos_supported():
+                out_fn = os.path.join(mountpoint, 'input', 'fifo1')
+                sto = os.stat(out_fn)
+                assert stat.S_ISFIFO(sto.st_mode)
+
+    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    def test_fuse_versions_view(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('test', contents=b'first')
+        self.cmd('create', self.repository_location + '::archive1', 'input')
+        self.create_regular_file('test', contents=b'second')
+        self.cmd('create', self.repository_location + '::archive2', 'input')
+        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
+        # mount the whole repository, archive contents shall show up in versioned view:
+        with self.fuse_mount(self.repository_location, mountpoint, 'versions'):
+            path = os.path.join(mountpoint, 'input', 'test')  # filename shows up as directory ...
+            files = os.listdir(path)
+            assert all(f.startswith('test.') for f in files)  # ... with files test.xxxxxxxx in there
+            assert {b'first', b'second'} == {open(os.path.join(path, f), 'rb').read() for f in files}
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
     def test_fuse_allow_damaged_files(self):
@@ -1423,7 +1508,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         verify_uniqueness()
         self.cmd('delete', self.repository_location + '::test.2')
         verify_uniqueness()
-        self.assert_equal(used, set(range(len(used))))
 
     def test_aes_counter_uniqueness_keyfile(self):
         self.verify_aes_counter_uniqueness('keyfile')
@@ -1437,6 +1521,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test', 'input')
         with changedir('output'):
             output = self.cmd('debug-dump-archive-items', self.repository_location + '::test')
+        output_dir = sorted(os.listdir('output'))
+        assert len(output_dir) > 0 and output_dir[0].startswith('000000_')
+        assert 'Done.' in output
+
+    def test_debug_dump_repo_objs(self):
+        self.create_test_files()
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            output = self.cmd('debug-dump-repo-objs', self.repository_location)
         output_dir = sorted(os.listdir('output'))
         assert len(output_dir) > 0 and output_dir[0].startswith('000000_')
         assert 'Done.' in output
@@ -1468,6 +1562,28 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('init', self.repository_location, exit_code=1)
         assert not os.path.exists(self.repository_location)
 
+    def test_recreate_target_rc(self):
+        self.cmd('init', self.repository_location)
+        output = self.cmd('recreate', self.repository_location, '--target=asdf', exit_code=2)
+        assert 'Need to specify single archive' in output
+
+    def test_recreate_target(self):
+        self.create_test_files()
+        self.cmd('init', self.repository_location)
+        archive = self.repository_location + '::test0'
+        self.cmd('create', archive, 'input')
+        original_archive = self.cmd('list', self.repository_location)
+        self.cmd('recreate', archive, 'input/dir2', '-e', 'input/dir2/file3', '--target=new-archive')
+        archives = self.cmd('list', self.repository_location)
+        assert original_archive in archives
+        assert 'new-archive' in archives
+
+        archive = self.repository_location + '::new-archive'
+        listing = self.cmd('list', '--short', archive)
+        assert 'file1' not in listing
+        assert 'dir2/file2' in listing
+        assert 'dir2/file3' not in listing
+
     def test_recreate_basic(self):
         self.create_test_files()
         self.create_regular_file('dir2/file3', size=1024 * 80)
@@ -1480,6 +1596,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert 'dir2/file2' in listing
         assert 'dir2/file3' not in listing
 
+    @pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
     def test_recreate_subtree_hardlinks(self):
         # This is essentially the same problem set as in test_extract_hardlinks
         self._extract_hardlinks_setup()
@@ -1696,6 +1813,10 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
         pass
 
     @unittest.skip('patches objects')
+    def test_recreate_interrupt2(self):
+        pass
+
+    @unittest.skip('patches objects')
     def test_recreate_changed_source(self):
         pass
 
@@ -1782,7 +1903,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
     def test_missing_archive_item_chunk(self):
         archive, repository = self.open_archive('archive1')
         with repository:
-            repository.delete(archive.metadata[b'items'][-5])
+            repository.delete(archive.metadata.items[-5])
             repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', '--repair', self.repository_location, exit_code=0)
@@ -1810,7 +1931,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 
     def test_extra_chunks(self):
         self.cmd('check', self.repository_location, exit_code=0)
-        with Repository(self.repository_location) as repository:
+        with Repository(self.repository_location, exclusive=True) as repository:
             repository.put(b'01234567890123456789012345678901', b'xxxx')
             repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
@@ -1847,27 +1968,49 @@ class RemoteArchiverTestCase(ArchiverTestCase):
     prefix = '__testsuite__:'
 
     def test_remote_repo_restrict_to_path(self):
-        self.cmd('init', self.repository_location)
-        path_prefix = os.path.dirname(self.repository_path)
+        # restricted to repo directory itself:
+        with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', self.repository_path]):
+            self.cmd('init', self.repository_location)
+        # restricted to repo directory itself, fail for other directories with same prefix:
+        with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', self.repository_path]):
+            self.assert_raises(PathNotAllowed, lambda: self.cmd('init', self.repository_location + '_0'))
+
+        # restricted to a completely different path:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo']):
             self.assert_raises(PathNotAllowed, lambda: self.cmd('init', self.repository_location + '_1'))
+        path_prefix = os.path.dirname(self.repository_path)
+        # restrict to repo directory's parent directory:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', path_prefix]):
             self.cmd('init', self.repository_location + '_2')
+        # restrict to repo directory's parent directory and another directory:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo', '--restrict-to-path', path_prefix]):
             self.cmd('init', self.repository_location + '_3')
-
-    # skip fuse tests here, they deadlock since this change in exec_cmd:
-    # -output = subprocess.check_output(borg + args, stderr=None)
-    # +output = subprocess.check_output(borg + args, stderr=subprocess.STDOUT)
-    # this was introduced because some tests expect stderr contents to show up
-    # in "output" also. Also, the non-forking exec_cmd catches both, too.
-    @unittest.skip('deadlock issues')
-    def test_fuse(self):
-        pass
 
     @unittest.skip('only works locally')
     def test_debug_put_get_delete_obj(self):
         pass
+
+    def test_strip_components_doesnt_leak(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('dir/file', contents=b"test file contents 1")
+        self.create_regular_file('dir/file2', contents=b"test file contents 2")
+        self.create_regular_file('skipped-file1', contents=b"test file contents 3")
+        self.create_regular_file('skipped-file2', contents=b"test file contents 4")
+        self.create_regular_file('skipped-file3', contents=b"test file contents 5")
+        self.cmd('create', self.repository_location + '::test', 'input')
+        marker = 'cached responses left in RemoteRepository'
+        with changedir('output'):
+            res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '3')
+            self.assert_true(marker not in res)
+            with self.assert_creates_file('file'):
+                res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '2')
+                self.assert_true(marker not in res)
+            with self.assert_creates_file('dir/file'):
+                res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '1')
+                self.assert_true(marker not in res)
+            with self.assert_creates_file('input/dir/file'):
+                res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '0')
+                self.assert_true(marker not in res)
 
 
 class DiffArchiverTestCase(ArchiverTestCaseBase):
@@ -1883,17 +2026,19 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file_replaced', size=1024)
         os.mkdir('input/dir_replaced_with_file')
         os.chmod('input/dir_replaced_with_file', stat.S_IFDIR | 0o755)
-        os.mkdir('input/dir_replaced_with_link')
         os.mkdir('input/dir_removed')
-        os.symlink('input/dir_replaced_with_file', 'input/link_changed')
-        os.symlink('input/file_unchanged', 'input/link_removed')
-        os.symlink('input/file_removed2', 'input/link_target_removed')
-        os.symlink('input/empty', 'input/link_target_contents_changed')
-        os.symlink('input/empty', 'input/link_replaced_by_file')
-        os.link('input/empty', 'input/hardlink_contents_changed')
-        os.link('input/file_removed', 'input/hardlink_removed')
-        os.link('input/file_removed2', 'input/hardlink_target_removed')
-        os.link('input/file_replaced', 'input/hardlink_target_replaced')
+        if are_symlinks_supported():
+            os.mkdir('input/dir_replaced_with_link')
+            os.symlink('input/dir_replaced_with_file', 'input/link_changed')
+            os.symlink('input/file_unchanged', 'input/link_removed')
+            os.symlink('input/file_removed2', 'input/link_target_removed')
+            os.symlink('input/empty', 'input/link_target_contents_changed')
+            os.symlink('input/empty', 'input/link_replaced_by_file')
+        if are_hardlinks_supported():
+            os.link('input/empty', 'input/hardlink_contents_changed')
+            os.link('input/file_removed', 'input/hardlink_removed')
+            os.link('input/file_removed2', 'input/hardlink_target_removed')
+            os.link('input/file_replaced', 'input/hardlink_target_replaced')
 
         # Create the first snapshot
         self.cmd('create', self.repository_location + '::test0', 'input')
@@ -1909,16 +2054,18 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         os.chmod('input/dir_replaced_with_file', stat.S_IFREG | 0o755)
         os.mkdir('input/dir_added')
         os.rmdir('input/dir_removed')
-        os.rmdir('input/dir_replaced_with_link')
-        os.symlink('input/dir_added', 'input/dir_replaced_with_link')
-        os.unlink('input/link_changed')
-        os.symlink('input/dir_added', 'input/link_changed')
-        os.symlink('input/dir_added', 'input/link_added')
-        os.unlink('input/link_removed')
-        os.unlink('input/link_replaced_by_file')
-        self.create_regular_file('link_replaced_by_file', size=16384)
-        os.unlink('input/hardlink_removed')
-        os.link('input/file_added', 'input/hardlink_added')
+        if are_symlinks_supported():
+            os.rmdir('input/dir_replaced_with_link')
+            os.symlink('input/dir_added', 'input/dir_replaced_with_link')
+            os.unlink('input/link_changed')
+            os.symlink('input/dir_added', 'input/link_changed')
+            os.symlink('input/dir_added', 'input/link_added')
+            os.unlink('input/link_replaced_by_file')
+            self.create_regular_file('link_replaced_by_file', size=16384)
+            os.unlink('input/link_removed')
+        if are_hardlinks_supported():
+            os.unlink('input/hardlink_removed')
+            os.link('input/file_added', 'input/hardlink_added')
 
         with open('input/empty', 'ab') as fd:
             fd.write(b'appended_data')
@@ -1935,49 +2082,57 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             assert 'input/file_unchanged' not in output
 
             # Directory replaced with a regular file
-            assert '[drwxr-xr-x -> -rwxr-xr-x] input/dir_replaced_with_file' in output
+            if 'BORG_TESTS_IGNORE_MODES' not in os.environ:
+                assert '[drwxr-xr-x -> -rwxr-xr-x] input/dir_replaced_with_file' in output
 
             # Basic directory cases
             assert 'added directory     input/dir_added' in output
             assert 'removed directory   input/dir_removed' in output
 
-            # Basic symlink cases
-            assert 'changed link        input/link_changed' in output
-            assert 'added link          input/link_added' in output
-            assert 'removed link        input/link_removed' in output
+            if are_symlinks_supported():
+                # Basic symlink cases
+                assert 'changed link        input/link_changed' in output
+                assert 'added link          input/link_added' in output
+                assert 'removed link        input/link_removed' in output
 
-            # Symlink replacing or being replaced
-            assert '] input/dir_replaced_with_link' in output
-            assert '] input/link_replaced_by_file' in output
+                # Symlink replacing or being replaced
+                assert '] input/dir_replaced_with_link' in output
+                assert '] input/link_replaced_by_file' in output
 
-            # Symlink target removed. Should not affect the symlink at all.
-            assert 'input/link_target_removed' not in output
+                # Symlink target removed. Should not affect the symlink at all.
+                assert 'input/link_target_removed' not in output
 
             # The inode has two links and the file contents changed. Borg
             # should notice the changes in both links. However, the symlink
             # pointing to the file is not changed.
             assert '0 B input/empty' in output
-            assert '0 B input/hardlink_contents_changed' in output
-            assert 'input/link_target_contents_changed' not in output
+            if are_hardlinks_supported():
+                assert '0 B input/hardlink_contents_changed' in output
+            if are_symlinks_supported():
+                assert 'input/link_target_contents_changed' not in output
 
             # Added a new file and a hard link to it. Both links to the same
             # inode should appear as separate files.
             assert 'added       2.05 kB input/file_added' in output
-            assert 'added       2.05 kB input/hardlink_added' in output
+            if are_hardlinks_supported():
+                assert 'added       2.05 kB input/hardlink_added' in output
 
             # The inode has two links and both of them are deleted. They should
             # appear as two deleted files.
             assert 'removed       256 B input/file_removed' in output
-            assert 'removed       256 B input/hardlink_removed' in output
+            if are_hardlinks_supported():
+                assert 'removed       256 B input/hardlink_removed' in output
 
             # Another link (marked previously as the source in borg) to the
             # same inode was removed. This should not change this link at all.
-            assert 'input/hardlink_target_removed' not in output
+            if are_hardlinks_supported():
+                assert 'input/hardlink_target_removed' not in output
 
             # Another link (marked previously as the source in borg) to the
             # same inode was replaced with a new regular file. This should not
             # change this link at all.
-            assert 'input/hardlink_target_replaced' not in output
+            if are_hardlinks_supported():
+                assert 'input/hardlink_target_replaced' not in output
 
         do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1a'), '1a')
         # We expect exit_code=1 due to the chunker params warning
@@ -2067,3 +2222,30 @@ def test_compare_chunk_contents():
     ], [
         b'1234', b'565'
     ])
+
+
+class TestBuildFilter:
+    @staticmethod
+    def peek_and_store_hardlink_masters(item, matched):
+        pass
+
+    def test_basic(self):
+        matcher = PatternMatcher()
+        matcher.add([parse_pattern('included')], True)
+        filter = Archiver.build_filter(matcher, self.peek_and_store_hardlink_masters, 0)
+        assert filter(Item(path='included'))
+        assert filter(Item(path='included/file'))
+        assert not filter(Item(path='something else'))
+
+    def test_empty(self):
+        matcher = PatternMatcher(fallback=True)
+        filter = Archiver.build_filter(matcher, self.peek_and_store_hardlink_masters, 0)
+        assert filter(Item(path='anything'))
+
+    def test_strip_components(self):
+        matcher = PatternMatcher(fallback=True)
+        filter = Archiver.build_filter(matcher, self.peek_and_store_hardlink_masters, strip_components=1)
+        assert not filter(Item(path='shallow'))
+        assert not filter(Item(path='shallow/'))  # can this even happen? paths are normalized...
+        assert filter(Item(path='deep enough/file'))
+        assert filter(Item(path='something/dir/file'))

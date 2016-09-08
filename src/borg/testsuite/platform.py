@@ -1,11 +1,13 @@
+import functools
 import os
 import shutil
 import sys
 import tempfile
+import pwd
 import unittest
 
 from ..platform import acl_get, acl_set, swidth
-from . import BaseTestCase
+from . import BaseTestCase, unopened_tempfile
 
 
 ACCESS_ACL = """
@@ -30,9 +32,37 @@ mask::rw-
 other::r--
 """.strip().encode('ascii')
 
+_acls_working = None
+
 
 def fakeroot_detected():
     return 'FAKEROOTKEY' in os.environ
+
+
+def user_exists(username):
+    try:
+        pwd.getpwnam(username)
+        return True
+    except (KeyError, ValueError):
+        return False
+
+
+@functools.lru_cache()
+def are_acls_working():
+    with unopened_tempfile() as filepath:
+        open(filepath, 'w').close()
+        try:
+            access = b'user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-:9999\ngroup:root:rw-:9999\n'
+            acl = {'acl_access': access}
+            acl_set(filepath, acl)
+            read_acl = {}
+            acl_get(filepath, read_acl, os.stat(filepath))
+            read_acl_access = read_acl.get('acl_access', None)
+            if read_acl_access and b'user::rw-' in read_acl_access:
+                return True
+        except PermissionError:
+            pass
+        return False
 
 
 @unittest.skipUnless(sys.platform.startswith('linux'), 'linux only test')
@@ -54,6 +84,7 @@ class PlatformLinuxTestCase(BaseTestCase):
         item = {'acl_access': access, 'acl_default': default}
         acl_set(path, item, numeric_owner=numeric_owner)
 
+    @unittest.skipIf(not are_acls_working(), 'ACLs do not work')
     def test_access_acl(self):
         file = tempfile.NamedTemporaryFile()
         self.assert_equal(self.get_acl(file.name), {})
@@ -66,12 +97,15 @@ class PlatformLinuxTestCase(BaseTestCase):
         self.assert_in(b'user:9999:rw-:9999', self.get_acl(file2.name)['acl_access'])
         self.assert_in(b'group:9999:rw-:9999', self.get_acl(file2.name)['acl_access'])
 
+    @unittest.skipIf(not are_acls_working(), 'ACLs do not work')
     def test_default_acl(self):
         self.assert_equal(self.get_acl(self.tmpdir), {})
         self.set_acl(self.tmpdir, access=ACCESS_ACL, default=DEFAULT_ACL)
         self.assert_equal(self.get_acl(self.tmpdir)['acl_access'], ACCESS_ACL)
         self.assert_equal(self.get_acl(self.tmpdir)['acl_default'], DEFAULT_ACL)
 
+    @unittest.skipIf(not user_exists('übel'), 'requires übel user')
+    @unittest.skipIf(not are_acls_working(), 'ACLs do not work')
     def test_non_ascii_acl(self):
         # Testing non-ascii ACL processing to see whether our code is robust.
         # I have no idea whether non-ascii ACLs are allowed by the standard,
@@ -128,6 +162,7 @@ class PlatformDarwinTestCase(BaseTestCase):
         item = {'acl_extended': acl}
         acl_set(path, item, numeric_owner=numeric_owner)
 
+    @unittest.skipIf(not are_acls_working(), 'ACLs do not work')
     def test_access_acl(self):
         file = tempfile.NamedTemporaryFile()
         file2 = tempfile.NamedTemporaryFile()

@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 from .helpers import get_home_dir, get_keys_dir, get_cache_dir
 from .helpers import ProgressIndicatorPercent
 from .key import KeyfileKey, KeyfileNotFoundError
-from .locking import UpgradableLock
+from .locking import Lock
 from .repository import Repository, MAGIC
 
 ATTIC_MAGIC = b'ATTICSEG'
@@ -40,7 +40,7 @@ class AtticRepositoryUpgrader(Repository):
                     shutil.copytree(self.path, backup, copy_function=os.link)
             logger.info("opening attic repository with borg and converting")
             # now lock the repo, after we have made the copy
-            self.lock = UpgradableLock(os.path.join(self.path, 'lock'), exclusive=True, timeout=1.0).acquire()
+            self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=1.0).acquire()
             segments = [filename for i, filename in self.io.segment_iterator()]
             try:
                 keyfile = self.find_attic_keyfile()
@@ -49,8 +49,7 @@ class AtticRepositoryUpgrader(Repository):
             else:
                 self.convert_keyfiles(keyfile, dryrun)
         # partial open: just hold on to the lock
-        self.lock = UpgradableLock(os.path.join(self.path, 'lock'),
-                                   exclusive=True).acquire()
+        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True).acquire()
         try:
             self.convert_cache(dryrun)
             self.convert_repo_index(dryrun=dryrun, inplace=inplace)
@@ -78,7 +77,7 @@ class AtticRepositoryUpgrader(Repository):
         replace the 8 first bytes of all regular files in there."""
         logger.info("converting %d segments..." % len(segments))
         segment_count = len(segments)
-        pi = ProgressIndicatorPercent(total=segment_count, msg="Converting segments %3.0f%%", same_line=True)
+        pi = ProgressIndicatorPercent(total=segment_count, msg="Converting segments %3.0f%%")
         for i, filename in enumerate(segments):
             if progress:
                 pi.show(i)

@@ -12,12 +12,19 @@ end
 
 def packages_debianoid
   return <<-EOF
+    if id "vagrant" >/dev/null 2>&1; then
+      username='vagrant'
+      home_dir=/home/vagrant
+    else
+      username='ubuntu'
+      home_dir=/home/ubuntu
+    fi
     apt-get update
     # install all the (security and other) updates
     apt-get dist-upgrade -y
     # for building borgbackup and dependencies:
     apt-get install -y libssl-dev libacl1-dev liblz4-dev libfuse-dev fuse pkg-config
-    usermod -a -G fuse vagrant
+    usermod -a -G fuse $username
     apt-get install -y fakeroot build-essential git
     apt-get install -y python3-dev python3-setuptools
     # for building python:
@@ -27,7 +34,7 @@ def packages_debianoid
     # newer versions are not compatible with py 3.2 any more.
     easy_install3 'pip<8.0'
     pip3 install 'virtualenv<14.0'
-    touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
+    touch $home_dir/.bash_profile ; chown $username $home_dir/.bash_profile
   EOF
 end
 
@@ -54,9 +61,9 @@ def packages_darwin
     # install all the (security and other) updates
     sudo softwareupdate --install --all
     # get osxfuse 3.x pre-release code from github:
-    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.3.3/osxfuse-3.3.3.dmg >osxfuse.dmg
+    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.4.1/osxfuse-3.4.1.dmg >osxfuse.dmg
     MOUNTDIR=$(echo `hdiutil mount osxfuse.dmg | tail -1 | awk '{$1="" ; print $0}'` | xargs -0 echo) \
-    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for OS X 3.3.3.pkg" -target /
+    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.4.1.pkg" -target /
     sudo chown -R vagrant /usr/local  # brew must be able to create stuff here
     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     brew update
@@ -65,7 +72,7 @@ def packages_darwin
     brew install xz  # required for python lzma module
     brew install fakeroot
     brew install git
-    brew install pkgconfig
+    brew install pkg-config
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
   EOF
 end
@@ -229,7 +236,8 @@ def install_pyinstaller(boxname)
     . borg-env/bin/activate
     git clone https://github.com/pyinstaller/pyinstaller.git
     cd pyinstaller
-    git checkout v3.1.1
+    # develop branch, with rebuilt bootloaders, with ThomasWaldmann/do-not-overwrite-LD_LP
+    git checkout fd3df7796afa367e511c881dac983cad0697b9a3
     pip install -e .
   EOF
 end
@@ -241,7 +249,8 @@ def install_pyinstaller_bootloader(boxname)
     . borg-env/bin/activate
     git clone https://github.com/pyinstaller/pyinstaller.git
     cd pyinstaller
-    git checkout v3.1.1
+    # develop branch, with rebuilt bootloaders, with ThomasWaldmann/do-not-overwrite-LD_LP
+    git checkout fd3df7796afa367e511c881dac983cad0697b9a3
     # build bootloader, if it is not included
     cd bootloader
     python ./waf all
@@ -283,7 +292,13 @@ end
 def fix_perms
   return <<-EOF
     # . ~/.profile
-    chown -R vagrant /vagrant/borg
+
+    if id "vagrant" >/dev/null 2>&1; then
+      chown -R vagrant /vagrant/borg
+    else
+      chown -R ubuntu /vagrant/borg
+    fi
+
   EOF
 end
 
@@ -344,9 +359,9 @@ Vagrant.configure(2) do |config|
       v.memory = 768
     end
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("trusty64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("trusty64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("trusty64")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("xenial64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("xenial64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("xenial64")
   end
 
   config.vm.define "trusty64" do |b|

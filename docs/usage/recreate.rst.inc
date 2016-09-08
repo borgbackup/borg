@@ -42,6 +42,8 @@ Exclusion options
         | keep tag files of excluded caches/directories
 
 Archive options
+    ``--target TARGET``
+        | create a new archive with the name ARCHIVE, do not replace existing archive (only applies for a single archive)
     ``--comment COMMENT``
         | add a comment text to the archive
     ``--timestamp yyyy-mm-ddThh:mm:ss``
@@ -56,6 +58,8 @@ Archive options
         | zlib,0 .. zlib,9 == zlib (with level 0..9),
         | lzma == lzma (default level 6),
         | lzma,0 .. lzma,9 == lzma (with level 0..9).
+    ``--always-recompress``
+        | always recompress chunks, don't skip chunks already compressed with the samealgorithm.
     ``--compression-from COMPRESSIONCONFIG``
         | read compression patterns from COMPRESSIONCONFIG, one per line
     ``--chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE``
@@ -69,6 +73,9 @@ Recreate the contents of existing archives.
 --exclude, --exclude-from and PATH have the exact same semantics
 as in "borg create". If PATHs are specified the resulting archive
 will only contain files from these PATHs.
+
+Note that all paths in an archive are relative, therefore absolute patterns/paths
+will *not* match (--exclude, --exclude-from, --compression-from, PATHs).
 
 --compression: all chunks seen will be stored using the given method.
 Due to how Borg stores compressed size information this might display
@@ -97,6 +104,8 @@ interpreted.
 The archive being recreated is only removed after the operation completes. The
 archive that is built during the operation exists at the same time at
 "<ARCHIVE>.recreate". The new archive will have a different archive ID.
+
+With --target the original archive is not replaced, instead a new archive is created.
 
 When rechunking space usage can be substantial, expect at least the entire
 deduplicated size of the archives using the previous chunker params.

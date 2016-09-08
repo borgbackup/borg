@@ -16,9 +16,10 @@ from .helpers import get_cache_dir
 from .helpers import decode_dict, int_to_bigint, bigint_to_int, bin_to_hex
 from .helpers import format_file_size
 from .helpers import yes
-from .item import Item
+from .item import Item, ArchiveItem
 from .key import PlaintextKey
-from .locking import UpgradableLock
+from .locking import Lock
+from .platform import SaveFile
 from .remote import cache_if_remote
 
 ChunkListEntry = namedtuple('ChunkListEntry', 'id size csize')
@@ -43,7 +44,7 @@ class Cache:
     @staticmethod
     def break_lock(repository, path=None):
         path = path or os.path.join(get_cache_dir(), repository.id_str)
-        UpgradableLock(os.path.join(path, 'lock'), exclusive=True).break_lock()
+        Lock(os.path.join(path, 'lock'), exclusive=True).break_lock()
 
     @staticmethod
     def destroy(repository, path=None):
@@ -141,11 +142,11 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         config.set('cache', 'version', '1')
         config.set('cache', 'repository', self.repository.id_str)
         config.set('cache', 'manifest', '')
-        with open(os.path.join(self.path, 'config'), 'w') as fd:
+        with SaveFile(os.path.join(self.path, 'config')) as fd:
             config.write(fd)
         ChunkIndex().write(os.path.join(self.path, 'chunks').encode('utf-8'))
         os.makedirs(os.path.join(self.path, 'chunks.archive.d'))
-        with open(os.path.join(self.path, 'files'), 'wb') as fd:
+        with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
             pass  # empty file
 
     def _do_open(self):
@@ -156,9 +157,11 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             cache_version = self.config.getint('cache', 'version')
             wanted_version = 1
             if cache_version != wanted_version:
+                self.close()
                 raise Exception('%s has unexpected cache version %d (wanted: %d).' % (
                     config_path, cache_version, wanted_version))
         except configparser.NoSectionError:
+            self.close()
             raise Exception('%s does not look like a Borg cache.' % config_path) from None
         self.id = self.config.get('cache', 'repository')
         self.manifest_id = unhexlify(self.config.get('cache', 'manifest'))
@@ -171,7 +174,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
     def open(self, lock_wait=None):
         if not os.path.isdir(self.path):
             raise Exception('%s Does not look like a Borg cache' % self.path)
-        self.lock = UpgradableLock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait).acquire()
+        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait).acquire()
         self.rollback()
 
     def close(self):
@@ -212,18 +215,21 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not self.txn_active:
             return
         if self.files is not None:
-            with open(os.path.join(self.path, 'files'), 'wb') as fd:
+            ttl = int(os.environ.get('BORG_FILES_CACHE_TTL', 20))
+            with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
                 for path_hash, item in self.files.items():
-                    # Discard cached files with the newest mtime to avoid
-                    # issues with filesystem snapshots and mtime precision
+                    # Only keep files seen in this backup that are older than newest mtime seen in this backup -
+                    # this is to avoid issues with filesystem snapshots and mtime granularity.
+                    # Also keep files from older backups that have not reached BORG_FILES_CACHE_TTL yet.
                     entry = FileCacheEntry(*msgpack.unpackb(item))
-                    if entry.age < 10 and bigint_to_int(entry.mtime) < self._newest_mtime:
+                    if entry.age == 0 and bigint_to_int(entry.mtime) < self._newest_mtime or \
+                       entry.age > 0 and entry.age < ttl:
                         msgpack.pack((path_hash, entry), fd)
         self.config.set('cache', 'manifest', self.manifest.id_str)
         self.config.set('cache', 'timestamp', self.manifest.timestamp)
         self.config.set('cache', 'key_type', str(self.key.TYPE))
         self.config.set('cache', 'previous_location', self.repository._location.canonical_path())
-        with open(os.path.join(self.path, 'config'), 'w') as fd:
+        with SaveFile(os.path.join(self.path, 'config')) as fd:
             self.config.write(fd)
         self.chunks.write(os.path.join(self.path, 'chunks').encode('utf-8'))
         os.rename(os.path.join(self.path, 'txn.active'),
@@ -275,7 +281,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 return set()
 
         def repo_archives():
-            return set(info[b'id'] for info in self.manifest.archives.values())
+            return set(info.id for info in self.manifest.archives.list())
 
         def cleanup_outdated(ids):
             for id in ids:
@@ -286,12 +292,11 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             cdata = repository.get(archive_id)
             _, data = key.decrypt(archive_id, cdata)
             chunk_idx.add(archive_id, 1, len(data), len(cdata))
-            archive = msgpack.unpackb(data)
-            if archive[b'version'] != 1:
+            archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
+            if archive.version != 1:
                 raise Exception('Unknown archive metadata version')
-            decode_dict(archive, (b'name',))
             unpacker = msgpack.Unpacker()
-            for item_id, chunk in zip(archive[b'items'], repository.get_many(archive[b'items'])):
+            for item_id, chunk in zip(archive.items, repository.get_many(archive.items)):
                 _, data = key.decrypt(item_id, chunk)
                 chunk_idx.add(item_id, 1, len(data), len(chunk))
                 unpacker.feed(data)
@@ -315,9 +320,9 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             return chunk_idx
 
         def lookup_name(archive_id):
-            for name, info in self.manifest.archives.items():
-                if info[b'id'] == archive_id:
-                    return name
+            for info in self.manifest.archives.list():
+                if info.id == archive_id:
+                    return info.name
 
         def create_master_idx(chunk_idx):
             logger.info('Synchronizing chunks cache...')

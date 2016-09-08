@@ -2,6 +2,7 @@ import argparse
 import grp
 import hashlib
 import logging
+import io
 import os
 import os.path
 import platform
@@ -9,18 +10,19 @@ import pwd
 import re
 import signal
 import socket
-import sys
 import stat
+import sys
 import textwrap
+import threading
 import time
 import unicodedata
 import uuid
 from binascii import hexlify
-from collections import namedtuple, deque
+from collections import namedtuple, deque, abc
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
-from functools import wraps, partial
+from functools import wraps, partial, lru_cache
 from itertools import islice
 from operator import attrgetter
 from string import Formatter
@@ -37,7 +39,6 @@ from . import crypto
 from . import hashindex
 from . import shellpattern
 from .constants import *  # NOQA
-from .compress import COMPR_BUFFER, get_compressor
 
 # meta dict, data bytes
 _Chunk = namedtuple('_Chunk', 'meta data')
@@ -83,10 +84,12 @@ class PlaceholderError(Error):
 
 
 def check_extension_modules():
-    from . import platform
-    if hashindex.API_VERSION != 2:
+    from . import platform, compress
+    if hashindex.API_VERSION != 3:
         raise ExtensionModuleError
     if chunker.API_VERSION != 2:
+        raise ExtensionModuleError
+    if compress.API_VERSION != 2:
         raise ExtensionModuleError
     if crypto.API_VERSION != 3:
         raise ExtensionModuleError
@@ -94,12 +97,76 @@ def check_extension_modules():
         raise ExtensionModuleError
 
 
+ArchiveInfo = namedtuple('ArchiveInfo', 'name id ts')
+
+
+class Archives(abc.MutableMapping):
+    """
+    Nice wrapper around the archives dict, making sure only valid types/values get in
+    and we can deal with str keys (and it internally encodes to byte keys) and eiter
+    str timestamps or datetime timestamps.
+    """
+    def __init__(self):
+        # key: encoded archive name, value: dict(b'id': bytes_id, b'time': bytes_iso_ts)
+        self._archives = {}
+
+    def __len__(self):
+        return len(self._archives)
+
+    def __iter__(self):
+        return iter(safe_decode(name) for name in self._archives)
+
+    def __getitem__(self, name):
+        assert isinstance(name, str)
+        _name = safe_encode(name)
+        values = self._archives.get(_name)
+        if values is None:
+            raise KeyError
+        ts = parse_timestamp(values[b'time'].decode('utf-8'))
+        return ArchiveInfo(name=name, id=values[b'id'], ts=ts)
+
+    def __setitem__(self, name, info):
+        assert isinstance(name, str)
+        name = safe_encode(name)
+        assert isinstance(info, tuple)
+        id, ts = info
+        assert isinstance(id, bytes)
+        if isinstance(ts, datetime):
+            ts = ts.replace(tzinfo=None).isoformat()
+        assert isinstance(ts, str)
+        ts = ts.encode()
+        self._archives[name] = {b'id': id, b'time': ts}
+
+    def __delitem__(self, name):
+        assert isinstance(name, str)
+        name = safe_encode(name)
+        del self._archives[name]
+
+    def list(self, sort_by=None, reverse=False):
+        # inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
+        archives = self.values()  # [self[name] for name in self]
+        if sort_by is not None:
+            archives = sorted(archives, key=attrgetter(sort_by), reverse=reverse)
+        return archives
+
+    def set_raw_dict(self, d):
+        """set the dict we get from the msgpack unpacker"""
+        for k, v in d.items():
+            assert isinstance(k, bytes)
+            assert isinstance(v, dict) and b'id' in v and b'time' in v
+            self._archives[k] = v
+
+    def get_raw_dict(self):
+        """get the dict we can give to the msgpack packer"""
+        return self._archives
+
+
 class Manifest:
 
     MANIFEST_ID = b'\0' * 32
 
     def __init__(self, key, repository, item_keys=None):
-        self.archives = {}
+        self.archives = Archives()
         self.config = {}
         self.key = key
         self.repository = repository
@@ -111,6 +178,7 @@ class Manifest:
 
     @classmethod
     def load(cls, repository, key=None):
+        from .item import ManifestItem
         from .key import key_factory
         from .repository import Repository
         try:
@@ -122,41 +190,29 @@ class Manifest:
         manifest = cls(key, repository)
         _, data = key.decrypt(None, cdata)
         manifest.id = key.id_hash(data)
-        m = msgpack.unpackb(data)
-        if not m.get(b'version') == 1:
+        m = ManifestItem(internal_dict=msgpack.unpackb(data))
+        if m.get('version') != 1:
             raise ValueError('Invalid manifest version')
-        manifest.archives = dict((k.decode('utf-8'), v) for k, v in m[b'archives'].items())
-        manifest.timestamp = m.get(b'timestamp')
-        if manifest.timestamp:
-            manifest.timestamp = manifest.timestamp.decode('ascii')
-        manifest.config = m[b'config']
+        manifest.archives.set_raw_dict(m.archives)
+        manifest.timestamp = m.get('timestamp')
+        manifest.config = m.config
         # valid item keys are whatever is known in the repo or every key we know
-        manifest.item_keys = ITEM_KEYS | frozenset(key.decode() for key in m.get(b'item_keys', []))
+        manifest.item_keys = ITEM_KEYS | frozenset(key.decode() for key in m.get('item_keys', []))
         return manifest, key
 
     def write(self):
+        from .item import ManifestItem
         self.timestamp = datetime.utcnow().isoformat()
-        data = msgpack.packb(StableDict({
-            'version': 1,
-            'archives': self.archives,
-            'timestamp': self.timestamp,
-            'config': self.config,
-            'item_keys': tuple(self.item_keys),
-        }))
+        manifest = ManifestItem(
+            version=1,
+            archives=self.archives.get_raw_dict(),
+            timestamp=self.timestamp,
+            config=self.config,
+            item_keys=tuple(self.item_keys),
+        )
+        data = msgpack.packb(manifest.as_dict())
         self.id = self.key.id_hash(data)
         self.repository.put(self.MANIFEST_ID, self.key.encrypt(Chunk(data)))
-
-    def list_archive_infos(self, sort_by=None, reverse=False):
-        # inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
-        ArchiveInfo = namedtuple('ArchiveInfo', 'name id ts')
-        archives = []
-        for name, values in self.archives.items():
-            ts = parse_timestamp(values[b'time'].decode('utf-8'))
-            id = values[b'id']
-            archives.append(ArchiveInfo(name=name, id=id, ts=ts))
-        if sort_by is not None:
-            archives = sorted(archives, key=attrgetter(sort_by), reverse=reverse)
-        return archives
 
 
 def prune_within(archives, within):
@@ -211,6 +267,17 @@ def get_keys_dir():
         os.makedirs(keys_dir)
         os.chmod(keys_dir, stat.S_IRWXU)
     return keys_dir
+
+
+def get_nonces_dir():
+    """Determine where to store the local nonce high watermark"""
+
+    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(get_home_dir(), '.config'))
+    nonces_dir = os.environ.get('BORG_NONCES_DIR', os.path.join(xdg_config, 'borg', 'key-nonces'))
+    if not os.path.exists(nonces_dir):
+        os.makedirs(nonces_dir)
+        os.chmod(nonces_dir, stat.S_IRWXU)
+    return nonces_dir
 
 
 def get_cache_dir():
@@ -469,8 +536,6 @@ def ChunkerParams(s):
         return CHUNKER_PARAMS
     chunk_min, chunk_max, chunk_mask, window_size = s.split(',')
     if int(chunk_max) > 23:
-        # do not go beyond 2**23 (8MB) chunk size now,
-        # COMPR_BUFFER can only cope with up to this size
         raise ValueError('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)')
     return int(chunk_min), int(chunk_max), int(chunk_mask), int(window_size)
 
@@ -575,6 +640,7 @@ def replace_placeholders(text):
         'utcnow': current_time.utcnow(),
         'user': uid2user(os.getuid(), os.getuid()),
         'uuid4': str(uuid.uuid4()),
+        'borgversion': borg_version,
     }
     return format_line(text, data)
 
@@ -596,8 +662,7 @@ def format_time(t):
 def format_timedelta(td):
     """Format timedelta in a human friendly format
     """
-    # Since td.total_seconds() requires python 2.7
-    ts = (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10 ** 6) / float(10 ** 6)
+    ts = td.total_seconds()
     s = ts % 60
     m = int(ts / 60) % 60
     h = int(ts / 3600) % 24
@@ -615,6 +680,26 @@ def format_file_size(v, precision=2, sign=False):
     """Format file size into a human friendly format
     """
     return sizeof_fmt_decimal(v, suffix='B', sep=' ', precision=precision, sign=sign)
+
+
+def parse_file_size(s):
+    """Return int from file size (1234, 55G, 1.7T)."""
+    if not s:
+        return int(s)  # will raise
+    suffix = s[-1]
+    power = 1000
+    try:
+        factor = {
+            'K': power,
+            'M': power**2,
+            'G': power**3,
+            'T': power**4,
+            'P': power**5,
+        }[suffix]
+        s = s[:-1]
+    except KeyError:
+        factor = 1
+    return int(float(s) * factor)
 
 
 def sizeof_fmt(num, suffix='B', units=None, power=None, sep='', precision=2, sign=False):
@@ -648,20 +733,48 @@ def format_archive(archive):
     )
 
 
-def memoize(function):
-    cache = {}
+class Buffer:
+    """
+    provide a thread-local buffer
+    """
+    def __init__(self, allocator, size=4096, limit=None):
+        """
+        Initialize the buffer: use allocator(size) call to allocate a buffer.
+        Optionally, set the upper <limit> for the buffer size.
+        """
+        assert callable(allocator), 'must give alloc(size) function as first param'
+        assert limit is None or size <= limit, 'initial size must be <= limit'
+        self._thread_local = threading.local()
+        self.allocator = allocator
+        self.limit = limit
+        self.resize(size, init=True)
 
-    def decorated_function(*args):
-        try:
-            return cache[args]
-        except KeyError:
-            val = function(*args)
-            cache[args] = val
-            return val
-    return decorated_function
+    def __len__(self):
+        return len(self._thread_local.buffer)
+
+    def resize(self, size, init=False):
+        """
+        resize the buffer - to avoid frequent reallocation, we usually always grow (if needed).
+        giving init=True it is possible to first-time initialize or shrink the buffer.
+        if a buffer size beyond the limit is requested, raise ValueError.
+        """
+        size = int(size)
+        if self.limit is not None and size > self.limit:
+            raise ValueError('Requested buffer size %d is above the limit of %d.' % (size, self.limit))
+        if init or len(self) < size:
+            self._thread_local.buffer = self.allocator(size)
+
+    def get(self, size=None, init=False):
+        """
+        return a buffer of at least the requested size (None: any current size).
+        init=True can be given to trigger shrinking of the buffer to the given size.
+        """
+        if size is not None:
+            self.resize(size, init)
+        return self._thread_local.buffer
 
 
-@memoize
+@lru_cache(maxsize=None)
 def uid2user(uid, default=None):
     try:
         return pwd.getpwuid(uid).pw_name
@@ -669,7 +782,7 @@ def uid2user(uid, default=None):
         return default
 
 
-@memoize
+@lru_cache(maxsize=None)
 def user2uid(user, default=None):
     try:
         return user and pwd.getpwnam(user).pw_uid
@@ -677,7 +790,7 @@ def user2uid(user, default=None):
         return default
 
 
-@memoize
+@lru_cache(maxsize=None)
 def gid2group(gid, default=None):
     try:
         return grp.getgrgid(gid).gr_name
@@ -685,7 +798,7 @@ def gid2group(gid, default=None):
         return default
 
 
-@memoize
+@lru_cache(maxsize=None)
 def group2gid(group, default=None):
     try:
         return group and grp.getgrnam(group).gr_gid
@@ -886,7 +999,7 @@ def daemonize():
     os.close(0)
     os.close(1)
     os.close(2)
-    fd = os.open('/dev/null', os.O_RDWR)
+    fd = os.open(os.devnull, os.O_RDWR)
     os.dup2(fd, 0)
     os.dup2(fd, 1)
     os.dup2(fd, 2)
@@ -926,7 +1039,7 @@ DEFAULTISH = ('Default', 'DEFAULT', 'default', 'D', 'd', '', )
 
 
 def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
-        retry_msg=None, invalid_msg=None, env_msg=None,
+        retry_msg=None, invalid_msg=None, env_msg='{} (from {})',
         falsish=FALSISH, truish=TRUISH, defaultish=DEFAULTISH,
         default=False, retry=True, env_var_override=None, ofile=None, input=input):
     """Output <msg> (usually a question) and let user input an answer.
@@ -947,8 +1060,8 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
     :param true_msg: message to output before returning True [None]
     :param default_msg: message to output before returning a <default> [None]
     :param invalid_msg: message to output after a invalid answer was given [None]
-    :param env_msg: message to output when using input from env_var_override [None],
-           needs to have 2 placeholders for answer and env var name, e.g.: "{} (from {})"
+    :param env_msg: message to output when using input from env_var_override ['{} (from {})'],
+           needs to have 2 placeholders for answer and env var name
     :param falsish: sequence of answers qualifying as False
     :param truish: sequence of answers qualifying as True
     :param defaultish: sequence of answers qualifying as <default>
@@ -1003,14 +1116,15 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
 
 
 class ProgressIndicatorPercent:
-    def __init__(self, total, step=5, start=0, same_line=False, msg="%3.0f%%"):
+    LOGGER = 'borg.output.progress'
+
+    def __init__(self, total=0, step=5, start=0, msg="%3.0f%%"):
         """
         Percentage-based progress indicator
 
         :param total: total amount of items
         :param step: step size in percent
         :param start: at which percent value to start
-        :param same_line: if True, emit output always on same line
         :param msg: output message, must contain one %f placeholder for the percentage
         """
         self.counter = 0  # 0 .. (total-1)
@@ -1018,9 +1132,9 @@ class ProgressIndicatorPercent:
         self.trigger_at = start  # output next percentage value when reaching (at least) this
         self.step = step
         self.msg = msg
-        self.same_line = same_line
+        self.output_len = len(self.msg % 100.0)
         self.handler = None
-        self.logger = logging.getLogger('borg.output.progress')
+        self.logger = logging.getLogger(self.LOGGER)
 
         # If there are no handlers, set one up explicitly because the
         # terminator and propagation needs to be set.  If there are,
@@ -1028,7 +1142,7 @@ class ProgressIndicatorPercent:
         if not self.logger.handlers:
             self.handler = logging.StreamHandler(stream=sys.stderr)
             self.handler.setLevel(logging.INFO)
-            self.handler.terminator = '\r' if self.same_line else '\n'
+            self.handler.terminator = '\r'
 
             self.logger.addHandler(self.handler)
             if self.logger.level == logging.NOTSET:
@@ -1040,26 +1154,27 @@ class ProgressIndicatorPercent:
             self.logger.removeHandler(self.handler)
             self.handler.close()
 
-    def progress(self, current=None):
+    def progress(self, current=None, increase=1):
         if current is not None:
             self.counter = current
         pct = self.counter * 100 / self.total
-        self.counter += 1
+        self.counter += increase
         if pct >= self.trigger_at:
             self.trigger_at += self.step
             return pct
 
-    def show(self, current=None):
-        pct = self.progress(current)
+    def show(self, current=None, increase=1):
+        pct = self.progress(current, increase)
         if pct is not None:
-            return self.output(pct)
+            return self.output(self.msg % pct)
 
-    def output(self, percent):
-        self.logger.info(self.msg % percent)
+    def output(self, message):
+        self.output_len = max(len(message), self.output_len)
+        message = message.ljust(self.output_len)
+        self.logger.info(message)
 
     def finish(self):
-        if self.same_line:
-            self.logger.info(" " * len(self.msg % 100.0))
+        self.output('')
 
 
 class ProgressIndicatorEndless:
@@ -1506,6 +1621,8 @@ class CompressionDecider1:
 
 
 class CompressionDecider2:
+    logger = create_logger('borg.debug.file-compression')
+
     def __init__(self, compression):
         self.compression = compression
 
@@ -1515,16 +1632,15 @@ class CompressionDecider2:
         # if we compress the data here to decide, we can even update the chunk data
         # and modify the metadata as desired.
         compr_spec = chunk.meta.get('compress', self.compression)
-        compr_args = dict(buffer=COMPR_BUFFER)
-        compr_args.update(compr_spec)
-        if compr_args['name'] == 'auto':
+        if compr_spec['name'] == 'auto':
             # we did not decide yet, use heuristic:
-            compr_args, chunk = self.heuristic_lz4(compr_args, chunk)
-        return compr_args, chunk
+            compr_spec, chunk = self.heuristic_lz4(compr_spec, chunk)
+        return compr_spec, chunk
 
     def heuristic_lz4(self, compr_args, chunk):
+        from .compress import get_compressor
         meta, data = chunk
-        lz4 = get_compressor('lz4', buffer=compr_args['buffer'])
+        lz4 = get_compressor('lz4')
         cdata = lz4.compress(data)
         data_len = len(data)
         cdata_len = len(cdata)
@@ -1535,7 +1651,7 @@ class CompressionDecider2:
             # that marks such data as uncompressible via compression-type metadata.
             compr_spec = CompressionSpec('none')
         compr_args.update(compr_spec)
-        logger.debug("len(data) == %d, len(lz4(data)) == %d, choosing %s", data_len, cdata_len, compr_spec)
+        self.logger.debug("len(data) == %d, len(lz4(data)) == %d, choosing %s", data_len, cdata_len, compr_spec)
         return compr_args, Chunk(data, **meta)
 
 
@@ -1546,3 +1662,27 @@ def signal_handler(signo, handler):
         yield
     finally:
         signal.signal(signo, old_signal_handler)
+
+
+class ErrorIgnoringTextIOWrapper(io.TextIOWrapper):
+    def read(self, n):
+        if not self.closed:
+            try:
+                return super().read(n)
+            except BrokenPipeError:
+                try:
+                    super().close()
+                except OSError:
+                    pass
+        return ''
+
+    def write(self, s):
+        if not self.closed:
+            try:
+                return super().write(s)
+            except BrokenPipeError:
+                try:
+                    super().close()
+                except OSError:
+                    pass
+        return len(s)

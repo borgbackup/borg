@@ -1,80 +1,95 @@
-.. highlight:: python
 
 API Documentation
 =================
 
-.. automodule:: borg.archiver
+.. automodule:: src.borg.archiver
     :members:
     :undoc-members:
 
-.. automodule:: borg.archive
+.. automodule:: src.borg.archive
     :members:
     :undoc-members:
 
-.. automodule:: borg.repository
+.. automodule:: src.borg.repository
     :members:
     :undoc-members:
 
-.. automodule:: borg.remote
+.. automodule:: src.borg.remote
     :members:
     :undoc-members:
 
-.. automodule:: borg.cache
+.. automodule:: src.borg.cache
     :members:
     :undoc-members:
 
-.. automodule:: borg.key
+.. automodule:: src.borg.key
     :members:
     :undoc-members:
 
-.. automodule:: borg.logger
+.. automodule:: src.borg.nonces
     :members:
     :undoc-members:
 
-.. automodule:: borg.helpers
+.. automodule:: src.borg.item
     :members:
     :undoc-members:
 
-.. automodule:: borg.locking
+.. automodule:: src.borg.constants
     :members:
     :undoc-members:
 
-.. automodule:: borg.shellpattern
+.. automodule:: src.borg.logger
     :members:
     :undoc-members:
 
-.. automodule:: borg.lrucache
+.. automodule:: src.borg.helpers
     :members:
     :undoc-members:
 
-.. automodule:: borg.fuse
+.. automodule:: src.borg.locking
     :members:
     :undoc-members:
 
-.. automodule:: borg.xattr
+.. automodule:: src.borg.shellpattern
     :members:
     :undoc-members:
 
-.. automodule:: borg.platform
+.. automodule:: src.borg.lrucache
     :members:
     :undoc-members:
 
-.. automodule:: borg.platform_linux
+.. automodule:: src.borg.fuse
     :members:
     :undoc-members:
 
-.. automodule:: borg.hashindex
+.. automodule:: src.borg.selftest
     :members:
     :undoc-members:
 
-.. automodule:: borg.compress
+.. automodule:: src.borg.xattr
+    :members:
+    :undoc-members:
+
+.. automodule:: src.borg.platform.base
+    :members:
+    :undoc-members:
+
+.. automodule:: src.borg.platform.linux
+    :members:
+    :undoc-members:
+
+.. automodule:: src.borg.hashindex
+    :members:
+    :undoc-members:
+
+.. automodule:: src.borg.compress
     :members: get_compressor, Compressor, CompressorBase
     :undoc-members:
 
-.. automodule:: borg.chunker
+.. automodule:: src.borg.chunker
     :members:
     :undoc-members:
 
-.. automodule:: borg.crypto
+.. automodule:: src.borg.crypto
     :members:
     :undoc-members:

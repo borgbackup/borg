@@ -6,6 +6,7 @@ import tempfile
 import time
 from collections import defaultdict
 from distutils.version import LooseVersion
+from zlib import adler32
 
 import llfuse
 import msgpack
@@ -50,14 +51,18 @@ class ItemCache:
 class FuseOperations(llfuse.Operations):
     """Export archive as a fuse filesystem
     """
-
+    # mount options
     allow_damaged_files = False
+    versions = False
 
     def __init__(self, key, repository, manifest, archive, cached_repo):
         super().__init__()
-        self._inode_count = 0
-        self.key = key
+        self.repository_uncached = repository
         self.repository = cached_repo
+        self.archive = archive
+        self.manifest = manifest
+        self.key = key
+        self._inode_count = 0
         self.items = {}
         self.parent = {}
         self.contents = defaultdict(dict)
@@ -68,19 +73,22 @@ class FuseOperations(llfuse.Operations):
         data_cache_capacity = int(os.environ.get('BORG_MOUNT_DATA_CACHE_ENTRIES', os.cpu_count() or 1))
         logger.debug('mount data cache capacity: %d chunks', data_cache_capacity)
         self.data_cache = LRUCache(capacity=data_cache_capacity, dispose=lambda _: None)
-        if archive:
-            self.process_archive(archive)
+
+    def _create_filesystem(self):
+        self._create_dir(parent=1)  # first call, create root dir (inode == 1)
+        if self.archive:
+            self.process_archive(self.archive)
         else:
-            # Create root inode
-            self.parent[1] = self.allocate_inode()
-            self.items[1] = self.default_dir
-            for archive_name in manifest.archives:
-                # Create archive placeholder inode
-                archive_inode = self.allocate_inode()
-                self.items[archive_inode] = self.default_dir
-                self.parent[archive_inode] = 1
-                self.contents[1][os.fsencode(archive_name)] = archive_inode
-                self.pending_archives[archive_inode] = Archive(repository, key, manifest, archive_name)
+            for name in self.manifest.archives:
+                archive = Archive(self.repository_uncached, self.key, self.manifest, name)
+                if self.versions:
+                    # process archives immediately
+                    self.process_archive(archive)
+                else:
+                    # lazy load archives, create archive placeholder inode
+                    archive_inode = self._create_dir(parent=1)
+                    self.contents[1][os.fsencode(name)] = archive_inode
+                    self.pending_archives[archive_inode] = archive
 
     def mount(self, mountpoint, mount_options, foreground=False):
         """Mount filesystem on *mountpoint* with *mount_options*."""
@@ -92,6 +100,12 @@ class FuseOperations(llfuse.Operations):
             self.allow_damaged_files = True
         except ValueError:
             pass
+        try:
+            options.remove('versions')
+            self.versions = True
+        except ValueError:
+            pass
+        self._create_filesystem()
         llfuse.init(self, mountpoint, options)
         if not foreground:
             daemonize()
@@ -108,56 +122,75 @@ class FuseOperations(llfuse.Operations):
         finally:
             llfuse.close(umount)
 
+    def _create_dir(self, parent):
+        """Create directory
+        """
+        ino = self.allocate_inode()
+        self.items[ino] = self.default_dir
+        self.parent[ino] = parent
+        return ino
+
     def process_archive(self, archive, prefix=[]):
         """Build fuse inode hierarchy from archive metadata
         """
         unpacker = msgpack.Unpacker()
-        for key, chunk in zip(archive.metadata[b'items'], self.repository.get_many(archive.metadata[b'items'])):
+        for key, chunk in zip(archive.metadata.items, self.repository.get_many(archive.metadata.items)):
             _, data = self.key.decrypt(key, chunk)
             unpacker.feed(data)
             for item in unpacker:
                 item = Item(internal_dict=item)
-                try:
-                    # This can happen if an archive was created with a command line like
-                    # $ borg create ... dir1/file dir1
-                    # In this case the code below will have created a default_dir inode for dir1 already.
-                    inode = self._find_inode(safe_encode(item.path), prefix)
-                except KeyError:
-                    pass
-                else:
-                    self.items[inode] = item
-                    continue
+                is_dir = stat.S_ISDIR(item.mode)
+                if is_dir:
+                    try:
+                        # This can happen if an archive was created with a command line like
+                        # $ borg create ... dir1/file dir1
+                        # In this case the code below will have created a default_dir inode for dir1 already.
+                        inode = self._find_inode(item.path, prefix)
+                    except KeyError:
+                        pass
+                    else:
+                        self.items[inode] = item
+                        continue
                 segments = prefix + os.fsencode(os.path.normpath(item.path)).split(b'/')
                 del item.path
-                num_segments = len(segments)
                 parent = 1
-                for i, segment in enumerate(segments, 1):
-                    # Insert a default root inode if needed
-                    if self._inode_count == 0 and segment:
-                        archive_inode = self.allocate_inode()
-                        self.items[archive_inode] = self.default_dir
-                        self.parent[archive_inode] = parent
-                    # Leaf segment?
-                    if i == num_segments:
-                        if 'source' in item and stat.S_ISREG(item.mode):
-                            inode = self._find_inode(item.source, prefix)
-                            item = self.cache.get(inode)
-                            item.nlink = item.get('nlink', 1) + 1
-                            self.items[inode] = item
-                        else:
-                            inode = self.cache.add(item)
-                        self.parent[inode] = parent
-                        if segment:
-                            self.contents[parent][segment] = inode
-                    elif segment in self.contents[parent]:
-                        parent = self.contents[parent][segment]
-                    else:
-                        inode = self.allocate_inode()
-                        self.items[inode] = self.default_dir
-                        self.parent[inode] = parent
-                        if segment:
-                            self.contents[parent][segment] = inode
-                        parent = inode
+                for segment in segments[:-1]:
+                    parent = self.process_inner(segment, parent)
+                self.process_leaf(segments[-1], item, parent, prefix, is_dir)
+
+    def process_leaf(self, name, item, parent, prefix, is_dir):
+        def version_name(name, item):
+            if 'chunks' in item:
+                ident = 0
+                for chunkid, _, _ in item.chunks:
+                    ident = adler32(chunkid, ident)
+                name = name + safe_encode('.%08x' % ident)
+            return name
+
+        if self.versions and not is_dir:
+            parent = self.process_inner(name, parent)
+            name = version_name(name, item)
+
+        if 'source' in item and stat.S_ISREG(item.mode):
+            inode = self._find_inode(item.source, prefix)
+            item = self.cache.get(inode)
+            item.nlink = item.get('nlink', 1) + 1
+            self.items[inode] = item
+        else:
+            inode = self.cache.add(item)
+        self.parent[inode] = parent
+        if name:
+            self.contents[parent][name] = inode
+
+    def process_inner(self, name, parent_inode):
+        dir = self.contents[parent_inode]
+        if name in dir:
+            inode = dir[name]
+        else:
+            inode = self._create_dir(parent_inode)
+            if name:
+                dir[name] = inode
+        return inode
 
     def allocate_inode(self):
         self._inode_count += 1

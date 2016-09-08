@@ -9,6 +9,10 @@
     background-color: #000000 !important;
 }
 
+.wy-side-nav-search input[type="text"] {
+        border-color: #000000;
+}
+
 .wy-side-nav-search > a {
     color: rgba(255, 255, 255, 0.5);
 }

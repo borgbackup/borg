@@ -4,9 +4,17 @@ try:
 except ImportError:
     lzma = None
 
+from .helpers import Buffer
+
+API_VERSION = 2
+
 cdef extern from "lz4.h":
     int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
     int LZ4_decompress_safe(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
+    int LZ4_compressBound(int inputSize) nogil
+
+
+buffer = Buffer(bytearray, size=0)
 
 
 cdef class CompressorBase:
@@ -52,40 +60,31 @@ class CNONE(CompressorBase):
         return data
 
 
-cdef class LZ4(CompressorBase):
+class LZ4(CompressorBase):
     """
     raw LZ4 compression / decompression (liblz4).
 
     Features:
         - lz4 is super fast
         - wrapper releases CPython's GIL to support multithreaded code
-        - buffer given by caller, avoiding frequent reallocation and buffer duplication
         - uses safe lz4 methods that never go beyond the end of the output buffer
-
-    But beware:
-        - this is not very generic, the given buffer MUST be large enough to
-          handle all compression or decompression output (or it will fail).
-        - you must not do method calls to the same LZ4 instance from different
-          threads at the same time - create one LZ4 instance per thread!
     """
     ID = b'\x01\x00'
     name = 'lz4'
 
-    cdef char *buffer  # helper buffer for (de)compression output
-    cdef int bufsize  # size of this buffer
-
-    def __cinit__(self, **kwargs):
-        buffer = kwargs['buffer']
-        self.buffer = buffer
-        self.bufsize = len(buffer)
+    def __init__(self, **kwargs):
+        pass
 
     def compress(self, idata):
         if not isinstance(idata, bytes):
             idata = bytes(idata)  # code below does not work with memoryview
         cdef int isize = len(idata)
-        cdef int osize = self.bufsize
+        cdef int osize
         cdef char *source = idata
-        cdef char *dest = self.buffer
+        cdef char *dest
+        osize = LZ4_compressBound(isize)
+        buf = buffer.get(osize)
+        dest = <char *> buf
         with nogil:
             osize = LZ4_compress_limitedOutput(source, dest, isize, osize)
         if not osize:
@@ -97,15 +96,26 @@ cdef class LZ4(CompressorBase):
             idata = bytes(idata)  # code below does not work with memoryview
         idata = super().decompress(idata)
         cdef int isize = len(idata)
-        cdef int osize = self.bufsize
+        cdef int osize
+        cdef int rsize
         cdef char *source = idata
-        cdef char *dest = self.buffer
-        with nogil:
-            osize = LZ4_decompress_safe(source, dest, isize, osize)
-        if osize < 0:
-            # malformed input data, buffer too small, ...
-            raise Exception('lz4 decompress failed')
-        return dest[:osize]
+        cdef char *dest
+        # a bit more than 8MB is enough for the usual data sizes yielded by the chunker.
+        # allocate more if isize * 3 is already bigger, to avoid having to resize often.
+        osize = max(int(1.1 * 2**23), isize * 3)
+        while True:
+            buf = buffer.get(osize)
+            dest = <char *> buf
+            with nogil:
+                rsize = LZ4_decompress_safe(source, dest, isize, osize)
+            if rsize >= 0:
+                break
+            if osize > 2 ** 30:
+                # this is insane, get out of here
+                raise Exception('lz4 decompress failed')
+            # likely the buffer was too small, get a bigger one:
+            osize = int(1.5 * osize)
+        return dest[:rsize]
 
 
 class LZMA(CompressorBase):
@@ -186,14 +196,14 @@ class Compressor:
         return self.compressor.compress(data)
 
     def decompress(self, data):
+        compressor_cls = self.detect(data)
+        return compressor_cls(**self.params).decompress(data)
+
+    @staticmethod
+    def detect(data):
         hdr = bytes(data[:2])  # detect() does not work with memoryview
         for cls in COMPRESSOR_LIST:
             if cls.detect(hdr):
-                return cls(**self.params).decompress(data)
+                return cls
         else:
             raise ValueError('No decompressor for this data found: %r.', data[:2])
-
-
-# a buffer used for (de)compression result, which can be slightly bigger
-# than the chunk buffer in the worst (incompressible data) case, add 10%:
-COMPR_BUFFER = bytes(int(1.1 * 2 ** 23))  # CHUNK_MAX_EXP == 23

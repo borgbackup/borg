@@ -48,7 +48,7 @@ Lock files
 the repository.
 
 The locking system is based on creating a directory `lock.exclusive` (for
-exclusive locks). Inside the lock directory, there is a file indication
+exclusive locks). Inside the lock directory, there is a file indicating
 hostname, process id and thread id of the lock holder.
 
 There is also a json file `lock.roster` that keeps a directory of all shared
@@ -160,12 +160,40 @@ object that contains:
 
 * version
 * name
-* list of chunks containing item metadata
+* list of chunks containing item metadata (size: count * ~40B)
 * cmdline
 * hostname
 * username
 * time
 
+.. _archive_limitation:
+
+Note about archive limitations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The archive is currently stored as a single object in the repository
+and thus limited in size to MAX_OBJECT_SIZE (20MiB).
+
+As one chunk list entry is ~40B, that means we can reference ~500.000 item
+metadata stream chunks per archive.
+
+Each item metadata stream chunk is ~128kiB (see hardcoded ITEMS_CHUNKER_PARAMS).
+
+So that means the whole item metadata stream is limited to ~64GiB chunks.
+If compression is used, the amount of storable metadata is bigger - by the
+compression factor.
+
+If the medium size of an item entry is 100B (small size file, no ACLs/xattrs),
+that means a limit of ~640 million files/directories per archive.
+
+If the medium size of an item entry is 2kB (~100MB size files or more
+ACLs/xattrs), the limit will be ~32 million files/directories per archive.
+
+If one tries to create an archive object bigger than MAX_OBJECT_SIZE, a fatal
+IntegrityError will be raised.
+
+A workaround is to create multiple archives with less items each, see
+also :issue:`1452`.
 
 The Item
 --------
@@ -174,7 +202,7 @@ Each item represents a file, directory or other fs item and is stored as an
 ``item`` dictionary that contains:
 
 * path
-* list of data chunks
+* list of data chunks (size: count * ~40B)
 * user
 * group
 * uid
@@ -310,7 +338,7 @@ more chunks than estimated above, because 1 file is at least 1 chunk).
 
 If a remote repository is used the repo index will be allocated on the remote side.
 
-E.g. backing up a total count of 1 Mi (IEC binary prefix e.g. 2^20) files with a total size of 1TiB.
+E.g. backing up a total count of 1 Mi (IEC binary prefix i.e. 2^20) files with a total size of 1TiB.
 
 a) with ``create --chunker-params 10,23,16,4095`` (custom, like borg < 1.0 or attic):
 
@@ -371,7 +399,7 @@ repository_id
 
 enc_key
   the key used to encrypt data with AES (256 bits)
-  
+
 enc_hmac_key
   the key used to HMAC the encrypted data (256 bits)
 

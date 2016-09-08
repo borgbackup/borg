@@ -10,10 +10,11 @@ import msgpack
 import msgpack.fallback
 
 from ..helpers import Location
-from ..helpers import partial_format, format_file_size, format_timedelta, format_line, PlaceholderError
+from ..helpers import Buffer
+from ..helpers import partial_format, format_file_size, parse_file_size, format_timedelta, format_line, PlaceholderError
 from ..helpers import make_path_safe, clean_lines
 from ..helpers import prune_within, prune_split
-from ..helpers import get_cache_dir, get_keys_dir
+from ..helpers import get_cache_dir, get_keys_dir, get_nonces_dir
 from ..helpers import is_slow_msgpack
 from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
 from ..helpers import StableDict, int_to_bigint, bigint_to_int, bin_to_hex
@@ -635,6 +636,17 @@ def test_get_keys_dir():
         os.environ['BORG_KEYS_DIR'] = old_env
 
 
+def test_get_nonces_dir(monkeypatch):
+    """test that get_nonces_dir respects environment"""
+    monkeypatch.delenv('XDG_CONFIG_HOME', raising=False)
+    monkeypatch.delenv('BORG_NONCES_DIR', raising=False)
+    assert get_nonces_dir() == os.path.join(os.path.expanduser('~'), '.config', 'borg', 'key-nonces')
+    monkeypatch.setenv('XDG_CONFIG_HOME', '/var/tmp/.config')
+    assert get_nonces_dir() == os.path.join('/var/tmp/.config', 'borg', 'key-nonces')
+    monkeypatch.setenv('BORG_NONCES_DIR', '/var/tmp')
+    assert get_nonces_dir() == '/var/tmp'
+
+
 def test_file_size():
     """test the size formatting routines"""
     si_size_map = {
@@ -682,6 +694,26 @@ def test_file_size_sign():
         assert format_file_size(size, sign=True) == fmt
 
 
+@pytest.mark.parametrize('string,value', (
+    ('1', 1),
+    ('20', 20),
+    ('5K', 5000),
+    ('1.75M', 1750000),
+    ('1e+9', 1e9),
+    ('-1T', -1e12),
+))
+def test_parse_file_size(string, value):
+    assert parse_file_size(string) == int(value)
+
+
+@pytest.mark.parametrize('string', (
+    '', '5 Äpfel', '4E', '2229 bit', '1B',
+))
+def test_parse_file_size_invalid(string):
+    with pytest.raises(ValueError):
+        parse_file_size(string)
+
+
 def test_is_slow_msgpack():
     saved_packer = msgpack.Packer
     try:
@@ -691,6 +723,61 @@ def test_is_slow_msgpack():
         msgpack.Packer = saved_packer
     # this assumes that we have fast msgpack on test platform:
     assert not is_slow_msgpack()
+
+
+class TestBuffer:
+    def test_type(self):
+        buffer = Buffer(bytearray)
+        assert isinstance(buffer.get(), bytearray)
+        buffer = Buffer(bytes)  # don't do that in practice
+        assert isinstance(buffer.get(), bytes)
+
+    def test_len(self):
+        buffer = Buffer(bytearray, size=0)
+        b = buffer.get()
+        assert len(buffer) == len(b) == 0
+        buffer = Buffer(bytearray, size=1234)
+        b = buffer.get()
+        assert len(buffer) == len(b) == 1234
+
+    def test_resize(self):
+        buffer = Buffer(bytearray, size=100)
+        assert len(buffer) == 100
+        b1 = buffer.get()
+        buffer.resize(200)
+        assert len(buffer) == 200
+        b2 = buffer.get()
+        assert b2 is not b1  # new, bigger buffer
+        buffer.resize(100)
+        assert len(buffer) >= 100
+        b3 = buffer.get()
+        assert b3 is b2  # still same buffer (200)
+        buffer.resize(100, init=True)
+        assert len(buffer) == 100  # except on init
+        b4 = buffer.get()
+        assert b4 is not b3  # new, smaller buffer
+
+    def test_limit(self):
+        buffer = Buffer(bytearray, size=100, limit=200)
+        buffer.resize(200)
+        assert len(buffer) == 200
+        with pytest.raises(ValueError):
+            buffer.resize(201)
+        assert len(buffer) == 200
+
+    def test_get(self):
+        buffer = Buffer(bytearray, size=100, limit=200)
+        b1 = buffer.get(50)
+        assert len(b1) >= 50  # == 100
+        b2 = buffer.get(100)
+        assert len(b2) >= 100  # == 100
+        assert b2 is b1  # did not need resizing yet
+        b3 = buffer.get(200)
+        assert len(b3) == 200
+        assert b3 is not b2  # new, resized buffer
+        with pytest.raises(ValueError):
+            buffer.get(201)  # beyond limit
+        assert len(buffer) == 200
 
 
 def test_yes_input():
@@ -784,24 +871,19 @@ def test_yes_output(capfd):
     assert 'false-msg' in err
 
 
-def test_progress_percentage_multiline(capfd):
-    pi = ProgressIndicatorPercent(1000, step=5, start=0, same_line=False, msg="%3.0f%%")
-    pi.show(0)
+def test_yes_env_output(capfd, monkeypatch):
+    env_var = 'OVERRIDE_SOMETHING'
+    monkeypatch.setenv(env_var, 'yes')
+    assert yes(env_var_override=env_var)
     out, err = capfd.readouterr()
-    assert err == '  0%\n'
-    pi.show(420)
-    out, err = capfd.readouterr()
-    assert err == ' 42%\n'
-    pi.show(1000)
-    out, err = capfd.readouterr()
-    assert err == '100%\n'
-    pi.finish()
-    out, err = capfd.readouterr()
-    assert err == ''
+    assert out == ''
+    assert env_var in err
+    assert 'yes' in err
 
 
 def test_progress_percentage_sameline(capfd):
-    pi = ProgressIndicatorPercent(1000, step=5, start=0, same_line=True, msg="%3.0f%%")
+    pi = ProgressIndicatorPercent(1000, step=5, start=0, msg="%3.0f%%")
+    pi.logger.setLevel('INFO')
     pi.show(0)
     out, err = capfd.readouterr()
     assert err == '  0%\r'
@@ -818,22 +900,22 @@ def test_progress_percentage_sameline(capfd):
 
 
 def test_progress_percentage_step(capfd):
-    pi = ProgressIndicatorPercent(100, step=2, start=0, same_line=False, msg="%3.0f%%")
+    pi = ProgressIndicatorPercent(100, step=2, start=0, msg="%3.0f%%")
+    pi.logger.setLevel('INFO')
     pi.show()
     out, err = capfd.readouterr()
-    assert err == '  0%\n'
+    assert err == '  0%\r'
     pi.show()
     out, err = capfd.readouterr()
     assert err == ''  # no output at 1% as we have step == 2
     pi.show()
     out, err = capfd.readouterr()
-    assert err == '  2%\n'
+    assert err == '  2%\r'
 
 
 def test_progress_percentage_quiet(capfd):
-    logging.getLogger('borg.output.progress').setLevel(logging.WARN)
-
-    pi = ProgressIndicatorPercent(1000, step=5, start=0, same_line=False, msg="%3.0f%%")
+    pi = ProgressIndicatorPercent(1000, step=5, start=0, msg="%3.0f%%")
+    pi.logger.setLevel('WARN')
     pi.show(0)
     out, err = capfd.readouterr()
     assert err == ''

@@ -15,6 +15,8 @@ positional arguments
 optional arguments
     ``-e``, ``--encryption``
         | select encryption key mode (default: "repokey")
+    ``-a``, ``--append-only``
+        | create an append-only mode repository
 
 `Common options`_
     |

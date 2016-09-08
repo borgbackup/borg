@@ -8,10 +8,10 @@ hashindex.c
 chunker.c
 compress.c
 crypto.c
-platform_darwin.c
-platform_freebsd.c
-platform_linux.c
-platform_posix.c
+src/borg/platform/darwin.c
+src/borg/platform/freebsd.c
+src/borg/platform/linux.c
+src/borg/platform/posix.c
 *.egg-info
 *.pyc
 *.pyo
@@ -23,5 +23,6 @@ borg.build/
 borg.dist/
 borg.exe
 .coverage
+.coverage.*
 .vagrant
 .eggs

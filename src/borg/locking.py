@@ -201,6 +201,9 @@ class LockRoster:
         roster = self.load()
         return set(tuple(e) for e in roster.get(key, []))
 
+    def empty(self, *keys):
+        return all(not self.get(key) for key in keys)
+
     def modify(self, key, op):
         roster = self.load()
         try:
@@ -217,7 +220,7 @@ class LockRoster:
         self.save(roster)
 
 
-class UpgradableLock:
+class Lock:
     """
     A Lock for a resource that can be accessed in a shared or exclusive way.
     Typically, write access to a resource needs an exclusive lock (1 writer,
@@ -226,7 +229,7 @@ class UpgradableLock:
 
     If possible, try to use the contextmanager here like::
 
-        with UpgradableLock(...) as lock:
+        with Lock(...) as lock:
             ...
 
     This makes sure the lock is released again if the block is left, no
@@ -242,7 +245,7 @@ class UpgradableLock:
         self._roster = LockRoster(path + '.roster', id=id)
         # an exclusive lock, used for:
         # - holding while doing roster queries / updates
-        # - holding while the UpgradableLock itself is exclusive
+        # - holding while the Lock instance itself is exclusive
         self._lock = ExclusiveLock(path + '.exclusive', id=id, timeout=timeout)
 
     def __enter__(self):
@@ -293,18 +296,27 @@ class UpgradableLock:
     def release(self):
         if self.is_exclusive:
             self._roster.modify(EXCLUSIVE, REMOVE)
+            if self._roster.empty(EXCLUSIVE, SHARED):
+                self._roster.remove()
             self._lock.release()
         else:
             with self._lock:
                 self._roster.modify(SHARED, REMOVE)
+                if self._roster.empty(EXCLUSIVE, SHARED):
+                    self._roster.remove()
 
     def upgrade(self):
+        # WARNING: if multiple read-lockers want to upgrade, it will deadlock because they
+        # all will wait until the other read locks go away - and that won't happen.
         if not self.is_exclusive:
             self.acquire(exclusive=True, remove=SHARED)
 
     def downgrade(self):
         if self.is_exclusive:
             self.acquire(exclusive=False, remove=EXCLUSIVE)
+
+    def got_exclusive_lock(self):
+        return self.is_exclusive and self._lock.is_locked() and self._lock.by_me()
 
     def break_lock(self):
         self._roster.remove()

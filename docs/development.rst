@@ -10,6 +10,15 @@ This chapter will get you started with |project_name| development.
 |project_name| is written in Python (with a little bit of Cython and C for
 the performance critical parts).
 
+Code and issues
+---------------
+
+Code is stored on Github, in the `Borgbackup organization
+<https://github.com/borgbackup/borg/>`_. `Issues
+<https://github.com/borgbackup/borg/issues>`_ and `pull requests
+<https://github.com/borgbackup/borg/pulls>`_ should be sent there as
+well. See also the :ref:`support` section for more details.
+
 Style guide
 -----------
 
@@ -18,6 +27,17 @@ We generally follow `pep8
 instead of 79. We do *not* use form-feed (``^L``) characters to
 separate sections either. Compliance is tested automatically when
 you run the tests.
+
+Continuous Integration
+----------------------
+
+All pull requests go through Travis-CI_, which runs the tests on Linux
+and Mac OS X as well as the flake8 style checker. Windows builds run on AppVeyor_,
+while additional Unix-like platforms are tested on Golem_.
+
+.. _AppVeyor: https://ci.appveyor.com/project/borgbackup/borg/
+.. _Golem: https://golem.enkore.de/view/Borg/
+.. _Travis-CI: https://travis-ci.org/borgbackup/borg
 
 Output and Logging
 ------------------
@@ -172,6 +192,14 @@ Checklist:
 
     git tag -s -m "tagged/signed release X.Y.Z" X.Y.Z
 
+- create a clean repo and use it for the following steps::
+
+    git clone borg borg-clean
+
+  This makes sure no uncommitted files get into the release archive.
+  It also will find if you forgot to commit something that is needed.
+  It also makes sure the vagrant machines only get committed files and
+  do a fresh start based on that.
 - run tox and/or binary builds on all supported platforms via vagrant,
   check for test failures
 - create a release on PyPi::

@@ -3,7 +3,7 @@ import getpass
 import os
 import sys
 import textwrap
-from binascii import a2b_base64, b2a_base64, hexlify
+from binascii import a2b_base64, b2a_base64, hexlify, unhexlify
 from hashlib import sha256, pbkdf2_hmac
 from hmac import compare_digest
 
@@ -13,7 +13,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from .constants import *  # NOQA
-from .compress import Compressor, COMPR_BUFFER, get_compressor
+from .compress import Compressor, get_compressor
 from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks, hmac_sha256
 from .helpers import Chunk
 from .helpers import Error, IntegrityError
@@ -22,6 +22,8 @@ from .helpers import get_keys_dir
 from .helpers import bin_to_hex
 from .helpers import CompressionDecider2, CompressionSpec
 from .item import Key, EncryptedKey
+from .platform import SaveFile
+from .nonces import NonceManager
 
 
 PREFIX = b'\0' * 8
@@ -88,7 +90,7 @@ class KeyBase:
         self.repository = repository
         self.target = None  # key location file path / repo obj
         self.compression_decider2 = CompressionDecider2(CompressionSpec('none'))
-        self.compressor = Compressor('none', buffer=COMPR_BUFFER)  # for decompression
+        self.compressor = Compressor('none')  # for decompression
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
@@ -104,8 +106,14 @@ class KeyBase:
     def encrypt(self, chunk):
         pass
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, decompress=True):
         pass
+
+    def assert_id(self, id, data):
+        if id:
+            id_computed = self.id_hash(data)
+            if not compare_digest(id_computed, id):
+                raise IntegrityError('Chunk id verification failed')
 
 
 class PlaintextKey(KeyBase):
@@ -129,12 +137,14 @@ class PlaintextKey(KeyBase):
         chunk = self.compress(chunk)
         return b''.join([self.TYPE_STR, chunk.data])
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, decompress=True):
         if data[0] != self.TYPE:
             raise IntegrityError('Invalid encryption envelope')
-        data = self.compressor.decompress(memoryview(data)[1:])
-        if id and sha256(data).digest() != id:
-            raise IntegrityError('Chunk id verification failed')
+        payload = memoryview(data)[1:]
+        if not decompress:
+            return Chunk(payload)
+        data = self.compressor.decompress(payload)
+        self.assert_id(id, data)
         return Chunk(data)
 
 
@@ -160,12 +170,13 @@ class AESKeyBase(KeyBase):
 
     def encrypt(self, chunk):
         chunk = self.compress(chunk)
+        self.nonce_manager.ensure_reservation(num_aes_blocks(len(chunk.data)))
         self.enc_cipher.reset()
         data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(chunk.data)))
         hmac = hmac_sha256(self.enc_hmac_key, data)
         return b''.join((self.TYPE_STR, hmac, data))
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, decompress=True):
         if not (data[0] == self.TYPE or
             data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             raise IntegrityError('Invalid encryption envelope')
@@ -175,12 +186,11 @@ class AESKeyBase(KeyBase):
         if not compare_digest(hmac_computed, hmac_given):
             raise IntegrityError('Encryption envelope checksum mismatch')
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
-        data = self.compressor.decompress(self.dec_cipher.decrypt(data_view[41:]))
-        if id:
-            hmac_given = id
-            hmac_computed = hmac_sha256(self.id_key, data)
-            if not compare_digest(hmac_computed, hmac_given):
-                raise IntegrityError('Chunk id verification failed')
+        payload = self.dec_cipher.decrypt(data_view[41:])
+        if not decompress:
+            return Chunk(payload)
+        data = self.compressor.decompress(payload)
+        self.assert_id(id, data)
         return Chunk(data)
 
     def extract_nonce(self, payload):
@@ -199,8 +209,9 @@ class AESKeyBase(KeyBase):
         if self.chunk_seed & 0x80000000:
             self.chunk_seed = self.chunk_seed - 0xffffffff - 1
 
-    def init_ciphers(self, enc_iv=b''):
-        self.enc_cipher = AES(is_encrypt=True, key=self.enc_key, iv=enc_iv)
+    def init_ciphers(self, manifest_nonce=0):
+        self.enc_cipher = AES(is_encrypt=True, key=self.enc_key, iv=manifest_nonce.to_bytes(16, byteorder='big'))
+        self.nonce_manager = NonceManager(self.repository, self.enc_cipher, manifest_nonce)
         self.dec_cipher = AES(is_encrypt=False, key=self.enc_key)
 
 
@@ -291,7 +302,7 @@ class PassphraseKey(AESKeyBase):
             try:
                 key.decrypt(None, manifest_data)
                 num_blocks = num_aes_blocks(len(manifest_data) - 41)
-                key.init_ciphers(PREFIX + long_to_bytes(key.extract_nonce(manifest_data) + num_blocks))
+                key.init_ciphers(key.extract_nonce(manifest_data) + num_blocks)
                 return key
             except IntegrityError:
                 passphrase = Passphrase.getpass(prompt)
@@ -329,7 +340,7 @@ class KeyfileKeyBase(AESKeyBase):
             if not key.load(target, passphrase):
                 raise PassphraseWrong
         num_blocks = num_aes_blocks(len(manifest_data) - 41)
-        key.init_ciphers(PREFIX + long_to_bytes(key.extract_nonce(manifest_data) + num_blocks))
+        key.init_ciphers(key.extract_nonce(manifest_data) + num_blocks)
         return key
 
     def find_key(self):
@@ -470,7 +481,7 @@ class KeyfileKey(KeyfileKeyBase):
 
     def save(self, target, passphrase):
         key_data = self._save(passphrase)
-        with open(target, 'w') as fd:
+        with SaveFile(target) as fd:
             fd.write('%s %s\n' % (self.FILE_ID, bin_to_hex(self.repository_id)))
             fd.write(key_data)
             fd.write('\n')

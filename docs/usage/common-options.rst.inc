@@ -10,6 +10,8 @@
         | work on log level INFO
     ``--debug``
         | enable debug output, work on log level DEBUG
+    ``--debug-topic TOPIC``
+        | enable TOPIC debugging (can be specified multiple times). The logger path is borg.debug.<TOPIC> if TOPIC is not fully qualified.
     ``--lock-wait N``
         | wait for the lock, but max. N seconds (default: 1).
     ``--show-version``
@@ -22,3 +24,5 @@
         | set umask to M (local and remote, default: 0077)
     ``--remote-path PATH``
         | set remote path to executable (default: "borg")
+    ``--consider-part-files``
+        | treat part files like normal files (e.g. to list/extract them)

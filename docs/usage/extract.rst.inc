@@ -15,6 +15,8 @@ positional arguments
         paths to extract; patterns are supported
 
 optional arguments
+    ``-p``, ``--progress``
+        | show progress while extracting (may be slower)
     ``--list``
         | output verbose list of items (files, dirs, ...)
     ``-n``, ``--dry-run``

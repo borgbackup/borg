@@ -2,7 +2,7 @@ import time
 
 import pytest
 
-from ..locking import get_id, TimeoutTimer, ExclusiveLock, UpgradableLock, LockRoster, \
+from ..locking import get_id, TimeoutTimer, ExclusiveLock, Lock, LockRoster, \
                       ADD, REMOVE, SHARED, EXCLUSIVE, LockTimeout
 
 
@@ -58,52 +58,64 @@ class TestExclusiveLock:
                 ExclusiveLock(lockpath, id=ID2, timeout=0.1).acquire()
 
 
-class TestUpgradableLock:
+class TestLock:
     def test_shared(self, lockpath):
-        lock1 = UpgradableLock(lockpath, exclusive=False, id=ID1).acquire()
-        lock2 = UpgradableLock(lockpath, exclusive=False, id=ID2).acquire()
+        lock1 = Lock(lockpath, exclusive=False, id=ID1).acquire()
+        lock2 = Lock(lockpath, exclusive=False, id=ID2).acquire()
         assert len(lock1._roster.get(SHARED)) == 2
         assert len(lock1._roster.get(EXCLUSIVE)) == 0
+        assert not lock1._roster.empty(SHARED, EXCLUSIVE)
+        assert lock1._roster.empty(EXCLUSIVE)
         lock1.release()
         lock2.release()
 
     def test_exclusive(self, lockpath):
-        with UpgradableLock(lockpath, exclusive=True, id=ID1) as lock:
+        with Lock(lockpath, exclusive=True, id=ID1) as lock:
             assert len(lock._roster.get(SHARED)) == 0
             assert len(lock._roster.get(EXCLUSIVE)) == 1
+            assert not lock._roster.empty(SHARED, EXCLUSIVE)
 
     def test_upgrade(self, lockpath):
-        with UpgradableLock(lockpath, exclusive=False) as lock:
+        with Lock(lockpath, exclusive=False) as lock:
             lock.upgrade()
             lock.upgrade()  # NOP
             assert len(lock._roster.get(SHARED)) == 0
             assert len(lock._roster.get(EXCLUSIVE)) == 1
+            assert not lock._roster.empty(SHARED, EXCLUSIVE)
 
     def test_downgrade(self, lockpath):
-        with UpgradableLock(lockpath, exclusive=True) as lock:
+        with Lock(lockpath, exclusive=True) as lock:
             lock.downgrade()
             lock.downgrade()  # NOP
             assert len(lock._roster.get(SHARED)) == 1
             assert len(lock._roster.get(EXCLUSIVE)) == 0
 
+    def test_got_exclusive_lock(self, lockpath):
+        lock = Lock(lockpath, exclusive=True, id=ID1)
+        assert not lock.got_exclusive_lock()
+        lock.acquire()
+        assert lock.got_exclusive_lock()
+        lock.release()
+        assert not lock.got_exclusive_lock()
+
     def test_break(self, lockpath):
-        lock = UpgradableLock(lockpath, exclusive=True, id=ID1).acquire()
+        lock = Lock(lockpath, exclusive=True, id=ID1).acquire()
         lock.break_lock()
         assert len(lock._roster.get(SHARED)) == 0
         assert len(lock._roster.get(EXCLUSIVE)) == 0
-        with UpgradableLock(lockpath, exclusive=True, id=ID2):
+        with Lock(lockpath, exclusive=True, id=ID2):
             pass
 
     def test_timeout(self, lockpath):
-        with UpgradableLock(lockpath, exclusive=False, id=ID1):
+        with Lock(lockpath, exclusive=False, id=ID1):
             with pytest.raises(LockTimeout):
-                UpgradableLock(lockpath, exclusive=True, id=ID2, timeout=0.1).acquire()
-        with UpgradableLock(lockpath, exclusive=True, id=ID1):
+                Lock(lockpath, exclusive=True, id=ID2, timeout=0.1).acquire()
+        with Lock(lockpath, exclusive=True, id=ID1):
             with pytest.raises(LockTimeout):
-                UpgradableLock(lockpath, exclusive=False, id=ID2, timeout=0.1).acquire()
-        with UpgradableLock(lockpath, exclusive=True, id=ID1):
+                Lock(lockpath, exclusive=False, id=ID2, timeout=0.1).acquire()
+        with Lock(lockpath, exclusive=True, id=ID1):
             with pytest.raises(LockTimeout):
-                UpgradableLock(lockpath, exclusive=True, id=ID2, timeout=0.1).acquire()
+                Lock(lockpath, exclusive=True, id=ID2, timeout=0.1).acquire()
 
 
 @pytest.fixture()

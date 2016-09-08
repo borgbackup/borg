@@ -1,6 +1,7 @@
 import getpass
 import re
 import tempfile
+import os.path
 from binascii import hexlify, unhexlify
 
 import pytest
@@ -9,6 +10,7 @@ from ..crypto import bytes_to_long, num_aes_blocks
 from ..helpers import Location
 from ..helpers import Chunk
 from ..helpers import IntegrityError
+from ..helpers import get_nonces_dir
 from ..key import PlaintextKey, PassphraseKey, KeyfileKey, Passphrase, PasswordRetriesExceeded, bin_to_hex
 
 
@@ -16,6 +18,11 @@ from ..key import PlaintextKey, PassphraseKey, KeyfileKey, Passphrase, PasswordR
 def clean_env(monkeypatch):
     # Workaround for some tests (testsuite/archiver) polluting the environment
     monkeypatch.delenv('BORG_PASSPHRASE', False)
+
+
+@pytest.fixture(autouse=True)
+def nonce_dir(tmpdir_factory, monkeypatch):
+    monkeypatch.setenv('XDG_CONFIG_HOME', tmpdir_factory.mktemp('xdg-config-home'))
 
 
 class TestKey:
@@ -43,6 +50,14 @@ class TestKey:
         monkeypatch.setenv('BORG_KEYS_DIR', tmpdir)
         return tmpdir
 
+    @pytest.fixture(params=(
+        KeyfileKey,
+        PlaintextKey
+    ))
+    def key(self, request, monkeypatch):
+        monkeypatch.setenv('BORG_PASSPHRASE', 'test')
+        return request.param.create(self.MockRepository(), self.MockArgs())
+
     class MockRepository:
         class _Location:
             orig = '/some/place'
@@ -50,6 +65,12 @@ class TestKey:
         _location = _Location()
         id = bytes(32)
         id_str = bin_to_hex(id)
+
+        def get_free_nonce(self):
+            return None
+
+        def commit_nonce_reservation(self, next_unreserved, start_nonce):
+            pass
 
     def test_plaintext(self):
         key = PlaintextKey.create(None, None)
@@ -61,20 +82,30 @@ class TestKey:
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
         key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
         assert bytes_to_long(key.enc_cipher.iv, 8) == 0
-        manifest = key.encrypt(Chunk(b'XXX'))
+        manifest = key.encrypt(Chunk(b'ABC'))
         assert key.extract_nonce(manifest) == 0
-        manifest2 = key.encrypt(Chunk(b'XXX'))
+        manifest2 = key.encrypt(Chunk(b'ABC'))
         assert manifest != manifest2
         assert key.decrypt(None, manifest) == key.decrypt(None, manifest2)
         assert key.extract_nonce(manifest2) == 1
         iv = key.extract_nonce(manifest)
         key2 = KeyfileKey.detect(self.MockRepository(), manifest)
-        assert bytes_to_long(key2.enc_cipher.iv, 8) == iv + num_aes_blocks(len(manifest) - KeyfileKey.PAYLOAD_OVERHEAD)
+        assert bytes_to_long(key2.enc_cipher.iv, 8) >= iv + num_aes_blocks(len(manifest) - KeyfileKey.PAYLOAD_OVERHEAD)
         # Key data sanity check
         assert len({key2.id_key, key2.enc_key, key2.enc_hmac_key}) == 3
         assert key2.chunk_seed != 0
         chunk = Chunk(b'foo')
         assert chunk == key2.decrypt(key.id_hash(chunk.data), key.encrypt(chunk))
+
+    def test_keyfile_nonce_rollback_protection(self, monkeypatch, keys_dir):
+        monkeypatch.setenv('BORG_PASSPHRASE', 'test')
+        repository = self.MockRepository()
+        with open(os.path.join(get_nonces_dir(), repository.id_str), "w") as fd:
+            fd.write("0000000000002000")
+        key = KeyfileKey.create(repository, self.MockArgs())
+        data = key.encrypt(Chunk(b'ABC'))
+        assert key.extract_nonce(data) == 0x2000
+        assert key.decrypt(None, data).data == b'ABC'
 
     def test_keyfile_kfenv(self, tmpdir, monkeypatch):
         keyfile = tmpdir.join('keyfile')
@@ -83,7 +114,7 @@ class TestKey:
         assert not keyfile.exists()
         key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
         assert keyfile.exists()
-        chunk = Chunk(b'XXX')
+        chunk = Chunk(b'ABC')
         chunk_id = key.id_hash(chunk.data)
         chunk_cdata = key.encrypt(chunk)
         key = KeyfileKey.detect(self.MockRepository(), chunk_cdata)
@@ -116,9 +147,9 @@ class TestKey:
         assert hexlify(key.enc_hmac_key) == b'b885a05d329a086627412a6142aaeb9f6c54ab7950f996dd65587251f6bc0901'
         assert hexlify(key.enc_key) == b'2ff3654c6daf7381dbbe718d2b20b4f1ea1e34caa6cc65f6bb3ac376b93fed2a'
         assert key.chunk_seed == -775740477
-        manifest = key.encrypt(Chunk(b'XXX'))
+        manifest = key.encrypt(Chunk(b'ABC'))
         assert key.extract_nonce(manifest) == 0
-        manifest2 = key.encrypt(Chunk(b'XXX'))
+        manifest2 = key.encrypt(Chunk(b'ABC'))
         assert manifest != manifest2
         assert key.decrypt(None, manifest) == key.decrypt(None, manifest2)
         assert key.extract_nonce(manifest2) == 1
@@ -154,6 +185,24 @@ class TestKey:
             id = bytearray(key.id_hash(data))  # corrupt chunk id
             id[12] = 0
             key.decrypt(id, data)
+
+    def test_decrypt_decompress(self, key):
+        plaintext = Chunk(b'123456789')
+        encrypted = key.encrypt(plaintext)
+        assert key.decrypt(None, encrypted, decompress=False) != plaintext
+        assert key.decrypt(None, encrypted) == plaintext
+
+    def test_assert_id(self, key):
+        plaintext = b'123456789'
+        id = key.id_hash(plaintext)
+        key.assert_id(id, plaintext)
+        id_changed = bytearray(id)
+        id_changed[0] += 1
+        with pytest.raises(IntegrityError):
+            key.assert_id(id_changed, plaintext)
+        plaintext_changed = plaintext + b'1'
+        with pytest.raises(IntegrityError):
+            key.assert_id(id, plaintext_changed)
 
 
 class TestPassphrase:

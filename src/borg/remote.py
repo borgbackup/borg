@@ -6,6 +6,7 @@ import select
 import shlex
 import sys
 import tempfile
+import traceback
 from subprocess import Popen, PIPE
 
 import msgpack
@@ -15,6 +16,7 @@ from .helpers import Error, IntegrityError
 from .helpers import get_home_dir
 from .helpers import sysinfo
 from .helpers import bin_to_hex
+from .helpers import replace_placeholders
 from .repository import Repository
 
 RPC_PROTOCOL_VERSION = 2
@@ -40,6 +42,14 @@ class InvalidRPCMethod(Error):
     """RPC method {} is not valid"""
 
 
+class UnexpectedRPCDataFormatFromClient(Error):
+    """Borg {}: Got unexpected RPC data format from client."""
+
+
+class UnexpectedRPCDataFormatFromServer(Error):
+    """Got unexpected RPC data format from server."""
+
+
 class RepositoryServer:  # pragma: no cover
     rpc_methods = (
         '__len__',
@@ -56,6 +66,8 @@ class RepositoryServer:  # pragma: no cover
         'save_key',
         'load_key',
         'break_lock',
+        'get_free_nonce',
+        'commit_nonce_reservation'
     )
 
     def __init__(self, restrict_to_paths, append_only):
@@ -82,13 +94,18 @@ class RepositoryServer:  # pragma: no cover
             if r:
                 data = os.read(stdin_fd, BUFSIZE)
                 if not data:
-                    self.repository.close()
+                    if self.repository is not None:
+                        self.repository.close()
+                    else:
+                        os.write(stderr_fd, "Borg {}: Got connection close before repository was opened.\n"
+                                 .format(__version__).encode())
                     return
                 unpacker.feed(data)
                 for unpacked in unpacker:
                     if not (isinstance(unpacked, tuple) and len(unpacked) == 4):
-                        self.repository.close()
-                        raise Exception("Unexpected RPC data format.")
+                        if self.repository is not None:
+                            self.repository.close()
+                        raise UnexpectedRPCDataFormatFromClient(__version__)
                     type, msgid, method, args = unpacked
                     method = method.decode('ascii')
                     try:
@@ -100,12 +117,21 @@ class RepositoryServer:  # pragma: no cover
                             f = getattr(self.repository, method)
                         res = f(*args)
                     except BaseException as e:
-                        # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
-                        # and will be handled just like locally raised exceptions. Suppress the remote traceback
-                        # for these, except ErrorWithTraceback, which should always display a traceback.
-                        if not isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
-                            logging.exception('Borg %s: exception in RPC call:', __version__)
-                            logging.error(sysinfo())
+                        if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
+                            # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
+                            # and will be handled just like locally raised exceptions. Suppress the remote traceback
+                            # for these, except ErrorWithTraceback, which should always display a traceback.
+                            pass
+                        else:
+                            if isinstance(e, Error):
+                                tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
+                                msg = e.get_message()
+                            else:
+                                tb_log_level = logging.ERROR
+                                msg = '%s Exception in RPC call' % e.__class__.__name__
+                            tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
+                            logging.error(msg)
+                            logging.log(tb_log_level, tb)
                         exc = "Remote Exception (see remote log for the traceback)"
                         os.write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc)))
                     else:
@@ -117,18 +143,25 @@ class RepositoryServer:  # pragma: no cover
     def negotiate(self, versions):
         return RPC_PROTOCOL_VERSION
 
-    def open(self, path, create=False, lock_wait=None, lock=True):
+    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=None, append_only=False):
         path = os.fsdecode(path)
         if path.startswith('/~'):
             path = os.path.join(get_home_dir(), path[2:])
         path = os.path.realpath(path)
         if self.restrict_to_paths:
+            # if --restrict-to-path P is given, we make sure that we only operate in/below path P.
+            # for the prefix check, it is important that the compared pathes both have trailing slashes,
+            # so that a path /foobar will NOT be accepted with --restrict-to-path /foo option.
+            path_with_sep = os.path.join(path, '')  # make sure there is a trailing slash (os.sep)
             for restrict_to_path in self.restrict_to_paths:
-                if path.startswith(os.path.realpath(restrict_to_path)):
+                restrict_to_path_with_sep = os.path.join(os.path.realpath(restrict_to_path), '')  # trailing slash
+                if path_with_sep.startswith(restrict_to_path_with_sep):
                     break
             else:
                 raise PathNotAllowed(path)
-        self.repository = Repository(path, create, lock_wait=lock_wait, lock=lock, append_only=self.append_only)
+        self.repository = Repository(path, create, lock_wait=lock_wait, lock=lock,
+                                     append_only=self.append_only or append_only,
+                                     exclusive=exclusive)
         self.repository.__enter__()  # clean exit handled by serve() method
         return self.repository.id
 
@@ -137,10 +170,14 @@ class RemoteRepository:
     extra_test_args = []
 
     class RPCError(Exception):
-        def __init__(self, name):
+        def __init__(self, name, remote_type):
             self.name = name
+            self.remote_type = remote_type
 
-    def __init__(self, location, create=False, lock_wait=None, lock=True, args=None):
+    class NoAppendOnlyOnServer(Error):
+        """Server does not support --append-only."""
+
+    def __init__(self, location, create=False, exclusive=False, lock_wait=None, lock=True, append_only=False, args=None):
         self.location = self._location = location
         self.preload_ids = []
         self.msgid = 0
@@ -155,10 +192,17 @@ class RemoteRepository:
         env = dict(os.environ)
         if not testing:
             borg_cmd = self.ssh_cmd(location) + borg_cmd
-            # pyinstaller binary adds LD_LIBRARY_PATH=/tmp/_ME... but we do not want
-            # that the system's ssh binary picks up (non-matching) libraries from there
-            env.pop('LD_LIBRARY_PATH', None)
+            # pyinstaller binary modifies LD_LIBRARY_PATH=/tmp/_ME... but we do not want
+            # that the system's ssh binary picks up (non-matching) libraries from there.
+            # thus we install the original LDLP, before pyinstaller has modified it:
+            lp_key = 'LD_LIBRARY_PATH'
+            lp_orig = env.get(lp_key + '_ORIG')  # pyinstaller >= 20160820 has this
+            if lp_orig is not None:
+                env[lp_key] = lp_orig
+            else:
+                env.pop(lp_key, None)
         env.pop('BORG_PASSPHRASE', None)  # security: do not give secrets to subprocess
+        env['BORG_VERSION'] = __version__
         self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()
@@ -170,18 +214,37 @@ class RemoteRepository:
         self.x_fds = [self.stdin_fd, self.stdout_fd, self.stderr_fd]
 
         try:
-            version = self.call('negotiate', RPC_PROTOCOL_VERSION)
-        except ConnectionClosed:
-            raise ConnectionClosedWithHint('Is borg working on the server?') from None
-        if version != RPC_PROTOCOL_VERSION:
-            raise Exception('Server insisted on using unsupported protocol version %d' % version)
-        try:
-            self.id = self.call('open', self.location.path, create, lock_wait, lock)
+            try:
+                version = self.call('negotiate', RPC_PROTOCOL_VERSION)
+            except ConnectionClosed:
+                raise ConnectionClosedWithHint('Is borg working on the server?') from None
+            if version != RPC_PROTOCOL_VERSION:
+                raise Exception('Server insisted on using unsupported protocol version %d' % version)
+            try:
+                self.id = self.call('open', self.location.path, create, lock_wait, lock, exclusive, append_only)
+            except self.RPCError as err:
+                if err.remote_type != 'TypeError':
+                    raise
+                msg = """\
+Please note:
+If you see a TypeError complaining about the number of positional arguments
+given to open(), you can ignore it if it comes from a borg version < 1.0.7.
+This TypeError is a cosmetic side effect of the compatibility code borg
+clients >= 1.0.7 have to support older borg servers.
+This problem will go away as soon as the server has been upgraded to 1.0.7+.
+"""
+                # emit this msg in the same way as the "Remote: ..." lines that show the remote TypeError
+                sys.stderr.write(msg)
+                if append_only:
+                    raise self.NoAppendOnlyOnServer()
+                self.id = self.call('open', self.location.path, create, lock_wait, lock)
         except Exception:
             self.close()
             raise
 
     def __del__(self):
+        if len(self.responses):
+            logging.debug("still %d cached responses left in RemoteRepository" % (len(self.responses),))
         if self.p:
             self.close()
             assert False, "cleanup happened in Repository.__del__"
@@ -229,6 +292,7 @@ class RemoteRepository:
             return [sys.executable, '-m', 'borg.archiver', 'serve'] + opts + self.extra_test_args
         else:  # pragma: no cover
             remote_path = args.remote_path or os.environ.get('BORG_REMOTE_PATH', 'borg')
+            remote_path = replace_placeholders(remote_path)
             return [remote_path, 'serve'] + opts
 
     def ssh_cmd(self, location):
@@ -257,22 +321,23 @@ class RemoteRepository:
             return msgid
 
         def handle_error(error, res):
-            if error == b'DoesNotExist':
+            error = error.decode('utf-8')
+            if error == 'DoesNotExist':
                 raise Repository.DoesNotExist(self.location.orig)
-            elif error == b'AlreadyExists':
+            elif error == 'AlreadyExists':
                 raise Repository.AlreadyExists(self.location.orig)
-            elif error == b'CheckNeeded':
+            elif error == 'CheckNeeded':
                 raise Repository.CheckNeeded(self.location.orig)
-            elif error == b'IntegrityError':
+            elif error == 'IntegrityError':
                 raise IntegrityError(res)
-            elif error == b'PathNotAllowed':
+            elif error == 'PathNotAllowed':
                 raise PathNotAllowed(*res)
-            elif error == b'ObjectNotFound':
+            elif error == 'ObjectNotFound':
                 raise Repository.ObjectNotFound(res[0], self.location.orig)
-            elif error == b'InvalidRPCMethod':
+            elif error == 'InvalidRPCMethod':
                 raise InvalidRPCMethod(*res)
             else:
-                raise self.RPCError(res.decode('utf-8'))
+                raise self.RPCError(res.decode('utf-8'), error)
 
         calls = list(calls)
         waiting_for = []
@@ -304,7 +369,7 @@ class RemoteRepository:
                     self.unpacker.feed(data)
                     for unpacked in self.unpacker:
                         if not (isinstance(unpacked, tuple) and len(unpacked) == 4):
-                            raise Exception("Unexpected RPC data format.")
+                            raise UnexpectedRPCDataFormatFromServer()
                         type, msgid, error, res = unpacked
                         if msgid in self.ignore_responses:
                             self.ignore_responses.remove(msgid)
@@ -386,6 +451,12 @@ class RemoteRepository:
 
     def load_key(self):
         return self.call('load_key')
+
+    def get_free_nonce(self):
+        return self.call('get_free_nonce')
+
+    def commit_nonce_reservation(self, next_unreserved, start_nonce):
+        return self.call('commit_nonce_reservation', next_unreserved, start_nonce)
 
     def break_lock(self):
         return self.call('break_lock')

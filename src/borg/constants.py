@@ -1,7 +1,8 @@
 # this set must be kept complete, otherwise the RobustUnpacker might malfunction:
 ITEM_KEYS = frozenset(['path', 'source', 'rdev', 'chunks', 'chunks_healthy', 'hardlink_master',
                        'mode', 'user', 'group', 'uid', 'gid', 'mtime', 'atime', 'ctime',
-                       'xattrs', 'bsdflags', 'acl_nfs4', 'acl_access', 'acl_default', 'acl_extended', ])
+                       'xattrs', 'bsdflags', 'acl_nfs4', 'acl_access', 'acl_default', 'acl_extended',
+                       'part'])
 
 # this is the set of keys that are always present in items:
 REQUIRED_ITEM_KEYS = frozenset(['path', 'mtime', ])
@@ -13,8 +14,6 @@ ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'hostname', 'us
 
 # this is the set of keys that are always present in archives:
 REQUIRED_ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'time', ])
-
-ARCHIVE_TEXT_KEYS = (b'name', b'comment', b'hostname', b'username', b'time', b'time_end')
 
 # default umask, overriden by --umask, defaults to read/write only for owner
 UMASK_DEFAULT = 0o077
@@ -40,7 +39,7 @@ HASH_MASK_BITS = 21  # results in ~2MiB chunks statistically
 CHUNKER_PARAMS = (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
 
 # chunker params for the items metadata stream, finer granularity
-ITEMS_CHUNKER_PARAMS = (12, 16, 14, HASH_WINDOW_SIZE)
+ITEMS_CHUNKER_PARAMS = (15, 19, 17, HASH_WINDOW_SIZE)
 
 # return codes returned by borg command
 # when borg is killed by signal N, rc = 128 + N

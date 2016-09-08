@@ -8,7 +8,7 @@ import msgpack
 
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_dict, ITEM_KEYS, Statistics
 from ..archive import BackupOSError, backup_io, backup_io_iter
-from ..item import Item
+from ..item import Item, ArchiveItem
 from ..key import PlaintextKey
 from ..helpers import Manifest
 from . import BaseTestCase
@@ -53,7 +53,6 @@ def tests_stats_progress(stats, columns=80):
 
 def test_stats_format(stats):
     assert str(stats) == """\
-                       Original size      Compressed size    Deduplicated size
 This archive:                   20 B                 10 B                 10 B"""
     s = "{0.osize_fmt}".format(stats)
     assert s == "20 B"
@@ -78,7 +77,7 @@ class ArchiveTimestampTestCase(BaseTestCase):
         key = PlaintextKey(repository)
         manifest = Manifest(repository, key)
         a = Archive(repository, key, manifest, 'test', create=True)
-        a.metadata = {b'time': isoformat}
+        a.metadata = ArchiveItem(time=isoformat)
         self.assert_equal(a.ts, expected)
 
     def test_with_microseconds(self):
@@ -110,7 +109,7 @@ class ChunkBufferTestCase(BaseTestCase):
         self.assert_equal(data, [Item(internal_dict=d) for d in unpacker])
 
     def test_partial(self):
-        big = "0123456789" * 10000
+        big = "0123456789abcdefghijklmnopqrstuvwxyz" * 25000
         data = [Item(path='full', source=big), Item(path='partial', source=big)]
         cache = MockCache()
         key = PlaintextKey(None)

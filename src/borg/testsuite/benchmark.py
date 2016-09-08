@@ -104,29 +104,28 @@ def test_help(benchmark, cmd):
 
 def test_chunk_indexer_setitem(benchmark):
     max_key = 2**17
+    # we want 32 byte keys, since that's what we use day to day
+    keys = [sha256(H(k)).digest() for k in range(max_key)]
+    bucket_val = (0, 0, 0)
     def setup():
         # return *args, **kwargs for the benchmarked function
         return [ChunkIndex(max_key), ], dict()
-    key = 0
     def do_inserts(index):
-        for key in range(max_key):
-            # we want 32 byte keys, since that's what we use day to day
-            key = sha256(H(key)).digest()
-            index[key] = (0, 0, 0)
-    benchmark.pedantic(do_inserts, rounds=3, setup=setup)
+        for key in keys:
+            index[key] = bucket_val
+    benchmark.pedantic(do_inserts, rounds=100, setup=setup)
 
 
 def test_chunk_indexer_getitem(benchmark):
     max_key = 2**17
     index = ChunkIndex(max_key)
-    key = 0
-    for key in range(max_key):
+    keys = [sha256(H(k)).digest() for k in range(max_key)]
+    bucket_val = (0, 0, 0)
+    for key in keys:
         # we want 32 byte keys, since that's what we use day to day
-        key = sha256(H(key)).digest()
-        index[key] = (0, 0, 0)
+        index[key] = bucket_val
     def do_gets():
-        for key in range(max_key):
+        for key in keys:
             # we want 32 byte keys, since that's what we use day to day
-            key = sha256(H(key)).digest()
             val = index[key]
-    benchmark.pedantic(do_gets, rounds=3)
+    benchmark.pedantic(do_gets, rounds=100)

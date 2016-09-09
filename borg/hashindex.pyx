@@ -23,6 +23,8 @@ cdef extern from "_hashindex.c":
     uint32_t _htole32(uint32_t v)
     uint32_t _le32toh(uint32_t v)
 
+    double HASH_MAX_LOAD
+
 
 cdef _NoDefault = object()
 
@@ -45,7 +47,6 @@ assert UINT32_MAX == 2**32-1
 
 # module-level constant because cdef's in classes can't have default values
 cdef uint32_t _MAX_VALUE = 2**32-1025
-MAX_VALUE = _MAX_VALUE
 
 assert _MAX_VALUE % 2 == 1
 
@@ -53,6 +54,9 @@ assert _MAX_VALUE % 2 == 1
 cdef class IndexBase:
     cdef HashIndex *index
     cdef int key_size
+
+    MAX_LOAD_FACTOR = HASH_MAX_LOAD
+    MAX_VALUE = _MAX_VALUE
 
     def __cinit__(self, capacity=0, path=None, key_size=32):
         self.key_size = key_size
@@ -280,7 +284,7 @@ cdef class ChunkIndex(IndexBase):
             unique_chunks += 1
             values = <uint32_t*> (key + self.key_size)
             refcount = _le32toh(values[0])
-            assert refcount <= MAX_VALUE, "invalid reference count"
+            assert refcount <= _MAX_VALUE, "invalid reference count"
             chunks += refcount
             unique_size += _le32toh(values[1])
             unique_csize += _le32toh(values[2])
@@ -340,5 +344,5 @@ cdef class ChunkKeyIterator:
             raise StopIteration
         cdef uint32_t *value = <uint32_t *>(self.key + self.key_size)
         cdef uint32_t refcount = _le32toh(value[0])
-        assert refcount <= MAX_VALUE, "invalid reference count"
+        assert refcount <= _MAX_VALUE, "invalid reference count"
         return (<char *>self.key)[:self.key_size], (refcount, _le32toh(value[1]), _le32toh(value[2]))

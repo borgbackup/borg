@@ -853,8 +853,9 @@ class ArchiveChecker:
         """Fetch a list of all object keys from repository
         """
         # Explicitly set the initial hash table capacity to avoid performance issues
-        # due to hash table "resonance"
-        capacity = int(len(self.repository) * 1.35 + 1)  # > len * 1.0 / HASH_MAX_LOAD (see _hashindex.c)
+        # due to hash table "resonance".
+        # Since reconstruction of archive items can add some new chunks, add 10 % headroom
+        capacity = int(len(self.repository) / ChunkIndex.MAX_LOAD_FACTOR * 1.1)
         self.chunks = ChunkIndex(capacity)
         marker = None
         while True:

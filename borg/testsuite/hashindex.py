@@ -279,5 +279,5 @@ def test_nsindex_segment_limit():
 
 
 def test_max_load_factor():
-    assert NSIndex.MAX_LOAD_FACTOR < 1
-    assert ChunkIndex.MAX_LOAD_FACTOR < 1
+    assert NSIndex.MAX_LOAD_FACTOR < 1.0
+    assert ChunkIndex.MAX_LOAD_FACTOR < 1.0

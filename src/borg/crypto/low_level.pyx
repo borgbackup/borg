@@ -456,6 +456,11 @@ cdef class _AEAD_BASE:
         if iv is not None:
             self.set_iv(iv)
         assert self.blocks == 0, 'iv needs to be set before encrypt is called'
+        # AES-GCM, AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit (12Byte)
+        # IV we provide, thus we must not encrypt more than 2^32 cipher blocks with same IV).
+        block_count = self.block_count(len(data))
+        if block_count > 2**32:
+            raise ValueError('too much data, would overflow internal 32bit counter')
         cdef int ilen = len(data)
         cdef int hlen = len(header)
         assert hlen == self.header_len
@@ -500,7 +505,7 @@ cdef class _AEAD_BASE:
             offset += olen
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_GET_TAG, self.mac_len, odata+hlen):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl GET TAG failed')
-            self.blocks = self.block_count(ilen)
+            self.blocks = block_count
             return odata[:offset]
         finally:
             PyMem_Free(odata)
@@ -511,6 +516,11 @@ cdef class _AEAD_BASE:
         """
         authenticate aad + iv + cdata, decrypt cdata, ignore header bytes up to aad_offset.
         """
+        # AES-GCM, AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit (12Byte)
+        # IV we provide, thus we must not decrypt more than 2^32 cipher blocks with same IV):
+        approx_block_count = self.block_count(len(envelope))  # sloppy, but good enough for borg
+        if approx_block_count > 2**32:
+            raise ValueError('too much data, would overflow internal 32bit counter')
         cdef int ilen = len(envelope)
         cdef int hlen = self.header_len
         assert hlen == self.header_len
@@ -573,9 +583,7 @@ cdef class _AEAD_BASE:
     def next_iv(self):
         # call this after encrypt() to get the next iv (int) for the next encrypt() call
         # AES-GCM, AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit
-        # (12 byte) IV we provide, thus we only need to increment the IV by 1 (and we must
-        # not encrypt more than 2^32 cipher blocks with same IV):
-        assert self.blocks < 2**32
+        # (12 byte) IV we provide, thus we only need to increment the IV by 1.
         iv = int.from_bytes(self.iv[:self.iv_len], byteorder='big')
         return iv + 1
 

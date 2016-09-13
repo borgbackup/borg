@@ -1666,6 +1666,14 @@ def sig_term_handler(signum, stack):
     raise SIGTERMReceived
 
 
+class SIGHUPReceived(BaseException):
+    pass
+
+
+def sig_hup_handler(signum, stack):
+    raise SIGHUPReceived
+
+
 def setup_signal_handlers():  # pragma: no cover
     sigs = []
     if hasattr(signal, 'SIGUSR1'):
@@ -1674,7 +1682,12 @@ def setup_signal_handlers():  # pragma: no cover
         sigs.append(signal.SIGINFO)  # kill -INFO pid (or ctrl-t)
     for sig in sigs:
         signal.signal(sig, sig_info_handler)
+    # If we received SIGTERM or SIGHUP, catch them and raise a proper exception
+    # that can be handled for an orderly exit. SIGHUP is important especially
+    # for systemd systems, where logind sends it when a session exits, in
+    # addition to any traditional use.
     signal.signal(signal.SIGTERM, sig_term_handler)
+    signal.signal(signal.SIGHUP, sig_hup_handler)
 
 
 def main():  # pragma: no cover
@@ -1712,6 +1725,9 @@ def main():  # pragma: no cover
         exit_code = EXIT_ERROR
     except SIGTERMReceived:
         msg = 'Received SIGTERM.'
+        exit_code = EXIT_ERROR
+    except SIGHUPReceived:
+        msg = 'Received SIGHUP.'
         exit_code = EXIT_ERROR
     if msg:
         logger.error(msg)

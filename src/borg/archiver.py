@@ -989,7 +989,8 @@ class Archiver:
                                      dry_run=args.dry_run)
 
         with signal_handler(signal.SIGTERM, interrupt), \
-             signal_handler(signal.SIGINT, interrupt):
+             signal_handler(signal.SIGINT, interrupt), \
+             signal_handler(signal.SIGHUP, interrupt):
             if args.location.archive:
                 name = args.location.archive
                 if recreater.is_temporary_archive(name):

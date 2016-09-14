@@ -140,16 +140,16 @@ class HashIndexSizeTestCase(BaseTestCase):
 class HashIndexRefcountingTestCase(BaseTestCase):
     def test_chunkindex_limit(self):
         idx = ChunkIndex()
-        idx[H(1)] = hashindex.MAX_VALUE - 1, 1, 2
+        idx[H(1)] = ChunkIndex.MAX_VALUE - 1, 1, 2
 
         # 5 is arbitray, any number of incref/decrefs shouldn't move it once it's limited
         for i in range(5):
             # first incref to move it to the limit
             refcount, *_ = idx.incref(H(1))
-            assert refcount == hashindex.MAX_VALUE
+            assert refcount == ChunkIndex.MAX_VALUE
         for i in range(5):
             refcount, *_ = idx.decref(H(1))
-            assert refcount == hashindex.MAX_VALUE
+            assert refcount == ChunkIndex.MAX_VALUE
 
     def _merge(self, refcounta, refcountb):
         def merge(refcount1, refcount2):
@@ -168,23 +168,23 @@ class HashIndexRefcountingTestCase(BaseTestCase):
     def test_chunkindex_merge_limit1(self):
         # Check that it does *not* limit at MAX_VALUE - 1
         # (MAX_VALUE is odd)
-        half = hashindex.MAX_VALUE // 2
-        assert self._merge(half, half) == hashindex.MAX_VALUE - 1
+        half = ChunkIndex.MAX_VALUE // 2
+        assert self._merge(half, half) == ChunkIndex.MAX_VALUE - 1
 
     def test_chunkindex_merge_limit2(self):
         # 3000000000 + 2000000000 > MAX_VALUE
-        assert self._merge(3000000000, 2000000000) == hashindex.MAX_VALUE
+        assert self._merge(3000000000, 2000000000) == ChunkIndex.MAX_VALUE
 
     def test_chunkindex_merge_limit3(self):
         # Crossover point: both addition and limit semantics will yield the same result
-        half = hashindex.MAX_VALUE // 2
-        assert self._merge(half + 1, half) == hashindex.MAX_VALUE
+        half = ChunkIndex.MAX_VALUE // 2
+        assert self._merge(half + 1, half) == ChunkIndex.MAX_VALUE
 
     def test_chunkindex_merge_limit4(self):
         # Beyond crossover, result of addition would be 2**31
-        half = hashindex.MAX_VALUE // 2
-        assert self._merge(half + 2, half) == hashindex.MAX_VALUE
-        assert self._merge(half + 1, half + 1) == hashindex.MAX_VALUE
+        half = ChunkIndex.MAX_VALUE // 2
+        assert self._merge(half + 2, half) == ChunkIndex.MAX_VALUE
+        assert self._merge(half + 1, half + 1) == ChunkIndex.MAX_VALUE
 
     def test_chunkindex_add(self):
         idx1 = ChunkIndex()
@@ -195,17 +195,17 @@ class HashIndexRefcountingTestCase(BaseTestCase):
 
     def test_incref_limit(self):
         idx1 = ChunkIndex()
-        idx1[H(1)] = (hashindex.MAX_VALUE, 6, 7)
+        idx1[H(1)] = (ChunkIndex.MAX_VALUE, 6, 7)
         idx1.incref(H(1))
         refcount, *_ = idx1[H(1)]
-        assert refcount == hashindex.MAX_VALUE
+        assert refcount == ChunkIndex.MAX_VALUE
 
     def test_decref_limit(self):
         idx1 = ChunkIndex()
-        idx1[H(1)] = hashindex.MAX_VALUE, 6, 7
+        idx1[H(1)] = ChunkIndex.MAX_VALUE, 6, 7
         idx1.decref(H(1))
         refcount, *_ = idx1[H(1)]
-        assert refcount == hashindex.MAX_VALUE
+        assert refcount == ChunkIndex.MAX_VALUE
 
     def test_decref_zero(self):
         idx1 = ChunkIndex()
@@ -225,7 +225,7 @@ class HashIndexRefcountingTestCase(BaseTestCase):
     def test_setitem_raises(self):
         idx1 = ChunkIndex()
         with self.assert_raises(AssertionError):
-            idx1[H(1)] = hashindex.MAX_VALUE + 1, 0, 0
+            idx1[H(1)] = ChunkIndex.MAX_VALUE + 1, 0, 0
 
     def test_keyerror(self):
         idx = ChunkIndex()
@@ -282,14 +282,20 @@ class HashIndexDataTestCase(BaseTestCase):
         idx2 = ChunkIndex()
         idx2[H(3)] = 2**32 - 123456, 6, 7
         idx1.merge(idx2)
-        assert idx1[H(3)] == (hashindex.MAX_VALUE, 6, 7)
+        assert idx1[H(3)] == (ChunkIndex.MAX_VALUE, 6, 7)
 
 
 class NSIndexTestCase(BaseTestCase):
     def test_nsindex_segment_limit(self):
         idx = NSIndex()
         with self.assert_raises(AssertionError):
-            idx[H(1)] = hashindex.MAX_VALUE + 1, 0
+            idx[H(1)] = NSIndex.MAX_VALUE + 1, 0
         assert H(1) not in idx
-        idx[H(2)] = hashindex.MAX_VALUE, 0
+        idx[H(2)] = NSIndex.MAX_VALUE, 0
         assert H(2) in idx
+
+
+class AllIndexTestCase(BaseTestCase):
+    def test_max_load_factor(self):
+        assert NSIndex.MAX_LOAD_FACTOR < 1.0
+        assert ChunkIndex.MAX_LOAD_FACTOR < 1.0

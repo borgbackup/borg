@@ -234,10 +234,10 @@ def install_pyinstaller(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     . borg-env/bin/activate
-    git clone https://github.com/pyinstaller/pyinstaller.git
+    git clone https://github.com/thomaswaldmann/pyinstaller.git
     cd pyinstaller
-    # develop branch, with rebuilt bootloaders, with ThomasWaldmann/do-not-overwrite-LD_LP
-    git checkout fd3df7796afa367e511c881dac983cad0697b9a3
+    # develop branch, with fixed / freshly rebuilt bootloaders
+    git checkout fresh-bootloader
     pip install -e .
   EOF
 end
@@ -247,10 +247,10 @@ def install_pyinstaller_bootloader(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     . borg-env/bin/activate
-    git clone https://github.com/pyinstaller/pyinstaller.git
+    git clone https://github.com/thomaswaldmann/pyinstaller.git
     cd pyinstaller
-    # develop branch, with rebuilt bootloaders, with ThomasWaldmann/do-not-overwrite-LD_LP
-    git checkout fd3df7796afa367e511c881dac983cad0697b9a3
+    # develop branch, with fixed / freshly rebuilt bootloaders
+    git checkout fresh-bootloader
     # build bootloader, if it is not included
     cd bootloader
     python ./waf all

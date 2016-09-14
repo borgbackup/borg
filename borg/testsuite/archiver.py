@@ -1325,13 +1325,13 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             for item in archive.iter_items():
                 if item[b'path'].endswith('testsuite/archiver.py'):
                     chunk = item[b'chunks'][-1]
-                    data = repository.get(chunk.id) + b'1234'
-                    repository.put(chunk.id, data)
+                    data = repository.get(chunk[0]) + b'1234'
+                    repository.put(chunk[0], data)
                     break
             repository.commit()
         self.cmd('check', self.repository_location, exit_code=0)
         output = self.cmd('check', '--verify-data', self.repository_location, exit_code=1)
-        assert bin_to_hex(chunk.id) + ', integrity error' in output
+        assert hexlify(chunk[0]).decode('ascii') + ', integrity error' in output
 
     def test_verify_data(self):
         self._test_verify_data('--encryption', 'repokey')

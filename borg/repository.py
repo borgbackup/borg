@@ -56,7 +56,7 @@ class Repository:
 
         def __init__(self, id, repo):
             if isinstance(id, bytes):
-                id = bin_to_hex(id)
+                id = hexlify(id).decode('ascii')
             super().__init__(id, repo)
 
     def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True, append_only=False):

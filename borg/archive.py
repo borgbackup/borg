@@ -900,15 +900,15 @@ class ArchiveChecker:
             except Repository.ObjectNotFound:
                 self.error_found = True
                 errors += 1
-                logger.error('chunk %s not found', bin_to_hex(chunk_id))
+                logger.error('chunk %s not found', hexlify(chunk_id).decode('ascii'))
                 continue
             try:
                 _chunk_id = None if chunk_id == Manifest.MANIFEST_ID else chunk_id
-                _, data = self.key.decrypt(_chunk_id, encrypted_data)
+                self.key.decrypt(_chunk_id, encrypted_data)
             except IntegrityError as integrity_error:
                 self.error_found = True
                 errors += 1
-                logger.error('chunk %s, integrity error: %s', bin_to_hex(chunk_id), integrity_error)
+                logger.error('chunk %s, integrity error: %s', hexlify(chunk_id).decode('ascii'), integrity_error)
         pi.finish()
         log = logger.error if errors else logger.info
         log('Finished cryptographic data integrity verification, verified %d chunks with %d integrity errors.', count, errors)

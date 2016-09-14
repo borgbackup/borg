@@ -379,8 +379,13 @@ class Archiver:
                 if not read_special:
                     status = archive.process_symlink(path, st)
                 else:
-                    st_target = os.stat(path)
-                    if is_special(st_target.st_mode):
+                    try:
+                        st_target = os.stat(path)
+                    except OSError:
+                        special = False
+                    else:
+                        special = is_special(st_target.st_mode)
+                    if special:
                         status = archive.process_file(path, st_target, cache)
                     else:
                         status = archive.process_symlink(path, st)
@@ -1865,11 +1870,14 @@ class Archiver:
         info_epilog = textwrap.dedent("""
         This command displays detailed information about the specified archive or repository.
 
-        The "This archive" line refers exclusively to the given archive:
-        "Deduplicated size" is the size of the unique chunks stored only for the
-        given archive.
+        Please note that the deduplicated sizes of the individual archives do not add
+        up to the deduplicated size of the repository ("all archives"), because the two
+        are meaning different things:
 
-        The "All archives" line shows global statistics (all chunks).
+        This archive / deduplicated size = amount of data stored ONLY for this archive
+                                         = unique chunks of this archive.
+        All archives / deduplicated size = amount of data stored in the repo
+                                         = all chunks in the repository.
         """)
         subparser = subparsers.add_parser('info', parents=[common_parser], add_help=False,
                                           description=self.do_info.__doc__,
@@ -2375,6 +2383,14 @@ def sig_term_handler(signum, stack):
     raise SIGTERMReceived
 
 
+class SIGHUPReceived(BaseException):
+    pass
+
+
+def sig_hup_handler(signum, stack):
+    raise SIGHUPReceived
+
+
 def setup_signal_handlers():  # pragma: no cover
     sigs = []
     if hasattr(signal, 'SIGUSR1'):
@@ -2383,7 +2399,12 @@ def setup_signal_handlers():  # pragma: no cover
         sigs.append(signal.SIGINFO)  # kill -INFO pid (or ctrl-t)
     for sig in sigs:
         signal.signal(sig, sig_info_handler)
+    # If we received SIGTERM or SIGHUP, catch them and raise a proper exception
+    # that can be handled for an orderly exit. SIGHUP is important especially
+    # for systemd systems, where logind sends it when a session exits, in
+    # addition to any traditional use.
     signal.signal(signal.SIGTERM, sig_term_handler)
+    signal.signal(signal.SIGHUP, sig_hup_handler)
 
 
 def main():  # pragma: no cover
@@ -2437,6 +2458,9 @@ def main():  # pragma: no cover
         msg = 'Received SIGTERM'
         tb_log_level = logging.DEBUG
         tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
+        exit_code = EXIT_ERROR
+    except SIGHUPReceived:
+        msg = 'Received SIGHUP.'
         exit_code = EXIT_ERROR
     if msg:
         logger.error(msg)

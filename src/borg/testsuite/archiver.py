@@ -1130,6 +1130,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('create', '--list', '--filter=AM', self.repository_location + '::test3', 'input')
         self.assert_in('file1', output)
 
+    def test_create_read_special_broken_symlink(self):
+        os.symlink('somewhere doesnt exist', os.path.join(self.input_path, 'link'))
+        self.cmd('init', self.repository_location)
+        archive = self.repository_location + '::test'
+        self.cmd('create', '--read-special', archive, 'input')
+        output = self.cmd('list', archive)
+        assert 'input/link -> somewhere doesnt exist' in output
+
     # def test_cmdline_compatibility(self):
     #    self.create_regular_file('file1', size=1024 * 80)
     #    self.cmd('init', self.repository_location)

@@ -92,7 +92,6 @@ Initialize a new backup repository and create a backup archive::
 Now doing another backup, just to show off the great deduplication:
 
 .. code-block:: none
-   :emphasize-lines: 11
 
     $ borg create -v --stats /path/to/repo::Saturday2 ~/Documents
     -----------------------------------------------------------------------------
@@ -113,6 +112,22 @@ Now doing another backup, just to show off the great deduplication:
 
 
 For a graphical frontend refer to our complementary project `BorgWeb <https://borgweb.readthedocs.io/>`_.
+
+Checking Release Authenticity and Security Contact
+==================================================
+
+`Releases <https://github.com/borgbackup/borg/releases>`_ are signed with this GPG key,
+please use GPG to verify their authenticity.
+
+In case you discover a security issue, please use this contact for reporting it privately
+and please, if possible, use encrypted E-Mail:
+
+Thomas Waldmann <tw@waldmann-edv.de>
+
+GPG Key Fingerprint: 6D5B EF9A DD20 7580 5747  B70F 9F88 FB52 FAF7 B393
+
+The public key can be fetched from any GPG keyserver, but be careful: you must
+use the **full fingerprint** to check that you got the correct key.
 
 Links
 =====
@@ -169,7 +184,7 @@ THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
 
 Borg is distributed under a 3-clause BSD license, see `License`_ for the complete license.
 
-|doc| |build| |coverage|
+|doc| |build| |coverage| |bestpractices|
 
 .. |doc| image:: https://readthedocs.org/projects/borgbackup/badge/?version=stable
         :alt: Documentation
@@ -186,3 +201,7 @@ Borg is distributed under a 3-clause BSD license, see `License`_ for the complet
 .. |screencast| image:: https://asciinema.org/a/28691.png
         :alt: BorgBackup Installation and Basic Usage
         :target: https://asciinema.org/a/28691?autoplay=1&speed=2
+
+.. |bestpractices| image:: https://bestpractices.coreinfrastructure.org/projects/271/badge
+        :alt: Best Practices Score
+        :target: https://bestpractices.coreinfrastructure.org/projects/271

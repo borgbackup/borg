@@ -387,7 +387,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "wheezy32" do |b|
-    b.vm.box = "boxcutter/debian79-i386"
+    b.vm.box = "boxcutter/debian711-i386"
     b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy32")
@@ -400,7 +400,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "wheezy64" do |b|
-    b.vm.box = "boxcutter/debian79"
+    b.vm.box = "boxcutter/debian711"
     b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy64")

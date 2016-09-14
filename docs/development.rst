@@ -10,11 +10,50 @@ This chapter will get you started with |project_name| development.
 |project_name| is written in Python (with a little bit of Cython and C for
 the performance critical parts).
 
+Contributions
+-------------
+
+... are welcome!
+
+Some guidance for contributors:
+
+- discuss about changes on github issue tracker, IRC or mailing list
+
+- choose the branch you base your changesets on wisely:
+
+  - choose x.y-maint for stuff that should go into next x.y release
+    (it usually gets merged into master branch later also)
+  - choose master if that does not apply
+
+- do clean changesets:
+
+  - focus on some topic, resist changing anything else.
+  - do not do style changes mixed with functional changes.
+  - try to avoid refactorings mixed with functional changes.
+  - if you need to fix something after commit/push:
+
+    - if there are ongoing reviews: do a fixup commit you can
+      merge into the bad commit later.
+    - if there are no ongoing reviews or you did not push the
+      bad commit yet: edit the commit to include your fix or
+      merge the fixup commit before pushing.
+  - have a nice, clear, typo-free commit comment
+  - if you fixed an issue, refer to it in your commit comment
+  - follow the style guide (see below)
+
+- if you write new code, please add tests and docs for it
+
+- run the tests, fix anything that comes up
+
+- make a pull request on github
+
+- wait for review by other developers
+
 Code and issues
 ---------------
 
 Code is stored on Github, in the `Borgbackup organization
-<https://github.com/borgbackup/borg/>`_. `Issues
+https://github.com/borgbackup/borg/>`_. `Issues
 <https://github.com/borgbackup/borg/issues>`_ and `pull requests
 <https://github.com/borgbackup/borg/pulls>`_ should be sent there as
 well. See also the :ref:`support` section for more details.

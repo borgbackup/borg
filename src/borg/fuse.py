@@ -43,7 +43,10 @@ class ItemCache:
         return pos + self.offset
 
     def get(self, inode):
-        self.fd.seek(inode - self.offset, io.SEEK_SET)
+        offset = inode - self.offset
+        if offset < 0:
+            raise ValueError('ItemCache.get() called with an invalid inode number')
+        self.fd.seek(offset, io.SEEK_SET)
         item = next(msgpack.Unpacker(self.fd, read_size=1024))
         return Item(internal_dict=item)
 

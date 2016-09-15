@@ -687,7 +687,23 @@ class Repository:
             # current_index = "as found on disk"
             # self.index = "as rebuilt in-memory from segments"
             if len(current_index) != len(self.index):
-                report_error('Index object count mismatch. {} != {}'.format(len(current_index), len(self.index)))
+                report_error('Index object count mismatch.')
+                logger.error('committed index: %d objects', len(current_index))
+                logger.error('rebuilt index:   %d objects', len(self.index))
+
+                line_format = '%-64s %-16s %-16s'
+                not_found = '<not found>'
+                logger.warning(line_format, 'ID', 'rebuilt index', 'committed index')
+                for key, value in self.index.iteritems():
+                    current_value = current_index.get(key, not_found)
+                    if current_value != value:
+                        logger.warning(line_format, bin_to_hex(key), value, current_value)
+                for key, current_value in current_index.iteritems():
+                    if key in self.index:
+                        continue
+                    value = self.index.get(key, not_found)
+                    if current_value != value:
+                        logger.warning(line_format, bin_to_hex(key), value, current_value)
             elif current_index:
                 for key, value in self.index.iteritems():
                     if current_index.get(key, (-1, -1)) != value:

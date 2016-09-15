@@ -122,6 +122,9 @@ def test_chunk_indexer_getitem(benchmark):
     max_key = 2**23
     index = ChunkIndex(max_key)
     keys = [sha256(H(k)).digest() for k in range(max_key)]
+    missing_keys = [
+        sha256(H(k)).digest()
+        for k in range(max_key, (max_key+int(len(keys)/3)))]
     bucket_val = (0, 0, 0)
     for key in keys:
         # we want 32 byte keys, since that's what we use day to day
@@ -131,4 +134,7 @@ def test_chunk_indexer_getitem(benchmark):
         for key in keys:
             # we want 32 byte keys, since that's what we use day to day
             index[key]  # noqa
+        for key in missing_keys:
+            index.get(key)  # noqa
+
     benchmark.pedantic(do_gets, rounds=5)

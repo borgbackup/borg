@@ -15,7 +15,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from .archive import Archive
-from .helpers import daemonize, safe_encode
+from .helpers import daemonize
 from .item import Item
 from .lrucache import LRUCache
 
@@ -136,6 +136,7 @@ class FuseOperations(llfuse.Operations):
     def process_archive(self, archive, prefix=[]):
         """Build fuse inode hierarchy from archive metadata
         """
+        self.file_versions = {}  # for versions mode: original path -> version
         unpacker = msgpack.Unpacker()
         for key, chunk in zip(archive.metadata.items, self.repository.get_many(archive.metadata.items)):
             _, data = self.key.decrypt(key, chunk)
@@ -155,7 +156,6 @@ class FuseOperations(llfuse.Operations):
                         self.items[inode] = item
                         continue
                 segments = prefix + os.fsencode(os.path.normpath(item.path)).split(b'/')
-                del item.path
                 parent = 1
                 for segment in segments[:-1]:
                     parent = self.process_inner(segment, parent)
@@ -169,14 +169,31 @@ class FuseOperations(llfuse.Operations):
                     ident = adler32(chunkid, ident)
                 return ident
 
+        def make_versioned_name(name, version, add_dir=False):
+            if add_dir:
+                # add intermediate directory with same name as filename
+                path_fname = name.rsplit(b'/', 1)
+                name += b'/' + path_fname[-1]
+            return name + os.fsencode('.%08x' % version)
+
         if self.versions and not is_dir:
             parent = self.process_inner(name, parent)
             version = file_version(item)
             if version is not None:
-                name += safe_encode('.%08x' % version)
+                # regular file, with contents - maybe a hardlink master
+                name = make_versioned_name(name, version)
+                self.file_versions[item.path] = version
 
+        del item.path  # safe some space
         if 'source' in item and stat.S_ISREG(item.mode):
-            inode = self._find_inode(item.source, prefix)
+            # a hardlink, no contents, <source> is the hardlink master
+            source = item.source
+            if self.versions:
+                # adjust source name with version
+                version = self.file_versions[source]
+                source = os.fsdecode(make_versioned_name(os.fsencode(source), version, add_dir=True))
+                name = make_versioned_name(name, version)
+            inode = self._find_inode(source, prefix)
             item = self.cache.get(inode)
             item.nlink = item.get('nlink', 1) + 1
             self.items[inode] = item

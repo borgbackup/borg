@@ -1453,6 +1453,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_fuse_versions_view(self):
         self.cmd('init', self.repository_location)
         self.create_regular_file('test', contents=b'first')
+        if are_hardlinks_supported():
+            self.create_regular_file('hardlink1', contents=b'')
+            os.link('input/hardlink1', 'input/hardlink2')
         self.cmd('create', self.repository_location + '::archive1', 'input')
         self.create_regular_file('test', contents=b'second')
         self.cmd('create', self.repository_location + '::archive2', 'input')
@@ -1463,6 +1466,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             files = os.listdir(path)
             assert all(f.startswith('test.') for f in files)  # ... with files test.xxxxxxxx in there
             assert {b'first', b'second'} == {open(os.path.join(path, f), 'rb').read() for f in files}
+            if are_hardlinks_supported():
+                st1 = os.stat(os.path.join(mountpoint, 'input', 'hardlink1', 'hardlink1.00000000'))
+                st2 = os.stat(os.path.join(mountpoint, 'input', 'hardlink2', 'hardlink2.00000000'))
+                assert st1.st_ino == st2.st_ino
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
     def test_fuse_allow_damaged_files(self):

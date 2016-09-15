@@ -143,19 +143,20 @@ class FuseOperations(llfuse.Operations):
             unpacker.feed(data)
             for item in unpacker:
                 item = Item(internal_dict=item)
+                path = os.fsencode(os.path.normpath(item.path))
                 is_dir = stat.S_ISDIR(item.mode)
                 if is_dir:
                     try:
                         # This can happen if an archive was created with a command line like
                         # $ borg create ... dir1/file dir1
                         # In this case the code below will have created a default_dir inode for dir1 already.
-                        inode = self._find_inode(item.path, prefix)
+                        inode = self._find_inode(path, prefix)
                     except KeyError:
                         pass
                     else:
                         self.items[inode] = item
                         continue
-                segments = prefix + os.fsencode(os.path.normpath(item.path)).split(b'/')
+                segments = prefix + path.split(b'/')
                 parent = 1
                 for segment in segments[:-1]:
                     parent = self.process_inner(segment, parent)
@@ -182,16 +183,17 @@ class FuseOperations(llfuse.Operations):
             if version is not None:
                 # regular file, with contents - maybe a hardlink master
                 name = make_versioned_name(name, version)
-                self.file_versions[item.path] = version
+                path = os.fsencode(os.path.normpath(item.path))
+                self.file_versions[path] = version
 
         del item.path  # safe some space
         if 'source' in item and stat.S_ISREG(item.mode):
             # a hardlink, no contents, <source> is the hardlink master
-            source = item.source
+            source = os.fsencode(os.path.normpath(item.source))
             if self.versions:
                 # adjust source name with version
                 version = self.file_versions[source]
-                source = os.fsdecode(make_versioned_name(os.fsencode(source), version, add_dir=True))
+                source = make_versioned_name(source, version, add_dir=True)
                 name = make_versioned_name(name, version)
             inode = self._find_inode(source, prefix)
             item = self.cache.get(inode)
@@ -236,7 +238,7 @@ class FuseOperations(llfuse.Operations):
             return self.cache.get(inode)
 
     def _find_inode(self, path, prefix=[]):
-        segments = prefix + os.fsencode(os.path.normpath(path)).split(b'/')
+        segments = prefix + path.split(b'/')
         inode = 1
         for segment in segments:
             inode = self.contents[inode][segment]

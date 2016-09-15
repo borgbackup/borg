@@ -6,6 +6,7 @@ import select
 import shlex
 import sys
 import tempfile
+import time
 import traceback
 from subprocess import Popen, PIPE
 
@@ -24,6 +25,8 @@ RPC_PROTOCOL_VERSION = 2
 BUFSIZE = 10 * 1024 * 1024
 
 MAX_INFLIGHT = 100
+
+RATELIMIT_PERIOD = 0.1
 
 
 class ConnectionClosed(Error):
@@ -166,6 +169,36 @@ class RepositoryServer:  # pragma: no cover
         return self.repository.id
 
 
+class SleepingBandwidthLimiter:
+    def __init__(self, limit):
+        if limit:
+            self.ratelimit = int(limit * RATELIMIT_PERIOD)
+            self.ratelimit_last = time.monotonic()
+            self.ratelimit_quota = self.ratelimit
+        else:
+            self.ratelimit = None
+
+    def write(self, fd, to_send):
+        if self.ratelimit:
+            now = time.monotonic()
+            if self.ratelimit_last + RATELIMIT_PERIOD <= now:
+                self.ratelimit_quota += self.ratelimit
+                if self.ratelimit_quota > 2 * self.ratelimit:
+                    self.ratelimit_quota = 2 * self.ratelimit
+                self.ratelimit_last = now
+            if self.ratelimit_quota == 0:
+                tosleep = self.ratelimit_last + RATELIMIT_PERIOD - now
+                time.sleep(tosleep)
+                self.ratelimit_quota += self.ratelimit
+                self.ratelimit_last = time.monotonic()
+            if len(to_send) > self.ratelimit_quota:
+                to_send = to_send[:self.ratelimit_quota]
+        written = os.write(fd, to_send)
+        if self.ratelimit:
+            self.ratelimit_quota -= written
+        return written
+
+
 class RemoteRepository:
     extra_test_args = []
 
@@ -185,6 +218,8 @@ class RemoteRepository:
         self.cache = {}
         self.ignore_responses = set()
         self.responses = {}
+        self.ratelimit = SleepingBandwidthLimiter(args.remote_ratelimit * 1024 if args and args.remote_ratelimit else 0)
+
         self.unpacker = msgpack.Unpacker(use_list=False)
         self.p = None
         testing = location.host == '__testsuite__'
@@ -406,7 +441,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
 
                 if self.to_send:
                     try:
-                        self.to_send = self.to_send[os.write(self.stdin_fd, self.to_send):]
+                        self.to_send = self.to_send[self.ratelimit.write(self.stdin_fd, self.to_send):]
                     except OSError as e:
                         # io.write might raise EAGAIN even though select indicates
                         # that the fd should be writable

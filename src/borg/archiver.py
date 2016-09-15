@@ -1322,6 +1322,8 @@ class Archiver:
                                   help='set umask to M (local and remote, default: %(default)04o)')
         common_group.add_argument('--remote-path', dest='remote_path', metavar='PATH',
                                   help='set remote path to executable (default: "borg")')
+        common_group.add_argument('--remote-ratelimit', dest='remote_ratelimit', type=int, metavar='rate',
+                                  help='set remote network upload rate limit in kiByte/s (default: 0=unlimited)')
         common_group.add_argument('--consider-part-files', dest='consider_part_files',
                                   action='store_true', default=False,
                                   help='treat part files like normal files (e.g. to list/extract them)')

@@ -162,17 +162,18 @@ class FuseOperations(llfuse.Operations):
                 self.process_leaf(segments[-1], item, parent, prefix, is_dir)
 
     def process_leaf(self, name, item, parent, prefix, is_dir):
-        def version_name(name, item):
+        def file_version(item):
             if 'chunks' in item:
                 ident = 0
                 for chunkid, _, _ in item.chunks:
                     ident = adler32(chunkid, ident)
-                name = name + safe_encode('.%08x' % ident)
-            return name
+                return ident
 
         if self.versions and not is_dir:
             parent = self.process_inner(name, parent)
-            name = version_name(name, item)
+            version = file_version(item)
+            if version is not None:
+                name += safe_encode('.%08x' % version)
 
         if 'source' in item and stat.S_ISREG(item.mode):
             inode = self._find_inode(item.source, prefix)

@@ -15,7 +15,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from .archive import Archive
-from .helpers import daemonize, safe_encode
+from .helpers import daemonize
 from .item import Item
 from .lrucache import LRUCache
 
@@ -43,7 +43,10 @@ class ItemCache:
         return pos + self.offset
 
     def get(self, inode):
-        self.fd.seek(inode - self.offset, io.SEEK_SET)
+        offset = inode - self.offset
+        if offset < 0:
+            raise ValueError('ItemCache.get() called with an invalid inode number')
+        self.fd.seek(offset, io.SEEK_SET)
         item = next(msgpack.Unpacker(self.fd, read_size=1024))
         return Item(internal_dict=item)
 
@@ -133,46 +136,66 @@ class FuseOperations(llfuse.Operations):
     def process_archive(self, archive, prefix=[]):
         """Build fuse inode hierarchy from archive metadata
         """
+        self.file_versions = {}  # for versions mode: original path -> version
         unpacker = msgpack.Unpacker()
         for key, chunk in zip(archive.metadata.items, self.repository.get_many(archive.metadata.items)):
             _, data = self.key.decrypt(key, chunk)
             unpacker.feed(data)
             for item in unpacker:
                 item = Item(internal_dict=item)
+                path = os.fsencode(os.path.normpath(item.path))
                 is_dir = stat.S_ISDIR(item.mode)
                 if is_dir:
                     try:
                         # This can happen if an archive was created with a command line like
                         # $ borg create ... dir1/file dir1
                         # In this case the code below will have created a default_dir inode for dir1 already.
-                        inode = self._find_inode(item.path, prefix)
+                        inode = self._find_inode(path, prefix)
                     except KeyError:
                         pass
                     else:
                         self.items[inode] = item
                         continue
-                segments = prefix + os.fsencode(os.path.normpath(item.path)).split(b'/')
-                del item.path
+                segments = prefix + path.split(b'/')
                 parent = 1
                 for segment in segments[:-1]:
                     parent = self.process_inner(segment, parent)
                 self.process_leaf(segments[-1], item, parent, prefix, is_dir)
 
     def process_leaf(self, name, item, parent, prefix, is_dir):
-        def version_name(name, item):
+        def file_version(item):
             if 'chunks' in item:
                 ident = 0
                 for chunkid, _, _ in item.chunks:
                     ident = adler32(chunkid, ident)
-                name = name + safe_encode('.%08x' % ident)
-            return name
+                return ident
+
+        def make_versioned_name(name, version, add_dir=False):
+            if add_dir:
+                # add intermediate directory with same name as filename
+                path_fname = name.rsplit(b'/', 1)
+                name += b'/' + path_fname[-1]
+            return name + os.fsencode('.%08x' % version)
 
         if self.versions and not is_dir:
             parent = self.process_inner(name, parent)
-            name = version_name(name, item)
+            version = file_version(item)
+            if version is not None:
+                # regular file, with contents - maybe a hardlink master
+                name = make_versioned_name(name, version)
+                path = os.fsencode(os.path.normpath(item.path))
+                self.file_versions[path] = version
 
+        del item.path  # safe some space
         if 'source' in item and stat.S_ISREG(item.mode):
-            inode = self._find_inode(item.source, prefix)
+            # a hardlink, no contents, <source> is the hardlink master
+            source = os.fsencode(os.path.normpath(item.source))
+            if self.versions:
+                # adjust source name with version
+                version = self.file_versions[source]
+                source = make_versioned_name(source, version, add_dir=True)
+                name = make_versioned_name(name, version)
+            inode = self._find_inode(source, prefix)
             item = self.cache.get(inode)
             item.nlink = item.get('nlink', 1) + 1
             self.items[inode] = item
@@ -215,7 +238,7 @@ class FuseOperations(llfuse.Operations):
             return self.cache.get(inode)
 
     def _find_inode(self, path, prefix=[]):
-        segments = prefix + os.fsencode(os.path.normpath(path)).split(b'/')
+        segments = prefix + path.split(b'/')
         inode = 1
         for segment in segments:
             inode = self.contents[inode][segment]

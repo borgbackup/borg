@@ -33,7 +33,7 @@ from .helpers import decode_dict, StableDict
 from .helpers import int_to_bigint, bigint_to_int, bin_to_hex
 from .helpers import ProgressIndicatorPercent, log_multi
 from .helpers import PathPrefixPattern, FnmatchPattern
-from .helpers import consume
+from .helpers import consume, chunkit
 from .helpers import CompressionDecider1, CompressionDecider2, CompressionSpec
 from .item import Item, ArchiveItem
 from .key import key_factory
@@ -1045,23 +1045,34 @@ class ArchiveChecker:
         errors = 0
         defect_chunks = []
         pi = ProgressIndicatorPercent(total=count, msg="Verifying data %6.2f%%", step=0.01)
-        for chunk_id, (refcount, *_) in self.chunks.iteritems():
-            pi.show()
-            try:
-                encrypted_data = self.repository.get(chunk_id)
-            except Repository.ObjectNotFound:
-                self.error_found = True
-                errors += 1
-                logger.error('chunk %s not found', bin_to_hex(chunk_id))
-                continue
-            try:
-                _chunk_id = None if chunk_id == Manifest.MANIFEST_ID else chunk_id
-                _, data = self.key.decrypt(_chunk_id, encrypted_data)
-            except IntegrityError as integrity_error:
-                self.error_found = True
-                errors += 1
-                logger.error('chunk %s, integrity error: %s', bin_to_hex(chunk_id), integrity_error)
-                defect_chunks.append(chunk_id)
+        for chunk_infos in chunkit(self.chunks.iteritems(), 100):
+            chunk_ids = [chunk_id for chunk_id, _ in chunk_infos]
+            chunk_data_iter = self.repository.get_many(chunk_ids)
+            chunk_ids_revd = list(reversed(chunk_ids))
+            while chunk_ids_revd:
+                pi.show()
+                chunk_id = chunk_ids_revd.pop(-1)  # better efficiency
+                try:
+                    encrypted_data = next(chunk_data_iter)
+                except (Repository.ObjectNotFound, IntegrityError) as err:
+                    self.error_found = True
+                    errors += 1
+                    logger.error('chunk %s: %s', bin_to_hex(chunk_id), err)
+                    if isinstance(err, IntegrityError):
+                        defect_chunks.append(chunk_id)
+                    # as the exception killed our generator, make a new one for remaining chunks:
+                    if chunk_ids_revd:
+                        chunk_ids = list(reversed(chunk_ids_revd))
+                        chunk_data_iter = self.repository.get_many(chunk_ids)
+                else:
+                    try:
+                        _chunk_id = None if chunk_id == Manifest.MANIFEST_ID else chunk_id
+                        _, data = self.key.decrypt(_chunk_id, encrypted_data)
+                    except IntegrityError as integrity_error:
+                        self.error_found = True
+                        errors += 1
+                        logger.error('chunk %s, integrity error: %s', bin_to_hex(chunk_id), integrity_error)
+                        defect_chunks.append(chunk_id)
         pi.finish()
         if defect_chunks:
             if self.repair:

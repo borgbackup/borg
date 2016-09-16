@@ -1494,6 +1494,17 @@ def file_status(mode):
     return '?'
 
 
+def chunkit(it, size):
+    """
+    Chunk an iterator <it> into pieces of <size>.
+
+    >>> list(chunker('ABCDEFG', 3))
+    [['A', 'B', 'C'], ['D', 'E', 'F'], ['G']]
+    """
+    iterable = iter(it)
+    return iter(lambda: list(islice(iterable, size)), [])
+
+
 def consume(iterator, n=None):
     """Advance the iterator n-steps ahead. If n is none, consume entirely."""
     # Use functions that consume iterators at C speed.

@@ -481,8 +481,9 @@ class Repository:
             for tag, key, offset, data in self.io.iter_objects(segment, include_data=True):
                 if tag == TAG_COMMIT:
                     continue
-                in_index = self.index.get(key) == (segment, offset)
-                if tag == TAG_PUT and in_index:
+                in_index = self.index.get(key)
+                is_index_object = in_index == (segment, offset)
+                if tag == TAG_PUT and is_index_object:
                     try:
                         new_segment, offset = self.io.write_put(key, data, raise_full=True)
                     except LoggedIO.SegmentFull:
@@ -492,22 +493,23 @@ class Repository:
                     segments.setdefault(new_segment, 0)
                     segments[new_segment] += 1
                     segments[segment] -= 1
-                elif tag == TAG_PUT and not in_index:
+                elif tag == TAG_PUT and not is_index_object:
                     # If this is a PUT shadowed by a later tag, then it will be gone when this segment is deleted after
                     # this loop. Therefore it is removed from the shadow index.
                     try:
                         self.shadow_index[key].remove(segment)
                     except (KeyError, ValueError):
                         pass
-                elif tag == TAG_DELETE:
+                elif tag == TAG_DELETE and not in_index:
                     # If the shadow index doesn't contain this key, then we can't say if there's a shadowed older tag,
                     # therefore we do not drop the delete, but write it to a current segment.
                     shadowed_put_exists = key not in self.shadow_index or any(
                         # If the key is in the shadow index and there is any segment with an older PUT of this
                         # key, we have a shadowed put.
                         shadowed < segment for shadowed in self.shadow_index[key])
+                    delete_is_not_stable = index_transaction_id is None or segment > index_transaction_id
 
-                    if shadowed_put_exists or index_transaction_id is None or segment > index_transaction_id:
+                    if shadowed_put_exists or delete_is_not_stable:
                         # (introduced in 6425d16aa84be1eaaf88)
                         # This is needed to avoid object un-deletion if we crash between the commit and the deletion
                         # of old segments in complete_xfer().

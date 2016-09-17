@@ -642,7 +642,7 @@ Number of files: {0.stats.nfiles}'''.format(
         # Is it a hard link?
         if st.st_nlink > 1:
             source = self.hard_links.get((st.st_ino, st.st_dev))
-            if (st.st_ino, st.st_dev) in self.hard_links:
+            if source is not None:
                 item = self.stat_attrs(st, path)
                 item.update({b'path': safe_path, b'source': source})
                 self.add_item(item)

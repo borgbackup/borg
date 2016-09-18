@@ -314,7 +314,7 @@ def load_excludes(fh):
     """Load and parse exclude patterns from file object. Lines empty or starting with '#' after stripping whitespace on
     both line ends are ignored.
     """
-    return [parse_pattern(pattern) for pattern in clean_lines(fh)]
+    return [parse_inclexcl_pattern(pattern) for pattern in clean_lines(fh)]
 
 
 def update_excludes(args):
@@ -342,6 +342,12 @@ class PatternMatcher:
         given patterns matches.
         """
         self._items.extend((i, value) for i in patterns)
+
+    def add_inclexcl(self, patterns):
+        """Add list of patterns (of type InclExclPattern) to internal list. The patterns ptype member is returned from
+        the match function when one of the given patterns matches.
+        """
+        self._items.extend(patterns)
 
     def match(self, path):
         for (pattern, value) in self._items:
@@ -494,6 +500,8 @@ _PATTERN_STYLES = set([
 
 _PATTERN_STYLE_BY_PREFIX = dict((i.PREFIX, i) for i in _PATTERN_STYLES)
 
+InclExclPattern = namedtuple('InclExclPattern', 'pattern ptype')
+
 
 def parse_pattern(pattern, fallback=FnmatchPattern):
     """Read pattern from string and return an instance of the appropriate implementation class.
@@ -509,6 +517,21 @@ def parse_pattern(pattern, fallback=FnmatchPattern):
         cls = fallback
 
     return cls(pattern)
+
+
+def parse_inclexcl_pattern(pattern, fallback=FnmatchPattern, default_ptype=False):
+    """Read pattern from string and return a InclExclPattern object."""
+    type_prefix_map = {
+        '-': False,
+        '+': True,
+    }
+    # patterns without + or - prefix are exclude patterns
+    ptype = default_ptype
+    if len(pattern) > 1 and pattern[0] in type_prefix_map:
+        (ptype, pattern) = (type_prefix_map[pattern[0]], pattern[1:])
+        pattern = pattern.lstrip()
+    pobj = parse_pattern(pattern, fallback)
+    return InclExclPattern(pobj, ptype)
 
 
 def timestamp(s):

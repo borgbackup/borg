@@ -404,7 +404,47 @@ def test_patterns_from_file(tmpdir, lines, expected):
 
     def evaluate(filename):
         matcher = PatternMatcher(fallback=True)
-        matcher.add(load_excludes(open(filename, "rt")), False)
+        matcher.add_inclexcl(load_excludes(open(filename, "rt")))
+        return [path for path in files if matcher.match(path)]
+
+    exclfile = tmpdir.join("exclude.txt")
+
+    with exclfile.open("wt") as fh:
+        fh.write("\n".join(lines))
+
+    assert evaluate(str(exclfile)) == (files if expected is None else expected)
+
+
+@pytest.mark.parametrize("lines, expected", [
+    # "None" means all files, i.e. none excluded
+    ([], None),
+    (["# Comment only"], None),
+    (["*"], []),
+    (["*/something00.txt"],
+     ['/data', '/home', '/home/leo', '/home/leo/t', '/home/other']),
+    (["-*/something00.txt"],
+     ['/data', '/home', '/home/leo', '/home/leo/t', '/home/other']),
+    (["-fm:*/something00.txt"],
+     ["/data", '/home', '/home/leo', '/home/leo/t', '/home/other']),
+    (["+*/something00.txt",
+      "-/data"],
+     ["/data/something00.txt", '/home', '/home/leo', '/home/leo/t', '/home/other']),
+    (["+fm:*/something00.txt",
+      "-/data"],
+     ["/data/something00.txt", '/home', '/home/leo', '/home/leo/t', '/home/other']),
+    (["+fm:/home/leo",
+      "-/home/"],
+     ["/data", "/data/something00.txt", '/home', '/home/leo', '/home/leo/t']),
+])
+def test_inclexcl_patterns_from_file(tmpdir, lines, expected):
+    files = [
+        '/data', '/data/something00.txt',
+        '/home', '/home/leo', '/home/leo/t', '/home/other'
+    ]
+
+    def evaluate(filename):
+        matcher = PatternMatcher(fallback=True)
+        matcher.add_inclexcl(load_excludes(open(filename, "rt")))
         return [path for path in files if matcher.match(path)]
 
     exclfile = tmpdir.join("exclude.txt")

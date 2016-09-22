@@ -190,8 +190,9 @@ class Passphrase(str):
 
     @classmethod
     def verification(cls, passphrase):
-        if yes('Do you want your passphrase to be displayed for verification? [yN]: ',
-               env_var_override='BORG_DISPLAY_PASSPHRASE'):
+        msg = 'Do you want your passphrase to be displayed for verification? [yN]: '
+        if yes(msg, retry_msg=msg, invalid_msg='Invalid answer, try again.',
+               retry=True, env_var_override='BORG_DISPLAY_PASSPHRASE'):
             print('Your passphrase (between double-quotes): "%s"' % passphrase,
                   file=sys.stderr)
             print('Make sure the passphrase displayed above is exactly what you wanted.',

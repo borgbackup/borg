@@ -141,7 +141,8 @@ class Archiver:
             msg = ("'check --repair' is an experimental feature that might result in data loss." +
                    "\n" +
                    "Type 'YES' if you understand this and want to continue: ")
-            if not yes(msg, false_msg="Aborting.", truish=('YES', ),
+            if not yes(msg, false_msg="Aborting.", invalid_msg="Invalid answer, aborting.",
+                       truish=('YES', ), retry=False,
                        env_var_override='BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
                 return EXIT_ERROR
         if not args.archives_only:
@@ -466,8 +467,8 @@ class Archiver:
                         msg.append(format_archive(archive_info))
                 msg.append("Type 'YES' if you understand this and want to continue: ")
                 msg = '\n'.join(msg)
-                if not yes(msg, false_msg="Aborting.", truish=('YES', ),
-                           env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'):
+                if not yes(msg, false_msg="Aborting.", invalid_msg='Invalid answer, aborting.', truish=('YES', ),
+                           retry=False, env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'):
                     self.exit_code = EXIT_ERROR
                     return self.exit_code
                 repository.destroy()

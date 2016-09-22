@@ -11,7 +11,7 @@ import msgpack.fallback
 
 from ..helpers import Location
 from ..helpers import Buffer
-from ..helpers import partial_format, format_file_size, parse_file_size, format_timedelta, format_line, PlaceholderError
+from ..helpers import partial_format, format_file_size, parse_file_size, format_timedelta, format_line, PlaceholderError, replace_placeholders
 from ..helpers import make_path_safe, clean_lines
 from ..helpers import prune_within, prune_split
 from ..helpers import get_cache_dir, get_keys_dir, get_nonces_dir
@@ -1035,3 +1035,9 @@ def test_format_line_erroneous():
         assert format_line('{invalid}', data)
     with pytest.raises(PlaceholderError):
         assert format_line('{}', data)
+
+
+def test_replace_placeholders():
+    now = datetime.now()
+    assert " " not in replace_placeholders('{now}')
+    assert int(replace_placeholders('{now:%Y}')) == now.year

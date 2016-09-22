@@ -223,9 +223,13 @@ class Statistics:
                 msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
                 path = remove_surrogates(item[b'path']) if item else ''
                 space = columns - len(msg)
-                if space < len('...') + len(path):
-                    path = '%s...%s' % (path[:(space // 2) - len('...')], path[-space // 2:])
-                msg += "{0:<{space}}".format(path, space=space)
+                if space < 12:
+                    msg = ''
+                    space = columns - len(msg)
+                if space >= 8:
+                    if space < len('...') + len(path):
+                        path = '%s...%s' % (path[:(space // 2) - len('...')], path[-space // 2:])
+                    msg += "{0:<{space}}".format(path, space=space)
             else:
                 msg = ' ' * columns
             print(msg, file=stream or sys.stderr, end="\r", flush=True)

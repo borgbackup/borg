@@ -1,5 +1,6 @@
 import argparse
 from collections import namedtuple
+import contextlib
 from functools import wraps
 import grp
 import os
@@ -10,6 +11,7 @@ import re
 from shutil import get_terminal_size
 import sys
 import platform
+import signal
 import threading
 import time
 import unicodedata
@@ -1160,3 +1162,49 @@ class ErrorIgnoringTextIOWrapper(io.TextIOWrapper):
                 except OSError:
                     pass
         return len(s)
+
+
+class SignalException(BaseException):
+    """base class for all signal-based exceptions"""
+
+
+class SigHup(SignalException):
+    """raised on SIGHUP signal"""
+
+
+class SigTerm(SignalException):
+    """raised on SIGTERM signal"""
+
+
+@contextlib.contextmanager
+def signal_handler(sig, handler):
+    """
+    when entering context, set up signal handler <handler> for signal <sig>.
+    when leaving context, restore original signal handler.
+
+    <sig> can bei either a str when giving a signal.SIGXXX attribute name (it
+    won't crash if the attribute name does not exist as some names are platform
+    specific) or a int, when giving a signal number.
+
+    <handler> is any handler value as accepted by the signal.signal(sig, handler).
+    """
+    if isinstance(sig, str):
+        sig = getattr(signal, sig, None)
+    if sig is not None:
+        orig_handler = signal.signal(sig, handler)
+    try:
+        yield
+    finally:
+        if sig is not None:
+            signal.signal(sig, orig_handler)
+
+
+def raising_signal_handler(exc_cls):
+    def handler(sig_no, frame):
+        # setting SIG_IGN avoids that an incoming second signal of this
+        # kind would raise a 2nd exception while we still process the
+        # exception handler for exc_cls for the 1st signal.
+        signal.signal(sig_no, signal.SIG_IGN)
+        raise exc_cls
+
+    return handler

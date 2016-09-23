@@ -622,6 +622,16 @@ def partial_format(format, mapping):
     return format
 
 
+class DatetimeWrapper:
+    def __init__(self, dt):
+        self.dt = dt
+
+    def __format__(self, format_spec):
+        if format_spec == '':
+            format_spec = '%Y-%m-%dT%H:%M:%S'
+        return self.dt.__format__(format_spec)
+
+
 def format_line(format, data):
     try:
         return format.format(**data)
@@ -636,8 +646,8 @@ def replace_placeholders(text):
         'pid': os.getpid(),
         'fqdn': socket.getfqdn(),
         'hostname': socket.gethostname(),
-        'now': current_time.now(),
-        'utcnow': current_time.utcnow(),
+        'now': DatetimeWrapper(current_time.now()),
+        'utcnow': DatetimeWrapper(current_time.utcnow()),
         'user': uid2user(os.getuid(), os.getuid()),
         'uuid4': str(uuid.uuid4()),
         'borgversion': borg_version,

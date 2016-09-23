@@ -133,6 +133,7 @@ class RepositoryTestCase(RepositoryTestCaseBase):
     def test_list(self):
         for x in range(100):
             self.repository.put(H(x), b'SOMEDATA')
+        self.repository.commit()
         all = self.repository.list()
         self.assert_equal(len(all), 100)
         first_half = self.repository.list(limit=50)
@@ -142,6 +143,23 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         self.assert_equal(len(second_half), 50)
         self.assert_equal(second_half, all[50:])
         self.assert_equal(len(self.repository.list(limit=50)), 50)
+
+    def test_scan(self):
+        for x in range(100):
+            self.repository.put(H(x), b'SOMEDATA')
+        self.repository.commit()
+        all = self.repository.scan()
+        assert len(all) == 100
+        first_half = self.repository.scan(limit=50)
+        assert len(first_half) == 50
+        assert first_half == all[:50]
+        second_half = self.repository.scan(marker=first_half[-1])
+        assert len(second_half) == 50
+        assert second_half == all[50:]
+        assert len(self.repository.scan(limit=50)) == 50
+        # check result order == on-disk order (which is hash order)
+        for x in range(100):
+            assert all[x] == H(x)
 
     def test_max_data_size(self):
         max_data = b'x' * MAX_DATA_SIZE

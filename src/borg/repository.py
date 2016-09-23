@@ -2,7 +2,7 @@ import errno
 import os
 import shutil
 import struct
-from binascii import unhexlify
+from binascii import hexlify, unhexlify
 from collections import defaultdict
 from configparser import ConfigParser
 from datetime import datetime
@@ -750,9 +750,52 @@ class Repository:
         return id in self.index
 
     def list(self, limit=None, marker=None):
+        """
+        list <limit> IDs starting from after id <marker> - in index (pseudo-random) order.
+        """
         if not self.index:
             self.index = self.open_index(self.get_transaction_id())
         return [id_ for id_, _ in islice(self.index.iteritems(marker=marker), limit)]
+
+    def scan(self, limit=None, marker=None):
+        """
+        list <limit> IDs starting from after id <marker> - in on-disk order, so that a client
+        fetching data in this order does linear reads and reuses stuff from disk cache.
+
+        We rely on repository.check() has run already (either now or some time before) and that:
+        - if we are called from a borg check command, self.index is a valid, fresh, in-sync repo index.
+        - if we are called from elsewhere, either self.index or the on-disk index is valid and in-sync.
+        - the repository segments are valid (no CRC errors).
+          if we encounter CRC errors in segment entry headers, rest of segment is skipped.
+        """
+        if limit is not None and limit < 1:
+            raise ValueError('please use limit > 0 or limit = None')
+        if not self.index:
+            transaction_id = self.get_transaction_id()
+            self.index = self.open_index(transaction_id)
+        at_start = marker is None
+        # smallest valid seg is <uint32> 0, smallest valid offs is <uint32> 8
+        marker_segment, marker_offset = (0, 0) if at_start else self.index[marker]
+        result = []
+        for segment, filename in self.io.segment_iterator():
+            if segment < marker_segment:
+                continue
+            obj_iterator = self.io.iter_objects(segment, read_data=False, include_data=False)
+            while True:
+                try:
+                    tag, id, offset, size = next(obj_iterator)
+                except (StopIteration, IntegrityError):
+                    # either end-of-segment or an error - we can not seek to objects at
+                    # higher offsets than one that has an error in the header fields
+                    break
+                if segment == marker_segment and offset <= marker_offset:
+                    continue
+                if tag == TAG_PUT and (segment, offset) == self.index.get(id):
+                    # we have found an existing and current object
+                    result.append(id)
+                    if len(result) == limit:
+                        return result
+        return result
 
     def get(self, id_):
         if not self.index:

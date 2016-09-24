@@ -30,6 +30,7 @@ from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache
 from .key import key_creator, RepoKey, PassphraseKey
+from .keymanager import KeyManager
 from .archive import backup_io, BackupOSError, Archive, ArchiveChecker, CHUNKER_PARAMS, is_special
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 
@@ -157,6 +158,39 @@ class Archiver:
     def do_change_passphrase(self, args, repository, manifest, key):
         """Change repository key file passphrase"""
         key.change_passphrase()
+        return EXIT_SUCCESS
+
+    @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
+    def do_key_export(self, args, repository):
+        """Export the repository key for backup"""
+        manager = KeyManager(repository)
+        manager.load_keyblob()
+        if args.paper:
+            manager.export_paperkey(args.path)
+        else:
+            if not args.path:
+                self.print_error("output file to export key to expected")
+                return EXIT_ERROR
+            manager.export(args.path)
+        return EXIT_SUCCESS
+
+    @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
+    def do_key_import(self, args, repository):
+        """Import the repository key from backup"""
+        manager = KeyManager(repository)
+        if args.paper:
+            if args.path:
+                self.print_error("with --paper import from file is not supported")
+                return EXIT_ERROR
+            manager.import_paperkey(args)
+        else:
+            if not args.path:
+                self.print_error("input file to import key from expected")
+                return EXIT_ERROR
+            if not os.path.exists(args.path):
+                self.print_error("input file does not exist: " + args.path)
+                return EXIT_ERROR
+            manager.import_keyfile(args)
         return EXIT_SUCCESS
 
     @with_repository(manifest=False)
@@ -1075,6 +1109,34 @@ class Archiver:
         subparser.set_defaults(func=self.do_change_passphrase)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
+
+        subparser = subparsers.add_parser('key-export', parents=[common_parser],
+                                          description=self.do_key_export.__doc__,
+                                          epilog="",
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='export repository key for backup')
+        subparser.set_defaults(func=self.do_key_export)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False))
+        subparser.add_argument('path', metavar='PATH', nargs='?', type=str,
+                               help='where to store the backup')
+        subparser.add_argument('--paper', dest='paper', action='store_true',
+                               default=False,
+                               help='Create an export suitable for printing and later type-in')
+
+        subparser = subparsers.add_parser('key-import', parents=[common_parser],
+                                          description=self.do_key_import.__doc__,
+                                          epilog="",
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='import repository key from backup')
+        subparser.set_defaults(func=self.do_key_import)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False))
+        subparser.add_argument('path', metavar='PATH', nargs='?', type=str,
+                               help='path to the backup')
+        subparser.add_argument('--paper', dest='paper', action='store_true',
+                               default=False,
+                               help='interactively import from a backup done with --paper')
 
         migrate_to_repokey_epilog = textwrap.dedent("""
         This command migrates a repository from passphrase mode (not supported any

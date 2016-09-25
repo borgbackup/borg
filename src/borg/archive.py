@@ -89,9 +89,13 @@ class Statistics:
                 msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
                 path = remove_surrogates(item.path) if item else ''
                 space = columns - swidth(msg)
-                if space < swidth('...') + swidth(path):
-                    path = '%s...%s' % (path[:(space // 2) - swidth('...')], path[-space // 2:])
-                msg += "{0:<{space}}".format(path, space=space)
+                if space < 12:
+                    msg = ''
+                    space = columns - swidth(msg)
+                if space >= 8:
+                    if space < swidth('...') + swidth(path):
+                        path = '%s...%s' % (path[:(space // 2) - swidth('...')], path[-space // 2:])
+                    msg += "{0:<{space}}".format(path, space=space)
             else:
                 msg = ' ' * columns
             print(msg, file=stream or sys.stderr, end="\r", flush=True)
@@ -798,7 +802,7 @@ Number of files: {0.stats.nfiles}'''.format(
         # Is it a hard link?
         if st.st_nlink > 1:
             source = self.hard_links.get((st.st_ino, st.st_dev))
-            if (st.st_ino, st.st_dev) in self.hard_links:
+            if source is not None:
                 item = Item(path=safe_path, source=source)
                 item.update(self.stat_attrs(st, path))
                 self.add_item(item)

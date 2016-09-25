@@ -1,3 +1,4 @@
+from binascii import hexlify, unhexlify, b2a_base64
 from configparser import ConfigParser
 import errno
 import os
@@ -33,7 +34,8 @@ from ..helpers import Chunk, Manifest
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
 from ..item import Item
-from ..key import KeyfileKeyBase
+from ..key import KeyfileKeyBase, RepoKey, KeyfileKey, Passphrase
+from ..keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import has_lchflags, has_llfuse
@@ -1808,6 +1810,106 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('recreate', '--info', self.repository_location + '::test', '-e', 'input/file5')
         self.assert_not_in("input/file1", output)
         self.assert_not_in("x input/file5", output)
+
+    def test_key_export_keyfile(self):
+        export_file = self.output_path + '/exported'
+        self.cmd('init', self.repository_location, '--encryption', 'keyfile')
+        repo_id = self._extract_repository_id(self.repository_path)
+        self.cmd('key-export', self.repository_location, export_file)
+
+        with open(export_file, 'r') as fd:
+            export_contents = fd.read()
+
+        assert export_contents.startswith('BORG_KEY ' + hexlify(repo_id).decode() + '\n')
+
+        key_file = self.keys_path + '/' + os.listdir(self.keys_path)[0]
+
+        with open(key_file, 'r') as fd:
+            key_contents = fd.read()
+
+        assert key_contents == export_contents
+
+        os.unlink(key_file)
+
+        self.cmd('key-import', self.repository_location, export_file)
+
+        with open(key_file, 'r') as fd:
+            key_contents2 = fd.read()
+
+        assert key_contents2 == key_contents
+
+    def test_key_export_repokey(self):
+        export_file = self.output_path + '/exported'
+        self.cmd('init', self.repository_location, '--encryption', 'repokey')
+        repo_id = self._extract_repository_id(self.repository_path)
+        self.cmd('key-export', self.repository_location, export_file)
+
+        with open(export_file, 'r') as fd:
+            export_contents = fd.read()
+
+        assert export_contents.startswith('BORG_KEY ' + hexlify(repo_id).decode() + '\n')
+
+        with Repository(self.repository_path) as repository:
+            repo_key = RepoKey(repository)
+            repo_key.load(None, Passphrase.env_passphrase())
+
+        backup_key = KeyfileKey(None)
+        backup_key.load(export_file, Passphrase.env_passphrase())
+
+        assert repo_key.enc_key == backup_key.enc_key
+
+        with Repository(self.repository_path) as repository:
+            repository.save_key(b'')
+
+        self.cmd('key-import', self.repository_location, export_file)
+
+        with Repository(self.repository_path) as repository:
+            repo_key2 = RepoKey(repository)
+            repo_key2.load(None, Passphrase.env_passphrase())
+
+        assert repo_key2.enc_key == repo_key2.enc_key
+
+    def test_key_import_errors(self):
+        export_file = self.output_path + '/exported'
+        self.cmd('init', self.repository_location, '--encryption', 'keyfile')
+
+        self.cmd('key-import', self.repository_location, export_file, exit_code=EXIT_ERROR)
+
+        with open(export_file, 'w') as fd:
+            fd.write('something not a key\n')
+
+        self.assert_raises(NotABorgKeyFile, lambda: self.cmd('key-import', self.repository_location, export_file))
+
+        with open(export_file, 'w') as fd:
+            fd.write('BORG_KEY a0a0a0\n')
+
+        self.assert_raises(RepoIdMismatch, lambda: self.cmd('key-import', self.repository_location, export_file))
+
+    def test_key_export_paperkey(self):
+        repo_id = 'e294423506da4e1ea76e8dcdf1a3919624ae3ae496fddf905610c351d3f09239'
+
+        export_file = self.output_path + '/exported'
+        self.cmd('init', self.repository_location, '--encryption', 'keyfile')
+        self._set_repository_id(self.repository_path, unhexlify(repo_id))
+
+        key_file = self.keys_path + '/' + os.listdir(self.keys_path)[0]
+
+        with open(key_file, 'w') as fd:
+            fd.write(KeyfileKey.FILE_ID + ' ' + repo_id + '\n')
+            fd.write(b2a_base64(b'abcdefghijklmnopqrstu').decode())
+
+        self.cmd('key-export', '--paper', self.repository_location, export_file)
+
+        with open(export_file, 'r') as fd:
+            export_contents = fd.read()
+
+        assert export_contents == """To restore key use borg key-import --paper /path/to/repo
+
+BORG PAPER KEY v1
+id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
+ 1: 616263 646566 676869 6a6b6c 6d6e6f 707172 - 6d
+ 2: 737475 - 88
+"""
 
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')

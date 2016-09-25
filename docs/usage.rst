@@ -484,6 +484,12 @@ Examples
     $ fusermount -u /tmp/mymountpoint
 
 
+.. include:: usage/key_export.rst.inc
+
+
+.. include:: usage/key_import.rst.inc
+
+
 .. include:: usage/change-passphrase.rst.inc
 
 Examples

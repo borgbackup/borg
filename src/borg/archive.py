@@ -95,7 +95,8 @@ class Statistics:
                 if space >= 8:
                     if space < swidth('...') + swidth(path):
                         path = '%s...%s' % (path[:(space // 2) - swidth('...')], path[-space // 2:])
-                    msg += "{0:<{space}}".format(path, space=space)
+                    space -= swidth(path)
+                    msg += path + ' ' * space
             else:
                 msg = ' ' * columns
             print(msg, file=stream or sys.stderr, end="\r", flush=True)

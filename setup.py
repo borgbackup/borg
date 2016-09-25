@@ -150,19 +150,33 @@ class build_usage(Command):
 
     def run(self):
         print('generating usage docs')
+        if not os.path.exists('docs/usage'):
+            os.mkdir('docs/usage')
         # allows us to build docs without the C modules fully loaded during help generation
         from borg.archiver import Archiver
         parser = Archiver().build_parser(prog='borg')
+
+        self.generate_level("", parser, Archiver)
+
+    def generate_level(self, prefix, parser, Archiver):
+        is_subcommand = False
         choices = {}
         for action in parser._actions:
-            if action.choices is not None:
-                choices.update(action.choices)
+            if action.choices is not None and 'SubParsersAction' in str(action.__class__):
+                is_subcommand = True
+                for cmd, parser in action.choices.items():
+                    choices[prefix + cmd] = parser
+        if prefix and not choices:
+            return
         print('found commands: %s' % list(choices.keys()))
-        if not os.path.exists('docs/usage'):
-            os.mkdir('docs/usage')
+
         for command, parser in choices.items():
             print('generating help for %s' % command)
-            with open('docs/usage/%s.rst.inc' % command, 'w') as doc:
+
+            if self.generate_level(command + " ", parser, Archiver):
+                return
+
+            with open('docs/usage/%s.rst.inc' % command.replace(" ", "_"), 'w') as doc:
                 doc.write(".. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!\n\n")
                 if command == 'help':
                     for topic in Archiver.helptext:
@@ -173,14 +187,16 @@ class build_usage(Command):
                         doc.write(Archiver.helptext[topic])
                 else:
                     params = {"command": command,
+                              "command_": command.replace(' ', '_'),
                               "underline": '-' * len('borg ' + command)}
-                    doc.write(".. _borg_{command}:\n\n".format(**params))
+                    doc.write(".. _borg_{command_}:\n\n".format(**params))
                     doc.write("borg {command}\n{underline}\n::\n\n".format(**params))
                     epilog = parser.epilog
                     parser.epilog = None
                     doc.write(re.sub("^", "    ", parser.format_help(), flags=re.M))
                     doc.write("\nDescription\n~~~~~~~~~~~\n")
                     doc.write(epilog)
+        return is_subcommand
 
 
 class build_api(Command):

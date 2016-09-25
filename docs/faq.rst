@@ -399,7 +399,7 @@ Create a wrapper script:  /usr/local/bin/pv-wrapper  ::
 
 Add BORG_RSH environment variable to use pipeviewer wrapper script with ssh. ::
 
-    export BORG_RSH='/usr/local/bin/pv-wrapper.sh ssh'
+    export BORG_RSH='/usr/local/bin/pv-wrapper ssh'
 
 Now |project_name| will be bandwidth limited. Nice thing about pv is that you can change rate-limit on the fly: ::
 

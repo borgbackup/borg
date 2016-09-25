@@ -481,8 +481,9 @@ class Repository:
             for tag, key, offset, data in self.io.iter_objects(segment, include_data=True):
                 if tag == TAG_COMMIT:
                     continue
-                in_index = self.index.get(key) == (segment, offset)
-                if tag == TAG_PUT and in_index:
+                in_index = self.index.get(key)
+                is_index_object = in_index == (segment, offset)
+                if tag == TAG_PUT and is_index_object:
                     try:
                         new_segment, offset = self.io.write_put(key, data, raise_full=True)
                     except LoggedIO.SegmentFull:
@@ -492,22 +493,23 @@ class Repository:
                     segments.setdefault(new_segment, 0)
                     segments[new_segment] += 1
                     segments[segment] -= 1
-                elif tag == TAG_PUT and not in_index:
+                elif tag == TAG_PUT and not is_index_object:
                     # If this is a PUT shadowed by a later tag, then it will be gone when this segment is deleted after
                     # this loop. Therefore it is removed from the shadow index.
                     try:
                         self.shadow_index[key].remove(segment)
                     except (KeyError, ValueError):
                         pass
-                elif tag == TAG_DELETE:
+                elif tag == TAG_DELETE and not in_index:
                     # If the shadow index doesn't contain this key, then we can't say if there's a shadowed older tag,
                     # therefore we do not drop the delete, but write it to a current segment.
                     shadowed_put_exists = key not in self.shadow_index or any(
                         # If the key is in the shadow index and there is any segment with an older PUT of this
                         # key, we have a shadowed put.
                         shadowed < segment for shadowed in self.shadow_index[key])
+                    delete_is_not_stable = index_transaction_id is None or segment > index_transaction_id
 
-                    if shadowed_put_exists or index_transaction_id is None or segment > index_transaction_id:
+                    if shadowed_put_exists or delete_is_not_stable:
                         # (introduced in 6425d16aa84be1eaaf88)
                         # This is needed to avoid object un-deletion if we crash between the commit and the deletion
                         # of old segments in complete_xfer().
@@ -650,18 +652,25 @@ class Repository:
         try:
             transaction_id = self.get_transaction_id()
             current_index = self.open_index(transaction_id)
-        except Exception:
+            logger.debug('Read committed index of transaction %d', transaction_id)
+        except Exception as exc:
             transaction_id = self.io.get_segments_transaction_id()
             current_index = None
+            logger.debug('Failed to read committed index (%s)', exc)
         if transaction_id is None:
+            logger.debug('No segments transaction found')
             transaction_id = self.get_index_transaction_id()
         if transaction_id is None:
+            logger.debug('No index transaction found, trying latest segment')
             transaction_id = self.io.get_latest_segment()
         if repair:
             self.io.cleanup(transaction_id)
         segments_transaction_id = self.io.get_segments_transaction_id()
+        logger.debug('Segment transaction is    %s', segments_transaction_id)
+        logger.debug('Determined transaction is %s', transaction_id)
         self.prepare_txn(None)  # self.index, self.compact, self.segments all empty now!
         segment_count = sum(1 for _ in self.io.segment_iterator())
+        logger.debug('Found %d segments', segment_count)
         pi = ProgressIndicatorPercent(total=segment_count, msg="Checking segments %3.1f%%", step=0.1)
         for i, (segment, filename) in enumerate(self.io.segment_iterator()):
             pi.show(i)
@@ -683,11 +692,28 @@ class Repository:
             report_error('Adding commit tag to segment {}'.format(transaction_id))
             self.io.segment = transaction_id + 1
             self.io.write_commit()
+        logger.info('Starting repository index check')
         if current_index and not repair:
             # current_index = "as found on disk"
             # self.index = "as rebuilt in-memory from segments"
             if len(current_index) != len(self.index):
-                report_error('Index object count mismatch. {} != {}'.format(len(current_index), len(self.index)))
+                report_error('Index object count mismatch.')
+                logger.error('committed index: %d objects', len(current_index))
+                logger.error('rebuilt index:   %d objects', len(self.index))
+
+                line_format = '%-64s %-16s %-16s'
+                not_found = '<not found>'
+                logger.warning(line_format, 'ID', 'rebuilt index', 'committed index')
+                for key, value in self.index.iteritems():
+                    current_value = current_index.get(key, not_found)
+                    if current_value != value:
+                        logger.warning(line_format, bin_to_hex(key), value, current_value)
+                for key, current_value in current_index.iteritems():
+                    if key in self.index:
+                        continue
+                    value = self.index.get(key, not_found)
+                    if current_value != value:
+                        logger.warning(line_format, bin_to_hex(key), value, current_value)
             elif current_index:
                 for key, value in self.index.iteritems():
                     if current_index.get(key, (-1, -1)) != value:

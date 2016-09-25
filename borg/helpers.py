@@ -965,9 +965,8 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
         default=False, retry=True, env_var_override=None, ofile=None, input=input):
     """Output <msg> (usually a question) and let user input an answer.
     Qualifies the answer according to falsish, truish and defaultish as True, False or <default>.
-    If it didn't qualify and retry_msg is None (no retries wanted),
-    return the default [which defaults to False]. Otherwise let user retry
-    answering until answer is qualified.
+    If it didn't qualify and retry is False (no retries wanted), return the default [which
+    defaults to False]. If retry is True let user retry answering until answer is qualified.
 
     If env_var_override is given and this var is present in the environment, do not ask
     the user, but just use the env var contents as answer as if it was typed in.

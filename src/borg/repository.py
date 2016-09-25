@@ -650,18 +650,25 @@ class Repository:
         try:
             transaction_id = self.get_transaction_id()
             current_index = self.open_index(transaction_id)
-        except Exception:
+            logger.debug('Read committed index of transaction %d', transaction_id)
+        except Exception as exc:
             transaction_id = self.io.get_segments_transaction_id()
             current_index = None
+            logger.debug('Failed to read committed index (%s)', exc)
         if transaction_id is None:
+            logger.debug('No segments transaction found')
             transaction_id = self.get_index_transaction_id()
         if transaction_id is None:
+            logger.debug('No index transaction found, trying latest segment')
             transaction_id = self.io.get_latest_segment()
         if repair:
             self.io.cleanup(transaction_id)
         segments_transaction_id = self.io.get_segments_transaction_id()
+        logger.debug('Segment transaction is    %s', segments_transaction_id)
+        logger.debug('Determined transaction is %s', transaction_id)
         self.prepare_txn(None)  # self.index, self.compact, self.segments all empty now!
         segment_count = sum(1 for _ in self.io.segment_iterator())
+        logger.debug('Found %d segments', segment_count)
         pi = ProgressIndicatorPercent(total=segment_count, msg="Checking segments %3.1f%%", step=0.1)
         for i, (segment, filename) in enumerate(self.io.segment_iterator()):
             pi.show(i)
@@ -683,6 +690,7 @@ class Repository:
             report_error('Adding commit tag to segment {}'.format(transaction_id))
             self.io.segment = transaction_id + 1
             self.io.write_commit()
+        logger.info('Starting repository index check')
         if current_index and not repair:
             # current_index = "as found on disk"
             # self.index = "as rebuilt in-memory from segments"

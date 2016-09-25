@@ -98,7 +98,7 @@ class KeyManager:
                 i += 1
             return ret
 
-        export = 'To restore key use borg key-import --paper /path/to/repo\n\n'
+        export = 'To restore key use borg key import --paper /path/to/repo\n\n'
 
         binary = a2b_base64(self.keyblob)
         export += 'BORG PAPER KEY v1\n'

@@ -1110,7 +1110,15 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 
-        subparser = subparsers.add_parser('key-export', parents=[common_parser],
+        subparser = subparsers.add_parser('key',
+                                          description="Manage a keyfile or repokey of a repository",
+                                          epilog="",
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='manage repository key')
+
+        key_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
+
+        subparser = key_parsers.add_parser('export', parents=[common_parser],
                                           description=self.do_key_export.__doc__,
                                           epilog="",
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1124,7 +1132,7 @@ class Archiver:
                                default=False,
                                help='Create an export suitable for printing and later type-in')
 
-        subparser = subparsers.add_parser('key-import', parents=[common_parser],
+        subparser = key_parsers.add_parser('import', parents=[common_parser],
                                           description=self.do_key_import.__doc__,
                                           epilog="",
                                           formatter_class=argparse.RawDescriptionHelpFormatter,

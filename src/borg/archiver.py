@@ -1287,7 +1287,7 @@ class Archiver:
 
             The version of borg.
 
-       Examples::
+        Examples::
 
             borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
             borg create /path/to/repo::{hostname}-{now:%Y-%m-%d_%H:%M:%S} ...
@@ -1349,24 +1349,24 @@ class Archiver:
 
         Examples::
 
-             borg create --compression lz4 REPO::ARCHIVE data
-             borg create --compression zlib REPO::ARCHIVE data
-             borg create --compression zlib,1 REPO::ARCHIVE data
-             borg create --compression auto,lzma,6 REPO::ARCHIVE data
-             borg create --compression-from compression.conf --compression auto,lzma ...
+            borg create --compression lz4 REPO::ARCHIVE data
+            borg create --compression zlib REPO::ARCHIVE data
+            borg create --compression zlib,1 REPO::ARCHIVE data
+            borg create --compression auto,lzma,6 REPO::ARCHIVE data
+            borg create --compression-from compression.conf --compression auto,lzma ...
 
         compression.conf has entries like::
 
-             # example config file for --compression-from option
-             #
-             # Format of non-comment / non-empty lines:
-             # <compression-spec>:<path/filename pattern>
-             # compression-spec is same format as for --compression option
-             # path/filename pattern is same format as for --exclude option
-             none:*.gz
-             none:*.zip
-             none:*.mp3
-             none:*.ogg
+            # example config file for --compression-from option
+            #
+            # Format of non-comment / non-empty lines:
+            # <compression-spec>:<path/filename pattern>
+            # compression-spec is same format as for --compression option
+            # path/filename pattern is same format as for --exclude option
+            none:*.gz
+            none:*.zip
+            none:*.mp3
+            none:*.ogg
 
         General remarks:
 

@@ -38,20 +38,20 @@ borg key export
 Description
 ~~~~~~~~~~~
 
-If repository encryption is used, the repository is unaccessable
+If repository encryption is used, the repository is inaccessible
 without the key. This command allows to backup this essential key.
 
 There are two backup formats. The normal backup format is suitable for
-digital storage as a file. The ``--paper`` backup format is opimized for
+digital storage as a file. The ``--paper`` backup format is optimized for
 print out and later type-in, with per line checks to reduce problems
 with manual input.
 
 For repositories using keyfile encryption the key is saved locally
 on the system that is capable of doing backups. To guard against loss
-of this key the key needs to be backuped independent of the main data
+of this key the key needs to be backed up independent of the main data
 backup.
 
 For repositories using the repokey encryption the key is saved in the
 repository in the config file. A backup is thus not strictly needed,
-but guards against the repository becoming inaccessable if the file
+but guards against the repository becoming inaccessible if the file
 is damaged for some reason.

@@ -69,7 +69,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
             sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
 
 
-# check if the binary "borg.exe" is available
+# check if the binary "borg.exe" is available (for local testing a symlink to virtualenv/bin/borg should do)
 try:
     exec_cmd('help', exe='borg.exe', fork=True)
     BORG_EXES = ['python', 'binary', ]
@@ -1263,12 +1263,18 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with open(export_file, 'w') as fd:
             fd.write('something not a key\n')
 
-        self.assert_raises(NotABorgKeyFile, lambda: self.cmd('key', 'import', self.repository_location, export_file))
+        if self.FORK_DEFAULT:
+            self.cmd('key', 'import', self.repository_location, export_file, exit_code=2)
+        else:
+            self.assert_raises(NotABorgKeyFile, lambda: self.cmd('key', 'import', self.repository_location, export_file))
 
         with open(export_file, 'w') as fd:
             fd.write('BORG_KEY a0a0a0\n')
 
-        self.assert_raises(RepoIdMismatch, lambda: self.cmd('key', 'import', self.repository_location, export_file))
+        if self.FORK_DEFAULT:
+            self.cmd('key', 'import', self.repository_location, export_file, exit_code=2)
+        else:
+            self.assert_raises(RepoIdMismatch, lambda: self.cmd('key', 'import', self.repository_location, export_file))
 
     def test_key_export_paperkey(self):
         repo_id = 'e294423506da4e1ea76e8dcdf1a3919624ae3ae496fddf905610c351d3f09239'

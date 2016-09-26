@@ -233,8 +233,8 @@ For automated backups the passphrase can be specified using the
     If you want to print a backup of your key to paper use the ``--paper``
     option of this command and print the result.
 
-    The backup that is encrypted with that key/passphrase won't help you
-    with that, of course.
+    A backup inside of the backup that is encrypted with that key/passphrase
+    won't help you with that, of course.
 
 .. _remote_repos:
 

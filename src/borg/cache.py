@@ -215,7 +215,9 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not self.txn_active:
             return
         if self.files is not None:
-            ttl = int(os.environ.get('BORG_FILES_CACHE_TTL', 20))
+            ttl_min = int(os.environ.get('BORG_FILES_CACHE_TTL_MIN', 20))
+			ttl_max = int(os.environ.get('BORG_FILES_CACHE_TTL_MAX', 50))
+			
             with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
                 for path_hash, item in self.files.items():
                     # Only keep files seen in this backup that are older than newest mtime seen in this backup -
@@ -223,7 +225,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     # Also keep files from older backups that have not reached BORG_FILES_CACHE_TTL yet.
                     entry = FileCacheEntry(*msgpack.unpackb(item))
                     if entry.age == 0 and bigint_to_int(entry.mtime) < self._newest_mtime or \
-                       entry.age > 0 and entry.age < ttl:
+                       entry.age > 0 and entry.age < randint(ttl_min,ttl_max):
                         msgpack.pack((path_hash, entry), fd)
         self.config.set('cache', 'manifest', self.manifest.id_str)
         self.config.set('cache', 'timestamp', self.manifest.timestamp)

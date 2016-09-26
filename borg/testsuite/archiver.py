@@ -69,7 +69,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
             sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
 
 
-# check if the binary "borg.exe" is available
+# check if the binary "borg.exe" is available (for local testing a symlink to virtualenv/bin/borg should do)
 try:
     exec_cmd('help', exe='borg.exe', fork=True)
     BORG_EXES = ['python', 'binary', ]

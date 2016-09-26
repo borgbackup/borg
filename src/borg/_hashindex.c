@@ -110,18 +110,35 @@ hashindex_index(HashIndex *index, const void *key)
     return _le32toh(*((uint32_t *)key)) % index->num_buckets;
 }
 
+inline int
+distance(int num_buckets, int current_idx, int ideal_idx)
+{
+    /* If the current index is smaller than the ideal index we've wrapped
+       around the end of the bucket array and need to compensate for that. */
+    return current_idx - ideal_idx + ( (current_idx < ideal_idx) ? num_buckets : 0 );
+}
+
+
 static int
-hashindex_lookup(HashIndex *index, const void *key)
+hashindex_lookup(HashIndex *index, const void *key, int *skip_hint)
 {
     int didx = -1;  // deleted index
     int start = hashindex_index(index, key);
     int idx = start;
-    for(;;) {
+    int num_buckets = index->num_buckets;
+    for(int offset = 0;; offset++) {
+        if (skip_hint != NULL) {
+            (*skip_hint) = offset;
+        }
         if(BUCKET_IS_EMPTY(index, idx))
         {
             return -1;
         }
+        if(offset > distance(num_buckets, idx, start)) {
+            return -1;
+        }
         if(BUCKET_IS_DELETED(index, idx)) {
+            /* TODO: don't hint at skipping deleted buckets */
             if(didx == -1) {
                 didx = idx;
             }
@@ -372,19 +389,11 @@ hashindex_write(HashIndex *index, const char *path)
 static const void *
 hashindex_get(HashIndex *index, const void *key)
 {
-    int idx = hashindex_lookup(index, key);
+    int idx = hashindex_lookup(index, key, NULL);
     if(idx < 0) {
         return NULL;
     }
     return BUCKET_ADDR(index, idx) + index->key_size;
-}
-
-inline int
-distance(HashIndex *index, int current_idx, int ideal_idx)
-{
-    /* If the current index is smaller than the ideal index we've wrapped
-       around the end of the bucket array and need to compensate for that. */
-    return current_idx - ideal_idx + ( (current_idx < ideal_idx) ? index->num_buckets : 0 );
 }
 
 inline void
@@ -397,13 +406,14 @@ memswap(void *a, void *b, void *tmp, size_t entry_size) {
 static int
 hashindex_set(HashIndex *index, const void *key, const void *value)
 {
-    int idx = hashindex_lookup(index, key);
-    uint8_t *bucket_ptr;
     int offset = 0;
+    int idx = hashindex_lookup(index, key, &offset);
+    uint8_t *bucket_ptr;
     int other_offset;
     int entry_size = (index->key_size + index->value_size);
     static void *entry_to_insert = NULL;
     static void *tmp_entry = NULL;
+    int num_buckets = index->num_buckets;
     if (entry_to_insert == NULL) {
         entry_to_insert = malloc(entry_size * 2);
         tmp_entry = entry_to_insert + entry_size;
@@ -416,15 +426,16 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
             if(!hashindex_resize(index, grow_size(index->num_buckets))) {
                 return 0;
             }
+            offset = 0;
         }
-        idx = hashindex_index(index, key);
+        idx = (hashindex_index(index, key) + offset) % index->num_buckets;
         memcpy(entry_to_insert, key, index->key_size);
         memcpy(entry_to_insert + index->key_size, value, index->value_size);
         bucket_ptr = BUCKET_ADDR(index, idx);
         while(!BUCKET_IS_EMPTY(index, idx) && !BUCKET_IS_DELETED(index, idx)) {
             /* we have a collision */
             other_offset = distance(
-                index, idx, hashindex_index(index, bucket_ptr));
+                num_buckets, idx, hashindex_index(index, bucket_ptr));
             if(other_offset < offset) {
                 /* Swap the bucket at idx with the current entry_to_insert.
                    This is the gist of robin-hood hashing, we rob from the key with the
@@ -450,7 +461,7 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
 static int
 hashindex_delete(HashIndex *index, const void *key)
 {
-    int idx = hashindex_lookup(index, key);
+    int idx = hashindex_lookup(index, key, NULL);
     if (idx < 0) {
         return 1;
     }

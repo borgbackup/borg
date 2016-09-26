@@ -705,6 +705,13 @@ class LoggedIO:
             else:
                 yield tag, key, offset
             offset += size
+            # we must get the fd via get_fd() here again as we yielded to our caller and it might
+            # have triggered closing of the fd we had before (e.g. by calling io.read() for
+            # different segment(s)).
+            # by calling get_fd() here again we also make our fd "recently used" so it likely
+            # does not get kicked out of self.fds LRUcache.
+            fd = self.get_fd(segment)
+            fd.seek(offset)
             header = fd.read(self.header_fmt.size)
 
     def recover_segment(self, segment, filename):

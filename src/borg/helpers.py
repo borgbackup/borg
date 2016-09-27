@@ -1696,3 +1696,29 @@ class ErrorIgnoringTextIOWrapper(io.TextIOWrapper):
                 except OSError:
                     pass
         return len(s)
+
+
+def swidth_slice(string, max_width):
+    """
+    Return a slice of *max_width* cells from *string*.
+
+    Negative *max_width* means from the end of string.
+
+    *max_width* is in units of character cells (or "columns").
+    Latin characters are usually one cell wide, many CJK characters are two cells wide.
+    """
+    from .platform import swidth
+    reverse = max_width < 0
+    max_width = abs(max_width)
+    if reverse:
+        string = reversed(string)
+    current_swidth = 0
+    result = []
+    for character in string:
+        current_swidth += swidth(character)
+        if current_swidth > max_width:
+            break
+        result.append(character)
+    if reverse:
+        result.reverse()
+    return ''.join(result)

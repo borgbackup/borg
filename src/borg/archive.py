@@ -28,7 +28,7 @@ from .helpers import Error, IntegrityError
 from .helpers import uid2user, user2uid, gid2group, group2gid
 from .helpers import parse_timestamp, to_localtime
 from .helpers import format_time, format_timedelta, format_file_size, file_status
-from .helpers import safe_encode, safe_decode, make_path_safe, remove_surrogates
+from .helpers import safe_encode, safe_decode, make_path_safe, remove_surrogates, swidth_slice
 from .helpers import decode_dict, StableDict
 from .helpers import int_to_bigint, bigint_to_int, bin_to_hex
 from .helpers import ProgressIndicatorPercent, log_multi
@@ -94,8 +94,10 @@ class Statistics:
                     space = columns - swidth(msg)
                 if space >= 8:
                     if space < swidth('...') + swidth(path):
-                        path = '%s...%s' % (path[:(space // 2) - swidth('...')], path[-space // 2:])
-                    msg += "{0:<{space}}".format(path, space=space)
+                        path = '%s...%s' % (swidth_slice(path, space // 2 - swidth('...')),
+                                            swidth_slice(path, -space // 2))
+                    space -= swidth(path)
+                    msg += path + ' ' * space
             else:
                 msg = ' ' * columns
             print(msg, file=stream or sys.stderr, end="\r", flush=True)

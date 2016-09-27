@@ -9,6 +9,7 @@ import pytest
 import msgpack
 import msgpack.fallback
 
+from .. import platform
 from ..helpers import Location
 from ..helpers import Buffer
 from ..helpers import partial_format, format_file_size, parse_file_size, format_timedelta, format_line, PlaceholderError, replace_placeholders
@@ -23,6 +24,7 @@ from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
 from ..helpers import load_excludes
 from ..helpers import CompressionSpec, CompressionDecider1, CompressionDecider2
 from ..helpers import parse_pattern, PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern
+from ..helpers import swidth_slice
 
 from . import BaseTestCase, environment_variable, FakeInputs
 
@@ -1041,3 +1043,23 @@ def test_replace_placeholders():
     now = datetime.now()
     assert " " not in replace_placeholders('{now}')
     assert int(replace_placeholders('{now:%Y}')) == now.year
+
+
+def working_swidth():
+    return platform.swidth('선') == 2
+
+
+@pytest.mark.skipif(not working_swidth(), reason='swidth() is not supported / active')
+def test_swidth_slice():
+    string = '나윤선나윤선나윤선나윤선나윤선'
+    assert swidth_slice(string, 1) == ''
+    assert swidth_slice(string, -1) == ''
+    assert swidth_slice(string, 4) == '나윤'
+    assert swidth_slice(string, -4) == '윤선'
+
+
+@pytest.mark.skipif(not working_swidth(), reason='swidth() is not supported / active')
+def test_swidth_slice_mixed_characters():
+    string = '나윤a선나윤선나윤선나윤선나윤선'
+    assert swidth_slice(string, 5) == '나윤a'
+    assert swidth_slice(string, 6) == '나윤a'

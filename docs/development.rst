@@ -158,7 +158,7 @@ The documentation (in reStructuredText format, .rst) is in docs/.
 
 To build the html version of it, you need to have sphinx installed::
 
-  pip3 install sphinx  # important: this will install sphinx with Python 3
+  pip3 install sphinx sphinx_rtd_theme  # important: this will install sphinx with Python 3
 
 Now run::
 

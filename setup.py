@@ -168,19 +168,33 @@ class build_usage(Command):
 
     def run(self):
         print('generating usage docs')
+        if not os.path.exists('docs/usage'):
+            os.mkdir('docs/usage')
         # allows us to build docs without the C modules fully loaded during help generation
         from borg.archiver import Archiver
         parser = Archiver(prog='borg').parser
+
+        self.generate_level("", parser, Archiver)
+
+    def generate_level(self, prefix, parser, Archiver):
+        is_subcommand = False
         choices = {}
         for action in parser._actions:
-            if action.choices is not None:
-                choices.update(action.choices)
+            if action.choices is not None and 'SubParsersAction' in str(action.__class__):
+                is_subcommand = True
+                for cmd, parser in action.choices.items():
+                    choices[prefix + cmd] = parser
+        if prefix and not choices:
+            return
         print('found commands: %s' % list(choices.keys()))
-        if not os.path.exists('docs/usage'):
-            os.mkdir('docs/usage')
+
         for command, parser in choices.items():
             print('generating help for %s' % command)
-            with open('docs/usage/%s.rst.inc' % command, 'w') as doc:
+
+            if self.generate_level(command + " ", parser, Archiver):
+                return
+
+            with open('docs/usage/%s.rst.inc' % command.replace(" ", "_"), 'w') as doc:
                 doc.write(".. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!\n\n")
                 if command == 'help':
                     for topic in Archiver.helptext:
@@ -191,8 +205,9 @@ class build_usage(Command):
                         doc.write(Archiver.helptext[topic])
                 else:
                     params = {"command": command,
+                              "command_": command.replace(' ', '_'),
                               "underline": '-' * len('borg ' + command)}
-                    doc.write(".. _borg_{command}:\n\n".format(**params))
+                    doc.write(".. _borg_{command_}:\n\n".format(**params))
                     doc.write("borg {command}\n{underline}\n::\n\n    borg {command}".format(**params))
                     self.write_usage(parser, doc)
                     epilog = parser.epilog
@@ -200,9 +215,13 @@ class build_usage(Command):
                     self.write_options(parser, doc)
                     doc.write("\n\nDescription\n~~~~~~~~~~~\n")
                     doc.write(epilog)
-        common_options = [group for group in choices['create']._action_groups if group.title == 'Common options'][0]
-        with open('docs/usage/common-options.rst.inc', 'w') as doc:
-            self.write_options_group(common_options, doc, False)
+
+        if 'create' in choices:
+            common_options = [group for group in choices['create']._action_groups if group.title == 'Common options'][0]
+            with open('docs/usage/common-options.rst.inc', 'w') as doc:
+                self.write_options_group(common_options, doc, False)
+
+        return is_subcommand
 
     def write_usage(self, parser, fp):
         if any(len(o.option_strings) for o in parser._actions):

@@ -39,7 +39,7 @@ from .helpers import update_excludes, check_extension_modules
 from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo
 from .helpers import log_multi
 from .helpers import parse_pattern, PatternMatcher, PathPrefixPattern
-from .helpers import signal_handler
+from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
 from .helpers import ErrorIgnoringTextIOWrapper
 from .helpers import ProgressIndicatorPercent
 from .item import Item
@@ -200,7 +200,8 @@ class Archiver:
             msg = ("'check --repair' is an experimental feature that might result in data loss." +
                    "\n" +
                    "Type 'YES' if you understand this and want to continue: ")
-            if not yes(msg, false_msg="Aborting.", truish=('YES', ),
+            if not yes(msg, false_msg="Aborting.", invalid_msg="Invalid answer, aborting.",
+                       truish=('YES', ), retry=False,
                        env_var_override='BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
                 return EXIT_ERROR
         if args.repo_only and args.verify_data:
@@ -798,8 +799,8 @@ class Archiver:
                         msg.append(format_archive(archive_info))
                 msg.append("Type 'YES' if you understand this and want to continue: ")
                 msg = '\n'.join(msg)
-                if not yes(msg, false_msg="Aborting.", truish=('YES', ),
-                           env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'):
+                if not yes(msg, false_msg="Aborting.", invalid_msg='Invalid answer, aborting.', truish=('YES', ),
+                           retry=False, env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'):
                     self.exit_code = EXIT_ERROR
                     return self.exit_code
                 repository.destroy()
@@ -1621,9 +1622,36 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 
-        subparser = subparsers.add_parser('key-export', parents=[common_parser], add_help=False,
-                                          description=self.do_key_export.__doc__,
+        subparser = subparsers.add_parser('key', add_help=False,
+                                          description="Manage a keyfile or repokey of a repository",
                                           epilog="",
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='manage repository key')
+
+        key_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
+
+        key_export_epilog = textwrap.dedent("""
+        If repository encryption is used, the repository is inaccessible
+        without the key. This command allows to backup this essential key.
+
+        There are two backup formats. The normal backup format is suitable for
+        digital storage as a file. The ``--paper`` backup format is optimized
+        for printing and typing in while importing, with per line checks to
+        reduce problems with manual input.
+
+        For repositories using keyfile encryption the key is saved locally
+        on the system that is capable of doing backups. To guard against loss
+        of this key, the key needs to be backed up independently of the main
+        data backup.
+
+        For repositories using the repokey encryption the key is saved in the
+        repository in the config file. A backup is thus not strictly needed,
+        but guards against the repository becoming inaccessible if the file
+        is damaged for some reason.
+        """)
+        subparser = key_parsers.add_parser('export', parents=[common_parser], add_help=False,
+                                          description=self.do_key_export.__doc__,
+                                          epilog=key_export_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='export repository key for backup')
         subparser.set_defaults(func=self.do_key_export)
@@ -1635,9 +1663,17 @@ class Archiver:
                                default=False,
                                help='Create an export suitable for printing and later type-in')
 
-        subparser = subparsers.add_parser('key-import', parents=[common_parser], add_help=False,
+        key_import_epilog = textwrap.dedent("""
+        This command allows to restore a key previously backed up with the
+        export command.
+
+        If the ``--paper`` option is given, the import will be an interactive
+        process in which each line is checked for plausibility before
+        proceeding to the next line. For this format PATH must not be given.
+        """)
+        subparser = key_parsers.add_parser('import', parents=[common_parser], add_help=False,
                                           description=self.do_key_import.__doc__,
-                                          epilog="",
+                                          epilog=key_import_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='import repository key from backup')
         subparser.set_defaults(func=self.do_key_import)
@@ -2345,6 +2381,22 @@ class Archiver:
         subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
                                help='additional help on TOPIC')
 
+        debug_epilog = textwrap.dedent("""
+        These commands are not intended for normal use and potentially very
+        dangerous if used incorrectly.
+
+        They exist to improve debugging capabilities without direct system access, e.g.
+        in case you ever run into some severe malfunction. Use them only if you know
+        what you are doing or if a trusted developer tells you what to do.""")
+
+        subparser = subparsers.add_parser('debug', add_help=False,
+                                          description='debugging command (not intended for normal use)',
+                                          epilog=debug_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='debugging command (not intended for normal use)')
+
+        debug_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
+
         debug_info_epilog = textwrap.dedent("""
         This command displays some system information that might be useful for bug
         reports and debugging problems. If a traceback happens, this information is
@@ -2357,10 +2409,27 @@ class Archiver:
                                           help='show system infos for debugging / bug reports (debug)')
         subparser.set_defaults(func=self.do_debug_info)
 
+        subparser = debug_parsers.add_parser('info', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_info.__doc__,
+                                          epilog=debug_info_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='show system infos for debugging / bug reports (debug)')
+        subparser.set_defaults(func=self.do_debug_info)
+
         debug_dump_archive_items_epilog = textwrap.dedent("""
         This command dumps raw (but decrypted and decompressed) archive items (only metadata) to files.
         """)
         subparser = subparsers.add_parser('debug-dump-archive-items', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_dump_archive_items.__doc__,
+                                          epilog=debug_dump_archive_items_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='dump archive items (metadata) (debug)')
+        subparser.set_defaults(func=self.do_debug_dump_archive_items)
+        subparser.add_argument('location', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='archive to dump')
+
+        subparser = debug_parsers.add_parser('dump-archive-items', parents=[common_parser], add_help=False,
                                           description=self.do_debug_dump_archive_items.__doc__,
                                           epilog=debug_dump_archive_items_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -2383,10 +2452,34 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='repo to dump')
 
+        subparser = debug_parsers.add_parser('dump-repo-objs', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_dump_repo_objs.__doc__,
+                                          epilog=debug_dump_repo_objs_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='dump repo objects (debug)')
+        subparser.set_defaults(func=self.do_debug_dump_repo_objs)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repo to dump')
+
         debug_get_obj_epilog = textwrap.dedent("""
         This command gets an object from the repository.
         """)
         subparser = subparsers.add_parser('debug-get-obj', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_get_obj.__doc__,
+                                          epilog=debug_get_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='get object from repository (debug)')
+        subparser.set_defaults(func=self.do_debug_get_obj)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('id', metavar='ID', type=str,
+                               help='hex object ID to get from the repo')
+        subparser.add_argument('path', metavar='PATH', type=str,
+                               help='file to write object data into')
+
+        subparser = debug_parsers.add_parser('get-obj', parents=[common_parser], add_help=False,
                                           description=self.do_debug_get_obj.__doc__,
                                           epilog=debug_get_obj_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -2415,6 +2508,18 @@ class Archiver:
         subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
                                help='file(s) to read and create object(s) from')
 
+        subparser = debug_parsers.add_parser('put-obj', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_put_obj.__doc__,
+                                          epilog=debug_put_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='put object to repository (debug)')
+        subparser.set_defaults(func=self.do_debug_put_obj)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
+                               help='file(s) to read and create object(s) from')
+
         debug_delete_obj_epilog = textwrap.dedent("""
         This command deletes objects from the repository.
         """)
@@ -2429,6 +2534,19 @@ class Archiver:
                                help='repository to use')
         subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
                                help='hex object ID(s) to delete from the repo')
+
+        subparser = debug_parsers.add_parser('delete-obj', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_delete_obj.__doc__,
+                                          epilog=debug_delete_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='delete object from repository (debug)')
+        subparser.set_defaults(func=self.do_debug_delete_obj)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
+                               help='hex object ID(s) to delete from the repo')
+
         return parser
 
     def get_args(self, argv, cmd):
@@ -2494,59 +2612,28 @@ class Archiver:
         return args.func(args)
 
 
-def sig_info_handler(signum, stack):  # pragma: no cover
+def sig_info_handler(sig_no, stack):  # pragma: no cover
     """search the stack for infos about the currently processed file and print them"""
-    for frame in inspect.getouterframes(stack):
-        func, loc = frame[3], frame[0].f_locals
-        if func in ('process_file', '_process', ):  # create op
-            path = loc['path']
-            try:
-                pos = loc['fd'].tell()
-                total = loc['st'].st_size
-            except Exception:
-                pos, total = 0, 0
-            logger.info("{0} {1}/{2}".format(path, format_file_size(pos), format_file_size(total)))
-            break
-        if func in ('extract_item', ):  # extract op
-            path = loc['item'].path
-            try:
-                pos = loc['fd'].tell()
-            except Exception:
-                pos = 0
-            logger.info("{0} {1}/???".format(path, format_file_size(pos)))
-            break
-
-
-class SIGTERMReceived(BaseException):
-    pass
-
-
-def sig_term_handler(signum, stack):
-    raise SIGTERMReceived
-
-
-class SIGHUPReceived(BaseException):
-    pass
-
-
-def sig_hup_handler(signum, stack):
-    raise SIGHUPReceived
-
-
-def setup_signal_handlers():  # pragma: no cover
-    sigs = []
-    if hasattr(signal, 'SIGUSR1'):
-        sigs.append(signal.SIGUSR1)  # kill -USR1 pid
-    if hasattr(signal, 'SIGINFO'):
-        sigs.append(signal.SIGINFO)  # kill -INFO pid (or ctrl-t)
-    for sig in sigs:
-        signal.signal(sig, sig_info_handler)
-    # If we received SIGTERM or SIGHUP, catch them and raise a proper exception
-    # that can be handled for an orderly exit. SIGHUP is important especially
-    # for systemd systems, where logind sends it when a session exits, in
-    # addition to any traditional use.
-    signal.signal(signal.SIGTERM, sig_term_handler)
-    signal.signal(signal.SIGHUP, sig_hup_handler)
+    with signal_handler(sig_no, signal.SIG_IGN):
+        for frame in inspect.getouterframes(stack):
+            func, loc = frame[3], frame[0].f_locals
+            if func in ('process_file', '_process', ):  # create op
+                path = loc['path']
+                try:
+                    pos = loc['fd'].tell()
+                    total = loc['st'].st_size
+                except Exception:
+                    pos, total = 0, 0
+                logger.info("{0} {1}/{2}".format(path, format_file_size(pos), format_file_size(total)))
+                break
+            if func in ('extract_item', ):  # extract op
+                path = loc['item'].path
+                try:
+                    pos = loc['fd'].tell()
+                except Exception:
+                    pos = 0
+                logger.info("{0} {1}/???".format(path, format_file_size(pos)))
+                break
 
 
 def main():  # pragma: no cover
@@ -2558,68 +2645,79 @@ def main():  # pragma: no cover
     # issues when print()-ing unicode file names
     sys.stdout = ErrorIgnoringTextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=True)
     sys.stderr = ErrorIgnoringTextIOWrapper(sys.stderr.buffer, sys.stderr.encoding, 'replace', line_buffering=True)
-    setup_signal_handlers()
-    archiver = Archiver()
-    msg = tb = None
-    tb_log_level = logging.ERROR
-    try:
-        args = archiver.get_args(sys.argv, os.environ.get('SSH_ORIGINAL_COMMAND'))
-    except Error as e:
-        msg = e.get_message()
-        tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
-        tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
-        # we might not have logging setup yet, so get out quickly
-        print(msg, file=sys.stderr)
-        if tb_log_level == logging.ERROR:
-            print(tb, file=sys.stderr)
-        sys.exit(e.exit_code)
-    try:
-        exit_code = archiver.run(args)
-    except Error as e:
-        msg = e.get_message()
-        tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
-        tb = "%s\n%s" % (traceback.format_exc(), sysinfo())
-        exit_code = e.exit_code
-    except RemoteRepository.RPCError as e:
-        msg = "%s %s" % (e.remote_type, e.name)
-        important = e.remote_type not in ('LockTimeout', )
-        tb_log_level = logging.ERROR if important else logging.DEBUG
-        tb = sysinfo()
-        exit_code = EXIT_ERROR
-    except Exception:
-        msg = 'Local Exception'
+
+    # If we receive SIGINT (ctrl-c), SIGTERM (kill) or SIGHUP (kill -HUP),
+    # catch them and raise a proper exception that can be handled for an
+    # orderly exit.
+    # SIGHUP is important especially for systemd systems, where logind
+    # sends it when a session exits, in addition to any traditional use.
+    # Output some info if we receive SIGUSR1 or SIGINFO (ctrl-t).
+    with signal_handler('SIGINT', raising_signal_handler(KeyboardInterrupt)), \
+         signal_handler('SIGHUP', raising_signal_handler(SigHup)), \
+         signal_handler('SIGTERM', raising_signal_handler(SigTerm)), \
+         signal_handler('SIGUSR1', sig_info_handler), \
+         signal_handler('SIGINFO', sig_info_handler):
+        archiver = Archiver()
+        msg = tb = None
         tb_log_level = logging.ERROR
-        tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
-        exit_code = EXIT_ERROR
-    except KeyboardInterrupt:
-        msg = 'Keyboard interrupt'
-        tb_log_level = logging.DEBUG
-        tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
-        exit_code = EXIT_ERROR
-    except SIGTERMReceived:
-        msg = 'Received SIGTERM'
-        tb_log_level = logging.DEBUG
-        tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
-        exit_code = EXIT_ERROR
-    except SIGHUPReceived:
-        msg = 'Received SIGHUP.'
-        exit_code = EXIT_ERROR
-    if msg:
-        logger.error(msg)
-    if tb:
-        logger.log(tb_log_level, tb)
-    if args.show_rc:
-        rc_logger = logging.getLogger('borg.output.show-rc')
-        exit_msg = 'terminating with %s status, rc %d'
-        if exit_code == EXIT_SUCCESS:
-            rc_logger.info(exit_msg % ('success', exit_code))
-        elif exit_code == EXIT_WARNING:
-            rc_logger.warning(exit_msg % ('warning', exit_code))
-        elif exit_code == EXIT_ERROR:
-            rc_logger.error(exit_msg % ('error', exit_code))
-        else:
-            rc_logger.error(exit_msg % ('abnormal', exit_code or 666))
-    sys.exit(exit_code)
+        try:
+            args = archiver.get_args(sys.argv, os.environ.get('SSH_ORIGINAL_COMMAND'))
+        except Error as e:
+            msg = e.get_message()
+            tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
+            tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
+            # we might not have logging setup yet, so get out quickly
+            print(msg, file=sys.stderr)
+            if tb_log_level == logging.ERROR:
+                print(tb, file=sys.stderr)
+            sys.exit(e.exit_code)
+        try:
+            exit_code = archiver.run(args)
+        except Error as e:
+            msg = e.get_message()
+            tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
+            tb = "%s\n%s" % (traceback.format_exc(), sysinfo())
+            exit_code = e.exit_code
+        except RemoteRepository.RPCError as e:
+            msg = "%s %s" % (e.remote_type, e.name)
+            important = e.remote_type not in ('LockTimeout', )
+            tb_log_level = logging.ERROR if important else logging.DEBUG
+            tb = sysinfo()
+            exit_code = EXIT_ERROR
+        except Exception:
+            msg = 'Local Exception'
+            tb_log_level = logging.ERROR
+            tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
+            exit_code = EXIT_ERROR
+        except KeyboardInterrupt:
+            msg = 'Keyboard interrupt'
+            tb_log_level = logging.DEBUG
+            tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
+            exit_code = EXIT_ERROR
+        except SigTerm:
+            msg = 'Received SIGTERM'
+            tb_log_level = logging.DEBUG
+            tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
+            exit_code = EXIT_ERROR
+        except SigHup:
+            msg = 'Received SIGHUP.'
+            exit_code = EXIT_ERROR
+        if msg:
+            logger.error(msg)
+        if tb:
+            logger.log(tb_log_level, tb)
+        if args.show_rc:
+            rc_logger = logging.getLogger('borg.output.show-rc')
+            exit_msg = 'terminating with %s status, rc %d'
+            if exit_code == EXIT_SUCCESS:
+                rc_logger.info(exit_msg % ('success', exit_code))
+            elif exit_code == EXIT_WARNING:
+                rc_logger.warning(exit_msg % ('warning', exit_code))
+            elif exit_code == EXIT_ERROR:
+                rc_logger.error(exit_msg % ('error', exit_code))
+            else:
+                rc_logger.error(exit_msg % ('abnormal', exit_code or 666))
+        sys.exit(exit_code)
 
 
 if __name__ == '__main__':

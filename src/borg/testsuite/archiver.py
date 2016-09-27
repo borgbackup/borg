@@ -76,7 +76,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
             sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
 
 
-# check if the binary "borg.exe" is available
+# check if the binary "borg.exe" is available (for local testing a symlink to virtualenv/bin/borg should do)
 try:
     exec_cmd('help', exe='borg.exe', fork=True)
     BORG_EXES = ['python', 'binary', ]
@@ -1815,7 +1815,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         export_file = self.output_path + '/exported'
         self.cmd('init', self.repository_location, '--encryption', 'keyfile')
         repo_id = self._extract_repository_id(self.repository_path)
-        self.cmd('key-export', self.repository_location, export_file)
+        self.cmd('key', 'export', self.repository_location, export_file)
 
         with open(export_file, 'r') as fd:
             export_contents = fd.read()
@@ -1831,7 +1831,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         os.unlink(key_file)
 
-        self.cmd('key-import', self.repository_location, export_file)
+        self.cmd('key', 'import', self.repository_location, export_file)
 
         with open(key_file, 'r') as fd:
             key_contents2 = fd.read()
@@ -1842,7 +1842,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         export_file = self.output_path + '/exported'
         self.cmd('init', self.repository_location, '--encryption', 'repokey')
         repo_id = self._extract_repository_id(self.repository_path)
-        self.cmd('key-export', self.repository_location, export_file)
+        self.cmd('key', 'export', self.repository_location, export_file)
 
         with open(export_file, 'r') as fd:
             export_contents = fd.read()
@@ -1861,7 +1861,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with Repository(self.repository_path) as repository:
             repository.save_key(b'')
 
-        self.cmd('key-import', self.repository_location, export_file)
+        self.cmd('key', 'import', self.repository_location, export_file)
 
         with Repository(self.repository_path) as repository:
             repo_key2 = RepoKey(repository)
@@ -1873,17 +1873,23 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         export_file = self.output_path + '/exported'
         self.cmd('init', self.repository_location, '--encryption', 'keyfile')
 
-        self.cmd('key-import', self.repository_location, export_file, exit_code=EXIT_ERROR)
+        self.cmd('key', 'import', self.repository_location, export_file, exit_code=EXIT_ERROR)
 
         with open(export_file, 'w') as fd:
             fd.write('something not a key\n')
 
-        self.assert_raises(NotABorgKeyFile, lambda: self.cmd('key-import', self.repository_location, export_file))
+        if self.FORK_DEFAULT:
+            self.cmd('key', 'import', self.repository_location, export_file, exit_code=2)
+        else:
+            self.assert_raises(NotABorgKeyFile, lambda: self.cmd('key', 'import', self.repository_location, export_file))
 
         with open(export_file, 'w') as fd:
             fd.write('BORG_KEY a0a0a0\n')
 
-        self.assert_raises(RepoIdMismatch, lambda: self.cmd('key-import', self.repository_location, export_file))
+        if self.FORK_DEFAULT:
+            self.cmd('key', 'import', self.repository_location, export_file, exit_code=2)
+        else:
+            self.assert_raises(RepoIdMismatch, lambda: self.cmd('key', 'import', self.repository_location, export_file))
 
     def test_key_export_paperkey(self):
         repo_id = 'e294423506da4e1ea76e8dcdf1a3919624ae3ae496fddf905610c351d3f09239'
@@ -1898,12 +1904,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.write(KeyfileKey.FILE_ID + ' ' + repo_id + '\n')
             fd.write(b2a_base64(b'abcdefghijklmnopqrstu').decode())
 
-        self.cmd('key-export', '--paper', self.repository_location, export_file)
+        self.cmd('key', 'export', '--paper', self.repository_location, export_file)
 
         with open(export_file, 'r') as fd:
             export_contents = fd.read()
 
-        assert export_contents == """To restore key use borg key-import --paper /path/to/repo
+        assert export_contents == """To restore key use borg key import --paper /path/to/repo
 
 BORG PAPER KEY v1
 id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02

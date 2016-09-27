@@ -538,6 +538,12 @@ borgfs
     standalone binary will have to manually create a symlink (see
     :ref:`pyinstaller-binary`).
 
+.. include:: usage/key_export.rst.inc
+
+
+.. include:: usage/key_import.rst.inc
+
+
 .. include:: usage/change-passphrase.rst.inc
 
 Examples

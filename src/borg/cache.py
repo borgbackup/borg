@@ -78,7 +78,8 @@ class Cache:
                 msg = ("Warning: Attempting to access a previously unknown unencrypted repository!" +
                        "\n" +
                        "Do you want to continue? [yN] ")
-                if not yes(msg, false_msg="Aborting.", env_var_override='BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'):
+                if not yes(msg, false_msg="Aborting.", invalid_msg="Invalid answer, aborting.",
+                           retry=False, env_var_override='BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'):
                     raise self.CacheInitAbortedError()
             self.create()
         self.open(lock_wait=lock_wait)
@@ -88,7 +89,8 @@ class Cache:
                 msg = ("Warning: The repository at location {} was previously located at {}".format(repository._location.canonical_path(), self.previous_location) +
                        "\n" +
                        "Do you want to continue? [yN] ")
-                if not yes(msg, false_msg="Aborting.", env_var_override='BORG_RELOCATED_REPO_ACCESS_IS_OK'):
+                if not yes(msg, false_msg="Aborting.", invalid_msg="Invalid answer, aborting.",
+                           retry=False, env_var_override='BORG_RELOCATED_REPO_ACCESS_IS_OK'):
                     raise self.RepositoryAccessAborted()
 
             if sync and self.manifest.id != self.manifest_id:

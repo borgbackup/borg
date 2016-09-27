@@ -248,8 +248,13 @@ For automated backups the passphrase can be specified using the
     the key in case it gets corrupted or lost. Also keep your passphrase
     at a safe place.
 
-    The backup that is encrypted with that key/passphrase won't help you
-    with that, of course.
+    You can make backups using :ref:`borg_key_export` subcommand.
+
+    If you want to print a backup of your key to paper use the ``--paper``
+    option of this command and print the result.
+
+    A backup inside of the backup that is encrypted with that key/passphrase
+    won't help you with that, of course.
 
 .. _remote_repos:
 

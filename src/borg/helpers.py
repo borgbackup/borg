@@ -1,4 +1,5 @@
 import argparse
+import contextlib
 import grp
 import hashlib
 import logging
@@ -19,7 +20,6 @@ import unicodedata
 import uuid
 from binascii import hexlify
 from collections import namedtuple, deque, abc
-from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from functools import wraps, partial, lru_cache
@@ -1054,9 +1054,8 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
         default=False, retry=True, env_var_override=None, ofile=None, input=input):
     """Output <msg> (usually a question) and let user input an answer.
     Qualifies the answer according to falsish, truish and defaultish as True, False or <default>.
-    If it didn't qualify and retry_msg is None (no retries wanted),
-    return the default [which defaults to False]. Otherwise let user retry
-    answering until answer is qualified.
+    If it didn't qualify and retry is False (no retries wanted), return the default [which
+    defaults to False]. If retry is True let user retry answering until answer is qualified.
 
     If env_var_override is given and this var is present in the environment, do not ask
     the user, but just use the env var contents as answer as if it was typed in.
@@ -1665,15 +1664,6 @@ class CompressionDecider2:
         return compr_args, Chunk(data, **meta)
 
 
-@contextmanager
-def signal_handler(signo, handler):
-    old_signal_handler = signal.signal(signo, handler)
-    try:
-        yield
-    finally:
-        signal.signal(signo, old_signal_handler)
-
-
 class ErrorIgnoringTextIOWrapper(io.TextIOWrapper):
     def read(self, n):
         if not self.closed:
@@ -1696,6 +1686,52 @@ class ErrorIgnoringTextIOWrapper(io.TextIOWrapper):
                 except OSError:
                     pass
         return len(s)
+
+
+class SignalException(BaseException):
+    """base class for all signal-based exceptions"""
+
+
+class SigHup(SignalException):
+    """raised on SIGHUP signal"""
+
+
+class SigTerm(SignalException):
+    """raised on SIGTERM signal"""
+
+
+@contextlib.contextmanager
+def signal_handler(sig, handler):
+    """
+    when entering context, set up signal handler <handler> for signal <sig>.
+    when leaving context, restore original signal handler.
+
+    <sig> can bei either a str when giving a signal.SIGXXX attribute name (it
+    won't crash if the attribute name does not exist as some names are platform
+    specific) or a int, when giving a signal number.
+
+    <handler> is any handler value as accepted by the signal.signal(sig, handler).
+    """
+    if isinstance(sig, str):
+        sig = getattr(signal, sig, None)
+    if sig is not None:
+        orig_handler = signal.signal(sig, handler)
+    try:
+        yield
+    finally:
+        if sig is not None:
+            signal.signal(sig, orig_handler)
+
+
+def raising_signal_handler(exc_cls):
+    def handler(sig_no, frame):
+        # setting SIG_IGN avoids that an incoming second signal of this
+        # kind would raise a 2nd exception while we still process the
+        # exception handler for exc_cls for the 1st signal.
+        signal.signal(sig_no, signal.SIG_IGN)
+        raise exc_cls
+
+    return handler
 
 
 def swidth_slice(string, max_width):

@@ -84,8 +84,11 @@ class HashIndexTestCase(BaseTestCase):
         idx = NSIndex()
         for x in range(100):
             idx[H(x)] = x, x
-        all = list(idx.iteritems())
+        iterator = idx.iteritems()
+        all = list(iterator)
         self.assert_equal(len(all), 100)
+        # iterator is already exhausted by list():
+        self.assert_raises(StopIteration, next, iterator)
         second_half = list(idx.iteritems(marker=all[49][0]))
         self.assert_equal(len(second_half), 50)
         self.assert_equal(second_half, all[50:])

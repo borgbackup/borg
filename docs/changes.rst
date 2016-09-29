@@ -50,6 +50,36 @@ The best check that everything is ok is to run a dry-run extraction::
     borg extract -v --dry-run REPO::ARCHIVE
 
 
+Version 1.1.0b2 (not released yet)
+----------------------------------
+
+Bug fixes:
+
+- fix incorrect preservation of delete tags, leading to "object count mismatch"
+  on borg check, #1598. This only occurred with 1.1.0b1 (not with 1.0.x) and is
+  normally fixed by running another borg create/delete/prune.
+- fix broken --progress for double-cell paths (e.g. CJK), #1624
+- borg recreate: also catch SIGHUP
+- FUSE:
+
+  - fix hardlinks in versions view, #1599
+  - add parameter check to ItemCache.get to make potential failures more clear
+
+New features:
+
+- Archiver, RemoteRepository: add --remote-ratelimit (send data)
+- borg help compression, #1582
+- borg check: delete chunks with integrity errors, #1575, so they can be
+  "repaired" immediately and maybe healed later.
+
+Other changes:
+
+- borg check --verify-data slightly tuned (use get_many())
+- Change {utcnow} and {now} to ISO-8601 format ("T" date/time separator)
+- repo check: log transaction IDs, improve object count mismatch diagnostic
+- Vagrantfile: use TW's fresh-bootloader pyinstaller branch
+
+
 Version 1.1.0b1 (2016-08-28)
 ----------------------------
 

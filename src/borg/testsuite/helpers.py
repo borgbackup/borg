@@ -25,6 +25,7 @@ from ..helpers import load_excludes
 from ..helpers import CompressionSpec, CompressionDecider1, CompressionDecider2
 from ..helpers import parse_pattern, PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern
 from ..helpers import swidth_slice
+from ..helpers import chunkit
 
 from . import BaseTestCase, environment_variable, FakeInputs
 
@@ -975,6 +976,23 @@ def test_chunk_file_wrapper():
     cfw = ChunkIteratorFileWrapper(iter([]))
     assert cfw.read(2) == b''
     assert cfw.exhausted
+
+
+def test_chunkit():
+    it = chunkit('abcdefg', 3)
+    assert next(it) == ['a', 'b', 'c']
+    assert next(it) == ['d', 'e', 'f']
+    assert next(it) == ['g']
+    with pytest.raises(StopIteration):
+        next(it)
+    with pytest.raises(StopIteration):
+        next(it)
+
+    it = chunkit('ab', 3)
+    assert list(it) == [['a', 'b']]
+
+    it = chunkit('', 3)
+    assert list(it) == []
 
 
 def test_clean_lines():

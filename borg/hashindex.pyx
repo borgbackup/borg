@@ -168,17 +168,22 @@ cdef class NSKeyIterator:
     cdef HashIndex *index
     cdef const void *key
     cdef int key_size
+    cdef int exhausted
 
     def __cinit__(self, key_size):
         self.key = NULL
         self.key_size = key_size
+        self.exhausted = 0
 
     def __iter__(self):
         return self
 
     def __next__(self):
+        if self.exhausted:
+            raise StopIteration
         self.key = hashindex_next_key(self.index, <char *>self.key)
         if not self.key:
+            self.exhausted = 1
             raise StopIteration
         cdef uint32_t *value = <uint32_t *>(self.key + self.key_size)
         cdef uint32_t segment = _le32toh(value[0])
@@ -330,17 +335,22 @@ cdef class ChunkKeyIterator:
     cdef HashIndex *index
     cdef const void *key
     cdef int key_size
+    cdef int exhausted
 
     def __cinit__(self, key_size):
         self.key = NULL
         self.key_size = key_size
+        self.exhausted = 0
 
     def __iter__(self):
         return self
 
     def __next__(self):
+        if self.exhausted:
+            raise StopIteration
         self.key = hashindex_next_key(self.index, <char *>self.key)
         if not self.key:
+            self.exhausted = 1
             raise StopIteration
         cdef uint32_t *value = <uint32_t *>(self.key + self.key_size)
         cdef uint32_t refcount = _le32toh(value[0])

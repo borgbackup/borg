@@ -567,8 +567,19 @@ Miscellaneous Help
 
 Debug Commands
 --------------
+
 There are some more commands (all starting with "debug-") which are all
 **not intended for normal use** and **potentially very dangerous** if used incorrectly.
+
+For example, ``borg debug-put-obj`` and ``borg debug-delete-obj`` will only do
+what their name suggests: put objects into repo / delete objects from repo.
+
+Please note:
+
+- they will not update the chunks cache (chunks index) about the object
+- they will not update the manifest (so no automatic chunks index resync is triggered)
+- they will not check whether the object is in use (e.g. before delete-obj)
+- they will not update any metadata which may point to the object
 
 They exist to improve debugging capabilities without direct system access, e.g.
 in case you ever run into some severe malfunction. Use them only if you know

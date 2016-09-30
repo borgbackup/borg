@@ -212,6 +212,73 @@ Other changes:
   - ChunkBuffer: add test for leaving partial chunk in buffer, fixes #945
 
 
+Version 1.0.8rc1 (not released yet)
+-----------------------------------
+
+Bug fixes:
+
+- fix signal handling (SIGINT, SIGTERM, SIGHUP), #1620 #1593
+  Fixes e.g. leftover lock files for quickly repeated signals (e.g. Ctrl-C
+  Ctrl-C) or lost connections or systemd sending SIGHUP.
+- progress display: adapt formatting to narrow screens, do not crash, #1628
+- borg create --read-special - fix crash on broken symlink, #1584.
+  also correctly processes broken symlinks. before this regressed to a crash
+  (5b45385) a broken symlink would've been skipped.
+- process_symlink: fix missing backup_io()
+  Fixes a chmod/chown/chgrp/unlink/rename/... crash race between getting dirents
+  and dispatching to process_symlink.
+- yes(): abort on wrong answers, saying so
+- fixed exception borg serve raised when connection was closed before reposiory
+  was openend. add an error message for this.
+- fix read-from-closed-FD issue, #1551
+  (this seems not to get triggered in 1.0.x, but was discovered in master)
+- hashindex: fix iterators (always raise StopIteration when exhausted)
+  (this seems not to get triggered in 1.0.x, but was discovered in master)
+
+New features:
+
+- add "borg key export" / "borg key import" commands, #1555, so users are able
+  to backup / restore their encryption keys more easily.
+
+  Supported formats are the keyfile format used by borg internally and a
+  special "paper" format with by line checksums for printed backups. For the
+  paper format, the import is an interactive process which checks each line as
+  soon as it is input.
+
+Other changes:
+
+- add "borg debug ..." subcommands
+  (borg debug-* still works, but will be removed in borg 1.1)
+- setup.py: Add subcommand support to build_usage.
+- remote: change exception message for unexpected RPC data format to indicate
+  dataflow direction.
+- vagrant:
+
+  - upgrade OSXfuse / FUSE for macOS to 3.5.2
+  - update Debian Wheezy boxes to 7.11
+- docs:
+
+  - add docs for "key export" and "key import" commands, #1641
+  - fix inconsistency in FAQ (pv-wrapper).
+  - fix second block in "Easy to use" section not showing on GitHub, #1576
+  - add bestpractices badge
+  - link reference docs and faq about BORG_FILES_CACHE_TTL, #1561
+  - improve borg info --help, explain size infos, #1532
+  - add release signing key / security contact to README, #1560
+  - add contribution guidelines for developers
+  - development.rst: add sphinx_rtd_theme to the sphinx install command
+  - adjust border color in borg.css
+  - add debug-info usage help file
+  - internals.rst: fix typos
+  - setup.py: fix build_usage to always process all commands
+- tests:
+
+  - work around fuse xattr test issue with recent fakeroot
+  - simplify repo/hashindex tests
+  - travis: test fuse-enabled borg, use trusty to have a recent FUSE
+  - re-enable fuse tests for RemoteArchiver (no deadlocks any more)
+
+
 Version 1.0.7 (2016-08-19)
 --------------------------
 

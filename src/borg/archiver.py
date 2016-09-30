@@ -16,6 +16,7 @@ import traceback
 from binascii import unhexlify
 from datetime import datetime
 from itertools import zip_longest
+from operator import attrgetter
 
 from .logger import create_logger, setup_logging
 logger = create_logger()
@@ -28,7 +29,8 @@ from .cache import Cache
 from .constants import *  # NOQA
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError
-from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec, PrefixSpec
+from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
+from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter, format_time, format_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex
 from .helpers import prune_within, prune_split
@@ -768,11 +770,31 @@ class Archiver:
 
     @with_repository(exclusive=True, manifest=False)
     def do_delete(self, args, repository):
-        """Delete an existing repository or archive"""
+        """Delete an existing repository or archives"""
+        if any((args.location.archive, args.first, args.last, args.prefix)):
+            return self._delete_archives(args, repository)
+        else:
+            return self._delete_repository(args, repository)
+
+    def _delete_archives(self, args, repository):
+        """Delete archives"""
+        manifest, key = Manifest.load(repository)
+
         if args.location.archive:
-            manifest, key = Manifest.load(repository)
-            with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
-                archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
+            archive_names = (args.location.archive,)
+        else:
+            archive_names = tuple(x.name for x in self._get_filtered_archives(args, manifest))
+            if not archive_names:
+                return self.exit_code
+
+        stats_logger = logging.getLogger('borg.output.stats')
+        if args.stats:
+            log_multi(DASHES, STATS_HEADER, logger=stats_logger)
+
+        with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
+            for i, archive_name in enumerate(archive_names, 1):
+                logger.info('Deleting {} ({}/{}):'.format(archive_name, i, len(archive_names)))
+                archive = Archive(repository, key, manifest, archive_name, cache=cache)
                 stats = Statistics()
                 archive.delete(stats, progress=args.progress, forced=args.forced)
                 manifest.write()
@@ -780,33 +802,41 @@ class Archiver:
                 cache.commit()
                 logger.info("Archive deleted.")
                 if args.stats:
-                    log_multi(DASHES,
-                              STATS_HEADER,
-                              stats.summary.format(label='Deleted data:', stats=stats),
-                              str(cache),
-                              DASHES, logger=logging.getLogger('borg.output.stats'))
-        else:
-            if not args.cache_only:
-                msg = []
-                try:
-                    manifest, key = Manifest.load(repository)
-                except NoManifestError:
-                    msg.append("You requested to completely DELETE the repository *including* all archives it may contain.")
-                    msg.append("This repository seems to have no manifest, so we can't tell anything about its contents.")
-                else:
-                    msg.append("You requested to completely DELETE the repository *including* all archives it contains:")
-                    for archive_info in manifest.archives.list(sort_by='ts'):
-                        msg.append(format_archive(archive_info))
-                msg.append("Type 'YES' if you understand this and want to continue: ")
-                msg = '\n'.join(msg)
-                if not yes(msg, false_msg="Aborting.", invalid_msg='Invalid answer, aborting.', truish=('YES', ),
-                           retry=False, env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'):
-                    self.exit_code = EXIT_ERROR
-                    return self.exit_code
-                repository.destroy()
-                logger.info("Repository deleted.")
-            Cache.destroy(repository)
-            logger.info("Cache deleted.")
+                    log_multi(stats.summary.format(label='Deleted data:', stats=stats),
+                              DASHES, logger=stats_logger)
+                if not args.forced and self.exit_code:
+                    break
+            if args.stats:
+                stats_logger.info(str(cache))
+
+        return self.exit_code
+
+    def _delete_repository(self, args, repository):
+        """Delete a repository"""
+        if not args.cache_only:
+            msg = []
+            try:
+                manifest, key = Manifest.load(repository)
+            except NoManifestError:
+                msg.append("You requested to completely DELETE the repository *including* all archives it may "
+                           "contain.")
+                msg.append("This repository seems to have no manifest, so we can't tell anything about its "
+                           "contents.")
+            else:
+                msg.append("You requested to completely DELETE the repository *including* all archives it "
+                           "contains:")
+                for archive_info in manifest.archives.list(sort_by='ts'):
+                    msg.append(format_archive(archive_info))
+            msg.append("Type 'YES' if you understand this and want to continue: ")
+            msg = '\n'.join(msg)
+            if not yes(msg, false_msg="Aborting.", invalid_msg='Invalid answer, aborting.', truish=('YES',),
+                       retry=False, env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'):
+                self.exit_code = EXIT_ERROR
+                return self.exit_code
+            repository.destroy()
+            logger.info("Repository deleted.")
+        Cache.destroy(repository)
+        logger.info("Cache deleted.")
         return self.exit_code
 
     @with_repository()
@@ -849,45 +879,62 @@ class Archiver:
             write = sys.stdout.buffer.write
 
         if args.location.archive:
-            matcher, _ = self.build_matcher(args.excludes, args.paths)
-            with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
-                archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
-                                  consider_part_files=args.consider_part_files)
-
-                if args.format is not None:
-                    format = args.format
-                elif args.short:
-                    format = "{path}{NL}"
-                else:
-                    format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
-                formatter = ItemFormatter(archive, format)
-
-                for item in archive.iter_items(lambda item: matcher.match(item.path)):
-                    write(safe_encode(formatter.format_item(item)))
+            return self._list_archive(args, repository, manifest, key, write)
         else:
+            return self._list_repository(args, manifest, write)
+
+    def _list_archive(self, args, repository, manifest, key, write):
+        matcher, _ = self.build_matcher(args.excludes, args.paths)
+        with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
+            archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
+                              consider_part_files=args.consider_part_files)
             if args.format is not None:
                 format = args.format
             elif args.short:
-                format = "{archive}{NL}"
+                format = "{path}{NL}"
             else:
-                format = "{archive:<36} {time} [{id}]{NL}"
-            formatter = ArchiveFormatter(format)
+                format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
+            formatter = ItemFormatter(archive, format)
 
-            for archive_info in manifest.archives.list(sort_by='ts'):
-                if args.prefix and not archive_info.name.startswith(args.prefix):
-                    continue
-                write(safe_encode(formatter.format_item(archive_info)))
+            for item in archive.iter_items(lambda item: matcher.match(item.path)):
+                write(safe_encode(formatter.format_item(item)))
+        return self.exit_code
+
+    def _list_repository(self, args, manifest, write):
+        if args.format is not None:
+            format = args.format
+        elif args.short:
+            format = "{archive}{NL}"
+        else:
+            format = "{archive:<36} {time} [{id}]{NL}"
+        formatter = ArchiveFormatter(format)
+
+        for archive_info in self._get_filtered_archives(args, manifest):
+            write(safe_encode(formatter.format_item(archive_info)))
 
         return self.exit_code
 
     @with_repository(cache=True)
     def do_info(self, args, repository, manifest, key, cache):
         """Show archive details such as disk space used"""
+        if any((args.location.archive, args.first, args.last, args.prefix)):
+            return self._info_archives(args, repository, manifest, key, cache)
+        else:
+            return self._info_repository(cache)
+
+    def _info_archives(self, args, repository, manifest, key, cache):
         def format_cmdline(cmdline):
             return remove_surrogates(' '.join(shlex.quote(x) for x in cmdline))
 
         if args.location.archive:
-            archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
+            archive_names = (args.location.archive,)
+        else:
+            archive_names = tuple(x.name for x in self._get_filtered_archives(args, manifest))
+            if not archive_names:
+                return self.exit_code
+
+        for i, archive_name in enumerate(archive_names, 1):
+            archive = Archive(repository, key, manifest, archive_name, cache=cache,
                               consider_part_files=args.consider_part_files)
             stats = archive.calc_stats(cache)
             print('Archive name: %s' % archive.name)
@@ -904,9 +951,15 @@ class Archiver:
             print(STATS_HEADER)
             print(str(stats))
             print(str(cache))
-        else:
-            print(STATS_HEADER)
-            print(str(cache))
+            if self.exit_code:
+                break
+            if len(archive_names) - i:
+                print()
+        return self.exit_code
+
+    def _info_repository(self, cache):
+        print(STATS_HEADER)
+        print(str(cache))
         return self.exit_code
 
     @with_repository(exclusive=True)
@@ -1967,6 +2020,7 @@ class Archiver:
         subparser.add_argument('location', metavar='TARGET', nargs='?', default='',
                                type=location_validator(),
                                help='archive or repository to delete')
+        self.add_archives_filters_args(subparser)
 
         list_epilog = textwrap.dedent("""
         This command lists the contents of a repository or an archive.
@@ -1993,8 +2047,6 @@ class Archiver:
         subparser.add_argument('--format', '--list-format', dest='format', type=str,
                                help="""specify format for file listing
                                 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")""")
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec,
-                               help='only consider archive names starting with this prefix')
         subparser.add_argument('-e', '--exclude', dest='excludes',
                                type=parse_pattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
@@ -2006,6 +2058,7 @@ class Archiver:
                                help='repository/archive to list contents of')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to list; patterns are supported')
+        self.add_archives_filters_args(subparser)
 
         mount_epilog = textwrap.dedent("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -2071,6 +2124,7 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE',
                                type=location_validator(),
                                help='archive or repository to display information about')
+        self.add_archives_filters_args(subparser)
 
         break_lock_epilog = textwrap.dedent("""
         This command breaks the repository and cache locks.
@@ -2549,6 +2603,23 @@ class Archiver:
 
         return parser
 
+    @staticmethod
+    def add_archives_filters_args(subparser):
+        filters_group = subparser.add_argument_group('filters', 'Archive filters can be applied to repository targets.')
+        filters_group.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec, default='',
+                                   help='only consider archive names starting with this prefix')
+
+        sort_by_default = 'timestamp'
+        filters_group.add_argument('--sort-by', dest='sort_by', type=SortBySpec, default=sort_by_default,
+                                   help='Comma-separated list of sorting keys; valid keys are: {}; default is: {}'
+                                   .format(', '.join(HUMAN_SORT_KEYS), sort_by_default))
+
+        group = filters_group.add_mutually_exclusive_group()
+        group.add_argument('--first', dest='first', metavar='N', default=0, type=int,
+                           help='consider first N archives after other filters were applied')
+        group.add_argument('--last', dest='last', metavar='N', default=0, type=int,
+                           help='consider last N archives after other filters were applied')
+
     def get_args(self, argv, cmd):
         """usually, just returns argv, except if we deal with a ssh forced command for borg serve."""
         result = self.parse_args(argv[1:])
@@ -2610,6 +2681,21 @@ class Archiver:
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
         return args.func(args)
+
+    def _get_filtered_archives(self, args, manifest):
+        if args.location.archive:
+            raise Error('The options --first, --last and --prefix can only be used on repository targets.')
+
+        archives = manifest.archives.list(prefix=args.prefix)
+
+        for sortkey in reversed(args.sort_by.split(',')):
+            archives.sort(key=attrgetter(sortkey))
+        if args.last:
+            archives.reverse()
+
+        n = args.first or args.last or len(archives)
+
+        return archives[:n]
 
 
 def sig_info_handler(sig_no, stack):  # pragma: no cover

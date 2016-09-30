@@ -142,11 +142,16 @@ class Archives(abc.MutableMapping):
         name = safe_encode(name)
         del self._archives[name]
 
-    def list(self, sort_by=None, reverse=False):
-        # inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
-        archives = self.values()  # [self[name] for name in self]
+    def list(self, sort_by=None, reverse=False, prefix=''):
+        """
+        Inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
+        Returns list of borg.helpers.ArchiveInfo instances
+        """
+        archives = [x for x in self.values() if x.name.startswith(prefix)]
         if sort_by is not None:
-            archives = sorted(archives, key=attrgetter(sort_by), reverse=reverse)
+            archives = sorted(archives, key=attrgetter(sort_by))
+        if reverse:
+            archives.reverse()
         return archives
 
     def set_raw_dict(self, d):
@@ -568,10 +573,6 @@ def CompressionSpec(s):
     raise ValueError
 
 
-def PrefixSpec(s):
-    return replace_placeholders(s)
-
-
 def dir_is_cachedir(path):
     """Determines whether the specified path is a cache directory (and
     therefore should potentially be excluded from the backup) according to
@@ -653,6 +654,19 @@ def replace_placeholders(text):
         'borgversion': borg_version,
     }
     return format_line(text, data)
+
+PrefixSpec = replace_placeholders
+
+
+HUMAN_SORT_KEYS = ['timestamp'] + list(ArchiveInfo._fields)
+HUMAN_SORT_KEYS.remove('ts')
+
+
+def SortBySpec(text):
+    for token in text.split(','):
+        if token not in HUMAN_SORT_KEYS:
+            raise ValueError('Invalid sort key: %s' % token)
+    return text.replace('timestamp', 'ts')
 
 
 def safe_timestamp(item_timestamp_ns):

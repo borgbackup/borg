@@ -80,7 +80,7 @@ class PlaceholderError(Error):
 
 def check_extension_modules():
     from . import platform
-    if hashindex.API_VERSION != 2:
+    if hashindex.API_VERSION != 3:
         raise ExtensionModuleError
     if chunker.API_VERSION != 2:
         raise ExtensionModuleError

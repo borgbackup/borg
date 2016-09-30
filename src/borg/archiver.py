@@ -2616,9 +2616,9 @@ class Archiver:
 
         group = filters_group.add_mutually_exclusive_group()
         group.add_argument('--first', dest='first', metavar='N', default=0, type=int,
-                           help='consider first N archives after other filter args were applied')
+                           help='consider first N archives after other filters were applied')
         group.add_argument('--last', dest='last', metavar='N', default=0, type=int,
-                           help='consider last N archives after other filter args were applied')
+                           help='consider last N archives after other filters were applied')
 
     def get_args(self, argv, cmd):
         """usually, just returns argv, except if we deal with a ssh forced command for borg serve."""
@@ -2687,10 +2687,6 @@ class Archiver:
             raise Error('The options --first, --last and --prefix can only be used on repository targets.')
 
         archives = manifest.archives.list(prefix=args.prefix)
-        if not archives:
-            logger.critical('There are no archives.')
-            self.exit_code = self.exit_code or EXIT_WARNING
-            return []
 
         for sortkey in reversed(args.sort_by.split(',')):
             archives.sort(key=attrgetter(sortkey))

@@ -143,8 +143,9 @@ class Archives(abc.MutableMapping):
         del self._archives[name]
 
     def list(self, sort_by=None, reverse=False, prefix=''):
-        """ Inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
-            Returns list of borg.helpers.ArchiveInfo instances
+        """
+        Inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
+        Returns list of borg.helpers.ArchiveInfo instances
         """
         archives = [x for x in self.values() if x.name.startswith(prefix)]
         if sort_by is not None:

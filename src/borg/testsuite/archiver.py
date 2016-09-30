@@ -1826,7 +1826,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test', 'input')
         self.cmd('delete', '--first', '1', '--last', '1', self.repository_location, fork=True, exit_code=2)
 
-
     def test_key_export_keyfile(self):
         export_file = self.output_path + '/exported'
         self.cmd('init', self.repository_location, '--encryption', 'keyfile')

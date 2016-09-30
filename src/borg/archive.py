@@ -1,4 +1,5 @@
 import errno
+import io
 import os
 import socket
 import stat
@@ -22,7 +23,7 @@ from .chunker import Chunker
 from .compress import Compressor
 from .constants import *  # NOQA
 from .hashindex import ChunkIndex, ChunkIndexEntry
-from .helpers import Manifest
+from .helpers import Manifest, slice_chunks
 from .helpers import Chunk, ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError
 from .helpers import uid2user, user2uid, gid2group, group2gid
@@ -428,7 +429,7 @@ Number of files: {0.stats.nfiles}'''.format(
         return stats
 
     def extract_item(self, item, restore_attrs=True, dry_run=False, stdout=False, sparse=False,
-                     hardlink_masters=None, stripped_components=0, original_path=None, pi=None):
+                     hardlink_masters=None, complete_partial=False, stripped_components=0, original_path=None, pi=None):
         """
         Extract archive item.
 
@@ -437,6 +438,7 @@ Number of files: {0.stats.nfiles}'''.format(
         :param dry_run: do not write any data
         :param stdout: write extracted data to stdout
         :param sparse: write sparse files (chunk-granularity, independent of the original being sparse)
+        :param complete_partial: False: replace files, True: existing files are completed
         :param hardlink_masters: maps paths to (chunks, link_target) for extracting subtrees with hardlinks correctly
         :param stripped_components: stripped leading path components to correct hard link extraction
         :param original_path: 'path' key as stored in archive
@@ -466,14 +468,15 @@ Number of files: {0.stats.nfiles}'''.format(
         # Attempt to remove existing files, ignore errors on failure
         try:
             st = os.lstat(path)
-            if stat.S_ISDIR(st.st_mode):
-                os.rmdir(path)
-            else:
-                os.unlink(path)
+            if not complete_partial:
+                if stat.S_ISDIR(st.st_mode):
+                    os.rmdir(path)
+                else:
+                    os.unlink(path)
         except UnicodeEncodeError:
             raise self.IncompatibleFilesystemEncodingError(path, sys.getfilesystemencoding()) from None
         except OSError:
-            pass
+            st = None
         mode = item.mode
         if stat.S_ISREG(mode):
             with backup_io():
@@ -496,9 +499,30 @@ Number of files: {0.stats.nfiles}'''.format(
                     return
                 # Extract chunks, since the item which had the chunks was not extracted
             with backup_io():
-                fd = open(path, 'wb')
+                if complete_partial and st is not None:
+                    # Open existing file for updating
+                    # Note that 'ab' wouldn't work on e.g. NetBSD, since seeking would be meaningless for writes.
+                    # However, r+b requires the file to exist. Therefore we need to distinguish the two cases here.
+                    fd = open(path, 'r+b')
+                else:
+                    fd = open(path, 'wb')
             with fd:
-                ids = [c.id for c in item.chunks]
+                chunks = item.chunks
+                if complete_partial:
+                    with backup_io():
+                        fd.seek(0, io.SEEK_END)
+                        existing_length = fd.tell()
+                        # Slice chunks by current length of the existing file.
+                        chunks, prefix_length = slice_chunks(chunks, maximum_length=existing_length)
+                        # We don't bother extracting fractional chunks. Just seek to a chunk boundary.
+                        fd.seek(prefix_length)
+                        fd.truncate()
+                    discarded_count = len(item.chunks) - len(chunks)
+                    discarded_chunks_ids = [c.id for c in item.chunks[:discarded_count]]
+                    self.repository.discard_preload(discarded_chunks_ids)
+                    if pi:
+                        pi.show(increase=prefix_length)
+                ids = [c.id for c in chunks]
                 for _, data in self.pipeline.fetch_many(ids, is_preloaded=True):
                     if pi:
                         pi.show(increase=len(data))

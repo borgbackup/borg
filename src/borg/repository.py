@@ -805,6 +805,14 @@ class Repository:
         """Preload objects (only applies to remote repositories)
         """
 
+    def discard_preload(self, discard_ids):
+        """
+        Ignore/stop preloading objects (only applies to remote repositories).
+
+        Be warned: trying to get_many() anything from discard_ids while specifying is_preloaded=True *will*
+        deadlock with remote repositories.
+        """
+
 
 class LoggedIO:
 

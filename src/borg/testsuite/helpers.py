@@ -10,7 +10,8 @@ import msgpack
 import msgpack.fallback
 
 from .. import platform
-from ..helpers import Location
+from ..cache import ChunkListEntry
+from ..helpers import Location, slice_chunks
 from ..helpers import Buffer
 from ..helpers import partial_format, format_file_size, parse_file_size, format_timedelta, format_line, PlaceholderError, replace_placeholders
 from ..helpers import make_path_safe, clean_lines
@@ -1081,3 +1082,29 @@ def test_swidth_slice_mixed_characters():
     string = '나윤a선나윤선나윤선나윤선나윤선'
     assert swidth_slice(string, 5) == '나윤a'
     assert swidth_slice(string, 6) == '나윤a'
+
+
+class TestSliceChunks:
+    @staticmethod
+    def chunk(size):
+        return ChunkListEntry(None, size, 0)
+
+    @pytest.mark.parametrize('chunks, offset, expected_chunks, expected_prefix_length', (
+        # Edge case: offset exactly on chunk boundary
+        ([(1, 1000), (2, 500)], 1000, [(2, 500)], 1000),
+        ([(1, 1000), (2, 500)], 999, [(1, 1000), (2, 500)], 0),
+        ([(1, 1000), (2, 500)], 1001, [(2, 500)], 1000),
+
+        # Edge case: offset completely consumes
+        ([(1, 1000), (2, 500)], 1500, [], 1500),
+        ([(1, 1000), (2, 500)], 1499, [(2, 500)], 1000),
+
+        # Edge case: offset > length of chunks
+        ([(1, 1000), (2, 500)], 1501, [], 1500),
+    ))
+    def test_basic(self, chunks, offset, expected_chunks, expected_prefix_length):
+        chunks = [ChunkListEntry(id, size, 0) for id, size in chunks]
+        expected_chunks = [ChunkListEntry(id, size, 0) for id, size in expected_chunks]
+        chunks, remaing_offset = slice_chunks(chunks, offset)
+        assert chunks == expected_chunks
+        assert remaing_offset == expected_prefix_length

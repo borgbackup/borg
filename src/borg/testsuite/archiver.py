@@ -736,6 +736,32 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd("extract", self.repository_location + "::test", "fm:input/file1", "fm:*file33*", "input/file2")
         self.assert_equal(sorted(os.listdir("output/input")), ["file1", "file2", "file333"])
 
+    def test_extract_continue(self):
+        self.cmd('init', self.repository_location)
+        self.create_regular_file('file1', size=1024 * 80)
+        self.create_regular_file('file2', size=1024 * 100)
+        self.cmd('create', self.repository_location + '::test', 'input')
+
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+            with open('input/file1', 'ab') as file:
+                file.truncate(1234)
+            with open('input/file2', 'ab') as file:
+                file.write(b'extra bytes')
+            self.cmd('extract', self.repository_location + '::test', '--continue')
+        self.assert_dirs_equal('input', 'output/input')
+
+        shutil.rmtree('output/input')
+
+        with changedir('output'):
+            os.mkdir('input')
+            with open('input/file1', 'ab') as file:
+                file.truncate(1234)
+            with open('input/file2', 'ab') as file:
+                file.write(b'extra bytes')
+            self.cmd('extract', self.repository_location + '::test')
+        self.assert_dirs_equal('input', 'output/input')
+
     def test_extract_list_output(self):
         self.cmd('init', self.repository_location)
         self.create_regular_file('file', size=1024 * 80)

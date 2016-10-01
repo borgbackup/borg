@@ -277,6 +277,7 @@ def run_tests(boxname)
     if which pyenv > /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
       pyenv global 3.4.0 3.5.0
+      pyenv local 3.4.0 3.5.0
     fi
     # otherwise: just use the system python
     if which fakeroot > /dev/null; then

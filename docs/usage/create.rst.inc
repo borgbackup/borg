@@ -61,18 +61,9 @@ Archive options
     ``--chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE``
         | specify the chunker parameters. default: 19,23,21,4095
     ``-C COMPRESSION``, ``--compression COMPRESSION``
-        | select compression algorithm (and level):
-        | none == no compression (default),
-        | auto,C[,L] == built-in heuristic (try with lz4 whether the data is
-        |               compressible) decides between none or C[,L] - with C[,L]
-        |               being any valid compression algorithm (and optional level),
-        | lz4 == lz4,
-        | zlib == zlib (default level 6),
-        | zlib,0 .. zlib,9 == zlib (with level 0..9),
-        | lzma == lzma (default level 6),
-        | lzma,0 .. lzma,9 == lzma (with level 0..9).
+        | select compression algorithm, see the output of the "borg help compression" command for details.
     ``--compression-from COMPRESSIONCONFIG``
-        | read compression patterns from COMPRESSIONCONFIG, one per line
+        | read compression patterns from COMPRESSIONCONFIG, see the output of the "borg help compression" command for details.
 
 Description
 ~~~~~~~~~~~

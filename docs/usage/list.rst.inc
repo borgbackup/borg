@@ -20,8 +20,6 @@ optional arguments
     ``--format``, ``--list-format``
         | specify format for file listing
         |                                 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")
-    ``-P``, ``--prefix``
-        | only consider archive names starting with this prefix
     ``-e PATTERN``, ``--exclude PATTERN``
         | exclude paths matching PATTERN
     ``--exclude-from EXCLUDEFILE``
@@ -29,6 +27,16 @@ optional arguments
 
 `Common options`_
     |
+
+filters
+    ``-P``, ``--prefix``
+        | only consider archive names starting with this prefix
+    ``--sort-by``
+        | Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
+    ``--first N``
+        | consider first N archives after other filters were applied
+    ``--last N``
+        | consider last N archives after other filters were applied
 
 Description
 ~~~~~~~~~~~

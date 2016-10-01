@@ -12,6 +12,33 @@ Yes, the `deduplication`_ technique used by
 |project_name| makes sure only the modified parts of the file are stored.
 Also, we have optional simple sparse file support for extract.
 
+If you use tools like Borg (or rsync, tar, cp and most other backup tools) to backup
+virtual machines, then these should be turned off for doing so, since Borg doesn't do
+*any* kind of snapshotting on it's own. Backing up live VMs this way can (and will)
+result in corrupted or inconsistent backup contents; a VM image is just a regular file,
+with the same issues as regular files when it comes to concurrent reading at writing from
+the same file.
+
+A better method is to use file system snapshots on the hosts, which establishes
+crash-consistency for the VM images. This means that with most file systems
+(that are journaling) the FS will always be fine in the backup (but may need a
+journal replay to become accessible).
+
+Usually this does not mean that file *contents* are consistent, since file contents
+are normally not journaled. Notable exceptions are ext4 in data=journal mode or ZFS.
+
+Applications designed with crash-consistency in mind (most relational databases
+like postgres, SQLite etc. but also for example Borg repositories) should always
+be able to recover to a consistent state from a backup created with
+crash-consistent snapshots.
+
+Hypervisor snapshots can also be used for backups and can be a better alternative to
+pure file system based snapshots of the VMs disk.
+
+Other applications may require a lot of work to reach that level: this is a broad
+and complex issue that cannot be explained in entirety here. Borg doesn't intend
+to address these issues do their huge complexity and platform dependency.
+
 Can I backup from multiple servers into a single repository?
 ------------------------------------------------------------
 

@@ -1,13 +1,10 @@
-import errno
 import json
 import os
-import socket
-import sys
 import time
 
+from . import platform
 from .helpers import Error, ErrorWithTraceback
 from .logger import create_logger
-from .platform import process_alive, get_process_id
 
 ADD, REMOVE = 'add', 'remove'
 SHARED, EXCLUSIVE = 'shared', 'exclusive'
@@ -107,7 +104,7 @@ class ExclusiveLock:
         self.timeout = timeout
         self.sleep = sleep
         self.path = os.path.abspath(path)
-        self.id = id or get_process_id()
+        self.id = id or platform.get_process_id()
         self.unique_name = os.path.join(self.path, "%s.%d-%x" % self.id)
         self.ok_to_kill_stale_locks = kill_stale_locks
         self.stale_warning_printed = False
@@ -170,7 +167,7 @@ class ExclusiveLock:
                 # It's safer to just exit
                 return False
 
-            if not process_alive(host, pid, thread):
+            if not platform.process_alive(host, pid, thread):
                 return False
 
             if not self.ok_to_kill_stale_locks:
@@ -216,7 +213,7 @@ class LockRoster:
     """
     def __init__(self, path, id=None, kill_stale_locks=False):
         self.path = path
-        self.id = id or get_process_id()
+        self.id = id or platform.get_process_id()
         self.ok_to_kill_zombie_locks = kill_stale_locks
 
     def load(self):
@@ -231,7 +228,7 @@ class LockRoster:
                     try:
                         for e in data[key]:
                             (host, pid, thread) = e
-                            if not process_alive(host, pid, thread):
+                            if not platform.process_alive(host, pid, thread):
                                 elements.add(tuple(e))
                             else:
                                 logger.warning('Removed stale %s roster lock for pid %d.', key, pid)
@@ -297,7 +294,7 @@ class Lock:
         self.is_exclusive = exclusive
         self.sleep = sleep
         self.timeout = timeout
-        self.id = id or get_process_id()
+        self.id = id or platform.get_process_id()
         # globally keeping track of shared and exclusive lockers:
         self._roster = LockRoster(path + '.roster', id=id, kill_stale_locks=kill_stale_locks)
         # an exclusive lock, used for:

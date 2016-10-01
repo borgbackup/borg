@@ -263,7 +263,7 @@ def build_binary_with_pyinstaller(boxname)
     cd /vagrant/borg
     . borg-env/bin/activate
     cd borg
-    pyinstaller -F -n borg.exe --distpath=/vagrant/borg --clean borg/__main__.py
+    pyinstaller --clean --distpath=/vagrant/borg scripts/borg.exe.spec
   EOF
 end
 

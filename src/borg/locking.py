@@ -6,47 +6,11 @@ import sys
 import time
 
 from .helpers import Error, ErrorWithTraceback
+from .platform import process_alive, get_process_id
 
 ADD, REMOVE = 'add', 'remove'
 SHARED, EXCLUSIVE = 'shared', 'exclusive'
 
-# only determine the PID and hostname once.
-# for FUSE mounts, we fork a child process that needs to release
-# the lock made by the parent, so it needs to use the same PID for that.
-_pid = os.getpid()
-_hostname = socket.gethostname()
-
-
-def get_id():
-    """Get identification tuple for 'us'"""
-
-    # If changing the thread_id to ever be non-zero, also revisit the check_lock_stale() below.
-    thread_id = 0
-    return _hostname, _pid, thread_id
-
-
-def check_lock_stale(host, pid, thread):
-    """Check if the host, pid, thread combination corresponds to a dead process on our local node or not."""
-    if host != _hostname:
-        return False
-
-    if thread != 0:
-        # Currently thread is always 0, if we ever decide to set this to a non-zero value, this code needs to be revisited too to do a sensible thing
-        return False
-
-    try:
-        # This may not work in Windows.
-        # This does not kill anything, 0 means "see if we can send a signal to this process or not".
-        # Possible errors: No such process (== stale lock) or permission denied (not a stale lock)
-        # If the exception is not raised that means such a pid is valid and we can send a signal to it (== not a stale lock too).
-        os.kill(pid, 0)
-        return False
-    except OSError as err:
-        if err.errno != errno.ESRCH:
-            return False
-        pass
-
-    return True
 
 
 class TimeoutTimer:
@@ -141,7 +105,7 @@ class ExclusiveLock:
         self.timeout = timeout
         self.sleep = sleep
         self.path = os.path.abspath(path)
-        self.id = id or get_id()
+        self.id = id or get_process_id()
         self.unique_name = os.path.join(self.path, "%s.%d-%x" % self.id)
         self.ok_to_kill_stale_locks = kill_stale_locks
         self.stale_warning_printed = False
@@ -194,7 +158,6 @@ class ExclusiveLock:
 
     def kill_stale_lock(self):
         for name in os.listdir(self.path):
-
             try:
                 host_pid, thread_str = name.rsplit('-', 1)
                 host, pid_str = host_pid.rsplit('.', 1)
@@ -205,7 +168,7 @@ class ExclusiveLock:
                 # It's safer to just exit
                 return False
 
-            if not check_lock_stale(host, pid, thread):
+            if not process_alive(host, pid, thread):
                 return False
 
             if not self.ok_to_kill_stale_locks:
@@ -249,7 +212,7 @@ class LockRoster:
     """
     def __init__(self, path, id=None, kill_stale_locks=False):
         self.path = path
-        self.id = id or get_id()
+        self.id = id or get_process_id()
         self.ok_to_kill_zombie_locks = kill_stale_locks
 
     def load(self):
@@ -264,7 +227,7 @@ class LockRoster:
                     try:
                         for e in data[key]:
                             (host, pid, thread) = e
-                            if not check_lock_stale(host, pid, thread):
+                            if not process_alive(host, pid, thread):
                                 elements.add(tuple(e))
                             else:
                                 print(("Removed stale %s roster lock for pid %d." % (key, pid)), file=sys.stderr)
@@ -330,7 +293,7 @@ class Lock:
         self.is_exclusive = exclusive
         self.sleep = sleep
         self.timeout = timeout
-        self.id = id or get_id()
+        self.id = id or get_process_id()
         # globally keeping track of shared and exclusive lockers:
         self._roster = LockRoster(path + '.roster', id=id, kill_stale_locks=kill_stale_locks)
         # an exclusive lock, used for:

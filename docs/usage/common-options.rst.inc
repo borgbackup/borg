@@ -24,5 +24,7 @@
         | set umask to M (local and remote, default: 0077)
     ``--remote-path PATH``
         | set remote path to executable (default: "borg")
+    ``--remote-ratelimit rate``
+        | set remote network upload rate limit in kiByte/s (default: 0=unlimited)
     ``--consider-part-files``
         | treat part files like normal files (e.g. to list/extract them)

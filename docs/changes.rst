@@ -50,8 +50,8 @@ The best check that everything is ok is to run a dry-run extraction::
     borg extract -v --dry-run REPO::ARCHIVE
 
 
-Version 1.1.0b2 (not released yet)
-----------------------------------
+Version 1.1.0b2 (2016-10-01)
+----------------------------
 
 Bug fixes:
 
@@ -71,13 +71,19 @@ New features:
 - borg help compression, #1582
 - borg check: delete chunks with integrity errors, #1575, so they can be
   "repaired" immediately and maybe healed later.
+- archives filters concept (refactoring/unifying older code)
+
+  - covers --first/--last/--prefix/--sort-by options
+  - currently used for borg list/info/delete
 
 Other changes:
 
 - borg check --verify-data slightly tuned (use get_many())
-- Change {utcnow} and {now} to ISO-8601 format ("T" date/time separator)
+- change {utcnow} and {now} to ISO-8601 format ("T" date/time separator)
 - repo check: log transaction IDs, improve object count mismatch diagnostic
 - Vagrantfile: use TW's fresh-bootloader pyinstaller branch
+- fix module names in api.rst
+- hashindex: bump api_version
 
 
 Version 1.1.0b1 (2016-08-28)

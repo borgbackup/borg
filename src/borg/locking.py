@@ -6,11 +6,13 @@ import sys
 import time
 
 from .helpers import Error, ErrorWithTraceback
+from .logger import create_logger
 from .platform import process_alive, get_process_id
 
 ADD, REMOVE = 'add', 'remove'
 SHARED, EXCLUSIVE = 'shared', 'exclusive'
 
+logger = create_logger(__name__)
 
 
 class TimeoutTimer:
@@ -173,16 +175,18 @@ class ExclusiveLock:
 
             if not self.ok_to_kill_stale_locks:
                 if not self.stale_warning_printed:
-                    print(("Found stale lock %s, but not deleting because BORG_UNIQUE_HOSTNAME is not set." % name), file=sys.stderr)
+                    # Log this at warning level to hint the user at the ability
+                    logger.warning("Found stale lock %s, but not deleting because BORG_UNIQUE_HOSTNAME is not set.", name)
                     self.stale_warning_printed = True
                 return False
 
             try:
                 os.unlink(os.path.join(self.path, name))
-                print(("Killed stale lock %s." % name), file=sys.stderr)
+                logger.warning('Killed stale lock %s.', name)
             except OSError as err:
                 if not self.stale_warning_printed:
-                    print(("Found stale lock %s, but cannot delete due to %s" % (name, str(err))), file=sys.stderr)
+                    # This error will bubble up and likely result in locking failure
+                    logger.error('Found stale lock %s, but cannot delete due to %s', name, str(err))
                     self.stale_warning_printed = True
                 return False
 
@@ -230,7 +234,7 @@ class LockRoster:
                             if not process_alive(host, pid, thread):
                                 elements.add(tuple(e))
                             else:
-                                print(("Removed stale %s roster lock for pid %d." % (key, pid)), file=sys.stderr)
+                                logger.warning('Removed stale %s roster lock for pid %d.', key, pid)
                         data[key] = list(list(e) for e in elements)
                     except KeyError:
                         pass

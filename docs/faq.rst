@@ -12,11 +12,11 @@ Yes, the `deduplication`_ technique used by
 |project_name| makes sure only the modified parts of the file are stored.
 Also, we have optional simple sparse file support for extract.
 
-If you use tools like Borg (or rsync, tar, cp and most other backup tools) to backup
-virtual machines, then these should be turned off for doing so, since Borg doesn't do
+If you use tools like Borg (or rsync, tar, cp and most other backup tools) to back
+virtual machines up, then these should be turned off for doing so, since Borg doesn't do
 *any* kind of snapshotting on it's own. Backing up live VMs this way can (and will)
-result in corrupted or inconsistent backup contents; a VM image is just a regular file,
-with the same issues as regular files when it comes to concurrent reading at writing from
+result in corrupted or inconsistent backup contents: a VM image is just a regular file to
+Borg with the same issues as regular files when it comes to concurrent reading and writing from
 the same file.
 
 A better method is to use file system snapshots on the hosts, which establishes
@@ -33,11 +33,14 @@ be able to recover to a consistent state from a backup created with
 crash-consistent snapshots.
 
 Hypervisor snapshots can also be used for backups and can be a better alternative to
-pure file system based snapshots of the VMs disk.
+pure file system based snapshots of the VMs disk, since no state is lost. Depending
+on the application this can be the easiest and most reliable way to create application-
+consistent backups.
 
-Other applications may require a lot of work to reach that level: this is a broad
-and complex issue that cannot be explained in entirety here. Borg doesn't intend
-to address these issues do their huge complexity and platform dependency.
+Other applications may require a lot of work to reach application-consistency:
+It's a broad and complex issue that cannot be explained in entirety here.
+
+Borg doesn't intend to address these issues do their huge complexity and platform/software dependency.
 
 Can I backup from multiple servers into a single repository?
 ------------------------------------------------------------

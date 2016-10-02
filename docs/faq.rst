@@ -12,7 +12,7 @@ Yes, the `deduplication`_ technique used by
 |project_name| makes sure only the modified parts of the file are stored.
 Also, we have optional simple sparse file support for extract.
 
-If you use tools like Borg (or most others) to back up virtual machines,
+If you use non-snapshotting backup tools like Borg to back up virtual machines,
 then these should be turned off for doing so, since Borg doesn't do
 *any* kind of snapshotting on its own. Backing up live VMs this way can (and will)
 result in corrupted or inconsistent backup contents: a VM image is just a regular file to

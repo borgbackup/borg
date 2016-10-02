@@ -12,8 +12,8 @@ Yes, the `deduplication`_ technique used by
 |project_name| makes sure only the modified parts of the file are stored.
 Also, we have optional simple sparse file support for extract.
 
-If you use tools like Borg (or rsync, tar, cp and most other backup tools) to back up
-virtual machines, then these should be turned off for doing so, since Borg doesn't do
+If you use tools like Borg (or most others) to back up virtual machines,
+then these should be turned off for doing so, since Borg doesn't do
 *any* kind of snapshotting on its own. Backing up live VMs this way can (and will)
 result in corrupted or inconsistent backup contents: a VM image is just a regular file to
 Borg with the same issues as regular files when it comes to concurrent reading and writing from
@@ -25,7 +25,8 @@ crash-consistency for the VM images. This means that with most file systems
 journal replay to become accessible).
 
 Usually this does not mean that file *contents* on the VM are consistent, since file
-contents are normally not journaled. Notable exceptions are ext4 in data=journal mode or ZFS.
+contents are normally not journaled. Notable exceptions are ext4 in data=journal mode,
+ZFS and btrfs (unless nodatacow is used).
 
 Applications designed with crash-consistency in mind (most relational databases
 like PostgreSQL, SQLite etc. but also for example Borg repositories) should always

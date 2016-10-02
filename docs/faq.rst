@@ -13,8 +13,7 @@ Yes, the `deduplication`_ technique used by
 Also, we have optional simple sparse file support for extract.
 
 If you use non-snapshotting backup tools like Borg to back up virtual machines,
-then these should be turned off for doing so, since Borg doesn't do
-*any* kind of snapshotting on its own. Backing up live VMs this way can (and will)
+then these should be turned off for doing so. Backing up live VMs this way can (and will)
 result in corrupted or inconsistent backup contents: a VM image is just a regular file to
 Borg with the same issues as regular files when it comes to concurrent reading and writing from
 the same file.

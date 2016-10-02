@@ -33,7 +33,7 @@ be able to recover to a consistent state from a backup created with
 crash-consistent snapshots (even on ext4 with data=writeback or XFS).
 
 Hypervisor snapshots capturing most of the VM's state can also be used for backups
-and can be a better alternative to pure file system based snapshots of the VMs disk,
+and can be a better alternative to pure file system based snapshots of the VM's disk,
 since no state is lost. Depending on the application this can be the easiest and most
 reliable way to create application-consistent backups.
 

@@ -130,8 +130,7 @@ class ExclusiveLock:
             except FileExistsError:  # already locked
                 if self.by_me():
                     return self
-                if self.kill_stale_lock():
-                    pass
+                self.kill_stale_lock()
                 if timer.timed_out_or_sleep():
                     raise LockTimeout(self.path)
             except OSError as err:
@@ -167,7 +166,7 @@ class ExclusiveLock:
                 # It's safer to just exit
                 return False
 
-            if not platform.process_alive(host, pid, thread):
+            if platform.process_alive(host, pid, thread):
                 return False
 
             if not self.ok_to_kill_stale_locks:
@@ -224,17 +223,17 @@ class LockRoster:
             # Just nuke the stale locks early on load
             if self.ok_to_kill_zombie_locks:
                 for key in (SHARED, EXCLUSIVE):
-                    elements = set()
                     try:
-                        for e in data[key]:
-                            (host, pid, thread) = e
-                            if not platform.process_alive(host, pid, thread):
-                                elements.add(tuple(e))
-                            else:
-                                logger.warning('Removed stale %s roster lock for pid %d.', key, pid)
-                        data[key] = list(list(e) for e in elements)
+                        entries = data[key]
                     except KeyError:
-                        pass
+                        continue
+                    elements = set()
+                    for host, pid, thread in entries:
+                        if platform.process_alive(host, pid, thread):
+                            elements.add((host, pid, thread))
+                        else:
+                            logger.warning('Removed stale %s roster lock for pid %d.', key, pid)
+                    data[key] = list(elements)
         except (FileNotFoundError, ValueError):
             # no or corrupt/empty roster file?
             data = {}

@@ -1,22 +1,25 @@
+import random
 import time
 
 import pytest
 
-from ..locking import get_id, TimeoutTimer, ExclusiveLock, Lock, LockRoster, \
-                      ADD, REMOVE, SHARED, EXCLUSIVE, LockTimeout
-
+from ..platform import get_process_id, process_alive
+from ..locking import TimeoutTimer, ExclusiveLock, Lock, LockRoster, \
+                      ADD, REMOVE, SHARED, EXCLUSIVE, LockTimeout, NotLocked, NotMyLock
 
 ID1 = "foo", 1, 1
 ID2 = "bar", 2, 2
 
 
-def test_id():
-    hostname, pid, tid = get_id()
-    assert isinstance(hostname, str)
-    assert isinstance(pid, int)
-    assert isinstance(tid, int)
-    assert len(hostname) > 0
-    assert pid > 0
+@pytest.fixture()
+def free_pid():
+    """Return a free PID not used by any process (naturally this is racy)"""
+    host, pid, tid = get_process_id()
+    while True:
+        # PIDs are often restricted to a small range. On Linux the range >32k is by default not used.
+        pid = random.randint(33000, 65000)
+        if not process_alive(host, pid, tid):
+            return pid
 
 
 class TestTimeoutTimer:
@@ -56,6 +59,22 @@ class TestExclusiveLock:
         with ExclusiveLock(lockpath, id=ID1):
             with pytest.raises(LockTimeout):
                 ExclusiveLock(lockpath, id=ID2, timeout=0.1).acquire()
+
+    def test_kill_stale(self, lockpath, free_pid):
+        host, pid, tid = our_id = get_process_id()
+        dead_id = host, free_pid, tid
+        cant_know_if_dead_id = 'foo.bar.example.net', 1, 2
+
+        dead_lock = ExclusiveLock(lockpath, id=dead_id).acquire()
+        with ExclusiveLock(lockpath, id=our_id, kill_stale_locks=True):
+            with pytest.raises(NotMyLock):
+                dead_lock.release()
+        with pytest.raises(NotLocked):
+            dead_lock.release()
+
+        with ExclusiveLock(lockpath, id=cant_know_if_dead_id):
+            with pytest.raises(LockTimeout):
+                ExclusiveLock(lockpath, id=our_id, kill_stale_locks=True, timeout=0.1).acquire()
 
 
 class TestLock:
@@ -117,6 +136,25 @@ class TestLock:
             with pytest.raises(LockTimeout):
                 Lock(lockpath, exclusive=True, id=ID2, timeout=0.1).acquire()
 
+    def test_kill_stale(self, lockpath, free_pid):
+        host, pid, tid = our_id = get_process_id()
+        dead_id = host, free_pid, tid
+        cant_know_if_dead_id = 'foo.bar.example.net', 1, 2
+
+        dead_lock = Lock(lockpath, id=dead_id, exclusive=True).acquire()
+        roster = dead_lock._roster
+        with Lock(lockpath, id=our_id, kill_stale_locks=True):
+            assert roster.get(EXCLUSIVE) == set()
+            assert roster.get(SHARED) == {our_id}
+        assert roster.get(EXCLUSIVE) == set()
+        assert roster.get(SHARED) == set()
+        with pytest.raises(KeyError):
+            dead_lock.release()
+
+        with Lock(lockpath, id=cant_know_if_dead_id, exclusive=True):
+            with pytest.raises(LockTimeout):
+                Lock(lockpath, id=our_id, kill_stale_locks=True, timeout=0.1).acquire()
+
 
 @pytest.fixture()
 def rosterpath(tmpdir):
@@ -144,3 +182,28 @@ class TestLockRoster:
         roster2 = LockRoster(rosterpath, id=ID2)
         roster2.modify(SHARED, REMOVE)
         assert roster2.get(SHARED) == set()
+
+    def test_kill_stale(self, rosterpath, free_pid):
+        host, pid, tid = our_id = get_process_id()
+        dead_id = host, free_pid, tid
+
+        roster1 = LockRoster(rosterpath, id=dead_id)
+        assert roster1.get(SHARED) == set()
+        roster1.modify(SHARED, ADD)
+        assert roster1.get(SHARED) == {dead_id}
+
+        cant_know_if_dead_id = 'foo.bar.example.net', 1, 2
+        roster1 = LockRoster(rosterpath, id=cant_know_if_dead_id)
+        assert roster1.get(SHARED) == {dead_id}
+        roster1.modify(SHARED, ADD)
+        assert roster1.get(SHARED) == {dead_id, cant_know_if_dead_id}
+
+        killer_roster = LockRoster(rosterpath, kill_stale_locks=True)
+        # Did kill the dead processes lock (which was alive ... I guess?!)
+        assert killer_roster.get(SHARED) == {cant_know_if_dead_id}
+        killer_roster.modify(SHARED, ADD)
+        assert killer_roster.get(SHARED) == {our_id, cant_know_if_dead_id}
+
+        other_killer_roster = LockRoster(rosterpath, kill_stale_locks=True)
+        # Did not kill us, since we're alive
+        assert other_killer_roster.get(SHARED) == {our_id, cant_know_if_dead_id}

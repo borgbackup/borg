@@ -35,18 +35,23 @@ def get_process_id():
 
 
 def process_alive(host, pid, thread):
-    """Check if the (host, pid, thread_id) combination corresponds to a dead process on our local node or not."""
+    """
+    Check if the (host, pid, thread_id) combination corresponds to a potentially alive process.
+
+    If the process is local, then this will be accurate. If the process is not local, then this
+    returns always True, since there is no real way to check.
+    """
     from . import local_pid_alive
 
     if host != _hostname:
-        return False
+        return True
 
     if thread != 0:
         # Currently thread is always 0, if we ever decide to set this to a non-zero value,
         # this code needs to be revisited, too, to do a sensible thing
-        return False
+        return True
 
-    return local_pid_alive
+    return local_pid_alive(pid)
 
 def local_pid_alive(pid):
     """Return whether *pid* is alive."""

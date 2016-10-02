@@ -41,7 +41,9 @@ Other applications may require a lot of work to reach application-consistency:
 It's a broad and complex issue that cannot be explained in entirety here.
 
 Borg doesn't intend to address these issues due to their huge complexity
-and platform/software dependency.
+and platform/software dependency. Combining Borg with the mechanisms provided
+by the platform (snapshots, hypervisor features) will be the best approach
+to start tackling them.
 
 Can I backup from multiple servers into a single repository?
 ------------------------------------------------------------

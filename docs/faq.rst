@@ -18,7 +18,7 @@ result in corrupted or inconsistent backup contents: a VM image is just a regula
 Borg with the same issues as regular files when it comes to concurrent reading and writing from
 the same file.
 
-A better method is to use file system snapshots on the VM host, which establishes
+For backing up live VMs use file system snapshots on the VM host, which establishes
 crash-consistency for the VM images. This means that with most file systems
 (that are journaling) the FS will always be fine in the backup (but may need a
 journal replay to become accessible).

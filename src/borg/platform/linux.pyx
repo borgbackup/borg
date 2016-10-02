@@ -12,7 +12,7 @@ from .posix import swidth
 from libc cimport errno
 from libc.stdint cimport int64_t
 
-API_VERSION = 3
+API_VERSION = 4
 
 cdef extern from "sys/types.h":
     int ACL_TYPE_ACCESS

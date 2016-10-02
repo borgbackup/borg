@@ -54,6 +54,11 @@ Restrictions
 Borg is instructed to restrict clients into their own paths:
 ``borg serve --restrict-to-path /home/backup/repos/<client fqdn>``
 
+The client will be able to access any file or subdirectory inside of ``/home/backup/repos/<client fqdn>``
+but no other directories.  You can allow a client to access several directories by passing multiple
+`--restrict-to-path` flags, for instance: ``borg serve --restrict-to-path /home/backup/repos/<client fqdn>/root --restrict-to-path /home/backup/repos/<client fqdn>/home``,
+or instead simply use `--restrict-to-path` once to restrict the client to ``/home/backup/repos/<client fqdn>/*``.
+
 There is only one ssh key per client allowed. Keys are added for ``johndoe.clnt.local``, ``web01.srv.local`` and
 ``app01.srv.local``. But they will access the backup under only one UNIX user account as:
 ``backup@backup01.srv.local``. Every key in ``$HOME/.ssh/authorized_keys`` has a

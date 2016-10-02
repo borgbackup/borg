@@ -1011,7 +1011,8 @@ class Archiver:
                                           help='start repository server process')
         subparser.set_defaults(func=self.do_serve)
         subparser.add_argument('--restrict-to-path', dest='restrict_to_paths', action='append',
-                               metavar='PATH', help='restrict repository access to PATH')
+                               metavar='PATH', help='restrict repository access to PATH. '
+                                                    'Can be specified multiple times to allow the client access to several directories.')
         subparser.add_argument('--append-only', dest='append_only', action='store_true',
                                help='only allow appending to repository segment files')
         init_epilog = textwrap.dedent("""

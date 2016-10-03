@@ -27,3 +27,4 @@ elif sys.platform == 'win32':  # pragma: windows only
     from .windows import API_VERSION
     from .windows import sync_dir
     from .windows import get_owner, set_owner
+    from .windows import get_ads

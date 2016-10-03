@@ -51,6 +51,7 @@ from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 
 if sys.platform == 'win32':
     import posixpath
+    from .platform import get_ads
 
 
 def argument(args, str_or_bool):
@@ -409,6 +410,13 @@ class Archiver:
             else:
                 status = '-'  # dry run, item was not backed up
         self.print_file_status(status, path)
+        if sys.platform == 'win32':
+            if ':' not in os.path.basename(path):
+                for stream in get_ads(path):
+                    if stream != '::$DATA':
+                        self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
+                            keep_tag_files, skip_inodes, path + stream[:-6], restrict_dev,
+                            read_special, dry_run, st)
 
     @with_repository()
     @with_archive

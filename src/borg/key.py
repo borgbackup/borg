@@ -118,6 +118,7 @@ class KeyBase:
 
 class PlaintextKey(KeyBase):
     TYPE = 0x02
+    NAME = 'plaintext'
 
     chunk_seed = 0
 
@@ -281,6 +282,7 @@ class PassphraseKey(AESKeyBase):
     # - --encryption=passphrase is an invalid argument now
     # This class is kept for a while to support migration from passphrase to repokey mode.
     TYPE = 0x01
+    NAME = 'passphrase'
     iterations = 100000  # must not be changed ever!
 
     @classmethod
@@ -432,6 +434,7 @@ class KeyfileKeyBase(AESKeyBase):
 
 class KeyfileKey(KeyfileKeyBase):
     TYPE = 0x00
+    NAME = 'key file'
     FILE_ID = 'BORG_KEY'
 
     def sanity_check(self, filename, id):
@@ -491,6 +494,7 @@ class KeyfileKey(KeyfileKeyBase):
 
 class RepoKey(KeyfileKeyBase):
     TYPE = 0x03
+    NAME = 'repokey'
 
     def find_key(self):
         loc = self.repository._location.canonical_path()

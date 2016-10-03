@@ -920,7 +920,7 @@ class Archiver:
         if any((args.location.archive, args.first, args.last, args.prefix)):
             return self._info_archives(args, repository, manifest, key, cache)
         else:
-            return self._info_repository(cache)
+            return self._info_repository(repository, key, cache)
 
     def _info_archives(self, args, repository, manifest, key, cache):
         def format_cmdline(cmdline):
@@ -957,7 +957,17 @@ class Archiver:
                 print()
         return self.exit_code
 
-    def _info_repository(self, cache):
+    def _info_repository(self, repository, key, cache):
+        print('Repository ID: %s' % bin_to_hex(repository.id))
+        if key.NAME == 'plaintext':
+            encrypted = 'No'
+        else:
+            encrypted = 'Yes (%s)' % key.NAME
+        print('Encrypted: %s' % encrypted)
+        if key.NAME == 'key file':
+            print('Key file: %s' % key.find_key())
+        print('Cache: %s' % cache.path)
+        print(DASHES)
         print(STATS_HEADER)
         print(str(cache))
         return self.exit_code

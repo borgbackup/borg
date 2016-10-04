@@ -1045,8 +1045,12 @@ class ArchiveChecker:
         errors = 0
         defect_chunks = []
         pi = ProgressIndicatorPercent(total=count, msg="Verifying data %6.2f%%", step=0.01)
-        for chunk_infos in chunkit(self.chunks.iteritems(), 100):
-            chunk_ids = [chunk_id for chunk_id, _ in chunk_infos]
+        marker = None
+        while True:
+            chunk_ids = self.repository.scan(limit=100, marker=marker)
+            if not chunk_ids:
+                break
+            marker = chunk_ids[-1]
             chunk_data_iter = self.repository.get_many(chunk_ids)
             chunk_ids_revd = list(reversed(chunk_ids))
             while chunk_ids_revd:

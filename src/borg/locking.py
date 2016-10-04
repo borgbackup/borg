@@ -106,7 +106,7 @@ class ExclusiveLock:
         self.path = os.path.abspath(path)
         self.id = id or platform.get_process_id()
         self.unique_name = os.path.join(self.path, "%s.%d-%x" % self.id)
-        self.ok_to_kill_stale_locks = kill_stale_locks
+        self.kill_stale_locks = kill_stale_locks
         self.stale_warning_printed = False
 
     def __enter__(self):
@@ -163,16 +163,16 @@ class ExclusiveLock:
                 thread = int(thread_str)
             except ValueError:
                 # Malformed lock name? Or just some new format we don't understand?
-                # It's safer to just exit
+                # It's safer to just exit.
                 return False
 
             if platform.process_alive(host, pid, thread):
                 return False
 
-            if not self.ok_to_kill_stale_locks:
+            if not self.kill_stale_locks:
                 if not self.stale_warning_printed:
                     # Log this at warning level to hint the user at the ability
-                    logger.warning("Found stale lock %s, but not deleting because BORG_UNIQUE_HOSTNAME is not set.", name)
+                    logger.warning("Found stale lock %s, but not deleting because BORG_HOSTNAME_IS_UNIQUE is not set.", name)
                     self.stale_warning_printed = True
                 return False
 
@@ -213,7 +213,7 @@ class LockRoster:
     def __init__(self, path, id=None, kill_stale_locks=False):
         self.path = path
         self.id = id or platform.get_process_id()
-        self.ok_to_kill_zombie_locks = kill_stale_locks
+        self.kill_stale_locks = kill_stale_locks
 
     def load(self):
         try:
@@ -221,7 +221,7 @@ class LockRoster:
                 data = json.load(f)
 
             # Just nuke the stale locks early on load
-            if self.ok_to_kill_zombie_locks:
+            if self.kill_stale_locks:
                 for key in (SHARED, EXCLUSIVE):
                     try:
                         entries = data[key]
@@ -237,7 +237,6 @@ class LockRoster:
         except (FileNotFoundError, ValueError):
             # no or corrupt/empty roster file?
             data = {}
-
         return data
 
     def save(self, data):

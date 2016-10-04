@@ -1041,15 +1041,17 @@ class ArchiveChecker:
 
     def verify_data(self):
         logger.info('Starting cryptographic data integrity verification...')
-        count = len(self.chunks)
+        chunks_count_index = len(self.chunks)
+        chunks_count_segments = 0
         errors = 0
         defect_chunks = []
-        pi = ProgressIndicatorPercent(total=count, msg="Verifying data %6.2f%%", step=0.01)
+        pi = ProgressIndicatorPercent(total=chunks_count_index, msg="Verifying data %6.2f%%", step=0.01)
         marker = None
         while True:
             chunk_ids = self.repository.scan(limit=100, marker=marker)
             if not chunk_ids:
                 break
+            chunks_count_segments += len(chunk_ids)
             marker = chunk_ids[-1]
             chunk_data_iter = self.repository.get_many(chunk_ids)
             chunk_ids_revd = list(reversed(chunk_ids))
@@ -1078,6 +1080,10 @@ class ArchiveChecker:
                         logger.error('chunk %s, integrity error: %s', bin_to_hex(chunk_id), integrity_error)
                         defect_chunks.append(chunk_id)
         pi.finish()
+        if chunks_count_index != chunks_count_segments:
+            logger.error('Repo/Chunks index object count vs. segment files object count mismatch.')
+            logger.error('Repo/Chunks index: %d objects != segment files: %d objects',
+                         chunks_count_index, chunks_count_segments)
         if defect_chunks:
             if self.repair:
                 # if we kill the defect chunk here, subsequent actions within this "borg check"
@@ -1110,7 +1116,8 @@ class ArchiveChecker:
                 for defect_chunk in defect_chunks:
                     logger.debug('chunk %s is defect.', bin_to_hex(defect_chunk))
         log = logger.error if errors else logger.info
-        log('Finished cryptographic data integrity verification, verified %d chunks with %d integrity errors.', count, errors)
+        log('Finished cryptographic data integrity verification, verified %d chunks with %d integrity errors.',
+            chunks_count_segments, errors)
 
     def rebuild_manifest(self):
         """Rebuild the manifest object if it is missing

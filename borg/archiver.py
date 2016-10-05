@@ -767,7 +767,7 @@ class Archiver:
         else:
             try:
                 data = repository.get(id)
-            except repository.ObjectNotFound:
+            except Repository.ObjectNotFound:
                 print("object %s not found." % hex_id)
             else:
                 with open(args.path, "wb") as f:
@@ -801,7 +801,7 @@ class Archiver:
                     repository.delete(id)
                     modified = True
                     print("object %s deleted." % hex_id)
-                except repository.ObjectNotFound:
+                except Repository.ObjectNotFound:
                     print("object %s not found." % hex_id)
         if modified:
             repository.commit()

@@ -62,6 +62,7 @@ class RepositoryServer:  # pragma: no cover
         'destroy',
         'get',
         'list',
+        'scan',
         'negotiate',
         'open',
         'put',
@@ -466,6 +467,9 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
 
     def list(self, limit=None, marker=None):
         return self.call('list', limit, marker)
+
+    def scan(self, limit=None, marker=None):
+        return self.call('scan', limit, marker)
 
     def get(self, id_):
         for resp in self.get_many([id_]):

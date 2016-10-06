@@ -1,10 +1,10 @@
-from binascii import hexlify, unhexlify, a2b_base64, b2a_base64
+from binascii import unhexlify, a2b_base64, b2a_base64
 import binascii
 import textwrap
 from hashlib import sha256
 
 from .key import KeyfileKey, RepoKey, PassphraseKey, KeyfileNotFoundError, PlaintextKey
-from .helpers import Manifest, NoManifestError, Error, yes
+from .helpers import Manifest, NoManifestError, Error, yes, bin_to_hex
 from .repository import Repository
 
 
@@ -79,7 +79,7 @@ class KeyManager:
 
     def store_keyfile(self, target):
         with open(target, 'w') as fd:
-            fd.write('%s %s\n' % (KeyfileKey.FILE_ID, hexlify(self.repository.id).decode('ascii')))
+            fd.write('%s %s\n' % (KeyfileKey.FILE_ID, bin_to_hex(self.repository.id)))
             fd.write(self.keyblob)
             if not self.keyblob.endswith('\n'):
                 fd.write('\n')
@@ -103,7 +103,7 @@ class KeyManager:
         binary = a2b_base64(self.keyblob)
         export += 'BORG PAPER KEY v1\n'
         lines = (len(binary) + 17) // 18
-        repoid = hexlify(self.repository.id).decode('ascii')[:18]
+        repoid = bin_to_hex(self.repository.id)[:18]
         complete_checksum = sha256_truncated(binary, 12)
         export += 'id: {0:d} / {1} / {2} - {3}\n'.format(lines,
                                        grouped(repoid),
@@ -114,7 +114,7 @@ class KeyManager:
             idx += 1
             binline = binary[:18]
             checksum = sha256_truncated(idx.to_bytes(2, byteorder='big') + binline, 2)
-            export += '{0:2d}: {1} - {2}\n'.format(idx, grouped(hexlify(binline).decode('ascii')), checksum)
+            export += '{0:2d}: {1} - {2}\n'.format(idx, grouped(bin_to_hex(binline)), checksum)
             binary = binary[18:]
 
         if path:
@@ -125,7 +125,7 @@ class KeyManager:
 
     def import_keyfile(self, args):
         file_id = KeyfileKey.FILE_ID
-        first_line = file_id + ' ' + hexlify(self.repository.id).decode('ascii') + '\n'
+        first_line = file_id + ' ' + bin_to_hex(self.repository.id) + '\n'
         with open(args.path, 'r') as fd:
             file_first_line = fd.read(len(first_line))
             if file_first_line != first_line:
@@ -141,7 +141,7 @@ class KeyManager:
         # imported here because it has global side effects
         import readline
 
-        repoid = hexlify(self.repository.id).decode('ascii')[:18]
+        repoid = bin_to_hex(self.repository.id)[:18]
         try:
             while True:  # used for repeating on overall checksum mismatch
                 # id line input

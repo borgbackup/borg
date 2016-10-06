@@ -7,7 +7,7 @@ import textwrap
 from hmac import HMAC, compare_digest
 from hashlib import sha256, pbkdf2_hmac
 
-from .helpers import IntegrityError, get_keys_dir, Error, yes
+from .helpers import IntegrityError, get_keys_dir, Error, yes, bin_to_hex
 from .logger import create_logger
 logger = create_logger()
 
@@ -201,7 +201,7 @@ class Passphrase(str):
                 passphrase.encode('ascii')
             except UnicodeEncodeError:
                 print('Your passphrase (UTF-8 encoding in hex): %s' %
-                      hexlify(passphrase.encode('utf-8')).decode('ascii'),
+                      bin_to_hex(passphrase.encode('utf-8')),
                       file=sys.stderr)
                 print('As you have a non-ASCII passphrase, it is recommended to keep the UTF-8 encoding in hex together with the passphrase at a safe place.',
                       file=sys.stderr)
@@ -427,7 +427,7 @@ class KeyfileKey(KeyfileKeyBase):
     def save(self, target, passphrase):
         key_data = self._save(passphrase)
         with open(target, 'w') as fd:
-            fd.write('%s %s\n' % (self.FILE_ID, hexlify(self.repository_id).decode('ascii')))
+            fd.write('%s %s\n' % (self.FILE_ID, bin_to_hex(self.repository_id)))
             fd.write(key_data)
             fd.write('\n')
         self.target = target

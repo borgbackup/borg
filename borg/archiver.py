@@ -1,4 +1,4 @@
-from binascii import hexlify, unhexlify
+from binascii import unhexlify
 from datetime import datetime
 from hashlib import sha256
 from operator import attrgetter
@@ -18,7 +18,7 @@ import collections
 
 from . import __version__
 from .helpers import Error, location_validator, archivename_validator, format_line, format_time, format_file_size, \
-    parse_pattern, PathPrefixPattern, to_localtime, timestamp, safe_timestamp, \
+    parse_pattern, PathPrefixPattern, to_localtime, timestamp, safe_timestamp, bin_to_hex, \
     get_cache_dir, prune_within, prune_split, \
     Manifest, NoManifestError, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, PrefixSpec, is_slow_msgpack, yes, sysinfo, \
@@ -631,7 +631,7 @@ class Archiver:
         """Show archive details such as disk space used"""
         stats = archive.calc_stats(cache)
         print('Name:', archive.name)
-        print('Fingerprint: %s' % hexlify(archive.id).decode('ascii'))
+        print('Fingerprint: %s' % bin_to_hex(archive.id))
         print('Hostname:', archive.metadata[b'hostname'])
         print('Username:', archive.metadata[b'username'])
         print('Time (start): %s' % format_time(to_localtime(archive.ts)))
@@ -727,7 +727,7 @@ class Archiver:
         archive = Archive(repository, key, manifest, args.location.archive)
         for i, item_id in enumerate(archive.metadata[b'items']):
             data = key.decrypt(item_id, repository.get(item_id))
-            filename = '%06d_%s.items' % (i, hexlify(item_id).decode('ascii'))
+            filename = '%06d_%s.items' % (i, bin_to_hex(item_id))
             print('Dumping', filename)
             with open(filename, 'wb') as fd:
                 fd.write(data)
@@ -748,7 +748,7 @@ class Archiver:
                 cdata = repository.get(id)
                 give_id = id if id != Manifest.MANIFEST_ID else None
                 data = key.decrypt(give_id, cdata)
-                filename = '%06d_%s.obj' % (i, hexlify(id).decode('ascii'))
+                filename = '%06d_%s.obj' % (i, bin_to_hex(id))
                 print('Dumping', filename)
                 with open(filename, 'wb') as fd:
                     fd.write(data)

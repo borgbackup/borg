@@ -1,4 +1,3 @@
-from binascii import hexlify
 import datetime
 import logging
 logger = logging.getLogger(__name__)
@@ -6,7 +5,7 @@ import os
 import shutil
 import time
 
-from .helpers import get_keys_dir, get_cache_dir, ProgressIndicatorPercent
+from .helpers import get_keys_dir, get_cache_dir, ProgressIndicatorPercent, bin_to_hex
 from .locking import Lock
 from .repository import Repository, MAGIC
 from .key import KeyfileKey, KeyfileNotFoundError
@@ -188,8 +187,8 @@ class AtticRepositoryUpgrader(Repository):
         attic_cache_dir = os.environ.get('ATTIC_CACHE_DIR',
                                          os.path.join(os.path.expanduser('~'),
                                                       '.cache', 'attic'))
-        attic_cache_dir = os.path.join(attic_cache_dir, hexlify(self.id).decode('ascii'))
-        borg_cache_dir = os.path.join(get_cache_dir(), hexlify(self.id).decode('ascii'))
+        attic_cache_dir = os.path.join(attic_cache_dir, bin_to_hex(self.id))
+        borg_cache_dir = os.path.join(get_cache_dir(), bin_to_hex(self.id))
 
         def copy_cache_file(path):
             """copy the given attic cache path into the borg directory
@@ -263,7 +262,7 @@ class AtticKeyfileKey(KeyfileKey):
            assume the repository has been opened by the archiver yet
         """
         get_keys_dir = cls.get_keys_dir
-        id = hexlify(repository.id).decode('ascii')
+        id = bin_to_hex(repository.id)
         keys_dir = get_keys_dir()
         if not os.path.exists(keys_dir):
             raise KeyfileNotFoundError(repository.path, keys_dir)
@@ -313,7 +312,7 @@ class Borg0xxKeyfileKey(KeyfileKey):
     @classmethod
     def find_key_file(cls, repository):
         get_keys_dir = cls.get_keys_dir
-        id = hexlify(repository.id).decode('ascii')
+        id = bin_to_hex(repository.id)
         keys_dir = get_keys_dir()
         if not os.path.exists(keys_dir):
             raise KeyfileNotFoundError(repository.path, keys_dir)

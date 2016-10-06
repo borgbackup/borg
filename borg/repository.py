@@ -1,5 +1,5 @@
 from configparser import ConfigParser
-from binascii import hexlify, unhexlify
+from binascii import unhexlify
 from datetime import datetime
 from itertools import islice
 import errno
@@ -12,7 +12,7 @@ import struct
 from zlib import crc32
 
 import msgpack
-from .helpers import Error, ErrorWithTraceback, IntegrityError, Location, ProgressIndicatorPercent
+from .helpers import Error, ErrorWithTraceback, IntegrityError, Location, ProgressIndicatorPercent, bin_to_hex
 from .hashindex import NSIndex
 from .locking import Lock, LockError, LockErrorT
 from .lrucache import LRUCache
@@ -109,7 +109,7 @@ class Repository:
         config.set('repository', 'segments_per_dir', str(self.DEFAULT_SEGMENTS_PER_DIR))
         config.set('repository', 'max_segment_size', str(self.DEFAULT_MAX_SEGMENT_SIZE))
         config.set('repository', 'append_only', str(int(self.append_only)))
-        config.set('repository', 'id', hexlify(os.urandom(32)).decode('ascii'))
+        config.set('repository', 'id', bin_to_hex(os.urandom(32)))
         self.save_config(path, config)
 
     def save_config(self, path, config):

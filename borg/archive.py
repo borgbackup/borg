@@ -1,4 +1,3 @@
-from binascii import hexlify
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from getpass import getuser
@@ -17,7 +16,7 @@ import sys
 import time
 from io import BytesIO
 from . import xattr
-from .helpers import Error, uid2user, user2uid, gid2group, group2gid, \
+from .helpers import Error, uid2user, user2uid, gid2group, group2gid, bin_to_hex, \
     parse_timestamp, to_localtime, format_time, format_timedelta, remove_surrogates, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
     ProgressIndicatorPercent
@@ -254,7 +253,7 @@ class Archive:
 
     @property
     def fpr(self):
-        return hexlify(self.id).decode('ascii')
+        return bin_to_hex(self.id)
 
     @property
     def duration(self):
@@ -522,7 +521,7 @@ Number of files: {0.stats.nfiles}'''.format(
             try:
                 self.cache.chunk_decref(id, stats)
             except KeyError:
-                cid = hexlify(id).decode('ascii')
+                cid = bin_to_hex(id)
                 raise ChunksIndexError(cid)
             except Repository.ObjectNotFound as e:
                 # object not in repo - strange, but we wanted to delete it anyway.
@@ -1010,7 +1009,7 @@ class ArchiveChecker:
                 return _state
 
             def report(msg, chunk_id, chunk_no):
-                cid = hexlify(chunk_id).decode('ascii')
+                cid = bin_to_hex(chunk_id)
                 msg += ' [chunk: %06d_%s]' % (chunk_no, cid)  # see debug-dump-archive-items
                 self.error_found = True
                 logger.error(msg)

@@ -3,14 +3,14 @@ from .remote import cache_if_remote
 from collections import namedtuple
 import os
 import stat
-from binascii import hexlify, unhexlify
+from binascii import unhexlify
 import shutil
 
 from .key import PlaintextKey
 from .logger import create_logger
 logger = create_logger()
 from .helpers import Error, get_cache_dir, decode_dict, int_to_bigint, \
-    bigint_to_int, format_file_size, yes
+    bigint_to_int, format_file_size, yes, bin_to_hex
 from .locking import Lock
 from .hashindex import ChunkIndex
 
@@ -34,13 +34,13 @@ class Cache:
 
     @staticmethod
     def break_lock(repository, path=None):
-        path = path or os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
+        path = path or os.path.join(get_cache_dir(), bin_to_hex(repository.id))
         Lock(os.path.join(path, 'lock'), exclusive=True).break_lock()
 
     @staticmethod
     def destroy(repository, path=None):
         """destroy the cache for ``repository`` or at ``path``"""
-        path = path or os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
+        path = path or os.path.join(get_cache_dir(), bin_to_hex(repository.id))
         config = os.path.join(path, 'config')
         if os.path.exists(config):
             os.remove(config)  # kill config first
@@ -55,7 +55,7 @@ class Cache:
         self.repository = repository
         self.key = key
         self.manifest = manifest
-        self.path = path or os.path.join(get_cache_dir(), hexlify(repository.id).decode('ascii'))
+        self.path = path or os.path.join(get_cache_dir(), bin_to_hex(repository.id))
         self.do_files = do_files
         # Warn user before sending data to a never seen before unencrypted repository
         if not os.path.exists(self.path):
@@ -122,7 +122,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         config = configparser.ConfigParser(interpolation=None)
         config.add_section('cache')
         config.set('cache', 'version', '1')
-        config.set('cache', 'repository', hexlify(self.repository.id).decode('ascii'))
+        config.set('cache', 'repository', bin_to_hex(self.repository.id))
         config.set('cache', 'manifest', '')
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             config.write(fd)
@@ -208,7 +208,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     if age == 0 and bigint_to_int(item[3]) < self._newest_mtime or \
                        age > 0 and age < ttl:
                         msgpack.pack((path_hash, item), fd)
-        self.config.set('cache', 'manifest', hexlify(self.manifest.id).decode('ascii'))
+        self.config.set('cache', 'manifest', bin_to_hex(self.manifest.id))
         self.config.set('cache', 'timestamp', self.manifest.timestamp)
         self.config.set('cache', 'key_type', str(self.key.TYPE))
         self.config.set('cache', 'previous_location', self.repository._location.canonical_path())
@@ -251,7 +251,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         archive_path = os.path.join(self.path, 'chunks.archive.d')
 
         def mkpath(id, suffix=''):
-            id_hex = hexlify(id).decode('ascii')
+            id_hex = bin_to_hex(id)
             path = os.path.join(archive_path, id_hex + suffix)
             return path.encode('utf-8')
 

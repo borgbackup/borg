@@ -1,4 +1,5 @@
 import argparse
+from binascii import hexlify
 from collections import namedtuple
 import contextlib
 from functools import wraps
@@ -757,6 +758,10 @@ def safe_decode(s, coding='utf-8', errors='surrogateescape'):
 def safe_encode(s, coding='utf-8', errors='surrogateescape'):
     """encode str to bytes, with round-tripping "invalid" bytes"""
     return s.encode(coding, errors)
+
+
+def bin_to_hex(binary):
+    return hexlify(binary).decode('ascii')
 
 
 class Location:

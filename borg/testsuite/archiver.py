@@ -1,4 +1,4 @@
-from binascii import hexlify, unhexlify, b2a_base64
+from binascii import unhexlify, b2a_base64
 from configparser import ConfigParser
 import errno
 import os
@@ -21,7 +21,7 @@ from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP, flags_noatime, flags_
 from ..archiver import Archiver
 from ..cache import Cache
 from ..crypto import bytes_to_long, num_aes_blocks
-from ..helpers import Manifest, PatternMatcher, parse_pattern, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
+from ..helpers import Manifest, PatternMatcher, parse_pattern, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, bin_to_hex
 from ..key import RepoKey, KeyfileKey, Passphrase
 from ..keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..remote import RemoteRepository, PathNotAllowed
@@ -409,7 +409,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def _set_repository_id(self, path, id):
         config = ConfigParser(interpolation=None)
         config.read(os.path.join(path, 'config'))
-        config.set('repository', 'id', hexlify(id).decode('ascii'))
+        config.set('repository', 'id', bin_to_hex(id))
         with open(os.path.join(path, 'config'), 'w') as fd:
             config.write(fd)
         with Repository(self.repository_path) as repository:
@@ -1205,7 +1205,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with open(export_file, 'r') as fd:
             export_contents = fd.read()
 
-        assert export_contents.startswith('BORG_KEY ' + hexlify(repo_id).decode() + '\n')
+        assert export_contents.startswith('BORG_KEY ' + bin_to_hex(repo_id) + '\n')
 
         key_file = self.keys_path + '/' + os.listdir(self.keys_path)[0]
 
@@ -1232,7 +1232,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with open(export_file, 'r') as fd:
             export_contents = fd.read()
 
-        assert export_contents.startswith('BORG_KEY ' + hexlify(repo_id).decode() + '\n')
+        assert export_contents.startswith('BORG_KEY ' + bin_to_hex(repo_id) + '\n')
 
         with Repository(self.repository_path) as repository:
             repo_key = RepoKey(repository)

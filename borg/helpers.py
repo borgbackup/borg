@@ -64,7 +64,7 @@ class ErrorWithTraceback(Error):
 
 
 class IntegrityError(ErrorWithTraceback):
-    """Data integrity error"""
+    """Data integrity error: {}"""
 
 
 class ExtensionModuleError(Error):

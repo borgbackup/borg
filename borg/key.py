@@ -105,10 +105,10 @@ class PlaintextKey(KeyBase):
 
     def decrypt(self, id, data):
         if data[0] != self.TYPE:
-            raise IntegrityError('Invalid encryption envelope')
+            raise IntegrityError('Chunk %s: Invalid encryption envelope' % bin_to_hex(id))
         data = self.compressor.decompress(memoryview(data)[1:])
         if id and sha256(data).digest() != id:
-            raise IntegrityError('Chunk id verification failed')
+            raise IntegrityError('Chunk %s: id verification failed' % bin_to_hex(id))
         return data
 
 
@@ -142,24 +142,24 @@ class AESKeyBase(KeyBase):
     def decrypt(self, id, data):
         if not (data[0] == self.TYPE or
             data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
-            raise IntegrityError('Invalid encryption envelope')
+            raise IntegrityError('Chunk %s: Invalid encryption envelope' % bin_to_hex(id))
         hmac_given = memoryview(data)[1:33]
         hmac_computed = memoryview(HMAC(self.enc_hmac_key, memoryview(data)[33:], sha256).digest())
         if not compare_digest(hmac_computed, hmac_given):
-            raise IntegrityError('Encryption envelope checksum mismatch')
+            raise IntegrityError('Chunk %s: Encryption envelope checksum mismatch' % bin_to_hex(id))
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
         data = self.compressor.decompress(self.dec_cipher.decrypt(data[41:]))
         if id:
             hmac_given = id
             hmac_computed = HMAC(self.id_key, data, sha256).digest()
             if not compare_digest(hmac_computed, hmac_given):
-                raise IntegrityError('Chunk id verification failed')
+                raise IntegrityError('Chunk %s: Chunk id verification failed' % bin_to_hex(id))
         return data
 
     def extract_nonce(self, payload):
         if not (payload[0] == self.TYPE or
             payload[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
-            raise IntegrityError('Invalid encryption envelope')
+            raise IntegrityError('Manifest: Invalid encryption envelope')
         nonce = bytes_to_long(payload[33:41])
         return nonce
 

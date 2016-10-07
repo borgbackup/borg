@@ -1937,10 +1937,11 @@ class Archiver:
                                help='paths to extract; patterns are supported')
 
         diff_epilog = textwrap.dedent("""
-            This command finds differences in files (contents, user, group, mode) between archives.
+            This command finds differences (file contents, user/group/mode) between archives.
 
-            Both archives need to be in the same repository, and a repository location may only
-            be specified for ARCHIVE1.
+            A repository location and an archive name must be specified for REPO_ARCHIVE1.
+            ARCHIVE2 is just another archive name in same repository (no repository location
+            allowed).
 
             For archives created with Borg 1.1 or newer diff automatically detects whether
             the archives are created with the same chunker params. If so, only chunk IDs
@@ -1974,14 +1975,14 @@ class Archiver:
         subparser.add_argument('--sort', dest='sort',
                                action='store_true', default=False,
                                help='Sort the output lines by file path.')
-        subparser.add_argument('location', metavar='ARCHIVE1',
+        subparser.add_argument('location', metavar='REPO_ARCHIVE1',
                                type=location_validator(archive=True),
-                               help='archive')
+                               help='repository location and ARCHIVE1 name')
         subparser.add_argument('archive2', metavar='ARCHIVE2',
                                type=archivename_validator(),
-                               help='archive to compare with ARCHIVE1 (no repository location)')
+                               help='ARCHIVE2 name (no repository location allowed)')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to compare; patterns are supported')
+                               help='paths of items inside the archives to compare; patterns are supported')
 
         rename_epilog = textwrap.dedent("""
         This command renames an archive in the repository.

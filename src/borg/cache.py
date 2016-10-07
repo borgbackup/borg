@@ -321,6 +321,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     os.unlink(fn_tmp)
                 else:
                     os.rename(fn_tmp, fn)
+                    os.rename(fn_tmp + '.signature', fn + '.signature')
             return chunk_idx
 
         def lookup_name(archive_id):

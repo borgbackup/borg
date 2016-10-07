@@ -216,7 +216,7 @@ class RemoteRepository:
         self.preload_ids = []
         self.msgid = 0
         self.to_send = b''
-        self.cache = {}
+        self.chunkid_to_msgids = {}
         self.ignore_responses = set()
         self.responses = {}
         self.ratelimit = SleepingBandwidthLimiter(args.remote_ratelimit * 1024 if args and args.remote_ratelimit else 0)
@@ -350,10 +350,10 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
         if not calls:
             return
 
-        def fetch_from_cache(args):
-            msgid = self.cache[args].pop(0)
-            if not self.cache[args]:
-                del self.cache[args]
+        def pop_preload_msgid(chunkid):
+            msgid = self.chunkid_to_msgids[chunkid].pop(0)
+            if not self.chunkid_to_msgids[chunkid]:
+                del self.chunkid_to_msgids[chunkid]
             return msgid
 
         def handle_error(error, res):
@@ -424,21 +424,23 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 while not self.to_send and (calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT:
                     if calls:
                         if is_preloaded:
-                            if calls[0] in self.cache:
-                                waiting_for.append(fetch_from_cache(calls.pop(0)))
+                            assert cmd == "get", "is_preload is only supported for 'get'"
+                            if calls[0][0] in self.chunkid_to_msgids:
+                                waiting_for.append(pop_preload_msgid(calls.pop(0)[0]))
                         else:
                             args = calls.pop(0)
-                            if cmd == 'get' and args in self.cache:
-                                waiting_for.append(fetch_from_cache(args))
+                            if cmd == 'get' and args[0] in self.chunkid_to_msgids:
+                                waiting_for.append(pop_preload_msgid(args[0]))
                             else:
                                 self.msgid += 1
                                 waiting_for.append(self.msgid)
                                 self.to_send = msgpack.packb((1, self.msgid, cmd, args))
                     if not self.to_send and self.preload_ids:
-                        args = (self.preload_ids.pop(0),)
+                        chunk_id = self.preload_ids.pop(0)
+                        args = (chunk_id,)
                         self.msgid += 1
-                        self.cache.setdefault(args, []).append(self.msgid)
-                        self.to_send = msgpack.packb((1, self.msgid, cmd, args))
+                        self.chunkid_to_msgids.setdefault(chunk_id, []).append(self.msgid)
+                        self.to_send = msgpack.packb((1, self.msgid, 'get', args))
 
                 if self.to_send:
                     try:

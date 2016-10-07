@@ -83,5 +83,5 @@ class SignedFile(FileLikeWrapper):
                     'algorithm': self.signer.NAME,
                     'signatures': self.signatures,
                 }, fd)
-        else:
+        elif self.signatures:
             logger.debug('Verified signature of %s', self.path)

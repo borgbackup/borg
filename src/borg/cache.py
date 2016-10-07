@@ -21,6 +21,7 @@ from .key import PlaintextKey
 from .locking import Lock
 from .platform import SaveFile
 from .remote import cache_if_remote
+from .signature import SignedFile
 
 ChunkListEntry = namedtuple('ChunkListEntry', 'id size csize')
 FileCacheEntry = namedtuple('FileCacheEntry', 'age inode size mtime chunk_ids')
@@ -146,7 +147,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         config.set('cache', 'manifest', '')
         with SaveFile(os.path.join(self.path, 'config')) as fd:
             config.write(fd)
-        ChunkIndex().write(os.path.join(self.path, 'chunks').encode('utf-8'))
+        ChunkIndex().write(self.repository.id, os.path.join(self.path, 'chunks'))
         os.makedirs(os.path.join(self.path, 'chunks.archive.d'))
         with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
             pass  # empty file
@@ -170,7 +171,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         self.timestamp = self.config.get('cache', 'timestamp', fallback=None)
         self.key_type = self.config.get('cache', 'key_type', fallback=None)
         self.previous_location = self.config.get('cache', 'previous_location', fallback=None)
-        self.chunks = ChunkIndex.read(os.path.join(self.path, 'chunks').encode('utf-8'))
+        self.chunks = ChunkIndex.read(self.repository.id, os.path.join(self.path, 'chunks'))
         self.files = None
 
     def open(self, lock_wait=None):
@@ -188,7 +189,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         self.files = {}
         self._newest_mtime = 0
         logger.debug('Reading files cache ...')
-        with open(os.path.join(self.path, 'files'), 'rb') as fd:
+        with SignedFile(self.repository.id, os.path.join(self.path, 'files'), write=False) as fd:
             u = msgpack.Unpacker(use_list=True)
             while True:
                 data = fd.read(64 * 1024)
@@ -218,7 +219,8 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             return
         if self.files is not None:
             ttl = int(os.environ.get('BORG_FILES_CACHE_TTL', 20))
-            with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
+            files_path = os.path.join(self.path, 'files')
+            with SignedFile(self.repository.id, files_path, write=True) as fd:
                 for path_hash, item in self.files.items():
                     # Only keep files seen in this backup that are older than newest mtime seen in this backup -
                     # this is to avoid issues with filesystem snapshots and mtime granularity.
@@ -233,7 +235,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         self.config.set('cache', 'previous_location', self.repository._location.canonical_path())
         with SaveFile(os.path.join(self.path, 'config')) as fd:
             self.config.write(fd)
-        self.chunks.write(os.path.join(self.path, 'chunks').encode('utf-8'))
+        self.chunks.write(self.repository.id, os.path.join(self.path, 'chunks'))
         os.rename(os.path.join(self.path, 'txn.active'),
                   os.path.join(self.path, 'txn.tmp'))
         shutil.rmtree(os.path.join(self.path, 'txn.tmp'))
@@ -272,7 +274,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         def mkpath(id, suffix=''):
             id_hex = bin_to_hex(id)
             path = os.path.join(archive_path, id_hex + suffix)
-            return path.encode('utf-8')
+            return path
 
         def cached_archives():
             if self.do_cache:
@@ -314,7 +316,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 fn = mkpath(archive_id)
                 fn_tmp = mkpath(archive_id, suffix='.tmp')
                 try:
-                    chunk_idx.write(fn_tmp)
+                    chunk_idx.write(self.repository.id, fn_tmp, filename=fn)
                 except Exception:
                     os.unlink(fn_tmp)
                 else:
@@ -343,7 +345,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     if archive_id in cached_ids:
                         archive_chunk_idx_path = mkpath(archive_id)
                         logger.info("Reading cached archive chunk index for %s ..." % archive_name)
-                        archive_chunk_idx = ChunkIndex.read(archive_chunk_idx_path)
+                        archive_chunk_idx = ChunkIndex.read(self.repository.id, archive_chunk_idx_path)
                     else:
                         logger.info('Fetching and building archive index for %s ...' % archive_name)
                         archive_chunk_idx = fetch_and_build_idx(archive_id, repository, self.key)

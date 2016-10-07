@@ -3,7 +3,7 @@ from binascii import hexlify, unhexlify
 
 from ..crypto import AES, bytes_to_long, bytes_to_int, long_to_bytes, hmac_sha256
 from ..crypto import increment_iv, bytes16_to_int, int_to_bytes16
-from ..crypto import StreamSigner_HMAC_SHA512
+from ..crypto import StreamSigner_HMAC_SHA512_REPOID
 
 from . import BaseTestCase
 
@@ -83,21 +83,21 @@ class CryptoTestCase(BaseTestCase):
                          '85f0faa3e578f8077a2e3ff46729665b')
         assert hmac_sha256(key, data) == hmac
 
-    def test_StreamSigner_HMAC_SHA512_write(self):
+    def test_StreamSigner_HMAC_SHA512_REPOID_write(self):
         # Standard test vectors don't apply, since we add the length of the data into the MAC
         fd = io.BytesIO()
         key = b'\x0b' * 20
-        ss = StreamSigner_HMAC_SHA512(key, fd, write=True)
+        ss = StreamSigner_HMAC_SHA512_REPOID(key, fd, write=True)
         with ss:
             ss.write(unhexlify('12345678'))
         assert ss.signature() == unhexlify('760c9a20dfccc132d30ec838ba19b3989f2a41201236623f07bf923c67aeccc1'
                                            'e3245709f2508455cddea55f168b84b90563d5016065830793b31f9deb8e4687')
 
-    def test_StreamSigner_HMAC_SHA512_read(self):
+    def test_StreamSigner_HMAC_SHA512_REPOID_read(self):
         data = unhexlify('12345678')
         fd = io.BytesIO(data)
         key = b'\x0b' * 20
-        ss = StreamSigner_HMAC_SHA512(key, fd, write=True)
+        ss = StreamSigner_HMAC_SHA512_REPOID(key, fd, write=False)
         with ss:
             assert ss.read() == data
         assert ss.signature() == unhexlify('760c9a20dfccc132d30ec838ba19b3989f2a41201236623f07bf923c67aeccc1'

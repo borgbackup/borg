@@ -507,7 +507,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         return sorted(int(n) for n in os.listdir(os.path.join(self.tmppath, 'repository', 'data', '0')) if n.isdigit())[-1]
 
     def open_index(self):
-        return NSIndex.read(os.path.join(self.tmppath, 'repository', 'index.{}'.format(self.get_head())))
+        return NSIndex.read(self.repository.id, os.path.join(self.tmppath, 'repository', 'index.{}'.format(self.get_head())))
 
     def corrupt_object(self, id_):
         idx = self.open_index()
@@ -578,9 +578,9 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.assert_raises(Repository.CheckNeeded, lambda: self.get_objects(4))
         self.check(status=False)
         self.check(status=False)
-        self.assert_equal(self.list_indices(), ['index.1'])
+        self.assert_equal(self.list_indices(), ['index.1.signature', 'index.1'])
         self.check(repair=True, status=True)
-        self.assert_equal(self.list_indices(), ['index.3'])
+        self.assert_equal(self.list_indices(), ['index.3.signature', 'index.3'])
         self.check(status=True)
         self.get_objects(3)
         self.assert_equal(set([1, 2, 3]), self.list_objects())
@@ -594,10 +594,10 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
     def test_repair_index_too_new(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
-        self.assert_equal(self.list_indices(), ['index.3'])
+        self.assert_equal(self.list_indices(), ['index.3.signature', 'index.3'])
         self.rename_index('index.100')
         self.check(status=True)
-        self.assert_equal(self.list_indices(), ['index.3'])
+        self.assert_equal(self.list_indices(), ['index.3.signature', 'index.3'])
         self.get_objects(4)
         self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
 

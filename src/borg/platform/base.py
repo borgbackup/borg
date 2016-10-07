@@ -1,4 +1,5 @@
 import errno
+import io
 import os
 
 """
@@ -89,7 +90,8 @@ class SyncFile:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
+        self.fd.__exit__(exc_type, exc_val, exc_tb)
+        #self.close()
 
     def write(self, data):
         self.fd.write(data)
@@ -111,6 +113,12 @@ class SyncFile:
         self.sync()
         self.fd.close()
         platform.sync_dir(os.path.dirname(self.fd.name))
+
+    def tell(self):
+        return self.fd.tell()
+
+    def seek(self, offset, whence=io.SEEK_SET):
+        return self.fd.seek(offset, whence)
 
 
 class SaveFile:
@@ -138,11 +146,12 @@ class SaveFile:
         except FileNotFoundError:
             pass
         self.fd = platform.SyncFile(self.tmppath, self.binary)
-        return self.fd
+        return self.fd.__enter__()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         from .. import platform
-        self.fd.close()
+        self.fd.__exit__(exc_type, exc_val, exc_tb)
+        #self.fd.close()
         if exc_type is not None:
             os.unlink(self.tmppath)
             return

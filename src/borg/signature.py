@@ -1,9 +1,8 @@
-
 import json
 import os
 from hmac import compare_digest
 
-from .crypto import StreamSigner_HMAC_SHA512, FileLikeWrapper
+from .crypto import StreamSigner_HMAC_SHA512_REPOID, FileLikeWrapper
 from .helpers import bin_to_hex
 from .helpers import Error
 from .logger import create_logger
@@ -11,30 +10,30 @@ logger = create_logger()
 
 
 class SignatureError(Error):
-    """Invalid signature for {}."""
+    """Invalid signature for {}"""
 
 
 class SignedFile(FileLikeWrapper):
     # generic enough that it can be used without a KeyBase
-    def __init__(self, key, path, write):
+    def __init__(self, key, path, write, filename=None, override_fd=None):
         self.path = path
         self.writing = write
         mode = 'wb' if write else 'rb'
-        self.file_fd = open(path, mode)
-        self.signer = StreamSigner_HMAC_SHA512(key, self.file_fd, write)
+        self.file_fd = override_fd or open(path, mode)
+        self.signer = StreamSigner_HMAC_SHA512_REPOID(key, self.file_fd, write)
         self.fd = self.signer  # for FileLikeWrapper
-        self.sign_filename()
+        self.sign_filename(filename)
         if write:
             self.signatures = {}
         else:
             self.signatures = self.read_signatures(path, self.signer)
 
-    def sign_filename(self):
+    def sign_filename(self, filename=None):
         # Sign the name of the file as well, but only the basename, ie. not the path. In Borg
         # the name itself encodes the context (eg. index.N, cache, files), while the path doesn't matter,
         # and moving eg. a repository or cache directory is supported.
         # Changing the name however imbues a change of context that is not permissible.
-        filename = os.path.basename(self.path)
+        filename = os.path.basename(filename or self.path)
         self.signer.update(str(len(filename)).encode())
         self.signer.update(filename.encode())
 
@@ -50,7 +49,7 @@ class SignedFile(FileLikeWrapper):
                 # Provisions for agility now, implementation later, but make sure the on-disk joint is oiled.
                 algorithm = signature['algorithm']
                 if algorithm != signer.NAME:
-                    logger.info('Cannot verify signature for %s: Unknown algorithm %r', path, algorithm)
+                    logger.warning('Cannot verify signature for %s: Unknown algorithm %r', path, algorithm)
                     return
                 signatures = signature['signatures']
                 # Require at least presence of the final signature
@@ -72,13 +71,17 @@ class SignedFile(FileLikeWrapper):
             raise SignatureError(self.path)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        no_exception = exc_type is None
-        if no_exception:
+        exception = exc_type is not None
+        if not exception:
             self.sign_part('final', is_final=True)
         self.signer.__exit__(exc_type, exc_val, exc_tb)
-        if no_exception and self.writing:
+        if exception:
+            return
+        if self.writing:
             with open(self.signature_path(self.path), 'w') as fd:
                 json.dump({
                     'algorithm': self.signer.NAME,
                     'signatures': self.signatures,
                 }, fd)
+        else:
+            logger.debug('Verified signature of %s', self.path)

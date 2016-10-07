@@ -222,10 +222,16 @@ class FileLikeWrapper:
         return self.fd.seek(offset, whence)
 
     def write(self, data):
-        self.fd.write(data)
+        return self.fd.write(data)
 
     def read(self, n=None):
         return self.fd.read(n)
+
+    def flush(self):
+        self.fd.flush()
+
+    def fileno(self):
+        return self.fd.fileno()
 
 
 class StreamSigner(FileLikeWrapper):
@@ -233,7 +239,11 @@ class StreamSigner(FileLikeWrapper):
     Wrapper for file-like objects that computes a signature or digest.
 
     WARNING: Seeks should only be used to query the size of the file, not
-    to skip data, because skipped data isn't read and not signed.
+    to skip data, because skipped data isn't read and not signed. Similarly
+    skipping while writing to create sparse files is also not supported.
+
+    Data has to be read/written in a symmetric fashion, otherwise different
+    signatures will be generated.
 
     Note: When used as a context manager read/write operations outside the enclosed scope
     are illegal.
@@ -252,8 +262,9 @@ class StreamSigner(FileLikeWrapper):
         """
         Write *data* to backing file and update internal state.
         """
-        self.fd.write(data)
+        n = self.fd.write(data)
         self.update(data)
+        return n
 
     def read(self, n=None):
         """
@@ -284,8 +295,10 @@ class StreamSigner(FileLikeWrapper):
         self.update(str(self.tell()).encode())
 
 
-class StreamSigner_HMAC_SHA512(StreamSigner):
-    NAME = 'HMAC_SHA_512'
+class StreamSigner_HMAC_SHA512_REPOID(StreamSigner):
+    # REPOID is a semantic difference, not implementation wise. This means that the key is no secret key, but the
+    # repository ID the file is related to.
+    NAME = 'HMAC_SHA_512_REPOID'
 
     def __init__(self, key, backing_fd, write):
         super().__init__(key, backing_fd, write)

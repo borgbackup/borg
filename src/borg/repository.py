@@ -13,6 +13,8 @@ from zlib import crc32
 import msgpack
 
 import logging
+
+
 logger = logging.getLogger(__name__)
 
 from .constants import *  # NOQA
@@ -25,6 +27,7 @@ from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .lrucache import LRUCache
 from .platform import SaveFile, SyncFile, sync_dir
+from .signature import SignedFile, SignatureError
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
 MAGIC = b'BORG_SEG'
@@ -293,12 +296,15 @@ class Repository:
     def open_index(self, transaction_id, auto_recover=True):
         if transaction_id is None:
             return NSIndex()
-        index_path = os.path.join(self.path, 'index.%d' % transaction_id).encode('utf-8')
+        index_path = os.path.join(self.path, 'index.%d' % transaction_id)
         try:
-            return NSIndex.read(index_path)
-        except RuntimeError as error:
-            assert str(error) == 'hashindex_read failed'  # everything else means we're in *deep* trouble
-            logger.warning('Repository index missing or corrupted, trying to recover')
+            return NSIndex.read(self.id, index_path)
+        except (OSError, ValueError, SignatureError) as exc:
+            if isinstance(exc, Error):
+                msg = exc.get_message()
+            else:
+                msg = exc
+            logger.warning('Repository index missing or corrupted (%s), trying to recover', msg)
             os.unlink(index_path)
             if not auto_recover:
                 raise
@@ -329,7 +335,7 @@ class Repository:
         if not self.index or transaction_id is None:
             try:
                 self.index = self.open_index(transaction_id, False)
-            except RuntimeError:
+            except (OSError, ValueError):
                 self.check_transaction()
                 self.index = self.open_index(transaction_id, False)
         if transaction_id is None:
@@ -342,9 +348,9 @@ class Repository:
             hints_path = os.path.join(self.path, 'hints.%d' % transaction_id)
             index_path = os.path.join(self.path, 'index.%d' % transaction_id)
             try:
-                with open(hints_path, 'rb') as fd:
+                with SignedFile(self.id, hints_path, write=False) as fd:
                     hints = msgpack.unpack(fd)
-            except (msgpack.UnpackException, msgpack.ExtraData, FileNotFoundError) as e:
+            except (msgpack.UnpackException, msgpack.ExtraData, FileNotFoundError, SignatureError) as e:
                 logger.warning('Repository hints file missing or corrupted, trying to recover')
                 if not isinstance(e, FileNotFoundError):
                     os.unlink(hints_path)
@@ -379,19 +385,23 @@ class Repository:
         transaction_id = self.io.get_segments_transaction_id()
         assert transaction_id is not None
         hints_file = os.path.join(self.path, 'hints.%d' % transaction_id)
-        with open(hints_file + '.tmp', 'wb') as fd:
+        with SignedFile(self.id, hints_file + '.tmp', write=True, filename=hints_file) as fd:
             msgpack.pack(hints, fd)
             fd.flush()
             os.fsync(fd.fileno())
         os.rename(hints_file + '.tmp', hints_file)
-        self.index.write(os.path.join(self.path, 'index.tmp'))
+        os.rename(hints_file + '.tmp.signature', hints_file + '.signature')
+        current_index = 'index.%d' % transaction_id
+        self.index.write(self.id, os.path.join(self.path, 'index.tmp'), current_index)
         os.rename(os.path.join(self.path, 'index.tmp'),
-                  os.path.join(self.path, 'index.%d' % transaction_id))
+                  os.path.join(self.path, current_index))
+        os.rename(os.path.join(self.path, 'index.tmp.signature'),
+                  os.path.join(self.path, current_index + '.signature'))
         if self.append_only:
             with open(os.path.join(self.path, 'transactions'), 'a') as log:
                 print('transaction %d, UTC time %s' % (transaction_id, datetime.utcnow().isoformat()), file=log)
         # Remove old auxiliary files
-        current = '.%d' % transaction_id
+        current = '.%d' % transaction_id, '.%d' % transaction_id + '.signature'
         for name in os.listdir(self.path):
             if not name.startswith(('index.', 'hints.')):
                 continue

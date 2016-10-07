@@ -1,3 +1,4 @@
+#include <Python.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,6 +45,8 @@ typedef struct {
     off_t bucket_size;
     int lower_limit;
     int upper_limit;
+    /* buckets may be backed by a Python buffer. If buckets_buffer.buf is NULL then this is not used. */
+    Py_buffer buckets_buffer;
 } HashIndex;
 
 /* prime (or w/ big prime factors) hash table sizes
@@ -91,8 +94,8 @@ static int hash_sizes[] = {
 #define EPRINTF(msg, ...) fprintf(stderr, "hashindex: " msg "(%s)\n", ##__VA_ARGS__, strerror(errno))
 #define EPRINTF_PATH(path, msg, ...) fprintf(stderr, "hashindex: %s: " msg " (%s)\n", path, ##__VA_ARGS__, strerror(errno))
 
-static HashIndex *hashindex_read(const char *path);
-static int hashindex_write(HashIndex *index, const char *path);
+static HashIndex *hashindex_read(PyObject *signed_file);
+static void hashindex_write(HashIndex *index, PyObject *signed_file);
 static HashIndex *hashindex_init(int capacity, int key_size, int value_size);
 static const void *hashindex_get(HashIndex *index, const void *key);
 static int hashindex_set(HashIndex *index, const void *key, const void *value);
@@ -156,7 +159,11 @@ hashindex_resize(HashIndex *index, int capacity)
             return 0;
         }
     }
-    free(index->buckets);
+    if(index->buckets_buffer.buf) {
+        PyBuffer_Release(&index->buckets_buffer);
+    } else {
+        free(index->buckets);
+    }
     index->buckets = new->buckets;
     index->num_buckets = new->num_buckets;
     index->lower_limit = new->lower_limit;
@@ -214,87 +221,117 @@ int shrink_size(int current){
 
 /* Public API */
 static HashIndex *
-hashindex_read(const char *path)
+hashindex_read(PyObject *signed_file)
 {
-    FILE *fd;
-    off_t length, buckets_length, bytes_read;
-    HashHeader header;
+    Py_ssize_t length, buckets_length, bytes_read;
+    HashHeader *header;
     HashIndex *index = NULL;
 
-    if((fd = fopen(path, "rb")) == NULL) {
-        EPRINTF_PATH(path, "fopen for reading failed");
-        return NULL;
+    PyObject *header_bytes = PyObject_CallMethod(signed_file, "read", "n", sizeof(HashHeader));
+    if(!header_bytes) {
+        /* Python exception occurred; just return */
+        return 0;
     }
-    bytes_read = fread(&header, 1, sizeof(HashHeader), fd);
+    bytes_read = PyBytes_Size(header_bytes);
+    if(PyErr_Occurred()) {
+        /* TypeError, not a bytes() object */
+        goto fail_decref_header;
+    }
     if(bytes_read != sizeof(HashHeader)) {
-        if(ferror(fd)) {
-            EPRINTF_PATH(path, "fread header failed (expected %ju, got %ju)",
-                         (uintmax_t) sizeof(HashHeader), (uintmax_t) bytes_read);
-        }
-        else {
-            EPRINTF_MSG_PATH(path, "fread header failed (expected %ju, got %ju)",
-                             (uintmax_t) sizeof(HashHeader), (uintmax_t) bytes_read);
-        }
-        goto fail;
+        /* Truncated file */
+        /* Note: %zd is the format for Py_ssize_t */
+        PyErr_Format(PyExc_ValueError, "Could not read header (expected %zd, but read %zd bytes)", sizeof(HashHeader), bytes_read);
+        goto fail_decref_header;
     }
-    if(fseek(fd, 0, SEEK_END) < 0) {
-        EPRINTF_PATH(path, "fseek failed");
-        goto fail;
+    /* Ok - we got the header, sign it away */
+    PyObject_CallMethod(signed_file, "sign_part", "s", "index_header");
+    if(PyErr_Occurred()) {
+        /* Header corrupted */
+        goto fail_decref_header;
     }
-    if((length = ftell(fd)) < 0) {
-        EPRINTF_PATH(path, "ftell failed");
-        goto fail;
+
+    /* Find length of file */
+    PyObject *length_object = PyObject_CallMethod(signed_file, "seek", "ni", 0, SEEK_END);
+    if(PyErr_Occurred()) {
+        goto fail_decref_header;
     }
-    if(fseek(fd, sizeof(HashHeader), SEEK_SET) < 0) {
-        EPRINTF_PATH(path, "fseek failed");
-        goto fail;
+    length = PyNumber_AsSsize_t(length_object, PyExc_OverflowError);
+    Py_DECREF(length_object);
+    if(PyErr_Occurred()) {
+        /* This shouldn't generally happen; but can if seek() returns something that's not a number */
+        goto fail_decref_header;
     }
-    if(memcmp(header.magic, MAGIC, MAGIC_LEN)) {
-        EPRINTF_MSG_PATH(path, "Unknown MAGIC in header");
-        goto fail;
+
+    Py_XDECREF(PyObject_CallMethod(signed_file, "seek", "ni", sizeof(HashHeader), SEEK_SET));
+    if(PyErr_Occurred()) {
+        goto fail_decref_header;
     }
-    buckets_length = (off_t)_le32toh(header.num_buckets) * (header.key_size + header.value_size);
-    if((size_t) length != sizeof(HashHeader) + buckets_length) {
-        EPRINTF_MSG_PATH(path, "Incorrect file length (expected %ju, got %ju)",
-                         (uintmax_t) sizeof(HashHeader) + buckets_length, (uintmax_t) length);
-        goto fail;
-    }
+
+    /* Set up the in-memory header */
     if(!(index = malloc(sizeof(HashIndex)))) {
-        EPRINTF_PATH(path, "malloc header failed");
-        goto fail;
+        PyErr_NoMemory();
+        goto fail_decref_header;
     }
-    if(!(index->buckets = malloc(buckets_length))) {
-        EPRINTF_PATH(path, "malloc buckets failed");
-        free(index);
-        index = NULL;
-        goto fail;
+
+    Py_buffer header_buffer;
+    PyObject_GetBuffer(header_bytes, &header_buffer, PyBUF_SIMPLE);
+    if(PyErr_Occurred()) {
+        goto fail_free_index;
     }
-    bytes_read = fread(index->buckets, 1, buckets_length, fd);
-    if(bytes_read != buckets_length) {
-        if(ferror(fd)) {
-            EPRINTF_PATH(path, "fread buckets failed (expected %ju, got %ju)",
-                         (uintmax_t) buckets_length, (uintmax_t) bytes_read);
-        }
-        else {
-            EPRINTF_MSG_PATH(path, "fread buckets failed (expected %ju, got %ju)",
-                             (uintmax_t) buckets_length, (uintmax_t) bytes_read);
-        }
-        free(index->buckets);
-        free(index);
-        index = NULL;
-        goto fail;
+
+    header = (HashHeader*) header_buffer.buf;
+    if(memcmp(header->magic, MAGIC, MAGIC_LEN)) {
+        PyErr_Format(PyExc_ValueError, "Unknown MAGIC in header");
+        goto fail_release_header_buffer;
     }
-    index->num_entries = _le32toh(header.num_entries);
-    index->num_buckets = _le32toh(header.num_buckets);
-    index->key_size = header.key_size;
-    index->value_size = header.value_size;
+
+    buckets_length = (off_t)_le32toh(header->num_buckets) * (header->key_size + header->value_size);
+    if((size_t) length != sizeof(HashHeader) + buckets_length) {
+        PyErr_Format(PyExc_ValueError, "Incorrect file length (expected %zd, got %zd",
+                     sizeof(HashHeader) + buckets_length, length);
+        goto fail_release_header_buffer;
+    }
+
+    index->num_entries = _le32toh(header->num_entries);
+    index->num_buckets = _le32toh(header->num_buckets);
+    index->key_size = header->key_size;
+    index->value_size = header->value_size;
     index->bucket_size = index->key_size + index->value_size;
     index->lower_limit = get_lower_limit(index->num_buckets);
     index->upper_limit = get_upper_limit(index->num_buckets);
-fail:
-    if(fclose(fd) < 0) {
-        EPRINTF_PATH(path, "fclose failed");
+
+    /* For indices read from disk we don't malloc() the buckets ourselves, we have them backed by a Python bytes() object instead */
+    PyObject *bucket_bytes = PyObject_CallMethod(signed_file, "read", "n", buckets_length);
+    if(!bucket_bytes) {
+        /* Python exception occured; clean up and return */
+        goto fail_release_header_buffer;
     }
+    bytes_read = PyBytes_Size(bucket_bytes);
+    if(PyErr_Occurred()) {
+        /* TypeError, not a bytes() object */
+        goto fail_decref_buckets;
+    }
+    if(bytes_read != buckets_length) {
+        PyErr_Format(PyExc_ValueError, "Could not read buckets (expected %zd, got %zd)", buckets_length, bytes_read);
+        goto fail_decref_buckets;
+    }
+
+    PyObject_GetBuffer(bucket_bytes, &index->buckets_buffer, PyBUF_SIMPLE);
+    if(PyErr_Occurred()) {
+        goto fail_decref_buckets;
+    }
+    index->buckets = index->buckets_buffer.buf;
+
+fail_decref_buckets:
+    Py_DECREF(bucket_bytes);
+fail_release_header_buffer:
+    PyBuffer_Release(&header_buffer);
+fail_free_index:
+    if(PyErr_Occurred()) {
+        free(index);
+    }
+fail_decref_header:
+    Py_DECREF(header_bytes);
     return index;
 }
 
@@ -321,6 +358,7 @@ hashindex_init(int capacity, int key_size, int value_size)
     index->bucket_size = index->key_size + index->value_size;
     index->lower_limit = get_lower_limit(index->num_buckets);
     index->upper_limit = get_upper_limit(index->num_buckets);
+    index->buckets_buffer.buf = NULL;
     for(i = 0; i < capacity; i++) {
         BUCKET_MARK_EMPTY(index, i);
     }
@@ -330,15 +368,20 @@ hashindex_init(int capacity, int key_size, int value_size)
 static void
 hashindex_free(HashIndex *index)
 {
-    free(index->buckets);
+    if(index->buckets_buffer.buf) {
+        PyBuffer_Release(&index->buckets_buffer);
+    } else {
+        free(index->buckets);
+    }
     free(index);
 }
 
-static int
-hashindex_write(HashIndex *index, const char *path)
+static void
+hashindex_write(HashIndex *index, PyObject *signed_file)
 {
-    off_t buckets_length = (off_t)index->num_buckets * index->bucket_size;
-    FILE *fd;
+    PyObject *length_object;
+    Py_ssize_t length;
+    Py_ssize_t buckets_length = (Py_ssize_t)index->num_buckets * index->bucket_size;
     HashHeader header = {
         .magic = MAGIC,
         .num_entries = _htole32(index->num_entries),
@@ -346,24 +389,52 @@ hashindex_write(HashIndex *index, const char *path)
         .key_size = index->key_size,
         .value_size = index->value_size
     };
-    int ret = 1;
 
-    if((fd = fopen(path, "wb")) == NULL) {
-        EPRINTF_PATH(path, "fopen for writing failed");
-        return 0;
+    /* Note: explicitly construct view; BuildValue can convert (pointer, length) to Python objects, but copies them for doing so */
+    PyObject *header_view = PyMemoryView_FromMemory((char*)&header, sizeof(HashHeader), PyBUF_READ);
+    if(!header_view) {
+        /* Exception raised */
+        return;
     }
-    if(fwrite(&header, 1, sizeof(header), fd) != sizeof(header)) {
-        EPRINTF_PATH(path, "fwrite header failed");
-        ret = 0;
+    length_object = PyObject_CallMethod(signed_file, "write", "O", header_view);
+    Py_DECREF(header_view);
+    if(PyErr_Occurred()) {
+        return;
     }
-    if(fwrite(index->buckets, 1, buckets_length, fd) != (size_t) buckets_length) {
-        EPRINTF_PATH(path, "fwrite buckets failed");
-        ret = 0;
+    length = PyNumber_AsSsize_t(length_object, PyExc_OverflowError);
+    Py_DECREF(length_object);
+    if(PyErr_Occurred()) {
+        return;
     }
-    if(fclose(fd) < 0) {
-        EPRINTF_PATH(path, "fclose failed");
+    if(length != sizeof(HashHeader)) {
+        PyErr_SetString(PyExc_ValueError, "Failed to write header");
+        return;
     }
-    return ret;
+
+    /* Sign header */
+    PyObject_CallMethod(signed_file, "sign_part", "s", "index_header");
+    if(PyErr_Occurred()) {
+        return;
+    }
+
+    PyObject *buckets_view = PyMemoryView_FromMemory((char*)index->buckets, buckets_length, PyBUF_READ);
+    if(!buckets_view) {
+        return;
+    }
+    length_object = PyObject_CallMethod(signed_file, "write", "O", buckets_view);
+    Py_DECREF(buckets_view);
+    if(PyErr_Occurred()) {
+        return;
+    }
+    length = PyNumber_AsSsize_t(length_object, PyExc_OverflowError);
+    Py_DECREF(length_object);
+    if(PyErr_Occurred()) {
+        return;
+    }
+    if(length != buckets_length) {
+        PyErr_SetString(PyExc_ValueError, "Failed to write buckets");
+        return;
+    }
 }
 
 static const void *

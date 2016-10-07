@@ -52,7 +52,7 @@ class TestReadSignatures:
 class TestSignedFile:
     @pytest.fixture
     def key(self):
-        return bytes(1234)
+        return bytes(64)
 
     @pytest.fixture
     def signed_path(self, tmpdir, key):
@@ -116,7 +116,7 @@ class TestSignedFile:
 class TestSignedFileParts:
     @pytest.fixture
     def key(self):
-        return bytes(1234)
+        return bytes(64)
 
     @pytest.fixture
     def signed_path(self, tmpdir, key):

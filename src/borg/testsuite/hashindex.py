@@ -5,11 +5,11 @@ import tempfile
 import zlib
 
 from ..hashindex import NSIndex, ChunkIndex
-from .. import hashindex
 from . import BaseTestCase
 
 # Note: these tests are part of the self test, do not use or import py.test functionality here.
 #       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT
+KEY = bytes(64)
 
 
 def H(x):
@@ -39,21 +39,21 @@ class HashIndexTestCase(BaseTestCase):
             del idx[H(x)]
         self.assert_equal(len(idx), 50)
         idx_name = tempfile.NamedTemporaryFile()
-        idx.write(idx_name.name)
+        idx.write(KEY, idx_name.name)
         del idx
         # Verify file contents
         with open(idx_name.name, 'rb') as fd:
             self.assert_equal(hashlib.sha256(fd.read()).hexdigest(), sha)
         # Make sure we can open the file
-        idx = cls.read(idx_name.name)
+        idx = cls.read(KEY, idx_name.name)
         self.assert_equal(len(idx), 50)
         for x in range(50, 100):
             self.assert_equal(idx[H(x)], make_value(x * 2))
         idx.clear()
         self.assert_equal(len(idx), 0)
-        idx.write(idx_name.name)
+        idx.write(KEY, idx_name.name)
         del idx
-        self.assert_equal(len(cls.read(idx_name.name)), 0)
+        self.assert_equal(len(cls.read(KEY, idx_name.name)), 0)
 
     def test_nsindex(self):
         self._generic_test(NSIndex, lambda x: (x, x),
@@ -67,17 +67,17 @@ class HashIndexTestCase(BaseTestCase):
         n = 2000  # Must be >= MIN_BUCKETS
         idx_name = tempfile.NamedTemporaryFile()
         idx = NSIndex()
-        idx.write(idx_name.name)
+        idx.write(KEY, idx_name.name)
         initial_size = os.path.getsize(idx_name.name)
         self.assert_equal(len(idx), 0)
         for x in range(n):
             idx[H(x)] = x, x
-        idx.write(idx_name.name)
+        idx.write(KEY, idx_name.name)
         self.assert_true(initial_size < os.path.getsize(idx_name.name))
         for x in range(n):
             del idx[H(x)]
         self.assert_equal(len(idx), 0)
-        idx.write(idx_name.name)
+        idx.write(KEY, idx_name.name)
         self.assert_equal(initial_size, os.path.getsize(idx_name.name))
 
     def test_iteritems(self):
@@ -135,7 +135,7 @@ class HashIndexSizeTestCase(BaseTestCase):
         for i in range(1234):
             idx[H(i)] = i, i**2, i**3
         with tempfile.NamedTemporaryFile() as file:
-            idx.write(file.name)
+            idx.write(KEY, file.name)
             size = os.path.getsize(file.name)
         assert idx.size() == size
 
@@ -251,7 +251,7 @@ class HashIndexDataTestCase(BaseTestCase):
     def _serialize_hashindex(self, idx):
         with tempfile.TemporaryDirectory() as tempdir:
             file = os.path.join(tempdir, 'idx')
-            idx.write(file)
+            idx.write(KEY, file)
             with open(file, 'rb') as f:
                 return self._pack(f.read())
 
@@ -260,7 +260,7 @@ class HashIndexDataTestCase(BaseTestCase):
             file = os.path.join(tempdir, 'idx')
             with open(file, 'wb') as f:
                 f.write(self._unpack(bytestring))
-            return ChunkIndex.read(file)
+            return ChunkIndex.read(KEY, file)
 
     def _pack(self, bytestring):
         return base64.b64encode(zlib.compress(bytestring))

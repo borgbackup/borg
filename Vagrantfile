@@ -106,7 +106,6 @@ def packages_openbsd
     chsh -s /usr/local/bin/bash vagrant
     pkg_add openssl
     pkg_add lz4
-    # pkg_add fuse  # does not install, sdl dependency missing
     pkg_add git  # no fakeroot
     pkg_add python-3.4.2
     pkg_add py3-setuptools

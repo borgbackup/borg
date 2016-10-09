@@ -1256,7 +1256,7 @@ class ArchiveChecker:
 
             def report(msg, chunk_id, chunk_no):
                 cid = bin_to_hex(chunk_id)
-                msg += ' [chunk: %06d_%s]' % (chunk_no, cid)  # see debug-dump-archive-items
+                msg += ' [chunk: %06d_%s]' % (chunk_no, cid)  # see "debug dump-archive-items"
                 self.error_found = True
                 logger.error(msg)
 

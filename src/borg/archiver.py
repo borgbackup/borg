@@ -2467,13 +2467,6 @@ class Archiver:
         reports and debugging problems. If a traceback happens, this information is
         already appended at the end of the traceback.
         """)
-        subparser = subparsers.add_parser('debug-info', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_info.__doc__,
-                                          epilog=debug_info_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='show system infos for debugging / bug reports (debug)')
-        subparser.set_defaults(func=self.do_debug_info)
-
         subparser = debug_parsers.add_parser('info', parents=[common_parser], add_help=False,
                                           description=self.do_debug_info.__doc__,
                                           epilog=debug_info_epilog,
@@ -2484,16 +2477,6 @@ class Archiver:
         debug_dump_archive_items_epilog = textwrap.dedent("""
         This command dumps raw (but decrypted and decompressed) archive items (only metadata) to files.
         """)
-        subparser = subparsers.add_parser('debug-dump-archive-items', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_dump_archive_items.__doc__,
-                                          epilog=debug_dump_archive_items_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='dump archive items (metadata) (debug)')
-        subparser.set_defaults(func=self.do_debug_dump_archive_items)
-        subparser.add_argument('location', metavar='ARCHIVE',
-                               type=location_validator(archive=True),
-                               help='archive to dump')
-
         subparser = debug_parsers.add_parser('dump-archive-items', parents=[common_parser], add_help=False,
                                           description=self.do_debug_dump_archive_items.__doc__,
                                           epilog=debug_dump_archive_items_epilog,
@@ -2507,16 +2490,6 @@ class Archiver:
         debug_dump_repo_objs_epilog = textwrap.dedent("""
         This command dumps raw (but decrypted and decompressed) repo objects to files.
         """)
-        subparser = subparsers.add_parser('debug-dump-repo-objs', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_dump_repo_objs.__doc__,
-                                          epilog=debug_dump_repo_objs_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='dump repo objects (debug)')
-        subparser.set_defaults(func=self.do_debug_dump_repo_objs)
-        subparser.add_argument('location', metavar='REPOSITORY',
-                               type=location_validator(archive=False),
-                               help='repo to dump')
-
         subparser = debug_parsers.add_parser('dump-repo-objs', parents=[common_parser], add_help=False,
                                           description=self.do_debug_dump_repo_objs.__doc__,
                                           epilog=debug_dump_repo_objs_epilog,
@@ -2530,20 +2503,6 @@ class Archiver:
         debug_get_obj_epilog = textwrap.dedent("""
         This command gets an object from the repository.
         """)
-        subparser = subparsers.add_parser('debug-get-obj', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_get_obj.__doc__,
-                                          epilog=debug_get_obj_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='get object from repository (debug)')
-        subparser.set_defaults(func=self.do_debug_get_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False),
-                               help='repository to use')
-        subparser.add_argument('id', metavar='ID', type=str,
-                               help='hex object ID to get from the repo')
-        subparser.add_argument('path', metavar='PATH', type=str,
-                               help='file to write object data into')
-
         subparser = debug_parsers.add_parser('get-obj', parents=[common_parser], add_help=False,
                                           description=self.do_debug_get_obj.__doc__,
                                           epilog=debug_get_obj_epilog,
@@ -2561,18 +2520,6 @@ class Archiver:
         debug_put_obj_epilog = textwrap.dedent("""
         This command puts objects into the repository.
         """)
-        subparser = subparsers.add_parser('debug-put-obj', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_put_obj.__doc__,
-                                          epilog=debug_put_obj_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='put object to repository (debug)')
-        subparser.set_defaults(func=self.do_debug_put_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False),
-                               help='repository to use')
-        subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
-                               help='file(s) to read and create object(s) from')
-
         subparser = debug_parsers.add_parser('put-obj', parents=[common_parser], add_help=False,
                                           description=self.do_debug_put_obj.__doc__,
                                           epilog=debug_put_obj_epilog,
@@ -2588,18 +2535,6 @@ class Archiver:
         debug_delete_obj_epilog = textwrap.dedent("""
         This command deletes objects from the repository.
         """)
-        subparser = subparsers.add_parser('debug-delete-obj', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_delete_obj.__doc__,
-                                          epilog=debug_delete_obj_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='delete object from repository (debug)')
-        subparser.set_defaults(func=self.do_debug_delete_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False),
-                               help='repository to use')
-        subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
-                               help='hex object ID(s) to delete from the repo')
-
         subparser = debug_parsers.add_parser('delete-obj', parents=[common_parser], add_help=False,
                                           description=self.do_debug_delete_obj.__doc__,
                                           epilog=debug_delete_obj_epilog,

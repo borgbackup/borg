@@ -768,20 +768,27 @@ class Location:
     """Object representing a repository / archive location
     """
     proto = user = host = port = path = archive = None
+    # path may not contain :: (it ends at :: or string end), but may contain single colons.
+    # to avoid ambiguities with other regexes, it must also not start with ":".
+    path_re = r'(?!:)(?P<path>([^:]|(:(?!:)))+)'
+    # optional ::archive_name at the end, archive name must not contain "/".
     # borg mount's FUSE filesystem creates one level of directories from
-    # the archive names. Thus, we must not accept "/" in archive names.
+    # the archive names and of course "/" is not valid in a directory name.
+    optional_archive_re = r'(?:::(?P<archive>[^/]+))?$'
+    # regexes for misc. kinds of supported location specifiers:
     ssh_re = re.compile(r'(?P<proto>ssh)://(?:(?P<user>[^@]+)@)?'
                         r'(?P<host>[^:/#]+)(?::(?P<port>\d+))?'
-                        r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
+                        + path_re + optional_archive_re)
     file_re = re.compile(r'(?P<proto>file)://'
-                         r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
+                         + path_re + optional_archive_re)
+    # note: scp_re is also use for local pathes
     scp_re = re.compile(r'((?:(?P<user>[^@]+)@)?(?P<host>[^:/]+):)?'
-                        r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
-    # get the repo from BORG_RE env and the optional archive from param.
+                        + path_re + optional_archive_re)
+    # get the repo from BORG_REPO env and the optional archive from param.
     # if the syntax requires giving REPOSITORY (see "borg mount"),
     # use "::" to let it use the env var.
     # if REPOSITORY argument is optional, it'll automatically use the env.
-    env_re = re.compile(r'(?:::(?P<archive>[^/]+)?)?$')
+    env_re = re.compile(r'(?:::$)|' + optional_archive_re)
 
     def __init__(self, text=''):
         self.orig = text

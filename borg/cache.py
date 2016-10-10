@@ -20,8 +20,11 @@ import msgpack
 class Cache:
     """Client Side cache
     """
+    class RepositoryIDNotUnique(Error):
+        """Cache is newer than repository - do you have multiple, independently updated repos with same ID?"""
+
     class RepositoryReplay(Error):
-        """Cache is newer than repository, refusing to continue"""
+        """Cache is newer than repository - this is either an attack or unsafe (multiple repos with same ID)"""
 
     class CacheInitAbortedError(Error):
         """Cache initialization aborted"""
@@ -81,7 +84,10 @@ class Cache:
             if sync and self.manifest.id != self.manifest_id:
                 # If repository is older than the cache something fishy is going on
                 if self.timestamp and self.timestamp > manifest.timestamp:
-                    raise self.RepositoryReplay()
+                    if isinstance(key, PlaintextKey):
+                        raise self.RepositoryIDNotUnique()
+                    else:
+                        raise self.RepositoryReplay()
                 # Make sure an encrypted repository has not been swapped for an unencrypted repository
                 if self.key_type is not None and self.key_type != str(key.TYPE):
                     raise self.EncryptionMethodMismatch()

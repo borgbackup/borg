@@ -77,6 +77,9 @@ class Cache:
                 if not yes(msg, false_msg="Aborting.", invalid_msg="Invalid answer, aborting.",
                            retry=False, env_var_override='BORG_RELOCATED_REPO_ACCESS_IS_OK'):
                     raise self.RepositoryAccessAborted()
+                # adapt on-disk config immediately if the new location was accepted
+                self.begin_txn()
+                self.commit()
 
             if sync and self.manifest.id != self.manifest_id:
                 # If repository is older than the cache something fishy is going on

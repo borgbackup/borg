@@ -788,7 +788,7 @@ class Location:
     ssh_re = re.compile(r"""
         (?P<proto>ssh)://                                   # ssh://
         (?:(?P<user>[^@]+)@)?                               # user@  (optional)
-        (?P<host>[^:/#]+)(?::(?P<port>\d+))?                # host or host:port
+        (?P<host>[^:/]+)(?::(?P<port>\d+))?                 # host or host:port
         """ + path_re + optional_archive_re, re.VERBOSE)    # path or path::archive
 
     file_re = re.compile(r"""

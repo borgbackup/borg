@@ -660,10 +660,10 @@ Miscellaneous Help
 Debug Commands
 --------------
 
-There are some more commands (all starting with "debug-") which are all
+There is a ``borg debug`` command that has some subcommands which are all
 **not intended for normal use** and **potentially very dangerous** if used incorrectly.
 
-For example, ``borg debug-put-obj`` and ``borg debug-delete-obj`` will only do
+For example, ``borg debug put-obj`` and ``borg debug delete-obj`` will only do
 what their name suggests: put objects into repo / delete objects from repo.
 
 Please note:

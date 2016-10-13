@@ -168,7 +168,7 @@ class TestKey:
         data = bytearray(data)
         data[offset] += 1
         with pytest.raises(IntegrityError):
-            key.decrypt("", data)
+            key.decrypt(b'', data)
 
     def test_decrypt_integrity(self, monkeypatch, keys_dir):
         with keys_dir.join('keyfile').open('w') as fd:

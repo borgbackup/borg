@@ -29,8 +29,11 @@ FileCacheEntry = namedtuple('FileCacheEntry', 'age inode size mtime chunk_ids')
 class Cache:
     """Client Side cache
     """
+    class RepositoryIDNotUnique(Error):
+        """Cache is newer than repository - do you have multiple, independently updated repos with same ID?"""
+
     class RepositoryReplay(Error):
-        """Cache is newer than repository, refusing to continue"""
+        """Cache is newer than repository - this is either an attack or unsafe (multiple repos with same ID)"""
 
     class CacheInitAbortedError(Error):
         """Cache initialization aborted"""
@@ -92,11 +95,17 @@ class Cache:
                 if not yes(msg, false_msg="Aborting.", invalid_msg="Invalid answer, aborting.",
                            retry=False, env_var_override='BORG_RELOCATED_REPO_ACCESS_IS_OK'):
                     raise self.RepositoryAccessAborted()
+                # adapt on-disk config immediately if the new location was accepted
+                self.begin_txn()
+                self.commit()
 
             if sync and self.manifest.id != self.manifest_id:
                 # If repository is older than the cache something fishy is going on
                 if self.timestamp and self.timestamp > manifest.timestamp:
-                    raise self.RepositoryReplay()
+                    if isinstance(key, PlaintextKey):
+                        raise self.RepositoryIDNotUnique()
+                    else:
+                        raise self.RepositoryReplay()
                 # Make sure an encrypted repository has not been swapped for an unencrypted repository
                 if self.key_type is not None and self.key_type != str(key.TYPE):
                     raise self.EncryptionMethodMismatch()

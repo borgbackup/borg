@@ -1295,7 +1295,7 @@ class ArchiveChecker:
 
         if archive is None:
             # we need last N or all archives
-            archive_infos = self.manifest.archives.list(sort_by='ts', reverse=True)
+            archive_infos = self.manifest.archives.list(sort_by=['ts'], reverse=True)
             if prefix is not None:
                 archive_infos = [info for info in archive_infos if info.name.startswith(prefix)]
             num_archives = len(archive_infos)

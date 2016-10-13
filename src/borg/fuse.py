@@ -84,7 +84,7 @@ class FuseOperations(llfuse.Operations):
                               consider_part_files=self.args.consider_part_files)
             self.process_archive(archive)
         else:
-            archive_names = (x.name for x in self.manifest.archives.list_filtered(self.args))
+            archive_names = (x.name for x in self.manifest.archives.list_considering(self.args))
             for name in archive_names:
                 archive = Archive(self.repository_uncached, self.key, self.manifest, name,
                                   consider_part_files=self.args.consider_part_files)

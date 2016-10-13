@@ -142,32 +142,29 @@ class Archives(abc.MutableMapping):
         name = safe_encode(name)
         del self._archives[name]
 
-    def list(self, sort_by=None, reverse=False, prefix=''):
+    def list(self, sort_by=(), reverse=False, prefix='', first=None, last=None):
         """
         Inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
-        Returns list of borg.helpers.ArchiveInfo instances
+        Returns list of borg.helpers.ArchiveInfo instances.
+        sort_by can be a list of sort keys, they are applied in reverse order.
         """
+        if isinstance(sort_by, (str, bytes)):
+            raise TypeError('sort_by must be a sequence of str')
         archives = [x for x in self.values() if x.name.startswith(prefix)]
-        if sort_by is not None:
-            archives = sorted(archives, key=attrgetter(sort_by))
-        if reverse:
+        for sortkey in reversed(sort_by):
+            archives.sort(key=attrgetter(sortkey))
+        if reverse or last:
             archives.reverse()
-        return archives
+        n = first or last or len(archives)
+        return archives[:n]
 
-    def list_filtered(self, args):
+    def list_considering(self, args):
         """
-        get a filtered list of archives, considering --first/last/prefix/sort
+        get a list of archives, considering --first/last/prefix/sort cmdline args
         """
         if args.location.archive:
             raise Error('The options --first, --last and --prefix can only be used on repository targets.')
-        archives = self.list(prefix=args.prefix)
-        for sortkey in reversed(args.sort_by.split(',')):
-            archives.sort(key=attrgetter(sortkey))
-        if args.last:
-            archives.reverse()
-        n = args.first or args.last or len(archives)
-        return archives[:n]
-
+        return self.list(sort_by=args.sort_by.split(','), prefix=args.prefix, first=args.first, last=args.last)
 
     def set_raw_dict(self, d):
         """set the dict we get from the msgpack unpacker"""

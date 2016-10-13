@@ -853,12 +853,7 @@ class Archiver:
             return self.exit_code
 
         with cache_if_remote(repository) as cached_repo:
-            if args.location.archive:
-                archive = Archive(repository, key, manifest, args.location.archive,
-                                  consider_part_files=args.consider_part_files)
-            else:
-                archive = None
-            operations = FuseOperations(key, repository, manifest, archive, cached_repo)
+            operations = FuseOperations(key, repository, manifest, args, cached_repo, archiver=self)
             logger.info("Mounting filesystem")
             try:
                 operations.mount(args.mountpoint, args.options, args.foreground)
@@ -2115,6 +2110,7 @@ class Archiver:
                                help='stay in foreground, do not daemonize')
         subparser.add_argument('-o', dest='options', type=str,
                                help='Extra mount options')
+        self.add_archives_filters_args(subparser)
 
         info_epilog = textwrap.dedent("""
         This command displays detailed information about the specified archive or repository.

@@ -1119,7 +1119,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             with pytest.raises(OSError) as excinfo:
                 open(os.path.join(mountpoint, path))
             assert excinfo.value.errno == errno.EIO
-        with self.fuse_mount(self.repository_location + '::archive', mountpoint, 'allow_damaged_files'):
+        with self.fuse_mount(self.repository_location + '::archive', mountpoint, '-o', 'allow_damaged_files'):
             open(os.path.join(mountpoint, path)).close()
 
     def verify_aes_counter_uniqueness(self, method):

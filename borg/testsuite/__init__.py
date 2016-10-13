@@ -94,11 +94,9 @@ class BaseTestCase(unittest.TestCase):
             self._assert_dirs_equal_cmp(sub_diff)
 
     @contextmanager
-    def fuse_mount(self, location, mountpoint, mount_options=None):
+    def fuse_mount(self, location, mountpoint, *options):
         os.mkdir(mountpoint)
-        args = ['mount', location, mountpoint]
-        if mount_options:
-            args += '-o', mount_options
+        args = ['mount', location, mountpoint] + list(options)
         self.cmd(*args, fork=True)
         self.wait_for_mount(mountpoint)
         yield

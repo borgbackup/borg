@@ -58,9 +58,8 @@ class FuseOperations(llfuse.Operations):
     allow_damaged_files = False
     versions = False
 
-    def __init__(self, key, repository, manifest, args, cached_repo, archiver):
+    def __init__(self, key, repository, manifest, args, cached_repo):
         super().__init__()
-        self.archiver = archiver
         self.repository_uncached = repository
         self.repository = cached_repo
         self.args = args
@@ -85,7 +84,7 @@ class FuseOperations(llfuse.Operations):
                               consider_part_files=self.args.consider_part_files)
             self.process_archive(archive)
         else:
-            archive_names = (x.name for x in self.archiver._get_filtered_archives(self.args, self.manifest))
+            archive_names = (x.name for x in self.manifest.archives.list_filtered(self.args))
             for name in archive_names:
                 archive = Archive(self.repository_uncached, self.key, self.manifest, name,
                                   consider_part_files=self.args.consider_part_files)

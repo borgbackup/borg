@@ -783,7 +783,7 @@ class Archiver:
         if args.location.archive:
             archive_names = (args.location.archive,)
         else:
-            archive_names = tuple(x.name for x in self._get_filtered_archives(args, manifest))
+            archive_names = tuple(x.name for x in manifest.archives.list_filtered(args))
             if not archive_names:
                 return self.exit_code
 
@@ -853,7 +853,7 @@ class Archiver:
             return self.exit_code
 
         with cache_if_remote(repository) as cached_repo:
-            operations = FuseOperations(key, repository, manifest, args, cached_repo, archiver=self)
+            operations = FuseOperations(key, repository, manifest, args, cached_repo)
             logger.info("Mounting filesystem")
             try:
                 operations.mount(args.mountpoint, args.options, args.foreground)
@@ -904,7 +904,7 @@ class Archiver:
             format = "{archive:<36} {time} [{id}]{NL}"
         formatter = ArchiveFormatter(format)
 
-        for archive_info in self._get_filtered_archives(args, manifest):
+        for archive_info in manifest.archives.list_filtered(args):
             write(safe_encode(formatter.format_item(archive_info)))
 
         return self.exit_code
@@ -924,7 +924,7 @@ class Archiver:
         if args.location.archive:
             archive_names = (args.location.archive,)
         else:
-            archive_names = tuple(x.name for x in self._get_filtered_archives(args, manifest))
+            archive_names = tuple(x.name for x in manifest.archives.list_filtered(args))
             if not archive_names:
                 return self.exit_code
 
@@ -2625,21 +2625,6 @@ class Archiver:
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
         return args.func(args)
-
-    def _get_filtered_archives(self, args, manifest):
-        if args.location.archive:
-            raise Error('The options --first, --last and --prefix can only be used on repository targets.')
-
-        archives = manifest.archives.list(prefix=args.prefix)
-
-        for sortkey in reversed(args.sort_by.split(',')):
-            archives.sort(key=attrgetter(sortkey))
-        if args.last:
-            archives.reverse()
-
-        n = args.first or args.last or len(archives)
-
-        return archives[:n]
 
 
 def sig_info_handler(sig_no, stack):  # pragma: no cover

@@ -154,6 +154,21 @@ class Archives(abc.MutableMapping):
             archives.reverse()
         return archives
 
+    def list_filtered(self, args):
+        """
+        get a filtered list of archives, considering --first/last/prefix/sort
+        """
+        if args.location.archive:
+            raise Error('The options --first, --last and --prefix can only be used on repository targets.')
+        archives = self.list(prefix=args.prefix)
+        for sortkey in reversed(args.sort_by.split(',')):
+            archives.sort(key=attrgetter(sortkey))
+        if args.last:
+            archives.reverse()
+        n = args.first or args.last or len(archives)
+        return archives[:n]
+
+
     def set_raw_dict(self, d):
         """set the dict we get from the msgpack unpacker"""
         for k, v in d.items():

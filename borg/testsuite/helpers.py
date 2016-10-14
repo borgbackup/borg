@@ -17,7 +17,7 @@ from ..helpers import Location, format_file_size, format_timedelta, format_line,
     ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
     PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, \
     Buffer
-from . import BaseTestCase, environment_variable, FakeInputs
+from . import BaseTestCase, FakeInputs
 
 
 class BigIntTestCase(BaseTestCase):
@@ -617,38 +617,24 @@ class TestParseTimestamp(BaseTestCase):
         self.assert_equal(parse_timestamp('2015-04-19T20:25:00'), datetime(2015, 4, 19, 20, 25, 0, 0, timezone.utc))
 
 
-def test_get_cache_dir():
+def test_get_cache_dir(monkeypatch):
     """test that get_cache_dir respects environment"""
-    # reset BORG_CACHE_DIR in order to test default
-    old_env = None
-    if os.environ.get('BORG_CACHE_DIR'):
-        old_env = os.environ['BORG_CACHE_DIR']
-        del(os.environ['BORG_CACHE_DIR'])
+    monkeypatch.delenv('XDG_CACHE_HOME', raising=False)
     assert get_cache_dir() == os.path.join(os.path.expanduser('~'), '.cache', 'borg')
-    os.environ['XDG_CACHE_HOME'] = '/var/tmp/.cache'
+    monkeypatch.setenv('XDG_CACHE_HOME', '/var/tmp/.cache')
     assert get_cache_dir() == os.path.join('/var/tmp/.cache', 'borg')
-    os.environ['BORG_CACHE_DIR'] = '/var/tmp'
+    monkeypatch.setenv('BORG_CACHE_DIR', '/var/tmp')
     assert get_cache_dir() == '/var/tmp'
-    # reset old env
-    if old_env is not None:
-        os.environ['BORG_CACHE_DIR'] = old_env
 
 
-def test_get_keys_dir():
+def test_get_keys_dir(monkeypatch):
     """test that get_keys_dir respects environment"""
-    # reset BORG_KEYS_DIR in order to test default
-    old_env = None
-    if os.environ.get('BORG_KEYS_DIR'):
-        old_env = os.environ['BORG_KEYS_DIR']
-        del(os.environ['BORG_KEYS_DIR'])
+    monkeypatch.delenv('XDG_CONFIG_HOME', raising=False)
     assert get_keys_dir() == os.path.join(os.path.expanduser('~'), '.config', 'borg', 'keys')
-    os.environ['XDG_CONFIG_HOME'] = '/var/tmp/.config'
+    monkeypatch.setenv('XDG_CONFIG_HOME', '/var/tmp/.config')
     assert get_keys_dir() == os.path.join('/var/tmp/.config', 'borg', 'keys')
-    os.environ['BORG_KEYS_DIR'] = '/var/tmp'
+    monkeypatch.setenv('BORG_KEYS_DIR', '/var/tmp')
     assert get_keys_dir() == '/var/tmp'
-    # reset old env
-    if old_env is not None:
-        os.environ['BORG_KEYS_DIR'] = old_env
 
 
 @pytest.fixture()
@@ -667,8 +653,8 @@ def test_stats_basic(stats):
     assert stats.usize == 10
 
 
-def tests_stats_progress(stats, columns=80):
-    os.environ['COLUMNS'] = str(columns)
+def tests_stats_progress(stats, monkeypatch, columns=80):
+    monkeypatch.setenv('COLUMNS', str(columns))
     out = StringIO()
     stats.show_progress(stream=out)
     s = '20 B O 10 B C 10 B D 0 N '
@@ -825,21 +811,20 @@ def test_yes_input_custom():
     assert not yes(falsish=('NOPE', ), input=input)
 
 
-def test_yes_env():
+def test_yes_env(monkeypatch):
     for value in TRUISH:
-        with environment_variable(OVERRIDE_THIS=value):
-            assert yes(env_var_override='OVERRIDE_THIS')
+        monkeypatch.setenv('OVERRIDE_THIS', value)
+        assert yes(env_var_override='OVERRIDE_THIS')
     for value in FALSISH:
-        with environment_variable(OVERRIDE_THIS=value):
-            assert not yes(env_var_override='OVERRIDE_THIS')
+        monkeypatch.setenv('OVERRIDE_THIS', value)
+        assert not yes(env_var_override='OVERRIDE_THIS')
 
 
-def test_yes_env_default():
+def test_yes_env_default(monkeypatch):
     for value in DEFAULTISH:
-        with environment_variable(OVERRIDE_THIS=value):
-            assert yes(env_var_override='OVERRIDE_THIS', default=True)
-        with environment_variable(OVERRIDE_THIS=value):
-            assert not yes(env_var_override='OVERRIDE_THIS', default=False)
+        monkeypatch.setenv('OVERRIDE_THIS', value)
+        assert yes(env_var_override='OVERRIDE_THIS', default=True)
+        assert not yes(env_var_override='OVERRIDE_THIS', default=False)
 
 
 def test_yes_defaults():

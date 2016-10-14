@@ -1,5 +1,7 @@
 import os
 
+import pytest
+
 from borg.logger import setup_logging
 
 # Ensure that the loggers exist for all tests
@@ -14,6 +16,17 @@ from borg import xattr, constants
 def pytest_configure(config):
     # no fixture-based monkey-patching since star-imports are used for the constants module
     constants.PBKDF2_ITERATIONS = 1
+
+
+@pytest.fixture(autouse=True)
+def clean_env(tmpdir_factory, monkeypatch):
+    # avoid that we access / modify the user's normal .config / .cache directory:
+    monkeypatch.setenv('XDG_CONFIG_HOME', tmpdir_factory.mktemp('xdg-config-home'))
+    monkeypatch.setenv('XDG_CACHE_HOME', tmpdir_factory.mktemp('xdg-cache-home'))
+    # also avoid to use anything from the outside environment:
+    keys = [key for key in os.environ if key.startswith('BORG_')]
+    for key in keys:
+        monkeypatch.delenv(key, raising=False)
 
 
 def pytest_report_header(config, startdir):

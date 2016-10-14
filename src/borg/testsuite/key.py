@@ -14,17 +14,6 @@ from ..helpers import get_nonces_dir
 from ..key import PlaintextKey, PassphraseKey, KeyfileKey, Passphrase, PasswordRetriesExceeded, bin_to_hex
 
 
-@pytest.fixture(autouse=True)
-def clean_env(monkeypatch):
-    # Workaround for some tests (testsuite/archiver) polluting the environment
-    monkeypatch.delenv('BORG_PASSPHRASE', False)
-
-
-@pytest.fixture(autouse=True)
-def nonce_dir(tmpdir_factory, monkeypatch):
-    monkeypatch.setenv('XDG_CONFIG_HOME', tmpdir_factory.mktemp('xdg-config-home'))
-
-
 class TestKey:
     class MockArgs:
         location = Location(tempfile.mkstemp()[1])

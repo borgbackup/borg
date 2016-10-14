@@ -113,7 +113,7 @@ class KeyBase:
         if id:
             id_computed = self.id_hash(data)
             if not compare_digest(id_computed, id):
-                raise IntegrityError('Chunk id verification failed')
+                raise IntegrityError('Chunk %s: id verification failed' % bin_to_hex(id))
 
 
 class PlaintextKey(KeyBase):
@@ -140,7 +140,7 @@ class PlaintextKey(KeyBase):
 
     def decrypt(self, id, data, decompress=True):
         if data[0] != self.TYPE:
-            raise IntegrityError('Invalid encryption envelope')
+            raise IntegrityError('Chunk %s: Invalid encryption envelope' % bin_to_hex(id))
         payload = memoryview(data)[1:]
         if not decompress:
             return Chunk(payload)
@@ -180,12 +180,12 @@ class AESKeyBase(KeyBase):
     def decrypt(self, id, data, decompress=True):
         if not (data[0] == self.TYPE or
             data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
-            raise IntegrityError('Invalid encryption envelope')
+            raise IntegrityError('Chunk %s: Invalid encryption envelope' % bin_to_hex(id))
         data_view = memoryview(data)
         hmac_given = data_view[1:33]
         hmac_computed = memoryview(hmac_sha256(self.enc_hmac_key, data_view[33:]))
         if not compare_digest(hmac_computed, hmac_given):
-            raise IntegrityError('Encryption envelope checksum mismatch')
+            raise IntegrityError('Chunk %s: Encryption envelope checksum mismatch' % bin_to_hex(id))
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
         payload = self.dec_cipher.decrypt(data_view[41:])
         if not decompress:
@@ -197,7 +197,7 @@ class AESKeyBase(KeyBase):
     def extract_nonce(self, payload):
         if not (payload[0] == self.TYPE or
             payload[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
-            raise IntegrityError('Invalid encryption envelope')
+            raise IntegrityError('Manifest: Invalid encryption envelope')
         nonce = bytes_to_long(payload[33:41])
         return nonce
 

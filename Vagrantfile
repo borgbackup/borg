@@ -114,7 +114,6 @@ def packages_openbsd
     chsh -s /usr/local/bin/bash vagrant
     pkg_add openssl
     pkg_add lz4
-    # pkg_add fuse  # does not install, sdl dependency missing
     pkg_add git  # no fakeroot
     pkg_add py3-setuptools
     ln -sf /usr/local/bin/python3.4 /usr/local/bin/python3
@@ -265,7 +264,7 @@ def build_binary_with_pyinstaller(boxname)
     cd /vagrant/borg
     . borg-env/bin/activate
     cd borg
-    pyinstaller -F -n borg.exe --distpath=/vagrant/borg --clean src/borg/__main__.py --hidden-import=borg.platform.posix
+    pyinstaller --clean --distpath=/vagrant/borg scripts/borg.exe.spec
   EOF
 end
 
@@ -388,7 +387,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "wheezy32" do |b|
-    b.vm.box = "boxcutter/debian711-i386"
+    b.vm.box = "boxcutter/debian7-i386"
     b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy32")
@@ -401,7 +400,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "wheezy64" do |b|
-    b.vm.box = "boxcutter/debian711"
+    b.vm.box = "boxcutter/debian7"
     b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy64")

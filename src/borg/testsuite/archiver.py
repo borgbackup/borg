@@ -1,4 +1,4 @@
-from binascii import hexlify, unhexlify, b2a_base64
+from binascii import unhexlify, b2a_base64
 from configparser import ConfigParser
 import errno
 import os
@@ -1473,7 +1473,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::archive2', 'input')
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
         # mount the whole repository, archive contents shall show up in versioned view:
-        with self.fuse_mount(self.repository_location, mountpoint, 'versions'):
+        with self.fuse_mount(self.repository_location, mountpoint, '-o', 'versions'):
             path = os.path.join(mountpoint, 'input', 'test')  # filename shows up as directory ...
             files = os.listdir(path)
             assert all(f.startswith('test.') for f in files)  # ... with files test.xxxxxxxx in there
@@ -1505,7 +1505,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             with pytest.raises(OSError) as excinfo:
                 open(os.path.join(mountpoint, path))
             assert excinfo.value.errno == errno.EIO
-        with self.fuse_mount(self.repository_location + '::archive', mountpoint, 'allow_damaged_files'):
+        with self.fuse_mount(self.repository_location + '::archive', mountpoint, '-o', 'allow_damaged_files'):
             open(os.path.join(mountpoint, path)).close()
 
     def verify_aes_counter_uniqueness(self, method):
@@ -1835,7 +1835,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with open(export_file, 'r') as fd:
             export_contents = fd.read()
 
-        assert export_contents.startswith('BORG_KEY ' + hexlify(repo_id).decode() + '\n')
+        assert export_contents.startswith('BORG_KEY ' + bin_to_hex(repo_id) + '\n')
 
         key_file = self.keys_path + '/' + os.listdir(self.keys_path)[0]
 
@@ -1862,7 +1862,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with open(export_file, 'r') as fd:
             export_contents = fd.read()
 
-        assert export_contents.startswith('BORG_KEY ' + hexlify(repo_id).decode() + '\n')
+        assert export_contents.startswith('BORG_KEY ' + bin_to_hex(repo_id) + '\n')
 
         with Repository(self.repository_path) as repository:
             repo_key = RepoKey(repository)

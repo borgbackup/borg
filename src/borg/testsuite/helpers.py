@@ -823,21 +823,20 @@ def test_yes_input_custom():
     assert not yes(falsish=('NOPE', ), input=input)
 
 
-def test_yes_env():
+def test_yes_env(monkeypatch):
     for value in TRUISH:
-        with environment_variable(OVERRIDE_THIS=value):
-            assert yes(env_var_override='OVERRIDE_THIS')
+        monkeypatch.setenv('OVERRIDE_THIS', value)
+        assert yes(env_var_override='OVERRIDE_THIS')
     for value in FALSISH:
-        with environment_variable(OVERRIDE_THIS=value):
-            assert not yes(env_var_override='OVERRIDE_THIS')
+        monkeypatch.setenv('OVERRIDE_THIS', value)
+        assert not yes(env_var_override='OVERRIDE_THIS')
 
 
-def test_yes_env_default():
+def test_yes_env_default(monkeypatch):
     for value in DEFAULTISH:
-        with environment_variable(OVERRIDE_THIS=value):
-            assert yes(env_var_override='OVERRIDE_THIS', default=True)
-        with environment_variable(OVERRIDE_THIS=value):
-            assert not yes(env_var_override='OVERRIDE_THIS', default=False)
+        monkeypatch.setenv('OVERRIDE_THIS', value)
+        assert yes(env_var_override='OVERRIDE_THIS', default=True)
+        assert not yes(env_var_override='OVERRIDE_THIS', default=False)
 
 
 def test_yes_defaults():

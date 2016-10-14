@@ -69,6 +69,8 @@ class TestLocationWithoutEnv:
             "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive='archive')"
         assert repr(Location('/some/absolute/path')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive=None)"
+        assert repr(Location('ssh://user@host/some/path')) == \
+               "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
 
     def test_relpath(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
@@ -76,6 +78,12 @@ class TestLocationWithoutEnv:
             "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='archive')"
         assert repr(Location('some/relative/path')) == \
             "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive=None)"
+        assert repr(Location('ssh://user@host/./some/path')) == \
+               "Location(proto='ssh', user='user', host='host', port=None, path='/./some/path', archive=None)"
+        assert repr(Location('ssh://user@host/~/some/path')) == \
+               "Location(proto='ssh', user='user', host='host', port=None, path='/~/some/path', archive=None)"
+        assert repr(Location('ssh://user@host/~user/some/path')) == \
+               "Location(proto='ssh', user='user', host='host', port=None, path='/~user/some/path', archive=None)"
 
     def test_with_colons(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
@@ -107,7 +115,7 @@ class TestLocationWithoutEnv:
                      'ssh://user@host:1234/some/path::archive']
         for location in locations:
             assert Location(location).canonical_path() == \
-                Location(Location(location).canonical_path()).canonical_path()
+                Location(Location(location).canonical_path()).canonical_path(), "failed: %s" % location
 
     def test_format_path(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)

@@ -129,8 +129,10 @@ class RepositoryServer:  # pragma: no cover
 
     def open(self, path, create=False, lock_wait=None, lock=True, exclusive=None, append_only=False):
         path = os.fsdecode(path)
-        if path.startswith('/~'):
+        if path.startswith('/~'):  # /~/x = path x relative to home dir, /~username/x = relative to "user" home dir
             path = path[1:]
+        elif path.startswith('/./'):  # /./x = path x relative to cwd
+            path = path[3:]
         path = os.path.realpath(os.path.expanduser(path))
         if self.restrict_to_paths:
             # if --restrict-to-path P is given, we make sure that we only operate in/below path P.

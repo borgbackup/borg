@@ -97,7 +97,7 @@ class MockArgs:
 
 
 @pytest.fixture()
-def attic_key_file(attic_repo, tmpdir):
+def attic_key_file(attic_repo, tmpdir, monkeypatch):
     """
     create an attic key file from the given repo, in the keys
     subdirectory of the given tmpdir
@@ -112,13 +112,13 @@ def attic_key_file(attic_repo, tmpdir):
 
     # we use the repo dir for the created keyfile, because we do
     # not want to clutter existing keyfiles
-    os.environ['ATTIC_KEYS_DIR'] = keys_dir
+    monkeypatch.setenv('ATTIC_KEYS_DIR', keys_dir)
 
     # we use the same directory for the converted files, which
     # will clutter the previously created one, which we don't care
     # about anyways. in real runs, the original key will be retained.
-    os.environ['BORG_KEYS_DIR'] = keys_dir
-    os.environ['ATTIC_PASSPHRASE'] = 'test'
+    monkeypatch.setenv('BORG_KEYS_DIR', keys_dir)
+    monkeypatch.setenv('ATTIC_PASSPHRASE', 'test')
     return attic.key.KeyfileKey.create(attic_repo,
                                        MockArgs(keys_dir))
 

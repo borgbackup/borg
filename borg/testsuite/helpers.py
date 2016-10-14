@@ -17,7 +17,7 @@ from ..helpers import Location, format_file_size, format_timedelta, format_line,
     ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
     PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, \
     Buffer
-from . import BaseTestCase, environment_variable, FakeInputs
+from . import BaseTestCase, FakeInputs
 
 
 class BigIntTestCase(BaseTestCase):
@@ -653,8 +653,8 @@ def test_stats_basic(stats):
     assert stats.usize == 10
 
 
-def tests_stats_progress(stats, columns=80):
-    os.environ['COLUMNS'] = str(columns)
+def tests_stats_progress(stats, monkeypatch, columns=80):
+    monkeypatch.setenv('COLUMNS', str(columns))
     out = StringIO()
     stats.show_progress(stream=out)
     s = '20 B O 10 B C 10 B D 0 N '
@@ -811,21 +811,20 @@ def test_yes_input_custom():
     assert not yes(falsish=('NOPE', ), input=input)
 
 
-def test_yes_env():
+def test_yes_env(monkeypatch):
     for value in TRUISH:
-        with environment_variable(OVERRIDE_THIS=value):
-            assert yes(env_var_override='OVERRIDE_THIS')
+        monkeypatch.setenv('OVERRIDE_THIS', value)
+        assert yes(env_var_override='OVERRIDE_THIS')
     for value in FALSISH:
-        with environment_variable(OVERRIDE_THIS=value):
-            assert not yes(env_var_override='OVERRIDE_THIS')
+        monkeypatch.setenv('OVERRIDE_THIS', value)
+        assert not yes(env_var_override='OVERRIDE_THIS')
 
 
-def test_yes_env_default():
+def test_yes_env_default(monkeypatch):
     for value in DEFAULTISH:
-        with environment_variable(OVERRIDE_THIS=value):
-            assert yes(env_var_override='OVERRIDE_THIS', default=True)
-        with environment_variable(OVERRIDE_THIS=value):
-            assert not yes(env_var_override='OVERRIDE_THIS', default=False)
+        monkeypatch.setenv('OVERRIDE_THIS', value)
+        assert yes(env_var_override='OVERRIDE_THIS', default=True)
+        assert not yes(env_var_override='OVERRIDE_THIS', default=False)
 
 
 def test_yes_defaults():

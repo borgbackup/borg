@@ -1,8 +1,8 @@
 #BorgBackup
 ![GitHub Logo](https://borgbackup.readthedocs.io/en/stable/_static/logo.png)
 
-1. [Documentation](https://borgbackup.readthedocs.io/en/stable/index.html)
-2. [Original Project](https://github.com/borgbackup/borg)
+1. [Documentação](https://borgbackup.readthedocs.io/en/stable/index.html)
+2. [Projecto Original](https://github.com/borgbackup/borg)
 
 ##Descrição do Projeto
 

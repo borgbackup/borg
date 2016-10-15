@@ -41,6 +41,7 @@ from ..repository import Repository
 from . import has_lchflags, has_llfuse
 from . import BaseTestCase, changedir, environment_variable
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported
+from .platform import fakeroot_detected
 
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -1965,6 +1966,12 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
     @unittest.skip('test_overwrite seems incompatible with fakeroot and/or the binary.')
     def test_overwrite(self):
         pass
+
+    def test_fuse(self):
+        if fakeroot_detected():
+            unittest.skip('test_fuse with the binary is not compatible with fakeroot')
+        else:
+            super().test_fuse()
 
 
 class ArchiverCheckTestCase(ArchiverTestCaseBase):

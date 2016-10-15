@@ -107,7 +107,8 @@ def packages_openbsd
   return <<-EOF
     . ~/.profile
     mkdir -p /home/vagrant/borg
-    rsync -aH /vagrant/borg/ /home/vagrant/borg/
+    pkg_add rsync
+    /usr/local/bin/rsync -aH /vagrant/borg/ /home/vagrant/borg/
     rm -rf /vagrant/borg
     ln -sf /home/vagrant/borg /vagrant/
     pkg_add bash

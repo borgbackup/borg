@@ -106,10 +106,6 @@ end
 def packages_openbsd
   return <<-EOF
     . ~/.profile
-    mkdir -p /home/vagrant/borg
-    rsync -aH /vagrant/borg/ /home/vagrant/borg/
-    rm -rf /vagrant/borg
-    ln -sf /home/vagrant/borg /vagrant/
     pkg_add bash
     chsh -s /usr/local/bin/bash vagrant
     pkg_add openssl
@@ -121,6 +117,8 @@ def packages_openbsd
     easy_install-3.4 pip
     pip3 install virtualenv
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
+    # avoid that breaking llfuse install breaks borgbackup install under tox:
+    sed -i.bak '/fuse.txt/d' /vagrant/borg/borg/tox.ini
   EOF
 end
 
@@ -271,12 +269,12 @@ def run_tests(boxname)
     . ~/.bash_profile
     cd /vagrant/borg/borg
     . ../borg-env/bin/activate
-    if which pyenv > /dev/null; then
+    if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
       pyenv global 3.4.0 3.5.0
     fi
     # otherwise: just use the system python
-    if which fakeroot > /dev/null; then
+    if which fakeroot 2> /dev/null; then
       echo "Running tox WITH fakeroot -u"
       fakeroot -u tox --skip-missing-interpreters
     else
@@ -440,7 +438,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd64" do |b|
-    b.vm.box = "kaorimatz/openbsd-5.9-amd64"
+    b.vm.box = "openbsd60-64"  # note: basic openbsd install for vagrant WITH sudo and rsync pre-installed
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end

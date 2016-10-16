@@ -54,6 +54,11 @@ class Repository:
     class ObjectNotFound(ErrorWithTraceback):
         """Object with key {} not found in repository {}."""
 
+        def __init__(self, id, repo):
+            if isinstance(id, bytes):
+                id = hexlify(id).decode('ascii')
+            super().__init__(id, repo)
+
     def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True, append_only=False):
         self.path = os.path.abspath(path)
         self._location = Location('file://%s' % self.path)

@@ -19,7 +19,7 @@ from . import xattr
 from .helpers import Error, uid2user, user2uid, gid2group, group2gid, bin_to_hex, \
     parse_timestamp, to_localtime, format_time, format_timedelta, remove_surrogates, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
-    ProgressIndicatorPercent
+    ProgressIndicatorPercent, IntegrityError
 from .platform import acl_get, acl_set
 from .chunker import Chunker
 from .hashindex import ChunkIndex
@@ -827,13 +827,25 @@ class ArchiveChecker:
         self.error_found = False
         self.possibly_superseded = set()
 
-    def check(self, repository, repair=False, archive=None, last=None, prefix=None, save_space=False):
+    def check(self, repository, repair=False, archive=None, last=None, prefix=None, verify_data=False,
+              save_space=False):
+        """Perform a set of checks on 'repository'
+
+        :param repair: enable repair mode, write updated or corrected data into repository
+        :param archive: only check this archive
+        :param last: only check this number of recent archives
+        :param prefix: only check archives with this prefix
+        :param verify_data: integrity verification of data referenced by archives
+        :param save_space: Repository.commit(save_space)
+        """
         logger.info('Starting archive consistency check...')
         self.check_all = archive is None and last is None and prefix is None
         self.repair = repair
         self.repository = repository
         self.init_chunks()
         self.key = self.identify_key(repository)
+        if verify_data:
+            self.verify_data()
         if Manifest.MANIFEST_ID not in self.chunks:
             logger.error("Repository manifest not found!")
             self.error_found = True
@@ -874,6 +886,31 @@ class ArchiveChecker:
             return None
         cdata = repository.get(some_chunkid)
         return key_factory(repository, cdata)
+
+    def verify_data(self):
+        logger.info('Starting cryptographic data integrity verification...')
+        count = len(self.chunks)
+        errors = 0
+        pi = ProgressIndicatorPercent(total=count, msg="Verifying data %6.2f%%", step=0.01, same_line=True)
+        for chunk_id, (refcount, *_) in self.chunks.iteritems():
+            pi.show()
+            try:
+                encrypted_data = self.repository.get(chunk_id)
+            except Repository.ObjectNotFound:
+                self.error_found = True
+                errors += 1
+                logger.error('chunk %s not found', hexlify(chunk_id).decode('ascii'))
+                continue
+            try:
+                _chunk_id = None if chunk_id == Manifest.MANIFEST_ID else chunk_id
+                self.key.decrypt(_chunk_id, encrypted_data)
+            except IntegrityError as integrity_error:
+                self.error_found = True
+                errors += 1
+                logger.error('chunk %s, integrity error: %s', hexlify(chunk_id).decode('ascii'), integrity_error)
+        pi.finish()
+        log = logger.error if errors else logger.info
+        log('Finished cryptographic data integrity verification, verified %d chunks with %d integrity errors.', count, errors)
 
     def rebuild_manifest(self):
         """Rebuild the manifest object if it is missing
@@ -1057,6 +1094,8 @@ class ArchiveChecker:
         else:
             # we only want one specific archive
             archive_items = [item for item in self.manifest.archives.items() if item[0] == archive]
+            if not archive_items:
+                logger.error("Archive '%s' not found.", archive)
             num_archives = 1
             end = 1
 

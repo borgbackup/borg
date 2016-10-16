@@ -55,7 +55,11 @@ def get_all(path, follow_symlinks=True):
             return {}
 
 
-libc_name = find_library('c')
+libc_name = None
+try:
+    libc_name = find_library('c')
+except:
+    pass  # workaround for systems like android where find_library doesn't work
 if libc_name is None:
     # find_library didn't work, maybe we are on some minimal system that misses essential
     # tools used by find_library, like ldconfig, gcc/cc, objdump.

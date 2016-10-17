@@ -808,6 +808,22 @@ class Archiver:
         print('Done.')
         return EXIT_SUCCESS
 
+    @with_repository(manifest=False, exclusive=True, cache=True)
+    def do_debug_refcount_obj(self, args, repository, manifest, key, cache):
+        """display refcounts for the objects with the given IDs"""
+        for hex_id in args.ids:
+            try:
+                id = unhexlify(hex_id)
+            except ValueError:
+                print("object id %s is invalid." % hex_id)
+            else:
+                try:
+                    refcount = cache.chunks[id][0]
+                    print("object %s has %d referrers [info from chunks cache]." % (hex_id, refcount))
+                except KeyError:
+                    print("object %s not found [info from chunks cache]." % hex_id)
+        return EXIT_SUCCESS
+
     @with_repository(lock=False, manifest=False)
     def do_break_lock(self, args, repository):
         """Break the repository lock (e.g. in case it was left by a dead borg."""
@@ -1781,6 +1797,33 @@ class Archiver:
                                help='repository to use')
         subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
                                help='hex object ID(s) to delete from the repo')
+
+        debug_refcount_obj_epilog = textwrap.dedent("""
+        This command displays the reference count for objects from the repository.
+        """)
+        subparser = subparsers.add_parser('debug-refcount-obj', parents=[common_parser],
+                                          description=self.do_debug_refcount_obj.__doc__,
+                                          epilog=debug_refcount_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='show refcount for object from repository (debug)')
+        subparser.set_defaults(func=self.do_debug_refcount_obj)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
+                               help='hex object ID(s) to show refcounts for')
+
+        subparser = debug_parsers.add_parser('refcount-obj', parents=[common_parser],
+                                          description=self.do_debug_refcount_obj.__doc__,
+                                          epilog=debug_refcount_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='show refcount for object from repository (debug)')
+        subparser.set_defaults(func=self.do_debug_refcount_obj)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
+                               help='hex object ID(s) to show refcounts for')
 
         return parser
 

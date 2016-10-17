@@ -1508,6 +1508,28 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with self.fuse_mount(self.repository_location + '::archive', mountpoint, '-o', 'allow_damaged_files'):
             open(os.path.join(mountpoint, path)).close()
 
+    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    def test_fuse_mount_options(self):
+        self.cmd('init', self.repository_location)
+        self.create_src_archive('arch11')
+        self.create_src_archive('arch12')
+        self.create_src_archive('arch21')
+        self.create_src_archive('arch22')
+
+        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
+        with self.fuse_mount(self.repository_location, mountpoint, '--first=2', '--sort=name'):
+            assert sorted(os.listdir(os.path.join(mountpoint))) == ['arch11', 'arch12']
+        with self.fuse_mount(self.repository_location, mountpoint, '--last=2', '--sort=name'):
+            assert sorted(os.listdir(os.path.join(mountpoint))) == ['arch21', 'arch22']
+        with self.fuse_mount(self.repository_location, mountpoint, '--prefix=arch1'):
+            assert sorted(os.listdir(os.path.join(mountpoint))) == ['arch11', 'arch12']
+        with self.fuse_mount(self.repository_location, mountpoint, '--prefix=arch2'):
+            assert sorted(os.listdir(os.path.join(mountpoint))) == ['arch21', 'arch22']
+        with self.fuse_mount(self.repository_location, mountpoint, '--prefix=arch'):
+            assert sorted(os.listdir(os.path.join(mountpoint))) == ['arch11', 'arch12', 'arch21', 'arch22']
+        with self.fuse_mount(self.repository_location, mountpoint, '--prefix=nope'):
+            assert sorted(os.listdir(os.path.join(mountpoint))) == []
+
     def verify_aes_counter_uniqueness(self, method):
         seen = set()  # Chunks already seen
         used = set()  # counter values already used

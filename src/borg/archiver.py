@@ -783,7 +783,7 @@ class Archiver:
         if args.location.archive:
             archive_names = (args.location.archive,)
         else:
-            archive_names = tuple(x.name for x in self._get_filtered_archives(args, manifest))
+            archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
             if not archive_names:
                 return self.exit_code
 
@@ -825,7 +825,7 @@ class Archiver:
             else:
                 msg.append("You requested to completely DELETE the repository *including* all archives it "
                            "contains:")
-                for archive_info in manifest.archives.list(sort_by='ts'):
+                for archive_info in manifest.archives.list(sort_by=['ts']):
                     msg.append(format_archive(archive_info))
             msg.append("Type 'YES' if you understand this and want to continue: ")
             msg = '\n'.join(msg)
@@ -853,12 +853,7 @@ class Archiver:
             return self.exit_code
 
         with cache_if_remote(repository) as cached_repo:
-            if args.location.archive:
-                archive = Archive(repository, key, manifest, args.location.archive,
-                                  consider_part_files=args.consider_part_files)
-            else:
-                archive = None
-            operations = FuseOperations(key, repository, manifest, archive, cached_repo)
+            operations = FuseOperations(key, repository, manifest, args, cached_repo)
             logger.info("Mounting filesystem")
             try:
                 operations.mount(args.mountpoint, args.options, args.foreground)
@@ -909,7 +904,7 @@ class Archiver:
             format = "{archive:<36} {time} [{id}]{NL}"
         formatter = ArchiveFormatter(format)
 
-        for archive_info in self._get_filtered_archives(args, manifest):
+        for archive_info in manifest.archives.list_considering(args):
             write(safe_encode(formatter.format_item(archive_info)))
 
         return self.exit_code
@@ -929,7 +924,7 @@ class Archiver:
         if args.location.archive:
             archive_names = (args.location.archive,)
         else:
-            archive_names = tuple(x.name for x in self._get_filtered_archives(args, manifest))
+            archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
             if not archive_names:
                 return self.exit_code
 
@@ -981,7 +976,7 @@ class Archiver:
                              '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
                              '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.')
             return self.exit_code
-        archives_checkpoints = manifest.archives.list(sort_by='ts', reverse=True)  # just a ArchiveInfo list
+        archives_checkpoints = manifest.archives.list(sort_by=['ts'], reverse=True)  # just a ArchiveInfo list
         if args.prefix:
             archives_checkpoints = [arch for arch in archives_checkpoints if arch.name.startswith(args.prefix)]
         is_checkpoint = re.compile(r'\.checkpoint(\.\d+)?$').search
@@ -1099,7 +1094,7 @@ class Archiver:
                 if args.target is not None:
                     self.print_error('--target: Need to specify single archive')
                     return self.exit_code
-                for archive in manifest.archives.list(sort_by='ts'):
+                for archive in manifest.archives.list(sort_by=['ts']):
                     name = archive.name
                     if recreater.is_temporary_archive(name):
                         continue
@@ -2115,6 +2110,7 @@ class Archiver:
                                help='stay in foreground, do not daemonize')
         subparser.add_argument('-o', dest='options', type=str,
                                help='Extra mount options')
+        self.add_archives_filters_args(subparser)
 
         info_epilog = textwrap.dedent("""
         This command displays detailed information about the specified archive or repository.
@@ -2629,21 +2625,6 @@ class Archiver:
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
         return args.func(args)
-
-    def _get_filtered_archives(self, args, manifest):
-        if args.location.archive:
-            raise Error('The options --first, --last and --prefix can only be used on repository targets.')
-
-        archives = manifest.archives.list(prefix=args.prefix)
-
-        for sortkey in reversed(args.sort_by.split(',')):
-            archives.sort(key=attrgetter(sortkey))
-        if args.last:
-            archives.reverse()
-
-        n = args.first or args.last or len(archives)
-
-        return archives[:n]
 
 
 def sig_info_handler(sig_no, stack):  # pragma: no cover

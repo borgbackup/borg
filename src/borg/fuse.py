@@ -58,11 +58,11 @@ class FuseOperations(llfuse.Operations):
     allow_damaged_files = False
     versions = False
 
-    def __init__(self, key, repository, manifest, archive, cached_repo):
+    def __init__(self, key, repository, manifest, args, cached_repo):
         super().__init__()
         self.repository_uncached = repository
         self.repository = cached_repo
-        self.archive = archive
+        self.args = args
         self.manifest = manifest
         self.key = key
         self._inode_count = 0
@@ -79,11 +79,15 @@ class FuseOperations(llfuse.Operations):
 
     def _create_filesystem(self):
         self._create_dir(parent=1)  # first call, create root dir (inode == 1)
-        if self.archive:
-            self.process_archive(self.archive)
+        if self.args.location.archive:
+            archive = Archive(self.repository_uncached, self.key, self.manifest, self.args.location.archive,
+                              consider_part_files=self.args.consider_part_files)
+            self.process_archive(archive)
         else:
-            for name in self.manifest.archives:
-                archive = Archive(self.repository_uncached, self.key, self.manifest, name)
+            archive_names = (x.name for x in self.manifest.archives.list_considering(self.args))
+            for name in archive_names:
+                archive = Archive(self.repository_uncached, self.key, self.manifest, name,
+                                  consider_part_files=self.args.consider_part_files)
                 if self.versions:
                     # process archives immediately
                     self.process_archive(archive)

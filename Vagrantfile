@@ -144,6 +144,8 @@ def packages_netbsd
     easy_install-3.4 pip
     pip install virtualenv
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
+    # fuse does not work good enough (see above), do not install llfuse:
+    sed -i.bak '/fuse.txt/d' /vagrant/borg/borg/tox.ini
   EOF
 end
 
@@ -449,7 +451,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "netbsd64" do |b|
-    b.vm.box = "alex-skimlinks/netbsd-6.1.5-amd64"
+    b.vm.box = "netbsd70-64"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end

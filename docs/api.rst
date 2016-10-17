@@ -27,6 +27,10 @@ API Documentation
     :members:
     :undoc-members:
 
+.. automodule:: borg.keymanager
+    :members:
+    :undoc-members:
+
 .. automodule:: borg.logger
     :members:
     :undoc-members:

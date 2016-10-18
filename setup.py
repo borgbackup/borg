@@ -21,12 +21,17 @@ on_rtd = os.environ.get('READTHEDOCS')
 # Also, we might use some rather recent API features.
 install_requires = ['msgpack-python>=0.4.6', ]
 
+# note for package maintainers: if you package borgbackup for distribution,
+# please add llfuse as a *requirement* on all platforms that have a working
+# llfuse package. "borg mount" needs llfuse to work.
+# if you do not have llfuse, do not require it, most of borgbackup will work.
 extras_require = {
     # llfuse 0.40 (tested, proven, ok), needs FUSE version >= 2.8.0
     # llfuse 0.41 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 0.41.1 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 0.42 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 1.0 (tested shortly, looks ok), needs FUSE version >= 2.8.0
+    # llfuse 1.1.1 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 2.0 will break API
     'fuse': ['llfuse<2.0', ],
 }

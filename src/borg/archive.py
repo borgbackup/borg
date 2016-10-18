@@ -978,19 +978,19 @@ class ArchiveChecker:
         self.error_found = False
         self.possibly_superseded = set()
 
-    def check(self, repository, repair=False, archive=None, last=None, prefix=None, verify_data=False,
-              save_space=False):
+    def check(self, repository, repair=False, archive=None, first=0, last=0, sort_by='', prefix='',
+              verify_data=False, save_space=False):
         """Perform a set of checks on 'repository'
 
         :param repair: enable repair mode, write updated or corrected data into repository
         :param archive: only check this archive
-        :param last: only check this number of recent archives
+        :param first/last/sort_by: only check this number of first/last archives ordered by sort_by
         :param prefix: only check archives with this prefix
         :param verify_data: integrity verification of data referenced by archives
         :param save_space: Repository.commit(save_space)
         """
         logger.info('Starting archive consistency check...')
-        self.check_all = archive is None and last is None and prefix is None
+        self.check_all = archive is None and not any((first, last, prefix))
         self.repair = repair
         self.repository = repository
         self.init_chunks()
@@ -1003,7 +1003,7 @@ class ArchiveChecker:
             self.manifest = self.rebuild_manifest()
         else:
             self.manifest, _ = Manifest.load(repository, key=self.key)
-        self.rebuild_refcounts(archive=archive, last=last, prefix=prefix)
+        self.rebuild_refcounts(archive=archive, first=first, last=last, sort_by=sort_by, prefix=prefix)
         self.orphan_chunks_check()
         self.finish(save_space=save_space)
         if self.error_found:
@@ -1160,7 +1160,7 @@ class ArchiveChecker:
         logger.info('Manifest rebuild complete.')
         return manifest
 
-    def rebuild_refcounts(self, archive=None, last=None, prefix=None):
+    def rebuild_refcounts(self, archive=None, first=0, last=0, sort_by='', prefix=''):
         """Rebuild object reference counts by walking the metadata
 
         Missing and/or incorrect data is repaired when detected
@@ -1294,12 +1294,11 @@ class ArchiveChecker:
                     i += 1
 
         if archive is None:
-            # we need last N or all archives
-            archive_infos = self.manifest.archives.list(sort_by=['ts'], reverse=True)
-            if prefix is not None:
-                archive_infos = [info for info in archive_infos if info.name.startswith(prefix)]
-            num_archives = len(archive_infos)
-            end = None if last is None else min(num_archives, last)
+            sort_by = sort_by.split(',')
+            if any((first, last, prefix)):
+                archive_infos = self.manifest.archives.list(sort_by=sort_by, prefix=prefix, first=first, last=last)
+            else:
+                archive_infos = self.manifest.archives.list(sort_by=sort_by)
         else:
             # we only want one specific archive
             info = self.manifest.archives.get(archive)
@@ -1308,12 +1307,11 @@ class ArchiveChecker:
                 archive_infos = []
             else:
                 archive_infos = [info]
-            num_archives = 1
-            end = 1
+        num_archives = len(archive_infos)
 
         with cache_if_remote(self.repository) as repository:
-            for i, info in enumerate(archive_infos[:end]):
-                logger.info('Analyzing archive {} ({}/{})'.format(info.name, num_archives - i, num_archives))
+            for i, info in enumerate(archive_infos):
+                logger.info('Analyzing archive {} ({}/{})'.format(info.name, i + 1, num_archives))
                 archive_id = info.id
                 if archive_id not in self.chunks:
                     logger.error('Archive metadata block is missing!')

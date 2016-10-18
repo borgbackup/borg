@@ -206,16 +206,16 @@ class Archiver:
                        truish=('YES', ), retry=False,
                        env_var_override='BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
                 return EXIT_ERROR
-        if args.repo_only and args.verify_data:
-            self.print_error("--repository-only and --verify-data contradict each other. Please select one.")
+        if args.repo_only and any((args.verify_data, args.first, args.last, args.prefix)):
+            self.print_error("--repository-only contradicts --first, --last, --prefix and --verify-data arguments.")
             return EXIT_ERROR
         if not args.archives_only:
             if not repository.check(repair=args.repair, save_space=args.save_space):
                 return EXIT_WARNING
         if not args.repo_only and not ArchiveChecker().check(
                 repository, repair=args.repair, archive=args.location.archive,
-                last=args.last, prefix=args.prefix, verify_data=args.verify_data,
-                save_space=args.save_space):
+                first=args.first, last=args.last, sort_by=args.sort_by or 'ts', prefix=args.prefix,
+                verify_data=args.verify_data, save_space=args.save_space):
             return EXIT_WARNING
         return EXIT_SUCCESS
 
@@ -1660,14 +1660,10 @@ class Archiver:
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
                                help='work slower, but using less space')
-        subparser.add_argument('--last', dest='last',
-                               type=int, default=None, metavar='N',
-                               help='only check last N archives (Default: all)')
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec,
-                               help='only consider archive names starting with this prefix')
         subparser.add_argument('-p', '--progress', dest='progress',
                                action='store_true', default=False,
                                help="""show progress display while checking""")
+        self.add_archives_filters_args(subparser)
 
         change_passphrase_epilog = textwrap.dedent("""
         The key files used for repository encryption are optionally passphrase

@@ -155,7 +155,7 @@ class TestKey:
 
     def _corrupt_byte(self, key, data, offset):
         data = bytearray(data)
-        data[offset] += 1
+        data[offset] ^= 1
         with pytest.raises(IntegrityError):
             key.decrypt(b'', data)
 
@@ -186,7 +186,7 @@ class TestKey:
         id = key.id_hash(plaintext)
         key.assert_id(id, plaintext)
         id_changed = bytearray(id)
-        id_changed[0] += 1
+        id_changed[0] ^= 1
         with pytest.raises(IntegrityError):
             key.assert_id(id_changed, plaintext)
         plaintext_changed = plaintext + b'1'

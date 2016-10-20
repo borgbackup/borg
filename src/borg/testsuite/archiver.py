@@ -2014,6 +2014,12 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.assert_in('Starting archive consistency check', output)
         output = self.cmd('check', '-v', '--archives-only', '--prefix=archive2', self.repository_location, exit_code=0)
         self.assert_not_in('archive1', output)
+        output = self.cmd('check', '-v', '--archives-only', '--first=1', self.repository_location, exit_code=0)
+        self.assert_in('archive1', output)
+        self.assert_not_in('archive2', output)
+        output = self.cmd('check', '-v', '--archives-only', '--last=1', self.repository_location, exit_code=0)
+        self.assert_not_in('archive1', output)
+        self.assert_in('archive2', output)
 
     def test_missing_file_chunk(self):
         archive, repository = self.open_archive('archive1')

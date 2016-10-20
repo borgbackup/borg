@@ -26,7 +26,7 @@ from ..key import RepoKey, KeyfileKey, Passphrase
 from ..keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
-from . import BaseTestCase, changedir, environment_variable
+from . import BaseTestCase, changedir, environment_variable, no_selinux
 
 try:
     import llfuse
@@ -1067,7 +1067,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             in_fn = 'input/fusexattr'
             out_fn = os.path.join(mountpoint, 'input', 'fusexattr')
             if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
-                assert xattr.listxattr(out_fn) == ['user.foo', ]
+                assert no_selinux(xattr.listxattr(out_fn)) == ['user.foo', ]
                 assert xattr.getxattr(out_fn, 'user.foo') == b'bar'
             else:
                 assert xattr.listxattr(out_fn) == []

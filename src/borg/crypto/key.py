@@ -359,14 +359,14 @@ class AESKeyBase(KeyBase):
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)
         self.nonce_manager.ensure_reservation(num_aes_blocks(len(data)))
-        return self.enc_cipher.encrypt(data, header=self.TYPE_STR, aad_offset=1)
+        return self.cipher.encrypt(data, header=self.TYPE_STR, aad_offset=1)
 
     def decrypt(self, id, data, decompress=True):
         if not (data[0] == self.TYPE or
             data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             id_str = bin_to_hex(id) if id is not None else '(unknown)'
             raise IntegrityError('Chunk %s: Invalid encryption envelope' % id_str)
-        payload = self.enc_cipher.decrypt(data, header_len=1, aad_offset=1)
+        payload = self.cipher.decrypt(data, header_len=1, aad_offset=1)
         if not decompress:
             return payload
         data = self.decompress(payload)
@@ -392,9 +392,9 @@ class AESKeyBase(KeyBase):
             self.chunk_seed = self.chunk_seed - 0xffffffff - 1
 
     def init_ciphers(self, manifest_nonce=0):
-        self.enc_cipher = CIPHERSUITE(mac_key=self.enc_hmac_key, enc_key=self.enc_key,
-                                      iv=manifest_nonce.to_bytes(16, byteorder='big'))
-        self.nonce_manager = NonceManager(self.repository, self.enc_cipher, manifest_nonce)
+        self.cipher = CIPHERSUITE(mac_key=self.enc_hmac_key, enc_key=self.enc_key,
+                                  iv=manifest_nonce.to_bytes(16, byteorder='big'))
+        self.nonce_manager = NonceManager(self.repository, self.cipher, manifest_nonce)
 
 
 class Passphrase(str):

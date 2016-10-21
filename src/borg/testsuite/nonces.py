@@ -38,22 +38,19 @@ class TestNonceManager:
             self.iv_set = False  # placeholder, this is never a valid iv
             self.iv = iv
 
-        def reset(self, key, iv):
-            assert key is None
+        def set_iv(self, iv):
             assert iv is not False
             self.iv_set = iv
             self.iv = iv
+
+        def next_iv(self):
+            return self.iv
 
         def expect_iv_and_advance(self, expected_iv, advance):
             expected_iv = expected_iv.to_bytes(16, byteorder='big')
             iv_set = self.iv_set
             assert iv_set == expected_iv
             self.iv_set = False
-            self.iv = advance.to_bytes(16, byteorder='big')
-
-        def expect_no_reset_and_advance(self, advance):
-            iv_set = self.iv_set
-            assert iv_set is False
             self.iv = advance.to_bytes(16, byteorder='big')
 
     def setUp(self):
@@ -105,25 +102,25 @@ class TestNonceManager:
 
         # enough space in reservation
         manager.ensure_reservation(13)
-        enc_cipher.expect_no_reset_and_advance(0x2000 + 19 + 13)
+        enc_cipher.expect_iv_and_advance(0x2013, 0x2000 + 19 + 13)
         assert self.cache_nonce() == "0000000000002033"
         assert self.repository.next_free == 0x2033
 
         # just barely enough space in reservation
         manager.ensure_reservation(19)
-        enc_cipher.expect_no_reset_and_advance(0x2000 + 19 + 13 + 19)
+        enc_cipher.expect_iv_and_advance(0x2020, 0x2000 + 19 + 13 + 19)
         assert self.cache_nonce() == "0000000000002033"
         assert self.repository.next_free == 0x2033
 
         # no space in reservation
         manager.ensure_reservation(16)
-        enc_cipher.expect_no_reset_and_advance(0x2000 + 19 + 13 + 19 + 16)
+        enc_cipher.expect_iv_and_advance(0x2033, 0x2000 + 19 + 13 + 19 + 16)
         assert self.cache_nonce() == "0000000000002063"
         assert self.repository.next_free == 0x2063
 
         # spans reservation boundary
         manager.ensure_reservation(64)
-        enc_cipher.expect_no_reset_and_advance(0x2000 + 19 + 13 + 19 + 16 + 64)
+        enc_cipher.expect_iv_and_advance(0x2063, 0x2000 + 19 + 13 + 19 + 16 + 64) # XXX FIX
         assert self.cache_nonce() == "00000000000020c3"
         assert self.repository.next_free == 0x20c3
 
@@ -219,7 +216,7 @@ class TestNonceManager:
 
         # enough space in reservation
         manager.ensure_reservation(12)
-        enc_cipher.expect_no_reset_and_advance(0x2000 + 19 + 12)
+        enc_cipher.expect_iv_and_advance(0x2013, 0x2000 + 19 + 12)
         assert self.cache_nonce() == "0000000000002033"
         assert self.repository.next_free == 0x4000
 

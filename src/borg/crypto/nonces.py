@@ -14,9 +14,9 @@ NONCE_SPACE_RESERVATION = 2**28  # This in units of AES blocksize (16 bytes)
 
 
 class NonceManager:
-    def __init__(self, repository, enc_cipher, manifest_nonce):
+    def __init__(self, repository, cipher, manifest_nonce):
         self.repository = repository
-        self.enc_cipher = enc_cipher
+        self.cipher = cipher
         self.end_of_nonce_reservation = None
         self.manifest_nonce = manifest_nonce
         self.nonce_file = os.path.join(get_security_dir(self.repository.id_str), 'nonce')
@@ -64,9 +64,11 @@ class NonceManager:
 
         if self.end_of_nonce_reservation:
             # we already got a reservation, if nonce_space_needed still fits everything is ok
-            next_nonce = int.from_bytes(self.enc_cipher.iv, byteorder='big')
+            next_nonce_bytes = self.cipher.next_iv()
+            next_nonce = int.from_bytes(next_nonce_bytes, byteorder='big')
             assert next_nonce <= self.end_of_nonce_reservation
             if next_nonce + nonce_space_needed <= self.end_of_nonce_reservation:
+                self.cipher.set_iv(next_nonce_bytes)
                 return
 
         repo_free_nonce = self.get_repo_free_nonce()
@@ -74,14 +76,8 @@ class NonceManager:
         free_nonce_space = max(x for x in (repo_free_nonce, local_free_nonce, self.manifest_nonce, self.end_of_nonce_reservation) if x is not None)
         reservation_end = free_nonce_space + nonce_space_needed + NONCE_SPACE_RESERVATION
         assert reservation_end < MAX_REPRESENTABLE_NONCE
-        if self.end_of_nonce_reservation is None:
-            # initialization, reset the encryption cipher to the start of the reservation
-            self.enc_cipher.reset(None, free_nonce_space.to_bytes(16, byteorder='big'))
-        else:
-            # expand existing reservation if possible
-            if free_nonce_space != self.end_of_nonce_reservation:
-                # some other client got an interleaved reservation, skip partial space in old reservation to avoid overlap
-                self.enc_cipher.reset(None, free_nonce_space.to_bytes(16, byteorder='big'))
+        next_nonce_bytes = free_nonce_space.to_bytes(16, byteorder='big')
+        self.cipher.set_iv(next_nonce_bytes)
         self.commit_repo_nonce_reservation(reservation_end, repo_free_nonce)
         self.commit_local_nonce_reservation(reservation_end, local_free_nonce)
         self.end_of_nonce_reservation = reservation_end

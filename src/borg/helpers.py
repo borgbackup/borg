@@ -91,7 +91,7 @@ class ErrorWithTraceback(Error):
     traceback = True
 
 
-class IntegrityError(ErrorWithTraceback):
+class IntegrityError(ErrorWithTraceback, borg.crypto.low_level.IntegrityError):
     """Data integrity error: {}"""
 
 

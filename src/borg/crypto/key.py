@@ -11,7 +11,7 @@ from hmac import HMAC, compare_digest
 
 import msgpack
 
-from borg.logger import create_logger
+from ..logger import create_logger
 
 logger = create_logger()
 
@@ -25,10 +25,10 @@ from ..helpers import get_limited_unpacker
 from ..helpers import bin_to_hex
 from ..item import Key, EncryptedKey
 from ..platform import SaveFile
-from .nonces import NonceManager
-from .low_level import AES, bytes_to_long, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
 
-PREFIX = b'\0' * 8
+from .nonces import NonceManager
+from .low_level import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
+from .low_level import AES256_CTR_HMAC_SHA256 as CIPHERSUITE
 
 
 class PassphraseWrong(Error):
@@ -352,35 +352,21 @@ class AESKeyBase(KeyBase):
 
     PAYLOAD_OVERHEAD = 1 + 32 + 8  # TYPE + HMAC + NONCE
 
-    MAC = hmac_sha256
+    MAC = hmac_sha256  # TODO: not used yet
 
     logically_encrypted = True
 
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)
         self.nonce_manager.ensure_reservation(num_aes_blocks(len(data)))
-        self.enc_cipher.reset()
-        data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(data)))
-        assert (self.MAC is blake2b_256 and len(self.enc_hmac_key) == 128 or
-                self.MAC is hmac_sha256 and len(self.enc_hmac_key) == 32)
-        hmac = self.MAC(self.enc_hmac_key, data)
-        return b''.join((self.TYPE_STR, hmac, data))
+        return self.enc_cipher.encrypt(data, header=self.TYPE_STR, aad_offset=1)
 
     def decrypt(self, id, data, decompress=True):
         if not (data[0] == self.TYPE or
             data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             id_str = bin_to_hex(id) if id is not None else '(unknown)'
             raise IntegrityError('Chunk %s: Invalid encryption envelope' % id_str)
-        data_view = memoryview(data)
-        hmac_given = data_view[1:33]
-        assert (self.MAC is blake2b_256 and len(self.enc_hmac_key) == 128 or
-                self.MAC is hmac_sha256 and len(self.enc_hmac_key) == 32)
-        hmac_computed = memoryview(self.MAC(self.enc_hmac_key, data_view[33:]))
-        if not compare_digest(hmac_computed, hmac_given):
-            id_str = bin_to_hex(id) if id is not None else '(unknown)'
-            raise IntegrityError('Chunk %s: Encryption envelope checksum mismatch' % id_str)
-        self.dec_cipher.reset(iv=PREFIX + data[33:41])
-        payload = self.dec_cipher.decrypt(data_view[41:])
+        payload = self.enc_cipher.decrypt(data, header_len=1, aad_offset=1)
         if not decompress:
             return payload
         data = self.decompress(payload)
@@ -406,9 +392,9 @@ class AESKeyBase(KeyBase):
             self.chunk_seed = self.chunk_seed - 0xffffffff - 1
 
     def init_ciphers(self, manifest_nonce=0):
-        self.enc_cipher = AES(is_encrypt=True, key=self.enc_key, iv=manifest_nonce.to_bytes(16, byteorder='big'))
+        self.enc_cipher = CIPHERSUITE(mac_key=self.enc_hmac_key, enc_key=self.enc_key,
+                                      iv=manifest_nonce.to_bytes(16, byteorder='big'))
         self.nonce_manager = NonceManager(self.repository, self.enc_cipher, manifest_nonce)
-        self.dec_cipher = AES(is_encrypt=False, key=self.enc_key)
 
 
 class Passphrase(str):
@@ -772,7 +758,7 @@ class Blake2KeyfileKey(ID_BLAKE2b_256, KeyfileKey):
     STORAGE = KeyBlobStorage.KEYFILE
 
     FILE_ID = 'BORG_KEY'
-    MAC = blake2b_256
+    MAC = blake2b_256  # TODO: not used yet
 
 
 class Blake2RepoKey(ID_BLAKE2b_256, RepoKey):
@@ -781,7 +767,7 @@ class Blake2RepoKey(ID_BLAKE2b_256, RepoKey):
     ARG_NAME = 'repokey-blake2'
     STORAGE = KeyBlobStorage.REPO
 
-    MAC = blake2b_256
+    MAC = blake2b_256  # TODO: not used yet
 
 
 class AuthenticatedKeyBase(RepoKey):
@@ -816,7 +802,8 @@ class AuthenticatedKeyBase(RepoKey):
 
     def decrypt(self, id, data, decompress=True):
         if data[0] != self.TYPE:
-            raise IntegrityError('Chunk %s: Invalid envelope' % bin_to_hex(id))
+            id_str = bin_to_hex(id) if id is not None else '(unknown)'
+            raise IntegrityError('Chunk %s: Invalid envelope' % id_str)
         payload = memoryview(data)[1:]
         if not decompress:
             return payload

@@ -111,6 +111,9 @@ Directories and files:
         Default to '~/.config/borg/keys'. This directory contains keys for encrypted repositories.
     BORG_KEY_FILE
         When set, use the given filename as repository key file.
+    BORG_NONCES_DIR
+        Default to '~/.config/borg/key-nonces'. This directory contains information borg uses to
+        track its usage of NONCES ("numbers used once" - usually in encryption context).
     BORG_CACHE_DIR
         Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
         of space for dealing with big repositories).

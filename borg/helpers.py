@@ -28,6 +28,7 @@ from fnmatch import translate
 from operator import attrgetter
 
 from . import __version__ as borg_version
+from . import __version_tuple__ as borg_version_tuple
 from . import hashindex
 from . import chunker
 from . import crypto
@@ -585,6 +586,9 @@ def replace_placeholders(text):
         'utcnow': current_time.utcnow(),
         'user': uid2user(os.getuid(), os.getuid()),
         'borgversion': borg_version,
+        'borgmajor': '%d' % borg_version_tuple[:1],
+        'borgminor': '%d.%d' % borg_version_tuple[:2],
+        'borgpatch': '%d.%d.%d' % borg_version_tuple[:3],
     }
     return format_line(text, data)
 

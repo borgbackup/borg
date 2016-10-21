@@ -949,7 +949,19 @@ class Archiver:
 
         {borgversion}
 
-            The version of borg.
+            The version of borg, e.g.: 1.0.8rc1
+
+        {borgmajor}
+
+            The version of borg, only the major version, e.g.: 1
+
+        {borgminor}
+
+            The version of borg, only major and minor version, e.g.: 1.0
+
+        {borgpatch}
+
+            The version of borg, only major, minor and patch version, e.g.: 1.0.8
 
        Examples::
 
@@ -1229,8 +1241,8 @@ class Archiver:
         '.checkpoint.N' (with N being a number), because these names are used for
         checkpoints and treated in special ways.
 
-        In the archive name, you may use the following format tags:
-        {now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}, {borgversion}
+        In the archive name, you may use the following placeholders:
+        {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 
         To speed up pulling backups over sshfs and similar network file systems which do
         not provide correct inode information the --ignore-inode flag can be used. This

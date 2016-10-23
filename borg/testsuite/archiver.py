@@ -1089,19 +1089,26 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             sto = os.stat(out_fn)
             assert stat.S_ISFIFO(sto.st_mode)
             # list/read xattrs
-            in_fn = 'input/fusexattr'
-            out_fn = os.path.join(mountpoint, 'input', 'fusexattr')
-            if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
-                assert no_selinux(xattr.listxattr(out_fn)) == ['user.foo', ]
-                assert xattr.getxattr(out_fn, 'user.foo') == b'bar'
-            else:
-                assert xattr.listxattr(out_fn) == []
-                try:
-                    xattr.getxattr(out_fn, 'user.foo')
-                except OSError as e:
-                    assert e.errno == llfuse.ENOATTR
+            try:
+                in_fn = 'input/fusexattr'
+                out_fn = os.path.join(mountpoint, 'input', 'fusexattr')
+                if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
+                    assert no_selinux(xattr.listxattr(out_fn)) == ['user.foo', ]
+                    assert xattr.getxattr(out_fn, 'user.foo') == b'bar'
                 else:
-                    assert False, "expected OSError(ENOATTR), but no error was raised"
+                    assert xattr.listxattr(out_fn) == []
+                    try:
+                        xattr.getxattr(out_fn, 'user.foo')
+                    except OSError as e:
+                        assert e.errno == llfuse.ENOATTR
+                    else:
+                        assert False, "expected OSError(ENOATTR), but no error was raised"
+            except OSError as err:
+                if sys.platform.startswith(('freebsd', )) and err.errno == errno.ENOTSUP:
+                    # some systems have no xattr support on FUSE
+                    pass
+                else:
+                    raise
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
     def test_fuse_allow_damaged_files(self):

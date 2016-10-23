@@ -1040,11 +1040,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
         # mount the whole repository, archive contents shall show up in archivename subdirs of mountpoint:
         with self.fuse_mount(self.repository_location, mountpoint):
-            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive', 'input'))
-            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive2', 'input'))
+            # bsdflags are not supported by the FUSE mount
+            # we also ignore xattrs here, they are tested separately
+            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive', 'input'),
+                                   ignore_bsdflags=True, ignore_xattrs=True)
+            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive2', 'input'),
+                                   ignore_bsdflags=True, ignore_xattrs=True)
         # mount only 1 archive, its contents shall show up directly in mountpoint:
         with self.fuse_mount(self.repository_location + '::archive', mountpoint):
-            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'))
+            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'),
+                                   ignore_bsdflags=True, ignore_xattrs=True)
             # regular file
             in_fn = 'input/file1'
             out_fn = os.path.join(mountpoint, 'input', 'file1')

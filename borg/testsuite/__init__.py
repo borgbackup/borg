@@ -60,11 +60,11 @@ class BaseTestCase(unittest.TestCase):
         yield
         self.assert_true(os.path.exists(path), '{} should exist'.format(path))
 
-    def assert_dirs_equal(self, dir1, dir2):
+    def assert_dirs_equal(self, dir1, dir2, **kwargs):
         diff = filecmp.dircmp(dir1, dir2)
-        self._assert_dirs_equal_cmp(diff)
+        self._assert_dirs_equal_cmp(diff, **kwargs)
 
-    def _assert_dirs_equal_cmp(self, diff):
+    def _assert_dirs_equal_cmp(self, diff, ignore_bsdflags=False, ignore_xattrs=False):
         self.assert_equal(diff.left_only, [])
         self.assert_equal(diff.right_only, [])
         self.assert_equal(diff.diff_files, [])
@@ -77,7 +77,7 @@ class BaseTestCase(unittest.TestCase):
             # Assume path2 is on FUSE if st_dev is different
             fuse = s1.st_dev != s2.st_dev
             attrs = ['st_mode', 'st_uid', 'st_gid', 'st_rdev']
-            if has_lchflags:
+            if has_lchflags and not ignore_bsdflags:
                 attrs.append('st_flags')
             if not fuse or not os.path.isdir(path1):
                 # dir nlink is always 1 on our fuse filesystem
@@ -96,11 +96,12 @@ class BaseTestCase(unittest.TestCase):
             else:
                 d1.append(round(s1.st_mtime_ns, st_mtime_ns_round))
                 d2.append(round(s2.st_mtime_ns, st_mtime_ns_round))
-            d1.append(no_selinux(get_all(path1, follow_symlinks=False)))
-            d2.append(no_selinux(get_all(path2, follow_symlinks=False)))
+            if not ignore_xattrs:
+                d1.append(no_selinux(get_all(path1, follow_symlinks=False)))
+                d2.append(no_selinux(get_all(path2, follow_symlinks=False)))
             self.assert_equal(d1, d2)
         for sub_diff in diff.subdirs.values():
-            self._assert_dirs_equal_cmp(sub_diff)
+            self._assert_dirs_equal_cmp(sub_diff, ignore_bsdflags=ignore_bsdflags, ignore_xattrs=ignore_xattrs)
 
     @contextmanager
     def fuse_mount(self, location, mountpoint, *options):

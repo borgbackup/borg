@@ -149,10 +149,10 @@ package manager to install and keep borg up-to-date.
     - authorized_key: user="{{ user }}"
                       key="{{ item.key }}"
                       key_options='command="cd {{ pool }}/{{ item.host }};borg serve --restrict-to-path {{ pool }}/{{ item.host }}",no-port-forwarding,no-X11-forwarding,no-pty,no-agent-forwarding,no-user-rc'
-      with_items: auth_users
+      with_items: "{{ auth_users }}"
     - file: path="{{ home }}/.ssh/authorized_keys" owner="{{ user }}" group="{{ group }}" mode=0600 state=file
     - file: path="{{ pool }}/{{ item.host }}" owner="{{ user }}" group="{{ group }}" mode=0700 state=directory
-      with_items: auth_users
+      with_items: "{{ auth_users }}"
 
 Enhancements
 ------------

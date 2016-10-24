@@ -117,6 +117,15 @@ def is_utime_fully_supported():
         return False
 
 
+def no_selinux(x):
+    # selinux fails our FUSE tests, thus ignore selinux xattrs
+    SELINUX_KEY = 'security.selinux'
+    if isinstance(x, dict):
+        return {k: v for k, v in x.items() if k != SELINUX_KEY}
+    if isinstance(x, list):
+        return [k for k in x if k != SELINUX_KEY]
+
+
 class BaseTestCase(unittest.TestCase):
     """
     """
@@ -176,8 +185,8 @@ class BaseTestCase(unittest.TestCase):
                 else:
                     d1.append(round(s1.st_mtime_ns, st_mtime_ns_round))
                     d2.append(round(s2.st_mtime_ns, st_mtime_ns_round))
-            d1.append(get_all(path1, follow_symlinks=False))
-            d2.append(get_all(path2, follow_symlinks=False))
+            d1.append(no_selinux(get_all(path1, follow_symlinks=False)))
+            d2.append(no_selinux(get_all(path2, follow_symlinks=False)))
             self.assert_equal(d1, d2)
         for sub_diff in diff.subdirs.values():
             self._assert_dirs_equal_cmp(sub_diff)

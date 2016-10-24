@@ -25,6 +25,8 @@ def packages_debianoid
     # for building borgbackup and dependencies:
     apt-get install -y libssl-dev libacl1-dev liblz4-dev libfuse-dev fuse pkg-config
     usermod -a -G fuse $username
+    chgrp fuse /dev/fuse
+    chmod 666 /dev/fuse
     apt-get install -y fakeroot build-essential git
     apt-get install -y python3-dev python3-setuptools
     # for building python:
@@ -45,6 +47,8 @@ def packages_redhatted
     # for building borgbackup and dependencies:
     yum install -y openssl-devel openssl libacl-devel libacl lz4-devel fuse-devel fuse pkgconfig
     usermod -a -G fuse vagrant
+    chgrp fuse /dev/fuse
+    chmod 666 /dev/fuse
     yum install -y fakeroot gcc git patch
     # needed to compile msgpack-python (otherwise it will use slow fallback code):
     yum install -y gcc-c++
@@ -96,6 +100,8 @@ def packages_freebsd
     kldload fuse
     sysctl vfs.usermount=1
     pw groupmod operator -M vagrant
+    # /dev/fuse has group operator
+    chmod 666 /dev/fuse
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
     # install all the (security and other) updates, packages
     pkg update
@@ -106,10 +112,6 @@ end
 def packages_openbsd
   return <<-EOF
     . ~/.profile
-    mkdir -p /home/vagrant/borg
-    rsync -aH /vagrant/borg/ /home/vagrant/borg/
-    rm -rf /vagrant/borg
-    ln -sf /home/vagrant/borg /vagrant/
     pkg_add bash
     chsh -s /usr/local/bin/bash vagrant
     pkg_add openssl
@@ -121,6 +123,8 @@ def packages_openbsd
     easy_install-3.4 pip
     pip3 install virtualenv
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
+    # avoid that breaking llfuse install breaks borgbackup install under tox:
+    sed -i.bak '/fuse.txt/d' /vagrant/borg/borg/tox.ini
   EOF
 end
 
@@ -146,6 +150,8 @@ def packages_netbsd
     easy_install-3.4 pip
     pip install virtualenv
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
+    # fuse does not work good enough (see above), do not install llfuse:
+    sed -i.bak '/fuse.txt/d' /vagrant/borg/borg/tox.ini
   EOF
 end
 
@@ -273,13 +279,13 @@ def run_tests(boxname)
     . ~/.bash_profile
     cd /vagrant/borg/borg
     . ../borg-env/bin/activate
-    if which pyenv > /dev/null; then
+    if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
       pyenv global 3.4.0 3.5.0
       pyenv local 3.4.0 3.5.0
     fi
     # otherwise: just use the system python
-    if which fakeroot > /dev/null; then
+    if which fakeroot 2> /dev/null; then
       echo "Running tox WITH fakeroot -u"
       fakeroot -u tox --skip-missing-interpreters
     else
@@ -304,7 +310,7 @@ end
 
 Vagrant.configure(2) do |config|
   # use rsync to copy content to the folder
-  config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"]
+  config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"], :rsync__chown => false
   # do not let the VM access . on the host machine via the default shared folder!
   config.vm.synced_folder ".", "/vagrant", disabled: true
 
@@ -443,7 +449,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd64" do |b|
-    b.vm.box = "kaorimatz/openbsd-5.9-amd64"
+    b.vm.box = "openbsd60-64"  # note: basic openbsd install for vagrant WITH sudo and rsync pre-installed
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
@@ -454,7 +460,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "netbsd64" do |b|
-    b.vm.box = "alex-skimlinks/netbsd-6.1.5-amd64"
+    b.vm.box = "netbsd70-64"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end

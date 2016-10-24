@@ -39,8 +39,10 @@ from ..keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import has_lchflags, has_llfuse
-from . import BaseTestCase, changedir, environment_variable
+from . import BaseTestCase, changedir, environment_variable, no_selinux
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported
+from .platform import fakeroot_detected
+
 
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -1428,7 +1430,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             in_fn = 'input/fusexattr'
             out_fn = os.path.join(mountpoint, 'input', 'fusexattr')
             if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
-                assert xattr.listxattr(out_fn) == ['user.foo', ]
+                assert no_selinux(xattr.listxattr(out_fn)) == ['user.foo', ]
                 assert xattr.getxattr(out_fn, 'user.foo') == b'bar'
             else:
                 assert xattr.listxattr(out_fn) == []
@@ -1987,6 +1989,12 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
     @unittest.skip('test_overwrite seems incompatible with fakeroot and/or the binary.')
     def test_overwrite(self):
         pass
+
+    def test_fuse(self):
+        if fakeroot_detected():
+            unittest.skip('test_fuse with the binary is not compatible with fakeroot')
+        else:
+            super().test_fuse()
 
 
 class ArchiverCheckTestCase(ArchiverTestCaseBase):

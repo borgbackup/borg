@@ -897,8 +897,13 @@ That's all to it.
 Drawbacks
 +++++++++
 
-As data is only appended, and nothing deleted, commands like ``prune`` or ``delete``
+As data is only appended, and nothing removed, commands like ``prune`` or ``delete``
 won't free disk space, they merely tag data as deleted in a new transaction.
+
+Be aware that as soon as you write to the repo in non-append-only mode (e.g. prune,
+delete or create archives from an admin machine), it will remove the deleted objects
+permanently (including the ones that were already marked as deleted, but not removed,
+in append-only mode).
 
 Note that you can go back-and-forth between normal and append-only operation by editing
 the configuration file, it's not a "one way trip".

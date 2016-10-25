@@ -50,6 +50,48 @@ The best check that everything is ok is to run a dry-run extraction::
     borg extract -v --dry-run REPO::ARCHIVE
 
 
+Version 1.0.8 (2016-10-29)
+--------------------------
+
+Bug fixes:
+
+- RemoteRepository: Fix busy wait in call_many, #940
+
+New features:
+
+- implement borgmajor/borgminor/borgpatch placeholders, #1694
+  {borgversion} was already there (full version string). With the new
+  placeholders you can now also get e.g. 1 or 1.0 or 1.0.8.
+
+Other changes:
+
+- avoid previous_location mismatch, #1741
+
+  due to the changed canonicalization for relative pathes in PR #1711 / #1655
+  (implement /./ relpath hack), there would be a changed repo location warning
+  and the user would be asked if this is ok. this would break automation and
+  require manual intervention, which is unwanted.
+
+  thus, we automatically fix the previous_location config entry, if it only
+  changed in the expected way, but still means the same location.
+
+- docs:
+
+  - deployment.rst: do not use bare variables in ansible snippet
+  - add clarification about append-only mode, #1689
+  - setup.py: add comment about requiring llfuse, #1726
+  - update usage.rst / api.rst
+  - repo url / archive location docs + typo fix
+  - quickstart: add a comment about other (remote) filesystems
+
+- vagrant / tests:
+
+  - no chown when rsyncing (fixes boxes w/o vagrant group)
+  - fix fuse permission issues on linux/freebsd, #1544
+  - skip fuse test for borg binary + fakeroot
+  - ignore security.selinux xattrs, fixes tests on centos, #1735
+
+
 Version 1.0.8rc1 (2016-10-17)
 -----------------------------
 
@@ -72,8 +114,8 @@ Bug fixes:
   (this seems not to get triggered in 1.0.x, but was discovered in master)
 - hashindex: fix iterators (always raise StopIteration when exhausted)
   (this seems not to get triggered in 1.0.x, but was discovered in master)
-- enable relative pathes in ssh:// repo URLs, via /./relpath hack, fixes #1655
-- allow repo pathes with colons, fixes #1705
+- enable relative pathes in ssh:// repo URLs, via /./relpath hack, #1655
+- allow repo pathes with colons, #1705
 - update changed repo location immediately after acceptance, #1524
 - fix debug get-obj / delete-obj crash if object not found and remote repo,
   #1684
@@ -105,7 +147,7 @@ Other changes:
     appears not only in the traceback, but also in the (short) error message,
     #1572
   - borg.key: include chunk id in exception msgs, #1571
-  - better messages for cache newer than repo, fixes #1700
+  - better messages for cache newer than repo, #1700
 - vagrant (testing/build VMs):
 
   - upgrade OSXfuse / FUSE for macOS to 3.5.2

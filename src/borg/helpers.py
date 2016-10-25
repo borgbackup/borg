@@ -34,6 +34,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from . import __version__ as borg_version
+from . import __version_tuple__ as borg_version_tuple
 from . import chunker
 from . import crypto
 from . import hashindex
@@ -664,6 +665,9 @@ def replace_placeholders(text):
         'user': uid2user(os.getuid(), os.getuid()),
         'uuid4': str(uuid.uuid4()),
         'borgversion': borg_version,
+        'borgmajor': '%d' % borg_version_tuple[:1],
+        'borgminor': '%d.%d' % borg_version_tuple[:2],
+        'borgpatch': '%d.%d.%d' % borg_version_tuple[:3],
     }
     return format_line(text, data)
 
@@ -945,26 +949,32 @@ class Location:
         return True
 
     def _parse(self, text):
+        def normpath_special(p):
+            # avoid that normpath strips away our relative path hack and even makes p absolute
+            relative = p.startswith('/./')
+            p = os.path.normpath(p)
+            return ('/.' + p) if relative else p
+
         m = self.ssh_re.match(text)
         if m:
             self.proto = m.group('proto')
             self.user = m.group('user')
             self.host = m.group('host')
             self.port = m.group('port') and int(m.group('port')) or None
-            self.path = os.path.normpath(m.group('path'))
+            self.path = normpath_special(m.group('path'))
             self.archive = m.group('archive')
             return True
         m = self.file_re.match(text)
         if m:
             self.proto = m.group('proto')
-            self.path = os.path.normpath(m.group('path'))
+            self.path = normpath_special(m.group('path'))
             self.archive = m.group('archive')
             return True
         m = self.scp_re.match(text)
         if m:
             self.user = m.group('user')
             self.host = m.group('host')
-            self.path = os.path.normpath(m.group('path'))
+            self.path = normpath_special(m.group('path'))
             self.archive = m.group('archive')
             self.proto = self.host and 'ssh' or 'file'
             return True
@@ -995,9 +1005,9 @@ class Location:
             return self.path
         else:
             if self.path and self.path.startswith('~'):
-                path = '/' + self.path
+                path = '/' + self.path  # /~/x = path x relative to home dir
             elif self.path and not self.path.startswith('/'):
-                path = '/~/' + self.path
+                path = '/./' + self.path  # /./x = path x relative to cwd
             else:
                 path = self.path
             return 'ssh://{}{}{}{}'.format('{}@'.format(self.user) if self.user else '',

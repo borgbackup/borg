@@ -218,8 +218,8 @@ Other changes:
   - ChunkBuffer: add test for leaving partial chunk in buffer, fixes #945
 
 
-Version 1.0.8rc1 (not released yet)
------------------------------------
+Version 1.0.8rc1 (2016-10-17)
+-----------------------------
 
 Bug fixes:
 
@@ -231,15 +231,22 @@ Bug fixes:
   also correctly processes broken symlinks. before this regressed to a crash
   (5b45385) a broken symlink would've been skipped.
 - process_symlink: fix missing backup_io()
-  Fixes a chmod/chown/chgrp/unlink/rename/... crash race between getting dirents
-  and dispatching to process_symlink.
-- yes(): abort on wrong answers, saying so
+  Fixes a chmod/chown/chgrp/unlink/rename/... crash race between getting
+  dirents and dispatching to process_symlink.
+- yes(): abort on wrong answers, saying so, #1622
 - fixed exception borg serve raised when connection was closed before reposiory
   was openend. add an error message for this.
 - fix read-from-closed-FD issue, #1551
   (this seems not to get triggered in 1.0.x, but was discovered in master)
 - hashindex: fix iterators (always raise StopIteration when exhausted)
   (this seems not to get triggered in 1.0.x, but was discovered in master)
+- enable relative pathes in ssh:// repo URLs, via /./relpath hack, fixes #1655
+- allow repo pathes with colons, fixes #1705
+- update changed repo location immediately after acceptance, #1524
+- fix debug get-obj / delete-obj crash if object not found and remote repo,
+  #1684
+- pyinstaller: use a spec file to build borg.exe binary, exclude osxfuse dylib
+  on Mac OS X (avoids mismatch lib <-> driver), #1619
 
 New features:
 
@@ -250,6 +257,8 @@ New features:
   special "paper" format with by line checksums for printed backups. For the
   paper format, the import is an interactive process which checks each line as
   soon as it is input.
+- add "borg debug-refcount-obj" to determine a repo objects' referrer counts,
+  #1352
 
 Other changes:
 
@@ -258,10 +267,19 @@ Other changes:
 - setup.py: Add subcommand support to build_usage.
 - remote: change exception message for unexpected RPC data format to indicate
   dataflow direction.
-- vagrant:
+- improved messages / error reporting:
+
+  - IntegrityError: add placeholder for message, so that the message we give
+    appears not only in the traceback, but also in the (short) error message,
+    #1572
+  - borg.key: include chunk id in exception msgs, #1571
+  - better messages for cache newer than repo, fixes #1700
+- vagrant (testing/build VMs):
 
   - upgrade OSXfuse / FUSE for macOS to 3.5.2
-  - update Debian Wheezy boxes to 7.11
+  - update Debian Wheezy boxes, #1686
+  - openbsd / netbsd: use own boxes, fixes misc rsync installation and
+    fuse/llfuse related testing issues, #1695 #1696 #1670 #1671 #1728
 - docs:
 
   - add docs for "key export" and "key import" commands, #1641
@@ -277,12 +295,17 @@ Other changes:
   - add debug-info usage help file
   - internals.rst: fix typos
   - setup.py: fix build_usage to always process all commands
+  - added docs explaining multiple --restrict-to-path flags, #1602
+  - add more specific warning about write-access debug commands, #1587
+  - clarify FAQ regarding backup of virtual machines, #1672
 - tests:
 
   - work around fuse xattr test issue with recent fakeroot
   - simplify repo/hashindex tests
   - travis: test fuse-enabled borg, use trusty to have a recent FUSE
   - re-enable fuse tests for RemoteArchiver (no deadlocks any more)
+  - clean env for pytest based tests, #1714
+  - fuse_mount contextmanager: accept any options
 
 
 Version 1.0.7 (2016-08-19)

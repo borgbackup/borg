@@ -1176,7 +1176,7 @@ class Archiver:
         else:
             try:
                 data = repository.get(id)
-            except repository.ObjectNotFound:
+            except Repository.ObjectNotFound:
                 print("object %s not found." % hex_id)
             else:
                 with open(args.path, "wb") as f:
@@ -1210,11 +1210,27 @@ class Archiver:
                     repository.delete(id)
                     modified = True
                     print("object %s deleted." % hex_id)
-                except repository.ObjectNotFound:
+                except Repository.ObjectNotFound:
                     print("object %s not found." % hex_id)
         if modified:
             repository.commit()
         print('Done.')
+        return EXIT_SUCCESS
+
+    @with_repository(manifest=False, exclusive=True, cache=True)
+    def do_debug_refcount_obj(self, args, repository, manifest, key, cache):
+        """display refcounts for the objects with the given IDs"""
+        for hex_id in args.ids:
+            try:
+                id = unhexlify(hex_id)
+            except ValueError:
+                print("object id %s is invalid." % hex_id)
+            else:
+                try:
+                    refcount = cache.chunks[id][0]
+                    print("object %s has %d referrers [info from chunks cache]." % (hex_id, refcount))
+                except KeyError:
+                    print("object %s not found [info from chunks cache]." % hex_id)
         return EXIT_SUCCESS
 
     @with_repository(lock=False, manifest=False)
@@ -1344,7 +1360,19 @@ class Archiver:
 
         {borgversion}
 
-            The version of borg.
+            The version of borg, e.g.: 1.0.8rc1
+
+        {borgmajor}
+
+            The version of borg, only the major version, e.g.: 1
+
+        {borgminor}
+
+            The version of borg, only major and minor version, e.g.: 1.0
+
+        {borgpatch}
+
+            The version of borg, only major, minor and patch version, e.g.: 1.0.8
 
         Examples::
 
@@ -1777,8 +1805,8 @@ class Archiver:
         '.checkpoint.N' (with N being a number), because these names are used for
         checkpoints and treated in special ways.
 
-        In the archive name, you may use the following format tags:
-        {now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}, {uuid4}, {borgversion}
+        In the archive name, you may use the following placeholders:
+        {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 
         To speed up pulling backups over sshfs and similar network file systems which do
         not provide correct inode information the --ignore-inode flag can be used. This
@@ -2540,6 +2568,21 @@ class Archiver:
                                help='repository to use')
         subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
                                help='hex object ID(s) to delete from the repo')
+
+        debug_refcount_obj_epilog = textwrap.dedent("""
+        This command displays the reference count for objects from the repository.
+        """)
+        subparser = debug_parsers.add_parser('refcount-obj', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_refcount_obj.__doc__,
+                                          epilog=debug_refcount_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='show refcount for object from repository (debug)')
+        subparser.set_defaults(func=self.do_debug_refcount_obj)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
+                               help='hex object ID(s) to show refcounts for')
 
         return parser
 

@@ -168,7 +168,7 @@ class Repository:
         config.add_section('repository')
         config.set('repository', 'version', '1')
         config.set('repository', 'segments_per_dir', str(DEFAULT_SEGMENTS_PER_DIR))
-        config.set('repository', 'max_segment_size', str(DEFAULT_MAX_SEGMENT_SIZE))
+        config.set('repository', 'peripheral_segment_size', str(DEFAULT_MAX_SEGMENT_SIZE))
         config.set('repository', 'append_only', str(int(self.append_only)))
         config.set('repository', 'additional_free_space', '0')
         config.set('repository', 'id', bin_to_hex(os.urandom(32)))
@@ -262,14 +262,14 @@ class Repository:
         if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:
             self.close()
             raise self.InvalidRepository(path)
-        self.max_segment_size = self.config.getint('repository', 'max_segment_size')
+        self.peripheral_segment_size = self.config.getint('repository', 'max_segment_size')
         self.segments_per_dir = self.config.getint('repository', 'segments_per_dir')
         self.additional_free_space = parse_file_size(self.config.get('repository', 'additional_free_space', fallback=0))
         # append_only can be set in the constructor
         # it shouldn't be overridden (True -> False) here
         self.append_only = self.append_only or self.config.getboolean('repository', 'append_only', fallback=False)
         self.id = unhexlify(self.config.get('repository', 'id').strip())
-        self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
+        self.io = LoggedIO(self.path, self.peripheral_segment_size, self.segments_per_dir)
 
     def close(self):
         if self.lock:
@@ -423,7 +423,7 @@ class Repository:
         required_free_space += self.additional_free_space
         if not self.append_only:
             # Keep one full worst-case segment free in non-append-only mode
-            required_free_space += self.max_segment_size + MAX_OBJECT_SIZE
+            required_free_space += self.peripheral_segment_size + MAX_OBJECT_SIZE
         try:
             st_vfs = os.statvfs(self.path)
         except OSError as os_error:
@@ -471,7 +471,7 @@ class Repository:
                 pi.show()
                 continue
             segment_size = self.io.segment_size(segment)
-            if segment_size > 0.2 * self.max_segment_size and freeable_space < 0.15 * segment_size:
+            if segment_size > 0.2 * self.peripheral_segment_size and freeable_space < 0.15 * segment_size:
                 logger.debug('not compacting segment %d (only %d bytes are sparse)', segment, freeable_space)
                 pi.show()
                 continue

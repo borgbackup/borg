@@ -1,5 +1,5 @@
 #BorgBackup
-![GitHub Logo](https://borgbackup.readthedocs.io/en/stable/_static/logo.png)
+![alt text](resources/borgLogo.png)
 
 1. [Documentação](https://borgbackup.readthedocs.io/en/stable/index.html)
 2. [Projecto Original](https://github.com/borgbackup/borg)
@@ -35,3 +35,4 @@ Para usar o borg basta inicializar um novo repositório e criar um arquivo ex: S
 ##Relatórios ESOF
 
 [Software Processes](1.Software Processes.md)
+[Requirements Elicitation](2.Requirements Elicitation.md)

@@ -128,7 +128,19 @@ borg help placeholders
 
  {borgversion}
 
-     The version of borg.
+     The version of borg, e.g.: 1.0.8rc1
+
+ {borgmajor}
+
+     The version of borg, only the major version, e.g.: 1
+
+ {borgminor}
+
+     The version of borg, only major and minor version, e.g.: 1.0
+
+ {borgpatch}
+
+     The version of borg, only major, minor and patch version, e.g.: 1.0.8
 
 Examples::
 

@@ -24,6 +24,7 @@ Repository URLs
 Also, stuff like ``~/path/to/repo`` or ``~other/path/to/repo`` works (this is
 expanded by your shell).
 
+Note: you may also prepend a ``file://`` to a filesystem path to get URL style.
 
 **Remote repositories** accessed via ssh user@host:
 

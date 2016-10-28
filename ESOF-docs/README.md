@@ -34,5 +34,5 @@ Para usar o borg basta inicializar um novo repositório e criar um arquivo ex: S
 
 ##Relatórios ESOF
 
-[Software Processes](1.Software Processes.md)
-[Requirements Elicitation](2.Requirements Elicitation.md)
+1. [Software Processes](1.Software Processes.md) 
+2. [Requirements Elicitation](2.Requirements Elicitation.md)

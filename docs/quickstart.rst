@@ -249,7 +249,7 @@ is installed on the remote host, in which case the following syntax is used::
 
 or::
 
-  $ borg init ssh://user@hostname:port//path/to/repo
+  $ borg init ssh://user@hostname:port/path/to/repo
 
 Remote operations over SSH can be automated with SSH keys. You can restrict the
 use of the SSH keypair by prepending a forced command to the SSH public key in

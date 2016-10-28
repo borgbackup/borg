@@ -68,7 +68,7 @@ if libc_name is None:
         libc_name = 'libc.dylib'
     else:
         msg = "Can't find C library. No fallback known. Try installing ldconfig, gcc/cc or objdump."
-        print(msg,file=sys.stderr)  # logger isn't initialized at this stage
+        print(msg, file=sys.stderr)  # logger isn't initialized at this stage
         raise Exception(msg)
 
 # If we are running with fakeroot on Linux, then use the xattr functions of fakeroot. This is needed by

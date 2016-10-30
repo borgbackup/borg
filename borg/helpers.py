@@ -219,7 +219,7 @@ class Statistics:
         return format_file_size(self.csize)
 
     def show_progress(self, item=None, final=False, stream=None, dt=None):
-        now = time.time()
+        now = time.monotonic()
         if dt is None or now - self.last_progress > dt:
             self.last_progress = now
             columns, lines = get_terminal_size()

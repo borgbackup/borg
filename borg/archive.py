@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from getpass import getuser
 from itertools import groupby
 import errno
@@ -186,7 +186,7 @@ class Archive:
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False, noatime=False, noctime=False, progress=False,
-                 chunker_params=CHUNKER_PARAMS, start=None, end=None):
+                 chunker_params=CHUNKER_PARAMS, start=None, start_monotonic=None, end=None):
         self.cwd = os.getcwd()
         self.key = key
         self.repository = repository
@@ -200,9 +200,12 @@ class Archive:
         self.numeric_owner = numeric_owner
         self.noatime = noatime
         self.noctime = noctime
+        assert (start is None) == (start_monotonic is None), 'Logic error: if start is given, start_monotonic must be given as well and vice versa.'
         if start is None:
             start = datetime.utcnow()
+            start_monotonic = time.monotonic()
         self.start = start
+        self.start_monotonic = start_monotonic
         if end is None:
             end = datetime.utcnow()
         self.end = end
@@ -302,7 +305,7 @@ Number of files: {0.stats.nfiles}'''.format(
             raise self.AlreadyExists(name)
         self.items_buffer.flush(flush=True)
         if timestamp is None:
-            self.end = datetime.utcnow()
+            self.end = self.start + timedelta(seconds=time.monotonic() - self.start_monotonic)
             start = self.start
             end = self.end
         else:

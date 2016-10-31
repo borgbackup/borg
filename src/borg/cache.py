@@ -11,6 +11,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from .hashindex import ChunkIndex, ChunkIndexEntry
+from .helpers import Location
 from .helpers import Error
 from .helpers import get_cache_dir
 from .helpers import decode_dict, int_to_bigint, bigint_to_int, bin_to_hex
@@ -160,10 +161,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
             pass  # empty file
 
-    def _do_open(self):
-        self.config = configparser.ConfigParser(interpolation=None)
-        config_path = os.path.join(self.path, 'config')
-        self.config.read(config_path)
+    def _check_upgrade(self, config_path):
         try:
             cache_version = self.config.getint('cache', 'version')
             wanted_version = 1
@@ -174,6 +172,25 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         except configparser.NoSectionError:
             self.close()
             raise Exception('%s does not look like a Borg cache.' % config_path) from None
+        # borg < 1.0.8rc1 had different canonicalization for the repo location (see #1655 and #1741).
+        cache_loc = self.config.get('cache', 'previous_location', fallback=None)
+        if cache_loc:
+            repo_loc = self.repository._location.canonical_path()
+            rl = Location(repo_loc)
+            cl = Location(cache_loc)
+            if cl.proto == rl.proto and cl.user == rl.user and cl.host == rl.host and cl.port == rl.port \
+                    and \
+                    cl.path and rl.path and \
+                    cl.path.startswith('/~/') and rl.path.startswith('/./') and cl.path[3:] == rl.path[3:]:
+                # everything is same except the expected change in relative path canonicalization,
+                # update previous_location to avoid warning / user query about changed location:
+                self.config.set('cache', 'previous_location', repo_loc)
+
+    def _do_open(self):
+        self.config = configparser.ConfigParser(interpolation=None)
+        config_path = os.path.join(self.path, 'config')
+        self.config.read(config_path)
+        self._check_upgrade(config_path)
         self.id = self.config.get('cache', 'repository')
         self.manifest_id = unhexlify(self.config.get('cache', 'manifest'))
         self.timestamp = self.config.get('cache', 'timestamp', fallback=None)

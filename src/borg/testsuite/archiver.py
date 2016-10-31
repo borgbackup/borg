@@ -1402,11 +1402,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
         # mount the whole repository, archive contents shall show up in archivename subdirs of mountpoint:
         with self.fuse_mount(self.repository_location, mountpoint):
-            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive', 'input'))
-            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive2', 'input'))
+            # bsdflags are not supported by the FUSE mount
+            # we also ignore xattrs here, they are tested separately
+            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive', 'input'),
+                                   ignore_bsdflags=True, ignore_xattrs=True)
+            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive2', 'input'),
+                                   ignore_bsdflags=True, ignore_xattrs=True)
         # mount only 1 archive, its contents shall show up directly in mountpoint:
         with self.fuse_mount(self.repository_location + '::archive', mountpoint):
-            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'))
+            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'),
+                                   ignore_bsdflags=True, ignore_xattrs=True)
             # regular file
             in_fn = 'input/file1'
             out_fn = os.path.join(mountpoint, 'input', 'file1')
@@ -1426,20 +1431,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # read
             with open(in_fn, 'rb') as in_f, open(out_fn, 'rb') as out_f:
                 assert in_f.read() == out_f.read()
-            # list/read xattrs
-            in_fn = 'input/fusexattr'
-            out_fn = os.path.join(mountpoint, 'input', 'fusexattr')
-            if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
-                assert no_selinux(xattr.listxattr(out_fn)) == ['user.foo', ]
-                assert xattr.getxattr(out_fn, 'user.foo') == b'bar'
-            else:
-                assert xattr.listxattr(out_fn) == []
-                try:
-                    xattr.getxattr(out_fn, 'user.foo')
-                except OSError as e:
-                    assert e.errno == llfuse.ENOATTR
-                else:
-                    assert False, "expected OSError(ENOATTR), but no error was raised"
             # hardlink (to 'input/file1')
             if are_hardlinks_supported():
                 in_fn = 'input/hardlink'
@@ -1462,6 +1453,27 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 out_fn = os.path.join(mountpoint, 'input', 'fifo1')
                 sto = os.stat(out_fn)
                 assert stat.S_ISFIFO(sto.st_mode)
+            # list/read xattrs
+            try:
+                in_fn = 'input/fusexattr'
+                out_fn = os.path.join(mountpoint, 'input', 'fusexattr')
+                if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
+                    assert no_selinux(xattr.listxattr(out_fn)) == ['user.foo', ]
+                    assert xattr.getxattr(out_fn, 'user.foo') == b'bar'
+                else:
+                    assert xattr.listxattr(out_fn) == []
+                    try:
+                        xattr.getxattr(out_fn, 'user.foo')
+                    except OSError as e:
+                        assert e.errno == llfuse.ENOATTR
+                    else:
+                        assert False, "expected OSError(ENOATTR), but no error was raised"
+            except OSError as err:
+                if sys.platform.startswith(('freebsd', )) and err.errno == errno.ENOTSUP:
+                    # some systems have no xattr support on FUSE
+                    pass
+                else:
+                    raise
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
     def test_fuse_versions_view(self):

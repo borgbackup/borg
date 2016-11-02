@@ -4,6 +4,8 @@ import sys
 import tempfile
 from unittest.mock import patch
 
+import pytest
+
 from ..hashindex import NSIndex
 from ..helpers import Location, IntegrityError
 from ..locking import Lock, LockFailed
@@ -413,6 +415,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
             self.assert_equal(self.repository.get(H(0)), b'data2')
 
 
+@pytest.mark.skipif(sys.platform == 'cygwin', reason='remote is broken on cygwin and hangs')
 class RemoteRepositoryTestCase(RepositoryTestCase):
 
     def open(self, create=False):
@@ -443,6 +446,7 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         assert self.repository.borg_cmd(args, testing=False) == ['borg-0.28.2', 'serve', '--umask=077', '--info']
 
 
+@pytest.mark.skipif(sys.platform == 'cygwin', reason='remote is broken on cygwin and hangs')
 class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
 
     def open(self, create=False):

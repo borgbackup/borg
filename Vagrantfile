@@ -155,6 +155,57 @@ def packages_netbsd
   EOF
 end
 
+# Install required cygwin packages and configure environment
+#
+# Microsoft/EdgeOnWindows10 image has MLS-OpenSSH installed by default,
+# which is based on cygwin x86_64 but should not be used together with cygwin.
+# In order to have have cygwin compatible bash 'ImagePath' is replaced with
+# cygrunsrv of newly installed cygwin
+#
+# supported cygwin versions:
+#   x86_64
+#   x86
+def packages_cygwin(version)
+  setup_exe = "setup-#{version}.exe"
+
+  return <<-EOF
+    mkdir -p /cygdrive/c/cygwin
+    powershell -Command '$client = new-object System.Net.WebClient; $client.DownloadFile("https://www.cygwin.com/#{setup_exe}","C:\\cygwin\\#{setup_exe}")'
+    echo '
+    REM --- Change to use different CygWin platform and final install path
+    set CYGSETUP=#{setup_exe}
+    REM --- Install build version of CygWin in a subfolder
+    set OURPATH=%cd%
+	    set CYGBUILD="C:\\cygwin\\CygWin"
+	    set CYGMIRROR=ftp://mirrors.kernel.org/sourceware/cygwin/
+	    set BUILDPKGS=python3,python3-setuptools,binutils,gcc-g++,libopenssl,openssl-devel,git,make,openssh,liblz4-devel,liblz4_1,rsync,curl,python-devel
+    %CYGSETUP% -q -B -o -n -R %CYGBUILD% -L -D -s %CYGMIRROR% -P %BUILDPKGS%
+    cd /d C:\\cygwin\\CygWin\\bin
+    regtool set /HKLM/SYSTEM/CurrentControlSet/Services/OpenSSHd/ImagePath "C:\\cygwin\\CygWin\\bin\\cygrunsrv.exe"
+    bash -c "ssh-host-config --no"
+	    ' > /cygdrive/c/cygwin/install.bat
+    cd /cygdrive/c/cygwin && cmd.exe /c install.bat
+
+    echo "alias mkdir='mkdir -p'" > ~/.profile
+    echo "export CYGWIN_ROOT=/cygdrive/c/cygwin/CygWin" >> ~/.profile
+    echo 'export PATH=$PATH:$CYGWIN_ROOT/bin' >> ~/.profile
+
+    echo '' > ~/.bash_profile
+
+    cmd.exe /c 'setx /m PATH "%PATH%;C:\\cygwin\\CygWin\\bin"'
+    source ~/.profile
+    echo 'db_home: windows' > $CYGWIN_ROOT/etc/nsswitch.conf
+  EOF
+end
+
+def install_cygwin_venv
+  return <<-EOF
+      easy_install-3.4 pip
+      pip install virtualenv
+  EOF
+end
+
+
 def install_pyenv(boxname)
   return <<-EOF
     curl -s -L https://raw.githubusercontent.com/yyuu/pyenv-installer/master/bin/pyenv-installer | bash
@@ -465,5 +516,32 @@ Vagrant.configure(2) do |config|
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("netbsd64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd64")
+  end
+
+  config.vm.define "windows10" do |b|
+    b.vm.box = "Microsoft/EdgeOnWindows10"
+    b.vm.guest = :windows
+    b.vm.boot_timeout = 180
+    b.vm.graceful_halt_timeout = 120
+
+    b.ssh.shell = "sh -l"
+    b.ssh.username = "IEUser"
+    b.ssh.password = "Passw0rd!"
+    b.ssh.insert_key = false
+
+    b.vm.provider :virtualbox do |v|
+      v.memory = 2048
+      #v.gui = true
+    end
+
+    # fix permissions placeholder
+    b.vm.provision "fix perms", :type => :shell,  :privileged => false, :inline => "echo 'fix permission placeholder'"
+
+    b.vm.provision "packages cygwin", :type => :shell, :privileged => false, :inline => packages_cygwin("x86_64")
+    b.vm.provision :reload
+    b.vm.provision "cygwin install pip", :type => :shell, :privileged => false, :inline => install_cygwin_venv
+    b.vm.provision "cygwin build env", :type => :shell, :privileged => false, :inline => build_sys_venv("windows10")    
+    b.vm.provision "cygwin install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("windows10")
+    b.vm.provision "cygwin run tests", :type => :shell, :privileged => false, :inline => run_tests("windows10")
   end
 end

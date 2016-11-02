@@ -267,9 +267,7 @@ is installed on the remote host, in which case the following syntax is used::
 
   $ borg init user@hostname:/path/to/repo
 
-or::
-
-  $ borg init ssh://user@hostname:port//path/to/repo
+Note: please see the usage chapter for a full documentation of repo URLs.
 
 Remote operations over SSH can be automated with SSH keys. You can restrict the
 use of the SSH keypair by prepending a forced command to the SSH public key in
@@ -285,3 +283,7 @@ mounting the remote filesystem, for example, using sshfs::
   $ sshfs user@hostname:/path/to /path/to
   $ borg init /path/to/repo
   $ fusermount -u /path/to
+
+You can also use other remote filesystems in a similar way. Just be careful,
+not all filesystems out there are really stable and working good enough to
+be acceptable for backup usage.

@@ -198,7 +198,7 @@ htmlhelp_basename = 'borgdoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'Borg.tex', 'Borg Documentation',
+  ('book', 'Borg.tex', 'Borg Documentation',
    'The Borg Collective', 'manual'),
 ]
 

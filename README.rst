@@ -78,8 +78,8 @@ Main features
 
 **Free and Open Source Software**
   * security and functionality can be audited independently
-  * licensed under the BSD (3-clause) license
-
+  * licensed under the BSD (3-clause) license, see `License`_ for the
+    complete license
 
 Easy to use
 -----------
@@ -143,37 +143,8 @@ Links
   `Mailing List <https://mail.python.org/mailman/listinfo/borgbackup>`_
 * `License <https://borgbackup.readthedocs.org/en/stable/authors.html#license>`_
 
-Notes
------
-
-Borg is a fork of `Attic`_ and maintained by "`The Borg collective`_".
-
-.. _Attic: https://github.com/jborg/attic
-.. _The Borg collective: https://borgbackup.readthedocs.org/en/latest/authors.html
-
-Differences between Attic and Borg
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Here's a (incomplete) list of some major changes:
-
-* more open, faster paced development (see `issue #1 <https://github.com/borgbackup/borg/issues/1>`_)
-* lots of attic issues fixed (see `issue #5 <https://github.com/borgbackup/borg/issues/5>`_)
-* less chunk management overhead (less memory and disk usage for chunks index)
-* faster remote cache resync (useful when backing up multiple machines into same repo)
-* compression: no, lz4, zlib or lzma compression, adjustable compression levels
-* repokey replaces problematic passphrase mode (you can't change the passphrase nor the pbkdf2 iteration count in "passphrase" mode)
-* simple sparse file support, great for virtual machine disk files
-* can read special files (e.g. block devices) or from stdin, write to stdout
-* mkdir-based locking is more compatible than attic's posix locking
-* uses fadvise to not spoil / blow up the fs cache
-* better error messages / exception handling
-* better logging, screen output, progress indication
-* tested on misc. Linux systems, 32 and 64bit, FreeBSD, OpenBSD, NetBSD, Mac OS X
-
-Please read the `ChangeLog`_ (or ``docs/changes.rst`` in the source distribution) for more
-information.
-
-BORG IS NOT COMPATIBLE WITH ORIGINAL ATTIC (but there is a one-way conversion).
+Compatibility notes
+===================
 
 EXPECT THAT WE WILL BREAK COMPATIBILITY REPEATEDLY WHEN MAJOR RELEASE NUMBER
 CHANGES (like when going from 0.x.y to 1.0.0 or from 1.x.y to 2.0.0).
@@ -181,8 +152,6 @@ CHANGES (like when going from 0.x.y to 1.0.0 or from 1.x.y to 2.0.0).
 NOT RELEASED DEVELOPMENT VERSIONS HAVE UNKNOWN COMPATIBILITY PROPERTIES.
 
 THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
-
-Borg is distributed under a 3-clause BSD license, see `License`_ for the complete license.
 
 |doc| |build| |coverage| |bestpractices|
 

@@ -199,12 +199,12 @@ htmlhelp_basename = 'borgdoc'
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
   ('index', 'Borg.tex', 'Borg Documentation',
-   'see "AUTHORS" file', 'manual'),
+   'The Borg Collective', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
 # the title page.
-#latex_logo = None
+latex_logo = '_static/logo.png'
 
 # For "manual" documents, if this is true, then toplevel headings are parts,
 # not chapters.

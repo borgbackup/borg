@@ -3,7 +3,7 @@
 .. highlight:: bash
 
 What is BorgBackup?
-===================
+-------------------
 
 BorgBackup (short: Borg) is a deduplicating backup program.
 Optionally, it supports compression and authenticated encryption.
@@ -20,7 +20,7 @@ downloaded Borg, ``docs/installation.rst`` to get started with Borg.
 .. _installation manual: https://borgbackup.readthedocs.org/en/stable/installation.html
 
 Main features
--------------
+~~~~~~~~~~~~~
 
 **Space efficient storage**
   Deduplication based on content-defined chunking is used to reduce the number
@@ -82,7 +82,7 @@ Main features
 
 
 Easy to use
------------
+~~~~~~~~~~~
 
 Initialize a new backup repository and create a backup archive::
 
@@ -114,7 +114,7 @@ Now doing another backup, just to show off the great deduplication:
 For a graphical frontend refer to our complementary project `BorgWeb <https://borgweb.readthedocs.io/>`_.
 
 Checking Release Authenticity and Security Contact
-==================================================
+--------------------------------------------------
 
 `Releases <https://github.com/borgbackup/borg/releases>`_ are signed with this GPG key,
 please use GPG to verify their authenticity.
@@ -130,7 +130,7 @@ The public key can be fetched from any GPG keyserver, but be careful: you must
 use the **full fingerprint** to check that you got the correct key.
 
 Links
-=====
+-----
 
 * `Main Web Site <https://borgbackup.readthedocs.org/>`_
 * `Releases <https://github.com/borgbackup/borg/releases>`_,
@@ -143,16 +143,13 @@ Links
   `Mailing List <https://mail.python.org/mailman/listinfo/borgbackup>`_
 * `License <https://borgbackup.readthedocs.org/en/stable/authors.html#license>`_
 
-Notes
------
+Differences between Attic and Borg
+----------------------------------
 
 Borg is a fork of `Attic`_ and maintained by "`The Borg collective`_".
 
 .. _Attic: https://github.com/jborg/attic
 .. _The Borg collective: https://borgbackup.readthedocs.org/en/latest/authors.html
-
-Differences between Attic and Borg
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Here's a (incomplete) list of some major changes:
 

@@ -512,3 +512,32 @@ Borg intends to be:
   * do not break compatibility accidentally, without a good reason
     or without warning. allow compatibility breaking for other cases.
   * if major version number changes, it may have incompatible changes
+
+What are the differences between Attic and Borg?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Borg is a fork of `Attic`_ and maintained by "`The Borg collective`_".
+
+.. _Attic: https://github.com/jborg/attic
+.. _The Borg collective: https://borgbackup.readthedocs.org/en/latest/authors.html
+
+Here's a (incomplete) list of some major changes:
+
+* more open, faster paced development (see `issue #1 <https://github.com/borgbackup/borg/issues/1>`_)
+* lots of attic issues fixed (see `issue #5 <https://github.com/borgbackup/borg/issues/5>`_)
+* less chunk management overhead (less memory and disk usage for chunks index)
+* faster remote cache resync (useful when backing up multiple machines into same repo)
+* compression: no, lz4, zlib or lzma compression, adjustable compression levels
+* repokey replaces problematic passphrase mode (you can't change the passphrase nor the pbkdf2 iteration count in "passphrase" mode)
+* simple sparse file support, great for virtual machine disk files
+* can read special files (e.g. block devices) or from stdin, write to stdout
+* mkdir-based locking is more compatible than attic's posix locking
+* uses fadvise to not spoil / blow up the fs cache
+* better error messages / exception handling
+* better logging, screen output, progress indication
+* tested on misc. Linux systems, 32 and 64bit, FreeBSD, OpenBSD, NetBSD, Mac OS X
+
+Please read the `ChangeLog`_ (or ``docs/changes.rst`` in the source distribution) for more
+information.
+
+Borg is not compatible with original attic (but there is a one-way conversion).

@@ -168,6 +168,9 @@ THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
 
 Borg is distributed under a 3-clause BSD license, see `License`_ for the complete license.
 
+Security issues should be reported to the :ref:`security-contact` (or
+see ``docs/suppport.rst`` in the source distribution).
+
 |doc| |build| |coverage| |bestpractices|
 
 .. |doc| image:: https://readthedocs.org/projects/borgbackup/badge/?version=stable

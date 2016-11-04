@@ -37,7 +37,7 @@ cdef extern from 'windows.h':
     ctypedef void* HANDLE
     struct _ACL:
         uint16_t AceCount
-        
+
     cdef enum _SID_NAME_USE:
         SidTypeUser,
         SidTypeGroup,
@@ -59,8 +59,19 @@ cdef extern from 'windows.h':
         _LARGE_INTEGER StreamSize
         wchar_t[296] cStreamName # MAX_PATH + 36
 
+    struct _LUID:
+        pass
+
+    struct _LUID_AND_ATTRIBUTES:
+        _LUID Luid
+        DWORD Attributes
+
+    struct _TOKEN_PRIVILEGES:
+        DWORD PrivilegeCount
+        _LUID_AND_ATTRIBUTES Privileges[1]
+
     HLOCAL LocalFree(HLOCAL)
-    DWORD GetLastError();
+    DWORD GetLastError()
     void SetLastError(DWORD)
 
     DWORD FormatMessageW(DWORD, void*, DWORD, DWORD, wchar_t*, DWORD, void*)
@@ -74,6 +85,15 @@ cdef extern from 'windows.h':
     BOOL LookupAccountNameW(LPCTSTR, LPCTSTR, PSID, LPDWORD, LPCTSTR, LPDWORD, _SID_NAME_USE*)
     BOOL GetSecurityDescriptorDacl(PSID, BOOL*, _ACL**, BOOL*)
 
+    BOOL OpenProcessToken(HANDLE, DWORD, HANDLE*)
+    BOOL OpenThreadToken(HANDLE, DWORD, BOOL, HANDLE*)
+    BOOL LookupPrivilegeValueW(wchar_t*, wchar_t*, _LUID*)
+    BOOL AdjustTokenPrivileges(HANDLE, BOOL, _TOKEN_PRIVILEGES*, DWORD, _TOKEN_PRIVILEGES*, DWORD*)
+
+    HANDLE GetCurrentThread()
+    HANDLE GetCurrentProcess()
+
+    cdef extern int ERROR_SUCCESS
     cdef extern int ERROR_INSUFFICIENT_BUFFER
     cdef extern int ERROR_INVALID_SID
     cdef extern int ERROR_NONE_MAPPED
@@ -100,6 +120,11 @@ cdef extern from 'windows.h':
 
     cdef extern int INVALID_HANDLE_VALUE
 
+    cdef extern DWORD SE_PRIVILEGE_ENABLED
+
+    cdef extern int TOKEN_ADJUST_PRIVILEGES
+    cdef extern int TOKEN_QUERY
+
 cdef extern from 'accctrl.h':
     ctypedef enum _SE_OBJECT_TYPE:
         SE_FILE_OBJECT
@@ -118,6 +143,8 @@ cdef extern from 'accctrl.h':
     cdef extern uint16_t TRUSTEE_IS_SID
     cdef extern uint16_t TRUSTEE_IS_NAME
     cdef extern uint16_t TRUSTEE_BAD_FORM
+
+    cdef extern int INHERITED_ACCESS_ENTRY
 
     DWORD GetExplicitEntriesFromAclW(_ACL*, uint32_t*, _EXPLICIT_ACCESS_W**)
 
@@ -156,6 +183,49 @@ def raise_error(api, path=''):
         raise OSError(error, error_string, path)
     else:
         raise OSError(error, error_string)
+
+
+permissions_enabled = False # Have we tried to acquire permissions for SACL
+permissions_granted = False # Did we get them
+
+
+cdef enable_permissions():
+    if permissions_enabled:
+        return
+    cdef HANDLE hToken
+    OpenProcessToken(GetCurrentProcess() , TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken)
+
+    cdef _TOKEN_PRIVILEGES tp
+    cdef _LUID luid
+    cdef _TOKEN_PRIVILEGES tpPrevious
+    cdef DWORD cbPrevious=sizeof(_TOKEN_PRIVILEGES)
+
+    cdef wchar_t* privilege = PyUnicode_AsWideCharString("SeSecurityPrivilege", NULL)
+    if not LookupPrivilegeValueW( NULL, privilege, &luid ):
+        permissions_granted = False
+        print("Warning: permissions to read SACL denied. Try running as admin.")
+        return
+
+    tp.PrivilegeCount           = 1
+    tp.Privileges[0].Luid       = luid
+    tp.Privileges[0].Attributes = 0
+
+    AdjustTokenPrivileges(hToken, 0, &tp, sizeof(_TOKEN_PRIVILEGES), &tpPrevious, &cbPrevious)
+    if GetLastError() != ERROR_SUCCESS:
+        permissions_granted = False
+        print("Warning: permissions to read SACL denied. Try running as admin.")
+        return
+
+    tpPrevious.PrivilegeCount           = 1
+    tpPrevious.Privileges[0].Luid       = luid
+    tpPrevious.Privileges[0].Attributes = tpPrevious.Privileges[0].Attributes | SE_PRIVILEGE_ENABLED
+
+    AdjustTokenPrivileges(hToken, 0, &tpPrevious, cbPrevious, NULL, NULL)
+
+    if GetLastError() != ERROR_SUCCESS:
+        permissions_granted = False
+        print("Warning: permissions to read SACL denied. Try running as admin.")
+        return
 
 
 cdef PSID _get_file_security(filename, int request):

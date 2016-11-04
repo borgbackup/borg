@@ -126,6 +126,7 @@ Links
 * `Web-Chat (IRC) <http://webchat.freenode.net/?randomnick=1&channels=%23borgbackup&uio=MTY9dHJ1ZSY5PXRydWUa8>`_ and
   `Mailing List <https://mail.python.org/mailman/listinfo/borgbackup>`_
 * `License <https://borgbackup.readthedocs.org/en/stable/authors.html#license>`_
+* `Security contact <https://borgbackup.readthedocs.org/en/stable/support.html#security-contact>`_
 
 Notes
 -----
@@ -168,7 +169,7 @@ THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
 
 Borg is distributed under a 3-clause BSD license, see `License`_ for the complete license.
 
-Security issues should be reported to the :ref:`security-contact` (or
+Security issues should be reported to the `Security contact`_ (or
 see ``docs/suppport.rst`` in the source distribution).
 
 |doc| |build| |coverage| |bestpractices|

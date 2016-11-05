@@ -113,22 +113,6 @@ Now doing another backup, just to show off the great deduplication:
 
 For a graphical frontend refer to our complementary project `BorgWeb <https://borgweb.readthedocs.io/>`_.
 
-Checking Release Authenticity and Security Contact
---------------------------------------------------
-
-`Releases <https://github.com/borgbackup/borg/releases>`_ are signed with this GPG key,
-please use GPG to verify their authenticity.
-
-In case you discover a security issue, please use this contact for reporting it privately
-and please, if possible, use encrypted E-Mail:
-
-Thomas Waldmann <tw@waldmann-edv.de>
-
-GPG Key Fingerprint: 6D5B EF9A DD20 7580 5747  B70F 9F88 FB52 FAF7 B393
-
-The public key can be fetched from any GPG keyserver, but be careful: you must
-use the **full fingerprint** to check that you got the correct key.
-
 Links
 -----
 
@@ -142,6 +126,7 @@ Links
 * `Web-Chat (IRC) <http://webchat.freenode.net/?randomnick=1&channels=%23borgbackup&uio=MTY9dHJ1ZSY5PXRydWUa8>`_ and
   `Mailing List <https://mail.python.org/mailman/listinfo/borgbackup>`_
 * `License <https://borgbackup.readthedocs.org/en/stable/authors.html#license>`_
+* `Security contact <https://borgbackup.readthedocs.org/en/stable/support.html#security-contact>`_
 
 Compatibility notes
 -------------------
@@ -152,6 +137,9 @@ CHANGES (like when going from 0.x.y to 1.0.0 or from 1.x.y to 2.0.0).
 NOT RELEASED DEVELOPMENT VERSIONS HAVE UNKNOWN COMPATIBILITY PROPERTIES.
 
 THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
+
+Security issues should be reported to the `Security contact`_ (or
+see ``docs/suppport.rst`` in the source distribution).
 
 |doc| |build| |coverage| |bestpractices|
 

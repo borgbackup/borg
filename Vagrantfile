@@ -40,8 +40,8 @@ def packages_debianoid
   EOF
 end
 
-def packages_redhatted(version)
-  script = <<-EOF
+def packages_redhatted
+  return <<-EOF
     yum install -y epel-release
     yum update -y
     # for building borgbackup and dependencies:
@@ -58,13 +58,6 @@ def packages_redhatted(version)
     #pip install virtualenv
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
   EOF
-  if version == "centos6"
-    script += <<-EOF
-      # avoid that breaking llfuse install breaks borgbackup install under tox:
-      sed -i.bak '/fuse.txt/d' /vagrant/borg/borg/tox.ini
-    EOF
-  end
-  return script
 end
 
 def packages_darwin
@@ -130,8 +123,6 @@ def packages_openbsd
     easy_install-3.4 pip
     pip3 install virtualenv
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
-    # avoid that breaking llfuse install breaks borgbackup install under tox:
-    sed -i.bak '/fuse.txt/d' /vagrant/borg/borg/tox.ini
   EOF
 end
 
@@ -157,8 +148,6 @@ def packages_netbsd
     easy_install-3.4 pip
     pip install virtualenv
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
-    # fuse does not work good enough (see above), do not install llfuse:
-    sed -i.bak '/fuse.txt/d' /vagrant/borg/borg/tox.ini
   EOF
 end
 
@@ -289,6 +278,8 @@ def install_borg_no_fuse(boxname)
     rm -rf borg/__pycache__ borg/support/__pycache__ borg/testsuite/__pycache__
     pip install -r requirements.d/development.txt
     pip install -e .
+    # do not install llfuse into the virtualenvs built by tox:
+    sed -i.bak '/fuse.txt/d' tox.ini
   EOF
 end
 
@@ -383,7 +374,7 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
-    b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted("centos7")
+    b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos7_64")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos7_64")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos7_64")
@@ -393,7 +384,7 @@ Vagrant.configure(2) do |config|
 
   config.vm.define "centos6_32" do |b|
     b.vm.box = "centos6-32"
-    b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted("centos6")
+    b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_32")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_32")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos6_32")
@@ -406,7 +397,7 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
-    b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted("centos6")
+    b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_64")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_64")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos6_64")

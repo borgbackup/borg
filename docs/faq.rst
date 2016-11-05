@@ -521,7 +521,7 @@ Borg intends to be:
   * if major version number changes, it may have incompatible changes
 
 What are the differences between Attic and Borg?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------------------------------
 
 Borg is a fork of `Attic`_ and maintained by "`The Borg collective`_".
 

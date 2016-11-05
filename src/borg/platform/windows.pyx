@@ -144,6 +144,9 @@ cdef extern from 'accctrl.h':
     cdef extern uint16_t TRUSTEE_IS_NAME
     cdef extern uint16_t TRUSTEE_BAD_FORM
 
+    cdef extern int NO_INHERITANCE
+    cdef extern int INHERIT_NO_PROPAGATE
+    cdef extern int INHERIT_ONLY
     cdef extern int INHERITED_ACCESS_ENTRY
 
     DWORD GetExplicitEntriesFromAclW(_ACL*, uint32_t*, _EXPLICIT_ACCESS_W**)
@@ -167,6 +170,7 @@ cdef extern from 'Aclapi.h':
     DWORD GetNamedSecurityInfoW(LPCTSTR, SE_OBJECT_TYPE, DWORD, PSID*, PSID*, PACL*, PACL*, _ACL**)
     DWORD SetNamedSecurityInfoW(LPCTSTR, int, int, PSID, PSID, PACL, PACL)
     DWORD SetEntriesInAclW(unsigned int, _EXPLICIT_ACCESS_W*, PACL, _ACL**)
+    DWORD LookupSecurityDescriptorPartsW(_TRUSTEE_W**, _TRUSTEE_W**, uint32_t*,_EXPLICIT_ACCESS_W**, uint32_t*,_EXPLICIT_ACCESS_W**, PSID)
 
 
 def raise_error(api, path=''):
@@ -337,9 +341,14 @@ def set_owner(path, owner, sidstring = None):
         free(newsid)
 
 
-def acl_get(path, item, st, numeric_owner=False):
-    cdef int request = DACL_SECURITY_INFORMATION
+def acl_get(path, item, st, numeric_owner=False, depth = 0):
+    pyDACL = []
+    if not os.path.samefile(os.path.abspath(path), os.path.abspath(os.path.join(path, ".."))):
+        pyDACL = acl_get(os.path.abspath(os.path.join(path, "..")), item, st, numeric_owner, depth + 1)
 
+
+
+    cdef int request = DACL_SECURITY_INFORMATION
     cdef BYTE* SD = _get_file_security(path, request)
     if SD == NULL:
         return
@@ -347,14 +356,20 @@ def acl_get(path, item, st, numeric_owner=False):
     cdef BOOL daclFound
     cdef _ACL* DACL
     cdef BOOL DACLDefaulted
-    GetSecurityDescriptorDacl(SD, &daclFound, &DACL, &DACLDefaulted)
 
     cdef uint32_t length
     cdef _EXPLICIT_ACCESS_W* ACEs
 
-    GetExplicitEntriesFromAclW(DACL, &length, &ACEs)
+    # LookupSecurityDescriptorPartsW(&owner, &group, &daclLength, &DACL, &saclLength, &sacl, SD)
+    LookupSecurityDescriptorPartsW(NULL, NULL, &length, &ACEs, NULL, NULL, SD)
+    """GetSecurityDescriptorDacl(SD, &daclFound, &DACL, &DACLDefaulted)
+    print("AceCount", DACL.AceCount)
 
-    pyDACL = []
+    cdef uint32_t length
+    cdef _EXPLICIT_ACCESS_W* ACEs
+
+    GetExplicitEntriesFromAclW(DACL, &length, &ACEs)"""
+
     cdef PSID newsid
     cdef uint32_t domainlength
     cdef _SID_NAME_USE sid_type
@@ -382,12 +397,18 @@ def acl_get(path, item, st, numeric_owner=False):
 
         elif ACEs[i].Trustee.TrusteeForm == TRUSTEE_BAD_FORM:
             continue
-        permissions = {'user': {'name': name, 'sid': sidstr}, 'permissions': (ACEs[i].grfAccessPermissions, ACEs[i].grfAccessMode, ACEs[i].grfInheritance)}
-        pyDACL.append(permissions)
-    item['win_dacl'] = json.dumps(pyDACL)
+        if ((depth == 0 and ACEs[i].grfInheritance & INHERIT_ONLY != 0)
+            or (ACEs[i].grfInheritance & INHERIT_NO_PROPAGATE and depth == 1)
+            or (ACEs[i].grfInheritance != NO_INHERITANCE and ACEs[i].grfInheritance & INHERIT_NO_PROPAGATE == 0)):
+            permissions = {'user': {'name': name, 'sid': sidstr}, 'permissions': (ACEs[i].grfAccessPermissions, ACEs[i].grfAccessMode, NO_INHERITANCE)}
+            pyDACL.append(permissions)
+    if depth == 0:
+        item['win_dacl'] = json.dumps(pyDACL)
+        print(pyDACL)
 
     free(SD)
     LocalFree(<HLOCAL>ACEs)
+    return pyDACL
 
 
 def acl_set(path, item, numeric_owner=False):
@@ -414,7 +435,7 @@ def acl_set(path, item, numeric_owner=False):
     cdef _ACL* newDACL
     SetEntriesInAclW(len(pyDACL), ACEs, NULL, &newDACL)
     cdef wchar_t* cstrPath = PyUnicode_AsWideCharString(path, NULL)
-    SetNamedSecurityInfoW(cstrPath, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, NULL, NULL, newDACL, NULL)
+    SetNamedSecurityInfoW(cstrPath, SE_FILE_OBJECT, PROTECTED_DACL_SECURITY_INFORMATION, NULL, NULL, newDACL, NULL)
 
     for i in range(len(pyDACL)):
         if pyDACL[i]['user']['name'] == '' or numeric_owner:

@@ -3,7 +3,7 @@
 .. highlight:: bash
 
 What is BorgBackup?
-===================
+-------------------
 
 BorgBackup (short: Borg) is a deduplicating backup program.
 Optionally, it supports compression and authenticated encryption.
@@ -20,7 +20,7 @@ downloaded Borg, ``docs/installation.rst`` to get started with Borg.
 .. _installation manual: https://borgbackup.readthedocs.org/en/stable/installation.html
 
 Main features
--------------
+~~~~~~~~~~~~~
 
 **Space efficient storage**
   Deduplication based on content-defined chunking is used to reduce the number
@@ -82,7 +82,7 @@ Main features
     complete license
 
 Easy to use
------------
+~~~~~~~~~~~
 
 Initialize a new backup repository and create a backup archive::
 
@@ -114,7 +114,7 @@ Now doing another backup, just to show off the great deduplication:
 For a graphical frontend refer to our complementary project `BorgWeb <https://borgweb.readthedocs.io/>`_.
 
 Checking Release Authenticity and Security Contact
-==================================================
+--------------------------------------------------
 
 `Releases <https://github.com/borgbackup/borg/releases>`_ are signed with this GPG key,
 please use GPG to verify their authenticity.
@@ -130,7 +130,7 @@ The public key can be fetched from any GPG keyserver, but be careful: you must
 use the **full fingerprint** to check that you got the correct key.
 
 Links
-=====
+-----
 
 * `Main Web Site <https://borgbackup.readthedocs.org/>`_
 * `Releases <https://github.com/borgbackup/borg/releases>`_,
@@ -144,7 +144,7 @@ Links
 * `License <https://borgbackup.readthedocs.org/en/stable/authors.html#license>`_
 
 Compatibility notes
-===================
+-------------------
 
 EXPECT THAT WE WILL BREAK COMPATIBILITY REPEATEDLY WHEN MAJOR RELEASE NUMBER
 CHANGES (like when going from 0.x.y to 1.0.0 or from 1.x.y to 2.0.0).

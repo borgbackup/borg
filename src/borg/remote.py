@@ -18,6 +18,7 @@ from .helpers import get_home_dir
 from .helpers import sysinfo
 from .helpers import bin_to_hex
 from .helpers import replace_placeholders
+from .helpers import yes
 from .repository import Repository
 
 RPC_PROTOCOL_VERSION = 2
@@ -326,12 +327,15 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 opts.append('--critical')
             else:
                 raise ValueError('log level missing, fix this code')
+        env_vars = []
+        if yes(env_var_override='BORG_HOSTNAME_IS_UNIQUE', env_msg=None, prompt=False):
+            env_vars.append('BORG_HOSTNAME_IS_UNIQUE=yes')
         if testing:
-            return [sys.executable, '-m', 'borg.archiver', 'serve'] + opts + self.extra_test_args
+            return env_vars + [sys.executable, '-m', 'borg.archiver', 'serve'] + opts + self.extra_test_args
         else:  # pragma: no cover
             remote_path = args.remote_path or os.environ.get('BORG_REMOTE_PATH', 'borg')
             remote_path = replace_placeholders(remote_path)
-            return [remote_path, 'serve'] + opts
+            return env_vars + [remote_path, 'serve'] + opts
 
     def ssh_cmd(self, location):
         """return a ssh command line that can be prefixed to a borg command line"""

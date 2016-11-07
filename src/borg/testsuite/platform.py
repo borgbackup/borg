@@ -1,5 +1,6 @@
 import functools
 import os
+import random
 import shutil
 import sys
 import tempfile
@@ -7,7 +8,9 @@ import pwd
 import unittest
 
 from ..platform import acl_get, acl_set, swidth
+from ..platform import get_process_id, process_alive
 from . import BaseTestCase, unopened_tempfile
+from .locking import free_pid
 
 
 ACCESS_ACL = """
@@ -186,3 +189,22 @@ class PlatformPosixTestCase(BaseTestCase):
 
     def test_swidth_mixed(self):
         self.assert_equal(swidth("borgバックアップ"), 4 + 6 * 2)
+
+
+def test_process_alive(free_pid):
+    id = get_process_id()
+    assert process_alive(*id)
+    host, pid, tid = id
+    assert process_alive(host + 'abc', pid, tid)
+    assert process_alive(host, pid, tid + 1)
+    assert not process_alive(host, free_pid, tid)
+
+
+def test_process_id():
+    hostname, pid, tid = get_process_id()
+    assert isinstance(hostname, str)
+    assert isinstance(pid, int)
+    assert isinstance(tid, int)
+    assert len(hostname) > 0
+    assert pid > 0
+    assert get_process_id() == (hostname, pid, tid)

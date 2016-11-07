@@ -94,7 +94,7 @@ def check_extension_modules():
         raise ExtensionModuleError
     if crypto.API_VERSION != 3:
         raise ExtensionModuleError
-    if platform.API_VERSION != 3:
+    if platform.API_VERSION != platform.OS_API_VERSION != 4:
         raise ExtensionModuleError
 
 
@@ -1116,7 +1116,7 @@ DEFAULTISH = ('Default', 'DEFAULT', 'default', 'D', 'd', '', )
 def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
         retry_msg=None, invalid_msg=None, env_msg='{} (from {})',
         falsish=FALSISH, truish=TRUISH, defaultish=DEFAULTISH,
-        default=False, retry=True, env_var_override=None, ofile=None, input=input):
+        default=False, retry=True, env_var_override=None, ofile=None, input=input, prompt=True):
     """Output <msg> (usually a question) and let user input an answer.
     Qualifies the answer according to falsish, truish and defaultish as True, False or <default>.
     If it didn't qualify and retry is False (no retries wanted), return the default [which
@@ -1161,6 +1161,8 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
             if answer is not None and env_msg:
                 print(env_msg.format(answer, env_var_override), file=ofile)
         if answer is None:
+            if not prompt:
+                return default
             try:
                 answer = input()
             except EOFError:

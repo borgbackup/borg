@@ -486,7 +486,7 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
 class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
     def list_indices(self):
-        return [name for name in os.listdir(os.path.join(self.tmppath, 'repository')) if name.startswith('index.')]
+        return [name for name in os.listdir(os.path.join(self.tmppath, 'repository')) if name.startswith('index.') and not name.endswith('.signature')]
 
     def check(self, repair=False, status=True):
         self.assert_equal(self.repository.check(repair=repair), status)
@@ -578,9 +578,9 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.assert_raises(Repository.CheckNeeded, lambda: self.get_objects(4))
         self.check(status=False)
         self.check(status=False)
-        self.assert_equal(self.list_indices(), ['index.1.signature', 'index.1'])
+        self.assert_equal(self.list_indices(), ['index.1'])
         self.check(repair=True, status=True)
-        self.assert_equal(self.list_indices(), ['index.3.signature', 'index.3'])
+        self.assert_equal(self.list_indices(), ['index.3'])
         self.check(status=True)
         self.get_objects(3)
         self.assert_equal(set([1, 2, 3]), self.list_objects())
@@ -594,10 +594,10 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
     def test_repair_index_too_new(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
-        self.assert_equal(self.list_indices(), ['index.3.signature', 'index.3'])
+        self.assert_equal(self.list_indices(), ['index.3'])
         self.rename_index('index.100')
         self.check(status=True)
-        self.assert_equal(self.list_indices(), ['index.3.signature', 'index.3'])
+        self.assert_equal(self.list_indices(), ['index.3'])
         self.get_objects(4)
         self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
 

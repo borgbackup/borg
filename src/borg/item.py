@@ -135,6 +135,7 @@ class Item(PropDict):
     acl_extended = PropDict._make_property('acl_extended', bytes)
     acl_nfs4 = PropDict._make_property('acl_nfs4', bytes)
     win_dacl = PropDict._make_property('win_dacl', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    win_sacl = PropDict._make_property('win_sacl', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
 
     mode = PropDict._make_property('mode', int)
     uid = PropDict._make_property('uid', int)

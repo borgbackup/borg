@@ -170,7 +170,7 @@ cdef extern from 'Aclapi.h':
     DWORD GetNamedSecurityInfoW(LPCTSTR, SE_OBJECT_TYPE, DWORD, PSID*, PSID*, PACL*, PACL*, _ACL**)
     DWORD SetNamedSecurityInfoW(LPCTSTR, int, int, PSID, PSID, PACL, PACL)
     DWORD SetEntriesInAclW(unsigned int, _EXPLICIT_ACCESS_W*, PACL, _ACL**)
-    DWORD LookupSecurityDescriptorPartsW(_TRUSTEE_W**, _TRUSTEE_W**, uint32_t*,_EXPLICIT_ACCESS_W**, uint32_t*,_EXPLICIT_ACCESS_W**, PSID)
+    DWORD LookupSecurityDescriptorPartsW(_TRUSTEE_W**, _TRUSTEE_W**, uint32_t*, _EXPLICIT_ACCESS_W**, uint32_t*, _EXPLICIT_ACCESS_W**, PSID)
 
 
 def raise_error(api, path=''):
@@ -194,8 +194,11 @@ permissions_granted = False # Did we get them
 
 
 cdef enable_permissions():
+    global permissions_enabled
+    global permissions_granted
     if permissions_enabled:
         return
+    permissions_enabled = True
     cdef HANDLE hToken
     OpenProcessToken(GetCurrentProcess() , TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken)
 
@@ -207,7 +210,7 @@ cdef enable_permissions():
     cdef wchar_t* privilege = PyUnicode_AsWideCharString("SeSecurityPrivilege", NULL)
     if not LookupPrivilegeValueW( NULL, privilege, &luid ):
         permissions_granted = False
-        print("Warning: permissions to read SACL denied. Try running as admin.")
+        print("Warning: permissions to read auditing settings (SACL) denied. Try running as admin.")
         return
 
     tp.PrivilegeCount           = 1
@@ -217,7 +220,7 @@ cdef enable_permissions():
     AdjustTokenPrivileges(hToken, 0, &tp, sizeof(_TOKEN_PRIVILEGES), &tpPrevious, &cbPrevious)
     if GetLastError() != ERROR_SUCCESS:
         permissions_granted = False
-        print("Warning: permissions to read SACL denied. Try running as admin.")
+        print("Warning: permissions to read auditing settings (SACL) denied. Try running as admin.")
         return
 
     tpPrevious.PrivilegeCount           = 1
@@ -228,7 +231,7 @@ cdef enable_permissions():
 
     if GetLastError() != ERROR_SUCCESS:
         permissions_granted = False
-        print("Warning: permissions to read SACL denied. Try running as admin.")
+        print("Warning: permissions to read auditing settings (SACL) denied. Try running as admin.")
         return
 
 
@@ -342,109 +345,180 @@ def set_owner(path, owner, sidstring = None):
 
 
 def acl_get(path, item, st, numeric_owner=False, depth = 0):
+    if not permissions_enabled:
+        enable_permissions()
     pyDACL = []
+    pySACL = []
     if not os.path.samefile(os.path.abspath(path), os.path.abspath(os.path.join(path, ".."))):
-        pyDACL = acl_get(os.path.abspath(os.path.join(path, "..")), item, st, numeric_owner, depth + 1)
-
-
+        pyDACL, pySACL = acl_get(os.path.abspath(os.path.join(path, "..")), item, st, numeric_owner, depth + 1)
 
     cdef int request = DACL_SECURITY_INFORMATION
+    if permissions_granted:
+        request = DACL_SECURITY_INFORMATION | SACL_SECURITY_INFORMATION
     cdef BYTE* SD = _get_file_security(path, request)
     if SD == NULL:
         return
 
-    cdef BOOL daclFound
-    cdef _ACL* DACL
-    cdef BOOL DACLDefaulted
+    cdef uint32_t dacllength
+    cdef _EXPLICIT_ACCESS_W* DACL
+    cdef uint32_t sacllength
+    cdef _EXPLICIT_ACCESS_W* SACL
 
-    cdef uint32_t length
-    cdef _EXPLICIT_ACCESS_W* ACEs
-
-    # LookupSecurityDescriptorPartsW(&owner, &group, &daclLength, &DACL, &saclLength, &sacl, SD)
-    LookupSecurityDescriptorPartsW(NULL, NULL, &length, &ACEs, NULL, NULL, SD)
-    """GetSecurityDescriptorDacl(SD, &daclFound, &DACL, &DACLDefaulted)
-    print("AceCount", DACL.AceCount)
-
-    cdef uint32_t length
-    cdef _EXPLICIT_ACCESS_W* ACEs
-
-    GetExplicitEntriesFromAclW(DACL, &length, &ACEs)"""
+    # LookupSecurityDescriptorPartsW(&owner, &group, &dacllength, &DACL, &sacllength, &sacl, SD)
+    LookupSecurityDescriptorPartsW(NULL, NULL, &dacllength, &DACL, &sacllength, &SACL, SD)
 
     cdef PSID newsid
     cdef uint32_t domainlength
+    cdef uint32_t sidlength
     cdef _SID_NAME_USE sid_type
-    for i in range(length):
+
+    # DACL
+    for i in range(dacllength):
         permissions = None
         name = ""
         sidstr = ""
-        if ACEs[i].Trustee.TrusteeForm == TRUSTEE_IS_SID:
-            name, domain, type = _look_up_account_sid(<BYTE*>(ACEs[i].Trustee.ptstrName))
-            sidstr = sid2string(<PSID>(ACEs[i].Trustee.ptstrName))
+        if DACL[i].Trustee.TrusteeForm == TRUSTEE_IS_SID:
+            name, domain, type = _look_up_account_sid(<BYTE*>(DACL[i].Trustee.ptstrName))
+            sidstr = sid2string(<PSID>(DACL[i].Trustee.ptstrName))
 
-        elif ACEs[i].Trustee.TrusteeForm == TRUSTEE_IS_NAME:
+        elif DACL[i].Trustee.TrusteeForm == TRUSTEE_IS_NAME:
             sid_type = SidTypeInvalid
             domainlength = 0
-            LookupAccountNameW(NULL, ACEs[i].Trustee.ptstrName, NULL, &(length), NULL, &domainlength, &sid_type)
+            LookupAccountNameW(NULL, DACL[i].Trustee.ptstrName, NULL, &sidlength, NULL, &domainlength, &sid_type)
 
-            newsid = <PSID>malloc((length) * sizeof(BYTE))
+            newsid = <PSID>malloc((sidlength) * sizeof(BYTE))
             domainlength = 0
-            LookupAccountNameW(NULL, ACEs[i].Trustee.ptstrName, newsid, &length, NULL, &domainlength, &sid_type)
+            LookupAccountNameW(NULL, DACL[i].Trustee.ptstrName, newsid, &sidlength, NULL, &domainlength, &sid_type)
             trusteeName, domain, type = _look_up_account_sid(newsid)
 
             name = trusteeName
             sidstr = sid2string(newsid)
             free(newsid)
 
-        elif ACEs[i].Trustee.TrusteeForm == TRUSTEE_BAD_FORM:
+        elif DACL[i].Trustee.TrusteeForm == TRUSTEE_BAD_FORM:
             continue
-        if ((depth == 0 and ACEs[i].grfInheritance & INHERIT_ONLY != 0)
-            or (ACEs[i].grfInheritance & INHERIT_NO_PROPAGATE and depth == 1)
-            or (ACEs[i].grfInheritance != NO_INHERITANCE and ACEs[i].grfInheritance & INHERIT_NO_PROPAGATE == 0)):
-            permissions = {'user': {'name': name, 'sid': sidstr}, 'permissions': (ACEs[i].grfAccessPermissions, ACEs[i].grfAccessMode, NO_INHERITANCE)}
+        if ((depth == 0 and DACL[i].grfInheritance & INHERIT_ONLY != 0)
+            or (DACL[i].grfInheritance & INHERIT_NO_PROPAGATE and depth == 1)
+            or (DACL[i].grfInheritance != NO_INHERITANCE and DACL[i].grfInheritance & INHERIT_NO_PROPAGATE == 0)):
+            permissions = {'user': {'name': name, 'sid': sidstr}, 'permissions': (DACL[i].grfAccessPermissions, DACL[i].grfAccessMode, NO_INHERITANCE)}
             pyDACL.append(permissions)
+
+    if permissions_granted:
+        for i in range(sacllength):
+            permissions = None
+            name = ""
+            sidstr = ""
+            if DACL[i].Trustee.TrusteeForm == TRUSTEE_IS_SID:
+                name, domain, type = _look_up_account_sid(<BYTE*>(SACL[i].Trustee.ptstrName))
+                sidstr = sid2string(<PSID>(SACL[i].Trustee.ptstrName))
+
+            elif SACL[i].Trustee.TrusteeForm == TRUSTEE_IS_NAME:
+                sid_type = SidTypeInvalid
+                domainlength = 0
+                LookupAccountNameW(NULL, SACL[i].Trustee.ptstrName, NULL, &sidlength, NULL, &domainlength, &sid_type)
+
+                newsid = <PSID>malloc((sidlength) * sizeof(BYTE))
+                domainlength = 0
+                LookupAccountNameW(NULL, SACL[i].Trustee.ptstrName, newsid, &sidlength, NULL, &domainlength, &sid_type)
+                trusteeName, domain, type = _look_up_account_sid(newsid)
+
+                name = trusteeName
+                sidstr = sid2string(newsid)
+                free(newsid)
+            else:
+                continue
+            if ((depth == 0 and SACL[i].grfInheritance & INHERIT_ONLY != 0)
+                or (SACL[i].grfInheritance & INHERIT_NO_PROPAGATE and depth == 1)
+                or (SACL[i].grfInheritance != NO_INHERITANCE and SACL[i].grfInheritance & INHERIT_NO_PROPAGATE == 0)):
+                permissions = {'user': {'name': name, 'sid': sidstr}, 'permissions': (SACL[i].grfAccessPermissions, SACL[i].grfAccessMode, NO_INHERITANCE)}
+                pySACL.append(permissions)
+
     if depth == 0:
         item['win_dacl'] = json.dumps(pyDACL)
-        print(pyDACL)
+        item['win_sacl'] = json.dumps(pySACL)
 
     free(SD)
-    LocalFree(<HLOCAL>ACEs)
-    return pyDACL
+    LocalFree(<HLOCAL>DACL)
+    LocalFree(<HLOCAL>SACL)
+    return pyDACL,pySACL
 
 
 def acl_set(path, item, numeric_owner=False):
-    if 'win_dacl' not in item:
-        return
+    if not permissions_enabled:
+        enable_permissions()
 
-    pyDACL = json.loads(item.win_dacl)
-    cdef _EXPLICIT_ACCESS_W* ACEs = <_EXPLICIT_ACCESS_W*>calloc(sizeof(_EXPLICIT_ACCESS_W), len(pyDACL))
+    cdef _EXPLICIT_ACCESS_W* DACL
     cdef wchar_t* temp
     cdef PSID newsid
-    for i in range(len(pyDACL)):
-        if pyDACL[i]['user']['name'] == '' or numeric_owner:
-            ACEs[i].Trustee.TrusteeForm = TRUSTEE_IS_SID
-            temp = PyUnicode_AsWideCharString(pyDACL[i]['user']['sid'], NULL)
-            ConvertStringSidToSidW(temp, &newsid)
-            ACEs[i].Trustee.ptstrName = <LPCTSTR>newsid
-            PyMem_Free(temp)
-        else:
-            ACEs[i].Trustee.TrusteeForm = TRUSTEE_IS_NAME
-            ACEs[i].Trustee.ptstrName = PyUnicode_AsWideCharString(pyDACL[i]['user']['name'], NULL)
-        ACEs[i].grfAccessPermissions = pyDACL[i]['permissions'][0]
-        ACEs[i].grfAccessMode = pyDACL[i]['permissions'][1]
-        ACEs[i].grfInheritance = pyDACL[i]['permissions'][2]
     cdef _ACL* newDACL
-    SetEntriesInAclW(len(pyDACL), ACEs, NULL, &newDACL)
-    cdef wchar_t* cstrPath = PyUnicode_AsWideCharString(path, NULL)
-    SetNamedSecurityInfoW(cstrPath, SE_FILE_OBJECT, PROTECTED_DACL_SECURITY_INFORMATION, NULL, NULL, newDACL, NULL)
 
-    for i in range(len(pyDACL)):
-        if pyDACL[i]['user']['name'] == '' or numeric_owner:
-            LocalFree(<HLOCAL>ACEs[i].Trustee.ptstrName)
-        else:
-            PyMem_Free(ACEs[i].Trustee.ptstrName)
-    free(ACEs)
-    PyMem_Free(cstrPath)
-    LocalFree(<HLOCAL>newDACL)
+    cdef wchar_t* cstrPath
+
+    if 'win_dacl' in item:
+        pyDACL = json.loads(item.win_dacl)
+        if len(pyDACL) > 0:
+            DACL = <_EXPLICIT_ACCESS_W*>calloc(sizeof(_EXPLICIT_ACCESS_W), len(pyDACL))
+
+            for i in range(len(pyDACL)):
+                if pyDACL[i]['user']['name'] == '' or numeric_owner:
+                    DACL[i].Trustee.TrusteeForm = TRUSTEE_IS_SID
+                    temp = PyUnicode_AsWideCharString(pyDACL[i]['user']['sid'], NULL)
+                    ConvertStringSidToSidW(temp, &newsid)
+                    DACL[i].Trustee.ptstrName = <LPCTSTR>newsid
+                    PyMem_Free(temp)
+                else:
+                    DACL[i].Trustee.TrusteeForm = TRUSTEE_IS_NAME
+                    DACL[i].Trustee.ptstrName = PyUnicode_AsWideCharString(pyDACL[i]['user']['name'], NULL)
+                DACL[i].grfAccessPermissions = pyDACL[i]['permissions'][0]
+                DACL[i].grfAccessMode = pyDACL[i]['permissions'][1]
+                DACL[i].grfInheritance = pyDACL[i]['permissions'][2]
+
+            SetEntriesInAclW(len(pyDACL), DACL, NULL, &newDACL)
+            cstrPath = PyUnicode_AsWideCharString(path, NULL)
+            SetNamedSecurityInfoW(cstrPath, SE_FILE_OBJECT, PROTECTED_DACL_SECURITY_INFORMATION, NULL, NULL, newDACL, NULL)
+
+            for i in range(len(pyDACL)):
+                if pyDACL[i]['user']['name'] == '' or numeric_owner:
+                    LocalFree(<HLOCAL>DACL[i].Trustee.ptstrName)
+                else:
+                    PyMem_Free(DACL[i].Trustee.ptstrName)
+            free(DACL)
+            PyMem_Free(cstrPath)
+            LocalFree(<HLOCAL>newDACL)
+
+    cdef _EXPLICIT_ACCESS_W* SACL
+    cdef _ACL* newSACL
+    if permissions_granted and 'win_sacl' in item:
+        pySACL = json.loads(item.win_sacl)
+        if len(pySACL) > 0:
+            SACL = <_EXPLICIT_ACCESS_W*>calloc(sizeof(_EXPLICIT_ACCESS_W), len(pySACL))
+
+            for i in range(len(pyDACL)):
+                if pySACL[i]['user']['name'] == '' or numeric_owner:
+                    SACL[i].Trustee.TrusteeForm = TRUSTEE_IS_SID
+                    temp = PyUnicode_AsWideCharString(pySACL[i]['user']['sid'], NULL)
+                    ConvertStringSidToSidW(temp, &newsid)
+                    SACL[i].Trustee.ptstrName = <LPCTSTR>newsid
+                    PyMem_Free(temp)
+                else:
+                    SACL[i].Trustee.TrusteeForm = TRUSTEE_IS_NAME
+                    SACL[i].Trustee.ptstrName = PyUnicode_AsWideCharString(pySACL[i]['user']['name'], NULL)
+                SACL[i].grfAccessPermissions = pySACL[i]['permissions'][0]
+                SACL[i].grfAccessMode = pySACL[i]['permissions'][1]
+                SACL[i].grfInheritance = pySACL[i]['permissions'][2]
+
+            SetEntriesInAclW(len(pySACL), SACL, NULL, &newSACL)
+            cstrPath = PyUnicode_AsWideCharString(path, NULL)
+            SetNamedSecurityInfoW(cstrPath, SE_FILE_OBJECT, PROTECTED_SACL_SECURITY_INFORMATION, NULL, NULL, newSACL, NULL)
+
+            for i in range(len(pySACL)):
+                if pySACL[i]['user']['name'] == '' or numeric_owner:
+                    LocalFree(<HLOCAL>SACL[i].Trustee.ptstrName)
+                else:
+                    PyMem_Free(SACL[i].Trustee.ptstrName)
+            free(SACL)
+            PyMem_Free(cstrPath)
+            LocalFree(<HLOCAL>newSACL)
 
 
 def sync_dir(path):

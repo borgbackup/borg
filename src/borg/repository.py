@@ -315,6 +315,9 @@ class Repository:
 
     def prepare_txn(self, transaction_id, do_cleanup=True):
         self._active_txn = True
+        if not self.lock:
+            logger.warning('Locking repository to recover')
+            self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=self.lock_wait).acquire()
         if not self.lock.got_exclusive_lock():
             if self.exclusive is not None:
                 # self.exclusive is either True or False, thus a new client is active here.

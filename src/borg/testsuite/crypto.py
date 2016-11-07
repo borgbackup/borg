@@ -1,6 +1,6 @@
 from binascii import hexlify, unhexlify
 
-from ..crypto import AES, bytes_to_long, bytes_to_int, long_to_bytes, hmac_sha256
+from ..crypto import AES, bytes_to_long, bytes_to_int, long_to_bytes, hmac_sha256, blake2b_256
 from ..crypto import increment_iv, bytes16_to_int, int_to_bytes16
 
 from . import BaseTestCase
@@ -80,3 +80,19 @@ class CryptoTestCase(BaseTestCase):
         hmac = unhexlify('82558a389a443c0ea4cc819899f2083a'
                          '85f0faa3e578f8077a2e3ff46729665b')
         assert hmac_sha256(key, data) == hmac
+
+    def test_blake2b_256(self):
+        # In BLAKE2 the output length actually is part of the hashes personality - it is *not* simple truncation like in
+        # the SHA-2 family. Therefore we need to generate test vectors ourselves (as is true for most applications that
+        # are not precisely vanilla BLAKE2b-512 or BLAKE2s-256).
+        #
+        # Obtained via "b2sum" utility from the official BLAKE2 repository. It calculates the exact hash of a file's
+        # contents, no extras (like length) included.
+        assert blake2b_256(b'', b'abc') == unhexlify('bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319')
+        assert blake2b_256(b'a', b'bc') == unhexlify('bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319')
+        assert blake2b_256(b'ab', b'c') == unhexlify('bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319')
+        assert blake2b_256(b'abc', b'') == unhexlify('bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319')
+
+        key = unhexlify('e944973af2256d4d670c12dd75304c319f58f4e40df6fb18ef996cb47e063676')
+        data = memoryview(b'1234567890' * 100)
+        assert blake2b_256(key, data) == unhexlify('97ede832378531dd0f4c668685d166e797da27b47d8cd441e885b60abd5e0cb2')

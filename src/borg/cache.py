@@ -178,7 +178,11 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not os.path.isdir(self.path):
             raise Exception('%s Does not look like a Borg cache' % self.path)
         self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait).acquire()
-        self.rollback()
+        try:
+            self.rollback()
+        except:
+            self.lock.release()
+            raise
 
     def close(self):
         if self.lock is not None:

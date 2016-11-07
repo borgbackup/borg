@@ -27,6 +27,9 @@ class SignedFile(FileLikeWrapper):
             self.signatures = {}
         else:
             self.signatures = self.read_signatures(path, self.signer)
+            if not self.signatures:
+                # Don't do unnecessary calculations - short-circuit if it's not needed.
+                self.signer = self.file_fd
 
     def sign_filename(self, filename=None):
         # Sign the name of the file as well, but only the basename, ie. not the path. In Borg
@@ -62,6 +65,8 @@ class SignedFile(FileLikeWrapper):
             raise SignatureError(path)
 
     def sign_part(self, partname, is_final=False):
+        if not self.writing and not self.signatures:
+            return
         self.signer.update(partname.encode())
         self.signer.sign_length(seek_to_end=is_final)
         signature = bin_to_hex(self.signer.signature())

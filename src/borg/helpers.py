@@ -37,7 +37,6 @@ from . import __version__ as borg_version
 from . import __version_tuple__ as borg_version_tuple
 from . import chunker
 from . import crypto
-from . import hashindex
 from . import shellpattern
 from .constants import *  # NOQA
 
@@ -85,14 +84,14 @@ class PlaceholderError(Error):
 
 
 def check_extension_modules():
-    from . import platform, compress
+    from . import platform, compress, hashindex
     if hashindex.API_VERSION != 4:
         raise ExtensionModuleError
     if chunker.API_VERSION != 2:
         raise ExtensionModuleError
     if compress.API_VERSION != 2:
         raise ExtensionModuleError
-    if crypto.API_VERSION != 3:
+    if crypto.API_VERSION != 4:
         raise ExtensionModuleError
     if platform.API_VERSION != 3:
         raise ExtensionModuleError

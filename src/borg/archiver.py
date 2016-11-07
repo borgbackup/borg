@@ -239,7 +239,7 @@ class Archiver:
             manager.export(args.path)
         return EXIT_SUCCESS
 
-    @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
+    @with_repository(exclusive=True, manifest=False, cache=False)
     def do_key_import(self, args, repository):
         """Import the repository key from backup"""
         manager = KeyManager(repository)

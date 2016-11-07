@@ -8,6 +8,8 @@ from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
 from libc.errno cimport errno
 from cpython.exc cimport PyErr_SetFromErrnoWithFilename
 
+from .signature import SignedFile
+
 API_VERSION = 4
 
 
@@ -15,12 +17,12 @@ cdef extern from "_hashindex.c":
     ctypedef struct HashIndex:
         pass
 
-    HashIndex *hashindex_read(char *path)
+    HashIndex *hashindex_read(object signed_file) except *
     HashIndex *hashindex_init(int capacity, int key_size, int value_size)
     void hashindex_free(HashIndex *index)
     int hashindex_len(HashIndex *index)
     int hashindex_size(HashIndex *index)
-    int hashindex_write(HashIndex *index, char *path)
+    void hashindex_write(HashIndex *index, object signed_file) except *
     void *hashindex_get(HashIndex *index, void *key)
     void *hashindex_next_key(HashIndex *index, void *key)
     int hashindex_delete(HashIndex *index, void *key)
@@ -64,16 +66,13 @@ cdef class IndexBase:
     MAX_LOAD_FACTOR = HASH_MAX_LOAD
     MAX_VALUE = _MAX_VALUE
 
-    def __cinit__(self, capacity=0, path=None, key_size=32):
+    def __init__(self, capacity=0, path=None, key_size=32, key=None):
         self.key_size = key_size
         if path:
-            path = os.fsencode(path)
-            self.index = hashindex_read(path)
+            with SignedFile(key, path, write=False) as fd:
+                self.index = hashindex_read(fd)
             if not self.index:
-                if errno:
-                    PyErr_SetFromErrnoWithFilename(OSError, path)
-                    return
-                raise RuntimeError('hashindex_read failed')
+                raise Exception('asdf')
         else:
             self.index = hashindex_init(capacity, self.key_size, self.value_size)
             if not self.index:
@@ -84,13 +83,12 @@ cdef class IndexBase:
             hashindex_free(self.index)
 
     @classmethod
-    def read(cls, path):
-        return cls(path=path)
+    def read(cls, key, path):
+        return cls(path=path, key=key)
 
-    def write(self, path):
-        path = os.fsencode(path)
-        if not hashindex_write(self.index, path):
-            raise Exception('hashindex_write failed')
+    def write(self, key, path, filename=None):
+        with SignedFile(key, path, write=True, filename=filename) as fd:
+            hashindex_write(self.index, fd)
 
     def clear(self):
         hashindex_free(self.index)

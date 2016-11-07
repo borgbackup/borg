@@ -30,7 +30,7 @@ SELFTEST_CASES = [
     ChunkerTestCase,
 ]
 
-SELFTEST_COUNT = 29
+SELFTEST_COUNT = 31
 
 
 class SelfTestResult(TestResult):

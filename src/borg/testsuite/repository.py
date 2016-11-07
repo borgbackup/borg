@@ -504,7 +504,7 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
 class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
     def list_indices(self):
-        return [name for name in os.listdir(os.path.join(self.tmppath, 'repository')) if name.startswith('index.')]
+        return [name for name in os.listdir(os.path.join(self.tmppath, 'repository')) if name.startswith('index.') and not name.endswith('.signature')]
 
     def check(self, repair=False, status=True):
         self.assert_equal(self.repository.check(repair=repair), status)
@@ -525,7 +525,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         return sorted(int(n) for n in os.listdir(os.path.join(self.tmppath, 'repository', 'data', '0')) if n.isdigit())[-1]
 
     def open_index(self):
-        return NSIndex.read(os.path.join(self.tmppath, 'repository', 'index.{}'.format(self.get_head())))
+        return NSIndex.read(self.repository.id, os.path.join(self.tmppath, 'repository', 'index.{}'.format(self.get_head())))
 
     def corrupt_object(self, id_):
         idx = self.open_index()

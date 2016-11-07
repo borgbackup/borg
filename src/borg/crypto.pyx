@@ -1,9 +1,13 @@
 """A thin OpenSSL wrapper"""
 
+import hashlib
+import hmac
+import io
+
 from libc.stdlib cimport malloc, free
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 
-API_VERSION = 3
+API_VERSION = 4
 
 
 cdef extern from "openssl/evp.h":
@@ -201,3 +205,107 @@ def hmac_sha256(key, data):
     finally:
         PyBuffer_Release(&data_buf)
     return md
+
+
+class FileLikeWrapper:
+    def __enter__(self):
+        self.fd.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.fd.__exit__(exc_type, exc_val, exc_tb)
+
+    def tell(self):
+        return self.fd.tell()
+
+    def seek(self, offset, whence=io.SEEK_SET):
+        return self.fd.seek(offset, whence)
+
+    def write(self, data):
+        return self.fd.write(data)
+
+    def read(self, n=None):
+        return self.fd.read(n)
+
+    def flush(self):
+        self.fd.flush()
+
+    def fileno(self):
+        return self.fd.fileno()
+
+
+class StreamSigner(FileLikeWrapper):
+    """
+    Wrapper for file-like objects that computes a signature or digest.
+
+    WARNING: Seeks should only be used to query the size of the file, not
+    to skip data, because skipped data isn't read and not signed. Similarly
+    skipping while writing to create sparse files is also not supported.
+
+    Data has to be read/written in a symmetric fashion, otherwise different
+    signatures will be generated.
+
+    Note: When used as a context manager read/write operations outside the enclosed scope
+    are illegal.
+    """
+
+    def __init__(self, key, backing_fd, write):
+        self.fd = backing_fd
+        self.writing = write
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None:
+            self.sign_length()
+        super().__exit__(exc_type, exc_val, exc_tb)
+
+    def write(self, data):
+        """
+        Write *data* to backing file and update internal state.
+        """
+        n = self.fd.write(data)
+        self.update(data)
+        return n
+
+    def read(self, n=None):
+        """
+        Read *data* from backing file (*n* has the usual meaning) and update internal state.
+        """
+        data = self.fd.read(n)
+        self.update(data)
+        return data
+
+    def signature(self):
+        """
+        Return current signature bytestring.
+
+        Note: this can be called multiple times.
+        """
+        raise NotImplementedError
+
+    def update(self, data):
+        """
+        Update internal state with *data*.
+        """
+        raise NotImplementedError
+
+    def sign_length(self, seek_to_end=False):
+        if seek_to_end:
+            # Sign length of file as well to avoid problems if only a prefix is read.
+            self.seek(0, io.SEEK_END)
+        self.update(str(self.tell()).encode())
+
+
+class StreamSigner_HMAC_SHA512_REPOID(StreamSigner):
+    # REPOID is a semantic difference, not implementation wise. This means that the key is no secret key, but the
+    # repository ID the file is related to.
+    NAME = 'HMAC_SHA_512_REPOID'
+
+    def __init__(self, key, backing_fd, write):
+        super().__init__(key, backing_fd, write)
+        self.hmac = hmac.new(key, digestmod=hashlib.sha512)
+
+    def update(self, data):
+        self.hmac.update(data)
+
+    def signature(self):
+        return self.hmac.digest()

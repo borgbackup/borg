@@ -12,7 +12,7 @@ from ..hashindex import NSIndex
 from ..helpers import Location
 from ..helpers import IntegrityError
 from ..locking import Lock, LockFailed
-from ..remote import RemoteRepository, InvalidRPCMethod, ConnectionClosedWithHint, handle_remote_line
+from ..remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed, ConnectionClosedWithHint, handle_remote_line
 from ..repository import Repository, LoggedIO, MAGIC, MAX_DATA_SIZE, TAG_DELETE
 from . import BaseTestCase
 from .hashindex import H
@@ -647,7 +647,60 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
                                 exclusive=True, create=create)
 
     def test_invalid_rpc(self):
-        self.assert_raises(InvalidRPCMethod, lambda: self.repository.call('__init__', None))
+        self.assert_raises(InvalidRPCMethod, lambda: self.repository.call('__init__', {}))
+
+    def test_rpc_exception_transport(self):
+        s1 = 'test string'
+
+        try:
+            self.repository.call('inject_exception', {'kind': 'DoesNotExist'})
+        except Repository.DoesNotExist as e:
+            assert len(e.args) == 1
+            assert e.args[0] == self.repository.location.orig
+
+        try:
+            self.repository.call('inject_exception', {'kind': 'AlreadyExists'})
+        except Repository.AlreadyExists as e:
+            assert len(e.args) == 1
+            assert e.args[0] == self.repository.location.orig
+
+        try:
+            self.repository.call('inject_exception', {'kind': 'CheckNeeded'})
+        except Repository.CheckNeeded as e:
+            assert len(e.args) == 1
+            assert e.args[0] == self.repository.location.orig
+
+        try:
+            self.repository.call('inject_exception', {'kind': 'IntegrityError'})
+        except IntegrityError as e:
+            assert len(e.args) == 1
+            assert e.args[0] == s1
+
+        try:
+            self.repository.call('inject_exception', {'kind': 'PathNotAllowed'})
+        except PathNotAllowed as e:
+            assert len(e.args) == 0
+
+        try:
+            self.repository.call('inject_exception', {'kind': 'ObjectNotFound'})
+        except Repository.ObjectNotFound as e:
+            assert len(e.args) == 2
+            assert e.args[0] == s1
+            assert e.args[1] == self.repository.location.orig
+
+        try:
+            self.repository.call('inject_exception', {'kind': 'InvalidRPCMethod'})
+        except InvalidRPCMethod as e:
+            assert len(e.args) == 1
+            assert e.args[0] == s1
+
+        try:
+            self.repository.call('inject_exception', {'kind': 'divide'})
+        except RemoteRepository.RPCError as e:
+            assert e.unpacked
+            assert e.get_message() == 'ZeroDivisionError: integer division or modulo by zero\n'
+            assert e.exception_class == 'ZeroDivisionError'
+            assert len(e.exception_full) > 0
 
     def test_ssh_cmd(self):
         assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', 'example.com']

@@ -122,7 +122,8 @@ class RepositoryServer:  # pragma: no cover
         'load_key',
         'break_lock',
         'get_free_nonce',
-        'commit_nonce_reservation'
+        'commit_nonce_reservation',
+        'inject_exception',
     )
 
     def __init__(self, restrict_to_paths, append_only):
@@ -285,6 +286,27 @@ class RepositoryServer:  # pragma: no cover
                                      exclusive=exclusive)
         self.repository.__enter__()  # clean exit handled by serve() method
         return self.repository.id
+
+    def inject_exception(self, kind):
+        kind = kind.decode()
+        s1 = 'test string'
+        s2 = 'test string2'
+        if kind == 'DoesNotExist':
+            raise Repository.DoesNotExist(s1)
+        elif kind == 'AlreadyExists':
+            raise Repository.AlreadyExists(s1)
+        elif kind == 'CheckNeeded':
+            raise Repository.CheckNeeded(s1)
+        elif kind == 'IntegrityError':
+            raise IntegrityError(s1)
+        elif kind == 'PathNotAllowed':
+            raise PathNotAllowed()
+        elif kind == 'ObjectNotFound':
+            raise Repository.ObjectNotFound(s1, s2)
+        elif kind == 'InvalidRPCMethod':
+            raise InvalidRPCMethod(s1)
+        elif kind == 'divide':
+            0 // 0
 
 
 class SleepingBandwidthLimiter:

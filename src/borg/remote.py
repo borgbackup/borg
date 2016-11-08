@@ -191,25 +191,53 @@ class RepositoryServer:  # pragma: no cover
                         args = self.filter_args(f, args)
                         res = f(**args)
                     except BaseException as e:
-                        if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
-                            # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
-                            # and will be handled just like locally raised exceptions. Suppress the remote traceback
-                            # for these, except ErrorWithTraceback, which should always display a traceback.
-                            pass
-                        else:
-                            if isinstance(e, Error):
-                                tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
-                                msg = e.get_message()
-                            else:
-                                tb_log_level = logging.ERROR
-                                msg = '%s Exception in RPC call' % e.__class__.__name__
-                            tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
-                            logging.error(msg)
-                            logging.log(tb_log_level, tb)
-                        exc = 'Remote Exception (see remote log for the traceback)'
                         if dictFormat:
-                            os.write(stdout_fd, msgpack.packb({MSGID: msgid, b'exception_class': e.__class__.__name__}))
+                            ex_short = traceback.format_exception_only(e.__class__, e)
+                            ex_full = traceback.format_exception(*sys.exc_info())
+                            if isinstance(e, Error):
+                                ex_short = e.get_message()
+                            if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
+                                # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
+                                # and will be handled just like locally raised exceptions. Suppress the remote traceback
+                                # for these, except ErrorWithTraceback, which should always display a traceback.
+                                pass
+                            else:
+                                logging.debug('\n'.join(ex_full))
+
+                            try:
+                                msg = msgpack.packb({MSGID: msgid,
+                                                    b'exception_class': e.__class__.__name__,
+                                                    b'exception_args': e.args,
+                                                    b'exception_full': ex_full,
+                                                    b'exception_short': ex_short,
+                                                    b'sysinfo': sysinfo()})
+                            except TypeError:
+                                msg = msgpack.packb({MSGID: msgid,
+                                                    b'exception_class': e.__class__.__name__,
+                                                    b'exception_args': [x if isinstance(x, (str, bytes, int)) else None
+                                                                        for x in e.args],
+                                                    b'exception_full': ex_full,
+                                                    b'exception_short': ex_short,
+                                                    b'sysinfo': sysinfo()})
+
+                            os.write(stdout_fd, msg)
                         else:
+                            if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
+                                # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
+                                # and will be handled just like locally raised exceptions. Suppress the remote traceback
+                                # for these, except ErrorWithTraceback, which should always display a traceback.
+                                pass
+                            else:
+                                if isinstance(e, Error):
+                                    tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
+                                    msg = e.get_message()
+                                else:
+                                    tb_log_level = logging.ERROR
+                                    msg = '%s Exception in RPC call' % e.__class__.__name__
+                                tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
+                                logging.error(msg)
+                                logging.log(tb_log_level, tb)
+                            exc = 'Remote Exception (see remote log for the traceback)'
                             os.write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc)))
                     else:
                         if dictFormat:
@@ -341,9 +369,34 @@ class RemoteRepository:
     extra_test_args = []
 
     class RPCError(Exception):
-        def __init__(self, name, remote_type):
-            self.name = name
-            self.remote_type = remote_type
+        def __init__(self, unpacked):
+            # for borg < 1.1: unpacked only has b'exception_class' as key
+            # for borg 1.1+: unpacked has keys: b'exception_args', b'exception_full', b'exception_short', b'sysinfo'
+            self.unpacked = unpacked
+
+        def get_message(self):
+            if b'exception_short' in self.unpacked:
+                return b'\n'.join(self.unpacked[b'exception_short']).decode()
+            else:
+                return self.exception_class
+
+        @property
+        def exception_class(self):
+            return self.unpacked[b'exception_class'].decode()
+
+        @property
+        def exception_full(self):
+            if b'exception_full' in self.unpacked:
+                return b'\n'.join(self.unpacked[b'exception_full']).decode()
+            else:
+                return self.get_message() + '\nRemote Exception (see remote log for the traceback)'
+
+        @property
+        def sysinfo(self):
+            if b'sysinfo' in self.unpacked:
+                return self.unpacked[b'sysinfo'].decode()
+            else:
+                return ''
 
     class RPCServerOutdated(Error):
         """Borg server is too old for {}. Required version {}"""
@@ -411,7 +464,7 @@ class RemoteRepository:
 
             def do_open():
                 self.id = self.open(path=self.location.path, create=create, lock_wait=lock_wait,
-                                lock=lock, exclusive=exclusive, append_only=append_only)
+                                    lock=lock, exclusive=exclusive, append_only=append_only)
 
             if self.dictFormat:
                 do_open()
@@ -420,7 +473,7 @@ class RemoteRepository:
                 try:
                     do_open()
                 except self.RPCError as err:
-                    if err.remote_type != 'TypeError':
+                    if err.exception_class != 'TypeError':
                         raise
                     msg = """\
 Please note:
@@ -524,8 +577,11 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 del self.chunkid_to_msgids[chunkid]
             return msgid
 
-        def handle_error(error, res):
-            error = error.decode('utf-8')
+        def handle_error(unpacked):
+            error = unpacked[b'exception_class'].decode()
+            old_server = b'exception_args' not in unpacked
+            args = unpacked.get(b'exception_args')
+
             if error == 'DoesNotExist':
                 raise Repository.DoesNotExist(self.location.orig)
             elif error == 'AlreadyExists':
@@ -533,15 +589,24 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             elif error == 'CheckNeeded':
                 raise Repository.CheckNeeded(self.location.orig)
             elif error == 'IntegrityError':
-                raise IntegrityError('(not available)')
+                if old_server:
+                    raise IntegrityError('(not available)')
+                else:
+                    raise IntegrityError(args[0].decode())
             elif error == 'PathNotAllowed':
                 raise PathNotAllowed()
             elif error == 'ObjectNotFound':
-                raise Repository.ObjectNotFound('(not available)', self.location.orig)
+                if old_server:
+                    raise Repository.ObjectNotFound('(not available)', self.location.orig)
+                else:
+                    raise Repository.ObjectNotFound(args[0].decode(), self.location.orig)
             elif error == 'InvalidRPCMethod':
-                raise InvalidRPCMethod('(not available)')
+                if old_server:
+                    raise InvalidRPCMethod('(not available)')
+                else:
+                    raise InvalidRPCMethod(args[0].decode())
             else:
-                raise self.RPCError(res.decode('utf-8'), error)
+                raise self.RPCError(unpacked)
 
         calls = list(calls)
         waiting_for = []
@@ -551,7 +616,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     unpacked = self.responses.pop(waiting_for[0])
                     waiting_for.pop(0)
                     if b'exception_class' in unpacked:
-                        handle_error(unpacked[b'exception_class'], None)
+                        handle_error(unpacked)
                     else:
                         yield unpacked[RESULT]
                         if not waiting_for and not calls:
@@ -577,6 +642,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                         elif isinstance(unpacked, tuple) and len(unpacked) == 4:
                             type, msgid, error, res = unpacked
                             if error:
+                                # ignore res, because it is only a fixed string anyway.
                                 unpacked = {MSGID: msgid, b'exception_class': error}
                             else:
                                 unpacked = {MSGID: msgid, RESULT: res}
@@ -585,7 +651,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                         if msgid in self.ignore_responses:
                             self.ignore_responses.remove(msgid)
                             if b'exception_class' in unpacked:
-                                handle_error(unpacked[b'exception_class'], None)
+                                handle_error(unpacked)
                         else:
                             self.responses[msgid] = unpacked
                 elif fd is self.stderr_fd:

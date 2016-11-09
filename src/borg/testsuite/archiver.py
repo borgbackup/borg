@@ -223,6 +223,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         os.environ['BORG_KEYS_DIR'] = self.keys_path
         os.environ['BORG_CACHE_DIR'] = self.cache_path
         os.mkdir(self.input_path)
+        os.chmod(self.input_path, 0o777)  # avoid troubles with fakeroot / FUSE
         os.mkdir(self.output_path)
         os.mkdir(self.keys_path)
         os.mkdir(self.cache_path)
@@ -2154,6 +2155,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self._test_verify_data('--encryption', 'none')
 
 
+@pytest.mark.skipif(sys.platform == 'cygwin', reason='remote is broken on cygwin and hangs')
 class RemoteArchiverTestCase(ArchiverTestCase):
     prefix = '__testsuite__:'
 

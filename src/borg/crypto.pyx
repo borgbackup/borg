@@ -231,6 +231,11 @@ def blake2b_256(key, data):
     md = bytes(32)
     cdef unsigned char *md_ptr = md
 
+    # This is secure, because BLAKE2 is not vulnerable to length-extension attacks (unlike SHA-1/2, MD-5 and others).
+    # See the BLAKE2 paper section 2.9 "Keyed hashing (MAC and PRF)" for details.
+    # A nice benefit is that this simpler prefix-MAC mode has less overhead than the more complex HMAC mode.
+    # We don't use the BLAKE2 parameter block (via blake2s_init_key) for this to
+    # avoid incompatibility with the limited API of OpenSSL.
     blake2b_update_from_buffer(&state, key)
     blake2b_update_from_buffer(&state, data)
 

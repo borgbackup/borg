@@ -102,7 +102,7 @@ class RepositoryServer:  # pragma: no cover
                     if self.repository is not None:
                         self.repository.close()
                     else:
-                        os.write(stderr_fd, "Borg {}: Got connection close before repository was opened.\n"
+                        os.write(stderr_fd, 'Borg {}: Got connection close before repository was opened.\n'
                                  .format(__version__).encode())
                     return
                 unpacker.feed(data)
@@ -137,7 +137,7 @@ class RepositoryServer:  # pragma: no cover
                             tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
                             logging.error(msg)
                             logging.log(tb_log_level, tb)
-                        exc = "Remote Exception (see remote log for the traceback)"
+                        exc = 'Remote Exception (see remote log for the traceback)'
                         os.write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc)))
                     else:
                         os.write(stdout_fd, msgpack.packb((1, msgid, None, res)))
@@ -272,7 +272,7 @@ This TypeError is a cosmetic side effect of the compatibility code borg
 clients >= 1.0.7 have to support older borg servers.
 This problem will go away as soon as the server has been upgraded to 1.0.7+.
 """
-                # emit this msg in the same way as the "Remote: ..." lines that show the remote TypeError
+                # emit this msg in the same way as the 'Remote: ...' lines that show the remote TypeError
                 sys.stderr.write(msg)
                 if append_only:
                     raise self.NoAppendOnlyOnServer()
@@ -283,10 +283,10 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
 
     def __del__(self):
         if len(self.responses):
-            logging.debug("still %d cached responses left in RemoteRepository" % (len(self.responses),))
+            logging.debug('still %d cached responses left in RemoteRepository' % (len(self.responses),))
         if self.p:
             self.close()
-            assert False, "cleanup happened in Repository.__del__"
+            assert False, 'cleanup happened in Repository.__del__'
 
     def __repr__(self):
         return '<%s %s>' % (self.__class__.__name__, self.location.canonical_path())
@@ -310,7 +310,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
 
     def borg_cmd(self, args, testing):
         """return a borg serve command line"""
-        # give some args/options to "borg serve" process as they were given to us
+        # give some args/options to 'borg serve' process as they were given to us
         opts = []
         if args is not None:
             opts.append('--umask=%03o' % args.umask)
@@ -430,7 +430,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 while not self.to_send and (calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT:
                     if calls:
                         if is_preloaded:
-                            assert cmd == "get", "is_preload is only supported for 'get'"
+                            assert cmd == 'get', "is_preload is only supported for 'get'"
                             if calls[0][0] in self.chunkid_to_msgids:
                                 waiting_for.append(pop_preload_msgid(calls.pop(0)[0]))
                         else:
@@ -531,7 +531,7 @@ def handle_remote_line(line):
             logname, msg = msg.split(' ', 1)
             logging.getLogger(logname).log(level, msg.rstrip())
     else:
-        sys.stderr.write("Remote: " + line)
+        sys.stderr.write('Remote: ' + line)
 
 
 class RepositoryNoCache:

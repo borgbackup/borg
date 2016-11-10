@@ -1536,6 +1536,8 @@ class Archiver:
         considered for deletion and only those archives count towards the totals
         specified by the rules.
         Otherwise, *all* archives in the repository are candidates for deletion!
+        There is no automatic distinction between archives representing different
+        contents. These need to be distinguished by specifying matching prefixes.
         """)
         subparser = subparsers.add_parser('prune', parents=[common_parser],
                                           description=self.do_prune.__doc__,

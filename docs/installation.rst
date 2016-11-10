@@ -88,6 +88,9 @@ github to followup on packaging efforts.
 Standalone Binary
 -----------------
 
+.. note:: Releases are signed with an OpenPGP key, see
+          :ref:`security-contact` for more instructions.
+
 |project_name| binaries (generated with `pyinstaller`_) are available
 on the releases_ page for the following platforms:
 

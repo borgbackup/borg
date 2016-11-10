@@ -431,6 +431,9 @@ class RemoteRepository:
         def required_version(self):
             return self.args[1]
 
+    # If compatibility with 1.0.x is not longer needed, replace all checks of this with True and simplify the code
+    dictFormat = False  # outside of __init__ for testing of legacy free protocol
+
     def __init__(self, location, create=False, exclusive=False, lock_wait=None, lock=True, append_only=False, args=None):
         self.location = self._location = location
         self.preload_ids = []
@@ -442,7 +445,6 @@ class RemoteRepository:
         self.ratelimit = SleepingBandwidthLimiter(args.remote_ratelimit * 1024 if args and args.remote_ratelimit else 0)
 
         self.unpacker = msgpack.Unpacker(use_list=False)
-        self.dictFormat = False
         self.server_version = parse_version('1.0.8')  # fallback version if server is too old to send version information
         self.p = None
         testing = location.host == '__testsuite__'

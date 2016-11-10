@@ -723,6 +723,31 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         assert self.repository.borg_cmd(args, testing=False) == ['borg-0.28.2', 'serve', '--umask=077', '--info']
 
 
+class RemoteLegacyFree(RepositoryTestCaseBase):
+    # Keep testing this so we can someday safely remove the legacy tuple format.
+
+    def open(self, create=False):
+        with patch.object(RemoteRepository, 'dictFormat', True):
+            return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')),
+                                    exclusive=True, create=create)
+
+    def test_legacy_free(self):
+        # put
+        self.repository.put(H(0), b'foo')
+        self.repository.commit()
+        self.repository.close()
+        # replace
+        self.repository = self.open()
+        with self.repository:
+            self.repository.put(H(0), b'bar')
+            self.repository.commit()
+        # delete
+        self.repository = self.open()
+        with self.repository:
+            self.repository.delete(H(0))
+            self.repository.commit()
+
+
 @pytest.mark.skipif(sys.platform == 'cygwin', reason='remote is broken on cygwin and hangs')
 class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
 

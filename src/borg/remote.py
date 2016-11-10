@@ -112,7 +112,7 @@ class RepositoryServer:  # pragma: no cover
                             self.repository.close()
                         raise UnexpectedRPCDataFormatFromClient(__version__)
                     type, msgid, method, args = unpacked
-                    method = method.decode('ascii')
+                    method = method.decode()
                     try:
                         if method not in self.rpc_methods:
                             raise InvalidRPCMethod(method)

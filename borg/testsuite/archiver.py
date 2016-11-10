@@ -1444,6 +1444,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.cmd('check', self.repository_location, exit_code=0)
         self.cmd('extract', '--dry-run', self.repository_location + '::archive1', exit_code=0)
 
+
 @pytest.mark.skipif(sys.platform == 'cygwin', reason='remote is broken on cygwin and hangs')
 class RemoteArchiverTestCase(ArchiverTestCase):
     prefix = '__testsuite__:'

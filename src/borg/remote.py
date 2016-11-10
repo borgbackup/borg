@@ -88,7 +88,7 @@ compatMap = {
     '__len__': (),
     'list': ('limit', 'marker', ),
     'put': ('id', 'data', ),
-    'get': ('id_', ),
+    'get': ('id', ),
     'delete': ('id', ),
     'save_key': ('keydata', ),
     'load_key': (),
@@ -690,12 +690,12 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     if calls:
                         if is_preloaded:
                             assert cmd == 'get', "is_preload is only supported for 'get'"
-                            if calls[0]['id_'] in self.chunkid_to_msgids:
-                                waiting_for.append(pop_preload_msgid(calls.pop(0)['id_']))
+                            if calls[0]['id'] in self.chunkid_to_msgids:
+                                waiting_for.append(pop_preload_msgid(calls.pop(0)['id']))
                         else:
                             args = calls.pop(0)
-                            if cmd == 'get' and args['id_'] in self.chunkid_to_msgids:
-                                waiting_for.append(pop_preload_msgid(args['id_']))
+                            if cmd == 'get' and args['id'] in self.chunkid_to_msgids:
+                                waiting_for.append(pop_preload_msgid(args['id']))
                             else:
                                 self.msgid += 1
                                 waiting_for.append(self.msgid)
@@ -705,7 +705,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                                     self.to_send = msgpack.packb((1, self.msgid, cmd, self.named_to_positional(cmd, args)))
                     if not self.to_send and self.preload_ids:
                         chunk_id = self.preload_ids.pop(0)
-                        args = {'id_': chunk_id}
+                        args = {'id': chunk_id}
                         self.msgid += 1
                         self.chunkid_to_msgids.setdefault(chunk_id, []).append(self.msgid)
                         if self.dictFormat:
@@ -756,12 +756,12 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
     def scan(self, limit=None, marker=None):
         """actual remoting is done via self.call in the @api decorator"""
 
-    def get(self, id_):
-        for resp in self.get_many([id_]):
+    def get(self, id):
+        for resp in self.get_many([id]):
             return resp
 
     def get_many(self, ids, is_preloaded=False):
-        for resp in self.call_many('get', [{'id_': id_} for id_ in ids], is_preloaded=is_preloaded):
+        for resp in self.call_many('get', [{'id': id} for id in ids], is_preloaded=is_preloaded):
             yield resp
 
     @api(since=parse_version('1.0.0'))

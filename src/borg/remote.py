@@ -371,13 +371,13 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             elif error == 'CheckNeeded':
                 raise Repository.CheckNeeded(self.location.orig)
             elif error == 'IntegrityError':
-                raise IntegrityError(res)
+                raise IntegrityError('(not available)')
             elif error == 'PathNotAllowed':
-                raise PathNotAllowed(*res)
+                raise PathNotAllowed()
             elif error == 'ObjectNotFound':
-                raise Repository.ObjectNotFound(res[0], self.location.orig)
+                raise Repository.ObjectNotFound('(not available)', self.location.orig)
             elif error == 'InvalidRPCMethod':
-                raise InvalidRPCMethod(*res)
+                raise InvalidRPCMethod('(not available)')
             else:
                 raise self.RPCError(res.decode('utf-8'), error)
 

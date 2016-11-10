@@ -6,7 +6,7 @@ from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 API_VERSION = 3
 
 
-cdef extern from "blake2/blake2b-ref.c":
+cdef extern from "blake2-libselect.h":
     ctypedef struct blake2b_state:
         pass
 

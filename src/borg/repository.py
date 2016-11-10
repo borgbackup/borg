@@ -147,7 +147,7 @@ class Repository:
                 cleanup = True
             else:
                 cleanup = False
-            self.rollback(cleanup)
+            self._rollback(cleanup=cleanup)
         self.close()
 
     @property
@@ -433,7 +433,7 @@ class Repository:
         free_space = st_vfs.f_bavail * st_vfs.f_bsize
         logger.debug('check_free_space: required bytes {}, free bytes {}'.format(required_free_space, free_space))
         if free_space < required_free_space:
-            self.rollback(cleanup=True)
+            self._rollback(cleanup=True)
             formatted_required = format_file_size(required_free_space)
             formatted_free = format_file_size(free_space)
             raise self.InsufficientFreeSpaceError(formatted_required, formatted_free)
@@ -731,13 +731,16 @@ class Repository:
             logger.info('Completed repository check, no problems found.')
         return not error_found or repair
 
-    def rollback(self, cleanup=False):
+    def _rollback(self, *, cleanup):
         """
         """
         if cleanup:
             self.io.cleanup(self.io.get_segments_transaction_id())
         self.index = None
         self._active_txn = False
+
+    def rollback(self):
+        self._rollback(cleanup=False)
 
     def __len__(self):
         if not self.index:

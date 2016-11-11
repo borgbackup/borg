@@ -166,7 +166,7 @@ class Repository:
         if not os.path.exists(path):
             os.mkdir(path)
         with open(os.path.join(path, 'README'), 'w') as fd:
-            fd.write('This is a Borg repository\n')
+            fd.write(REPOSITORY_README)
         os.mkdir(os.path.join(path, 'data'))
         config = ConfigParser(interpolation=None)
         config.add_section('repository')

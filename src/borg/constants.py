@@ -50,3 +50,12 @@ EXIT_ERROR = 2  # terminated abruptly, did not reach end of operation
 DASHES = '-' * 78
 
 PBKDF2_ITERATIONS = 100000
+
+
+REPOSITORY_README = """This is a Borg Backup repository.
+See https://borgbackup.readthedocs.io/
+"""
+
+CACHE_README = """This is a Borg Backup cache.
+See https://borgbackup.readthedocs.io/
+"""

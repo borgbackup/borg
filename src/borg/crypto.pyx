@@ -6,6 +6,15 @@ from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 API_VERSION = 3
 
 
+cdef extern from "blake2-libselect.h":
+    ctypedef struct blake2b_state:
+        pass
+
+    int blake2b_init(blake2b_state *S, size_t outlen) nogil
+    int blake2b_update(blake2b_state *S, const void *input, size_t inlen) nogil
+    int blake2b_final(blake2b_state *S, void *out, size_t outlen) nogil
+
+
 cdef extern from "openssl/evp.h":
     ctypedef struct EVP_MD:
         pass
@@ -200,4 +209,41 @@ def hmac_sha256(key, data):
             raise Exception('HMAC(EVP_sha256) failed')
     finally:
         PyBuffer_Release(&data_buf)
+    return md
+
+
+cdef blake2b_update_from_buffer(blake2b_state *state, obj):
+    cdef Py_buffer buf = ro_buffer(obj)
+    try:
+        with nogil:
+            rc = blake2b_update(state, buf.buf, buf.len)
+        if rc == -1:
+            raise Exception('blake2b_update() failed')
+    finally:
+        PyBuffer_Release(&buf)
+
+
+def blake2b_256(key, data):
+    cdef blake2b_state state
+    if blake2b_init(&state, 32) == -1:
+        raise Exception('blake2b_init() failed')
+
+    md = bytes(32)
+    cdef unsigned char *md_ptr = md
+    cdef unsigned char *key_ptr = key
+
+    # This is secure, because BLAKE2 is not vulnerable to length-extension attacks (unlike SHA-1/2, MD-5 and others).
+    # See the BLAKE2 paper section 2.9 "Keyed hashing (MAC and PRF)" for details.
+    # A nice benefit is that this simpler prefix-MAC mode has less overhead than the more complex HMAC mode.
+    # We don't use the BLAKE2 parameter block (via blake2s_init_key) for this to
+    # avoid incompatibility with the limited API of OpenSSL.
+    rc = blake2b_update(&state, key_ptr, len(key))
+    if rc == -1:
+        raise Exception('blake2b_update() failed')
+    blake2b_update_from_buffer(&state, data)
+
+    rc = blake2b_final(&state, md_ptr, 32)
+    if rc == -1:
+        raise Exception('blake2b_final() failed')
+
     return md

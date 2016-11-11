@@ -959,7 +959,7 @@ class Archiver:
         else:
             encrypted = 'Yes (%s)' % key.NAME
         print('Encrypted: %s' % encrypted)
-        if key.NAME == 'key file':
+        if key.NAME.startswith('key file'):
             print('Key file: %s' % key.find_key())
         print('Cache: %s' % cache.path)
         print(DASHES)
@@ -1556,6 +1556,7 @@ class Archiver:
                                                     'Access to all sub-directories is granted implicitly; PATH doesn\'t need to directly point to a repository.')
         subparser.add_argument('--append-only', dest='append_only', action='store_true',
                                help='only allow appending to repository segment files')
+
         init_epilog = textwrap.dedent("""
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
@@ -1599,8 +1600,21 @@ class Archiver:
         You can change your passphrase for existing repos at any time, it won't affect
         the encryption/decryption key or other secrets.
 
-        When encrypting, AES-CTR-256 is used for encryption, and HMAC-SHA256 for
-        authentication. Hardware acceleration will be used automatically.
+        Encryption modes
+        ++++++++++++++++
+
+        repokey and keyfile use AES-CTR-256 for encryption and HMAC-SHA256 for
+        authentication in an encrypt-then-MAC (EtM) construction. The chunk ID hash
+        is HMAC-SHA256 as well (with a separate key).
+
+        repokey-blake2 and keyfile-blake2 use the same authenticated encryption, but
+        use a keyed BLAKE2b-256 hash for the chunk ID hash.
+
+        "authenticated" mode uses no encryption, but authenticates repository contents
+        through the same keyed BLAKE2b-256 hash as the other blake2 modes.
+        The key is stored like repokey.
+
+        Hardware acceleration will be used automatically.
         """)
         subparser = subparsers.add_parser('init', parents=[common_parser], add_help=False,
                                           description=self.do_init.__doc__, epilog=init_epilog,
@@ -1611,7 +1625,8 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption',
-                               choices=('none', 'keyfile', 'repokey'), default='repokey',
+                               choices=('none', 'keyfile', 'repokey', 'keyfile-blake2', 'repokey-blake2', 'authenticated'),
+                               default='repokey',
                                help='select encryption key mode (default: "%(default)s")')
         subparser.add_argument('-a', '--append-only', dest='append_only', action='store_true',
                                help='create an append-only mode repository')

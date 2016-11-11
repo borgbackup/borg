@@ -407,6 +407,12 @@ class RepositoryFreeSpaceTestCase(RepositoryTestCaseBase):
             with pytest.raises(Repository.InsufficientFreeSpaceError):
                 self.repository.commit()
 
+    def test_create_free_space(self):
+        self.repository.additional_free_space = 1e20
+        with pytest.raises(Repository.InsufficientFreeSpaceError):
+            self.add_keys()
+        assert not os.path.exists(self.repository.path)
+
 
 class NonceReservation(RepositoryTestCaseBase):
     def test_get_free_nonce_asserts(self):

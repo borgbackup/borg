@@ -120,6 +120,7 @@ class Repository:
         self.lock_wait = lock_wait
         self.do_lock = lock
         self.do_create = create
+        self.created = False
         self.exclusive = exclusive
         self.append_only = append_only
         self.hostname_is_unique = yes(env_var_override='BORG_HOSTNAME_IS_UNIQUE', env_msg=None, prompt=False)
@@ -138,6 +139,7 @@ class Repository:
         if self.do_create:
             self.do_create = False
             self.create(self.path)
+            self.created = True
         self.open(self.path, bool(self.exclusive), lock_wait=self.lock_wait, lock=self.do_lock)
         return self
 
@@ -437,7 +439,11 @@ class Repository:
         free_space = st_vfs.f_bavail * st_vfs.f_bsize
         logger.debug('check_free_space: required bytes {}, free bytes {}'.format(required_free_space, free_space))
         if free_space < required_free_space:
-            self._rollback(cleanup=True)
+            if self.created:
+                logger.error('Not enough free space to initialize repository at this location.')
+                self.destroy()
+            else:
+                self._rollback(cleanup=True)
             formatted_required = format_file_size(required_free_space)
             formatted_free = format_file_size(free_space)
             raise self.InsufficientFreeSpaceError(formatted_required, formatted_free)

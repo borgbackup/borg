@@ -10,6 +10,7 @@ import msgpack
 from .logger import create_logger
 logger = create_logger()
 
+from .constants import CACHE_README
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Location
 from .helpers import Error
@@ -151,7 +152,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         """
         os.makedirs(self.path)
         with open(os.path.join(self.path, 'README'), 'w') as fd:
-            fd.write('This is a Borg cache')
+            fd.write(CACHE_README)
         config = configparser.ConfigParser(interpolation=None)
         config.add_section('cache')
         config.set('cache', 'version', '1')

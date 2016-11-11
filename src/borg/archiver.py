@@ -1721,7 +1721,7 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 
-        subparser = subparsers.add_parser('key', add_help=False,
+        subparser = subparsers.add_parser('key', add_help=True,
                                           description="Manage a keyfile or repokey of a repository",
                                           epilog="",
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -2491,7 +2491,7 @@ class Archiver:
         in case you ever run into some severe malfunction. Use them only if you know
         what you are doing or if a trusted developer tells you what to do.""")
 
-        subparser = subparsers.add_parser('debug', add_help=False,
+        subparser = subparsers.add_parser('debug', add_help=True,
                                           description='debugging command (not intended for normal use)',
                                           epilog=debug_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,

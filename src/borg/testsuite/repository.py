@@ -406,6 +406,7 @@ class RepositoryFreeSpaceTestCase(RepositoryTestCaseBase):
             self.repository.put(H(0), b'foobar')
             with pytest.raises(Repository.InsufficientFreeSpaceError):
                 self.repository.commit()
+        assert os.path.exists(self.repository.path)
 
     def test_create_free_space(self):
         self.repository.additional_free_space = 1e20

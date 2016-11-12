@@ -17,7 +17,7 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
     brew install lz4
     brew outdated pyenv || brew upgrade pyenv
     brew install pkg-config
-    brew install Caskroom/versions/osxfuse-beta
+    brew install Caskroom/versions/osxfuse
 
     case "${TOXENV}" in
         py34)

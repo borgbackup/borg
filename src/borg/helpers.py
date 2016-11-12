@@ -1388,7 +1388,17 @@ class ProgressIndicatorBase:
         if not self.logger.handlers:
             self.handler = logging.StreamHandler(stream=sys.stderr)
             self.handler.setLevel(logging.INFO)
-            self.handler.terminator = '\r'
+            logger = logging.getLogger('borg')
+            # Some special attributes on the borg logger, created by setup_logging
+            # But also be able to work without that
+            try:
+                formatter = logger.formatter
+                terminator = '\n' if logger.json else '\r'
+            except AttributeError:
+                terminator = '\r'
+            else:
+                self.handler.setFormatter(formatter)
+            self.handler.terminator = terminator
 
             self.logger.addHandler(self.handler)
             if self.logger.level == logging.NOTSET:

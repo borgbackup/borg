@@ -162,3 +162,8 @@ def swidth(s):
 def umount(mountpoint):
     """un-mount the FUSE filesystem mounted at <mountpoint>"""
     return 0  # dummy, see also posix module
+
+
+def fstype(path=None, fd=None):
+    """determine the filesystem type, returns fs name as str or None (unknown)"""
+    return None

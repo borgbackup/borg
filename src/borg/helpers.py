@@ -1258,13 +1258,13 @@ class ProgressIndicatorPercent:
         if pct is not None:
             # truncate the last argument, if space is available
             if info != []:
-                msg = self.msg % (pct, *info[:-1], '')
+                msg = self.msg % tuple([pct] + info[:-1] + [''])
                 space = get_terminal_size()[0] - len(msg)
                 if space < 8:
                     info[-1] = ''
                 else:
                     info[-1] = ellipsis_truncate(info[-1], space)
-                return self.output(self.msg % (pct, *info))
+                return self.output(self.msg % tuple([pct] + info))
 
             return self.output(self.msg % pct)
 

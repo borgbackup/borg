@@ -20,7 +20,7 @@ class PropDict:
     When "packing" a dict, ie. you have a dict with some data and want to convert it into an instance,
     then use eg. Item({'a': 1, ...}). This way all keys in your dictionary are validated.
 
-    When "unpacking", that is you've read a dictionary with some data from somewhere (eg mspack),
+    When "unpacking", that is you've read a dictionary with some data from somewhere (eg. msgpack),
     then use eg. Item(internal_dict={...}). This does not validate the keys, therefore unknown keys
     are ignored instead of causing an error.
     """

@@ -904,6 +904,8 @@ def test_yes_env_output(capfd, monkeypatch):
 
 
 def test_progress_percentage_sameline(capfd):
+    os.environ['COLUMNS'] = '4'
+    os.environ['LINES'] = '1'
     pi = ProgressIndicatorPercent(1000, step=5, start=0, msg="%3.0f%%")
     pi.logger.setLevel('INFO')
     pi.show(0)

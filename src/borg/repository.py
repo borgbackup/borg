@@ -683,6 +683,9 @@ class Repository:
         if transaction_id is None:
             logger.debug('No index transaction found, trying latest segment')
             transaction_id = self.io.get_latest_segment()
+        if transaction_id is None:
+            report_error('This repository contains no valid data.')
+            return False
         if repair:
             self.io.cleanup(transaction_id)
         segments_transaction_id = self.io.get_segments_transaction_id()

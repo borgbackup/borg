@@ -994,6 +994,9 @@ class ArchiveChecker:
         self.repair = repair
         self.repository = repository
         self.init_chunks()
+        if not self.chunks:
+            logger.error('Repository contains no apparent data at all, cannot continue check/repair.')
+            return False
         self.key = self.identify_key(repository)
         if verify_data:
             self.verify_data()
@@ -1260,11 +1263,21 @@ class ArchiveChecker:
                 self.error_found = True
                 logger.error(msg)
 
+            def list_keys_safe(keys):
+                return ', '.join((k.decode() if isinstance(k, bytes) else str(k) for k in keys))
+
             def valid_item(obj):
                 if not isinstance(obj, StableDict):
-                    return False
+                    return False, 'not a dictionary'
+                # A bug in Attic up to and including release 0.13 added a (meaningless) b'acl' key to every item.
+                # We ignore it here, should it exist. See test_attic013_acl_bug for details.
+                obj.pop(b'acl', None)
                 keys = set(obj)
-                return required_item_keys.issubset(keys) and keys.issubset(item_keys)
+                if not required_item_keys.issubset(keys):
+                    return False, 'missing required keys: ' + list_keys_safe(required_item_keys - keys)
+                if not keys.issubset(item_keys):
+                    return False, 'invalid keys: ' + list_keys_safe(keys - item_keys)
+                return True, ''
 
             i = 0
             for state, items in groupby(archive.items, missing_chunk_detector):
@@ -1281,10 +1294,11 @@ class ArchiveChecker:
                     unpacker.feed(data)
                     try:
                         for item in unpacker:
-                            if valid_item(item):
+                            valid, reason = valid_item(item)
+                            if valid:
                                 yield Item(internal_dict=item)
                             else:
-                                report('Did not get expected metadata dict when unpacking item metadata', chunk_id, i)
+                                report('Did not get expected metadata dict when unpacking item metadata (%s)' % reason, chunk_id, i)
                     except RobustUnpacker.UnpackerCrashed as err:
                         report('Unpacker crashed while unpacking item metadata, trying to resync...', chunk_id, i)
                         unpacker.resync()

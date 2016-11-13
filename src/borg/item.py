@@ -16,6 +16,13 @@ class PropDict:
     - optionally, decode when getting a value
     - be safe against typos in key names: check against VALID_KEYS
     - when setting a value: check type of value
+
+    When "packing" a dict, ie. you have a dict with some data and want to convert it into an instance,
+    then use eg. Item({'a': 1, ...}). This way all keys in your dictionary are validated.
+
+    When "unpacking", that is you've read a dictionary with some data from somewhere (eg mspack),
+    then use eg. Item(internal_dict={...}). This does not validate the keys, therefore unknown keys
+    are ignored instead of causing an error.
     """
     VALID_KEYS = None  # override with <set of str> in child class
 
@@ -112,11 +119,14 @@ class Item(PropDict):
     Items are created either from msgpack unpacker output, from another dict, from kwargs or
     built step-by-step by setting attributes.
 
-    msgpack gives us a dict with bytes-typed keys, just give it to Item(d) and use item.key_name later.
+    msgpack gives us a dict with bytes-typed keys, just give it to Item(internal_dict=d) and use item.key_name later.
     msgpack gives us byte-typed values for stuff that should be str, we automatically decode when getting
     such a property and encode when setting it.
 
     If an Item shall be serialized, give as_dict() method output to msgpack packer.
+
+    A bug in Attic up to and including release 0.13 added a (meaningless) 'acl' key to every item.
+    We must never re-use this key. See test_attic013_acl_bug for details.
     """
 
     VALID_KEYS = ITEM_KEYS | {'deleted', 'nlink', }  # str-typed keys

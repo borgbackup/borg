@@ -12,9 +12,6 @@ from distutils.version import LooseVersion
 
 from .helpers import Buffer
 
-from .logger import create_logger
-logger = create_logger()
-
 
 try:
     ENOATTR = errno.ENOATTR
@@ -68,7 +65,7 @@ if libc_name is None:
         libc_name = 'libc.dylib'
     else:
         msg = "Can't find C library. No fallback known. Try installing ldconfig, gcc/cc or objdump."
-        logger.error(msg)
+        print(msg, file=sys.stderr)  # logger isn't initialized at this stage
         raise Exception(msg)
 
 # If we are running with fakeroot on Linux, then use the xattr functions of fakeroot. This is needed by

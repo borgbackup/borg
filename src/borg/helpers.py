@@ -26,6 +26,7 @@ from functools import wraps, partial, lru_cache
 from itertools import islice
 from operator import attrgetter
 from string import Formatter
+from shutil import get_terminal_size
 
 import msgpack
 import msgpack.fallback
@@ -1191,6 +1192,20 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
         env_var_override = None
 
 
+def ellipsis_truncate(msg, space):
+    from .platform import swidth
+    """
+    shorten a long string by adding ellipsis between it and return it, example:
+    this_is_a_very_long_string -------> this_is..._string
+    """
+    ellipsis_width = swidth('...')
+    msg_width = swidth(msg)
+    if space < ellipsis_width + msg_width:
+        return '%s...%s' % (swidth_slice(msg, space // 2 - ellipsis_width),
+                            swidth_slice(msg, -space // 2))
+    return msg + ' ' * (space - msg_width)
+
+
 class ProgressIndicatorPercent:
     LOGGER = 'borg.output.progress'
 
@@ -1208,7 +1223,6 @@ class ProgressIndicatorPercent:
         self.trigger_at = start  # output next percentage value when reaching (at least) this
         self.step = step
         self.msg = msg
-        self.output_len = len(self.msg % 100.0)
         self.handler = None
         self.logger = logging.getLogger(self.LOGGER)
 
@@ -1239,14 +1253,23 @@ class ProgressIndicatorPercent:
             self.trigger_at += self.step
             return pct
 
-    def show(self, current=None, increase=1):
+    def show(self, current=None, increase=1, info=[]):
         pct = self.progress(current, increase)
         if pct is not None:
+            # truncate the last argument, if space is available
+            if info != []:
+                msg = self.msg % (pct, *info[:-1], '')
+                space = get_terminal_size()[0] - len(msg)
+                if space < 8:
+                    info[-1] = ''
+                else:
+                    info[-1] = ellipsis_truncate(info[-1], space)
+                return self.output(self.msg % (pct, *info))
+
             return self.output(self.msg % pct)
 
     def output(self, message):
-        self.output_len = max(len(message), self.output_len)
-        message = message.ljust(self.output_len)
+        message = message.ljust(get_terminal_size(fallback=(4, 1))[0])
         self.logger.info(message)
 
     def finish(self):

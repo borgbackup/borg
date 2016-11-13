@@ -31,7 +31,7 @@ from .helpers import format_time, format_timedelta, format_file_size, file_statu
 from .helpers import safe_encode, safe_decode, make_path_safe, remove_surrogates, swidth_slice
 from .helpers import decode_dict, StableDict
 from .helpers import int_to_bigint, bigint_to_int, bin_to_hex
-from .helpers import ProgressIndicatorPercent, log_multi
+from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
 from .helpers import PathPrefixPattern, FnmatchPattern
 from .helpers import consume, chunkit
 from .helpers import CompressionDecider1, CompressionDecider2, CompressionSpec
@@ -93,11 +93,7 @@ class Statistics:
                     msg = ''
                     space = columns - swidth(msg)
                 if space >= 8:
-                    if space < swidth('...') + swidth(path):
-                        path = '%s...%s' % (swidth_slice(path, space // 2 - swidth('...')),
-                                            swidth_slice(path, -space // 2))
-                    space -= swidth(path)
-                    msg += path + ' ' * space
+                    msg += ellipsis_truncate(path, space)
             else:
                 msg = ' ' * columns
             print(msg, file=stream or sys.stderr, end="\r", flush=True)
@@ -448,7 +444,7 @@ Number of files: {0.stats.nfiles}'''.format(
             if 'chunks' in item:
                 for _, data in self.pipeline.fetch_many([c.id for c in item.chunks], is_preloaded=True):
                     if pi:
-                        pi.show(increase=len(data))
+                        pi.show(increase=len(data), info=[remove_surrogates(item.path)])
                     if stdout:
                         sys.stdout.buffer.write(data)
                 if stdout:
@@ -501,7 +497,7 @@ Number of files: {0.stats.nfiles}'''.format(
                 ids = [c.id for c in item.chunks]
                 for _, data in self.pipeline.fetch_many(ids, is_preloaded=True):
                     if pi:
-                        pi.show(increase=len(data))
+                        pi.show(increase=len(data), info=[remove_surrogates(item.path)])
                     with backup_io():
                         if sparse and self.zeros.startswith(data):
                             # all-zero chunk: create a hole in a sparse file

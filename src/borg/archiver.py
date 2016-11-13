@@ -501,7 +501,7 @@ class Archiver:
 
         filter = self.build_filter(matcher, peek_and_store_hardlink_masters, strip_components)
         if progress:
-            pi = ProgressIndicatorPercent(msg='Extracting files %5.1f%%', step=0.1)
+            pi = ProgressIndicatorPercent(msg='%5.1f%% Extracting: %s', step=0.1)
             pi.output('Calculating size')
             extracted_size = sum(item.file_size(hardlink_masters) for item in archive.iter_items(filter))
             pi.total = extracted_size
@@ -546,6 +546,8 @@ class Archiver:
         for pattern in include_patterns:
             if pattern.match_count == 0:
                 self.print_warning("Include pattern '%s' never matched.", pattern)
+        if pi:
+            pi.finish()
         return self.exit_code
 
     @with_repository()

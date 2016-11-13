@@ -438,6 +438,9 @@ class Repository:
             transaction_id = self.get_index_transaction_id()
         if transaction_id is None:
             transaction_id = self.io.get_latest_segment()
+        if transaction_id is None:
+            report_error('This repository contains no valid data.')
+            return False
         if repair:
             self.io.cleanup(transaction_id)
         segments_transaction_id = self.io.get_segments_transaction_id()

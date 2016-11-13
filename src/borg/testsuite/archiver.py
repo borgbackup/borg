@@ -2166,18 +2166,19 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         # a b'acl'=None key-value pair.
         # This bug can still live on in Borg repositories (through borg upgrade).
         class Attic013Item:
-            as_dict = lambda: {
-                # These are required
-                b'path': '1234',
-                b'mtime': 0,
-                b'mode': 0,
-                b'user': b'0',
-                b'group': b'0',
-                b'uid': 0,
-                b'gid': 0,
-                # acl is the offending key.
-                b'acl': None,
-            }
+            def as_dict():
+                return {
+                    # These are required
+                    b'path': '1234',
+                    b'mtime': 0,
+                    b'mode': 0,
+                    b'user': b'0',
+                    b'group': b'0',
+                    b'uid': 0,
+                    b'gid': 0,
+                    # acl is the offending key.
+                    b'acl': None,
+                }
 
         archive, repository = self.open_archive('archive1')
         with repository:

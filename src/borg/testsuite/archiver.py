@@ -2154,6 +2154,42 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
     def test_verify_data_unencrypted(self):
         self._test_verify_data('--encryption', 'none')
 
+    def test_empty_repository(self):
+        with Repository(self.repository_location, exclusive=True) as repository:
+            for id_ in repository.list():
+                repository.delete(id_)
+            repository.commit()
+        self.cmd('check', self.repository_location, exit_code=1)
+
+    def test_attic013_acl_bug(self):
+        # Attic up to release 0.13 contained a bug where every item unintentionally received
+        # a b'acl'=None key-value pair.
+        # This bug can still live on in Borg repositories (through borg upgrade).
+        class Attic013Item:
+            def as_dict():
+                return {
+                    # These are required
+                    b'path': '1234',
+                    b'mtime': 0,
+                    b'mode': 0,
+                    b'user': b'0',
+                    b'group': b'0',
+                    b'uid': 0,
+                    b'gid': 0,
+                    # acl is the offending key.
+                    b'acl': None,
+                }
+
+        archive, repository = self.open_archive('archive1')
+        with repository:
+            manifest, key = Manifest.load(repository)
+            with Cache(repository, key, manifest) as cache:
+                archive = Archive(repository, key, manifest, '0.13', cache=cache, create=True)
+                archive.items_buffer.add(Attic013Item)
+                archive.save()
+        self.cmd('check', self.repository_location, exit_code=0)
+        self.cmd('list', self.repository_location + '::0.13', exit_code=0)
+
 
 @pytest.mark.skipif(sys.platform == 'cygwin', reason='remote is broken on cygwin and hangs')
 class RemoteArchiverTestCase(ArchiverTestCase):

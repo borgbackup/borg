@@ -18,7 +18,7 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
     brew install xz  # required for python lzma module
     brew outdated pyenv || brew upgrade pyenv
     brew install pkg-config
-    brew install Caskroom/versions/osxfuse-beta
+    brew install Caskroom/versions/osxfuse
 
     case "${TOXENV}" in
         py34)

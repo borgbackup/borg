@@ -833,6 +833,9 @@ class ArchiveChecker:
         self.repair = repair
         self.repository = repository
         self.init_chunks()
+        if not self.chunks:
+            logger.error('Repository contains no apparent data at all, cannot continue check/repair.')
+            return False
         self.key = self.identify_key(repository)
         if Manifest.MANIFEST_ID not in self.chunks:
             logger.error("Repository manifest not found!")

@@ -15,14 +15,17 @@ from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Location
 from .helpers import Error
 from .helpers import get_cache_dir
-from .helpers import decode_dict, int_to_bigint, bigint_to_int, bin_to_hex
+from .helpers import safe_encode, decode_dict, int_to_bigint, bigint_to_int, bin_to_hex
 from .helpers import format_file_size
 from .helpers import yes
 from .item import Item, ArchiveItem
 from .key import PlaintextKey
 from .locking import Lock
 from .platform import SaveFile
+from .platform import fstype
 from .remote import cache_if_remote
+
+FS_WITH_STABLE_INODES = {'extfs', 'btrfs', 'xfs', 'zfs', }
 
 ChunkListEntry = namedtuple('ChunkListEntry', 'id size csize')
 FileCacheEntry = namedtuple('FileCacheEntry', 'age inode size mtime chunk_ids')
@@ -452,25 +455,34 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         else:
             stats.update(-size, -csize, False)
 
-    def file_known_and_unchanged(self, path_hash, st, ignore_inode=False):
+    def file_cache_key(self, hash, path, st, ignore_inode):
+        if ignore_inode or fstype(path) not in FS_WITH_STABLE_INODES:
+            # we don't use the path directly (but its hash) to save memory
+            cache_key = hash(safe_encode(path))
+        else:
+            # we don't use the tuple directly (but packed) to save memory
+            cache_key = msgpack.packb((st.st_dev, st.st_ino))
+        return cache_key
+
+    def file_known_and_unchanged(self, cache_key, st, ignore_inode=False):
         if not (self.do_files and stat.S_ISREG(st.st_mode)):
             return None
         if self.files is None:
             self._read_files()
-        entry = self.files.get(path_hash)
+        entry = self.files.get(cache_key)
         if not entry:
             return None
         entry = FileCacheEntry(*msgpack.unpackb(entry))
         if (entry.size == st.st_size and bigint_to_int(entry.mtime) == st.st_mtime_ns and
                 (ignore_inode or entry.inode == st.st_ino)):
-            self.files[path_hash] = msgpack.packb(entry._replace(age=0))
+            self.files[cache_key] = msgpack.packb(entry._replace(age=0))
             return entry.chunk_ids
         else:
             return None
 
-    def memorize_file(self, path_hash, st, ids):
+    def memorize_file(self, cache_key, st, ids):
         if not (self.do_files and stat.S_ISREG(st.st_mode)):
             return
         entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, mtime=int_to_bigint(st.st_mtime_ns), chunk_ids=ids)
-        self.files[path_hash] = msgpack.packb(entry)
+        self.files[cache_key] = msgpack.packb(entry)
         self._newest_mtime = max(self._newest_mtime, st.st_mtime_ns)

@@ -815,13 +815,13 @@ Number of files: {0.stats.nfiles}'''.format(
                 self.hard_links[st.st_ino, st.st_dev] = safe_path
         is_special_file = is_special(st.st_mode)
         if not is_special_file:
-            path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
-            ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode)
+            cache_key = cache.file_cache_key(self.key.id_hash, os.path.join(self.cwd, path), st, ignore_inode)
+            ids = cache.file_known_and_unchanged(cache_key, st, ignore_inode)
         else:
             # in --read-special mode, we may be called for special files.
             # there should be no information in the cache about special files processed in
             # read-special mode, but we better play safe as this was wrong in the past:
-            path_hash = ids = None
+            cache_key = ids = None
         first_run = not cache.files and cache.do_files
         if first_run:
             logger.debug('Processing files ...')
@@ -854,7 +854,7 @@ Number of files: {0.stats.nfiles}'''.format(
             if not is_special_file:
                 # we must not memorize special files, because the contents of e.g. a
                 # block or char device will change without its mtime/size/inode changing.
-                cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
+                cache.memorize_file(cache_key, st, [c.id for c in item.chunks])
             status = status or 'M'  # regular file, modified (if not 'A' already)
         item.update(self.stat_attrs(st, path))
         if is_special_file:

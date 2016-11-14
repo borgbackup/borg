@@ -30,7 +30,7 @@ Some guidance for contributors:
       troubles in future)
   - choose master if that does not apply, like for:
 
-    - developping new features
+    - developing new features
 
 - do clean changesets:
 

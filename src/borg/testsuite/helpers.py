@@ -903,9 +903,10 @@ def test_yes_env_output(capfd, monkeypatch):
     assert 'yes' in err
 
 
-def test_progress_percentage_sameline(capfd):
-    os.environ['COLUMNS'] = '4'
-    os.environ['LINES'] = '1'
+def test_progress_percentage_sameline(capfd, monkeypatch):
+    # run the test as if it was in a 4x1 terminal
+    monkeypatch.setenv('COLUMNS', '4')
+    monkeypatch.setenv('LINES', '1')
     pi = ProgressIndicatorPercent(1000, step=5, start=0, msg="%3.0f%%")
     pi.logger.setLevel('INFO')
     pi.show(0)
@@ -923,7 +924,10 @@ def test_progress_percentage_sameline(capfd):
     assert err == ' ' * 4 + '\r'
 
 
-def test_progress_percentage_step(capfd):
+def test_progress_percentage_step(capfd, monkeypatch):
+    # run the test as if it was in a 4x1 terminal
+    monkeypatch.setenv('COLUMNS', '4')
+    monkeypatch.setenv('LINES', '1')
     pi = ProgressIndicatorPercent(100, step=2, start=0, msg="%3.0f%%")
     pi.logger.setLevel('INFO')
     pi.show()

@@ -672,6 +672,7 @@ def replace_placeholders(text):
     }
     return format_line(text, data)
 
+
 PrefixSpec = replace_placeholders
 
 
@@ -1668,6 +1669,7 @@ def scandir_generic(path='.'):
     """Like os.listdir(), but yield DirEntry objects instead of returning a list of names."""
     for name in sorted(os.listdir(path)):
         yield GenericDirEntry(path, name)
+
 
 try:
     from os import scandir

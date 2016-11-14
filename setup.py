@@ -136,6 +136,7 @@ def detect_libb2(prefixes):
                 if 'blake2b_init' in fd.read():
                     return prefix
 
+
 include_dirs = []
 library_dirs = []
 define_macros = []

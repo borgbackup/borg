@@ -22,10 +22,8 @@ from .item import Item, ArchiveItem
 from .key import PlaintextKey
 from .locking import Lock
 from .platform import SaveFile
-from .platform import fstype
+from .platform import has_stable_inodes
 from .remote import cache_if_remote
-
-FS_WITH_STABLE_INODES = {'extfs', 'btrfs', 'xfs', 'zfs', }
 
 ChunkListEntry = namedtuple('ChunkListEntry', 'id size csize')
 FileCacheEntry = namedtuple('FileCacheEntry', 'age inode size mtime chunk_ids')
@@ -456,7 +454,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             stats.update(-size, -csize, False)
 
     def file_cache_key(self, hash, path, st, ignore_inode):
-        if ignore_inode or fstype(path) not in FS_WITH_STABLE_INODES:
+        if ignore_inode or not has_stable_inodes(path):
             # we don't use the path directly (but its hash) to save memory
             cache_key = hash(safe_encode(path))
         else:

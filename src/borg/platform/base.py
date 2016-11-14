@@ -167,3 +167,8 @@ def umount(mountpoint):
 def fstype(path=None, fd=None):
     """determine the filesystem type, returns fs name as str or None (unknown)"""
     return None
+
+
+def has_stable_inodes(path=None, fd=None):
+    """determine if the filesystem that contains path or fd has stable inode numbers"""
+    return False

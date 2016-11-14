@@ -288,3 +288,7 @@ def fstype(path=None, fd=None):
     if rc == -1:
         raise OSError(errno.errno, strerror(errno.errno).decode(), os.fsdecode(path))
     return MAGIC_TO_NAME.get(buf.f_type)
+
+
+def has_stable_inodes(path=None, fd=None):
+    return fstype(path, fd) in {'extfs', 'btrfs', 'xfs', 'zfs', }

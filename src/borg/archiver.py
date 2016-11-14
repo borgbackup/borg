@@ -547,6 +547,7 @@ class Archiver:
             if pattern.match_count == 0:
                 self.print_warning("Include pattern '%s' never matched.", pattern)
         if pi:
+            # clear progress output
             pi.finish()
         return self.exit_code
 

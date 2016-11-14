@@ -1201,6 +1201,7 @@ def ellipsis_truncate(msg, space):
     ellipsis_width = swidth('...')
     msg_width = swidth(msg)
     if space < 8:
+        # if there is very little space, just show ...
         return '...' + ' ' * (space - ellipsis_width)
     if space < ellipsis_width + msg_width:
         return '%s...%s' % (swidth_slice(msg, space // 2 - ellipsis_width),
@@ -1256,6 +1257,13 @@ class ProgressIndicatorPercent:
             return pct
 
     def show(self, current=None, increase=1, info=None):
+        """
+        Show and output the progress message
+
+        :param current: set the current percentage [None]
+        :param increase: increase the current percentage [None]
+        :param info: array of strings to be formatted with msg [None]
+        """
         pct = self.progress(current, increase)
         if pct is not None:
             # truncate the last argument, if no space is available

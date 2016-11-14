@@ -26,6 +26,7 @@ from functools import wraps, partial, lru_cache
 from itertools import islice
 from operator import attrgetter
 from string import Formatter
+from shutil import get_terminal_size
 
 import msgpack
 import msgpack.fallback
@@ -1191,6 +1192,23 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
         env_var_override = None
 
 
+def ellipsis_truncate(msg, space):
+    """
+    shorten a long string by adding ellipsis between it and return it, example:
+    this_is_a_very_long_string -------> this_is..._string
+    """
+    from .platform import swidth
+    ellipsis_width = swidth('...')
+    msg_width = swidth(msg)
+    if space < 8:
+        # if there is very little space, just show ...
+        return '...' + ' ' * (space - ellipsis_width)
+    if space < ellipsis_width + msg_width:
+        return '%s...%s' % (swidth_slice(msg, space // 2 - ellipsis_width),
+                            swidth_slice(msg, -space // 2))
+    return msg + ' ' * (space - msg_width)
+
+
 class ProgressIndicatorPercent:
     LOGGER = 'borg.output.progress'
 
@@ -1208,7 +1226,6 @@ class ProgressIndicatorPercent:
         self.trigger_at = start  # output next percentage value when reaching (at least) this
         self.step = step
         self.msg = msg
-        self.output_len = len(self.msg % 100.0)
         self.handler = None
         self.logger = logging.getLogger(self.LOGGER)
 
@@ -1239,14 +1256,33 @@ class ProgressIndicatorPercent:
             self.trigger_at += self.step
             return pct
 
-    def show(self, current=None, increase=1):
+    def show(self, current=None, increase=1, info=None):
+        """
+        Show and output the progress message
+
+        :param current: set the current percentage [None]
+        :param increase: increase the current percentage [None]
+        :param info: array of strings to be formatted with msg [None]
+        """
         pct = self.progress(current, increase)
         if pct is not None:
+            # truncate the last argument, if no space is available
+            if info is not None:
+                # no need to truncate if we're not outputing to a terminal
+                terminal_space = get_terminal_size(fallback=(-1, -1))[0]
+                if terminal_space != -1:
+                    space = terminal_space - len(self.msg % tuple([pct] + info[:-1] + ['']))
+                    info[-1] = ellipsis_truncate(info[-1], space)
+                return self.output(self.msg % tuple([pct] + info), justify=False)
+
             return self.output(self.msg % pct)
 
-    def output(self, message):
-        self.output_len = max(len(message), self.output_len)
-        message = message.ljust(self.output_len)
+    def output(self, message, justify=True):
+        if justify:
+            terminal_space = get_terminal_size(fallback=(-1, -1))[0]
+            # no need to ljust if we're not outputing to a terminal
+            if terminal_space != -1:
+                message = message.ljust(terminal_space)
         self.logger.info(message)
 
     def finish(self):

@@ -774,7 +774,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         with changedir('output'):
             output = self.cmd('extract', self.repository_location + '::test', '--progress')
-            assert 'Extracting files' in output
+            assert 'Extracting:' in output
 
     def _create_test_caches(self):
         self.cmd('init', self.repository_location)

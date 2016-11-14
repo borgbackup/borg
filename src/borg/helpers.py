@@ -1193,11 +1193,11 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
 
 
 def ellipsis_truncate(msg, space):
-    from .platform import swidth
     """
     shorten a long string by adding ellipsis between it and return it, example:
     this_is_a_very_long_string -------> this_is..._string
     """
+    from .platform import swidth
     ellipsis_width = swidth('...')
     msg_width = swidth(msg)
     if space < ellipsis_width + msg_width:
@@ -1253,11 +1253,11 @@ class ProgressIndicatorPercent:
             self.trigger_at += self.step
             return pct
 
-    def show(self, current=None, increase=1, info=[]):
+    def show(self, current=None, increase=1, info=None):
         pct = self.progress(current, increase)
         if pct is not None:
-            # truncate the last argument, if space is available
-            if info != []:
+            # truncate the last argument, if no space is available
+            if info is not None:
                 msg = self.msg % tuple([pct] + info[:-1] + [''])
                 space = get_terminal_size()[0] - len(msg)
                 if space < 8:

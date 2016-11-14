@@ -34,7 +34,7 @@ matrix:
           osx_image: xcode6.4
           env: TOXENV=py35
     allow_failures:
-        - python: 3.6-dev
+        - os: osx
 
 install:
     - ./.travis/install.sh

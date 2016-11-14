@@ -1200,6 +1200,8 @@ def ellipsis_truncate(msg, space):
     from .platform import swidth
     ellipsis_width = swidth('...')
     msg_width = swidth(msg)
+    if space < 8:
+        return '...' + ' ' * (space - ellipsis_width)
     if space < ellipsis_width + msg_width:
         return '%s...%s' % (swidth_slice(msg, space // 2 - ellipsis_width),
                             swidth_slice(msg, -space // 2))
@@ -1262,10 +1264,7 @@ class ProgressIndicatorPercent:
                 terminal_space = get_terminal_size(fallback=(-1, -1))[0]
                 if terminal_space != -1:
                     space = terminal_space - len(self.msg % tuple([pct] + info[:-1] + ['']))
-                    if space < 8:
-                        info[-1] = ' ' * space
-                    else:
-                        info[-1] = ellipsis_truncate(info[-1], space)
+                    info[-1] = ellipsis_truncate(info[-1], space)
                 return self.output(self.msg % tuple([pct] + info), justify=False)
 
             return self.output(self.msg % pct)

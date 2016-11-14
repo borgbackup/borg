@@ -1258,18 +1258,24 @@ class ProgressIndicatorPercent:
         if pct is not None:
             # truncate the last argument, if no space is available
             if info is not None:
-                msg = self.msg % tuple([pct] + info[:-1] + [''])
-                space = get_terminal_size()[0] - len(msg)
-                if space < 8:
-                    info[-1] = ''
-                else:
-                    info[-1] = ellipsis_truncate(info[-1], space)
-                return self.output(self.msg % tuple([pct] + info))
+                # no need to truncate if we're not outputing to a terminal
+                terminal_space = get_terminal_size(fallback=(-1, -1))[0]
+                if terminal_space != -1:
+                    space = terminal_space - len(self.msg % tuple([pct] + info[:-1] + ['']))
+                    if space < 8:
+                        info[-1] = ' ' * space
+                    else:
+                        info[-1] = ellipsis_truncate(info[-1], space)
+                return self.output(self.msg % tuple([pct] + info), justify=False)
 
             return self.output(self.msg % pct)
 
-    def output(self, message):
-        message = message.ljust(get_terminal_size(fallback=(4, 1))[0])
+    def output(self, message, justify=True):
+        if justify:
+            terminal_space = get_terminal_size(fallback=(-1, -1))[0]
+            # no need to ljust if we're not outputing to a terminal
+            if terminal_space != -1:
+                message = message.ljust(terminal_space)
         self.logger.info(message)
 
     def finish(self):

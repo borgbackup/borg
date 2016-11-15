@@ -175,7 +175,8 @@ class RepositoryServer:  # pragma: no cover
                         args = decode_keys(unpacked[ARGS])
                     elif isinstance(unpacked, tuple) and len(unpacked) == 4:
                         dictFormat = False
-                        type, msgid, method, args = unpacked
+                        # The first field 'type' was always 1 and has always been ignored
+                        _, msgid, method, args = unpacked
                         method = method.decode()
                         args = self.positional_to_named(method, args)
                     else:
@@ -664,7 +665,8 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                         if isinstance(unpacked, dict):
                             msgid = unpacked[MSGID]
                         elif isinstance(unpacked, tuple) and len(unpacked) == 4:
-                            type, msgid, error, res = unpacked
+                            # The first field 'type' was always 1 and has always been ignored
+                            _, msgid, error, res = unpacked
                             if error:
                                 # ignore res, because it is only a fixed string anyway.
                                 unpacked = {MSGID: msgid, b'exception_class': error}

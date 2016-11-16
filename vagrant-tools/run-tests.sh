@@ -121,7 +121,7 @@ while read filesystem; do
 done <<< "$filesystems"
 
 if [[ "$fuse_supported" ]]; then
-  if which sshfs > /dev/null; then
+  if which sshfs--disabled > /dev/null; then
     mkdir "$root_testing_dir/sshfs"
     chown "$ssh_user" "$root_testing_dir/sshfs"
     ssh-keygen -t rsa -b 2048 -C 'borgbackup@github.com' -N '' -f "$root_testing_dir/ssh_key"
@@ -134,7 +134,7 @@ if [[ "$fuse_supported" ]]; then
       || error SSHFS
     directories+=("$mount_base/sshfs")
   fi
-  if which ntfs-3g > /dev/null; then
+  if which ntfs-3g--disabled > /dev/null; then
     truncate -s 128M "$root_testing_dir/ntfs" # NTFS requires a larger partition size than most filesystems
     mkfs.ntfs -F "$root_testing_dir/ntfs" || error NTFS
     mkdir "$mount_base/ntfs"

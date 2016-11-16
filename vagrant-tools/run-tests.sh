@@ -79,7 +79,7 @@ function error() {
 while read filesystem; do
   [[ "$filesystem" == "$root_fs" ]] && continue
   case "$filesystem" in
-    tmpfs)
+    tmpfs--disabled)
       mkdir "$mount_base/tmpfs"
       mount -t tmpfs tmpfs "$mount_base/tmpfs" -o "size=$testing_partition_size" || error tmpfs
       directories+=("$mount_base/tmpfs")

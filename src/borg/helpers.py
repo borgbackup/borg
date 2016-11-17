@@ -95,7 +95,7 @@ def check_extension_modules():
         raise ExtensionModuleError
     if crypto.API_VERSION != 3:
         raise ExtensionModuleError
-    if platform.API_VERSION != platform.OS_API_VERSION != 4:
+    if platform.API_VERSION != platform.OS_API_VERSION != 5:
         raise ExtensionModuleError
 
 

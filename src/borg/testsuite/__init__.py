@@ -12,7 +12,7 @@ import uuid
 import unittest
 
 from ..xattr import get_all
-from ..platform import get_flags
+from ..platform import get_flags, umount
 from .. import platform
 
 # Note: this is used by borg.selftest, do not use or import py.test functionality here.
@@ -200,11 +200,7 @@ class BaseTestCase(unittest.TestCase):
         self.cmd(*args, fork=True)
         self.wait_for_mount(mountpoint)
         yield
-        if sys.platform.startswith('linux'):
-            cmd = 'fusermount -u %s' % mountpoint
-        else:
-            cmd = 'umount %s' % mountpoint
-        os.system(cmd)
+        umount(mountpoint)
         os.rmdir(mountpoint)
         # Give the daemon some time to exit
         time.sleep(.2)

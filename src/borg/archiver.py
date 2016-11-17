@@ -47,7 +47,7 @@ from .helpers import ProgressIndicatorPercent
 from .item import Item
 from .key import key_creator, RepoKey, PassphraseKey
 from .keymanager import KeyManager
-from .platform import get_flags
+from .platform import get_flags, umount
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 from .repository import Repository
 from .selftest import selftest
@@ -864,6 +864,10 @@ class Archiver:
                 # Relevant error message already printed to stderr by fuse
                 self.exit_code = EXIT_ERROR
         return self.exit_code
+
+    def do_umount(self, args):
+        """un-mount the FUSE filesystem"""
+        return umount(args.mountpoint)
 
     @with_repository()
     def do_list(self, args, repository, manifest, key):
@@ -2153,6 +2157,21 @@ class Archiver:
         subparser.add_argument('-o', dest='options', type=str,
                                help='Extra mount options')
         self.add_archives_filters_args(subparser)
+
+        umount_epilog = textwrap.dedent("""
+        This command un-mounts a FUSE filesystem that was mounted with ``borg mount``.
+
+        This is a convenience wrapper that just calls the platform-specific shell
+        command - usually this is either umount or fusermount -u.
+        """)
+        subparser = subparsers.add_parser('umount', parents=[common_parser], add_help=False,
+                                          description=self.do_umount.__doc__,
+                                          epilog=umount_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='umount repository')
+        subparser.set_defaults(func=self.do_umount)
+        subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
+                               help='mountpoint of the filesystem to umount')
 
         info_epilog = textwrap.dedent("""
         This command displays detailed information about the specified archive or repository.

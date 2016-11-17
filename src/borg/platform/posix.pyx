@@ -1,7 +1,8 @@
-
 import errno
 import os
 import socket
+import subprocess
+
 
 cdef extern from "wchar.h":
     cdef int wcswidth(const Py_UNICODE *str, size_t n)
@@ -69,3 +70,10 @@ def local_pid_alive(pid):
             return False
         # Any other error (eg. permissions) means that the process ID refers to a live process.
         return True
+
+
+# most POSIX platforms (but not Linux)
+def umount(mountpoint):
+    return subprocess.call(['umount', mountpoint])
+
+

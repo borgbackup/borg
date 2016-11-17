@@ -13,7 +13,7 @@ blue_out=$(tput setaf 4)
 red_out=$(tput setaf 1)
 normal_out=$(tput sgr0)
 
-testing_partition_size=64M
+testing_partition_size=192M
 root_testing_dir="/var/tmp/borg-tests" # Also hardcoded in server configs in this directory
 mkdir -p "$root_testing_dir/rootfs"
 if [[ "$(uname -s)" == "Darwin" ]]; then
@@ -85,11 +85,11 @@ while read filesystem; do
       mount -t tmpfs tmpfs "$mount_base/tmpfs" -o "size=$testing_partition_size" || error tmpfs
       directories+=("$mount_base/tmpfs")
       ;;
-    ext4 | xfs)
+    ext4 | xfs | btrfs)
       truncate -s "$testing_partition_size" "$root_testing_dir/$filesystem"
-      force_option="-F"
-      if [[ "$filesystem" == "xfs" ]]; then
-        force_option="-f"
+      force_option="-f"
+      if [[ "$filesystem" == "ext4" ]]; then
+        force_option="-F"
       fi
       "mkfs.$filesystem" "$force_option" "$root_testing_dir/$filesystem" || error "$filesystem"
       mkdir "$mount_base/$filesystem"

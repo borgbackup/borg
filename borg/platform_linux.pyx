@@ -1,9 +1,10 @@
 import os
 import re
+import subprocess
 from stat import S_ISLNK
 from .helpers import posix_acl_use_stored_uid_gid, user2uid, group2gid, safe_decode, safe_encode
 
-API_VERSION = 2
+API_VERSION = 3
 
 cdef extern from "sys/types.h":
     int ACL_TYPE_ACCESS
@@ -141,3 +142,7 @@ def acl_set(path, item, numeric_owner=False):
                 acl_set_file(p, ACL_TYPE_DEFAULT, default_acl)
         finally:
             acl_free(default_acl)
+
+
+def umount(mountpoint):
+    return subprocess.call(['fusermount', '-u', mountpoint])

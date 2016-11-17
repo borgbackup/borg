@@ -545,6 +545,8 @@ Examples
 
 .. include:: usage/mount.rst.inc
 
+.. include:: usage/umount.rst.inc
+
 Examples
 ~~~~~~~~
 ::
@@ -552,7 +554,7 @@ Examples
     $ borg mount /path/to/repo::root-2016-02-15 /tmp/mymountpoint
     $ ls /tmp/mymountpoint
     bin  boot  etc	home  lib  lib64  lost+found  media  mnt  opt  root  sbin  srv  tmp  usr  var
-    $ fusermount -u /tmp/mymountpoint
+    $ borg umount /tmp/mymountpoint
 
 
 .. include:: usage/key_export.rst.inc

@@ -1,5 +1,6 @@
 import errno
 import os
+import subprocess
 import sys
 
 
@@ -17,14 +18,19 @@ def sync_dir(path):
         os.close(fd)
 
 
+# most POSIX platforms (but not Linux), see also borg 1.1 platform.base
+def umount(mountpoint):
+    return subprocess.call(['umount', mountpoint])
+
+
 if sys.platform.startswith('linux'):  # pragma: linux only
-    from .platform_linux import acl_get, acl_set, API_VERSION
+    from .platform_linux import acl_get, acl_set, umount, API_VERSION
 elif sys.platform.startswith('freebsd'):  # pragma: freebsd only
     from .platform_freebsd import acl_get, acl_set, API_VERSION
 elif sys.platform == 'darwin':  # pragma: darwin only
     from .platform_darwin import acl_get, acl_set, API_VERSION
 else:  # pragma: unknown platform only
-    API_VERSION = 2
+    API_VERSION = 3
 
     def acl_get(path, item, st, numeric_owner=False):
         pass

@@ -9,6 +9,7 @@ import time
 import unittest
 from ..xattr import get_all
 from ..logger import setup_logging
+from ..platform import umount
 
 try:
     import llfuse
@@ -110,11 +111,7 @@ class BaseTestCase(unittest.TestCase):
         self.cmd(*args, fork=True)
         self.wait_for_mount(mountpoint)
         yield
-        if sys.platform.startswith('linux'):
-            cmd = 'fusermount -u %s' % mountpoint
-        else:
-            cmd = 'umount %s' % mountpoint
-        os.system(cmd)
+        umount(mountpoint)
         os.rmdir(mountpoint)
         # Give the daemon some time to exit
         time.sleep(.2)

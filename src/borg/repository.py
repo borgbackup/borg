@@ -825,14 +825,14 @@ class Repository:
                         return result
         return result
 
-    def get(self, id_):
+    def get(self, id):
         if not self.index:
             self.index = self.open_index(self.get_transaction_id())
         try:
-            segment, offset = self.index[id_]
-            return self.io.read(segment, offset, id_)
+            segment, offset = self.index[id]
+            return self.io.read(segment, offset, id)
         except KeyError:
-            raise self.ObjectNotFound(id_, self.path) from None
+            raise self.ObjectNotFound(id, self.path) from None
 
     def get_many(self, ids, is_preloaded=False):
         for id_ in ids:

@@ -2753,10 +2753,14 @@ def main():  # pragma: no cover
             tb = "%s\n%s" % (traceback.format_exc(), sysinfo())
             exit_code = e.exit_code
         except RemoteRepository.RPCError as e:
-            msg = "%s %s" % (e.remote_type, e.name)
-            important = e.remote_type not in ('LockTimeout', )
+            important = e.exception_class not in ('LockTimeout', )
             tb_log_level = logging.ERROR if important else logging.DEBUG
-            tb = sysinfo()
+            if important:
+                msg = e.exception_full
+            else:
+                msg = e.get_message()
+            tb = '\n'.join('Borg server: ' + l for l in e.sysinfo.splitlines())
+            tb += "\n" + sysinfo()
             exit_code = EXIT_ERROR
         except Exception:
             msg = 'Local Exception'

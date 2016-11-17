@@ -79,7 +79,8 @@ function error() {
 while read filesystem; do
   [[ "$filesystem" == "$root_fs" ]] && continue
   case "$filesystem" in
-    tmpfs--disabled)
+    tmpfs)
+      continue  # TODO runs out of memory
       mkdir "$mount_base/tmpfs"
       mount -t tmpfs tmpfs "$mount_base/tmpfs" -o "size=$testing_partition_size" || error tmpfs
       directories+=("$mount_base/tmpfs")
@@ -96,7 +97,7 @@ while read filesystem; do
       directories+=("$mount_base/$filesystem")
       ;;
     cifs)
-      continue # Breaks py.test (I think). Reenable if working.
+      continue  # TODO breaks py.test
       mkdir "$root_testing_dir/cifs"
       chown nobody "$root_testing_dir/cifs" # guest == nobody user
       smbd -D -s vagrant-tools/smb.conf
@@ -121,7 +122,8 @@ while read filesystem; do
 done <<< "$filesystems"
 
 if [[ "$fuse_supported" ]]; then
-  if which sshfs--disabled > /dev/null; then
+  if which sshfs > /dev/null; then
+    continue  # TODO atime/teardown issues
     mkdir "$root_testing_dir/sshfs"
     chown "$ssh_user" "$root_testing_dir/sshfs"
     ssh-keygen -t rsa -b 2048 -C 'borgbackup@github.com' -N '' -f "$root_testing_dir/ssh_key"
@@ -134,7 +136,8 @@ if [[ "$fuse_supported" ]]; then
       || error SSHFS
     directories+=("$mount_base/sshfs")
   fi
-  if which ntfs-3g--disabled > /dev/null; then
+  if which ntfs-3g > /dev/null; then
+    continue  # TODO mode/atime/teardown issues
     truncate -s 128M "$root_testing_dir/ntfs" # NTFS requires a larger partition size than most filesystems
     mkfs.ntfs -F "$root_testing_dir/ntfs" || error NTFS
     mkdir "$mount_base/ntfs"

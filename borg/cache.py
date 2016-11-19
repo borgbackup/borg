@@ -191,7 +191,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
 
     def _read_files(self):
         self.files = {}
-        self._newest_mtime = 0
+        self._newest_mtime = None
         logger.debug('Reading files cache ...')
         with open(os.path.join(self.path, 'files'), 'rb') as fd:
             u = msgpack.Unpacker(use_list=True)
@@ -222,6 +222,9 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not self.txn_active:
             return
         if self.files is not None:
+            if self._newest_mtime is None:
+                # was never set because no files were modified/added
+                self._newest_mtime = 2 ** 63 - 1  # nanoseconds, good until y2262
             ttl = int(os.environ.get('BORG_FILES_CACHE_TTL', 20))
             with open(os.path.join(self.path, 'files'), 'wb') as fd:
                 for path_hash, item in self.files.items():
@@ -451,4 +454,4 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         # Entry: Age, inode, size, mtime, chunk ids
         mtime_ns = st.st_mtime_ns
         self.files[path_hash] = msgpack.packb((0, st.st_ino, st.st_size, int_to_bigint(mtime_ns), ids))
-        self._newest_mtime = max(self._newest_mtime, mtime_ns)
+        self._newest_mtime = max(self._newest_mtime or 0, mtime_ns)

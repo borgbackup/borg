@@ -746,6 +746,17 @@ a new repository when changing chunker params.
 
 For more details, see :ref:`chunker_details`.
 
+
+--umask
+~~~~~~~
+
+If you use ``--umask``, make sure that all repository-modifying borg commands
+(create, delete, prune) that access the repository in question use the same
+``--umask`` value.
+
+If multiple machines access the same repository, this should hold true for all
+of them.
+
 --read-special
 ~~~~~~~~~~~~~~
 

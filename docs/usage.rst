@@ -382,7 +382,19 @@ Examples
 
     # Use short hostname, user name and current time in archive name
     $ borg create /path/to/repo::{hostname}-{user}-{now} ~
-    $ borg create /path/to/repo::{hostname}-{user}-{now:%Y-%m-%d_%H:%M:%S} ~
+    # Similar, use the same datetime format as borg 1.1 will have as default
+    $ borg create /path/to/repo::{hostname}-{user}-{now:%Y-%m-%dT%H:%M:%S} ~
+    # As above, but add nanoseconds
+    $ borg create /path/to/repo::{hostname}-{user}-{now:%Y-%m-%dT%H:%M:%S.%f} ~
+
+Notes
+~~~~~
+
+- the --exclude patterns are not like tar. In tar --exclude .bundler/gems will
+  exclude foo/.bundler/gems. In borg it will not, you need to use --exclude
+  '*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
+  more information.
+
 
 .. include:: usage/extract.rst.inc
 
@@ -629,6 +641,20 @@ Examples
     no key file found for repository
 
 
+Upgrading a passphrase encrypted attic repo
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+attic offered a "passphrase" encryption mode, but this was removed in borg 1.0
+and replaced by the "repokey" mode (which stores the passphrase-protected
+encryption key into the repository config).
+
+Thus, to upgrade a "passphrase" attic repo to a "repokey" borg repo, 2 steps
+are needed, in this order:
+
+- borg upgrade repo
+- borg migrate-to-repokey repo
+
+
 .. include:: usage/break-lock.rst.inc
 
 
@@ -745,6 +771,17 @@ If you want to see an immediate big effect on resource usage, you better start
 a new repository when changing chunker params.
 
 For more details, see :ref:`chunker_details`.
+
+
+--umask
+~~~~~~~
+
+If you use ``--umask``, make sure that all repository-modifying borg commands
+(create, delete, prune) that access the repository in question use the same
+``--umask`` value.
+
+If multiple machines access the same repository, this should hold true for all
+of them.
 
 --read-special
 ~~~~~~~~~~~~~~

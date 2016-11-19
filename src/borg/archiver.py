@@ -1058,13 +1058,6 @@ class Archiver:
     @with_repository(cache=True, exclusive=True)
     def do_recreate(self, args, repository, manifest, key, cache):
         """Re-create archives"""
-        def interrupt(signal_num, stack_frame):
-            if recreater.interrupt:
-                print("\nReceived signal, again. I'm not deaf.", file=sys.stderr)
-            else:
-                print("\nReceived signal, will exit cleanly.", file=sys.stderr)
-            recreater.interrupt = True
-
         msg = ("recreate is an experimental feature.\n"
                "Type 'YES' if you understand this and want to continue: ")
         if not yes(msg, false_msg="Aborting.", truish=('YES',),
@@ -1084,30 +1077,27 @@ class Archiver:
                                      file_status_printer=self.print_file_status,
                                      dry_run=args.dry_run)
 
-        with signal_handler(signal.SIGTERM, interrupt), \
-             signal_handler(signal.SIGINT, interrupt), \
-             signal_handler(signal.SIGHUP, interrupt):
-            if args.location.archive:
-                name = args.location.archive
+        if args.location.archive:
+            name = args.location.archive
+            if recreater.is_temporary_archive(name):
+                self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
+                return self.exit_code
+            recreater.recreate(name, args.comment, args.target)
+        else:
+            if args.target is not None:
+                self.print_error('--target: Need to specify single archive')
+                return self.exit_code
+            for archive in manifest.archives.list(sort_by=['ts']):
+                name = archive.name
                 if recreater.is_temporary_archive(name):
-                    self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
-                    return self.exit_code
-                recreater.recreate(name, args.comment, args.target)
-            else:
-                if args.target is not None:
-                    self.print_error('--target: Need to specify single archive')
-                    return self.exit_code
-                for archive in manifest.archives.list(sort_by=['ts']):
-                    name = archive.name
-                    if recreater.is_temporary_archive(name):
-                        continue
-                    print('Processing', name)
-                    if not recreater.recreate(name, args.comment):
-                        break
-            manifest.write()
-            repository.commit()
-            cache.commit()
-            return self.exit_code
+                    continue
+                print('Processing', name)
+                if not recreater.recreate(name, args.comment):
+                    break
+        manifest.write()
+        repository.commit()
+        cache.commit()
+        return self.exit_code
 
     @with_repository(manifest=False, exclusive=True)
     def do_with_lock(self, args, repository):

@@ -1075,6 +1075,7 @@ class Archiver:
                                      always_recompress=args.always_recompress,
                                      progress=args.progress, stats=args.stats,
                                      file_status_printer=self.print_file_status,
+                                     checkpoint_interval=args.checkpoint_interval,
                                      dry_run=args.dry_run)
 
         if args.location.archive:
@@ -2412,6 +2413,9 @@ class Archiver:
                                    type=archivename_validator(),
                                    help='create a new archive with the name ARCHIVE, do not replace existing archive '
                                         '(only applies for a single archive)')
+        archive_group.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
+                                   type=int, default=1800, metavar='SECONDS',
+                                   help='write checkpoint every SECONDS seconds (Default: 1800)')
         archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default=None,
                                    help='add a comment text to the archive')
         archive_group.add_argument('--timestamp', dest='timestamp',
@@ -2424,7 +2428,7 @@ class Archiver:
                                    help='select compression algorithm, see the output of the '
                                         '"borg help compression" command for details.')
         archive_group.add_argument('--always-recompress', dest='always_recompress', action='store_true',
-                                   help='always recompress chunks, don\'t skip chunks already compressed with the same'
+                                   help='always recompress chunks, don\'t skip chunks already compressed with the same '
                                         'algorithm.')
         archive_group.add_argument('--compression-from', dest='compression_files',
                                    type=argparse.FileType('r'), action='append',

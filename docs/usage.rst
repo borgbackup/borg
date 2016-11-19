@@ -629,6 +629,20 @@ Examples
     no key file found for repository
 
 
+Upgrading a passphrase encrypted attic repo
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+attic offered a "passphrase" encryption mode, but this was removed in borg 1.0
+and replaced by the "repokey" mode (which stores the passphrase-protected
+encryption key into the repository config).
+
+Thus, to upgrade a "passphrase" attic repo to a "repokey" borg repo, 2 steps
+are needed, in this order:
+
+- borg upgrade repo
+- borg migrate-to-repokey repo
+
+
 .. include:: usage/break-lock.rst.inc
 
 

@@ -21,9 +21,16 @@ Some guidance for contributors:
 
 - choose the branch you base your changesets on wisely:
 
-  - choose x.y-maint for stuff that should go into next x.y release
-    (it usually gets merged into master branch later also)
-  - choose master if that does not apply
+  - choose x.y-maint for stuff that should go into next x.y.z release
+    (it usually gets merged into master branch later also), like:
+
+    - bug fixes (code or docs)
+    - missing *important* (and preferably small) features
+    - docs rearrangements (so stuff stays in-sync to avoid merge
+      troubles in future)
+  - choose master if that does not apply, like for:
+
+    - developing new features
 
 - do clean changesets:
 

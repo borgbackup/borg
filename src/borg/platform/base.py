@@ -164,9 +164,14 @@ def umount(mountpoint):
     return 0  # dummy, see also posix module
 
 
-def fstype(path=None, fd=None):
-    """determine the filesystem type, returns fs name as str or None (unknown)"""
-    return None
+def fsinfo(path=None, fd=None):
+    """
+    determine a dict of filesystem infos, keys may be missing (meaning "unknown").
+
+    known keys:
+    - fstype - filesystem type (str), e.g. "zfs"
+    """
+    return {}
 
 
 def has_stable_inodes(path=None, fd=None):

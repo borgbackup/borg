@@ -261,6 +261,7 @@ def umount(mountpoint):
 cdef extern from "sys/statfs.h":
     struct statfs_t "statfs":
         long f_type
+        # fsid_t f_fsid
 
     int statfs_c "statfs" (char *path, statfs_t *buf)
     int fstatfs_c "fstatfs" (int fd, statfs_t *buf)
@@ -274,7 +275,7 @@ MAGIC_TO_NAME = {
 }
 
 
-def fstype(path=None, fd=None):
+def fsinfo(path=None, fd=None):
     cdef statfs_t buf
     cdef int rc
     if isinstance(path, str):
@@ -287,8 +288,13 @@ def fstype(path=None, fd=None):
         raise ValueError('path or fd must be given')
     if rc == -1:
         raise OSError(errno.errno, strerror(errno.errno).decode(), os.fsdecode(path))
-    return MAGIC_TO_NAME.get(buf.f_type)
+    return dict(
+        fstype=MAGIC_TO_NAME.get(buf.f_type),
+        #fsid=...,
+    )
 
 
 def has_stable_inodes(path=None, fd=None):
-    return fstype(path, fd) in {'extfs', 'btrfs', 'xfs', 'zfs', }
+    info = fsinfo(path, fd)
+    fstype = info.get('fstype')
+    return fstype in {'extfs', 'btrfs', 'xfs', 'zfs', }

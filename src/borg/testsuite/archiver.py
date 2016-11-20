@@ -29,7 +29,7 @@ from ..archiver import Archiver
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto import bytes_to_long, num_aes_blocks
-from ..helpers import PatternMatcher, parse_pattern
+from ..helpers import PatternMatcher, parse_pattern, Location
 from ..helpers import Chunk, Manifest
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
@@ -259,6 +259,9 @@ class ArchiverTestCaseBase(BaseTestCase):
             manifest, key = Manifest.load(repository)
             archive = Archive(repository, key, manifest, name)
         return archive, repository
+
+    def open_repository(self):
+        return Repository(self.repository_path, exclusive=True)
 
     def create_regular_file(self, name, size=0, contents=None):
         filename = os.path.join(self.input_path, name)
@@ -1626,6 +1629,40 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('init', self.repository_location, exit_code=1)
         assert not os.path.exists(self.repository_location)
 
+    def check_cache(self):
+        # First run a regular borg check
+        self.cmd('check', self.repository_location)
+        # Then check that the cache on disk matches exactly what's in the repo.
+        with self.open_repository() as repository:
+            manifest, key = Manifest.load(repository)
+            with Cache(repository, key, manifest, sync=False) as cache:
+                original_chunks = cache.chunks
+            cache.destroy(repository)
+            with Cache(repository, key, manifest) as cache:
+                correct_chunks = cache.chunks
+        assert original_chunks is not correct_chunks
+        seen = set()
+        for id, (refcount, size, csize) in correct_chunks.iteritems():
+            o_refcount, o_size, o_csize = original_chunks[id]
+            assert refcount == o_refcount
+            assert size == o_size
+            assert csize == o_csize
+            seen.add(id)
+        for id, (refcount, size, csize) in original_chunks.iteritems():
+            assert id in seen
+
+    def test_check_cache(self):
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with self.open_repository() as repository:
+            manifest, key = Manifest.load(repository)
+            with Cache(repository, key, manifest, sync=False) as cache:
+                cache.begin_txn()
+                cache.chunks.incref(list(cache.chunks.iteritems())[0][0])
+                cache.commit()
+        with pytest.raises(AssertionError):
+            self.check_cache()
+
     def test_recreate_target_rc(self):
         self.cmd('init', self.repository_location)
         output = self.cmd('recreate', self.repository_location, '--target=asdf', exit_code=2)
@@ -1634,10 +1671,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_recreate_target(self):
         self.create_test_files()
         self.cmd('init', self.repository_location)
+        self.check_cache()
         archive = self.repository_location + '::test0'
         self.cmd('create', archive, 'input')
+        self.check_cache()
         original_archive = self.cmd('list', self.repository_location)
         self.cmd('recreate', archive, 'input/dir2', '-e', 'input/dir2/file3', '--target=new-archive')
+        self.check_cache()
         archives = self.cmd('list', self.repository_location)
         assert original_archive in archives
         assert 'new-archive' in archives
@@ -1655,6 +1695,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         archive = self.repository_location + '::test0'
         self.cmd('create', archive, 'input')
         self.cmd('recreate', archive, 'input/dir2', '-e', 'input/dir2/file3')
+        self.check_cache()
         listing = self.cmd('list', '--short', archive)
         assert 'file1' not in listing
         assert 'dir2/file2' in listing
@@ -1666,6 +1707,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self._extract_hardlinks_setup()
         self.cmd('create', self.repository_location + '::test2', 'input')
         self.cmd('recreate', self.repository_location + '::test', 'input/dir1')
+        self.check_cache()
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
             assert os.stat('input/dir1/hardlink').st_nlink == 2
@@ -1689,6 +1731,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # test1 and test2 do not deduplicate
         assert num_chunks == unique_chunks
         self.cmd('recreate', self.repository_location, '--chunker-params', 'default')
+        self.check_cache()
         # test1 and test2 do deduplicate after recreate
         assert not int(self.cmd('list', self.repository_location + '::test1', 'input/large_file',
                                 '--format', '{unique_chunks}'))
@@ -1702,6 +1745,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         size, csize, sha256_before = file_list.split(' ')
         assert int(csize) >= int(size)  # >= due to metadata overhead
         self.cmd('recreate', self.repository_location, '-C', 'lz4')
+        self.check_cache()
         file_list = self.cmd('list', self.repository_location + '::test', 'input/compressible',
                              '--format', '{size} {csize} {sha256}')
         size, csize, sha256_after = file_list.split(' ')
@@ -1714,6 +1758,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test', 'input')
         archives_before = self.cmd('list', self.repository_location + '::test')
         self.cmd('recreate', self.repository_location, '-n', '-e', 'input/compressible')
+        self.check_cache()
         archives_after = self.cmd('list', self.repository_location + '::test')
         assert archives_after == archives_before
 
@@ -1723,6 +1768,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test', 'input')
         info_before = self.cmd('info', self.repository_location + '::test')
         self.cmd('recreate', self.repository_location, '--chunker-params', 'default')
+        self.check_cache()
         info_after = self.cmd('info', self.repository_location + '::test')
         assert info_before == info_after  # includes archive ID
 
@@ -1743,18 +1789,22 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test', 'input')
 
         output = self.cmd('recreate', '--list', '--info', self.repository_location + '::test', '-e', 'input/file2')
+        self.check_cache()
         self.assert_in("input/file1", output)
         self.assert_in("x input/file2", output)
 
         output = self.cmd('recreate', '--list', self.repository_location + '::test', '-e', 'input/file3')
+        self.check_cache()
         self.assert_in("input/file1", output)
         self.assert_in("x input/file3", output)
 
         output = self.cmd('recreate', self.repository_location + '::test', '-e', 'input/file4')
+        self.check_cache()
         self.assert_not_in("input/file1", output)
         self.assert_not_in("x input/file4", output)
 
         output = self.cmd('recreate', '--info', self.repository_location + '::test', '-e', 'input/file5')
+        self.check_cache()
         self.assert_not_in("input/file1", output)
         self.assert_not_in("x input/file5", output)
 
@@ -2094,6 +2144,9 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 @pytest.mark.skipif(sys.platform == 'cygwin', reason='remote is broken on cygwin and hangs')
 class RemoteArchiverTestCase(ArchiverTestCase):
     prefix = '__testsuite__:'
+
+    def open_repository(self):
+        return RemoteRepository(Location(self.repository_location))
 
     def test_remote_repo_restrict_to_path(self):
         # restricted to repo directory itself:

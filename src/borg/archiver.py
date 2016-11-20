@@ -1062,13 +1062,6 @@ class Archiver:
     @with_repository(cache=True, exclusive=True)
     def do_recreate(self, args, repository, manifest, key, cache):
         """Re-create archives"""
-        def interrupt(signal_num, stack_frame):
-            if recreater.interrupt:
-                print("\nReceived signal, again. I'm not deaf.", file=sys.stderr)
-            else:
-                print("\nReceived signal, will exit cleanly.", file=sys.stderr)
-            recreater.interrupt = True
-
         msg = ("recreate is an experimental feature.\n"
                "Type 'YES' if you understand this and want to continue: ")
         if not yes(msg, false_msg="Aborting.", truish=('YES',),
@@ -1086,32 +1079,30 @@ class Archiver:
                                      always_recompress=args.always_recompress,
                                      progress=args.progress, stats=args.stats,
                                      file_status_printer=self.print_file_status,
+                                     checkpoint_interval=args.checkpoint_interval,
                                      dry_run=args.dry_run)
 
-        with signal_handler(signal.SIGTERM, interrupt), \
-             signal_handler(signal.SIGINT, interrupt), \
-             signal_handler(signal.SIGHUP, interrupt):
-            if args.location.archive:
-                name = args.location.archive
+        if args.location.archive:
+            name = args.location.archive
+            if recreater.is_temporary_archive(name):
+                self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
+                return self.exit_code
+            recreater.recreate(name, args.comment, args.target)
+        else:
+            if args.target is not None:
+                self.print_error('--target: Need to specify single archive')
+                return self.exit_code
+            for archive in manifest.archives.list(sort_by=['ts']):
+                name = archive.name
                 if recreater.is_temporary_archive(name):
-                    self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
-                    return self.exit_code
-                recreater.recreate(name, args.comment, args.target)
-            else:
-                if args.target is not None:
-                    self.print_error('--target: Need to specify single archive')
-                    return self.exit_code
-                for archive in manifest.archives.list(sort_by=['ts']):
-                    name = archive.name
-                    if recreater.is_temporary_archive(name):
-                        continue
-                    print('Processing', name)
-                    if not recreater.recreate(name, args.comment):
-                        break
-            manifest.write()
-            repository.commit()
-            cache.commit()
-            return self.exit_code
+                    continue
+                print('Processing', name)
+                if not recreater.recreate(name, args.comment):
+                    break
+        manifest.write()
+        repository.commit()
+        cache.commit()
+        return self.exit_code
 
     @with_repository(manifest=False, exclusive=True)
     def do_with_lock(self, args, repository):
@@ -2441,6 +2432,9 @@ class Archiver:
                                    type=archivename_validator(),
                                    help='create a new archive with the name ARCHIVE, do not replace existing archive '
                                         '(only applies for a single archive)')
+        archive_group.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
+                                   type=int, default=1800, metavar='SECONDS',
+                                   help='write checkpoint every SECONDS seconds (Default: 1800)')
         archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default=None,
                                    help='add a comment text to the archive')
         archive_group.add_argument('--timestamp', dest='timestamp',
@@ -2453,7 +2447,7 @@ class Archiver:
                                    help='select compression algorithm, see the output of the '
                                         '"borg help compression" command for details.')
         archive_group.add_argument('--always-recompress', dest='always_recompress', action='store_true',
-                                   help='always recompress chunks, don\'t skip chunks already compressed with the same'
+                                   help='always recompress chunks, don\'t skip chunks already compressed with the same '
                                         'algorithm.')
         archive_group.add_argument('--compression-from', dest='compression_files',
                                    type=argparse.FileType('r'), action='append',

@@ -50,6 +50,65 @@ The best check that everything is ok is to run a dry-run extraction::
     borg extract -v --dry-run REPO::ARCHIVE
 
 
+Version 1.0.9rc1 (2016-11-27)
+-----------------------------
+
+Bug fixes:
+
+- files cache: fix determination of newest mtime in backup set (which is
+  used in cache cleanup and led to wrong "A" [added] status for unchanged
+  files in next backup), #1860.
+
+- borg check:
+
+  - fix incorrectly reporting attic 0.13 and earlier archives as corrupt
+  - handle repo w/o objects gracefully and also bail out early if repo is
+    *completely* empty, #1815.
+- fix tox/pybuild in 1.0-maint
+- at xattr module import time, loggers are not initialized yet
+
+New features:
+
+- borg umount <mountpoint>
+  exposed already existing umount code via the CLI api, so users can use it,
+  which is more consistent than using borg to mount and fusermount -u (or
+  umount) to un-mount, #1855.
+- implement borg create --noatime --noctime, fixes #1853
+
+Other changes:
+
+- docs:
+
+  - display README correctly on PyPI
+  - improve cache / index docs, esp. files cache docs, fixes #1825
+  - different pattern matching for --exclude, #1779
+  - datetime formatting examples for {now} placeholder, #1822
+  - clarify passphrase mode attic repo upgrade, #1854
+  - clarify --umask usage, #1859
+  - clarify how to choose PR target branch
+  - clarify prune behavior for different archive contents, #1824
+  - fix PDF issues, add logo, fix authors, headings, TOC
+  - move security verification to support section
+  - fix links in standalone README (:ref: tags)
+  - add link to security contact in README
+  - add FAQ about security
+  - move fork differences to FAQ
+  - add more details about resource usage
+- tests: skip remote tests on cygwin, #1268
+- travis:
+
+  - allow OS X failures until the brew cask osxfuse issue is fixed
+  - caskroom osxfuse-beta gone, it's osxfuse now (3.5.3)
+- vagrant:
+
+  - upgrade OSXfuse / FUSE for macOS to 3.5.3
+  - remove llfuse from tox.ini at a central place
+  - do not try to install llfuse on centos6
+  - fix fuse test for darwin, #1546
+  - add windows virtual machine with cygwin
+  - Vagrantfile cleanup / code deduplication
+
+
 Version 1.0.8 (2016-10-29)
 --------------------------
 

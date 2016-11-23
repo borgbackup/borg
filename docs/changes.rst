@@ -3,6 +3,21 @@ Important notes
 
 This section is used for infos about e.g. security and corruption issues.
 
+Pre-1.0.9 potential data loss
+-----------------------------
+
+If you have archives in your repository that were made with attic <= 0.13
+(and later migrated to borg), running borg check would report errors in these
+archives. See issue #1837.
+
+The reason for this is a invalid (and useless) metadata key that was
+always added due to a bug in these old attic versions.
+
+If you run borg check --repair, things escalate quickly: all archive items
+with invalid metadata will be killed. Due to that attic bug, that means all
+items in all archives made with these old attic versions.
+
+
 Pre-1.0.4 potential repo corruption
 -----------------------------------
 

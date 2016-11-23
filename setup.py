@@ -138,6 +138,12 @@ elif not on_rtd:
 
 with open('README.rst', 'r') as fd:
     long_description = fd.read()
+    # remove badges
+    long_description = re.compile(r'^\.\. start-badges.*^\.\. end-badges', re.M | re.S).sub('', long_description)
+    # remove |substitutions|
+    long_description = re.compile(r'\|screencast\|').sub('', long_description)
+    # remove unknown directives
+    long_description = re.compile(r'^\.\. highlight:: \w+$', re.M).sub('', long_description)
 
 
 class build_usage(Command):

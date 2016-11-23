@@ -1,8 +1,10 @@
-Changelog
-=========
+Important notes
+===============
 
-Important note about pre-1.0.4 potential repo corruption
---------------------------------------------------------
+This section is used for infos about e.g. security and corruption issues.
+
+Pre-1.0.4 potential repo corruption
+-----------------------------------
 
 Some external errors (like network or disk I/O errors) could lead to
 corruption of the backup repository due to issue #1138.
@@ -49,6 +51,9 @@ The best check that everything is ok is to run a dry-run extraction::
 
     borg extract -v --dry-run REPO::ARCHIVE
 
+
+Changelog
+=========
 
 Version 1.0.9rc1 (2016-11-27)
 -----------------------------

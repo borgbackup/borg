@@ -172,14 +172,14 @@ def packages_cygwin(version)
     set CYGSETUP=#{setup_exe}
     REM --- Install build version of CygWin in a subfolder
     set OURPATH=%cd%
-	    set CYGBUILD="C:\\cygwin\\CygWin"
-	    set CYGMIRROR=ftp://mirrors.kernel.org/sourceware/cygwin/
-	    set BUILDPKGS=python3,python3-setuptools,binutils,gcc-g++,libopenssl,openssl-devel,git,make,openssh,liblz4-devel,liblz4_1,rsync,curl,python-devel
+    set CYGBUILD="C:\\cygwin\\CygWin"
+    set CYGMIRROR=ftp://mirrors.kernel.org/sourceware/cygwin/
+    set BUILDPKGS=python3,python3-setuptools,binutils,gcc-g++,libopenssl,openssl-devel,git,make,openssh,liblz4-devel,liblz4_1,rsync,curl,python-devel
     %CYGSETUP% -q -B -o -n -R %CYGBUILD% -L -D -s %CYGMIRROR% -P %BUILDPKGS%
     cd /d C:\\cygwin\\CygWin\\bin
     regtool set /HKLM/SYSTEM/CurrentControlSet/Services/OpenSSHd/ImagePath "C:\\cygwin\\CygWin\\bin\\cygrunsrv.exe"
     bash -c "ssh-host-config --no"
-	    ' > /cygdrive/c/cygwin/install.bat
+    ' > /cygdrive/c/cygwin/install.bat
     cd /cygdrive/c/cygwin && cmd.exe /c install.bat
 
     echo "alias mkdir='mkdir -p'" > ~/.profile
@@ -200,7 +200,6 @@ def install_cygwin_venv
       pip install virtualenv
   EOF
 end
-
 
 def install_pyenv(boxname)
   return <<-EOF
@@ -344,13 +343,11 @@ end
 def fix_perms
   return <<-EOF
     # . ~/.profile
-
     if id "vagrant" >/dev/null 2>&1; then
       chown -R vagrant /vagrant/borg
     else
       chown -R ubuntu /vagrant/borg
     fi
-
   EOF
 end
 

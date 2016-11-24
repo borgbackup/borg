@@ -54,6 +54,8 @@ class TestLocationWithoutEnv:
             "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive='archive')"
         assert repr(Location('ssh://user@host:1234/some/path')) == \
             "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive=None)"
+        assert repr(Location('ssh://user@host/some/path')) == \
+            "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
 
     def test_file(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
@@ -82,6 +84,8 @@ class TestLocationWithoutEnv:
             "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive='archive')"
         assert repr(Location('/some/absolute/path')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive=None)"
+        assert repr(Location('ssh://user@host/some/path')) == \
+               "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
 
     def test_relpath(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
@@ -89,6 +93,21 @@ class TestLocationWithoutEnv:
             "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='archive')"
         assert repr(Location('some/relative/path')) == \
             "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive=None)"
+        assert repr(Location('ssh://user@host/./some/path')) == \
+               "Location(proto='ssh', user='user', host='host', port=None, path='/./some/path', archive=None)"
+        assert repr(Location('ssh://user@host/~/some/path')) == \
+               "Location(proto='ssh', user='user', host='host', port=None, path='/~/some/path', archive=None)"
+        assert repr(Location('ssh://user@host/~user/some/path')) == \
+               "Location(proto='ssh', user='user', host='host', port=None, path='/~user/some/path', archive=None)"
+
+    def test_with_colons(self, monkeypatch):
+        monkeypatch.delenv('BORG_REPO', raising=False)
+        assert repr(Location('/abs/path:w:cols::arch:col')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='/abs/path:w:cols', archive='arch:col')"
+        assert repr(Location('/abs/path:with:colons::archive')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='/abs/path:with:colons', archive='archive')"
+        assert repr(Location('/abs/path:with:colons')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='/abs/path:with:colons', archive=None)"
 
     def test_underspecified(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
@@ -98,11 +117,6 @@ class TestLocationWithoutEnv:
             Location('::')
         with pytest.raises(ValueError):
             Location()
-
-    def test_no_double_colon(self, monkeypatch):
-        monkeypatch.delenv('BORG_REPO', raising=False)
-        with pytest.raises(ValueError):
-            Location('ssh://localhost:22/path:archive')
 
     def test_no_slashes(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
@@ -116,7 +130,7 @@ class TestLocationWithoutEnv:
                      'ssh://user@host:1234/some/path::archive']
         for location in locations:
             assert Location(location).canonical_path() == \
-                Location(Location(location).canonical_path()).canonical_path()
+                Location(Location(location).canonical_path()).canonical_path(), "failed: %s" % location
 
     def test_format_path(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
@@ -134,43 +148,64 @@ class TestLocationWithEnv:
         monkeypatch.setenv('BORG_REPO', 'ssh://user@host:1234/some/path')
         assert repr(Location('::archive')) == \
             "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive='archive')"
-        assert repr(Location()) == \
+        assert repr(Location('::')) == \
             "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive=None)"
+        assert repr(Location()) == \
+               "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive=None)"
 
     def test_file(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'file:///some/path')
         assert repr(Location('::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')"
-        assert repr(Location()) == \
+        assert repr(Location('::')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive=None)"
+        assert repr(Location()) == \
+               "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive=None)"
 
     def test_scp(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'user@host:/some/path')
         assert repr(Location('::archive')) == \
             "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='archive')"
-        assert repr(Location()) == \
+        assert repr(Location('::')) == \
             "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
+        assert repr(Location()) == \
+               "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
 
     def test_folder(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'path')
         assert repr(Location('::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='path', archive='archive')"
-        assert repr(Location()) == \
+        assert repr(Location('::')) == \
             "Location(proto='file', user=None, host=None, port=None, path='path', archive=None)"
+        assert repr(Location()) == \
+               "Location(proto='file', user=None, host=None, port=None, path='path', archive=None)"
 
     def test_abspath(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', '/some/absolute/path')
         assert repr(Location('::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive='archive')"
-        assert repr(Location()) == \
+        assert repr(Location('::')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive=None)"
+        assert repr(Location()) == \
+               "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive=None)"
 
     def test_relpath(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'some/relative/path')
         assert repr(Location('::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='archive')"
-        assert repr(Location()) == \
+        assert repr(Location('::')) == \
             "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive=None)"
+        assert repr(Location()) == \
+               "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive=None)"
+
+    def test_with_colons(self, monkeypatch):
+        monkeypatch.setenv('BORG_REPO', '/abs/path:w:cols')
+        assert repr(Location('::arch:col')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='/abs/path:w:cols', archive='arch:col')"
+        assert repr(Location('::')) == \
+               "Location(proto='file', user=None, host=None, port=None, path='/abs/path:w:cols', archive=None)"
+        assert repr(Location()) == \
+               "Location(proto='file', user=None, host=None, port=None, path='/abs/path:w:cols', archive=None)"
 
     def test_no_slashes(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', '/some/absolute/path')
@@ -605,44 +640,29 @@ class TestParseTimestamp(BaseTestCase):
         self.assert_equal(parse_timestamp('2015-04-19T20:25:00'), datetime(2015, 4, 19, 20, 25, 0, 0, timezone.utc))
 
 
-def test_get_cache_dir():
+def test_get_cache_dir(monkeypatch):
     """test that get_cache_dir respects environment"""
-    # reset BORG_CACHE_DIR in order to test default
-    old_env = None
-    if os.environ.get('BORG_CACHE_DIR'):
-        old_env = os.environ['BORG_CACHE_DIR']
-        del(os.environ['BORG_CACHE_DIR'])
+    monkeypatch.delenv('XDG_CACHE_HOME', raising=False)
     assert get_cache_dir() == os.path.join(os.path.expanduser('~'), '.cache', 'borg')
-    os.environ['XDG_CACHE_HOME'] = '/var/tmp/.cache'
+    monkeypatch.setenv('XDG_CACHE_HOME', '/var/tmp/.cache')
     assert get_cache_dir() == os.path.join('/var/tmp/.cache', 'borg')
-    os.environ['BORG_CACHE_DIR'] = '/var/tmp'
+    monkeypatch.setenv('BORG_CACHE_DIR', '/var/tmp')
     assert get_cache_dir() == '/var/tmp'
-    # reset old env
-    if old_env is not None:
-        os.environ['BORG_CACHE_DIR'] = old_env
 
 
-def test_get_keys_dir():
+def test_get_keys_dir(monkeypatch):
     """test that get_keys_dir respects environment"""
-    # reset BORG_KEYS_DIR in order to test default
-    old_env = None
-    if os.environ.get('BORG_KEYS_DIR'):
-        old_env = os.environ['BORG_KEYS_DIR']
-        del(os.environ['BORG_KEYS_DIR'])
+    monkeypatch.delenv('XDG_CONFIG_HOME', raising=False)
     assert get_keys_dir() == os.path.join(os.path.expanduser('~'), '.config', 'borg', 'keys')
-    os.environ['XDG_CONFIG_HOME'] = '/var/tmp/.config'
+    monkeypatch.setenv('XDG_CONFIG_HOME', '/var/tmp/.config')
     assert get_keys_dir() == os.path.join('/var/tmp/.config', 'borg', 'keys')
-    os.environ['BORG_KEYS_DIR'] = '/var/tmp'
+    monkeypatch.setenv('BORG_KEYS_DIR', '/var/tmp')
     assert get_keys_dir() == '/var/tmp'
-    # reset old env
-    if old_env is not None:
-        os.environ['BORG_KEYS_DIR'] = old_env
 
 
 def test_get_nonces_dir(monkeypatch):
     """test that get_nonces_dir respects environment"""
     monkeypatch.delenv('XDG_CONFIG_HOME', raising=False)
-    monkeypatch.delenv('BORG_NONCES_DIR', raising=False)
     assert get_nonces_dir() == os.path.join(os.path.expanduser('~'), '.config', 'borg', 'key-nonces')
     monkeypatch.setenv('XDG_CONFIG_HOME', '/var/tmp/.config')
     assert get_nonces_dir() == os.path.join('/var/tmp/.config', 'borg', 'key-nonces')
@@ -811,21 +831,20 @@ def test_yes_input_custom():
     assert not yes(falsish=('NOPE', ), input=input)
 
 
-def test_yes_env():
+def test_yes_env(monkeypatch):
     for value in TRUISH:
-        with environment_variable(OVERRIDE_THIS=value):
-            assert yes(env_var_override='OVERRIDE_THIS')
+        monkeypatch.setenv('OVERRIDE_THIS', value)
+        assert yes(env_var_override='OVERRIDE_THIS')
     for value in FALSISH:
-        with environment_variable(OVERRIDE_THIS=value):
-            assert not yes(env_var_override='OVERRIDE_THIS')
+        monkeypatch.setenv('OVERRIDE_THIS', value)
+        assert not yes(env_var_override='OVERRIDE_THIS')
 
 
-def test_yes_env_default():
+def test_yes_env_default(monkeypatch):
     for value in DEFAULTISH:
-        with environment_variable(OVERRIDE_THIS=value):
-            assert yes(env_var_override='OVERRIDE_THIS', default=True)
-        with environment_variable(OVERRIDE_THIS=value):
-            assert not yes(env_var_override='OVERRIDE_THIS', default=False)
+        monkeypatch.setenv('OVERRIDE_THIS', value)
+        assert yes(env_var_override='OVERRIDE_THIS', default=True)
+        assert not yes(env_var_override='OVERRIDE_THIS', default=False)
 
 
 def test_yes_defaults():
@@ -884,7 +903,10 @@ def test_yes_env_output(capfd, monkeypatch):
     assert 'yes' in err
 
 
-def test_progress_percentage_sameline(capfd):
+def test_progress_percentage_sameline(capfd, monkeypatch):
+    # run the test as if it was in a 4x1 terminal
+    monkeypatch.setenv('COLUMNS', '4')
+    monkeypatch.setenv('LINES', '1')
     pi = ProgressIndicatorPercent(1000, step=5, start=0, msg="%3.0f%%")
     pi.logger.setLevel('INFO')
     pi.show(0)
@@ -902,7 +924,10 @@ def test_progress_percentage_sameline(capfd):
     assert err == ' ' * 4 + '\r'
 
 
-def test_progress_percentage_step(capfd):
+def test_progress_percentage_step(capfd, monkeypatch):
+    # run the test as if it was in a 4x1 terminal
+    monkeypatch.setenv('COLUMNS', '4')
+    monkeypatch.setenv('LINES', '1')
     pi = ProgressIndicatorPercent(100, step=2, start=0, msg="%3.0f%%")
     pi.logger.setLevel('INFO')
     pi.show()

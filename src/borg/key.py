@@ -14,7 +14,7 @@ logger = create_logger()
 
 from .constants import *  # NOQA
 from .compress import Compressor, get_compressor
-from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks, hmac_sha256
+from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256
 from .helpers import Chunk
 from .helpers import Error, IntegrityError
 from .helpers import yes
@@ -62,6 +62,12 @@ def key_creator(repository, args):
         return KeyfileKey.create(repository, args)
     elif args.encryption == 'repokey':
         return RepoKey.create(repository, args)
+    elif args.encryption == 'keyfile-blake2':
+        return Blake2KeyfileKey.create(repository, args)
+    elif args.encryption == 'repokey-blake2':
+        return Blake2RepoKey.create(repository, args)
+    elif args.encryption == 'authenticated':
+        return AuthenticatedKey.create(repository, args)
     else:
         return PlaintextKey.create(repository, args)
 
@@ -78,6 +84,12 @@ def key_factory(repository, manifest_data):
         return RepoKey.detect(repository, manifest_data)
     elif key_type == PlaintextKey.TYPE:
         return PlaintextKey.detect(repository, manifest_data)
+    elif key_type == Blake2KeyfileKey.TYPE:
+        return Blake2KeyfileKey.detect(repository, manifest_data)
+    elif key_type == Blake2RepoKey.TYPE:
+        return Blake2RepoKey.detect(repository, manifest_data)
+    elif key_type == AuthenticatedKey.TYPE:
+        return AuthenticatedKey.detect(repository, manifest_data)
     else:
         raise UnsupportedPayloadError(key_type)
 
@@ -113,7 +125,7 @@ class KeyBase:
         if id:
             id_computed = self.id_hash(data)
             if not compare_digest(id_computed, id):
-                raise IntegrityError('Chunk id verification failed')
+                raise IntegrityError('Chunk %s: id verification failed' % bin_to_hex(id))
 
 
 class PlaintextKey(KeyBase):
@@ -140,13 +152,35 @@ class PlaintextKey(KeyBase):
 
     def decrypt(self, id, data, decompress=True):
         if data[0] != self.TYPE:
-            raise IntegrityError('Invalid encryption envelope')
+            raise IntegrityError('Chunk %s: Invalid encryption envelope' % bin_to_hex(id))
         payload = memoryview(data)[1:]
         if not decompress:
             return Chunk(payload)
         data = self.compressor.decompress(payload)
         self.assert_id(id, data)
         return Chunk(data)
+
+
+class ID_BLAKE2b_256:
+    """
+    Key mix-in class for using BLAKE2b-256 for the id key.
+
+    The id_key length must be 32 bytes.
+    """
+
+    def id_hash(self, data):
+        return blake2b_256(self.id_key, data)
+
+
+class ID_HMAC_SHA_256:
+    """
+    Key mix-in class for using HMAC-SHA-256 for the id key.
+
+    The id_key length must be 32 bytes.
+    """
+
+    def id_hash(self, data):
+        return hmac_sha256(self.id_key, data)
 
 
 class AESKeyBase(KeyBase):
@@ -164,11 +198,6 @@ class AESKeyBase(KeyBase):
 
     PAYLOAD_OVERHEAD = 1 + 32 + 8  # TYPE + HMAC + NONCE
 
-    def id_hash(self, data):
-        """Return HMAC hash using the "id" HMAC key
-        """
-        return hmac_sha256(self.id_key, data)
-
     def encrypt(self, chunk):
         chunk = self.compress(chunk)
         self.nonce_manager.ensure_reservation(num_aes_blocks(len(chunk.data)))
@@ -180,12 +209,12 @@ class AESKeyBase(KeyBase):
     def decrypt(self, id, data, decompress=True):
         if not (data[0] == self.TYPE or
             data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
-            raise IntegrityError('Invalid encryption envelope')
+            raise IntegrityError('Chunk %s: Invalid encryption envelope' % bin_to_hex(id))
         data_view = memoryview(data)
         hmac_given = data_view[1:33]
         hmac_computed = memoryview(hmac_sha256(self.enc_hmac_key, data_view[33:]))
         if not compare_digest(hmac_computed, hmac_given):
-            raise IntegrityError('Encryption envelope checksum mismatch')
+            raise IntegrityError('Chunk %s: Encryption envelope checksum mismatch' % bin_to_hex(id))
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
         payload = self.dec_cipher.decrypt(data_view[41:])
         if not decompress:
@@ -197,7 +226,7 @@ class AESKeyBase(KeyBase):
     def extract_nonce(self, payload):
         if not (payload[0] == self.TYPE or
             payload[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
-            raise IntegrityError('Invalid encryption envelope')
+            raise IntegrityError('Manifest: Invalid encryption envelope')
         nonce = bytes_to_long(payload[33:41])
         return nonce
 
@@ -272,7 +301,7 @@ class Passphrase(str):
         return pbkdf2_hmac('sha256', self.encode('utf-8'), salt, iterations, length)
 
 
-class PassphraseKey(AESKeyBase):
+class PassphraseKey(ID_HMAC_SHA_256, AESKeyBase):
     # This mode was killed in borg 1.0, see: https://github.com/borgbackup/borg/issues/97
     # Reasons:
     # - you can never ever change your passphrase for existing repos.
@@ -432,7 +461,7 @@ class KeyfileKeyBase(AESKeyBase):
         raise NotImplementedError
 
 
-class KeyfileKey(KeyfileKeyBase):
+class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
     TYPE = 0x00
     NAME = 'key file'
     FILE_ID = 'BORG_KEY'
@@ -492,7 +521,7 @@ class KeyfileKey(KeyfileKeyBase):
         self.target = target
 
 
-class RepoKey(KeyfileKeyBase):
+class RepoKey(ID_HMAC_SHA_256, KeyfileKeyBase):
     TYPE = 0x03
     NAME = 'repokey'
 
@@ -522,3 +551,33 @@ class RepoKey(KeyfileKeyBase):
         key_data = key_data.encode('utf-8')  # remote repo: msgpack issue #99, giving bytes
         target.save_key(key_data)
         self.target = target
+
+
+class Blake2KeyfileKey(ID_BLAKE2b_256, KeyfileKey):
+    TYPE = 0x04
+    NAME = 'key file BLAKE2b'
+    FILE_ID = 'BORG_KEY'
+
+
+class Blake2RepoKey(ID_BLAKE2b_256, RepoKey):
+    TYPE = 0x05
+    NAME = 'repokey BLAKE2b'
+
+
+class AuthenticatedKey(ID_BLAKE2b_256, RepoKey):
+    TYPE = 0x06
+    NAME = 'authenticated BLAKE2b'
+
+    def encrypt(self, chunk):
+        chunk = self.compress(chunk)
+        return b''.join([self.TYPE_STR, chunk.data])
+
+    def decrypt(self, id, data, decompress=True):
+        if data[0] != self.TYPE:
+            raise IntegrityError('Chunk %s: Invalid envelope' % bin_to_hex(id))
+        payload = memoryview(data)[1:]
+        if not decompress:
+            return Chunk(payload)
+        data = self.compressor.decompress(payload)
+        self.assert_id(id, data)
+        return Chunk(data)

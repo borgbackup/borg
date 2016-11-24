@@ -13,7 +13,7 @@ platform API: that way platform APIs provided by the platform-specific support m
 are correctly composed into the base functionality.
 """
 
-API_VERSION = 3
+API_VERSION = 5
 
 fdatasync = getattr(os, 'fdatasync', os.fsync)
 
@@ -33,6 +33,7 @@ def acl_set(path, item, numeric_owner=False):
     If `numeric_owner` is True the stored uid/gid is used instead
     of the user/group names
     """
+
 
 try:
     from os import lchflags
@@ -156,3 +157,8 @@ def swidth(s):
     For western scripts, this is just len(s), but for cjk glyphs, 2 cells are used.
     """
     return len(s)
+
+
+def umount(mountpoint):
+    """un-mount the FUSE filesystem mounted at <mountpoint>"""
+    return 0  # dummy, see also posix module

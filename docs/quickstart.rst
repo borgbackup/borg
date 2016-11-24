@@ -5,51 +5,8 @@
 Quick Start
 ===========
 
-This chapter will get you started with |project_name|. The first section
-presents a simple step by step example that uses |project_name| to backup data.
-The next section continues by showing how backups can be automated.
-
-Important note about free space
--------------------------------
-
-Before you start creating backups, please make sure that there is *always*
-a good amount of free space on the filesystem that has your backup repository
-(and also on ~/.cache). A few GB should suffice for most hard-drive sized
-repositories. See also :ref:`cache-memory-usage`.
-
-Borg doesn't use space reserved for root on repository disks (even when run as root),
-on file systems which do not support this mechanism (e.g. XFS) we recommend to
-reserve some space in Borg itself just to be safe by adjusting the
-``additional_free_space`` setting in the ``[repository]`` section of a repositories
-``config`` file. A good starting point is ``2G``.
-
-If |project_name| runs out of disk space, it tries to free as much space as it
-can while aborting the current operation safely, which allows to free more space
-by deleting/pruning archives. This mechanism is not bullet-proof in some
-circumstances [1]_.
-
-If you *really* run out of disk space, it can be hard or impossible to free space,
-because |project_name| needs free space to operate - even to delete backup
-archives.
-
-You can use some monitoring process or just include the free space information
-in your backup log files (you check them regularly anyway, right?).
-
-Also helpful:
-
-- create a big file as a "space reserve", that you can delete to free space
-- if you use LVM: use a LV + a filesystem that you can resize later and have
-  some unallocated PEs you can add to the LV.
-- consider using quotas
-- use `prune` regularly
-
-.. [1] This failsafe can fail in these circumstances:
-
-    - The underlying file system doesn't support statvfs(2), or returns incorrect
-      data, or the repository doesn't reside on a single file system
-    - Other tasks fill the disk simultaneously
-    - Hard quotas (which may not be reflected in statvfs(2))
-
+This chapter will get you started with |project_name| and covers
+various use cases.
 
 A step by step example
 ----------------------
@@ -116,6 +73,47 @@ A step by step example
     reports during command execution.  You can also add the ``-v`` (or
     ``--verbose`` or ``--info``) option to adjust the log level to INFO to
     get other informational messages.
+
+Important note about free space
+-------------------------------
+
+Before you start creating backups, please make sure that there is *always*
+a good amount of free space on the filesystem that has your backup repository
+(and also on ~/.cache). A few GB should suffice for most hard-drive sized
+repositories. See also :ref:`cache-memory-usage`.
+
+Borg doesn't use space reserved for root on repository disks (even when run as root),
+on file systems which do not support this mechanism (e.g. XFS) we recommend to
+reserve some space in Borg itself just to be safe by adjusting the
+``additional_free_space`` setting in the ``[repository]`` section of a repositories
+``config`` file. A good starting point is ``2G``.
+
+If |project_name| runs out of disk space, it tries to free as much space as it
+can while aborting the current operation safely, which allows to free more space
+by deleting/pruning archives. This mechanism is not bullet-proof in some
+circumstances [1]_.
+
+If you *really* run out of disk space, it can be hard or impossible to free space,
+because |project_name| needs free space to operate - even to delete backup
+archives.
+
+You can use some monitoring process or just include the free space information
+in your backup log files (you check them regularly anyway, right?).
+
+Also helpful:
+
+- create a big file as a "space reserve", that you can delete to free space
+- if you use LVM: use a LV + a filesystem that you can resize later and have
+  some unallocated PEs you can add to the LV.
+- consider using quotas
+- use `prune` regularly
+
+.. [1] This failsafe can fail in these circumstances:
+
+    - The underlying file system doesn't support statvfs(2), or returns incorrect
+      data, or the repository doesn't reside on a single file system
+    - Other tasks fill the disk simultaneously
+    - Hard quotas (which may not be reflected in statvfs(2))
 
 Automating backups
 ------------------
@@ -267,9 +265,7 @@ is installed on the remote host, in which case the following syntax is used::
 
   $ borg init user@hostname:/path/to/repo
 
-or::
-
-  $ borg init ssh://user@hostname:port//path/to/repo
+Note: please see the usage chapter for a full documentation of repo URLs.
 
 Remote operations over SSH can be automated with SSH keys. You can restrict the
 use of the SSH keypair by prepending a forced command to the SSH public key in
@@ -285,3 +281,7 @@ mounting the remote filesystem, for example, using sshfs::
   $ sshfs user@hostname:/path/to /path/to
   $ borg init /path/to/repo
   $ fusermount -u /path/to
+
+You can also use other remote filesystems in a similar way. Just be careful,
+not all filesystems out there are really stable and working good enough to
+be acceptable for backup usage.

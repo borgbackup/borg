@@ -26,6 +26,7 @@ from functools import wraps, partial, lru_cache
 from itertools import islice
 from operator import attrgetter
 from string import Formatter
+from shutil import get_terminal_size
 
 import msgpack
 import msgpack.fallback
@@ -34,6 +35,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from . import __version__ as borg_version
+from . import __version_tuple__ as borg_version_tuple
 from . import chunker
 from . import crypto
 from . import hashindex
@@ -68,7 +70,7 @@ class ErrorWithTraceback(Error):
 
 
 class IntegrityError(ErrorWithTraceback):
-    """Data integrity error"""
+    """Data integrity error: {}"""
 
 
 class ExtensionModuleError(Error):
@@ -93,7 +95,7 @@ def check_extension_modules():
         raise ExtensionModuleError
     if crypto.API_VERSION != 3:
         raise ExtensionModuleError
-    if platform.API_VERSION != 3:
+    if platform.API_VERSION != platform.OS_API_VERSION != 5:
         raise ExtensionModuleError
 
 
@@ -142,17 +144,29 @@ class Archives(abc.MutableMapping):
         name = safe_encode(name)
         del self._archives[name]
 
-    def list(self, sort_by=None, reverse=False, prefix=''):
+    def list(self, sort_by=(), reverse=False, prefix='', first=None, last=None):
         """
         Inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
-        Returns list of borg.helpers.ArchiveInfo instances
+        Returns list of borg.helpers.ArchiveInfo instances.
+        sort_by can be a list of sort keys, they are applied in reverse order.
         """
+        if isinstance(sort_by, (str, bytes)):
+            raise TypeError('sort_by must be a sequence of str')
         archives = [x for x in self.values() if x.name.startswith(prefix)]
-        if sort_by is not None:
-            archives = sorted(archives, key=attrgetter(sort_by))
-        if reverse:
+        for sortkey in reversed(sort_by):
+            archives.sort(key=attrgetter(sortkey))
+        if reverse or last:
             archives.reverse()
-        return archives
+        n = first or last or len(archives)
+        return archives[:n]
+
+    def list_considering(self, args):
+        """
+        get a list of archives, considering --first/last/prefix/sort cmdline args
+        """
+        if args.location.archive:
+            raise Error('The options --first, --last and --prefix can only be used on repository targets.')
+        return self.list(sort_by=args.sort_by.split(','), prefix=args.prefix, first=args.first, last=args.last)
 
     def set_raw_dict(self, d):
         """set the dict we get from the msgpack unpacker"""
@@ -652,8 +666,12 @@ def replace_placeholders(text):
         'user': uid2user(os.getuid(), os.getuid()),
         'uuid4': str(uuid.uuid4()),
         'borgversion': borg_version,
+        'borgmajor': '%d' % borg_version_tuple[:1],
+        'borgminor': '%d.%d' % borg_version_tuple[:2],
+        'borgpatch': '%d.%d.%d' % borg_version_tuple[:3],
     }
     return format_line(text, data)
+
 
 PrefixSpec = replace_placeholders
 
@@ -866,20 +884,49 @@ class Location:
     """Object representing a repository / archive location
     """
     proto = user = host = port = path = archive = None
+
+    # path must not contain :: (it ends at :: or string end), but may contain single colons.
+    # to avoid ambiguities with other regexes, it must also not start with ":".
+    path_re = r"""
+        (?!:)                                               # not starting with ":"
+        (?P<path>([^:]|(:(?!:)))+)                          # any chars, but no "::"
+        """
+    # optional ::archive_name at the end, archive name must not contain "/".
     # borg mount's FUSE filesystem creates one level of directories from
-    # the archive names. Thus, we must not accept "/" in archive names.
-    ssh_re = re.compile(r'(?P<proto>ssh)://(?:(?P<user>[^@]+)@)?'
-                        r'(?P<host>[^:/#]+)(?::(?P<port>\d+))?'
-                        r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
-    file_re = re.compile(r'(?P<proto>file)://'
-                         r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
-    scp_re = re.compile(r'((?:(?P<user>[^@]+)@)?(?P<host>[^:/]+):)?'
-                        r'(?P<path>[^:]+)(?:::(?P<archive>[^/]+))?$')
-    # get the repo from BORG_RE env and the optional archive from param.
+    # the archive names and of course "/" is not valid in a directory name.
+    optional_archive_re = r"""
+        (?:
+            ::                                              # "::" as separator
+            (?P<archive>[^/]+)                              # archive name must not contain "/"
+        )?$"""                                              # must match until the end
+
+    # regexes for misc. kinds of supported location specifiers:
+    ssh_re = re.compile(r"""
+        (?P<proto>ssh)://                                   # ssh://
+        (?:(?P<user>[^@]+)@)?                               # user@  (optional)
+        (?P<host>[^:/]+)(?::(?P<port>\d+))?                 # host or host:port
+        """ + path_re + optional_archive_re, re.VERBOSE)    # path or path::archive
+
+    file_re = re.compile(r"""
+        (?P<proto>file)://                                  # file://
+        """ + path_re + optional_archive_re, re.VERBOSE)    # path or path::archive
+
+    # note: scp_re is also use for local pathes
+    scp_re = re.compile(r"""
+        (
+            (?:(?P<user>[^@]+)@)?                           # user@  (optional)
+            (?P<host>[^:/]+):                               # host: (don't match / in host to disambiguate from file:)
+        )?                                                  # user@host: part is optional
+        """ + path_re + optional_archive_re, re.VERBOSE)    # path with optional archive
+
+    # get the repo from BORG_REPO env and the optional archive from param.
     # if the syntax requires giving REPOSITORY (see "borg mount"),
     # use "::" to let it use the env var.
     # if REPOSITORY argument is optional, it'll automatically use the env.
-    env_re = re.compile(r'(?:::(?P<archive>[^/]+)?)?$')
+    env_re = re.compile(r"""                                # the repo part is fetched from BORG_REPO
+        (?:::$)                                             # just "::" is ok (when a pos. arg is required, no archive)
+        |                                                   # or
+        """ + optional_archive_re, re.VERBOSE)              # archive name (optional, may be empty)
 
     def __init__(self, text=''):
         self.orig = text
@@ -904,26 +951,32 @@ class Location:
         return True
 
     def _parse(self, text):
+        def normpath_special(p):
+            # avoid that normpath strips away our relative path hack and even makes p absolute
+            relative = p.startswith('/./')
+            p = os.path.normpath(p)
+            return ('/.' + p) if relative else p
+
         m = self.ssh_re.match(text)
         if m:
             self.proto = m.group('proto')
             self.user = m.group('user')
             self.host = m.group('host')
             self.port = m.group('port') and int(m.group('port')) or None
-            self.path = os.path.normpath(m.group('path'))
+            self.path = normpath_special(m.group('path'))
             self.archive = m.group('archive')
             return True
         m = self.file_re.match(text)
         if m:
             self.proto = m.group('proto')
-            self.path = os.path.normpath(m.group('path'))
+            self.path = normpath_special(m.group('path'))
             self.archive = m.group('archive')
             return True
         m = self.scp_re.match(text)
         if m:
             self.user = m.group('user')
             self.host = m.group('host')
-            self.path = os.path.normpath(m.group('path'))
+            self.path = normpath_special(m.group('path'))
             self.archive = m.group('archive')
             self.proto = self.host and 'ssh' or 'file'
             return True
@@ -954,9 +1007,9 @@ class Location:
             return self.path
         else:
             if self.path and self.path.startswith('~'):
-                path = '/' + self.path
+                path = '/' + self.path  # /~/x = path x relative to home dir
             elif self.path and not self.path.startswith('/'):
-                path = '/~/' + self.path
+                path = '/./' + self.path  # /./x = path x relative to cwd
             else:
                 path = self.path
             return 'ssh://{}{}{}{}'.format('{}@'.format(self.user) if self.user else '',
@@ -1065,7 +1118,7 @@ DEFAULTISH = ('Default', 'DEFAULT', 'default', 'D', 'd', '', )
 def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
         retry_msg=None, invalid_msg=None, env_msg='{} (from {})',
         falsish=FALSISH, truish=TRUISH, defaultish=DEFAULTISH,
-        default=False, retry=True, env_var_override=None, ofile=None, input=input):
+        default=False, retry=True, env_var_override=None, ofile=None, input=input, prompt=True):
     """Output <msg> (usually a question) and let user input an answer.
     Qualifies the answer according to falsish, truish and defaultish as True, False or <default>.
     If it didn't qualify and retry is False (no retries wanted), return the default [which
@@ -1110,6 +1163,8 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
             if answer is not None and env_msg:
                 print(env_msg.format(answer, env_var_override), file=ofile)
         if answer is None:
+            if not prompt:
+                return default
             try:
                 answer = input()
             except EOFError:
@@ -1138,6 +1193,23 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
         env_var_override = None
 
 
+def ellipsis_truncate(msg, space):
+    """
+    shorten a long string by adding ellipsis between it and return it, example:
+    this_is_a_very_long_string -------> this_is..._string
+    """
+    from .platform import swidth
+    ellipsis_width = swidth('...')
+    msg_width = swidth(msg)
+    if space < 8:
+        # if there is very little space, just show ...
+        return '...' + ' ' * (space - ellipsis_width)
+    if space < ellipsis_width + msg_width:
+        return '%s...%s' % (swidth_slice(msg, space // 2 - ellipsis_width),
+                            swidth_slice(msg, -space // 2))
+    return msg + ' ' * (space - msg_width)
+
+
 class ProgressIndicatorPercent:
     LOGGER = 'borg.output.progress'
 
@@ -1155,7 +1227,6 @@ class ProgressIndicatorPercent:
         self.trigger_at = start  # output next percentage value when reaching (at least) this
         self.step = step
         self.msg = msg
-        self.output_len = len(self.msg % 100.0)
         self.handler = None
         self.logger = logging.getLogger(self.LOGGER)
 
@@ -1186,14 +1257,33 @@ class ProgressIndicatorPercent:
             self.trigger_at += self.step
             return pct
 
-    def show(self, current=None, increase=1):
+    def show(self, current=None, increase=1, info=None):
+        """
+        Show and output the progress message
+
+        :param current: set the current percentage [None]
+        :param increase: increase the current percentage [None]
+        :param info: array of strings to be formatted with msg [None]
+        """
         pct = self.progress(current, increase)
         if pct is not None:
+            # truncate the last argument, if no space is available
+            if info is not None:
+                # no need to truncate if we're not outputing to a terminal
+                terminal_space = get_terminal_size(fallback=(-1, -1))[0]
+                if terminal_space != -1:
+                    space = terminal_space - len(self.msg % tuple([pct] + info[:-1] + ['']))
+                    info[-1] = ellipsis_truncate(info[-1], space)
+                return self.output(self.msg % tuple([pct] + info), justify=False)
+
             return self.output(self.msg % pct)
 
-    def output(self, message):
-        self.output_len = max(len(message), self.output_len)
-        message = message.ljust(self.output_len)
+    def output(self, message, justify=True):
+        if justify:
+            terminal_space = get_terminal_size(fallback=(-1, -1))[0]
+            # no need to ljust if we're not outputing to a terminal
+            if terminal_space != -1:
+                message = message.ljust(terminal_space)
         self.logger.info(message)
 
     def finish(self):
@@ -1579,6 +1669,7 @@ def scandir_generic(path='.'):
     """Like os.listdir(), but yield DirEntry objects instead of returning a list of names."""
     for name in sorted(os.listdir(path)):
         yield GenericDirEntry(path, name)
+
 
 try:
     from os import scandir

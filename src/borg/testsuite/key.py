@@ -11,18 +11,8 @@ from ..helpers import Location
 from ..helpers import Chunk
 from ..helpers import IntegrityError
 from ..helpers import get_nonces_dir
-from ..key import PlaintextKey, PassphraseKey, KeyfileKey, Passphrase, PasswordRetriesExceeded, bin_to_hex
-
-
-@pytest.fixture(autouse=True)
-def clean_env(monkeypatch):
-    # Workaround for some tests (testsuite/archiver) polluting the environment
-    monkeypatch.delenv('BORG_PASSPHRASE', False)
-
-
-@pytest.fixture(autouse=True)
-def nonce_dir(tmpdir_factory, monkeypatch):
-    monkeypatch.setenv('XDG_CONFIG_HOME', tmpdir_factory.mktemp('xdg-config-home'))
+from ..key import PlaintextKey, PassphraseKey, KeyfileKey, RepoKey, Blake2KeyfileKey, Blake2RepoKey, AuthenticatedKey
+from ..key import Passphrase, PasswordRetriesExceeded, bin_to_hex
 
 
 class TestKey:
@@ -45,6 +35,24 @@ class TestKey:
         """))
     keyfile2_id = unhexlify('c3fbf14bc001ebcc3cd86e696c13482ed071740927cd7cbe1b01b4bfcee49314')
 
+    keyfile_blake2_key_file = """
+        BORG_KEY 0000000000000000000000000000000000000000000000000000000000000000
+        hqlhbGdvcml0aG2mc2hhMjU2pGRhdGHaANAwo4EbUPF/kLQXhQnT4LxRc1advS8lUiegDa
+        q2Q6oOkP1Jc7MwBa7ZVMgoBG1sBeKYO6Sn6W6BBrHbMR8Dxv7xquaQIh8jIpnjLWpzyFIk
+        JlijFiTWI58Sxj+2D19b2ayFolnGkF9PJSARgfaieo0GkryqjcIgcXuKHO/H9NfaUDk5YJ
+        UqrJ9TUMohXSQzwF1pO4ak2BHPZKnbeJ7XL/8fFN8VFQZl27R0et4WlTFRBI1qQYyQaTiL
+        +/1ICMUpVsQM0mvyW6dc8/zGMsAlmZVApGhhc2jaACDdRF7uPv90UN3zsZy5Be89728RBl
+        zKvtzupDyTsfrJMqppdGVyYXRpb25zzgABhqCkc2FsdNoAIGTK3TR09UZqw1bPi17gyHOi
+        7YtSp4BVK7XptWeKh6Vip3ZlcnNpb24B""".strip()
+
+    keyfile_blake2_cdata = bytes.fromhex('04dd21cc91140ef009bc9e4dd634d075e39d39025ccce1289c'
+                                         '5536f9cb57f5f8130404040404040408ec852921309243b164')
+    # Verified against b2sum. Entire string passed to BLAKE2, including the 32 byte key contained in
+    # keyfile_blake2_key_file above is
+    # 037fb9b75b20d623f1d5a568050fccde4a1b7c5f5047432925e941a17c7a2d0d7061796c6f6164
+    #                                                                 p a y l o a d
+    keyfile_blake2_id = bytes.fromhex('a22d4fc81bb61c3846c334a09eaf28d22dd7df08c9a7a41e713ef28d80eebd45')
+
     @pytest.fixture
     def keys_dir(self, request, monkeypatch, tmpdir):
         monkeypatch.setenv('BORG_KEYS_DIR', tmpdir)
@@ -52,7 +60,11 @@ class TestKey:
 
     @pytest.fixture(params=(
         KeyfileKey,
-        PlaintextKey
+        PlaintextKey,
+        RepoKey,
+        Blake2KeyfileKey,
+        Blake2RepoKey,
+        AuthenticatedKey,
     ))
     def key(self, request, monkeypatch):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
@@ -71,6 +83,12 @@ class TestKey:
 
         def commit_nonce_reservation(self, next_unreserved, start_nonce):
             pass
+
+        def save_key(self, data):
+            self.key_data = data
+
+        def load_key(self):
+            return self.key_data
 
     def test_plaintext(self):
         key = PlaintextKey.create(None, None)
@@ -139,6 +157,13 @@ class TestKey:
         key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
         assert key.decrypt(self.keyfile2_id, self.keyfile2_cdata).data == b'payload'
 
+    def test_keyfile_blake2(self, monkeypatch, keys_dir):
+        with keys_dir.join('keyfile').open('w') as fd:
+            fd.write(self.keyfile_blake2_key_file)
+        monkeypatch.setenv('BORG_PASSPHRASE', 'passphrase')
+        key = Blake2KeyfileKey.detect(self.MockRepository(), self.keyfile_blake2_cdata)
+        assert key.decrypt(self.keyfile_blake2_id, self.keyfile_blake2_cdata).data == b'payload'
+
     def test_passphrase(self, keys_dir, monkeypatch):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
         key = PassphraseKey.create(self.MockRepository(), None)
@@ -166,9 +191,9 @@ class TestKey:
 
     def _corrupt_byte(self, key, data, offset):
         data = bytearray(data)
-        data[offset] += 1
+        data[offset] ^= 1
         with pytest.raises(IntegrityError):
-            key.decrypt("", data)
+            key.decrypt(b'', data)
 
     def test_decrypt_integrity(self, monkeypatch, keys_dir):
         with keys_dir.join('keyfile').open('w') as fd:
@@ -197,12 +222,20 @@ class TestKey:
         id = key.id_hash(plaintext)
         key.assert_id(id, plaintext)
         id_changed = bytearray(id)
-        id_changed[0] += 1
+        id_changed[0] ^= 1
         with pytest.raises(IntegrityError):
             key.assert_id(id_changed, plaintext)
         plaintext_changed = plaintext + b'1'
         with pytest.raises(IntegrityError):
             key.assert_id(id, plaintext_changed)
+
+    def test_authenticated_encrypt(self, monkeypatch):
+        monkeypatch.setenv('BORG_PASSPHRASE', 'test')
+        key = AuthenticatedKey.create(self.MockRepository(), self.MockArgs())
+        plaintext = Chunk(b'123456789')
+        authenticated = key.encrypt(plaintext)
+        # 0x06 is the key TYPE, 0x0000 identifies CNONE compression
+        assert authenticated == b'\x06\x00\x00' + plaintext.data
 
 
 class TestPassphrase:

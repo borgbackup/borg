@@ -6,6 +6,7 @@ import time
 import logging
 logger = logging.getLogger(__name__)
 
+from .constants import REPOSITORY_README
 from .helpers import get_home_dir, get_keys_dir, get_cache_dir
 from .helpers import ProgressIndicatorPercent
 from .key import KeyfileKey, KeyfileNotFoundError
@@ -64,7 +65,7 @@ class AtticRepositoryUpgrader(Repository):
         readme = os.path.join(self.path, 'README')
         os.remove(readme)
         with open(readme, 'w') as fd:
-            fd.write('This is a Borg repository\n')
+            fd.write(REPOSITORY_README)
 
     @staticmethod
     def convert_segments(segments, dryrun=True, inplace=False, progress=False):

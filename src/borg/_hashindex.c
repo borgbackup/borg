@@ -109,12 +109,16 @@ hashindex_index(HashIndex *index, const void *key)
 }
 
 static int
-hashindex_lookup(HashIndex *index, const void *key)
+hashindex_lookup(HashIndex *index, const void *key, int *skip_hint)
 {
     int didx = -1;
     int start = hashindex_index(index, key);
     int idx = start;
-    for(;;) {
+    int offset;
+    for(offset=0;;offset++) {
+        if (skip_hint != NULL) {
+            (*skip_hint) = offset;
+        }
         if(BUCKET_IS_EMPTY(index, idx))
         {
             return -1;
@@ -369,7 +373,7 @@ hashindex_write(HashIndex *index, const char *path)
 static const void *
 hashindex_get(HashIndex *index, const void *key)
 {
-    int idx = hashindex_lookup(index, key);
+    int idx = hashindex_lookup(index, key, NULL);
     if(idx < 0) {
         return NULL;
     }
@@ -379,7 +383,8 @@ hashindex_get(HashIndex *index, const void *key)
 static int
 hashindex_set(HashIndex *index, const void *key, const void *value)
 {
-    int idx = hashindex_lookup(index, key);
+    int offset = 0;
+    int idx = hashindex_lookup(index, key, &offset);
     uint8_t *ptr;
     if(idx < 0)
     {
@@ -387,8 +392,9 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
             if(!hashindex_resize(index, grow_size(index->num_buckets))) {
                 return 0;
             }
+            offset = 0;
         }
-        idx = hashindex_index(index, key);
+        idx = (hashindex_index(index, key) + offset) % index->num_buckets;
         while(!BUCKET_IS_EMPTY(index, idx) && !BUCKET_IS_DELETED(index, idx)) {
             idx = (idx + 1) % index->num_buckets;
         }
@@ -407,7 +413,7 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
 static int
 hashindex_delete(HashIndex *index, const void *key)
 {
-    int idx = hashindex_lookup(index, key);
+    int idx = hashindex_lookup(index, key, NULL);
     if (idx < 0) {
         return 1;
     }

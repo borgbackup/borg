@@ -47,7 +47,7 @@ from .helpers import ProgressIndicatorPercent
 from .item import Item
 from .key import key_creator, RepoKey, PassphraseKey
 from .keymanager import KeyManager
-from .platform import get_flags
+from .platform import get_flags, umount
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 from .repository import Repository
 from .selftest import selftest
@@ -206,16 +206,16 @@ class Archiver:
                        truish=('YES', ), retry=False,
                        env_var_override='BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
                 return EXIT_ERROR
-        if args.repo_only and args.verify_data:
-            self.print_error("--repository-only and --verify-data contradict each other. Please select one.")
+        if args.repo_only and any((args.verify_data, args.first, args.last, args.prefix)):
+            self.print_error("--repository-only contradicts --first, --last, --prefix and --verify-data arguments.")
             return EXIT_ERROR
         if not args.archives_only:
             if not repository.check(repair=args.repair, save_space=args.save_space):
                 return EXIT_WARNING
         if not args.repo_only and not ArchiveChecker().check(
                 repository, repair=args.repair, archive=args.location.archive,
-                last=args.last, prefix=args.prefix, verify_data=args.verify_data,
-                save_space=args.save_space):
+                first=args.first, last=args.last, sort_by=args.sort_by or 'ts', prefix=args.prefix,
+                verify_data=args.verify_data, save_space=args.save_space):
             return EXIT_WARNING
         return EXIT_SUCCESS
 
@@ -501,7 +501,7 @@ class Archiver:
 
         filter = self.build_filter(matcher, peek_and_store_hardlink_masters, strip_components)
         if progress:
-            pi = ProgressIndicatorPercent(msg='Extracting files %5.1f%%', step=0.1)
+            pi = ProgressIndicatorPercent(msg='%5.1f%% Extracting: %s', step=0.1)
             pi.output('Calculating size')
             extracted_size = sum(item.file_size(hardlink_masters) for item in archive.iter_items(filter))
             pi.total = extracted_size
@@ -546,6 +546,9 @@ class Archiver:
         for pattern in include_patterns:
             if pattern.match_count == 0:
                 self.print_warning("Include pattern '%s' never matched.", pattern)
+        if pi:
+            # clear progress output
+            pi.finish()
         return self.exit_code
 
     @with_repository()
@@ -783,7 +786,7 @@ class Archiver:
         if args.location.archive:
             archive_names = (args.location.archive,)
         else:
-            archive_names = tuple(x.name for x in self._get_filtered_archives(args, manifest))
+            archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
             if not archive_names:
                 return self.exit_code
 
@@ -825,7 +828,7 @@ class Archiver:
             else:
                 msg.append("You requested to completely DELETE the repository *including* all archives it "
                            "contains:")
-                for archive_info in manifest.archives.list(sort_by='ts'):
+                for archive_info in manifest.archives.list(sort_by=['ts']):
                     msg.append(format_archive(archive_info))
             msg.append("Type 'YES' if you understand this and want to continue: ")
             msg = '\n'.join(msg)
@@ -853,12 +856,7 @@ class Archiver:
             return self.exit_code
 
         with cache_if_remote(repository) as cached_repo:
-            if args.location.archive:
-                archive = Archive(repository, key, manifest, args.location.archive,
-                                  consider_part_files=args.consider_part_files)
-            else:
-                archive = None
-            operations = FuseOperations(key, repository, manifest, archive, cached_repo)
+            operations = FuseOperations(key, repository, manifest, args, cached_repo)
             logger.info("Mounting filesystem")
             try:
                 operations.mount(args.mountpoint, args.options, args.foreground)
@@ -866,6 +864,10 @@ class Archiver:
                 # Relevant error message already printed to stderr by fuse
                 self.exit_code = EXIT_ERROR
         return self.exit_code
+
+    def do_umount(self, args):
+        """un-mount the FUSE filesystem"""
+        return umount(args.mountpoint)
 
     @with_repository()
     def do_list(self, args, repository, manifest, key):
@@ -909,7 +911,7 @@ class Archiver:
             format = "{archive:<36} {time} [{id}]{NL}"
         formatter = ArchiveFormatter(format)
 
-        for archive_info in self._get_filtered_archives(args, manifest):
+        for archive_info in manifest.archives.list_considering(args):
             write(safe_encode(formatter.format_item(archive_info)))
 
         return self.exit_code
@@ -929,7 +931,7 @@ class Archiver:
         if args.location.archive:
             archive_names = (args.location.archive,)
         else:
-            archive_names = tuple(x.name for x in self._get_filtered_archives(args, manifest))
+            archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
             if not archive_names:
                 return self.exit_code
 
@@ -964,7 +966,7 @@ class Archiver:
         else:
             encrypted = 'Yes (%s)' % key.NAME
         print('Encrypted: %s' % encrypted)
-        if key.NAME == 'key file':
+        if key.NAME.startswith('key file'):
             print('Key file: %s' % key.find_key())
         print('Cache: %s' % cache.path)
         print(DASHES)
@@ -981,7 +983,7 @@ class Archiver:
                              '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
                              '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.')
             return self.exit_code
-        archives_checkpoints = manifest.archives.list(sort_by='ts', reverse=True)  # just a ArchiveInfo list
+        archives_checkpoints = manifest.archives.list(sort_by=['ts'], reverse=True)  # just a ArchiveInfo list
         if args.prefix:
             archives_checkpoints = [arch for arch in archives_checkpoints if arch.name.startswith(args.prefix)]
         is_checkpoint = re.compile(r'\.checkpoint(\.\d+)?$').search
@@ -1060,13 +1062,6 @@ class Archiver:
     @with_repository(cache=True, exclusive=True)
     def do_recreate(self, args, repository, manifest, key, cache):
         """Re-create archives"""
-        def interrupt(signal_num, stack_frame):
-            if recreater.interrupt:
-                print("\nReceived signal, again. I'm not deaf.", file=sys.stderr)
-            else:
-                print("\nReceived signal, will exit cleanly.", file=sys.stderr)
-            recreater.interrupt = True
-
         msg = ("recreate is an experimental feature.\n"
                "Type 'YES' if you understand this and want to continue: ")
         if not yes(msg, false_msg="Aborting.", truish=('YES',),
@@ -1084,32 +1079,30 @@ class Archiver:
                                      always_recompress=args.always_recompress,
                                      progress=args.progress, stats=args.stats,
                                      file_status_printer=self.print_file_status,
+                                     checkpoint_interval=args.checkpoint_interval,
                                      dry_run=args.dry_run)
 
-        with signal_handler(signal.SIGTERM, interrupt), \
-             signal_handler(signal.SIGINT, interrupt), \
-             signal_handler(signal.SIGHUP, interrupt):
-            if args.location.archive:
-                name = args.location.archive
+        if args.location.archive:
+            name = args.location.archive
+            if recreater.is_temporary_archive(name):
+                self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
+                return self.exit_code
+            recreater.recreate(name, args.comment, args.target)
+        else:
+            if args.target is not None:
+                self.print_error('--target: Need to specify single archive')
+                return self.exit_code
+            for archive in manifest.archives.list(sort_by=['ts']):
+                name = archive.name
                 if recreater.is_temporary_archive(name):
-                    self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
-                    return self.exit_code
-                recreater.recreate(name, args.comment, args.target)
-            else:
-                if args.target is not None:
-                    self.print_error('--target: Need to specify single archive')
-                    return self.exit_code
-                for archive in manifest.archives.list(sort_by='ts'):
-                    name = archive.name
-                    if recreater.is_temporary_archive(name):
-                        continue
-                    print('Processing', name)
-                    if not recreater.recreate(name, args.comment):
-                        break
-            manifest.write()
-            repository.commit()
-            cache.commit()
-            return self.exit_code
+                    continue
+                print('Processing', name)
+                if not recreater.recreate(name, args.comment):
+                    break
+        manifest.write()
+        repository.commit()
+        cache.commit()
+        return self.exit_code
 
     @with_repository(manifest=False, exclusive=True)
     def do_with_lock(self, args, repository):
@@ -1181,7 +1174,7 @@ class Archiver:
         else:
             try:
                 data = repository.get(id)
-            except repository.ObjectNotFound:
+            except Repository.ObjectNotFound:
                 print("object %s not found." % hex_id)
             else:
                 with open(args.path, "wb") as f:
@@ -1215,11 +1208,27 @@ class Archiver:
                     repository.delete(id)
                     modified = True
                     print("object %s deleted." % hex_id)
-                except repository.ObjectNotFound:
+                except Repository.ObjectNotFound:
                     print("object %s not found." % hex_id)
         if modified:
             repository.commit()
         print('Done.')
+        return EXIT_SUCCESS
+
+    @with_repository(manifest=False, exclusive=True, cache=True)
+    def do_debug_refcount_obj(self, args, repository, manifest, key, cache):
+        """display refcounts for the objects with the given IDs"""
+        for hex_id in args.ids:
+            try:
+                id = unhexlify(hex_id)
+            except ValueError:
+                print("object id %s is invalid." % hex_id)
+            else:
+                try:
+                    refcount = cache.chunks[id][0]
+                    print("object %s has %d referrers [info from chunks cache]." % (hex_id, refcount))
+                except KeyError:
+                    print("object %s not found [info from chunks cache]." % hex_id)
         return EXIT_SUCCESS
 
     @with_repository(lock=False, manifest=False)
@@ -1349,7 +1358,19 @@ class Archiver:
 
         {borgversion}
 
-            The version of borg.
+            The version of borg, e.g.: 1.0.8rc1
+
+        {borgmajor}
+
+            The version of borg, only the major version, e.g.: 1
+
+        {borgminor}
+
+            The version of borg, only major and minor version, e.g.: 1.0
+
+        {borgpatch}
+
+            The version of borg, only major, minor and patch version, e.g.: 1.0.8
 
         Examples::
 
@@ -1528,9 +1549,12 @@ class Archiver:
                                           help='start repository server process')
         subparser.set_defaults(func=self.do_serve)
         subparser.add_argument('--restrict-to-path', dest='restrict_to_paths', action='append',
-                               metavar='PATH', help='restrict repository access to PATH')
+                               metavar='PATH', help='restrict repository access to PATH. '
+                                                    'Can be specified multiple times to allow the client access to several directories. '
+                                                    'Access to all sub-directories is granted implicitly; PATH doesn\'t need to directly point to a repository.')
         subparser.add_argument('--append-only', dest='append_only', action='store_true',
                                help='only allow appending to repository segment files')
+
         init_epilog = textwrap.dedent("""
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
@@ -1574,8 +1598,21 @@ class Archiver:
         You can change your passphrase for existing repos at any time, it won't affect
         the encryption/decryption key or other secrets.
 
-        When encrypting, AES-CTR-256 is used for encryption, and HMAC-SHA256 for
-        authentication. Hardware acceleration will be used automatically.
+        Encryption modes
+        ++++++++++++++++
+
+        repokey and keyfile use AES-CTR-256 for encryption and HMAC-SHA256 for
+        authentication in an encrypt-then-MAC (EtM) construction. The chunk ID hash
+        is HMAC-SHA256 as well (with a separate key).
+
+        repokey-blake2 and keyfile-blake2 use the same authenticated encryption, but
+        use a keyed BLAKE2b-256 hash for the chunk ID hash.
+
+        "authenticated" mode uses no encryption, but authenticates repository contents
+        through the same keyed BLAKE2b-256 hash as the other blake2 modes.
+        The key is stored like repokey.
+
+        Hardware acceleration will be used automatically.
         """)
         subparser = subparsers.add_parser('init', parents=[common_parser], add_help=False,
                                           description=self.do_init.__doc__, epilog=init_epilog,
@@ -1586,7 +1623,8 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption',
-                               choices=('none', 'keyfile', 'repokey'), default='repokey',
+                               choices=('none', 'keyfile', 'repokey', 'keyfile-blake2', 'repokey-blake2', 'authenticated'),
+                               default='repokey',
                                help='select encryption key mode (default: "%(default)s")')
         subparser.add_argument('-a', '--append-only', dest='append_only', action='store_true',
                                help='create an append-only mode repository')
@@ -1663,14 +1701,10 @@ class Archiver:
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
                                help='work slower, but using less space')
-        subparser.add_argument('--last', dest='last',
-                               type=int, default=None, metavar='N',
-                               help='only check last N archives (Default: all)')
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec,
-                               help='only consider archive names starting with this prefix')
         subparser.add_argument('-p', '--progress', dest='progress',
                                action='store_true', default=False,
                                help="""show progress display while checking""")
+        self.add_archives_filters_args(subparser)
 
         change_passphrase_epilog = textwrap.dedent("""
         The key files used for repository encryption are optionally passphrase
@@ -1685,7 +1719,7 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 
-        subparser = subparsers.add_parser('key', add_help=False,
+        subparser = subparsers.add_parser('key', add_help=True,
                                           description="Manage a keyfile or repokey of a repository",
                                           epilog="",
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1784,8 +1818,8 @@ class Archiver:
         '.checkpoint.N' (with N being a number), because these names are used for
         checkpoints and treated in special ways.
 
-        In the archive name, you may use the following format tags:
-        {now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}, {uuid4}, {borgversion}
+        In the archive name, you may use the following placeholders:
+        {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 
         To speed up pulling backups over sshfs and similar network file systems which do
         not provide correct inode information the --ignore-inode flag can be used. This
@@ -1937,10 +1971,11 @@ class Archiver:
                                help='paths to extract; patterns are supported')
 
         diff_epilog = textwrap.dedent("""
-            This command finds differences in files (contents, user, group, mode) between archives.
+            This command finds differences (file contents, user/group/mode) between archives.
 
-            Both archives need to be in the same repository, and a repository location may only
-            be specified for ARCHIVE1.
+            A repository location and an archive name must be specified for REPO_ARCHIVE1.
+            ARCHIVE2 is just another archive name in same repository (no repository location
+            allowed).
 
             For archives created with Borg 1.1 or newer diff automatically detects whether
             the archives are created with the same chunker params. If so, only chunk IDs
@@ -1974,14 +2009,14 @@ class Archiver:
         subparser.add_argument('--sort', dest='sort',
                                action='store_true', default=False,
                                help='Sort the output lines by file path.')
-        subparser.add_argument('location', metavar='ARCHIVE1',
+        subparser.add_argument('location', metavar='REPO_ARCHIVE1',
                                type=location_validator(archive=True),
-                               help='archive')
+                               help='repository location and ARCHIVE1 name')
         subparser.add_argument('archive2', metavar='ARCHIVE2',
                                type=archivename_validator(),
-                               help='archive to compare with ARCHIVE1 (no repository location)')
+                               help='ARCHIVE2 name (no repository location allowed)')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to compare; patterns are supported')
+                               help='paths of items inside the archives to compare; patterns are supported')
 
         rename_epilog = textwrap.dedent("""
         This command renames an archive in the repository.
@@ -2112,6 +2147,22 @@ class Archiver:
                                help='stay in foreground, do not daemonize')
         subparser.add_argument('-o', dest='options', type=str,
                                help='Extra mount options')
+        self.add_archives_filters_args(subparser)
+
+        umount_epilog = textwrap.dedent("""
+        This command un-mounts a FUSE filesystem that was mounted with ``borg mount``.
+
+        This is a convenience wrapper that just calls the platform-specific shell
+        command - usually this is either umount or fusermount -u.
+        """)
+        subparser = subparsers.add_parser('umount', parents=[common_parser], add_help=False,
+                                          description=self.do_umount.__doc__,
+                                          epilog=umount_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='umount repository')
+        subparser.set_defaults(func=self.do_umount)
+        subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
+                               help='mountpoint of the filesystem to umount')
 
         info_epilog = textwrap.dedent("""
         This command displays detailed information about the specified archive or repository.
@@ -2165,6 +2216,8 @@ class Archiver:
         considered for deletion and only those archives count towards the totals
         specified by the rules.
         Otherwise, *all* archives in the repository are candidates for deletion!
+        There is no automatic distinction between archives representing different
+        contents. These need to be distinguished by specifying matching prefixes.
 
         If you have multiple sequences of archives with different data sets (e.g.
         from different machines) in one shared repository, use one prune call per
@@ -2379,6 +2432,9 @@ class Archiver:
                                    type=archivename_validator(),
                                    help='create a new archive with the name ARCHIVE, do not replace existing archive '
                                         '(only applies for a single archive)')
+        archive_group.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
+                                   type=int, default=1800, metavar='SECONDS',
+                                   help='write checkpoint every SECONDS seconds (Default: 1800)')
         archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default=None,
                                    help='add a comment text to the archive')
         archive_group.add_argument('--timestamp', dest='timestamp',
@@ -2391,7 +2447,7 @@ class Archiver:
                                    help='select compression algorithm, see the output of the '
                                         '"borg help compression" command for details.')
         archive_group.add_argument('--always-recompress', dest='always_recompress', action='store_true',
-                                   help='always recompress chunks, don\'t skip chunks already compressed with the same'
+                                   help='always recompress chunks, don\'t skip chunks already compressed with the same '
                                         'algorithm.')
         archive_group.add_argument('--compression-from', dest='compression_files',
                                    type=argparse.FileType('r'), action='append',
@@ -2453,7 +2509,7 @@ class Archiver:
         in case you ever run into some severe malfunction. Use them only if you know
         what you are doing or if a trusted developer tells you what to do.""")
 
-        subparser = subparsers.add_parser('debug', add_help=False,
+        subparser = subparsers.add_parser('debug', add_help=True,
                                           description='debugging command (not intended for normal use)',
                                           epilog=debug_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -2466,13 +2522,6 @@ class Archiver:
         reports and debugging problems. If a traceback happens, this information is
         already appended at the end of the traceback.
         """)
-        subparser = subparsers.add_parser('debug-info', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_info.__doc__,
-                                          epilog=debug_info_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='show system infos for debugging / bug reports (debug)')
-        subparser.set_defaults(func=self.do_debug_info)
-
         subparser = debug_parsers.add_parser('info', parents=[common_parser], add_help=False,
                                           description=self.do_debug_info.__doc__,
                                           epilog=debug_info_epilog,
@@ -2483,16 +2532,6 @@ class Archiver:
         debug_dump_archive_items_epilog = textwrap.dedent("""
         This command dumps raw (but decrypted and decompressed) archive items (only metadata) to files.
         """)
-        subparser = subparsers.add_parser('debug-dump-archive-items', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_dump_archive_items.__doc__,
-                                          epilog=debug_dump_archive_items_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='dump archive items (metadata) (debug)')
-        subparser.set_defaults(func=self.do_debug_dump_archive_items)
-        subparser.add_argument('location', metavar='ARCHIVE',
-                               type=location_validator(archive=True),
-                               help='archive to dump')
-
         subparser = debug_parsers.add_parser('dump-archive-items', parents=[common_parser], add_help=False,
                                           description=self.do_debug_dump_archive_items.__doc__,
                                           epilog=debug_dump_archive_items_epilog,
@@ -2506,16 +2545,6 @@ class Archiver:
         debug_dump_repo_objs_epilog = textwrap.dedent("""
         This command dumps raw (but decrypted and decompressed) repo objects to files.
         """)
-        subparser = subparsers.add_parser('debug-dump-repo-objs', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_dump_repo_objs.__doc__,
-                                          epilog=debug_dump_repo_objs_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='dump repo objects (debug)')
-        subparser.set_defaults(func=self.do_debug_dump_repo_objs)
-        subparser.add_argument('location', metavar='REPOSITORY',
-                               type=location_validator(archive=False),
-                               help='repo to dump')
-
         subparser = debug_parsers.add_parser('dump-repo-objs', parents=[common_parser], add_help=False,
                                           description=self.do_debug_dump_repo_objs.__doc__,
                                           epilog=debug_dump_repo_objs_epilog,
@@ -2529,20 +2558,6 @@ class Archiver:
         debug_get_obj_epilog = textwrap.dedent("""
         This command gets an object from the repository.
         """)
-        subparser = subparsers.add_parser('debug-get-obj', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_get_obj.__doc__,
-                                          epilog=debug_get_obj_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='get object from repository (debug)')
-        subparser.set_defaults(func=self.do_debug_get_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False),
-                               help='repository to use')
-        subparser.add_argument('id', metavar='ID', type=str,
-                               help='hex object ID to get from the repo')
-        subparser.add_argument('path', metavar='PATH', type=str,
-                               help='file to write object data into')
-
         subparser = debug_parsers.add_parser('get-obj', parents=[common_parser], add_help=False,
                                           description=self.do_debug_get_obj.__doc__,
                                           epilog=debug_get_obj_epilog,
@@ -2560,18 +2575,6 @@ class Archiver:
         debug_put_obj_epilog = textwrap.dedent("""
         This command puts objects into the repository.
         """)
-        subparser = subparsers.add_parser('debug-put-obj', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_put_obj.__doc__,
-                                          epilog=debug_put_obj_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='put object to repository (debug)')
-        subparser.set_defaults(func=self.do_debug_put_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False),
-                               help='repository to use')
-        subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
-                               help='file(s) to read and create object(s) from')
-
         subparser = debug_parsers.add_parser('put-obj', parents=[common_parser], add_help=False,
                                           description=self.do_debug_put_obj.__doc__,
                                           epilog=debug_put_obj_epilog,
@@ -2587,18 +2590,6 @@ class Archiver:
         debug_delete_obj_epilog = textwrap.dedent("""
         This command deletes objects from the repository.
         """)
-        subparser = subparsers.add_parser('debug-delete-obj', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_delete_obj.__doc__,
-                                          epilog=debug_delete_obj_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='delete object from repository (debug)')
-        subparser.set_defaults(func=self.do_debug_delete_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False),
-                               help='repository to use')
-        subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
-                               help='hex object ID(s) to delete from the repo')
-
         subparser = debug_parsers.add_parser('delete-obj', parents=[common_parser], add_help=False,
                                           description=self.do_debug_delete_obj.__doc__,
                                           epilog=debug_delete_obj_epilog,
@@ -2610,6 +2601,21 @@ class Archiver:
                                help='repository to use')
         subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
                                help='hex object ID(s) to delete from the repo')
+
+        debug_refcount_obj_epilog = textwrap.dedent("""
+        This command displays the reference count for objects from the repository.
+        """)
+        subparser = debug_parsers.add_parser('refcount-obj', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_refcount_obj.__doc__,
+                                          epilog=debug_refcount_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='show refcount for object from repository (debug)')
+        subparser.set_defaults(func=self.do_debug_refcount_obj)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
+                               help='hex object ID(s) to show refcounts for')
 
         return parser
 
@@ -2692,21 +2698,6 @@ class Archiver:
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
         return args.func(args)
 
-    def _get_filtered_archives(self, args, manifest):
-        if args.location.archive:
-            raise Error('The options --first, --last and --prefix can only be used on repository targets.')
-
-        archives = manifest.archives.list(prefix=args.prefix)
-
-        for sortkey in reversed(args.sort_by.split(',')):
-            archives.sort(key=attrgetter(sortkey))
-        if args.last:
-            archives.reverse()
-
-        n = args.first or args.last or len(archives)
-
-        return archives[:n]
-
 
 def sig_info_handler(sig_no, stack):  # pragma: no cover
     """search the stack for infos about the currently processed file and print them"""
@@ -2775,10 +2766,14 @@ def main():  # pragma: no cover
             tb = "%s\n%s" % (traceback.format_exc(), sysinfo())
             exit_code = e.exit_code
         except RemoteRepository.RPCError as e:
-            msg = "%s %s" % (e.remote_type, e.name)
-            important = e.remote_type not in ('LockTimeout', )
+            important = e.exception_class not in ('LockTimeout', )
             tb_log_level = logging.ERROR if important else logging.DEBUG
-            tb = sysinfo()
+            if important:
+                msg = e.exception_full
+            else:
+                msg = e.get_message()
+            tb = '\n'.join('Borg server: ' + l for l in e.sysinfo.splitlines())
+            tb += "\n" + sysinfo()
             exit_code = EXIT_ERROR
         except Exception:
             msg = 'Local Exception'

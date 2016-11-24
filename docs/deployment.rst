@@ -54,6 +54,12 @@ Restrictions
 Borg is instructed to restrict clients into their own paths:
 ``borg serve --restrict-to-path /home/backup/repos/<client fqdn>``
 
+The client will be able to access any file or subdirectory inside of ``/home/backup/repos/<client fqdn>``
+but no other directories. You can allow a client to access several separate directories by passing multiple
+`--restrict-to-path` flags, for instance: ``borg serve --restrict-to-path /home/backup/repos/<client fqdn> --restrict-to-path /home/backup/repos/<other client fqdn>``,
+which could make sense if multiple machines belong to one person which should then have access to all the
+backups of their machines.
+
 There is only one ssh key per client allowed. Keys are added for ``johndoe.clnt.local``, ``web01.srv.local`` and
 ``app01.srv.local``. But they will access the backup under only one UNIX user account as:
 ``backup@backup01.srv.local``. Every key in ``$HOME/.ssh/authorized_keys`` has a
@@ -143,10 +149,10 @@ package manager to install and keep borg up-to-date.
     - authorized_key: user="{{ user }}"
                       key="{{ item.key }}"
                       key_options='command="cd {{ pool }}/{{ item.host }};borg serve --restrict-to-path {{ pool }}/{{ item.host }}",no-port-forwarding,no-X11-forwarding,no-pty,no-agent-forwarding,no-user-rc'
-      with_items: auth_users
+      with_items: "{{ auth_users }}"
     - file: path="{{ home }}/.ssh/authorized_keys" owner="{{ user }}" group="{{ group }}" mode=0600 state=file
     - file: path="{{ pool }}/{{ item.host }}" owner="{{ user }}" group="{{ group }}" mode=0700 state=directory
-      with_items: auth_users
+      with_items: "{{ auth_users }}"
 
 Salt
 ----

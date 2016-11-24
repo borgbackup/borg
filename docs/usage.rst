@@ -12,6 +12,77 @@ command in detail.
 General
 -------
 
+Repository URLs
+~~~~~~~~~~~~~~~
+
+**Local filesystem** (or locally mounted network filesystem):
+
+``/path/to/repo`` - filesystem path to repo directory, absolute path
+
+``path/to/repo`` - filesystem path to repo directory, relative path
+
+Also, stuff like ``~/path/to/repo`` or ``~other/path/to/repo`` works (this is
+expanded by your shell).
+
+Note: you may also prepend a ``file://`` to a filesystem path to get URL style.
+
+**Remote repositories** accessed via ssh user@host:
+
+``user@host:/path/to/repo`` - remote repo, absolute path
+
+``ssh://user@host:port/path/to/repo`` - same, alternative syntax, port can be given
+
+
+**Remote repositories with relative pathes** can be given using this syntax:
+
+``user@host:path/to/repo`` - path relative to current directory
+
+``user@host:~/path/to/repo`` - path relative to user's home directory
+
+``user@host:~other/path/to/repo`` - path relative to other's home directory
+
+Note: giving ``user@host:/./path/to/repo`` or ``user@host:/~/path/to/repo`` or
+``user@host:/~other/path/to/repo``is also supported, but not required here.
+
+
+**Remote repositories with relative pathes, alternative syntax with port**:
+
+``ssh://user@host:port/./path/to/repo`` - path relative to current directory
+
+``ssh://user@host:port/~/path/to/repo`` - path relative to user's home directory
+
+``ssh://user@host:port/~other/path/to/repo`` - path relative to other's home directory
+
+
+If you frequently need the same repo URL, it is a good idea to set the
+``BORG_REPO`` environment variable to set a default for the repo URL:
+
+::
+
+    export BORG_REPO='ssh://user@host:port/path/to/repo'
+
+Then just leave away the repo URL if only a repo URL is needed and you want
+to use the default - it will be read from BORG_REPO then.
+
+Use ``::`` syntax to give the repo URL when syntax requires giving a positional
+argument for the repo (e.g. ``borg mount :: /mnt``).
+
+
+Repository / Archive Locations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Many commands want either a repository (just give the repo URL, see above) or
+an archive location, which is a repo URL followed by ``::archive_name``.
+
+Archive names must not contain the ``/`` (slash) character. For simplicity,
+maybe also avoid blanks or other characters that have special meaning on the
+shell or in a filesystem (borg mount will use the archive name as directory
+name).
+
+If you have set BORG_REPO (see above) and an archive location is needed, use
+``::archive_name`` - the repo URL part is then read from BORG_REPO.
+
+
 Type of log output
 ~~~~~~~~~~~~~~~~~~
 
@@ -111,6 +182,9 @@ Directories and files:
         Default to '~/.config/borg/keys'. This directory contains keys for encrypted repositories.
     BORG_KEY_FILE
         When set, use the given filename as repository key file.
+    BORG_NONCES_DIR
+        Default to '~/.config/borg/key-nonces'. This directory contains information borg uses to
+        track its usage of NONCES ("numbers used once" - usually in encryption context).
     BORG_CACHE_DIR
         Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
         of space for dealing with big repositories).
@@ -120,6 +194,9 @@ Building:
         Adds given OpenSSL header file directory to the default locations (setup.py).
     BORG_LZ4_PREFIX
         Adds given LZ4 header file directory to the default locations (setup.py).
+    BORG_LIBB2_PREFIX
+        Adds given prefix directory to the default locations. If a 'include/blake2.h' is found Borg
+        will be linked against the system libb2 instead of a bundled implementation. (setup.py)
 
 
 Please note:
@@ -498,6 +575,8 @@ Examples
 
 .. include:: usage/mount.rst.inc
 
+.. include:: usage/umount.rst.inc
+
 Examples
 ~~~~~~~~
 borg mount
@@ -507,7 +586,7 @@ borg mount
     $ borg mount /path/to/repo::root-2016-02-15 /tmp/mymountpoint
     $ ls /tmp/mymountpoint
     bin  boot  etc	home  lib  lib64  lost+found  media  mnt  opt  root  sbin  srv  tmp  usr  var
-    $ fusermount -u /tmp/mymountpoint
+    $ borg umount /tmp/mymountpoint
 
 ::
 
@@ -660,10 +739,10 @@ Miscellaneous Help
 Debug Commands
 --------------
 
-There are some more commands (all starting with "debug-") which are all
+There is a ``borg debug`` command that has some subcommands which are all
 **not intended for normal use** and **potentially very dangerous** if used incorrectly.
 
-For example, ``borg debug-put-obj`` and ``borg debug-delete-obj`` will only do
+For example, ``borg debug put-obj`` and ``borg debug delete-obj`` will only do
 what their name suggests: put objects into repo / delete objects from repo.
 
 Please note:
@@ -894,8 +973,13 @@ That's all to it.
 Drawbacks
 +++++++++
 
-As data is only appended, and nothing deleted, commands like ``prune`` or ``delete``
+As data is only appended, and nothing removed, commands like ``prune`` or ``delete``
 won't free disk space, they merely tag data as deleted in a new transaction.
+
+Be aware that as soon as you write to the repo in non-append-only mode (e.g. prune,
+delete or create archives from an admin machine), it will remove the deleted objects
+permanently (including the ones that were already marked as deleted, but not removed,
+in append-only mode).
 
 Note that you can go back-and-forth between normal and append-only operation by editing
 the configuration file, it's not a "one way trip".

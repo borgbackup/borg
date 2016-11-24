@@ -23,12 +23,17 @@ on_rtd = os.environ.get('READTHEDOCS')
 # Also, we might use some rather recent API features.
 install_requires = ['msgpack-python>=0.4.6', ]
 
+# note for package maintainers: if you package borgbackup for distribution,
+# please add llfuse as a *requirement* on all platforms that have a working
+# llfuse package. "borg mount" needs llfuse to work.
+# if you do not have llfuse, do not require it, most of borgbackup will work.
 extras_require = {
     # llfuse 0.40 (tested, proven, ok), needs FUSE version >= 2.8.0
     # llfuse 0.41 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 0.41.1 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 0.42 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 1.0 (tested shortly, looks ok), needs FUSE version >= 2.8.0
+    # llfuse 1.1.1 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 2.0 will break API
     'fuse': ['llfuse<2.0', ],
 }
@@ -123,8 +128,19 @@ def detect_lz4(prefixes):
                     return prefix
 
 
+def detect_libb2(prefixes):
+    for prefix in prefixes:
+        filename = os.path.join(prefix, 'include', 'blake2.h')
+        if os.path.exists(filename):
+            with open(filename, 'r') as fd:
+                if 'blake2b_init' in fd.read():
+                    return prefix
+
+
 include_dirs = []
 library_dirs = []
+define_macros = []
+crypto_libraries = ['crypto']
 
 possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl',
                              '/usr/local/borg', '/opt/local', '/opt/pkg', ]
@@ -147,6 +163,18 @@ if lz4_prefix:
     library_dirs.append(os.path.join(lz4_prefix, 'lib'))
 elif not on_rtd:
     raise Exception('Unable to find LZ4 headers. (Looked here: {})'.format(', '.join(possible_lz4_prefixes)))
+
+possible_libb2_prefixes = ['/usr', '/usr/local', '/usr/local/opt/libb2', '/usr/local/libb2',
+                           '/usr/local/borg', '/opt/local', '/opt/pkg', ]
+if os.environ.get('BORG_LIBB2_PREFIX'):
+    possible_libb2_prefixes.insert(0, os.environ.get('BORG_LIBB2_PREFIX'))
+libb2_prefix = detect_libb2(possible_libb2_prefixes)
+if libb2_prefix:
+    print('Detected and preferring libb2 over bundled BLAKE2')
+    include_dirs.append(os.path.join(libb2_prefix, 'include'))
+    library_dirs.append(os.path.join(libb2_prefix, 'lib'))
+    crypto_libraries.append('b2')
+    define_macros.append(('BORG_USE_LIBB2', 'YES'))
 
 
 with open('README.rst', 'r') as fd:
@@ -321,8 +349,8 @@ cmdclass = {
 ext_modules = []
 if not on_rtd:
     ext_modules += [
-    Extension('borg.compress', [compress_source], libraries=['lz4'], include_dirs=include_dirs, library_dirs=library_dirs),
-    Extension('borg.crypto', [crypto_source], libraries=['crypto'], include_dirs=include_dirs, library_dirs=library_dirs),
+    Extension('borg.compress', [compress_source], libraries=['lz4'], include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
+    Extension('borg.crypto', [crypto_source], libraries=crypto_libraries, include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
     Extension('borg.chunker', [chunker_source]),
     Extension('borg.hashindex', [hashindex_source])
 ]

@@ -12,7 +12,7 @@ import uuid
 import unittest
 
 from ..xattr import get_all
-from ..platform import get_flags
+from ..platform import get_flags, umount
 from .. import platform
 
 # Note: this is used by borg.selftest, do not use or import py.test functionality here.
@@ -117,6 +117,15 @@ def is_utime_fully_supported():
         return False
 
 
+def no_selinux(x):
+    # selinux fails our FUSE tests, thus ignore selinux xattrs
+    SELINUX_KEY = 'security.selinux'
+    if isinstance(x, dict):
+        return {k: v for k, v in x.items() if k != SELINUX_KEY}
+    if isinstance(x, list):
+        return [k for k in x if k != SELINUX_KEY]
+
+
 class BaseTestCase(unittest.TestCase):
     """
     """
@@ -137,11 +146,11 @@ class BaseTestCase(unittest.TestCase):
         yield
         self.assert_true(os.path.exists(path), '{} should exist'.format(path))
 
-    def assert_dirs_equal(self, dir1, dir2):
+    def assert_dirs_equal(self, dir1, dir2, **kwargs):
         diff = filecmp.dircmp(dir1, dir2)
-        self._assert_dirs_equal_cmp(diff)
+        self._assert_dirs_equal_cmp(diff, **kwargs)
 
-    def _assert_dirs_equal_cmp(self, diff):
+    def _assert_dirs_equal_cmp(self, diff, ignore_bsdflags=False, ignore_xattrs=False):
         self.assert_equal(diff.left_only, [])
         self.assert_equal(diff.right_only, [])
         self.assert_equal(diff.diff_files, [])
@@ -159,8 +168,9 @@ class BaseTestCase(unittest.TestCase):
                 attrs.append('st_nlink')
             d1 = [filename] + [getattr(s1, a) for a in attrs]
             d2 = [filename] + [getattr(s2, a) for a in attrs]
-            d1.append(get_flags(path1, s1))
-            d2.append(get_flags(path2, s2))
+            if not ignore_bsdflags:
+                d1.append(get_flags(path1, s1))
+                d2.append(get_flags(path2, s2))
             # ignore st_rdev if file is not a block/char device, fixes #203
             if not stat.S_ISCHR(d1[1]) and not stat.S_ISBLK(d1[1]):
                 d1[4] = None
@@ -176,26 +186,21 @@ class BaseTestCase(unittest.TestCase):
                 else:
                     d1.append(round(s1.st_mtime_ns, st_mtime_ns_round))
                     d2.append(round(s2.st_mtime_ns, st_mtime_ns_round))
-            d1.append(get_all(path1, follow_symlinks=False))
-            d2.append(get_all(path2, follow_symlinks=False))
+            if not ignore_xattrs:
+                d1.append(no_selinux(get_all(path1, follow_symlinks=False)))
+                d2.append(no_selinux(get_all(path2, follow_symlinks=False)))
             self.assert_equal(d1, d2)
         for sub_diff in diff.subdirs.values():
-            self._assert_dirs_equal_cmp(sub_diff)
+            self._assert_dirs_equal_cmp(sub_diff, ignore_bsdflags=ignore_bsdflags, ignore_xattrs=ignore_xattrs)
 
     @contextmanager
-    def fuse_mount(self, location, mountpoint, mount_options=None):
+    def fuse_mount(self, location, mountpoint, *options):
         os.mkdir(mountpoint)
-        args = ['mount', location, mountpoint]
-        if mount_options:
-            args += '-o', mount_options
+        args = ['mount', location, mountpoint] + list(options)
         self.cmd(*args, fork=True)
         self.wait_for_mount(mountpoint)
         yield
-        if sys.platform.startswith('linux'):
-            cmd = 'fusermount -u %s' % mountpoint
-        else:
-            cmd = 'umount %s' % mountpoint
-        os.system(cmd)
+        umount(mountpoint)
         os.rmdir(mountpoint)
         # Give the daemon some time to exit
         time.sleep(.2)

@@ -2,6 +2,7 @@ import os
 import re
 import resource
 import stat
+import subprocess
 
 from ..helpers import posix_acl_use_stored_uid_gid
 from ..helpers import user2uid, group2gid
@@ -12,7 +13,7 @@ from .posix import swidth
 from libc cimport errno
 from libc.stdint cimport int64_t
 
-API_VERSION = 3
+API_VERSION = 5
 
 cdef extern from "sys/types.h":
     int ACL_TYPE_ACCESS
@@ -251,3 +252,7 @@ class SyncFile(BaseSyncFile):
         self.fd.flush()
         os.fdatasync(self.fileno)
         os.posix_fadvise(self.fileno, 0, 0, os.POSIX_FADV_DONTNEED)
+
+
+def umount(mountpoint):
+    return subprocess.call(['fusermount', '-u', mountpoint])

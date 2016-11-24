@@ -88,6 +88,9 @@ github to followup on packaging efforts.
 Standalone Binary
 -----------------
 
+.. note:: Releases are signed with an OpenPGP key, see
+          :ref:`security-contact` for more instructions.
+
 |project_name| binaries (generated with `pyinstaller`_) are available
 on the releases_ page for the following platforms:
 
@@ -210,6 +213,7 @@ following dependencies first:
 * some Python dependencies, pip will automatically install them for you
 * optionally, the llfuse_ Python package is required if you wish to mount an
   archive as a FUSE filesystem. See setup.py about the version requirements.
+* optionally libb2_. If it is not found a bundled implementation is used instead.
 
 If you have troubles finding the right package names, have a look at the
 distribution specific sections below and also at the Vagrantfile in our repo.

@@ -6,6 +6,7 @@ import sys
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from functools import partial
 from getpass import getuser
 from io import BytesIO
 from itertools import groupby
@@ -31,7 +32,7 @@ from .helpers import format_time, format_timedelta, format_file_size, file_statu
 from .helpers import safe_encode, safe_decode, make_path_safe, remove_surrogates, swidth_slice
 from .helpers import decode_dict, StableDict
 from .helpers import int_to_bigint, bigint_to_int, bin_to_hex
-from .helpers import ProgressIndicatorPercent, log_multi
+from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
 from .helpers import PathPrefixPattern, FnmatchPattern
 from .helpers import consume, chunkit
 from .helpers import CompressionDecider1, CompressionDecider2, CompressionSpec
@@ -93,11 +94,7 @@ class Statistics:
                     msg = ''
                     space = columns - swidth(msg)
                 if space >= 8:
-                    if space < swidth('...') + swidth(path):
-                        path = '%s...%s' % (swidth_slice(path, space // 2 - swidth('...')),
-                                            swidth_slice(path, -space // 2))
-                    space -= swidth(path)
-                    msg += path + ' ' * space
+                    msg += ellipsis_truncate(path, space)
             else:
                 msg = ' ' * columns
             print(msg, file=stream or sys.stderr, end="\r", flush=True)
@@ -448,7 +445,7 @@ Number of files: {0.stats.nfiles}'''.format(
             if 'chunks' in item:
                 for _, data in self.pipeline.fetch_many([c.id for c in item.chunks], is_preloaded=True):
                     if pi:
-                        pi.show(increase=len(data))
+                        pi.show(increase=len(data), info=[remove_surrogates(item.path)])
                     if stdout:
                         sys.stdout.buffer.write(data)
                 if stdout:
@@ -501,7 +498,7 @@ Number of files: {0.stats.nfiles}'''.format(
                 ids = [c.id for c in item.chunks]
                 for _, data in self.pipeline.fetch_many(ids, is_preloaded=True):
                     if pi:
-                        pi.show(increase=len(data))
+                        pi.show(increase=len(data), info=[remove_surrogates(item.path)])
                     with backup_io():
                         if sparse and self.zeros.startswith(data):
                             # all-zero chunk: create a hole in a sparse file
@@ -745,28 +742,32 @@ Number of files: {0.stats.nfiles}'''.format(
         self.add_item(item)
         return 's'  # symlink
 
-    def chunk_file(self, item, cache, stats, fd, fh=-1, **chunk_kw):
-        def write_part(item, from_chunk, number):
-            item = Item(internal_dict=item.as_dict())
-            length = len(item.chunks)
-            # the item should only have the *additional* chunks we processed after the last partial item:
-            item.chunks = item.chunks[from_chunk:]
-            item.path += '.borg_part_%d' % number
-            item.part = number
-            number += 1
-            self.add_item(item, show_progress=False)
-            self.write_checkpoint()
-            return length, number
+    def write_part_file(self, item, from_chunk, number):
+        item = Item(internal_dict=item.as_dict())
+        length = len(item.chunks)
+        # the item should only have the *additional* chunks we processed after the last partial item:
+        item.chunks = item.chunks[from_chunk:]
+        item.path += '.borg_part_%d' % number
+        item.part = number
+        number += 1
+        self.add_item(item, show_progress=False)
+        self.write_checkpoint()
+        return length, number
+
+    def chunk_file(self, item, cache, stats, chunk_iter, chunk_processor=None, **chunk_kw):
+        if not chunk_processor:
+            def chunk_processor(data):
+                return cache.add_chunk(self.key.id_hash(data), Chunk(data, **chunk_kw), stats)
 
         item.chunks = []
         from_chunk = 0
         part_number = 1
-        for data in backup_io_iter(self.chunker.chunkify(fd, fh)):
-            item.chunks.append(cache.add_chunk(self.key.id_hash(data), Chunk(data, **chunk_kw), stats))
+        for data in chunk_iter:
+            item.chunks.append(chunk_processor(data))
             if self.show_progress:
                 self.stats.show_progress(item=item, dt=0.2)
             if self.checkpoint_interval and time.time() - self.last_checkpoint > self.checkpoint_interval:
-                from_chunk, part_number = write_part(item, from_chunk, part_number)
+                from_chunk, part_number = self.write_part_file(item, from_chunk, part_number)
                 self.last_checkpoint = time.time()
         else:
             if part_number > 1:
@@ -774,7 +775,7 @@ Number of files: {0.stats.nfiles}'''.format(
                     # if we already have created a part item inside this file, we want to put the final
                     # chunks (if any) into a part item also (so all parts can be concatenated to get
                     # the complete file):
-                    from_chunk, part_number = write_part(item, from_chunk, part_number)
+                    from_chunk, part_number = self.write_part_file(item, from_chunk, part_number)
                     self.last_checkpoint = time.time()
 
                 # if we created part files, we have referenced all chunks from the part files,
@@ -793,7 +794,7 @@ Number of files: {0.stats.nfiles}'''.format(
             mtime=t, atime=t, ctime=t,
         )
         fd = sys.stdin.buffer  # binary
-        self.chunk_file(item, cache, self.stats, fd)
+        self.chunk_file(item, cache, self.stats, backup_io_iter(self.chunker.chunkify(fd)))
         self.stats.nfiles += 1
         self.add_item(item)
         return 'i'  # stdin
@@ -849,7 +850,7 @@ Number of files: {0.stats.nfiles}'''.format(
             with backup_io():
                 fh = Archive._open_rb(path)
             with os.fdopen(fh, 'rb') as fd:
-                self.chunk_file(item, cache, self.stats, fd, fh, compress=compress)
+                self.chunk_file(item, cache, self.stats, backup_io_iter(self.chunker.chunkify(fd, fh)), compress=compress)
             if not is_special_file:
                 # we must not memorize special files, because the contents of e.g. a
                 # block or char device will change without its mtime/size/inode changing.
@@ -978,22 +979,25 @@ class ArchiveChecker:
         self.error_found = False
         self.possibly_superseded = set()
 
-    def check(self, repository, repair=False, archive=None, last=None, prefix=None, verify_data=False,
-              save_space=False):
+    def check(self, repository, repair=False, archive=None, first=0, last=0, sort_by='', prefix='',
+              verify_data=False, save_space=False):
         """Perform a set of checks on 'repository'
 
         :param repair: enable repair mode, write updated or corrected data into repository
         :param archive: only check this archive
-        :param last: only check this number of recent archives
+        :param first/last/sort_by: only check this number of first/last archives ordered by sort_by
         :param prefix: only check archives with this prefix
         :param verify_data: integrity verification of data referenced by archives
         :param save_space: Repository.commit(save_space)
         """
         logger.info('Starting archive consistency check...')
-        self.check_all = archive is None and last is None and prefix is None
+        self.check_all = archive is None and not any((first, last, prefix))
         self.repair = repair
         self.repository = repository
         self.init_chunks()
+        if not self.chunks:
+            logger.error('Repository contains no apparent data at all, cannot continue check/repair.')
+            return False
         self.key = self.identify_key(repository)
         if verify_data:
             self.verify_data()
@@ -1003,7 +1007,7 @@ class ArchiveChecker:
             self.manifest = self.rebuild_manifest()
         else:
             self.manifest, _ = Manifest.load(repository, key=self.key)
-        self.rebuild_refcounts(archive=archive, last=last, prefix=prefix)
+        self.rebuild_refcounts(archive=archive, first=first, last=last, sort_by=sort_by, prefix=prefix)
         self.orphan_chunks_check()
         self.finish(save_space=save_space)
         if self.error_found:
@@ -1160,7 +1164,7 @@ class ArchiveChecker:
         logger.info('Manifest rebuild complete.')
         return manifest
 
-    def rebuild_refcounts(self, archive=None, last=None, prefix=None):
+    def rebuild_refcounts(self, archive=None, first=0, last=0, sort_by='', prefix=''):
         """Rebuild object reference counts by walking the metadata
 
         Missing and/or incorrect data is repaired when detected
@@ -1256,15 +1260,25 @@ class ArchiveChecker:
 
             def report(msg, chunk_id, chunk_no):
                 cid = bin_to_hex(chunk_id)
-                msg += ' [chunk: %06d_%s]' % (chunk_no, cid)  # see debug-dump-archive-items
+                msg += ' [chunk: %06d_%s]' % (chunk_no, cid)  # see "debug dump-archive-items"
                 self.error_found = True
                 logger.error(msg)
 
+            def list_keys_safe(keys):
+                return ', '.join((k.decode() if isinstance(k, bytes) else str(k) for k in keys))
+
             def valid_item(obj):
                 if not isinstance(obj, StableDict):
-                    return False
+                    return False, 'not a dictionary'
+                # A bug in Attic up to and including release 0.13 added a (meaningless) b'acl' key to every item.
+                # We ignore it here, should it exist. See test_attic013_acl_bug for details.
+                obj.pop(b'acl', None)
                 keys = set(obj)
-                return required_item_keys.issubset(keys) and keys.issubset(item_keys)
+                if not required_item_keys.issubset(keys):
+                    return False, 'missing required keys: ' + list_keys_safe(required_item_keys - keys)
+                if not keys.issubset(item_keys):
+                    return False, 'invalid keys: ' + list_keys_safe(keys - item_keys)
+                return True, ''
 
             i = 0
             for state, items in groupby(archive.items, missing_chunk_detector):
@@ -1281,10 +1295,11 @@ class ArchiveChecker:
                     unpacker.feed(data)
                     try:
                         for item in unpacker:
-                            if valid_item(item):
+                            valid, reason = valid_item(item)
+                            if valid:
                                 yield Item(internal_dict=item)
                             else:
-                                report('Did not get expected metadata dict when unpacking item metadata', chunk_id, i)
+                                report('Did not get expected metadata dict when unpacking item metadata (%s)' % reason, chunk_id, i)
                     except RobustUnpacker.UnpackerCrashed as err:
                         report('Unpacker crashed while unpacking item metadata, trying to resync...', chunk_id, i)
                         unpacker.resync()
@@ -1294,12 +1309,11 @@ class ArchiveChecker:
                     i += 1
 
         if archive is None:
-            # we need last N or all archives
-            archive_infos = self.manifest.archives.list(sort_by='ts', reverse=True)
-            if prefix is not None:
-                archive_infos = [info for info in archive_infos if info.name.startswith(prefix)]
-            num_archives = len(archive_infos)
-            end = None if last is None else min(num_archives, last)
+            sort_by = sort_by.split(',')
+            if any((first, last, prefix)):
+                archive_infos = self.manifest.archives.list(sort_by=sort_by, prefix=prefix, first=first, last=last)
+            else:
+                archive_infos = self.manifest.archives.list(sort_by=sort_by)
         else:
             # we only want one specific archive
             info = self.manifest.archives.get(archive)
@@ -1308,12 +1322,11 @@ class ArchiveChecker:
                 archive_infos = []
             else:
                 archive_infos = [info]
-            num_archives = 1
-            end = 1
+        num_archives = len(archive_infos)
 
         with cache_if_remote(self.repository) as repository:
-            for i, info in enumerate(archive_infos[:end]):
-                logger.info('Analyzing archive {} ({}/{})'.format(info.name, num_archives - i, num_archives))
+            for i, info in enumerate(archive_infos):
+                logger.info('Analyzing archive {} ({}/{})'.format(info.name, i + 1, num_archives))
                 archive_id = info.id
                 if archive_id not in self.chunks:
                     logger.error('Archive metadata block is missing!')
@@ -1363,9 +1376,6 @@ class ArchiveChecker:
 
 
 class ArchiveRecreater:
-    AUTOCOMMIT_THRESHOLD = 512 * 1024 * 1024
-    """Commit (compact segments) after this many (or 1 % of repository size, whichever is greater) bytes."""
-
     class FakeTargetArchive:
         def __init__(self):
             self.stats = Statistics()
@@ -1381,7 +1391,8 @@ class ArchiveRecreater:
     def __init__(self, repository, manifest, key, cache, matcher,
                  exclude_caches=False, exclude_if_present=None, keep_tag_files=False,
                  chunker_params=None, compression=None, compression_files=None, always_recompress=False,
-                 dry_run=False, stats=False, progress=False, file_status_printer=None):
+                 dry_run=False, stats=False, progress=False, file_status_printer=None,
+                 checkpoint_interval=1800):
         self.repository = repository
         self.key = key
         self.manifest = manifest
@@ -1401,34 +1412,26 @@ class ArchiveRecreater:
                                                         compression_files or [])
         key.compression_decider2 = CompressionDecider2(compression or CompressionSpec('none'))
 
-        self.autocommit_threshold = max(self.AUTOCOMMIT_THRESHOLD, self.cache.chunks_stored_size() / 100)
-        logger.debug("Autocommit threshold: %s", format_file_size(self.autocommit_threshold))
-
         self.dry_run = dry_run
         self.stats = stats
         self.progress = progress
         self.print_file_status = file_status_printer or (lambda *args: None)
-
-        self.interrupt = False
-        self.errors = False
+        self.checkpoint_interval = checkpoint_interval
 
     def recreate(self, archive_name, comment=None, target_name=None):
         assert not self.is_temporary_archive(archive_name)
         archive = self.open_archive(archive_name)
-        target, resume_from = self.create_target_or_resume(archive, target_name)
+        target = self.create_target(archive, target_name)
         if self.exclude_if_present or self.exclude_caches:
             self.matcher_add_tagged_dirs(archive)
         if self.matcher.empty() and not self.recompress and not target.recreate_rechunkify and comment is None:
             logger.info("Skipping archive %s, nothing to do", archive_name)
             return True
-        try:
-            self.process_items(archive, target, resume_from)
-        except self.Interrupted as e:
-            return self.save(archive, target, completed=False, metadata=e.metadata)
+        self.process_items(archive, target)
         replace_original = target_name is None
         return self.save(archive, target, comment, replace_original=replace_original)
 
-    def process_items(self, archive, target, resume_from=None):
+    def process_items(self, archive, target):
         matcher = self.matcher
         target_is_subset = not matcher.empty()
         hardlink_masters = {} if target_is_subset else None
@@ -1442,14 +1445,7 @@ class ArchiveRecreater:
 
         for item in archive.iter_items():
             if item_is_hardlink_master(item):
-                # Re-visit all of these items in the archive even when fast-forwarding to rebuild hardlink_masters
                 hardlink_masters[item.path] = (item.get('chunks'), None)
-                continue
-            if resume_from:
-                # Fast forward to after the last processed file
-                if item.path == resume_from:
-                    logger.info('Fast-forwarded to %s', remove_surrogates(item.path))
-                    resume_from = None
                 continue
             if not matcher.match(item.path):
                 self.print_file_status('x', item.path)
@@ -1468,23 +1464,16 @@ class ArchiveRecreater:
             if self.dry_run:
                 self.print_file_status('-', item.path)
             else:
-                try:
-                    self.process_item(archive, target, item)
-                except self.Interrupted:
-                    if self.progress:
-                        target.stats.show_progress(final=True)
-                    raise
+                self.process_item(archive, target, item)
         if self.progress:
             target.stats.show_progress(final=True)
 
     def process_item(self, archive, target, item):
         if 'chunks' in item:
-            item.chunks = self.process_chunks(archive, target, item)
+            self.process_chunks(archive, target, item)
             target.stats.nfiles += 1
         target.add_item(item)
         self.print_file_status(file_status(item.mode), item.path)
-        if self.interrupt:
-            raise self.Interrupted
 
     def process_chunks(self, archive, target, item):
         """Return new chunk ID list for 'item'."""
@@ -1492,103 +1481,62 @@ class ArchiveRecreater:
             for chunk_id, size, csize in item.chunks:
                 self.cache.chunk_incref(chunk_id, target.stats)
             return item.chunks
-        new_chunks = self.process_partial_chunks(target)
-        chunk_iterator = self.create_chunk_iterator(archive, target, item)
-        consume(chunk_iterator, len(new_chunks))
+        chunk_iterator = self.create_chunk_iterator(archive, target, list(item.chunks))
         compress = self.compression_decider1.decide(item.path)
-        for chunk in chunk_iterator:
-            chunk.meta['compress'] = compress
-            chunk_id = self.key.id_hash(chunk.data)
-            if chunk_id in self.seen_chunks:
-                new_chunks.append(self.cache.chunk_incref(chunk_id, target.stats))
-            else:
-                compression_spec, chunk = self.key.compression_decider2.decide(chunk)
-                overwrite = self.recompress
-                if self.recompress and not self.always_recompress and chunk_id in self.cache.chunks:
-                    # Check if this chunk is already compressed the way we want it
-                    old_chunk = self.key.decrypt(None, self.repository.get(chunk_id), decompress=False)
-                    if Compressor.detect(old_chunk.data).name == compression_spec['name']:
-                        # Stored chunk has the same compression we wanted
-                        overwrite = False
-                chunk_id, size, csize = self.cache.add_chunk(chunk_id, chunk, target.stats, overwrite=overwrite)
-                new_chunks.append((chunk_id, size, csize))
-                self.seen_chunks.add(chunk_id)
-                if self.recompress and self.cache.seen_chunk(chunk_id) == 1:
-                    # This tracks how many bytes are uncommitted but compactable, since we are recompressing
-                    # existing chunks.
-                    target.recreate_uncomitted_bytes += csize
-                    if target.recreate_uncomitted_bytes >= self.autocommit_threshold:
-                        # Issue commits to limit additional space usage when recompressing chunks
-                        target.recreate_uncomitted_bytes = 0
-                        self.repository.commit()
-            if self.progress:
-                target.stats.show_progress(item=item, dt=0.2)
-            if self.interrupt:
-                raise self.Interrupted({
-                    'recreate_partial_chunks': new_chunks,
-                })
-        return new_chunks
+        chunk_processor = partial(self.chunk_processor, target, compress)
+        target.chunk_file(item, self.cache, target.stats, chunk_iterator, chunk_processor)
 
-    def create_chunk_iterator(self, archive, target, item):
+    def chunk_processor(self, target, compress, data):
+        chunk_id = self.key.id_hash(data)
+        if chunk_id in self.seen_chunks:
+            return self.cache.chunk_incref(chunk_id, target.stats)
+        chunk = Chunk(data, compress=compress)
+        compression_spec, chunk = self.key.compression_decider2.decide(chunk)
+        overwrite = self.recompress
+        if self.recompress and not self.always_recompress and chunk_id in self.cache.chunks:
+            # Check if this chunk is already compressed the way we want it
+            old_chunk = self.key.decrypt(None, self.repository.get(chunk_id), decompress=False)
+            if Compressor.detect(old_chunk.data).name == compression_spec['name']:
+                # Stored chunk has the same compression we wanted
+                overwrite = False
+        chunk_id, size, csize = self.cache.add_chunk(chunk_id, chunk, target.stats, overwrite=overwrite)
+        self.seen_chunks.add(chunk_id)
+        return chunk_id, size, csize
+
+    def create_chunk_iterator(self, archive, target, chunks):
         """Return iterator of chunks to store for 'item' from 'archive' in 'target'."""
-        chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _, _ in item.chunks])
+        chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _, _ in chunks])
         if target.recreate_rechunkify:
             # The target.chunker will read the file contents through ChunkIteratorFileWrapper chunk-by-chunk
             # (does not load the entire file into memory)
             file = ChunkIteratorFileWrapper(chunk_iterator)
+            return target.chunker.chunkify(file)
+        else:
+            for chunk in chunk_iterator:
+                yield chunk.data
 
-            def _chunk_iterator():
-                for data in target.chunker.chunkify(file):
-                    yield Chunk(data)
-
-            chunk_iterator = _chunk_iterator()
-        return chunk_iterator
-
-    def process_partial_chunks(self, target):
-        """Return chunks from a previous run for archive 'target' (if any) or an empty list."""
-        if not target.recreate_partial_chunks:
-            return []
-        # No incref, create_target_or_resume already did that before to deleting the old target archive
-        # So just copy these over
-        partial_chunks = target.recreate_partial_chunks
-        target.recreate_partial_chunks = None
-        for chunk_id, size, csize in partial_chunks:
-            self.seen_chunks.add(chunk_id)
-        logger.debug('Copied %d chunks from a partially processed item', len(partial_chunks))
-        return partial_chunks
-
-    def save(self, archive, target, comment=None, completed=True, metadata=None, replace_original=True):
+    def save(self, archive, target, comment=None, replace_original=True):
         """Save target archive. If completed, replace source. If not, save temporary with additional 'metadata' dict."""
         if self.dry_run:
-            return completed
-        if completed:
-            timestamp = archive.ts.replace(tzinfo=None)
-            if comment is None:
-                comment = archive.metadata.get('comment', '')
-            target.save(timestamp=timestamp, comment=comment, additional_metadata={
-                'cmdline': archive.metadata.cmdline,
-                'recreate_cmdline': sys.argv,
-            })
-            if replace_original:
-                archive.delete(Statistics(), progress=self.progress)
-                target.rename(archive.name)
-            if self.stats:
-                target.end = datetime.utcnow()
-                log_multi(DASHES,
-                          str(target),
-                          DASHES,
-                          str(target.stats),
-                          str(self.cache),
-                          DASHES)
-        else:
-            additional_metadata = metadata or {}
-            additional_metadata.update({
-                'recreate_source_id': archive.id,
-                'recreate_args': sys.argv[1:],
-            })
-            target.save(name=archive.name + '.recreate', additional_metadata=additional_metadata)
-            logger.info('Run the same command again to resume.')
-        return completed
+            return
+        timestamp = archive.ts.replace(tzinfo=None)
+        if comment is None:
+            comment = archive.metadata.get('comment', '')
+        target.save(timestamp=timestamp, comment=comment, additional_metadata={
+            'cmdline': archive.metadata.cmdline,
+            'recreate_cmdline': sys.argv,
+        })
+        if replace_original:
+            archive.delete(Statistics(), progress=self.progress)
+            target.rename(archive.name)
+        if self.stats:
+            target.end = datetime.utcnow()
+            log_multi(DASHES,
+                      str(target),
+                      DASHES,
+                      str(target.stats),
+                      str(self.cache),
+                      DASHES)
 
     def matcher_add_tagged_dirs(self, archive):
         """Add excludes to the matcher created by exclude_cache and exclude_if_present."""
@@ -1623,91 +1571,20 @@ class ArchiveRecreater:
         matcher.add(tag_files, True)
         matcher.add(tagged_dirs, False)
 
-    def create_target_or_resume(self, archive, target_name=None):
-        """Create new target archive or resume from temporary archive, if it exists. Return archive, resume from path"""
+    def create_target(self, archive, target_name=None):
+        """Create target archive."""
         if self.dry_run:
             return self.FakeTargetArchive(), None
         target_name = target_name or archive.name + '.recreate'
-        resume = target_name in self.manifest.archives
-        target, resume_from = None, None
-        if resume:
-            target, resume_from = self.try_resume(archive, target_name)
-        if not target:
-            target = self.create_target_archive(target_name)
+        target = self.create_target_archive(target_name)
         # If the archives use the same chunker params, then don't rechunkify
         target.recreate_rechunkify = tuple(archive.metadata.get('chunker_params', [])) != self.chunker_params
-        return target, resume_from
-
-    def try_resume(self, archive, target_name):
-        """Try to resume from temporary archive. Return (target archive, resume from path) if successful."""
-        logger.info('Found %s, will resume interrupted operation', target_name)
-        old_target = self.open_archive(target_name)
-        if not self.can_resume(archive, old_target, target_name):
-            return None, None
-        target = self.create_target_archive(target_name + '.temp')
-        logger.info('Replaying items from interrupted operation...')
-        last_old_item = self.copy_items(old_target, target)
-        resume_from = getattr(last_old_item, 'path', None)
-        self.incref_partial_chunks(old_target, target)
-        old_target.delete(Statistics(), progress=self.progress)
-        logger.info('Done replaying items')
-        return target, resume_from
-
-    def incref_partial_chunks(self, source_archive, target_archive):
-        target_archive.recreate_partial_chunks = source_archive.metadata.get('recreate_partial_chunks', [])
-        for chunk_id, size, csize in target_archive.recreate_partial_chunks:
-            if not self.cache.seen_chunk(chunk_id):
-                try:
-                    # Repository has __contains__, RemoteRepository doesn't
-                    # `chunk_id in repo` doesn't read the data though, so we try to use that if possible.
-                    get_or_in = getattr(self.repository, '__contains__', self.repository.get)
-                    if get_or_in(chunk_id) is False:
-                        raise Repository.ObjectNotFound(chunk_id, self.repository)
-                except Repository.ObjectNotFound:
-                    # delete/prune/check between invocations: these chunks are gone.
-                    target_archive.recreate_partial_chunks = None
-                    break
-                # fast-lane insert into chunks cache
-                self.cache.chunks[chunk_id] = (1, size, csize)
-                target_archive.stats.update(size, csize, True)
-                continue
-            # incref now, otherwise a source_archive.delete() might delete these chunks
-            self.cache.chunk_incref(chunk_id, target_archive.stats)
-
-    def copy_items(self, source_archive, target_archive):
-        item = None
-        for item in source_archive.iter_items():
-            if 'chunks' in item:
-                for chunk in item.chunks:
-                    self.cache.chunk_incref(chunk.id, target_archive.stats)
-                    target_archive.stats.nfiles += 1
-            target_archive.add_item(item)
-        if self.progress:
-            target_archive.stats.show_progress(final=True)
-        return item
-
-    def can_resume(self, archive, old_target, target_name):
-        resume_id = old_target.metadata.recreate_source_id
-        resume_args = [safe_decode(arg) for arg in old_target.metadata.recreate_args]
-        if resume_id != archive.id:
-            logger.warning('Source archive changed, will discard %s and start over', target_name)
-            logger.warning('Saved fingerprint:   %s', bin_to_hex(resume_id))
-            logger.warning('Current fingerprint: %s', archive.fpr)
-            old_target.delete(Statistics(), progress=self.progress)
-            return False
-        if resume_args != sys.argv[1:]:
-            logger.warning('Command line changed, this might lead to inconsistencies')
-            logger.warning('Saved:   %s', repr(resume_args))
-            logger.warning('Current: %s', repr(sys.argv[1:]))
-            # Just warn in this case, don't start over
-        return True
+        return target
 
     def create_target_archive(self, name):
         target = Archive(self.repository, self.key, self.manifest, name, create=True,
                           progress=self.progress, chunker_params=self.chunker_params, cache=self.cache,
-                          checkpoint_interval=0, compression=self.compression)
-        target.recreate_partial_chunks = None
-        target.recreate_uncomitted_bytes = 0
+                          checkpoint_interval=self.checkpoint_interval, compression=self.compression)
         return target
 
     def open_archive(self, name, **kwargs):

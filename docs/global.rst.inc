@@ -15,6 +15,7 @@
 .. _libacl: https://savannah.nongnu.org/projects/acl/
 .. _libattr: https://savannah.nongnu.org/projects/attr/
 .. _liblz4: https://github.com/Cyan4973/lz4
+.. _libb2: https://github.com/BLAKE2/libb2
 .. _OpenSSL: https://www.openssl.org/
 .. _`Python 3`: https://www.python.org/
 .. _Buzhash: https://en.wikipedia.org/wiki/Buzhash

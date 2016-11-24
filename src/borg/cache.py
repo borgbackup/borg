@@ -10,7 +10,9 @@ import msgpack
 from .logger import create_logger
 logger = create_logger()
 
+from .constants import CACHE_README
 from .hashindex import ChunkIndex, ChunkIndexEntry
+from .helpers import Location
 from .helpers import Error
 from .helpers import get_cache_dir
 from .helpers import decode_dict, int_to_bigint, bigint_to_int, bin_to_hex
@@ -29,8 +31,11 @@ FileCacheEntry = namedtuple('FileCacheEntry', 'age inode size mtime chunk_ids')
 class Cache:
     """Client Side cache
     """
+    class RepositoryIDNotUnique(Error):
+        """Cache is newer than repository - do you have multiple, independently updated repos with same ID?"""
+
     class RepositoryReplay(Error):
-        """Cache is newer than repository, refusing to continue"""
+        """Cache is newer than repository - this is either an attack or unsafe (multiple repos with same ID)"""
 
     class CacheInitAbortedError(Error):
         """Cache initialization aborted"""
@@ -71,6 +76,9 @@ class Cache:
         self.key = key
         self.manifest = manifest
         self.path = path or os.path.join(get_cache_dir(), repository.id_str)
+        self.hostname_is_unique = yes(env_var_override='BORG_HOSTNAME_IS_UNIQUE', prompt=False, env_msg=None)
+        if self.hostname_is_unique:
+            logger.info('Enabled removal of stale cache locks')
         self.do_files = do_files
         # Warn user before sending data to a never seen before unencrypted repository
         if not os.path.exists(self.path):
@@ -92,11 +100,17 @@ class Cache:
                 if not yes(msg, false_msg="Aborting.", invalid_msg="Invalid answer, aborting.",
                            retry=False, env_var_override='BORG_RELOCATED_REPO_ACCESS_IS_OK'):
                     raise self.RepositoryAccessAborted()
+                # adapt on-disk config immediately if the new location was accepted
+                self.begin_txn()
+                self.commit()
 
             if sync and self.manifest.id != self.manifest_id:
                 # If repository is older than the cache something fishy is going on
                 if self.timestamp and self.timestamp > manifest.timestamp:
-                    raise self.RepositoryReplay()
+                    if isinstance(key, PlaintextKey):
+                        raise self.RepositoryIDNotUnique()
+                    else:
+                        raise self.RepositoryReplay()
                 # Make sure an encrypted repository has not been swapped for an unencrypted repository
                 if self.key_type is not None and self.key_type != str(key.TYPE):
                     raise self.EncryptionMethodMismatch()
@@ -138,7 +152,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         """
         os.makedirs(self.path)
         with open(os.path.join(self.path, 'README'), 'w') as fd:
-            fd.write('This is a Borg cache')
+            fd.write(CACHE_README)
         config = configparser.ConfigParser(interpolation=None)
         config.add_section('cache')
         config.set('cache', 'version', '1')
@@ -151,10 +165,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
             pass  # empty file
 
-    def _do_open(self):
-        self.config = configparser.ConfigParser(interpolation=None)
-        config_path = os.path.join(self.path, 'config')
-        self.config.read(config_path)
+    def _check_upgrade(self, config_path):
         try:
             cache_version = self.config.getint('cache', 'version')
             wanted_version = 1
@@ -165,6 +176,25 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         except configparser.NoSectionError:
             self.close()
             raise Exception('%s does not look like a Borg cache.' % config_path) from None
+        # borg < 1.0.8rc1 had different canonicalization for the repo location (see #1655 and #1741).
+        cache_loc = self.config.get('cache', 'previous_location', fallback=None)
+        if cache_loc:
+            repo_loc = self.repository._location.canonical_path()
+            rl = Location(repo_loc)
+            cl = Location(cache_loc)
+            if cl.proto == rl.proto and cl.user == rl.user and cl.host == rl.host and cl.port == rl.port \
+                    and \
+                    cl.path and rl.path and \
+                    cl.path.startswith('/~/') and rl.path.startswith('/./') and cl.path[3:] == rl.path[3:]:
+                # everything is same except the expected change in relative path canonicalization,
+                # update previous_location to avoid warning / user query about changed location:
+                self.config.set('cache', 'previous_location', repo_loc)
+
+    def _do_open(self):
+        self.config = configparser.ConfigParser(interpolation=None)
+        config_path = os.path.join(self.path, 'config')
+        self.config.read(config_path)
+        self._check_upgrade(config_path)
         self.id = self.config.get('cache', 'repository')
         self.manifest_id = unhexlify(self.config.get('cache', 'manifest'))
         self.timestamp = self.config.get('cache', 'timestamp', fallback=None)
@@ -176,7 +206,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
     def open(self, lock_wait=None):
         if not os.path.isdir(self.path):
             raise Exception('%s Does not look like a Borg cache' % self.path)
-        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait).acquire()
+        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait, kill_stale_locks=self.hostname_is_unique).acquire()
         self.rollback()
 
     def close(self):

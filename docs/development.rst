@@ -21,9 +21,16 @@ Some guidance for contributors:
 
 - choose the branch you base your changesets on wisely:
 
-  - choose x.y-maint for stuff that should go into next x.y release
-    (it usually gets merged into master branch later also)
-  - choose master if that does not apply
+  - choose x.y-maint for stuff that should go into next x.y.z release
+    (it usually gets merged into master branch later also), like:
+
+    - bug fixes (code or docs)
+    - missing *important* (and preferably small) features
+    - docs rearrangements (so stuff stays in-sync to avoid merge
+      troubles in future)
+  - choose master if that does not apply, like for:
+
+    - developing new features
 
 - do clean changesets:
 
@@ -212,6 +219,16 @@ If you encounter issues, see also our `Vagrantfile` for details.
 .. note:: Standalone binaries built with pyinstaller are supposed to
           work on same OS, same architecture (x86 32bit, amd64 64bit)
           without external dependencies.
+
+
+Merging maintenance branches
+----------------------------
+
+As mentioned above bug fixes will usually be merged into a maintenance branch (x.y-maint) and then
+merged back into the master branch. Large diffs between these branches can make automatic merges troublesome,
+therefore we recommend to use these merge parameters::
+
+  git merge 1.0-maint -s recursive -X rename-threshold=20%
 
 
 Creating a new release

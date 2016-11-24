@@ -21,6 +21,7 @@ from .helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size
 from .helpers import Location
 from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
+from .helpers import yes
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .lrucache import LRUCache
@@ -119,8 +120,12 @@ class Repository:
         self.lock_wait = lock_wait
         self.do_lock = lock
         self.do_create = create
+        self.created = False
         self.exclusive = exclusive
         self.append_only = append_only
+        self.hostname_is_unique = yes(env_var_override='BORG_HOSTNAME_IS_UNIQUE', env_msg=None, prompt=False)
+        if self.hostname_is_unique:
+            logger.info('Enabled removal of stale repository locks')
 
     def __del__(self):
         if self.lock:
@@ -134,6 +139,7 @@ class Repository:
         if self.do_create:
             self.do_create = False
             self.create(self.path)
+            self.created = True
         self.open(self.path, bool(self.exclusive), lock_wait=self.lock_wait, lock=self.do_lock)
         return self
 
@@ -147,7 +153,7 @@ class Repository:
                 cleanup = True
             else:
                 cleanup = False
-            self.rollback(cleanup)
+            self._rollback(cleanup=cleanup)
         self.close()
 
     @property
@@ -162,7 +168,7 @@ class Repository:
         if not os.path.exists(path):
             os.mkdir(path)
         with open(os.path.join(path, 'README'), 'w') as fd:
-            fd.write('This is a Borg repository\n')
+            fd.write(REPOSITORY_README)
         os.mkdir(os.path.join(path, 'data'))
         config = ConfigParser(interpolation=None)
         config.add_section('repository')
@@ -254,7 +260,7 @@ class Repository:
         if not os.path.isdir(path):
             raise self.DoesNotExist(path)
         if lock:
-            self.lock = Lock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait).acquire()
+            self.lock = Lock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait, kill_stale_locks=self.hostname_is_unique).acquire()
         else:
             self.lock = None
         self.config = ConfigParser(interpolation=None)
@@ -422,8 +428,18 @@ class Repository:
 
         required_free_space += self.additional_free_space
         if not self.append_only:
-            # Keep one full worst-case segment free in non-append-only mode
-            required_free_space += self.max_segment_size + MAX_OBJECT_SIZE
+            full_segment_size = self.max_segment_size + MAX_OBJECT_SIZE
+            if len(self.compact) < 10:
+                # This is mostly for the test suite to avoid overestimated free space needs. This can be annoying
+                # if TMP is a small-ish tmpfs.
+                compact_working_space = sum(self.io.segment_size(segment) - free for segment, free in self.compact.items())
+                logger.debug('check_free_space: few segments, not requiring a full free segment')
+                compact_working_space = min(compact_working_space, full_segment_size)
+                logger.debug('check_free_space: calculated working space for compact as %d bytes', compact_working_space)
+                required_free_space += compact_working_space
+            else:
+                # Keep one full worst-case segment free in non-append-only mode
+                required_free_space += full_segment_size
         try:
             st_vfs = os.statvfs(self.path)
         except OSError as os_error:
@@ -433,7 +449,11 @@ class Repository:
         free_space = st_vfs.f_bavail * st_vfs.f_bsize
         logger.debug('check_free_space: required bytes {}, free bytes {}'.format(required_free_space, free_space))
         if free_space < required_free_space:
-            self.rollback(cleanup=True)
+            if self.created:
+                logger.error('Not enough free space to initialize repository at this location.')
+                self.destroy()
+            else:
+                self._rollback(cleanup=True)
             formatted_required = format_file_size(required_free_space)
             formatted_free = format_file_size(free_space)
             raise self.InsufficientFreeSpaceError(formatted_required, formatted_free)
@@ -663,6 +683,9 @@ class Repository:
         if transaction_id is None:
             logger.debug('No index transaction found, trying latest segment')
             transaction_id = self.io.get_latest_segment()
+        if transaction_id is None:
+            report_error('This repository contains no valid data.')
+            return False
         if repair:
             self.io.cleanup(transaction_id)
         segments_transaction_id = self.io.get_segments_transaction_id()
@@ -731,13 +754,16 @@ class Repository:
             logger.info('Completed repository check, no problems found.')
         return not error_found or repair
 
-    def rollback(self, cleanup=False):
+    def _rollback(self, *, cleanup):
         """
         """
         if cleanup:
             self.io.cleanup(self.io.get_segments_transaction_id())
         self.index = None
         self._active_txn = False
+
+    def rollback(self):
+        self._rollback(cleanup=False)
 
     def __len__(self):
         if not self.index:
@@ -775,12 +801,10 @@ class Repository:
             self.index = self.open_index(transaction_id)
         at_start = marker is None
         # smallest valid seg is <uint32> 0, smallest valid offs is <uint32> 8
-        marker_segment, marker_offset = (0, 0) if at_start else self.index[marker]
+        start_segment, start_offset = (0, 0) if at_start else self.index[marker]
         result = []
-        for segment, filename in self.io.segment_iterator():
-            if segment < marker_segment:
-                continue
-            obj_iterator = self.io.iter_objects(segment, read_data=False, include_data=False)
+        for segment, filename in self.io.segment_iterator(start_segment):
+            obj_iterator = self.io.iter_objects(segment, start_offset, read_data=False, include_data=False)
             while True:
                 try:
                     tag, id, offset, size = next(obj_iterator)
@@ -788,7 +812,11 @@ class Repository:
                     # either end-of-segment or an error - we can not seek to objects at
                     # higher offsets than one that has an error in the header fields
                     break
-                if segment == marker_segment and offset <= marker_offset:
+                if start_offset > 0:
+                    # we are using a marker and the marker points to the last object we have already
+                    # returned in the previous scan() call - thus, we need to skip this one object.
+                    # also, for the next segment, we need to start at offset 0.
+                    start_offset = 0
                     continue
                 if tag == TAG_PUT and (segment, offset) == self.index.get(id):
                     # we have found an existing and current object
@@ -797,14 +825,14 @@ class Repository:
                         return result
         return result
 
-    def get(self, id_):
+    def get(self, id):
         if not self.index:
             self.index = self.open_index(self.get_transaction_id())
         try:
-            segment, offset = self.index[id_]
-            return self.io.read(segment, offset, id_)
+            segment, offset = self.index[id]
+            return self.io.read(segment, offset, id)
         except KeyError:
-            raise self.ObjectNotFound(id_, self.path) from None
+            raise self.ObjectNotFound(id, self.path) from None
 
     def get_many(self, ids, is_preloaded=False):
         for id_ in ids:
@@ -886,14 +914,25 @@ class LoggedIO:
             os.posix_fadvise(fd.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
         fd.close()
 
-    def segment_iterator(self, reverse=False):
+    def segment_iterator(self, segment=None, reverse=False):
+        if segment is None:
+            segment = 0 if not reverse else 2 ** 32 - 1
         data_path = os.path.join(self.path, 'data')
-        dirs = sorted((dir for dir in os.listdir(data_path) if dir.isdigit()), key=int, reverse=reverse)
+        start_segment_dir = segment // self.segments_per_dir
+        dirs = os.listdir(data_path)
+        if not reverse:
+            dirs = [dir for dir in dirs if dir.isdigit() and int(dir) >= start_segment_dir]
+        else:
+            dirs = [dir for dir in dirs if dir.isdigit() and int(dir) <= start_segment_dir]
+        dirs = sorted(dirs, key=int, reverse=reverse)
         for dir in dirs:
             filenames = os.listdir(os.path.join(data_path, dir))
-            sorted_filenames = sorted((filename for filename in filenames
-                                       if filename.isdigit()), key=int, reverse=reverse)
-            for filename in sorted_filenames:
+            if not reverse:
+                filenames = [filename for filename in filenames if filename.isdigit() and int(filename) >= segment]
+            else:
+                filenames = [filename for filename in filenames if filename.isdigit() and int(filename) <= segment]
+            filenames = sorted(filenames, key=int, reverse=reverse)
+            for filename in filenames:
                 yield int(filename), os.path.join(data_path, dir, filename)
 
     def get_latest_segment(self):
@@ -999,7 +1038,7 @@ class LoggedIO:
     def segment_size(self, segment):
         return os.path.getsize(self.segment_filename(segment))
 
-    def iter_objects(self, segment, include_data=False, read_data=True):
+    def iter_objects(self, segment, offset=0, include_data=False, read_data=True):
         """
         Return object iterator for *segment*.
 
@@ -1009,10 +1048,14 @@ class LoggedIO:
         The iterator returns four-tuples of (tag, key, offset, data|size).
         """
         fd = self.get_fd(segment)
-        fd.seek(0)
-        if fd.read(MAGIC_LEN) != MAGIC:
-            raise IntegrityError('Invalid segment magic [segment {}, offset {}]'.format(segment, 0))
-        offset = MAGIC_LEN
+        fd.seek(offset)
+        if offset == 0:
+            # we are touching this segment for the first time, check the MAGIC.
+            # Repository.scan() calls us with segment > 0 when it continues an ongoing iteration
+            # from a marker position - but then we have checked the magic before already.
+            if fd.read(MAGIC_LEN) != MAGIC:
+                raise IntegrityError('Invalid segment magic [segment {}, offset {}]'.format(segment, 0))
+            offset = MAGIC_LEN
         header = fd.read(self.header_fmt.size)
         while header:
             size, tag, key, data = self._read(fd, self.header_fmt, header, segment, offset,

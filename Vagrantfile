@@ -25,6 +25,8 @@ def packages_debianoid
     # for building borgbackup and dependencies:
     apt-get install -y libssl-dev libacl1-dev liblz4-dev libfuse-dev fuse pkg-config
     usermod -a -G fuse $username
+    chgrp fuse /dev/fuse
+    chmod 666 /dev/fuse
     apt-get install -y fakeroot build-essential git
     apt-get install -y python3-dev python3-setuptools
     # for building python:
@@ -45,6 +47,8 @@ def packages_redhatted
     # for building borgbackup and dependencies:
     yum install -y openssl-devel openssl libacl-devel libacl lz4-devel fuse-devel fuse pkgconfig
     usermod -a -G fuse vagrant
+    chgrp fuse /dev/fuse
+    chmod 666 /dev/fuse
     yum install -y fakeroot gcc git patch
     # needed to compile msgpack-python (otherwise it will use slow fallback code):
     yum install -y gcc-c++
@@ -96,6 +100,8 @@ def packages_freebsd
     kldload fuse
     sysctl vfs.usermount=1
     pw groupmod operator -M vagrant
+    # /dev/fuse has group operator
+    chmod 666 /dev/fuse
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
     # install all the (security and other) updates, packages
     pkg update
@@ -106,15 +112,10 @@ end
 def packages_openbsd
   return <<-EOF
     . ~/.profile
-    mkdir -p /home/vagrant/borg
-    rsync -aH /vagrant/borg/ /home/vagrant/borg/
-    rm -rf /vagrant/borg
-    ln -sf /home/vagrant/borg /vagrant/
     pkg_add bash
     chsh -s /usr/local/bin/bash vagrant
     pkg_add openssl
     pkg_add lz4
-    # pkg_add fuse  # does not install, sdl dependency missing
     pkg_add git  # no fakeroot
     pkg_add py3-setuptools
     ln -sf /usr/local/bin/python3.4 /usr/local/bin/python3
@@ -149,6 +150,57 @@ def packages_netbsd
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
   EOF
 end
+
+# Install required cygwin packages and configure environment
+#
+# Microsoft/EdgeOnWindows10 image has MLS-OpenSSH installed by default,
+# which is based on cygwin x86_64 but should not be used together with cygwin.
+# In order to have have cygwin compatible bash 'ImagePath' is replaced with
+# cygrunsrv of newly installed cygwin
+#
+# supported cygwin versions:
+#   x86_64
+#   x86
+def packages_cygwin(version)
+  setup_exe = "setup-#{version}.exe"
+
+  return <<-EOF
+    mkdir -p /cygdrive/c/cygwin
+    powershell -Command '$client = new-object System.Net.WebClient; $client.DownloadFile("https://www.cygwin.com/#{setup_exe}","C:\\cygwin\\#{setup_exe}")'
+    echo '
+    REM --- Change to use different CygWin platform and final install path
+    set CYGSETUP=#{setup_exe}
+    REM --- Install build version of CygWin in a subfolder
+    set OURPATH=%cd%
+	    set CYGBUILD="C:\\cygwin\\CygWin"
+	    set CYGMIRROR=ftp://mirrors.kernel.org/sourceware/cygwin/
+	    set BUILDPKGS=python3,python3-setuptools,binutils,gcc-g++,libopenssl,openssl-devel,git,make,openssh,liblz4-devel,liblz4_1,rsync,curl,python-devel
+    %CYGSETUP% -q -B -o -n -R %CYGBUILD% -L -D -s %CYGMIRROR% -P %BUILDPKGS%
+    cd /d C:\\cygwin\\CygWin\\bin
+    regtool set /HKLM/SYSTEM/CurrentControlSet/Services/OpenSSHd/ImagePath "C:\\cygwin\\CygWin\\bin\\cygrunsrv.exe"
+    bash -c "ssh-host-config --no"
+	    ' > /cygdrive/c/cygwin/install.bat
+    cd /cygdrive/c/cygwin && cmd.exe /c install.bat
+
+    echo "alias mkdir='mkdir -p'" > ~/.profile
+    echo "export CYGWIN_ROOT=/cygdrive/c/cygwin/CygWin" >> ~/.profile
+    echo 'export PATH=$PATH:$CYGWIN_ROOT/bin' >> ~/.profile
+
+    echo '' > ~/.bash_profile
+
+    cmd.exe /c 'setx /m PATH "%PATH%;C:\\cygwin\\CygWin\\bin"'
+    source ~/.profile
+    echo 'db_home: windows' > $CYGWIN_ROOT/etc/nsswitch.conf
+  EOF
+end
+
+def install_cygwin_venv
+  return <<-EOF
+      easy_install-3.4 pip
+      pip install virtualenv
+  EOF
+end
+
 
 def install_pyenv(boxname)
   return <<-EOF
@@ -226,6 +278,8 @@ def install_borg_no_fuse(boxname)
     rm -rf borg/__pycache__ borg/support/__pycache__ borg/testsuite/__pycache__
     pip install -r requirements.d/development.txt
     pip install -e .
+    # do not install llfuse into the virtualenvs built by tox:
+    sed -i.bak '/fuse.txt/d' tox.ini
   EOF
 end
 
@@ -265,7 +319,7 @@ def build_binary_with_pyinstaller(boxname)
     cd /vagrant/borg
     . borg-env/bin/activate
     cd borg
-    pyinstaller -F -n borg.exe --distpath=/vagrant/borg --clean src/borg/__main__.py --hidden-import=borg.platform.posix
+    pyinstaller --clean --distpath=/vagrant/borg scripts/borg.exe.spec
   EOF
 end
 
@@ -274,13 +328,13 @@ def run_tests(boxname)
     . ~/.bash_profile
     cd /vagrant/borg/borg
     . ../borg-env/bin/activate
-    if which pyenv > /dev/null; then
+    if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
       pyenv global 3.4.0 3.5.0
       pyenv local 3.4.0 3.5.0
     fi
     # otherwise: just use the system python
-    if which fakeroot > /dev/null; then
+    if which fakeroot 2> /dev/null; then
       echo "Running tox WITH fakeroot -u"
       fakeroot -u tox --skip-missing-interpreters
     else
@@ -305,7 +359,7 @@ end
 
 Vagrant.configure(2) do |config|
   # use rsync to copy content to the folder
-  config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"]
+  config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"], :rsync__chown => false
   # do not let the VM access . on the host machine via the default shared folder!
   config.vm.synced_folder ".", "/vagrant", disabled: true
 
@@ -388,7 +442,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "wheezy32" do |b|
-    b.vm.box = "boxcutter/debian711-i386"
+    b.vm.box = "boxcutter/debian7-i386"
     b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy32")
@@ -401,7 +455,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "wheezy64" do |b|
-    b.vm.box = "boxcutter/debian711"
+    b.vm.box = "boxcutter/debian7"
     b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy64")
@@ -444,7 +498,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd64" do |b|
-    b.vm.box = "kaorimatz/openbsd-5.9-amd64"
+    b.vm.box = "openbsd60-64"  # note: basic openbsd install for vagrant WITH sudo and rsync pre-installed
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
@@ -455,7 +509,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "netbsd64" do |b|
-    b.vm.box = "alex-skimlinks/netbsd-6.1.5-amd64"
+    b.vm.box = "netbsd70-64"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
@@ -463,5 +517,32 @@ Vagrant.configure(2) do |config|
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("netbsd64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd64")
+  end
+
+  config.vm.define "windows10" do |b|
+    b.vm.box = "Microsoft/EdgeOnWindows10"
+    b.vm.guest = :windows
+    b.vm.boot_timeout = 180
+    b.vm.graceful_halt_timeout = 120
+
+    b.ssh.shell = "sh -l"
+    b.ssh.username = "IEUser"
+    b.ssh.password = "Passw0rd!"
+    b.ssh.insert_key = false
+
+    b.vm.provider :virtualbox do |v|
+      v.memory = 2048
+      #v.gui = true
+    end
+
+    # fix permissions placeholder
+    b.vm.provision "fix perms", :type => :shell,  :privileged => false, :inline => "echo 'fix permission placeholder'"
+
+    b.vm.provision "packages cygwin", :type => :shell, :privileged => false, :inline => packages_cygwin("x86_64")
+    b.vm.provision :reload
+    b.vm.provision "cygwin install pip", :type => :shell, :privileged => false, :inline => install_cygwin_venv
+    b.vm.provision "cygwin build env", :type => :shell, :privileged => false, :inline => build_sys_venv("windows10")    
+    b.vm.provision "cygwin install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("windows10")
+    b.vm.provision "cygwin run tests", :type => :shell, :privileged => false, :inline => run_tests("windows10")
   end
 end

@@ -247,8 +247,8 @@ def build_pyenv_venv(boxname)
   EOF
 end
 
-def install_borg(boxname)
-  return <<-EOF
+def install_borg(fuse)
+  script = <<-EOF
     . ~/.bash_profile
     cd /vagrant/borg
     . borg-env/bin/activate
@@ -259,55 +259,43 @@ def install_borg(boxname)
     rm -f borg/{chunker,crypto,compress,hashindex,platform_linux}.c
     rm -rf borg/__pycache__ borg/support/__pycache__ borg/testsuite/__pycache__
     pip install -r requirements.d/development.txt
-    # by using [fuse], setup.py can handle different fuse requirements:
-    pip install -e .[fuse]
   EOF
+  if fuse
+    script += <<-EOF
+      # by using [fuse], setup.py can handle different fuse requirements:
+      pip install -e .[fuse]
+    EOF
+  else
+    script += <<-EOF
+      pip install -e .
+      # do not install llfuse into the virtualenvs built by tox:
+      sed -i.bak '/fuse.txt/d' tox.ini
+    EOF
+  end
+  return script
 end
 
-def install_borg_no_fuse(boxname)
-  return <<-EOF
-    . ~/.bash_profile
-    cd /vagrant/borg
-    . borg-env/bin/activate
-    pip install -U wheel  # upgrade wheel, too old for 3.5
-    cd borg
-    # clean up (wrong/outdated) stuff we likely got via rsync:
-    rm -f borg/*.so borg/*.cpy*
-    rm -f borg/{chunker,crypto,compress,hashindex,platform_linux}.c
-    rm -rf borg/__pycache__ borg/support/__pycache__ borg/testsuite/__pycache__
-    pip install -r requirements.d/development.txt
-    pip install -e .
-    # do not install llfuse into the virtualenvs built by tox:
-    sed -i.bak '/fuse.txt/d' tox.ini
-  EOF
-end
-
-def install_pyinstaller(boxname)
-  return <<-EOF
+def install_pyinstaller(bootloader)
+  script = <<-EOF
     . ~/.bash_profile
     cd /vagrant/borg
     . borg-env/bin/activate
     git clone https://github.com/pyinstaller/pyinstaller.git
     cd pyinstaller
     git checkout v3.1.1
+  EOF
+  if bootloader
+    script += <<-EOF
+      # build bootloader, if it is not included
+      cd bootloader
+      python ./waf all
+      cd ..
+    EOF
+  end
+  script += <<-EOF
     pip install -e .
   EOF
-end
-
-def install_pyinstaller_bootloader(boxname)
-  return <<-EOF
-    . ~/.bash_profile
-    cd /vagrant/borg
-    . borg-env/bin/activate
-    git clone https://github.com/pyinstaller/pyinstaller.git
-    cd pyinstaller
-    git checkout v3.1.1
-    # build bootloader, if it is not included
-    cd bootloader
-    python ./waf all
-    cd ..
-    pip install -e .
-  EOF
+  return script
 end
 
 def build_binary_with_pyinstaller(boxname)
@@ -375,7 +363,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos7_64")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos7_64")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos7_64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("centos7_64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos7_64")
   end
 
@@ -385,7 +373,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_32")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_32")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos6_32")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("centos6_32")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos6_32")
   end
 
@@ -398,7 +386,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_64")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_64")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos6_64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("centos6_64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos6_64")
   end
 
@@ -409,7 +397,7 @@ Vagrant.configure(2) do |config|
     end
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("xenial64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("xenial64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("xenial64")
   end
 
@@ -420,7 +408,7 @@ Vagrant.configure(2) do |config|
     end
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("trusty64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("trusty64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("trusty64")
   end
 
@@ -431,7 +419,7 @@ Vagrant.configure(2) do |config|
     end
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("jessie64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("jessie64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("jessie64")
   end
 
@@ -442,8 +430,8 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy32")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("wheezy32")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("wheezy32")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("wheezy32")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller("wheezy32")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller(false)
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("wheezy32")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("wheezy32")
   end
@@ -455,8 +443,8 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy64")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("wheezy64")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("wheezy64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("wheezy64")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller("wheezy64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller(false)
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("wheezy64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("wheezy64")
   end
@@ -469,8 +457,8 @@ Vagrant.configure(2) do |config|
     b.vm.provision "fix pyenv", :type => :shell, :privileged => false, :inline => fix_pyenv_darwin("darwin64")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("darwin64")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("darwin64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("darwin64")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller("darwin64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller(false)
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("darwin64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("darwin64")
   end
@@ -485,8 +473,8 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("freebsd")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("freebsd")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("freebsd")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("freebsd")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller_bootloader("freebsd")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller(true)
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("freebsd")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd")
   end
@@ -498,7 +486,7 @@ Vagrant.configure(2) do |config|
     end
     b.vm.provision "packages openbsd", :type => :shell, :inline => packages_openbsd
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openbsd64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("openbsd64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openbsd64")
   end
 
@@ -509,7 +497,7 @@ Vagrant.configure(2) do |config|
     end
     b.vm.provision "packages netbsd", :type => :shell, :inline => packages_netbsd
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("netbsd64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd64")
   end
 
@@ -536,7 +524,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision :reload
     b.vm.provision "cygwin install pip", :type => :shell, :privileged => false, :inline => install_cygwin_venv
     b.vm.provision "cygwin build env", :type => :shell, :privileged => false, :inline => build_sys_venv("windows10")    
-    b.vm.provision "cygwin install borg", :type => :shell, :privileged => false, :inline => install_borg_no_fuse("windows10")
+    b.vm.provision "cygwin install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
     b.vm.provision "cygwin run tests", :type => :shell, :privileged => false, :inline => run_tests("windows10")
   end
 end

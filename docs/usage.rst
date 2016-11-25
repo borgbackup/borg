@@ -144,6 +144,13 @@ General:
         can either leave it away or abbreviate as `::`, if a positional parameter is required.
     BORG_PASSPHRASE
         When set, use the value to answer the passphrase question for encrypted repositories.
+        It is used when a passphrase is needed to access a encrypted repo as well as when a new
+        passphrase should be initially set when initializing an encrypted repo.
+        See also BORG_NEW_PASSPHRASE.
+    BORG_NEW_PASSPHRASE
+        When set, use the value to answer the passphrase question when a **new** passphrase is asked for.
+        This variable is checked first. If it is not set, BORG_PASSPHRASE will be checked also.
+        Main usecase for this is to fully automate ``borg change-passphrase``.
     BORG_DISPLAY_PASSPHRASE
         When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
     BORG_LOGGING_CONF
@@ -648,6 +655,15 @@ Examples
     Enter same passphrase again:
     Remember your passphrase. Your data will be inaccessible without it.
     Key updated
+
+Fully automated using environment variables:
+
+::
+
+    $ BORG_NEW_PASSPHRASE=old borg init repo
+    # now "old" is the current passphrase.
+    $ BORG_PASSPHRASE=old BORG_NEW_PASSPHRASE=new borg change-passphrase repo
+    # now "new" is the current passphrase.
 
 
 .. include:: usage/serve.rst.inc

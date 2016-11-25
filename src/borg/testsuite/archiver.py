@@ -1363,6 +1363,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         size, csize = self._get_sizes('lzma', compressible=False)
         assert csize >= size
 
+    def test_change_passphrase(self):
+        self.cmd('init', self.repository_location)
+        os.environ['BORG_NEW_PASSPHRASE'] = 'newpassphrase'
+        # here we have both BORG_PASSPHRASE and BORG_NEW_PASSPHRASE set:
+        self.cmd('change-passphrase', self.repository_location)
+        os.environ['BORG_PASSPHRASE'] = 'newpassphrase'
+        self.cmd('list', self.repository_location)
+
     def test_break_lock(self):
         self.cmd('init', self.repository_location)
         self.cmd('break-lock', self.repository_location)

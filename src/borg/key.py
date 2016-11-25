@@ -247,10 +247,18 @@ class AESKeyBase(KeyBase):
 
 class Passphrase(str):
     @classmethod
-    def env_passphrase(cls, default=None):
-        passphrase = os.environ.get('BORG_PASSPHRASE', default)
+    def _env_passphrase(cls, env_var, default=None):
+        passphrase = os.environ.get(env_var, default)
         if passphrase is not None:
             return cls(passphrase)
+
+    @classmethod
+    def env_passphrase(cls, default=None):
+        return cls._env_passphrase('BORG_PASSPHRASE', default)
+
+    @classmethod
+    def env_new_passphrase(cls, default=None):
+        return cls._env_passphrase('BORG_NEW_PASSPHRASE', default)
 
     @classmethod
     def getpass(cls, prompt):
@@ -276,6 +284,9 @@ class Passphrase(str):
 
     @classmethod
     def new(cls, allow_empty=False):
+        passphrase = cls.env_new_passphrase()
+        if passphrase is not None:
+            return passphrase
         passphrase = cls.env_passphrase()
         if passphrase is not None:
             return passphrase

@@ -1210,23 +1210,10 @@ def ellipsis_truncate(msg, space):
     return msg + ' ' * (space - msg_width)
 
 
-class ProgressIndicatorPercent:
+class ProgressIndicatorBase:
     LOGGER = 'borg.output.progress'
 
-    def __init__(self, total=0, step=5, start=0, msg="%3.0f%%"):
-        """
-        Percentage-based progress indicator
-
-        :param total: total amount of items
-        :param step: step size in percent
-        :param start: at which percent value to start
-        :param msg: output message, must contain one %f placeholder for the percentage
-        """
-        self.counter = 0  # 0 .. (total-1)
-        self.total = total
-        self.trigger_at = start  # output next percentage value when reaching (at least) this
-        self.step = step
-        self.msg = msg
+    def __init__(self):
         self.handler = None
         self.logger = logging.getLogger(self.LOGGER)
 
@@ -1247,6 +1234,41 @@ class ProgressIndicatorPercent:
         if self.handler is not None:
             self.logger.removeHandler(self.handler)
             self.handler.close()
+
+
+def justify_to_terminal_size(message):
+    terminal_space = get_terminal_size(fallback=(-1, -1))[0]
+    # justify only if we are outputting to a terminal
+    if terminal_space != -1:
+        return message.ljust(terminal_space)
+    return message
+
+
+class ProgressIndicatorMessage(ProgressIndicatorBase):
+    def output(self, msg):
+        self.logger.info(justify_to_terminal_size(msg))
+
+    def finish(self):
+        self.output('')
+
+
+class ProgressIndicatorPercent(ProgressIndicatorBase):
+    def __init__(self, total=0, step=5, start=0, msg="%3.0f%%"):
+        """
+        Percentage-based progress indicator
+
+        :param total: total amount of items
+        :param step: step size in percent
+        :param start: at which percent value to start
+        :param msg: output message, must contain one %f placeholder for the percentage
+        """
+        self.counter = 0  # 0 .. (total-1)
+        self.total = total
+        self.trigger_at = start  # output next percentage value when reaching (at least) this
+        self.step = step
+        self.msg = msg
+
+        super().__init__()
 
     def progress(self, current=None, increase=1):
         if current is not None:
@@ -1280,10 +1302,7 @@ class ProgressIndicatorPercent:
 
     def output(self, message, justify=True):
         if justify:
-            terminal_space = get_terminal_size(fallback=(-1, -1))[0]
-            # no need to ljust if we're not outputing to a terminal
-            if terminal_space != -1:
-                message = message.ljust(terminal_space)
+            message = justify_to_terminal_size(message)
         self.logger.info(message)
 
     def finish(self):

@@ -18,6 +18,7 @@ from .helpers import get_cache_dir
 from .helpers import decode_dict, int_to_bigint, bigint_to_int, bin_to_hex
 from .helpers import format_file_size
 from .helpers import yes
+from .helpers import ProgressIndicatorMessage
 from .item import Item, ArchiveItem
 from .key import PlaintextKey
 from .locking import Lock
@@ -246,7 +247,9 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         """
         if not self.txn_active:
             return
+        pi = ProgressIndicatorMessage()
         if self.files is not None:
+            pi.output('Saving files cache')
             ttl = int(os.environ.get('BORG_FILES_CACHE_TTL', 20))
             with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
                 for path_hash, item in self.files.items():
@@ -257,17 +260,20 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     if entry.age == 0 and bigint_to_int(entry.mtime) < self._newest_mtime or \
                        entry.age > 0 and entry.age < ttl:
                         msgpack.pack((path_hash, entry), fd)
+        pi.output('Saving cache config')
         self.config.set('cache', 'manifest', self.manifest.id_str)
         self.config.set('cache', 'timestamp', self.manifest.timestamp)
         self.config.set('cache', 'key_type', str(self.key.TYPE))
         self.config.set('cache', 'previous_location', self.repository._location.canonical_path())
         with SaveFile(os.path.join(self.path, 'config')) as fd:
             self.config.write(fd)
+        pi.output('Saving chunks cache')
         self.chunks.write(os.path.join(self.path, 'chunks').encode('utf-8'))
         os.rename(os.path.join(self.path, 'txn.active'),
                   os.path.join(self.path, 'txn.tmp'))
         shutil.rmtree(os.path.join(self.path, 'txn.tmp'))
         self.txn_active = False
+        pi.finish()
 
     def rollback(self):
         """Roll back partial and aborted transactions

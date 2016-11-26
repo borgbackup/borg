@@ -256,3 +256,45 @@ class SyncFile(BaseSyncFile):
 
 def umount(mountpoint):
     return subprocess.call(['fusermount', '-u', mountpoint])
+
+
+cdef extern from "sys/statfs.h":
+    struct statfs_t "statfs":
+        long f_type
+        # fsid_t f_fsid
+
+    int statfs_c "statfs" (char *path, statfs_t *buf)
+    int fstatfs_c "fstatfs" (int fd, statfs_t *buf)
+
+
+MAGIC_TO_NAME = {
+    0xEF53: 'extfs',  # ext2, ext3, ext4
+    0x9123683E: 'btrfs',
+    0x58465342: 'xfs',
+    0x2FC12FC1: 'zfs',
+}
+
+
+def fsinfo(path=None, fd=None):
+    cdef statfs_t buf
+    cdef int rc
+    if isinstance(path, str):
+        path = os.fsencode(path)
+    if path is not None:
+        rc = statfs_c(path, &buf)
+    elif fd is not None:
+        rc = fstatfs_c(fd, &buf)
+    else:
+        raise ValueError('path or fd must be given')
+    if rc == -1:
+        raise OSError(errno.errno, strerror(errno.errno).decode(), os.fsdecode(path))
+    return dict(
+        fstype=MAGIC_TO_NAME.get(buf.f_type),
+        #fsid=...,
+    )
+
+
+def has_stable_inodes(path=None, fd=None):
+    info = fsinfo(path, fd)
+    fstype = info.get('fstype')
+    return fstype in {'extfs', 'btrfs', 'xfs', 'zfs', }

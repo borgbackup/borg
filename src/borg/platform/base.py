@@ -162,3 +162,18 @@ def swidth(s):
 def umount(mountpoint):
     """un-mount the FUSE filesystem mounted at <mountpoint>"""
     return 0  # dummy, see also posix module
+
+
+def fsinfo(path=None, fd=None):
+    """
+    determine a dict of filesystem infos, keys may be missing (meaning "unknown").
+
+    known keys:
+    - fstype - filesystem type (str), e.g. "zfs"
+    """
+    return {}
+
+
+def has_stable_inodes(path=None, fd=None):
+    """determine if the filesystem that contains path or fd has stable inode numbers"""
+    return False

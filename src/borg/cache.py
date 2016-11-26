@@ -18,7 +18,8 @@ from .helpers import get_cache_dir
 from .helpers import decode_dict, int_to_bigint, bigint_to_int, bin_to_hex
 from .helpers import format_file_size
 from .helpers import yes
-from .helpers import ProgressIndicatorMessage
+from .helpers import remove_surrogates
+from .helpers import ProgressIndicatorPercent, ProgressIndicatorMessage
 from .item import Item, ArchiveItem
 from .key import PlaintextKey
 from .locking import Lock
@@ -62,7 +63,7 @@ class Cache:
             shutil.rmtree(path)
 
     def __init__(self, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True,
-                 lock_wait=None):
+                 progress=False, lock_wait=None):
         """
         :param do_files: use file metadata cache
         :param warn_if_unencrypted: print warning if accessing unknown unencrypted repository
@@ -76,6 +77,7 @@ class Cache:
         self.repository = repository
         self.key = key
         self.manifest = manifest
+        self.progress = progress
         self.path = path or os.path.join(get_cache_dir(), repository.id_str)
         self.hostname_is_unique = yes(env_var_override='BORG_HOSTNAME_IS_UNIQUE', prompt=False, env_msg=None)
         if self.hostname_is_unique:
@@ -379,8 +381,13 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             cleanup_outdated(cached_ids - archive_ids)
             if archive_ids:
                 chunk_idx = None
+                if self.progress:
+                    pi = ProgressIndicatorPercent(total=len(archive_ids), step=0.1,
+                                                  msg='%3.0f%% Syncing chunks cache. Processing archive %s')
                 for archive_id in archive_ids:
                     archive_name = lookup_name(archive_id)
+                    if self.progress:
+                        pi.show(info=[remove_surrogates(archive_name)])
                     if archive_id in cached_ids:
                         archive_chunk_idx_path = mkpath(archive_id)
                         logger.info("Reading cached archive chunk index for %s ..." % archive_name)
@@ -396,6 +403,8 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                         chunk_idx = archive_chunk_idx
                     else:
                         chunk_idx.merge(archive_chunk_idx)
+                if self.progress:
+                    pi.finish()
             logger.info('Done.')
             return chunk_idx
 

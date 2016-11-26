@@ -281,7 +281,8 @@ class Archiver:
             with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
-                                  numeric_owner=args.numeric_owner, progress=args.progress,
+                                  numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime,
+                                  progress=args.progress,
                                   chunker_params=args.chunker_params, start=t0)
                 create_inner(archive, cache)
         else:
@@ -1301,6 +1302,12 @@ class Archiver:
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,
                                help='only store numeric user and group identifiers')
+        subparser.add_argument('--noatime', dest='noatime',
+                               action='store_true', default=False,
+                               help='do not store atime into archive')
+        subparser.add_argument('--noctime', dest='noctime',
+                               action='store_true', default=False,
+                               help='do not store ctime into archive')
         subparser.add_argument('--timestamp', dest='timestamp',
                                type=timestamp, default=None,
                                metavar='yyyy-mm-ddThh:mm:ss',

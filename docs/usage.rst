@@ -257,7 +257,8 @@ Chunks index (client only):
 
 Files index (client only):
     Proportional to the amount of files in your last backups. Can be switched
-    off (see create options), but next backup will be much slower if you do.
+    off (see create options), but next backup might be much slower if you do.
+    The speed benefit of using the files cache is proportional to file size.
 
 Repository index (server only):
     Proportional to the amount of data chunks in your repo. Lots of chunks
@@ -266,12 +267,12 @@ Repository index (server only):
     influence the amount of chunks being created.
 
 Temporary files (client):
-    Reading data and metadata from a FUSE mounted repository will consume about
-    the same space as the deduplicated chunks used to represent them in the
-    repository.
+    Reading data and metadata from a FUSE mounted repository will consume up to
+    the size of all deduplicated, small chunks in the repository. Big chunks
+    won't be locally cached.
 
 Temporary files (server):
-    Not much.
+    None.
 
 Cache files (client only):
     Contains the chunks index and files index (plus a collection of single-
@@ -286,8 +287,8 @@ Network (only for client/server operation):
     you backup multiple sources to one target repository, additional traffic
     happens for cache resynchronization.
 
-In case you are interested in more details (like formulas), please read the
-internals documentation.
+In case you are interested in more details (like formulas), please see
+:ref:`internals`.
 
 
 Units

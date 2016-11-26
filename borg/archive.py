@@ -185,7 +185,7 @@ class Archive:
         """Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable."""
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
-                 checkpoint_interval=300, numeric_owner=False, progress=False,
+                 checkpoint_interval=300, numeric_owner=False, noatime=False, noctime=False, progress=False,
                  chunker_params=CHUNKER_PARAMS, start=None, end=None):
         self.cwd = os.getcwd()
         self.key = key
@@ -198,6 +198,8 @@ class Archive:
         self.name = name
         self.checkpoint_interval = checkpoint_interval
         self.numeric_owner = numeric_owner
+        self.noatime = noatime
+        self.noctime = noctime
         if start is None:
             start = datetime.utcnow()
         self.start = start
@@ -571,10 +573,15 @@ Number of files: {0.stats.nfiles}'''.format(
             b'mode': st.st_mode,
             b'uid': st.st_uid, b'user': uid2user(st.st_uid),
             b'gid': st.st_gid, b'group': gid2group(st.st_gid),
-            b'atime': int_to_bigint(st.st_atime_ns),
-            b'ctime': int_to_bigint(st.st_ctime_ns),
             b'mtime': int_to_bigint(st.st_mtime_ns),
         }
+        # borg can work with archives only having mtime (older attic archives do not have
+        # atime/ctime). it can be useful to omit atime/ctime, if they change without the
+        # file content changing - e.g. to get better metadata deduplication.
+        if not self.noatime:
+            item[b'atime'] = int_to_bigint(st.st_atime_ns)
+        if not self.noctime:
+            item[b'ctime'] = int_to_bigint(st.st_ctime_ns)
         if self.numeric_owner:
             item[b'user'] = item[b'group'] = None
         with backup_io():

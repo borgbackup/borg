@@ -233,14 +233,19 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
 
     def begin_txn(self):
         # Initialize transaction snapshot
+        pi = ProgressIndicatorMessage()
         txn_dir = os.path.join(self.path, 'txn.tmp')
         os.mkdir(txn_dir)
+        pi.output('Initializing cache transaction: Reading config')
         shutil.copy(os.path.join(self.path, 'config'), txn_dir)
+        pi.output('Initializing cache transaction: Reading chunks')
         shutil.copy(os.path.join(self.path, 'chunks'), txn_dir)
+        pi.output('Initializing cache transaction: Reading files')
         shutil.copy(os.path.join(self.path, 'files'), txn_dir)
         os.rename(os.path.join(self.path, 'txn.tmp'),
                   os.path.join(self.path, 'txn.active'))
         self.txn_active = True
+        pi.finish()
 
     def commit(self):
         """Commit transaction

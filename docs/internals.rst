@@ -364,7 +364,7 @@ varies between 33% and 300%.
 Indexes / Caches memory usage
 -----------------------------
 
-Here is the estimated memory usage of |project_name|:
+Here is the estimated memory usage of |project_name| - it's complicated:
 
   chunk_count ~= total_file_size / 2 ^ HASH_MASK_BITS
 
@@ -377,6 +377,14 @@ Here is the estimated memory usage of |project_name|:
   mem_usage ~= repo_index_usage + chunks_cache_usage + files_cache_usage
              = chunk_count * 164 + total_file_count * 240
 
+Due to the hashtables, the best/usual/worst cases for memory allocation can
+be estimated like that:
+
+  mem_allocation = mem_usage / load_factor  # l_f = 0.25 .. 0.75
+
+  mem_allocation_peak = mem_allocation * (1 + growth_factor)  # g_f = 1.1 .. 2
+
+
 All units are Bytes.
 
 It is assuming every chunk is referenced exactly once (if you have a lot of
@@ -387,6 +395,17 @@ a lot of files smaller than this statistical medium chunk size, you will have
 more chunks than estimated above, because 1 file is at least 1 chunk).
 
 If a remote repository is used the repo index will be allocated on the remote side.
+
+The chunks cache, files cache and the repo index are all implemented as hash
+tables. A hash table must have a significant amount of unused entries to be
+fast - the so-called load factor gives the used/unused elements ratio.
+
+When a hash table gets full (load factor getting too high), it needs to be
+grown (allocate new, bigger hash table, copy all elements over to it, free old
+hash table) - this will lead to short-time peaks in memory usage each time this
+happens. Usually does not happen for all hashtables at the same time, though.
+For small hash tables, we start with a growth factor of 2, which comes down to
+~1.1x for big hash tables.
 
 E.g. backing up a total count of 1 Mi (IEC binary prefix i.e. 2^20) files with a total size of 1TiB.
 

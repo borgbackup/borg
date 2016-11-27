@@ -42,7 +42,7 @@ Note: you may also prepend a ``file://`` to a filesystem path to get URL style.
 ``user@host:~other/path/to/repo`` - path relative to other's home directory
 
 Note: giving ``user@host:/./path/to/repo`` or ``user@host:/~/path/to/repo`` or
-``user@host:/~other/path/to/repo``is also supported, but not required here.
+``user@host:/~other/path/to/repo`` is also supported, but not required here.
 
 
 **Remote repositories with relative pathes, alternative syntax with port**:
@@ -437,7 +437,7 @@ Notes
 
 - the --exclude patterns are not like tar. In tar --exclude .bundler/gems will
   exclude foo/.bundler/gems. In borg it will not, you need to use --exclude
-  '*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
+  '\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
   more information.
 
 

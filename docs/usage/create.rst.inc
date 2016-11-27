@@ -12,7 +12,7 @@ borg create
                        [--filter STATUSCHARS] [-e PATTERN]
                        [--exclude-from EXCLUDEFILE] [--exclude-caches]
                        [--exclude-if-present FILENAME] [--keep-tag-files]
-                       [-c SECONDS] [-x] [--numeric-owner]
+                       [-c SECONDS] [-x] [--numeric-owner] [--noatime] [--noctime]
                        [--timestamp yyyy-mm-ddThh:mm:ss]
                        [--chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE]
                        [--ignore-inode] [-C COMPRESSION] [--read-special] [-n]
@@ -60,6 +60,8 @@ borg create
       -x, --one-file-system
                             stay in same file system, do not cross mount points
       --numeric-owner       only store numeric user and group identifiers
+      --noatime             do not store atime into archive
+      --noctime             do not store ctime into archive
       --timestamp yyyy-mm-ddThh:mm:ss
                             manually specify the archive creation date/time (UTC).
                             alternatively, give a reference file/directory.
@@ -89,8 +91,8 @@ The archive name needs to be unique. It must not end in '.checkpoint' or
 '.checkpoint.N' (with N being a number), because these names are used for
 checkpoints and treated in special ways.
 
-In the archive name, you may use the following format tags:
-{now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}, {borgversion}
+In the archive name, you may use the following placeholders:
+{now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 
 To speed up pulling backups over sshfs and similar network file systems which do
 not provide correct inode information the --ignore-inode flag can be used. This

@@ -544,7 +544,7 @@ Here's a (incomplete) list of some major changes:
 * better logging, screen output, progress indication
 * tested on misc. Linux systems, 32 and 64bit, FreeBSD, OpenBSD, NetBSD, Mac OS X
 
-Please read the `ChangeLog`_ (or ``docs/changes.rst`` in the source distribution) for more
+Please read the :ref:`changelog` (or ``docs/changes.rst`` in the source distribution) for more
 information.
 
 Borg is not compatible with original attic (but there is a one-way conversion).

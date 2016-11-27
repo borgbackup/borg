@@ -66,6 +66,7 @@ The best check that everything is ok is to run a dry-run extraction::
 
     borg extract -v --dry-run REPO::ARCHIVE
 
+.. _changelog:
 
 Changelog
 =========

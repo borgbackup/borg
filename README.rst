@@ -89,9 +89,7 @@ Initialize a new backup repository and create a backup archive::
     $ borg init /path/to/repo
     $ borg create /path/to/repo::Saturday1 ~/Documents
 
-Now doing another backup, just to show off the great deduplication:
-
-.. code-block::
+Now doing another backup, just to show off the great deduplication::
 
     $ borg create -v --stats /path/to/repo::Saturday2 ~/Documents
     -----------------------------------------------------------------------------

@@ -10,7 +10,7 @@ from ..crypto import bytes_to_long, num_aes_blocks
 from ..helpers import Location
 from ..helpers import Chunk
 from ..helpers import IntegrityError
-from ..helpers import get_nonces_dir
+from ..helpers import get_security_dir
 from ..key import PlaintextKey, PassphraseKey, KeyfileKey, RepoKey, Blake2KeyfileKey, Blake2RepoKey, AuthenticatedKey
 from ..key import Passphrase, PasswordRetriesExceeded, bin_to_hex
 
@@ -118,7 +118,7 @@ class TestKey:
     def test_keyfile_nonce_rollback_protection(self, monkeypatch, keys_dir):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
         repository = self.MockRepository()
-        with open(os.path.join(get_nonces_dir(), repository.id_str), "w") as fd:
+        with open(os.path.join(get_security_dir(repository.id_str), 'nonce'), "w") as fd:
             fd.write("0000000000002000")
         key = KeyfileKey.create(repository, self.MockArgs())
         data = key.encrypt(Chunk(b'ABC'))

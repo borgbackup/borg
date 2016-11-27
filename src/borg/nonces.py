@@ -3,7 +3,7 @@ import sys
 from binascii import unhexlify
 
 from .crypto import bytes_to_long, long_to_bytes
-from .helpers import get_nonces_dir
+from .helpers import get_security_dir
 from .helpers import bin_to_hex
 from .platform import SaveFile
 from .remote import InvalidRPCMethod
@@ -19,7 +19,7 @@ class NonceManager:
         self.enc_cipher = enc_cipher
         self.end_of_nonce_reservation = None
         self.manifest_nonce = manifest_nonce
-        self.nonce_file = os.path.join(get_nonces_dir(), self.repository.id_str)
+        self.nonce_file = os.path.join(get_security_dir(self.repository.id_str), 'nonce')
 
     def get_local_free_nonce(self):
         try:

@@ -1,8 +1,25 @@
-Changelog
-=========
+Important notes
+===============
 
-Important note about pre-1.0.4 potential repo corruption
---------------------------------------------------------
+This section is used for infos about e.g. security and corruption issues.
+
+Pre-1.0.9 potential data loss
+-----------------------------
+
+If you have archives in your repository that were made with attic <= 0.13
+(and later migrated to borg), running borg check would report errors in these
+archives. See issue #1837.
+
+The reason for this is a invalid (and useless) metadata key that was
+always added due to a bug in these old attic versions.
+
+If you run borg check --repair, things escalate quickly: all archive items
+with invalid metadata will be killed. Due to that attic bug, that means all
+items in all archives made with these old attic versions.
+
+
+Pre-1.0.4 potential repo corruption
+-----------------------------------
 
 Some external errors (like network or disk I/O errors) could lead to
 corruption of the backup repository due to issue #1138.
@@ -48,6 +65,68 @@ Fix::
 The best check that everything is ok is to run a dry-run extraction::
 
     borg extract -v --dry-run REPO::ARCHIVE
+
+
+Changelog
+=========
+
+Version 1.0.9rc1 (2016-11-27)
+-----------------------------
+
+Bug fixes:
+
+- files cache: fix determination of newest mtime in backup set (which is
+  used in cache cleanup and led to wrong "A" [added] status for unchanged
+  files in next backup), #1860.
+
+- borg check:
+
+  - fix incorrectly reporting attic 0.13 and earlier archives as corrupt
+  - handle repo w/o objects gracefully and also bail out early if repo is
+    *completely* empty, #1815.
+- fix tox/pybuild in 1.0-maint
+- at xattr module import time, loggers are not initialized yet
+
+New features:
+
+- borg umount <mountpoint>
+  exposed already existing umount code via the CLI api, so users can use it,
+  which is more consistent than using borg to mount and fusermount -u (or
+  umount) to un-mount, #1855.
+- implement borg create --noatime --noctime, fixes #1853
+
+Other changes:
+
+- docs:
+
+  - display README correctly on PyPI
+  - improve cache / index docs, esp. files cache docs, fixes #1825
+  - different pattern matching for --exclude, #1779
+  - datetime formatting examples for {now} placeholder, #1822
+  - clarify passphrase mode attic repo upgrade, #1854
+  - clarify --umask usage, #1859
+  - clarify how to choose PR target branch
+  - clarify prune behavior for different archive contents, #1824
+  - fix PDF issues, add logo, fix authors, headings, TOC
+  - move security verification to support section
+  - fix links in standalone README (:ref: tags)
+  - add link to security contact in README
+  - add FAQ about security
+  - move fork differences to FAQ
+  - add more details about resource usage
+- tests: skip remote tests on cygwin, #1268
+- travis:
+
+  - allow OS X failures until the brew cask osxfuse issue is fixed
+  - caskroom osxfuse-beta gone, it's osxfuse now (3.5.3)
+- vagrant:
+
+  - upgrade OSXfuse / FUSE for macOS to 3.5.3
+  - remove llfuse from tox.ini at a central place
+  - do not try to install llfuse on centos6
+  - fix fuse test for darwin, #1546
+  - add windows virtual machine with cygwin
+  - Vagrantfile cleanup / code deduplication
 
 
 Version 1.0.8 (2016-10-29)

@@ -46,6 +46,10 @@ Filesystem options
         | stay in same file system, do not cross mount points
     ``--numeric-owner``
         | only store numeric user and group identifiers
+    ``--noatime``
+        | do not store atime into archive
+    ``--noctime``
+        | do not store ctime into archive
     ``--ignore-inode``
         | ignore inode data in the file metadata cache used to detect unchanged files.
     ``--read-special``
@@ -76,8 +80,8 @@ The archive name needs to be unique. It must not end in '.checkpoint' or
 '.checkpoint.N' (with N being a number), because these names are used for
 checkpoints and treated in special ways.
 
-In the archive name, you may use the following format tags:
-{now}, {utcnow}, {fqdn}, {hostname}, {user}, {pid}, {uuid4}, {borgversion}
+In the archive name, you may use the following placeholders:
+{now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 
 To speed up pulling backups over sshfs and similar network file systems which do
 not provide correct inode information the --ignore-inode flag can be used. This

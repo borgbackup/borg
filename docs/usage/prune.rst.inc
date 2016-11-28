@@ -61,6 +61,8 @@ If a prefix is set with -P, then only archives that start with the prefix are
 considered for deletion and only those archives count towards the totals
 specified by the rules.
 Otherwise, *all* archives in the repository are candidates for deletion!
+There is no automatic distinction between archives representing different
+contents. These need to be distinguished by specifying matching prefixes.
 
 If you have multiple sequences of archives with different data sets (e.g.
 from different machines) in one shared repository, use one prune call per

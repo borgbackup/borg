@@ -217,7 +217,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
 
     def _read_files(self):
         self.files = {}
-        self._newest_mtime = 0
+        self._newest_mtime = None
         logger.debug('Reading files cache ...')
         with open(os.path.join(self.path, 'files'), 'rb') as fd:
             u = msgpack.Unpacker(use_list=True)
@@ -254,8 +254,11 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             return
         pi = ProgressIndicatorMessage()
         if self.files is not None:
-            pi.output('Saving files cache')
+            if self._newest_mtime is None:
+                # was never set because no files were modified/added
+                self._newest_mtime = 2 ** 63 - 1  # nanoseconds, good until y2262
             ttl = int(os.environ.get('BORG_FILES_CACHE_TTL', 20))
+            pi.output('Saving files cache')
             with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
                 for path_hash, item in self.files.items():
                     # Only keep files seen in this backup that are older than newest mtime seen in this backup -
@@ -484,4 +487,4 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             return
         entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, mtime=int_to_bigint(st.st_mtime_ns), chunk_ids=ids)
         self.files[path_hash] = msgpack.packb(entry)
-        self._newest_mtime = max(self._newest_mtime, st.st_mtime_ns)
+        self._newest_mtime = max(self._newest_mtime or 0, st.st_mtime_ns)

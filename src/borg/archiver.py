@@ -344,7 +344,8 @@ class Archiver:
             with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
-                                  numeric_owner=args.numeric_owner, progress=args.progress,
+                                  numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime,
+                                  progress=args.progress,
                                   chunker_params=args.chunker_params, start=t0,
                                   compression=args.compression, compression_files=args.compression_files)
                 create_inner(archive, cache)
@@ -1880,6 +1881,12 @@ class Archiver:
         fs_group.add_argument('--numeric-owner', dest='numeric_owner',
                               action='store_true', default=False,
                               help='only store numeric user and group identifiers')
+        fs_group.add_argument('--noatime', dest='noatime',
+                              action='store_true', default=False,
+                              help='do not store atime into archive')
+        fs_group.add_argument('--noctime', dest='noctime',
+                              action='store_true', default=False,
+                              help='do not store ctime into archive')
         fs_group.add_argument('--ignore-inode', dest='ignore_inode',
                               action='store_true', default=False,
                               help='ignore inode data in the file metadata cache used to detect unchanged files.')

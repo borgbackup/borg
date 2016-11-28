@@ -241,7 +241,7 @@ class Archive:
         """Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable."""
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
-                 checkpoint_interval=300, numeric_owner=False, progress=False,
+                 checkpoint_interval=300, numeric_owner=False, noatime=False, noctime=False, progress=False,
                  chunker_params=CHUNKER_PARAMS, start=None, end=None, compression=None, compression_files=None,
                  consider_part_files=False):
         self.cwd = os.getcwd()
@@ -255,6 +255,8 @@ class Archive:
         self.name = name
         self.checkpoint_interval = checkpoint_interval
         self.numeric_owner = numeric_owner
+        self.noatime = noatime
+        self.noctime = noctime
         if start is None:
             start = datetime.utcnow()
         self.chunker_params = chunker_params
@@ -685,10 +687,15 @@ Number of files: {0.stats.nfiles}'''.format(
             mode=st.st_mode,
             uid=st.st_uid,
             gid=st.st_gid,
-            atime=st.st_atime_ns,
-            ctime=st.st_ctime_ns,
             mtime=st.st_mtime_ns,
         )
+        # borg can work with archives only having mtime (older attic archives do not have
+        # atime/ctime). it can be useful to omit atime/ctime, if they change without the
+        # file content changing - e.g. to get better metadata deduplication.
+        if not self.noatime:
+            attrs['atime'] = st.st_atime_ns
+        if not self.noctime:
+            attrs['ctime'] = st.st_ctime_ns
         if self.numeric_owner:
             attrs['user'] = attrs['group'] = None
         else:

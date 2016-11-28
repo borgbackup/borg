@@ -42,7 +42,7 @@ Note: you may also prepend a ``file://`` to a filesystem path to get URL style.
 ``user@host:~other/path/to/repo`` - path relative to other's home directory
 
 Note: giving ``user@host:/./path/to/repo`` or ``user@host:/~/path/to/repo`` or
-``user@host:/~other/path/to/repo``is also supported, but not required here.
+``user@host:/~other/path/to/repo`` is also supported, but not required here.
 
 
 **Remote repositories with relative pathes, alternative syntax with port**:
@@ -220,36 +220,80 @@ Resource Usage
 
 |project_name| might use a lot of resources depending on the size of the data set it is dealing with.
 
-CPU:
+If one uses |project_name| in a client/server way (with a ssh: repository),
+the resource usage occurs in part on the client and in another part on the
+server.
+
+If one uses |project_name| as a single process (with a filesystem repo),
+all the resource usage occurs in that one process, so just add up client +
+server to get the approximate resource usage.
+
+CPU client:
+    borg create: does chunking, hashing, compression, crypto (high CPU usage)
+    chunks cache sync: quite heavy on CPU, doing lots of hashtable operations.
+    borg extract: crypto, decompression (medium to high CPU usage)
+    borg check: similar to extract, but depends on options given.
+    borg prune / borg delete archive: low to medium CPU usage
+    borg delete repo: done on the server
     It won't go beyond 100% of 1 core as the code is currently single-threaded.
     Especially higher zlib and lzma compression levels use significant amounts
-    of CPU cycles.
+    of CPU cycles. Crypto might be cheap on the CPU (if hardware accelerated) or
+    expensive (if not).
 
-Memory (RAM):
+CPU server:
+    It usually doesn't need much CPU, it just deals with the key/value store
+    (repository) and uses the repository index for that.
+
+    borg check: the repository check computes the checksums of all chunks
+    (medium CPU usage)
+    borg delete repo: low CPU usage
+
+CPU (only for client/server operation):
+    When using borg in a client/server way with a ssh:-type repo, the ssh
+    processes used for the transport layer will need some CPU on the client and
+    on the server due to the crypto they are doing - esp. if you are pumping
+    big amounts of data.
+
+Memory (RAM) client:
     The chunks index and the files index are read into memory for performance
-    reasons.
+    reasons. Might need big amounts of memory (see below).
     Compression, esp. lzma compression with high levels might need substantial
     amounts of memory.
 
-Temporary files:
-    Reading data and metadata from a FUSE mounted repository will consume about
-    the same space as the deduplicated chunks used to represent them in the
-    repository.
+Memory (RAM) server:
+    The server process will load the repository index into memory. Might need
+    considerable amounts of memory, but less than on the client (see below).
 
-Cache files:
-    Contains the chunks index and files index (plus a compressed collection of
-    single-archive chunk indexes).
-
-Chunks index:
+Chunks index (client only):
     Proportional to the amount of data chunks in your repo. Lots of chunks
     in your repo imply a big chunks index.
     It is possible to tweak the chunker params (see create options).
 
-Files index:
-    Proportional to the amount of files in your last backup. Can be switched
-    off (see create options), but next backup will be much slower if you do.
+Files index (client only):
+    Proportional to the amount of files in your last backups. Can be switched
+    off (see create options), but next backup might be much slower if you do.
+    The speed benefit of using the files cache is proportional to file size.
 
-Network:
+Repository index (server only):
+    Proportional to the amount of data chunks in your repo. Lots of chunks
+    in your repo imply a big repository index.
+    It is possible to tweak the chunker params (see create options) to
+    influence the amount of chunks being created.
+
+Temporary files (client):
+    Reading data and metadata from a FUSE mounted repository will consume up to
+    the size of all deduplicated, small chunks in the repository. Big chunks
+    won't be locally cached.
+
+Temporary files (server):
+    None.
+
+Cache files (client only):
+    Contains the chunks index and files index (plus a collection of single-
+    archive chunk indexes which might need huge amounts of disk space,
+    depending on archive count and size - see FAQ about how to reduce).
+
+Network (only for client/server operation):
     If your repository is remote, all deduplicated (and optionally compressed/
     encrypted) data of course has to go over the connection (ssh: repo url).
     If you use a locally mounted network filesystem, additionally some copy
@@ -257,7 +301,8 @@ Network:
     you backup multiple sources to one target repository, additional traffic
     happens for cache resynchronization.
 
-In case you are interested in more details, please read the internals documentation.
+In case you are interested in more details (like formulas), please see
+:ref:`internals`.
 
 File systems
 ~~~~~~~~~~~~
@@ -386,7 +431,19 @@ Examples
 
     # Use short hostname, user name and current time in archive name
     $ borg create /path/to/repo::{hostname}-{user}-{now} ~
-    $ borg create /path/to/repo::{hostname}-{user}-{now:%Y-%m-%d_%H:%M:%S} ~
+    # Similar, use the same datetime format as borg 1.1 will have as default
+    $ borg create /path/to/repo::{hostname}-{user}-{now:%Y-%m-%dT%H:%M:%S} ~
+    # As above, but add nanoseconds
+    $ borg create /path/to/repo::{hostname}-{user}-{now:%Y-%m-%dT%H:%M:%S.%f} ~
+
+Notes
+~~~~~
+
+- the --exclude patterns are not like tar. In tar --exclude .bundler/gems will
+  exclude foo/.bundler/gems. In borg it will not, you need to use --exclude
+  '\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
+  more information.
+
 
 .. include:: usage/extract.rst.inc
 
@@ -705,6 +762,20 @@ Examples
     no key file found for repository
 
 
+Upgrading a passphrase encrypted attic repo
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+attic offered a "passphrase" encryption mode, but this was removed in borg 1.0
+and replaced by the "repokey" mode (which stores the passphrase-protected
+encryption key into the repository config).
+
+Thus, to upgrade a "passphrase" attic repo to a "repokey" borg repo, 2 steps
+are needed, in this order:
+
+- borg upgrade repo
+- borg migrate-to-repokey repo
+
+
 .. include:: usage/recreate.rst.inc
 
 Examples
@@ -860,6 +931,17 @@ If you want to see an immediate big effect on resource usage, you better start
 a new repository when changing chunker params.
 
 For more details, see :ref:`chunker_details`.
+
+
+--umask
+~~~~~~~
+
+If you use ``--umask``, make sure that all repository-modifying borg commands
+(create, delete, prune) that access the repository in question use the same
+``--umask`` value.
+
+If multiple machines access the same repository, this should hold true for all
+of them.
 
 --read-special
 ~~~~~~~~~~~~~~

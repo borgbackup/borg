@@ -1024,7 +1024,8 @@ class Archiver:
                     else:
                         if args.output_list:
                             list_logger.info('Pruning archive: %s' % format_archive(archive))
-                        Archive(repository, key, manifest, archive.name, cache).delete(stats, forced=args.forced)
+                        Archive(repository, key, manifest, archive.name, cache,
+                                progress=args.progress).delete(stats, forced=args.forced)
                 else:
                     if args.output_list:
                         list_logger.info('Keeping archive: %s' % format_archive(archive))
@@ -2244,6 +2245,9 @@ class Archiver:
         subparser.add_argument('--force', dest='forced',
                                action='store_true', default=False,
                                help='force pruning of corrupted archives')
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help='show progress display while deleting archives')
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the deleted archive')

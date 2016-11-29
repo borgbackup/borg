@@ -1430,6 +1430,7 @@ class ItemFormatter(BaseFormatter):
         'csize': 'compressed size',
         'num_chunks': 'number of chunks in this file',
         'unique_chunks': 'number of unique chunks in this file',
+        'health': 'either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)',
     }
     KEY_GROUPS = (
         ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget', 'flags'),
@@ -1437,6 +1438,7 @@ class ItemFormatter(BaseFormatter):
         ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
         tuple(sorted(hashlib.algorithms_guaranteed)),
         ('archiveid', 'archivename', 'extra'),
+        ('health', )
     )
 
     @classmethod
@@ -1526,6 +1528,7 @@ class ItemFormatter(BaseFormatter):
         item_data['linktarget'] = source
         item_data['extra'] = extra
         item_data['flags'] = item.get('bsdflags')
+        item_data['health'] = 'broken' if 'chunks_healthy' in item else 'healthy'
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)
         return item_data

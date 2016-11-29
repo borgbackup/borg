@@ -2082,6 +2082,8 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         output = self.cmd('check', '--repair', self.repository_location, exit_code=0)
         self.assert_in('New missing file chunk detected', output)
         self.cmd('check', self.repository_location, exit_code=0)
+        output = self.cmd('list', '--format={health}#{path}{LF}', self.repository_location + '::archive1', exit_code=0)
+        self.assert_in('broken#', output)
         # check that the file in the old archives has now a different chunk list without the killed chunk
         for archive_name in ('archive1', 'archive2'):
             archive, repository = self.open_archive(archive_name)
@@ -2110,6 +2112,9 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                         break
                 else:
                     self.assert_true(False)  # should not happen
+        # list is also all-healthy again
+        output = self.cmd('list', '--format={health}#{path}{LF}', self.repository_location + '::archive1', exit_code=0)
+        self.assert_not_in('broken#', output)
 
     def test_missing_archive_item_chunk(self):
         archive, repository = self.open_archive('archive1')

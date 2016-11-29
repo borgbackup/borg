@@ -161,6 +161,20 @@ class PlaintextKey(KeyBase):
         return Chunk(data)
 
 
+def random_blake2b_256_key():
+    # This might look a bit curious, but is the same construction used in the keyed mode of BLAKE2b.
+    # Why limit the key to 64 bytes and pad it with 64 nulls nonetheless? The answer is that BLAKE2b
+    # has a 128 byte block size, but only 64 bytes of internal state (this is also referred to as a
+    # "local wide pipe" design, because the compression function transforms (block, state) => state,
+    # and len(block) >= len(state), hence wide.)
+    # In other words, a key longer than 64 bytes would have simply no advantage, since the function
+    # has no way of propagating more than 64 bytes of entropy internally.
+    # It's padded to a full block so that the key is never buffered internally by blake2b_update, ie.
+    # it remains in a single memory location that can be tracked and could be erased securely, if we
+    # wanted to.
+    return os.urandom(64) + bytes(64)
+
+
 class ID_BLAKE2b_256:
     """
     Key mix-in class for using BLAKE2b-256 for the id key.
@@ -170,6 +184,12 @@ class ID_BLAKE2b_256:
 
     def id_hash(self, data):
         return blake2b_256(self.id_key, data)
+
+    def init_from_random_data(self, data=None):
+        assert data is None  # PassphraseKey is the only caller using *data*
+        super().init_from_random_data()
+        self.enc_hmac_key = random_blake2b_256_key()
+        self.id_key = random_blake2b_256_key()
 
 
 class ID_HMAC_SHA_256:
@@ -198,12 +218,14 @@ class AESKeyBase(KeyBase):
 
     PAYLOAD_OVERHEAD = 1 + 32 + 8  # TYPE + HMAC + NONCE
 
+    MAC = hmac_sha256
+
     def encrypt(self, chunk):
         chunk = self.compress(chunk)
         self.nonce_manager.ensure_reservation(num_aes_blocks(len(chunk.data)))
         self.enc_cipher.reset()
         data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(chunk.data)))
-        hmac = hmac_sha256(self.enc_hmac_key, data)
+        hmac = self.MAC(self.enc_hmac_key, data)
         return b''.join((self.TYPE_STR, hmac, data))
 
     def decrypt(self, id, data, decompress=True):
@@ -212,7 +234,7 @@ class AESKeyBase(KeyBase):
             raise IntegrityError('Chunk %s: Invalid encryption envelope' % bin_to_hex(id))
         data_view = memoryview(data)
         hmac_given = data_view[1:33]
-        hmac_computed = memoryview(hmac_sha256(self.enc_hmac_key, data_view[33:]))
+        hmac_computed = memoryview(self.MAC(self.enc_hmac_key, data_view[33:]))
         if not compare_digest(hmac_computed, hmac_given):
             raise IntegrityError('Chunk %s: Encryption envelope checksum mismatch' % bin_to_hex(id))
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
@@ -230,7 +252,9 @@ class AESKeyBase(KeyBase):
         nonce = bytes_to_long(payload[33:41])
         return nonce
 
-    def init_from_random_data(self, data):
+    def init_from_random_data(self, data=None):
+        if data is None:
+            data = os.urandom(100)
         self.enc_key = data[0:32]
         self.enc_hmac_key = data[32:64]
         self.id_key = data[64:96]
@@ -457,7 +481,7 @@ class KeyfileKeyBase(AESKeyBase):
         passphrase = Passphrase.new(allow_empty=True)
         key = cls(repository)
         key.repository_id = repository.id
-        key.init_from_random_data(os.urandom(100))
+        key.init_from_random_data()
         key.init_ciphers()
         target = key.get_new_target(args)
         key.save(target, passphrase)
@@ -568,11 +592,13 @@ class Blake2KeyfileKey(ID_BLAKE2b_256, KeyfileKey):
     TYPE = 0x04
     NAME = 'key file BLAKE2b'
     FILE_ID = 'BORG_KEY'
+    MAC = blake2b_256
 
 
 class Blake2RepoKey(ID_BLAKE2b_256, RepoKey):
     TYPE = 0x05
     NAME = 'repokey BLAKE2b'
+    MAC = blake2b_256
 
 
 class AuthenticatedKey(ID_BLAKE2b_256, RepoKey):

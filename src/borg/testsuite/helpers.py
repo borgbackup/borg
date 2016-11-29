@@ -15,7 +15,7 @@ from ..helpers import Buffer
 from ..helpers import partial_format, format_file_size, parse_file_size, format_timedelta, format_line, PlaceholderError, replace_placeholders
 from ..helpers import make_path_safe, clean_lines
 from ..helpers import prune_within, prune_split
-from ..helpers import get_cache_dir, get_keys_dir, get_nonces_dir
+from ..helpers import get_cache_dir, get_keys_dir, get_security_dir
 from ..helpers import is_slow_msgpack
 from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
 from ..helpers import StableDict, int_to_bigint, bigint_to_int, bin_to_hex
@@ -660,14 +660,15 @@ def test_get_keys_dir(monkeypatch):
     assert get_keys_dir() == '/var/tmp'
 
 
-def test_get_nonces_dir(monkeypatch):
-    """test that get_nonces_dir respects environment"""
+def test_get_security_dir(monkeypatch):
+    """test that get_security_dir respects environment"""
     monkeypatch.delenv('XDG_CONFIG_HOME', raising=False)
-    assert get_nonces_dir() == os.path.join(os.path.expanduser('~'), '.config', 'borg', 'key-nonces')
+    assert get_security_dir() == os.path.join(os.path.expanduser('~'), '.config', 'borg', 'security')
+    assert get_security_dir(repository_id='1234') == os.path.join(os.path.expanduser('~'), '.config', 'borg', 'security', '1234')
     monkeypatch.setenv('XDG_CONFIG_HOME', '/var/tmp/.config')
-    assert get_nonces_dir() == os.path.join('/var/tmp/.config', 'borg', 'key-nonces')
-    monkeypatch.setenv('BORG_NONCES_DIR', '/var/tmp')
-    assert get_nonces_dir() == '/var/tmp'
+    assert get_security_dir() == os.path.join('/var/tmp/.config', 'borg', 'security')
+    monkeypatch.setenv('BORG_SECURITY_DIR', '/var/tmp')
+    assert get_security_dir() == '/var/tmp'
 
 
 def test_file_size():

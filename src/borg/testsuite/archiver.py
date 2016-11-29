@@ -29,7 +29,7 @@ from ..archiver import Archiver
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto import bytes_to_long, num_aes_blocks
-from ..helpers import PatternMatcher, parse_pattern, Location
+from ..helpers import PatternMatcher, parse_pattern, Location, get_security_dir
 from ..helpers import Chunk, Manifest
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
@@ -382,8 +382,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         item_count = 4 if has_lchflags else 5  # one file is UF_NODUMP
         self.assert_in('Number of files: %d' % item_count, info_output)
         shutil.rmtree(self.cache_path)
-        with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='yes'):
-            info_output2 = self.cmd('info', self.repository_location + '::test')
+        info_output2 = self.cmd('info', self.repository_location + '::test')
 
         def filter(output):
             # filter for interesting "info" output, ignore cache rebuilding related stuff
@@ -562,6 +561,89 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('create', self.repository_location + '_encrypted::test.2', 'input', exit_code=EXIT_ERROR)
         else:
             self.assert_raises(Cache.RepositoryAccessAborted, lambda: self.cmd('create', self.repository_location + '_encrypted::test.2', 'input'))
+
+    def test_repository_swap_detection_no_cache(self):
+        self.create_test_files()
+        os.environ['BORG_PASSPHRASE'] = 'passphrase'
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        repository_id = self._extract_repository_id(self.repository_path)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        shutil.rmtree(self.repository_path)
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self._set_repository_id(self.repository_path, repository_id)
+        self.assert_equal(repository_id, self._extract_repository_id(self.repository_path))
+        self.cmd('delete', '--cache-only', self.repository_location)
+        if self.FORK_DEFAULT:
+            self.cmd('create', self.repository_location + '::test.2', 'input', exit_code=EXIT_ERROR)
+        else:
+            self.assert_raises(Cache.EncryptionMethodMismatch, lambda: self.cmd('create', self.repository_location + '::test.2', 'input'))
+
+    def test_repository_swap_detection2_no_cache(self):
+        self.create_test_files()
+        self.cmd('init', '--encryption=none', self.repository_location + '_unencrypted')
+        os.environ['BORG_PASSPHRASE'] = 'passphrase'
+        self.cmd('init', '--encryption=repokey', self.repository_location + '_encrypted')
+        self.cmd('create', self.repository_location + '_encrypted::test', 'input')
+        self.cmd('delete', '--cache-only', self.repository_location + '_unencrypted')
+        self.cmd('delete', '--cache-only', self.repository_location + '_encrypted')
+        shutil.rmtree(self.repository_path + '_encrypted')
+        os.rename(self.repository_path + '_unencrypted', self.repository_path + '_encrypted')
+        if self.FORK_DEFAULT:
+            self.cmd('create', self.repository_location + '_encrypted::test.2', 'input', exit_code=EXIT_ERROR)
+        else:
+            with pytest.raises(Cache.RepositoryAccessAborted):
+                self.cmd('create', self.repository_location + '_encrypted::test.2', 'input')
+
+    def test_repository_move(self):
+        self.cmd('init', self.repository_location)
+        repository_id = bin_to_hex(self._extract_repository_id(self.repository_path))
+        os.rename(self.repository_path, self.repository_path + '_new')
+        with environment_variable(BORG_RELOCATED_REPO_ACCESS_IS_OK='yes'):
+            self.cmd('info', self.repository_location + '_new')
+        security_dir = get_security_dir(repository_id)
+        with open(os.path.join(security_dir, 'location')) as fd:
+            location = fd.read()
+            assert location == Location(self.repository_location + '_new').canonical_path()
+        # Needs no confirmation anymore
+        self.cmd('info', self.repository_location + '_new')
+        shutil.rmtree(self.cache_path)
+        self.cmd('info', self.repository_location + '_new')
+        shutil.rmtree(security_dir)
+        self.cmd('info', self.repository_location + '_new')
+        for file in ('location', 'key-type', 'manifest-timestamp'):
+            assert os.path.exists(os.path.join(security_dir, file))
+
+    def test_security_dir_compat(self):
+        self.cmd('init', self.repository_location)
+        repository_id = bin_to_hex(self._extract_repository_id(self.repository_path))
+        security_dir = get_security_dir(repository_id)
+        with open(os.path.join(security_dir, 'location'), 'w') as fd:
+            fd.write('something outdated')
+        # This is fine, because the cache still has the correct information. security_dir and cache can disagree
+        # if older versions are used to confirm a renamed repository.
+        self.cmd('info', self.repository_location)
+
+    def test_unknown_unencrypted(self):
+        self.cmd('init', '--encryption=none', self.repository_location)
+        repository_id = bin_to_hex(self._extract_repository_id(self.repository_path))
+        security_dir = get_security_dir(repository_id)
+        # Ok: repository is known
+        self.cmd('info', self.repository_location)
+
+        # Ok: repository is still known (through security_dir)
+        shutil.rmtree(self.cache_path)
+        self.cmd('info', self.repository_location)
+
+        # Needs confirmation: cache and security dir both gone (eg. another host or rm -rf ~)
+        shutil.rmtree(self.cache_path)
+        shutil.rmtree(security_dir)
+        if self.FORK_DEFAULT:
+            self.cmd('info', self.repository_location, exit_code=EXIT_ERROR)
+        else:
+            with pytest.raises(Cache.CacheInitAbortedError):
+                self.cmd('info', self.repository_location)
+        with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='yes'):
+            self.cmd('info', self.repository_location)
 
     def test_strip_components(self):
         self.cmd('init', self.repository_location)

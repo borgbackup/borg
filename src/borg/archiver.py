@@ -970,6 +970,7 @@ class Archiver:
         if key.NAME.startswith('key file'):
             print('Key file: %s' % key.find_key())
         print('Cache: %s' % cache.path)
+        print('Security dir: %s' % cache.security_manager.dir)
         print(DASHES)
         print(STATS_HEADER)
         print(str(cache))

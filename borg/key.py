@@ -105,7 +105,8 @@ class PlaintextKey(KeyBase):
 
     def decrypt(self, id, data):
         if data[0] != self.TYPE:
-            raise IntegrityError('Chunk %s: Invalid encryption envelope' % bin_to_hex(id))
+            id_str = bin_to_hex(id) if id is not None else '(unknown)'
+            raise IntegrityError('Chunk %s: Invalid encryption envelope' % id_str)
         data = self.compressor.decompress(memoryview(data)[1:])
         if id and sha256(data).digest() != id:
             raise IntegrityError('Chunk %s: id verification failed' % bin_to_hex(id))

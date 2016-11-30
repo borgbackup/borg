@@ -45,8 +45,8 @@ class TestKey:
         zKvtzupDyTsfrJMqppdGVyYXRpb25zzgABhqCkc2FsdNoAIGTK3TR09UZqw1bPi17gyHOi
         7YtSp4BVK7XptWeKh6Vip3ZlcnNpb24B""".strip()
 
-    keyfile_blake2_cdata = bytes.fromhex('04dd21cc91140ef009bc9e4dd634d075e39d39025ccce1289c'
-                                         '5536f9cb57f5f8130404040404040408ec852921309243b164')
+    keyfile_blake2_cdata = bytes.fromhex('045d225d745e07af9002d739391e4e7509ff82a04f98debd74'
+                                         '012f09b82cc1d07e0404040404040408ec852921309243b164')
     # Verified against b2sum. Entire string passed to BLAKE2, including the 32 byte key contained in
     # keyfile_blake2_key_file above is
     # 037fb9b75b20d623f1d5a568050fccde4a1b7c5f5047432925e941a17c7a2d0d7061796c6f6164

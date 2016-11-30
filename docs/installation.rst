@@ -266,7 +266,7 @@ Cygwin
 
 Use the Cygwin installer to install the dependencies::
 
-    python3 python3-setuptools
+    python3 python3-devel python3-setuptools
     binutils gcc-g++
     libopenssl openssl-devel
     liblz4_1 liblz4-devel

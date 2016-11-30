@@ -31,9 +31,9 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
             ;;
     esac
     pyenv rehash
-    python -m pip install --user 'virtualenv<14.0'
+    python -m pip install --user virtualenv
 else
-    pip install 'virtualenv<14.0'
+    pip install virtualenv
     sudo apt-get update
     sudo apt-get install -y liblz4-dev
     sudo apt-get install -y libacl1-dev

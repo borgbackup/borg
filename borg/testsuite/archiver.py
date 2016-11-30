@@ -1446,6 +1446,22 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.assert_in('archive2', output)
         self.cmd('check', self.repository_location, exit_code=0)
 
+    def test_manifest_rebuild_corrupted_chunk(self):
+        archive, repository = self.open_archive('archive1')
+        with repository:
+            manifest = repository.get(Manifest.MANIFEST_ID)
+            corrupted_manifest = manifest + b'corrupted!'
+            repository.put(Manifest.MANIFEST_ID, corrupted_manifest)
+
+            chunk = repository.get(archive.id)
+            corrupted_chunk = chunk + b'corrupted!'
+            repository.put(archive.id, corrupted_chunk)
+            repository.commit()
+        self.cmd('check', self.repository_location, exit_code=1)
+        output = self.cmd('check', '-v', '--repair', self.repository_location, exit_code=0)
+        self.assert_in('archive2', output)
+        self.cmd('check', self.repository_location, exit_code=0)
+
     def test_extra_chunks(self):
         self.cmd('check', self.repository_location, exit_code=0)
         with Repository(self.repository_location, exclusive=True) as repository:

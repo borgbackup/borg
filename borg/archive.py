@@ -912,7 +912,12 @@ class ArchiveChecker:
         archive_keys_serialized = [msgpack.packb(name) for name in ARCHIVE_KEYS]
         for chunk_id, _ in self.chunks.iteritems():
             cdata = self.repository.get(chunk_id)
-            data = self.key.decrypt(chunk_id, cdata)
+            try:
+                data = self.key.decrypt(chunk_id, cdata)
+            except IntegrityError as exc:
+                logger.error('Skipping corrupted chunk: %s', exc)
+                self.error_found = True
+                continue
             if not valid_msgpacked_dict(data, archive_keys_serialized):
                 continue
             if b'cmdline' not in data or b'\xa7version\x01' not in data:

@@ -19,7 +19,7 @@ from . import xattr
 from .helpers import Error, uid2user, user2uid, gid2group, group2gid, bin_to_hex, \
     parse_timestamp, to_localtime, format_time, format_timedelta, remove_surrogates, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
-    ProgressIndicatorPercent
+    ProgressIndicatorPercent, IntegrityError
 from .platform import acl_get, acl_set
 from .chunker import Chunker
 from .hashindex import ChunkIndex
@@ -849,7 +849,13 @@ class ArchiveChecker:
             self.error_found = True
             self.manifest = self.rebuild_manifest()
         else:
-            self.manifest, _ = Manifest.load(repository, key=self.key)
+            try:
+                self.manifest, _ = Manifest.load(repository, key=self.key)
+            except IntegrityError as exc:
+                logger.error('Repository manifest is corrupted: %s', exc)
+                self.error_found = True
+                del self.chunks[Manifest.MANIFEST_ID]
+                self.manifest = self.rebuild_manifest()
         self.rebuild_refcounts(archive=archive, last=last, prefix=prefix)
         self.orphan_chunks_check()
         self.finish(save_space=save_space)

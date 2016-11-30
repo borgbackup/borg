@@ -152,7 +152,8 @@ class PlaintextKey(KeyBase):
 
     def decrypt(self, id, data, decompress=True):
         if data[0] != self.TYPE:
-            raise IntegrityError('Chunk %s: Invalid encryption envelope' % bin_to_hex(id))
+            id_str = bin_to_hex(id) if id is not None else '(unknown)'
+            raise IntegrityError('Chunk %s: Invalid encryption envelope' % id_str)
         payload = memoryview(data)[1:]
         if not decompress:
             return Chunk(payload)
@@ -209,12 +210,14 @@ class AESKeyBase(KeyBase):
     def decrypt(self, id, data, decompress=True):
         if not (data[0] == self.TYPE or
             data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
-            raise IntegrityError('Chunk %s: Invalid encryption envelope' % bin_to_hex(id))
+            id_str = bin_to_hex(id) if id is not None else '(unknown)'
+            raise IntegrityError('Chunk %s: Invalid encryption envelope' % id_str)
         data_view = memoryview(data)
         hmac_given = data_view[1:33]
         hmac_computed = memoryview(hmac_sha256(self.enc_hmac_key, data_view[33:]))
         if not compare_digest(hmac_computed, hmac_given):
-            raise IntegrityError('Chunk %s: Encryption envelope checksum mismatch' % bin_to_hex(id))
+            id_str = bin_to_hex(id) if id is not None else '(unknown)'
+            raise IntegrityError('Chunk %s: Encryption envelope checksum mismatch' % id_str)
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
         payload = self.dec_cipher.decrypt(data_view[41:])
         if not decompress:

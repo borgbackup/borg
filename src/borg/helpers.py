@@ -86,7 +86,7 @@ class PlaceholderError(Error):
 
 
 def check_extension_modules():
-    from . import platform, compress
+    from . import platform, compress, item
     if hashindex.API_VERSION != 4:
         raise ExtensionModuleError
     if chunker.API_VERSION != 2:
@@ -96,6 +96,8 @@ def check_extension_modules():
     if crypto.API_VERSION != 3:
         raise ExtensionModuleError
     if platform.API_VERSION != platform.OS_API_VERSION != 5:
+        raise ExtensionModuleError
+    if item.API_VERSION != 1:
         raise ExtensionModuleError
 
 

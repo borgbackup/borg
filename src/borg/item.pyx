@@ -3,6 +3,8 @@ from .helpers import safe_encode, safe_decode
 from .helpers import bigint_to_int, int_to_bigint
 from .helpers import StableDict
 
+API_VERSION = 1
+
 
 class PropDict:
     """

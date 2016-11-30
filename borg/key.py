@@ -143,11 +143,13 @@ class AESKeyBase(KeyBase):
     def decrypt(self, id, data):
         if not (data[0] == self.TYPE or
             data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
-            raise IntegrityError('Chunk %s: Invalid encryption envelope' % bin_to_hex(id))
+            id_str = bin_to_hex(id) if id is not None else '(unknown)'
+            raise IntegrityError('Chunk %s: Invalid encryption envelope' % id_str)
         hmac_given = memoryview(data)[1:33]
         hmac_computed = memoryview(HMAC(self.enc_hmac_key, memoryview(data)[33:], sha256).digest())
         if not compare_digest(hmac_computed, hmac_given):
-            raise IntegrityError('Chunk %s: Encryption envelope checksum mismatch' % bin_to_hex(id))
+            id_str = bin_to_hex(id) if id is not None else '(unknown)'
+            raise IntegrityError('Chunk %s: Encryption envelope checksum mismatch' % id_str)
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
         data = self.compressor.decompress(self.dec_cipher.decrypt(data[41:]))
         if id:

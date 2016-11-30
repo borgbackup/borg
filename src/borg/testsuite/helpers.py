@@ -642,6 +642,7 @@ class TestParseTimestamp(BaseTestCase):
 
 def test_get_cache_dir(monkeypatch):
     """test that get_cache_dir respects environment"""
+    monkeypatch.delenv('BORG_CACHE_DIR', raising=False)
     monkeypatch.delenv('XDG_CACHE_HOME', raising=False)
     assert get_cache_dir() == os.path.join(os.path.expanduser('~'), '.cache', 'borg')
     monkeypatch.setenv('XDG_CACHE_HOME', '/var/tmp/.cache')
@@ -652,6 +653,7 @@ def test_get_cache_dir(monkeypatch):
 
 def test_get_keys_dir(monkeypatch):
     """test that get_keys_dir respects environment"""
+    monkeypatch.delenv('BORG_KEYS_DIR', raising=False)
     monkeypatch.delenv('XDG_CONFIG_HOME', raising=False)
     assert get_keys_dir() == os.path.join(os.path.expanduser('~'), '.config', 'borg', 'keys')
     monkeypatch.setenv('XDG_CONFIG_HOME', '/var/tmp/.config')

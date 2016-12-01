@@ -1016,6 +1016,10 @@ class Archiver:
         stats = Statistics()
         with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
             list_logger = logging.getLogger('borg.output.list')
+            if args.output_list:
+                # set up counters for the progress display
+                to_delete_len = len(to_delete)
+                archives_deleted = 0
             for archive in archives_checkpoints:
                 if archive in to_delete:
                     if args.dry_run:
@@ -1023,7 +1027,9 @@ class Archiver:
                             list_logger.info('Would prune:     %s' % format_archive(archive))
                     else:
                         if args.output_list:
-                            list_logger.info('Pruning archive: %s' % format_archive(archive))
+                            archives_deleted += 1
+                            list_logger.info('Pruning archive: %s (%d/%d)' % (format_archive(archive),
+                                                                              archives_deleted, to_delete_len))
                         Archive(repository, key, manifest, archive.name, cache,
                                 progress=args.progress).delete(stats, forced=args.forced)
                 else:

@@ -2192,7 +2192,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='show repository or archive information')
         subparser.set_defaults(func=self.do_info)
-        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE',
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='archive or repository to display information about')
         self.add_archives_filters_args(subparser)

@@ -252,44 +252,94 @@ For some more general usage hints see also ``--chunker-params``.
 Indexes / Caches
 ----------------
 
-The **files cache** is stored in ``cache/files`` and is indexed on the
-``file path hash``. At backup time, it is used to quickly determine whether we
-need to chunk a given file (or whether it is unchanged and we already have all
-its pieces).
-It contains:
+The **files cache** is stored in ``cache/files`` and is used at backup time to
+quickly determine whether a given file is unchanged and we have all its chunks.
 
-* age
-* file inode number
-* file size
-* file mtime_ns
-* file content chunk hashes
+The files cache is a key -> value mapping and contains:
 
-The inode number is stored to make sure we distinguish between
+* key:
+
+  - full, absolute file path id_hash
+* value:
+
+  - file inode number
+  - file size
+  - file mtime_ns
+  - list of file content chunk id hashes
+  - age (0 [newest], 1, 2, 3, ..., BORG_FILES_CACHE_TTL - 1)
+
+To determine whether a file has not changed, cached values are looked up via
+the key in the mapping and compared to the current file attribute values.
+
+If the file's size, mtime_ns and inode number is still the same, it is
+considered to not have changed. In that case, we check that all file content
+chunks are (still) present in the repository (we check that via the chunks
+cache).
+
+If everything is matching and all chunks are present, the file is not read /
+chunked / hashed again (but still a file metadata item is written to the
+archive, made from fresh file metadata read from the filesystem). This is
+what makes borg so fast when processing unchanged files.
+
+If there is a mismatch or a chunk is missing, the file is read / chunked /
+hashed. Chunks already present in repo won't be transferred to repo again.
+
+The inode number is stored and compared to make sure we distinguish between
 different files, as a single path may not be unique across different
 archives in different setups.
 
-The files cache is stored as a python associative array storing
-python objects, which generates a lot of overhead.
+Not all filesystems have stable inode numbers. If that is the case, borg can
+be told to ignore the inode number in the check via --ignore-inode.
 
-The **chunks cache** is stored in ``cache/chunks`` and is indexed on the
-``chunk id_hash``. It is used to determine whether we already have a specific
-chunk, to count references to it and also for statistics.
-It contains:
+The age value is used for cache management. If a file is "seen" in a backup
+run, its age is reset to 0, otherwise its age is incremented by one.
+If a file was not seen in BORG_FILES_CACHE_TTL backups, its cache entry is
+removed. See also: :ref:`always_chunking` and :ref:`a_status_oddity`
 
-* reference count
-* size
-* encrypted/compressed size
+The files cache is a python dictionary, storing python objects, which
+generates a lot of overhead.
 
-The **repository index** is stored in ``repo/index.%d`` and is indexed on the
-``chunk id_hash``. It is used to determine a chunk's location in the repository.
-It contains:
+Borg can also work without using the files cache (saves memory if you have a
+lot of files or not much RAM free), then all files are assumed to have changed.
+This is usually much slower than with files cache.
 
-* segment (that contains the chunk)
-* offset (where the chunk is located in the segment)
+The **chunks cache** is stored in ``cache/chunks`` and is used to determine
+whether we already have a specific chunk, to count references to it and also
+for statistics.
 
-The repository index file is random access.
+The chunks cache is a key -> value mapping and contains:
+
+* key:
+
+  - chunk id_hash
+* value:
+
+  - reference count
+  - size
+  - encrypted/compressed size
+
+The chunks cache is a hashindex, a hash table implemented in C and tuned for
+memory efficiency.
+
+The **repository index** is stored in ``repo/index.%d`` and is used to
+determine a chunk's location in the repository.
+
+The repo index is a key -> value mapping and contains:
+
+* key:
+
+  - chunk id_hash
+* value:
+
+  - segment (that contains the chunk)
+  - offset (where the chunk is located in the segment)
+
+The repo index is a hashindex, a hash table implemented in C and tuned for
+memory efficiency.
+
 
 Hints are stored in a file (``repo/hints.%d``).
+
 It contains:
 
 * version
@@ -314,7 +364,7 @@ varies between 33% and 300%.
 Indexes / Caches memory usage
 -----------------------------
 
-Here is the estimated memory usage of |project_name|:
+Here is the estimated memory usage of |project_name| - it's complicated:
 
   chunk_count ~= total_file_size / 2 ^ HASH_MASK_BITS
 
@@ -327,6 +377,14 @@ Here is the estimated memory usage of |project_name|:
   mem_usage ~= repo_index_usage + chunks_cache_usage + files_cache_usage
              = chunk_count * 164 + total_file_count * 240
 
+Due to the hashtables, the best/usual/worst cases for memory allocation can
+be estimated like that:
+
+  mem_allocation = mem_usage / load_factor  # l_f = 0.25 .. 0.75
+
+  mem_allocation_peak = mem_allocation * (1 + growth_factor)  # g_f = 1.1 .. 2
+
+
 All units are Bytes.
 
 It is assuming every chunk is referenced exactly once (if you have a lot of
@@ -337,6 +395,17 @@ a lot of files smaller than this statistical medium chunk size, you will have
 more chunks than estimated above, because 1 file is at least 1 chunk).
 
 If a remote repository is used the repo index will be allocated on the remote side.
+
+The chunks cache, files cache and the repo index are all implemented as hash
+tables. A hash table must have a significant amount of unused entries to be
+fast - the so-called load factor gives the used/unused elements ratio.
+
+When a hash table gets full (load factor getting too high), it needs to be
+grown (allocate new, bigger hash table, copy all elements over to it, free old
+hash table) - this will lead to short-time peaks in memory usage each time this
+happens. Usually does not happen for all hashtables at the same time, though.
+For small hash tables, we start with a growth factor of 2, which comes down to
+~1.1x for big hash tables.
 
 E.g. backing up a total count of 1 Mi (IEC binary prefix i.e. 2^20) files with a total size of 1TiB.
 

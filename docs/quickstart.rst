@@ -59,7 +59,7 @@ A step by step example
     -rw-r--r-- user   group       7961 Mon, 2016-02-15 18:22:30 home/user/Documents/Important.doc
     ...
 
-6. Restore the *Monday* archive::
+6. Restore the *Monday* archive by extracting the files relative to the current directory::
 
     $ borg extract /path/to/repo::Monday
 

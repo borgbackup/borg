@@ -288,15 +288,17 @@ def get_keys_dir():
     return keys_dir
 
 
-def get_nonces_dir():
-    """Determine where to store the local nonce high watermark"""
+def get_security_dir(repository_id=None):
+    """Determine where to store local security information."""
 
     xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(get_home_dir(), '.config'))
-    nonces_dir = os.environ.get('BORG_NONCES_DIR', os.path.join(xdg_config, 'borg', 'key-nonces'))
-    if not os.path.exists(nonces_dir):
-        os.makedirs(nonces_dir)
-        os.chmod(nonces_dir, stat.S_IRWXU)
-    return nonces_dir
+    security_dir = os.environ.get('BORG_SECURITY_DIR', os.path.join(xdg_config, 'borg', 'security'))
+    if repository_id:
+        security_dir = os.path.join(security_dir, repository_id)
+    if not os.path.exists(security_dir):
+        os.makedirs(security_dir)
+        os.chmod(security_dir, stat.S_IRWXU)
+    return security_dir
 
 
 def get_cache_dir():
@@ -1210,23 +1212,10 @@ def ellipsis_truncate(msg, space):
     return msg + ' ' * (space - msg_width)
 
 
-class ProgressIndicatorPercent:
+class ProgressIndicatorBase:
     LOGGER = 'borg.output.progress'
 
-    def __init__(self, total=0, step=5, start=0, msg="%3.0f%%"):
-        """
-        Percentage-based progress indicator
-
-        :param total: total amount of items
-        :param step: step size in percent
-        :param start: at which percent value to start
-        :param msg: output message, must contain one %f placeholder for the percentage
-        """
-        self.counter = 0  # 0 .. (total-1)
-        self.total = total
-        self.trigger_at = start  # output next percentage value when reaching (at least) this
-        self.step = step
-        self.msg = msg
+    def __init__(self):
         self.handler = None
         self.logger = logging.getLogger(self.LOGGER)
 
@@ -1247,6 +1236,41 @@ class ProgressIndicatorPercent:
         if self.handler is not None:
             self.logger.removeHandler(self.handler)
             self.handler.close()
+
+
+def justify_to_terminal_size(message):
+    terminal_space = get_terminal_size(fallback=(-1, -1))[0]
+    # justify only if we are outputting to a terminal
+    if terminal_space != -1:
+        return message.ljust(terminal_space)
+    return message
+
+
+class ProgressIndicatorMessage(ProgressIndicatorBase):
+    def output(self, msg):
+        self.logger.info(justify_to_terminal_size(msg))
+
+    def finish(self):
+        self.output('')
+
+
+class ProgressIndicatorPercent(ProgressIndicatorBase):
+    def __init__(self, total=0, step=5, start=0, msg="%3.0f%%"):
+        """
+        Percentage-based progress indicator
+
+        :param total: total amount of items
+        :param step: step size in percent
+        :param start: at which percent value to start
+        :param msg: output message, must contain one %f placeholder for the percentage
+        """
+        self.counter = 0  # 0 .. (total-1)
+        self.total = total
+        self.trigger_at = start  # output next percentage value when reaching (at least) this
+        self.step = step
+        self.msg = msg
+
+        super().__init__()
 
     def progress(self, current=None, increase=1):
         if current is not None:
@@ -1280,10 +1304,7 @@ class ProgressIndicatorPercent:
 
     def output(self, message, justify=True):
         if justify:
-            terminal_space = get_terminal_size(fallback=(-1, -1))[0]
-            # no need to ljust if we're not outputing to a terminal
-            if terminal_space != -1:
-                message = message.ljust(terminal_space)
+            message = justify_to_terminal_size(message)
         self.logger.info(message)
 
     def finish(self):
@@ -1409,6 +1430,7 @@ class ItemFormatter(BaseFormatter):
         'csize': 'compressed size',
         'num_chunks': 'number of chunks in this file',
         'unique_chunks': 'number of unique chunks in this file',
+        'health': 'either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)',
     }
     KEY_GROUPS = (
         ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget', 'flags'),
@@ -1416,6 +1438,7 @@ class ItemFormatter(BaseFormatter):
         ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
         tuple(sorted(hashlib.algorithms_guaranteed)),
         ('archiveid', 'archivename', 'extra'),
+        ('health', )
     )
 
     @classmethod
@@ -1505,6 +1528,7 @@ class ItemFormatter(BaseFormatter):
         item_data['linktarget'] = source
         item_data['extra'] = extra
         item_data['flags'] = item.get('bsdflags')
+        item_data['health'] = 'broken' if 'chunks_healthy' in item else 'healthy'
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)
         return item_data

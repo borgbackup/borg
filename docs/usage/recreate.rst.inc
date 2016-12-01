@@ -44,24 +44,18 @@ Exclusion options
 Archive options
     ``--target TARGET``
         | create a new archive with the name ARCHIVE, do not replace existing archive (only applies for a single archive)
+    ``-c SECONDS``, ``--checkpoint-interval SECONDS``
+        | write checkpoint every SECONDS seconds (Default: 1800)
     ``--comment COMMENT``
         | add a comment text to the archive
     ``--timestamp yyyy-mm-ddThh:mm:ss``
         | manually specify the archive creation date/time (UTC). alternatively, give a reference file/directory.
     ``-C COMPRESSION``, ``--compression COMPRESSION``
-        | select compression algorithm (and level):
-        | none == no compression (default),
-        | auto,C[,L] == built-in heuristic decides between none or C[,L] - with C[,L]
-        |               being any valid compression algorithm (and optional level),
-        | lz4 == lz4,
-        | zlib == zlib (default level 6),
-        | zlib,0 .. zlib,9 == zlib (with level 0..9),
-        | lzma == lzma (default level 6),
-        | lzma,0 .. lzma,9 == lzma (with level 0..9).
+        | select compression algorithm, see the output of the "borg help compression" command for details.
     ``--always-recompress``
-        | always recompress chunks, don't skip chunks already compressed with the samealgorithm.
+        | always recompress chunks, don't skip chunks already compressed with the same algorithm.
     ``--compression-from COMPRESSIONCONFIG``
-        | read compression patterns from COMPRESSIONCONFIG, one per line
+        | read compression patterns from COMPRESSIONCONFIG, see the output of the "borg help compression" command for details.
     ``--chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE``
         | specify the chunker parameters (or "default").
 

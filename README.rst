@@ -89,9 +89,7 @@ Initialize a new backup repository and create a backup archive::
     $ borg init /path/to/repo
     $ borg create /path/to/repo::Saturday1 ~/Documents
 
-Now doing another backup, just to show off the great deduplication:
-
-.. code-block:: none
+Now doing another backup, just to show off the great deduplication::
 
     $ borg create -v --stats /path/to/repo::Saturday2 ~/Documents
     -----------------------------------------------------------------------------
@@ -141,6 +139,8 @@ THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
 Security issues should be reported to the `Security contact`_ (or
 see ``docs/suppport.rst`` in the source distribution).
 
+.. start-badges
+
 |doc| |build| |coverage| |bestpractices|
 
 .. |doc| image:: https://readthedocs.org/projects/borgbackup/badge/?version=stable
@@ -162,3 +162,5 @@ see ``docs/suppport.rst`` in the source distribution).
 .. |bestpractices| image:: https://bestpractices.coreinfrastructure.org/projects/271/badge
         :alt: Best Practices Score
         :target: https://bestpractices.coreinfrastructure.org/projects/271
+
+.. end-badges

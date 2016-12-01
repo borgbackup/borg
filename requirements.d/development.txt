@@ -1,4 +1,4 @@
-virtualenv<14.0
+virtualenv
 tox
 pytest
 pytest-cov

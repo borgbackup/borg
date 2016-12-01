@@ -14,10 +14,12 @@ from .constants import CACHE_README
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Location
 from .helpers import Error
-from .helpers import get_cache_dir
+from .helpers import get_cache_dir, get_security_dir
 from .helpers import decode_dict, int_to_bigint, bigint_to_int, bin_to_hex
 from .helpers import format_file_size
 from .helpers import yes
+from .helpers import remove_surrogates
+from .helpers import ProgressIndicatorPercent, ProgressIndicatorMessage
 from .item import Item, ArchiveItem
 from .key import PlaintextKey
 from .locking import Lock
@@ -26,6 +28,113 @@ from .remote import cache_if_remote
 
 ChunkListEntry = namedtuple('ChunkListEntry', 'id size csize')
 FileCacheEntry = namedtuple('FileCacheEntry', 'age inode size mtime chunk_ids')
+
+
+class SecurityManager:
+    def __init__(self, repository):
+        self.repository = repository
+        self.dir = get_security_dir(repository.id_str)
+        self.key_type_file = os.path.join(self.dir, 'key-type')
+        self.location_file = os.path.join(self.dir, 'location')
+        self.manifest_ts_file = os.path.join(self.dir, 'manifest-timestamp')
+
+    def known(self):
+        return os.path.exists(self.key_type_file)
+
+    def key_matches(self, key):
+        if not self.known():
+            return False
+        try:
+            with open(self.key_type_file, 'r') as fd:
+                type = fd.read()
+                return type == str(key.TYPE)
+        except OSError as exc:
+            logger.warning('Could not read/parse key type file: %s', exc)
+
+    def save(self, manifest, key, cache):
+        logger.debug('security: saving state for %s to %s', self.repository.id_str, self.dir)
+        current_location = cache.repository._location.canonical_path()
+        logger.debug('security: current location   %s', current_location)
+        logger.debug('security: key type           %s', str(key.TYPE))
+        logger.debug('security: manifest timestamp %s', manifest.timestamp)
+        with open(self.location_file, 'w') as fd:
+            fd.write(current_location)
+        with open(self.key_type_file, 'w') as fd:
+            fd.write(str(key.TYPE))
+        with open(self.manifest_ts_file, 'w') as fd:
+            fd.write(manifest.timestamp)
+
+    def assert_location_matches(self, cache):
+        # Warn user before sending data to a relocated repository
+        try:
+            with open(self.location_file) as fd:
+                previous_location = fd.read()
+            logger.debug('security: read previous_location %r', previous_location)
+        except FileNotFoundError:
+            logger.debug('security: previous_location file %s not found', self.location_file)
+            previous_location = None
+        except OSError as exc:
+            logger.warning('Could not read previous location file: %s', exc)
+            previous_location = None
+        if cache.previous_location and previous_location != cache.previous_location:
+            # Reconcile cache and security dir; we take the cache location.
+            previous_location = cache.previous_location
+            logger.debug('security: using previous_location of cache: %r', previous_location)
+        if previous_location and previous_location != self.repository._location.canonical_path():
+            msg = ("Warning: The repository at location {} was previously located at {}\n".format(
+                self.repository._location.canonical_path(), previous_location) +
+                "Do you want to continue? [yN] ")
+            if not yes(msg, false_msg="Aborting.", invalid_msg="Invalid answer, aborting.",
+                       retry=False, env_var_override='BORG_RELOCATED_REPO_ACCESS_IS_OK'):
+                raise Cache.RepositoryAccessAborted()
+            # adapt on-disk config immediately if the new location was accepted
+            logger.debug('security: updating location stored in cache and security dir')
+            with open(self.location_file, 'w') as fd:
+                fd.write(cache.repository._location.canonical_path())
+            cache.begin_txn()
+            cache.commit()
+
+    def assert_no_manifest_replay(self, manifest, key, cache):
+        try:
+            with open(self.manifest_ts_file) as fd:
+                timestamp = fd.read()
+            logger.debug('security: read manifest timestamp %r', timestamp)
+        except FileNotFoundError:
+            logger.debug('security: manifest timestamp file %s not found', self.manifest_ts_file)
+            timestamp = ''
+        except OSError as exc:
+            logger.warning('Could not read previous location file: %s', exc)
+            timestamp = ''
+        timestamp = max(timestamp, cache.timestamp or '')
+        logger.debug('security: determined newest manifest timestamp as %s', timestamp)
+        # If repository is older than the cache or security dir something fishy is going on
+        if timestamp and timestamp > manifest.timestamp:
+            if isinstance(key, PlaintextKey):
+                raise Cache.RepositoryIDNotUnique()
+            else:
+                raise Cache.RepositoryReplay()
+
+    def assert_key_type(self, key, cache):
+        # Make sure an encrypted repository has not been swapped for an unencrypted repository
+        if cache.key_type is not None and cache.key_type != str(key.TYPE):
+            raise Cache.EncryptionMethodMismatch()
+        if self.known() and not self.key_matches(key):
+            raise Cache.EncryptionMethodMismatch()
+
+    def assert_secure(self, manifest, key, cache):
+        self.assert_location_matches(cache)
+        self.assert_key_type(key, cache)
+        self.assert_no_manifest_replay(manifest, key, cache)
+        if not self.known():
+            self.save(manifest, key, cache)
+
+    def assert_access_unknown(self, warn_if_unencrypted, key):
+        if warn_if_unencrypted and isinstance(key, PlaintextKey) and not self.known():
+            msg = ("Warning: Attempting to access a previously unknown unencrypted repository!\n" +
+                   "Do you want to continue? [yN] ")
+            if not yes(msg, false_msg="Aborting.", invalid_msg="Invalid answer, aborting.",
+                       retry=False, env_var_override='BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'):
+                raise Cache.CacheInitAbortedError()
 
 
 class Cache:
@@ -61,7 +170,7 @@ class Cache:
             shutil.rmtree(path)
 
     def __init__(self, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True,
-                 lock_wait=None):
+                 progress=False, lock_wait=None):
         """
         :param do_files: use file metadata cache
         :param warn_if_unencrypted: print warning if accessing unknown unencrypted repository
@@ -75,45 +184,21 @@ class Cache:
         self.repository = repository
         self.key = key
         self.manifest = manifest
+        self.progress = progress
         self.path = path or os.path.join(get_cache_dir(), repository.id_str)
+        self.security_manager = SecurityManager(repository)
         self.hostname_is_unique = yes(env_var_override='BORG_HOSTNAME_IS_UNIQUE', prompt=False, env_msg=None)
         if self.hostname_is_unique:
             logger.info('Enabled removal of stale cache locks')
         self.do_files = do_files
         # Warn user before sending data to a never seen before unencrypted repository
         if not os.path.exists(self.path):
-            if warn_if_unencrypted and isinstance(key, PlaintextKey):
-                msg = ("Warning: Attempting to access a previously unknown unencrypted repository!" +
-                       "\n" +
-                       "Do you want to continue? [yN] ")
-                if not yes(msg, false_msg="Aborting.", invalid_msg="Invalid answer, aborting.",
-                           retry=False, env_var_override='BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'):
-                    raise self.CacheInitAbortedError()
+            self.security_manager.assert_access_unknown(warn_if_unencrypted, key)
             self.create()
         self.open(lock_wait=lock_wait)
         try:
-            # Warn user before sending data to a relocated repository
-            if self.previous_location and self.previous_location != repository._location.canonical_path():
-                msg = ("Warning: The repository at location {} was previously located at {}".format(repository._location.canonical_path(), self.previous_location) +
-                       "\n" +
-                       "Do you want to continue? [yN] ")
-                if not yes(msg, false_msg="Aborting.", invalid_msg="Invalid answer, aborting.",
-                           retry=False, env_var_override='BORG_RELOCATED_REPO_ACCESS_IS_OK'):
-                    raise self.RepositoryAccessAborted()
-                # adapt on-disk config immediately if the new location was accepted
-                self.begin_txn()
-                self.commit()
-
+            self.security_manager.assert_secure(manifest, key, self)
             if sync and self.manifest.id != self.manifest_id:
-                # If repository is older than the cache something fishy is going on
-                if self.timestamp and self.timestamp > manifest.timestamp:
-                    if isinstance(key, PlaintextKey):
-                        raise self.RepositoryIDNotUnique()
-                    else:
-                        raise self.RepositoryReplay()
-                # Make sure an encrypted repository has not been swapped for an unencrypted repository
-                if self.key_type is not None and self.key_type != str(key.TYPE):
-                    raise self.EncryptionMethodMismatch()
                 self.sync()
                 self.commit()
         except:
@@ -216,7 +301,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
 
     def _read_files(self):
         self.files = {}
-        self._newest_mtime = 0
+        self._newest_mtime = None
         logger.debug('Reading files cache ...')
         with open(os.path.join(self.path, 'files'), 'rb') as fd:
             u = msgpack.Unpacker(use_list=True)
@@ -232,22 +317,33 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
 
     def begin_txn(self):
         # Initialize transaction snapshot
+        pi = ProgressIndicatorMessage()
         txn_dir = os.path.join(self.path, 'txn.tmp')
         os.mkdir(txn_dir)
+        pi.output('Initializing cache transaction: Reading config')
         shutil.copy(os.path.join(self.path, 'config'), txn_dir)
+        pi.output('Initializing cache transaction: Reading chunks')
         shutil.copy(os.path.join(self.path, 'chunks'), txn_dir)
+        pi.output('Initializing cache transaction: Reading files')
         shutil.copy(os.path.join(self.path, 'files'), txn_dir)
         os.rename(os.path.join(self.path, 'txn.tmp'),
                   os.path.join(self.path, 'txn.active'))
         self.txn_active = True
+        pi.finish()
 
     def commit(self):
         """Commit transaction
         """
         if not self.txn_active:
             return
+        self.security_manager.save(self.manifest, self.key, self)
+        pi = ProgressIndicatorMessage()
         if self.files is not None:
+            if self._newest_mtime is None:
+                # was never set because no files were modified/added
+                self._newest_mtime = 2 ** 63 - 1  # nanoseconds, good until y2262
             ttl = int(os.environ.get('BORG_FILES_CACHE_TTL', 20))
+            pi.output('Saving files cache')
             with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
                 for path_hash, item in self.files.items():
                     # Only keep files seen in this backup that are older than newest mtime seen in this backup -
@@ -257,17 +353,20 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     if entry.age == 0 and bigint_to_int(entry.mtime) < self._newest_mtime or \
                        entry.age > 0 and entry.age < ttl:
                         msgpack.pack((path_hash, entry), fd)
+        pi.output('Saving cache config')
         self.config.set('cache', 'manifest', self.manifest.id_str)
         self.config.set('cache', 'timestamp', self.manifest.timestamp)
         self.config.set('cache', 'key_type', str(self.key.TYPE))
         self.config.set('cache', 'previous_location', self.repository._location.canonical_path())
         with SaveFile(os.path.join(self.path, 'config')) as fd:
             self.config.write(fd)
+        pi.output('Saving chunks cache')
         self.chunks.write(os.path.join(self.path, 'chunks').encode('utf-8'))
         os.rename(os.path.join(self.path, 'txn.active'),
                   os.path.join(self.path, 'txn.tmp'))
         shutil.rmtree(os.path.join(self.path, 'txn.tmp'))
         self.txn_active = False
+        pi.finish()
 
     def rollback(self):
         """Roll back partial and aborted transactions
@@ -368,8 +467,13 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             cleanup_outdated(cached_ids - archive_ids)
             if archive_ids:
                 chunk_idx = None
+                if self.progress:
+                    pi = ProgressIndicatorPercent(total=len(archive_ids), step=0.1,
+                                                  msg='%3.0f%% Syncing chunks cache. Processing archive %s')
                 for archive_id in archive_ids:
                     archive_name = lookup_name(archive_id)
+                    if self.progress:
+                        pi.show(info=[remove_surrogates(archive_name)])
                     if archive_id in cached_ids:
                         archive_chunk_idx_path = mkpath(archive_id)
                         logger.info("Reading cached archive chunk index for %s ..." % archive_name)
@@ -385,6 +489,8 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                         chunk_idx = archive_chunk_idx
                     else:
                         chunk_idx.merge(archive_chunk_idx)
+                if self.progress:
+                    pi.finish()
             logger.info('Done.')
             return chunk_idx
 
@@ -473,4 +579,4 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             return
         entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, mtime=int_to_bigint(st.st_mtime_ns), chunk_ids=ids)
         self.files[path_hash] = msgpack.packb(entry)
-        self._newest_mtime = max(self._newest_mtime, st.st_mtime_ns)
+        self._newest_mtime = max(self._newest_mtime or 0, st.st_mtime_ns)

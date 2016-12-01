@@ -2,7 +2,7 @@ import os.path
 
 import pytest
 
-from ..helpers import get_nonces_dir
+from ..helpers import get_security_dir
 from ..key import bin_to_hex
 from ..nonces import NonceManager
 from ..remote import InvalidRPCMethod
@@ -61,11 +61,11 @@ class TestNonceManager:
         self.repository = None
 
     def cache_nonce(self):
-        with open(os.path.join(get_nonces_dir(), self.repository.id_str), "r") as fd:
+        with open(os.path.join(get_security_dir(self.repository.id_str), 'nonce'), "r") as fd:
             return fd.read()
 
     def set_cache_nonce(self, nonce):
-        with open(os.path.join(get_nonces_dir(), self.repository.id_str), "w") as fd:
+        with open(os.path.join(get_security_dir(self.repository.id_str), 'nonce'), "w") as fd:
             assert fd.write(nonce)
 
     def test_empty_cache_and_old_server(self, monkeypatch):

@@ -6,15 +6,15 @@ borg diff
 ---------
 ::
 
-    borg diff <options> ARCHIVE1 ARCHIVE2 PATH
+    borg diff <options> REPO_ARCHIVE1 ARCHIVE2 PATH
 
 positional arguments
-    ARCHIVE1
-        archive
+    REPO_ARCHIVE1
+        repository location and ARCHIVE1 name
     ARCHIVE2
-        archive to compare with ARCHIVE1 (no repository location)
+        ARCHIVE2 name (no repository location allowed)
     PATH
-        paths to compare; patterns are supported
+        paths of items inside the archives to compare; patterns are supported
 
 optional arguments
     ``-e PATTERN``, ``--exclude PATTERN``
@@ -34,10 +34,11 @@ optional arguments
 Description
 ~~~~~~~~~~~
 
-This command finds differences in files (contents, user, group, mode) between archives.
+This command finds differences (file contents, user/group/mode) between archives.
 
-Both archives need to be in the same repository, and a repository location may only
-be specified for ARCHIVE1.
+A repository location and an archive name must be specified for REPO_ARCHIVE1.
+ARCHIVE2 is just another archive name in same repository (no repository location
+allowed).
 
 For archives created with Borg 1.1 or newer diff automatically detects whether
 the archives are created with the same chunker params. If so, only chunk IDs

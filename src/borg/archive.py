@@ -241,7 +241,7 @@ class Archive:
         """Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable."""
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
-                 checkpoint_interval=300, numeric_owner=False, progress=False,
+                 checkpoint_interval=300, numeric_owner=False, noatime=False, noctime=False, progress=False,
                  chunker_params=CHUNKER_PARAMS, start=None, end=None, compression=None, compression_files=None,
                  consider_part_files=False):
         self.cwd = os.getcwd()
@@ -255,6 +255,8 @@ class Archive:
         self.name = name
         self.checkpoint_interval = checkpoint_interval
         self.numeric_owner = numeric_owner
+        self.noatime = noatime
+        self.noctime = noctime
         if start is None:
             start = datetime.utcnow()
         self.chunker_params = chunker_params
@@ -685,10 +687,15 @@ Number of files: {0.stats.nfiles}'''.format(
             mode=st.st_mode,
             uid=st.st_uid,
             gid=st.st_gid,
-            atime=st.st_atime_ns,
-            ctime=st.st_ctime_ns,
             mtime=st.st_mtime_ns,
         )
+        # borg can work with archives only having mtime (older attic archives do not have
+        # atime/ctime). it can be useful to omit atime/ctime, if they change without the
+        # file content changing - e.g. to get better metadata deduplication.
+        if not self.noatime:
+            attrs['atime'] = st.st_atime_ns
+        if not self.noctime:
+            attrs['ctime'] = st.st_ctime_ns
         if self.numeric_owner:
             attrs['user'] = attrs['group'] = None
         else:
@@ -1006,7 +1013,13 @@ class ArchiveChecker:
             self.error_found = True
             self.manifest = self.rebuild_manifest()
         else:
-            self.manifest, _ = Manifest.load(repository, key=self.key)
+            try:
+                self.manifest, _ = Manifest.load(repository, key=self.key)
+            except IntegrityError as exc:
+                logger.error('Repository manifest is corrupted: %s', exc)
+                self.error_found = True
+                del self.chunks[Manifest.MANIFEST_ID]
+                self.manifest = self.rebuild_manifest()
         self.rebuild_refcounts(archive=archive, first=first, last=last, sort_by=sort_by, prefix=prefix)
         self.orphan_chunks_check()
         self.finish(save_space=save_space)
@@ -1146,7 +1159,12 @@ class ArchiveChecker:
         archive_keys_serialized = [msgpack.packb(name.encode()) for name in ARCHIVE_KEYS]
         for chunk_id, _ in self.chunks.iteritems():
             cdata = self.repository.get(chunk_id)
-            _, data = self.key.decrypt(chunk_id, cdata)
+            try:
+                _, data = self.key.decrypt(chunk_id, cdata)
+            except IntegrityError as exc:
+                logger.error('Skipping corrupted chunk: %s', exc)
+                self.error_found = True
+                continue
             if not valid_msgpacked_dict(data, archive_keys_serialized):
                 continue
             if b'cmdline' not in data or b'\xa7version\x01' not in data:

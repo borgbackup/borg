@@ -23,15 +23,21 @@ optional arguments
         | attempt to repair any inconsistencies found
     ``--save-space``
         | work slower, but using less space
-    ``--last N``
-        | only check last N archives (Default: all)
-    ``-P``, ``--prefix``
-        | only consider archive names starting with this prefix
     ``-p``, ``--progress``
         | show progress display while checking
 
 `Common options`_
     |
+
+filters
+    ``-P``, ``--prefix``
+        | only consider archive names starting with this prefix
+    ``--sort-by``
+        | Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
+    ``--first N``
+        | consider first N archives after other filters were applied
+    ``--last N``
+        | consider last N archives after other filters were applied
 
 Description
 ~~~~~~~~~~~

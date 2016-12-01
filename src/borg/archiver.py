@@ -95,7 +95,8 @@ def with_repository(fake=False, create=False, lock=True, exclusive=False, manife
                     kwargs['manifest'], kwargs['key'] = Manifest.load(repository)
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
-                               do_files=getattr(args, 'cache_files', False), lock_wait=self.lock_wait) as cache_:
+                               do_files=getattr(args, 'cache_files', False),
+                               progress=getattr(args, 'progress', False), lock_wait=self.lock_wait) as cache_:
                         return method(self, args, repository=repository, cache=cache_, **kwargs)
                 else:
                     return method(self, args, repository=repository, **kwargs)
@@ -341,10 +342,12 @@ class Archiver:
         dry_run = args.dry_run
         t0 = datetime.utcnow()
         if not dry_run:
-            with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
+            with Cache(repository, key, manifest, do_files=args.cache_files, progress=args.progress,
+                       lock_wait=self.lock_wait) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
-                                  numeric_owner=args.numeric_owner, progress=args.progress,
+                                  numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime,
+                                  progress=args.progress,
                                   chunker_params=args.chunker_params, start=t0,
                                   compression=args.compression, compression_files=args.compression_files)
                 create_inner(archive, cache)
@@ -794,7 +797,7 @@ class Archiver:
         if args.stats:
             log_multi(DASHES, STATS_HEADER, logger=stats_logger)
 
-        with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
+        with Cache(repository, key, manifest, progress=args.progress, lock_wait=self.lock_wait) as cache:
             for i, archive_name in enumerate(archive_names, 1):
                 logger.info('Deleting {} ({}/{}):'.format(archive_name, i, len(archive_names)))
                 archive = Archive(repository, key, manifest, archive_name, cache=cache)
@@ -969,6 +972,7 @@ class Archiver:
         if key.NAME.startswith('key file'):
             print('Key file: %s' % key.find_key())
         print('Cache: %s' % cache.path)
+        print('Security dir: %s' % cache.security_manager.dir)
         print(DASHES)
         print(STATS_HEADER)
         print(str(cache))
@@ -1880,6 +1884,12 @@ class Archiver:
         fs_group.add_argument('--numeric-owner', dest='numeric_owner',
                               action='store_true', default=False,
                               help='only store numeric user and group identifiers')
+        fs_group.add_argument('--noatime', dest='noatime',
+                              action='store_true', default=False,
+                              help='do not store atime into archive')
+        fs_group.add_argument('--noctime', dest='noctime',
+                              action='store_true', default=False,
+                              help='do not store ctime into archive')
         fs_group.add_argument('--ignore-inode', dest='ignore_inode',
                               action='store_true', default=False,
                               help='ignore inode data in the file metadata cache used to detect unchanged files.')

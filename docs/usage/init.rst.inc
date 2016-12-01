@@ -66,5 +66,18 @@ a different keyboard layout.
 You can change your passphrase for existing repos at any time, it won't affect
 the encryption/decryption key or other secrets.
 
-When encrypting, AES-CTR-256 is used for encryption, and HMAC-SHA256 for
-authentication. Hardware acceleration will be used automatically.
+Encryption modes
+++++++++++++++++
+
+repokey and keyfile use AES-CTR-256 for encryption and HMAC-SHA256 for
+authentication in an encrypt-then-MAC (EtM) construction. The chunk ID hash
+is HMAC-SHA256 as well (with a separate key).
+
+repokey-blake2 and keyfile-blake2 use the same authenticated encryption, but
+use a keyed BLAKE2b-256 hash for the chunk ID hash.
+
+"authenticated" mode uses no encryption, but authenticates repository contents
+through the same keyed BLAKE2b-256 hash as the other blake2 modes.
+The key is stored like repokey.
+
+Hardware acceleration will be used automatically.

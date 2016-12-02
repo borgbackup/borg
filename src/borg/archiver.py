@@ -2388,7 +2388,7 @@ class Archiver:
 
         When rechunking space usage can be substantial, expect at least the entire
         deduplicated size of the archives using the previous chunker params.
-        When recompressing expect approx throughput / checkpoint-interval in space usage,
+        When recompressing expect approx. (throughput / checkpoint-interval) in space usage,
         assuming all chunks are recompressed.
         """)
         subparser = subparsers.add_parser('recreate', parents=[common_parser], add_help=False,

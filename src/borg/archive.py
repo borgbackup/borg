@@ -1417,6 +1417,9 @@ class ArchiveRecreater:
         self.exclude_if_present = exclude_if_present or []
         self.keep_tag_files = keep_tag_files
 
+        self.rechunkify = chunker_params is not None
+        if self.rechunkify:
+            logger.debug('Rechunking archives to %s', chunker_params)
         self.chunker_params = chunker_params or CHUNKER_PARAMS
         self.recompress = bool(compression)
         self.always_recompress = always_recompress
@@ -1587,7 +1590,10 @@ class ArchiveRecreater:
         target_name = target_name or archive.name + '.recreate'
         target = self.create_target_archive(target_name)
         # If the archives use the same chunker params, then don't rechunkify
-        target.recreate_rechunkify = tuple(archive.metadata.get('chunker_params', [])) != self.chunker_params
+        source_chunker_params = tuple(archive.metadata.get('chunker_params', []))
+        target.recreate_rechunkify = self.rechunkify and source_chunker_params != target.chunker_params
+        if target.recreate_rechunkify:
+            logger.debug('Rechunking archive from %s to %s', source_chunker_params or '(unknown)', target.chunker_params)
         return target
 
     def create_target_archive(self, name):

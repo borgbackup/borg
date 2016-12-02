@@ -1,6 +1,5 @@
 from .constants import ITEM_KEYS
 from .helpers import safe_encode, safe_decode
-from .helpers import bigint_to_int, int_to_bigint
 from .helpers import StableDict
 
 API_VERSION = 1
@@ -153,9 +152,9 @@ class Item(PropDict):
     rdev = PropDict._make_property('rdev', int)
     bsdflags = PropDict._make_property('bsdflags', int)
 
-    atime = PropDict._make_property('atime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
-    ctime = PropDict._make_property('ctime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
-    mtime = PropDict._make_property('mtime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
+    atime = PropDict._make_property('atime', int)
+    ctime = PropDict._make_property('ctime', int)
+    mtime = PropDict._make_property('mtime', int)
 
     hardlink_master = PropDict._make_property('hardlink_master', bool)
 

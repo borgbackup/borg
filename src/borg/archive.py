@@ -1447,7 +1447,7 @@ class ArchiveRecreater:
             return True
         self.process_items(archive, target)
         replace_original = target_name is None
-        return self.save(archive, target, comment, replace_original=replace_original)
+        self.save(archive, target, comment, replace_original=replace_original)
 
     def process_items(self, archive, target):
         matcher = self.matcher

@@ -1101,8 +1101,7 @@ class Archiver:
                 if recreater.is_temporary_archive(name):
                     continue
                 print('Processing', name)
-                if not recreater.recreate(name, args.comment):
-                    break
+                recreater.recreate(name, args.comment)
         manifest.write()
         repository.commit()
         cache.commit()

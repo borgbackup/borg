@@ -181,7 +181,10 @@ class build_usage(Command):
             return
         print('found commands: %s' % list(choices.keys()))
 
-        for command, parser in choices.items():
+        for command, parser in sorted(choices.items()):
+            if command.startswith('debug'):
+                print('skipping', command)
+                continue
             print('generating help for %s' % command)
 
             if self.generate_level(command + " ", parser, Archiver):

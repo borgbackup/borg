@@ -1102,9 +1102,10 @@ class Archiver:
                     continue
                 print('Processing', name)
                 recreater.recreate(name, args.comment)
-        manifest.write()
-        repository.commit()
-        cache.commit()
+        if not args.dry_run:
+            manifest.write()
+            repository.commit()
+            cache.commit()
         return self.exit_code
 
     @with_repository(manifest=False, exclusive=True)
@@ -2387,8 +2388,8 @@ class Archiver:
 
         When rechunking space usage can be substantial, expect at least the entire
         deduplicated size of the archives using the previous chunker params.
-        When recompressing approximately 1 % of the repository size or 512 MB
-        (whichever is greater) of additional space is used.
+        When recompressing expect approx throughput / checkpoint-interval in space usage,
+        assuming all chunks are recompressed.
         """)
         subparser = subparsers.add_parser('recreate', parents=[common_parser], add_help=False,
                                           description=self.do_recreate.__doc__,

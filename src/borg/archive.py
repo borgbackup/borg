@@ -1394,10 +1394,6 @@ class ArchiveChecker:
 
 
 class ArchiveRecreater:
-    class FakeTargetArchive:
-        def __init__(self):
-            self.stats = Statistics()
-
     class Interrupted(Exception):
         def __init__(self, metadata=None):
             self.metadata = metadata or {}
@@ -1434,7 +1430,7 @@ class ArchiveRecreater:
         self.stats = stats
         self.progress = progress
         self.print_file_status = file_status_printer or (lambda *args: None)
-        self.checkpoint_interval = checkpoint_interval
+        self.checkpoint_interval = None if dry_run else checkpoint_interval
 
     def recreate(self, archive_name, comment=None, target_name=None):
         assert not self.is_temporary_archive(archive_name)
@@ -1444,7 +1440,7 @@ class ArchiveRecreater:
             self.matcher_add_tagged_dirs(archive)
         if self.matcher.empty() and not self.recompress and not target.recreate_rechunkify and comment is None:
             logger.info("Skipping archive %s, nothing to do", archive_name)
-            return True
+            return
         self.process_items(archive, target)
         replace_original = target_name is None
         self.save(archive, target, comment, replace_original=replace_original)
@@ -1588,8 +1584,6 @@ class ArchiveRecreater:
 
     def create_target(self, archive, target_name=None):
         """Create target archive."""
-        if self.dry_run:
-            return self.FakeTargetArchive(), None
         target_name = target_name or archive.name + '.recreate'
         target = self.create_target_archive(target_name)
         # If the archives use the same chunker params, then don't rechunkify

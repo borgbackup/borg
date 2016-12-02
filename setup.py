@@ -185,7 +185,7 @@ class build_usage(Command):
             print('generating help for %s' % command)
 
             if self.generate_level(command + " ", parser, Archiver):
-                break
+                continue
 
             with open('docs/usage/%s.rst.inc' % command.replace(" ", "_"), 'w') as doc:
                 doc.write(".. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!\n\n")

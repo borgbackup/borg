@@ -1528,7 +1528,7 @@ class ArchiveRecreater:
             # The target.chunker will read the file contents through ChunkIteratorFileWrapper chunk-by-chunk
             # (does not load the entire file into memory)
             file = ChunkIteratorFileWrapper(chunk_iterator)
-            return target.chunker.chunkify(file)
+            yield from target.chunker.chunkify(file)
         else:
             for chunk in chunk_iterator:
                 yield chunk.data

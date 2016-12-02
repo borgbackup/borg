@@ -23,7 +23,7 @@ from collections import namedtuple, deque, abc
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from functools import wraps, partial, lru_cache
-from itertools import islice
+from itertools import islice, dropwhile
 from operator import attrgetter
 from string import Formatter
 from shutil import get_terminal_size
@@ -1898,3 +1898,21 @@ def swidth_slice(string, max_width):
     if reverse:
         result.reverse()
     return ''.join(result)
+
+
+def slice_chunks(chunks, maximum_length):
+    """
+    Slice *chunks* (list(ChunkListEntry)) to remove a prefix of *maximum_length*.
+
+    Return (sliced_chunks, prefix_length).
+    """
+    def should_drop(chunk):
+        nonlocal current_length
+        dropped = (current_length + chunk.size) <= maximum_length
+        if dropped:
+            current_length += chunk.size
+        return dropped
+
+    current_length = 0
+    sliced_chunks = dropwhile(should_drop, chunks)
+    return list(sliced_chunks), current_length

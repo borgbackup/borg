@@ -492,10 +492,15 @@ class Archiver:
         dry_run = args.dry_run
         stdout = args.stdout
         sparse = args.sparse
+        continue_ = args.continue_
         strip_components = args.strip_components
         dirs = []
         partial_extract = not matcher.empty() or strip_components
         hardlink_masters = {} if partial_extract else None
+
+        if stdout and continue_:
+            self.print_error('Cannot combine --stdout and --continue.')
+            return self.exit_code
 
         def peek_and_store_hardlink_masters(item, matched):
             if (partial_extract and not matched and stat.S_ISREG(item.mode) and
@@ -532,8 +537,9 @@ class Archiver:
                         dirs.append(item)
                         archive.extract_item(item, restore_attrs=False)
                     else:
-                        archive.extract_item(item, stdout=stdout, sparse=sparse, hardlink_masters=hardlink_masters,
-                                             stripped_components=strip_components, original_path=orig_path, pi=pi)
+                        archive.extract_item(item, stdout=stdout, complete_partial=continue_, sparse=sparse,
+                                             hardlink_masters=hardlink_masters, original_path=orig_path, pi=pi,
+                                             stripped_components=strip_components)
             except BackupOSError as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 
@@ -1974,6 +1980,9 @@ class Archiver:
         subparser.add_argument('--sparse', dest='sparse',
                                action='store_true', default=False,
                                help='create holes in output sparse file from all-zero chunks')
+        subparser.add_argument('--continue', dest='continue_',
+                               action='store_true', default=False,
+                               help='continue interrupted extraction')
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to extract')

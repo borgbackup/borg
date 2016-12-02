@@ -804,6 +804,22 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
     def preload(self, ids):
         self.preload_ids += ids
 
+    def discard_preload(self, discard_ids):
+        # Stop preloading these immediately
+        self.preload_ids[:] = [id for id in self.preload_ids
+                               if id not in discard_ids]
+
+        for discard_id in discard_ids:
+            msgids = self.cache.get((discard_id,), [])
+            for msgid in list(msgids):
+                if msgid in self.responses:
+                    # Discard anything we may have already received
+                    self.responses.pop(msgid)
+                    msgids.remove(msgid)
+                else:
+                    # The call was sent out, but no response yet; if we get one, we'll ignore it
+                    self.ignore_responses.add(msgid)
+
 
 def handle_remote_line(line):
     if line.startswith('$LOG '):

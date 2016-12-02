@@ -1517,9 +1517,9 @@ class ArchiveRecreater:
             if Compressor.detect(old_chunk.data).name == compression_spec['name']:
                 # Stored chunk has the same compression we wanted
                 overwrite = False
-        chunk_id, size, csize = self.cache.add_chunk(chunk_id, chunk, target.stats, overwrite=overwrite)
-        self.seen_chunks.add(chunk_id)
-        return chunk_id, size, csize
+        chunk_entry = self.cache.add_chunk(chunk_id, chunk, target.stats, overwrite=overwrite)
+        self.seen_chunks.add(chunk_entry.id)
+        return chunk_entry
 
     def create_chunk_iterator(self, archive, target, chunks):
         """Return iterator of chunks to store for 'item' from 'archive' in 'target'."""

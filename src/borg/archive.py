@@ -1494,12 +1494,11 @@ class ArchiveRecreater:
         self.print_file_status(file_status(item.mode), item.path)
 
     def process_chunks(self, archive, target, item):
-        """Return new chunk ID list for 'item'."""
         if not self.recompress and not target.recreate_rechunkify:
             for chunk_id, size, csize in item.chunks:
                 self.cache.chunk_incref(chunk_id, target.stats)
             return item.chunks
-        chunk_iterator = self.create_chunk_iterator(archive, target, list(item.chunks))
+        chunk_iterator = self.iter_chunks(archive, target, list(item.chunks))
         compress = self.compression_decider1.decide(item.path)
         chunk_processor = partial(self.chunk_processor, target, compress)
         target.chunk_file(item, self.cache, target.stats, chunk_iterator, chunk_processor)
@@ -1521,8 +1520,7 @@ class ArchiveRecreater:
         self.seen_chunks.add(chunk_entry.id)
         return chunk_entry
 
-    def create_chunk_iterator(self, archive, target, chunks):
-        """Return iterator of chunks to store for 'item' from 'archive' in 'target'."""
+    def iter_chunks(self, archive, target, chunks):
         chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _, _ in chunks])
         if target.recreate_rechunkify:
             # The target.chunker will read the file contents through ChunkIteratorFileWrapper chunk-by-chunk
@@ -1534,7 +1532,6 @@ class ArchiveRecreater:
                 yield chunk.data
 
     def save(self, archive, target, comment=None, replace_original=True):
-        """Save target archive. If completed, replace source. If not, save temporary with additional 'metadata' dict."""
         if self.dry_run:
             return
         timestamp = archive.ts.replace(tzinfo=None)

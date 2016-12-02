@@ -2355,6 +2355,8 @@ class Archiver:
         recreate_epilog = textwrap.dedent("""
         Recreate the contents of existing archives.
 
+        This is an *experimental* feature. Do *not* use this on your only backup.
+
         --exclude, --exclude-from and PATH have the exact same semantics
         as in "borg create". If PATHs are specified the resulting archive
         will only contain files from these PATHs.
@@ -2370,15 +2372,6 @@ class Archiver:
         --chunker-params will re-chunk all files in the archive, this can be
         used to have upgraded Borg 0.xx or Attic archives deduplicate with
         Borg 1.x archives.
-
-        borg recreate is signal safe. Send either SIGINT (Ctrl-C on most terminals) or
-        SIGTERM to request termination.
-
-        Use the *exact same* command line to resume the operation later - changing excludes
-        or paths will lead to inconsistencies (changed excludes will only apply to newly
-        processed files/dirs). Changing compression leads to incorrect size information
-        (which does not cause any data loss, but can be misleading).
-        Changing chunker params between invocations might lead to data loss.
 
         USE WITH CAUTION.
         Depending on the PATHs and patterns given, recreate can be used to permanently

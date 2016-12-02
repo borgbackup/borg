@@ -1101,11 +1101,11 @@ class Archiver:
                 if recreater.is_temporary_archive(name):
                     continue
                 print('Processing', name)
-                if not recreater.recreate(name, args.comment):
-                    break
-        manifest.write()
-        repository.commit()
-        cache.commit()
+                recreater.recreate(name, args.comment)
+        if not args.dry_run:
+            manifest.write()
+            repository.commit()
+            cache.commit()
         return self.exit_code
 
     @with_repository(manifest=False, exclusive=True)
@@ -2356,6 +2356,8 @@ class Archiver:
         recreate_epilog = textwrap.dedent("""
         Recreate the contents of existing archives.
 
+        This is an *experimental* feature. Do *not* use this on your only backup.
+
         --exclude, --exclude-from and PATH have the exact same semantics
         as in "borg create". If PATHs are specified the resulting archive
         will only contain files from these PATHs.
@@ -2372,15 +2374,6 @@ class Archiver:
         used to have upgraded Borg 0.xx or Attic archives deduplicate with
         Borg 1.x archives.
 
-        borg recreate is signal safe. Send either SIGINT (Ctrl-C on most terminals) or
-        SIGTERM to request termination.
-
-        Use the *exact same* command line to resume the operation later - changing excludes
-        or paths will lead to inconsistencies (changed excludes will only apply to newly
-        processed files/dirs). Changing compression leads to incorrect size information
-        (which does not cause any data loss, but can be misleading).
-        Changing chunker params between invocations might lead to data loss.
-
         USE WITH CAUTION.
         Depending on the PATHs and patterns given, recreate can be used to permanently
         delete files from archives.
@@ -2395,8 +2388,8 @@ class Archiver:
 
         When rechunking space usage can be substantial, expect at least the entire
         deduplicated size of the archives using the previous chunker params.
-        When recompressing approximately 1 % of the repository size or 512 MB
-        (whichever is greater) of additional space is used.
+        When recompressing expect approx. (throughput / checkpoint-interval) in space usage,
+        assuming all chunks are recompressed.
         """)
         subparser = subparsers.add_parser('recreate', parents=[common_parser], add_help=False,
                                           description=self.do_recreate.__doc__,

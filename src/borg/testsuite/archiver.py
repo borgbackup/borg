@@ -1823,6 +1823,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('recreate', self.repository_location, '--chunker-params', 'default')
         self.check_cache()
         # test1 and test2 do deduplicate after recreate
+        assert int(self.cmd('list', self.repository_location + '::test1', 'input/large_file', '--format={size}'))
         assert not int(self.cmd('list', self.repository_location + '::test1', 'input/large_file',
                                 '--format', '{unique_chunks}'))
 

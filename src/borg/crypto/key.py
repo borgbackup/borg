@@ -802,6 +802,10 @@ class AuthenticatedKeyBase(RepoKey):
             raise IntegrityError('Manifest: Invalid encryption envelope')
         return 42
 
+    def init_ciphers(self, manifest_data=None):
+        if manifest_data is not None and manifest_data[0] != self.TYPE:
+            raise IntegrityError('Manifest: Invalid encryption envelope')
+
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)
         return b''.join([self.TYPE_STR, data])

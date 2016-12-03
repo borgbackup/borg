@@ -76,6 +76,7 @@ class TestKey:
         AuthenticatedKey,
         KeyfileKey,
         RepoKey,
+        AuthenticatedKey,
         # TODO temporarily disabled for branch merging XXX
         #Blake2KeyfileKey,
         #Blake2RepoKey,
@@ -258,7 +259,6 @@ class TestKey:
         with pytest.raises(IntegrityError):
             key.assert_id(id, plaintext_changed)
 
-    @pytest.mark.skip("temporarily disabled for branch merge")  # TODO
     def test_authenticated_encrypt(self, monkeypatch):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
         key = AuthenticatedKey.create(self.MockRepository(), self.MockArgs())

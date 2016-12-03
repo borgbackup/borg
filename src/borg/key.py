@@ -14,7 +14,7 @@ logger = create_logger()
 
 from .constants import *  # NOQA
 from .compress import Compressor, get_compressor
-from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256
+from .crypto import AES, bytes_to_long, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256
 from .helpers import Chunk
 from .helpers import Error, IntegrityError
 from .helpers import yes

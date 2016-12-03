@@ -18,7 +18,7 @@ from ..helpers import prune_within, prune_split
 from ..helpers import get_cache_dir, get_keys_dir, get_security_dir
 from ..helpers import is_slow_msgpack
 from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
-from ..helpers import StableDict, int_to_bigint, bigint_to_int, bin_to_hex
+from ..helpers import StableDict, bin_to_hex
 from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams, Chunk
 from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
 from ..helpers import load_excludes
@@ -27,19 +27,7 @@ from ..helpers import parse_pattern, PatternMatcher, RegexPattern, PathPrefixPat
 from ..helpers import swidth_slice
 from ..helpers import chunkit
 
-from . import BaseTestCase, environment_variable, FakeInputs
-
-
-class BigIntTestCase(BaseTestCase):
-
-    def test_bigint(self):
-        self.assert_equal(int_to_bigint(0), 0)
-        self.assert_equal(int_to_bigint(2**63-1), 2**63-1)
-        self.assert_equal(int_to_bigint(-2**63+1), -2**63+1)
-        self.assert_equal(int_to_bigint(2**63), b'\x00\x00\x00\x00\x00\x00\x00\x80\x00')
-        self.assert_equal(int_to_bigint(-2**63), b'\x00\x00\x00\x00\x00\x00\x00\x80\xff')
-        self.assert_equal(bigint_to_int(int_to_bigint(-2**70)), -2**70)
-        self.assert_equal(bigint_to_int(int_to_bigint(2**70)), 2**70)
+from . import BaseTestCase, FakeInputs
 
 
 def test_bin_to_hex():

@@ -24,7 +24,7 @@ logger = create_logger()
 from . import __version__
 from . import helpers
 from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
-from .archive import BackupOSError, CHUNKER_PARAMS
+from .archive import BackupOSError
 from .cache import Cache
 from .constants import *  # NOQA
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR

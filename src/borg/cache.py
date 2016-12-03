@@ -418,8 +418,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             for id in ids:
                 os.unlink(mkpath(id))
 
-        def fetch_and_build_idx(archive_id, repository, key):
-            chunk_idx = ChunkIndex()
+        def fetch_and_build_idx(archive_id, repository, key, chunk_idx):
             cdata = repository.get(archive_id)
             _, data = key.decrypt(archive_id, cdata)
             chunk_idx.add(archive_id, 1, len(data), len(cdata))
@@ -446,7 +445,6 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     os.unlink(fn_tmp)
                 else:
                     os.rename(fn_tmp, fn)
-            return chunk_idx
 
         def lookup_name(archive_id):
             for info in self.manifest.archives.list():
@@ -472,21 +470,27 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     archive_name = lookup_name(archive_id)
                     if self.progress:
                         pi.show(info=[remove_surrogates(archive_name)])
-                    if archive_id in cached_ids:
-                        archive_chunk_idx_path = mkpath(archive_id)
-                        logger.info("Reading cached archive chunk index for %s ..." % archive_name)
-                        archive_chunk_idx = ChunkIndex.read(archive_chunk_idx_path)
+                    if self.do_cache:
+                        if archive_id in cached_ids:
+                            archive_chunk_idx_path = mkpath(archive_id)
+                            logger.info("Reading cached archive chunk index for %s ..." % archive_name)
+                            archive_chunk_idx = ChunkIndex.read(archive_chunk_idx_path)
+                        else:
+                            logger.info('Fetching and building archive index for %s ...' % archive_name)
+                            archive_chunk_idx = ChunkIndex()
+                            fetch_and_build_idx(archive_id, repository, self.key, archive_chunk_idx)
+                        logger.info("Merging into master chunks index ...")
+                        if chunk_idx is None:
+                            # we just use the first archive's idx as starting point,
+                            # to avoid growing the hash table from 0 size and also
+                            # to save 1 merge call.
+                            chunk_idx = archive_chunk_idx
+                        else:
+                            chunk_idx.merge(archive_chunk_idx)
                     else:
-                        logger.info('Fetching and building archive index for %s ...' % archive_name)
-                        archive_chunk_idx = fetch_and_build_idx(archive_id, repository, self.key)
-                    logger.info("Merging into master chunks index ...")
-                    if chunk_idx is None:
-                        # we just use the first archive's idx as starting point,
-                        # to avoid growing the hash table from 0 size and also
-                        # to save 1 merge call.
-                        chunk_idx = archive_chunk_idx
-                    else:
-                        chunk_idx.merge(archive_chunk_idx)
+                        chunk_idx = chunk_idx or ChunkIndex()
+                        logger.info('Fetching archive index for %s ...' % archive_name)
+                        fetch_and_build_idx(archive_id, repository, self.key, chunk_idx)
                 if self.progress:
                     pi.finish()
             logger.info('Done.')

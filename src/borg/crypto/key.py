@@ -28,7 +28,7 @@ from ..platform import SaveFile
 
 from .nonces import NonceManager
 from .low_level import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
-from .low_level import AES256_CTR_HMAC_SHA256 as CIPHERSUITE
+from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b
 
 
 class PassphraseWrong(Error):
@@ -352,7 +352,7 @@ class AESKeyBase(KeyBase):
 
     PAYLOAD_OVERHEAD = 1 + 32 + 8  # TYPE + HMAC + NONCE
 
-    MAC = hmac_sha256  # TODO: not used yet
+    CIPHERSUITE = AES256_CTR_HMAC_SHA256
 
     logically_encrypted = True
 
@@ -389,7 +389,7 @@ class AESKeyBase(KeyBase):
             self.chunk_seed = self.chunk_seed - 0xffffffff - 1
 
     def init_ciphers(self, manifest_data=None):
-        self.cipher = CIPHERSUITE(mac_key=self.enc_hmac_key, enc_key=self.enc_key, header_len=1, aad_offset=1)
+        self.cipher = self.CIPHERSUITE(mac_key=self.enc_hmac_key, enc_key=self.enc_key, header_len=1, aad_offset=1)
         if manifest_data is None:
             nonce = 0
         else:
@@ -764,7 +764,7 @@ class Blake2KeyfileKey(ID_BLAKE2b_256, KeyfileKey):
     STORAGE = KeyBlobStorage.KEYFILE
 
     FILE_ID = 'BORG_KEY'
-    MAC = blake2b_256  # TODO: not used yet
+    CIPHERSUITE = AES256_CTR_BLAKE2b
 
 
 class Blake2RepoKey(ID_BLAKE2b_256, RepoKey):
@@ -773,7 +773,7 @@ class Blake2RepoKey(ID_BLAKE2b_256, RepoKey):
     ARG_NAME = 'repokey-blake2'
     STORAGE = KeyBlobStorage.REPO
 
-    MAC = blake2b_256  # TODO: not used yet
+    CIPHERSUITE = AES256_CTR_BLAKE2b
 
 
 class AuthenticatedKeyBase(RepoKey):

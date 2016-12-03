@@ -405,6 +405,9 @@ cdef class AES256_CTR_HMAC_SHA256:
         return bytes_to_long(envelope[offset:offset+self.iv_len_short])
 
 
+AES256_CTR_BLAKE2b = AES256_CTR_HMAC_SHA256  # TODO this is a dummy
+
+
 ctypedef const EVP_CIPHER * (* CIPHER)()
 
 

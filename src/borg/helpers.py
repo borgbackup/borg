@@ -86,7 +86,7 @@ class PlaceholderError(Error):
 
 
 def check_extension_modules():
-    from . import platform, compress
+    from . import platform, compress, item
     if hashindex.API_VERSION != 4:
         raise ExtensionModuleError
     if chunker.API_VERSION != 2:
@@ -96,6 +96,8 @@ def check_extension_modules():
     if crypto.API_VERSION != 3:
         raise ExtensionModuleError
     if platform.API_VERSION != platform.OS_API_VERSION != 5:
+        raise ExtensionModuleError
+    if item.API_VERSION != 1:
         raise ExtensionModuleError
 
 
@@ -691,7 +693,7 @@ def SortBySpec(text):
 
 def safe_timestamp(item_timestamp_ns):
     try:
-        return datetime.fromtimestamp(bigint_to_int(item_timestamp_ns) / 1e9)
+        return datetime.fromtimestamp(item_timestamp_ns / 1e9)
     except OverflowError:
         # likely a broken file time and datetime did not want to go beyond year 9999
         return datetime(9999, 12, 31, 23, 59, 59)
@@ -1088,24 +1090,6 @@ class StableDict(dict):
     """A dict subclass with stable items() ordering"""
     def items(self):
         return sorted(super().items())
-
-
-def bigint_to_int(mtime):
-    """Convert bytearray to int
-    """
-    if isinstance(mtime, bytes):
-        return int.from_bytes(mtime, 'little', signed=True)
-    return mtime
-
-
-def int_to_bigint(value):
-    """Convert integers larger than 64 bits to bytearray
-
-    Smaller integers are left alone
-    """
-    if value.bit_length() > 63:
-        return value.to_bytes((value.bit_length() + 9) // 8, 'little', signed=True)
-    return value
 
 
 def is_slow_msgpack():

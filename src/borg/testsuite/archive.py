@@ -220,7 +220,7 @@ def test_key_length_msgpacked_items():
 
 def test_backup_io():
     with pytest.raises(BackupOSError):
-        with backup_io():
+        with backup_io:
             raise OSError(123)
 
 

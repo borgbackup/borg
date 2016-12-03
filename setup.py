@@ -50,6 +50,7 @@ compress_source = 'src/borg/compress.pyx'
 crypto_source = 'src/borg/crypto.pyx'
 chunker_source = 'src/borg/chunker.pyx'
 hashindex_source = 'src/borg/hashindex.pyx'
+item_source = 'src/borg/item.pyx'
 platform_posix_source = 'src/borg/platform/posix.pyx'
 platform_linux_source = 'src/borg/platform/linux.pyx'
 platform_darwin_source = 'src/borg/platform/darwin.pyx'
@@ -60,6 +61,7 @@ cython_sources = [
     crypto_source,
     chunker_source,
     hashindex_source,
+    item_source,
 
     platform_posix_source,
     platform_linux_source,
@@ -83,6 +85,7 @@ try:
                 'src/borg/crypto.c',
                 'src/borg/chunker.c', 'src/borg/_chunker.c',
                 'src/borg/hashindex.c', 'src/borg/_hashindex.c',
+                'src/borg/item.c',
                 'src/borg/platform/posix.c',
                 'src/borg/platform/linux.c',
                 'src/borg/platform/freebsd.c',
@@ -99,6 +102,7 @@ except ImportError:
     crypto_source = crypto_source.replace('.pyx', '.c')
     chunker_source = chunker_source.replace('.pyx', '.c')
     hashindex_source = hashindex_source.replace('.pyx', '.c')
+    item_source = item_source.replace('.pyx', '.c')
     platform_posix_source = platform_posix_source.replace('.pyx', '.c')
     platform_linux_source = platform_linux_source.replace('.pyx', '.c')
     platform_freebsd_source = platform_freebsd_source.replace('.pyx', '.c')
@@ -358,7 +362,8 @@ if not on_rtd:
     Extension('borg.compress', [compress_source], libraries=['lz4'], include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
     Extension('borg.crypto', [crypto_source], libraries=crypto_libraries, include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
     Extension('borg.chunker', [chunker_source]),
-    Extension('borg.hashindex', [hashindex_source])
+    Extension('borg.hashindex', [hashindex_source]),
+    Extension('borg.item', [item_source]),
 ]
     if sys.platform.startswith(('linux', 'freebsd', 'darwin')):
         ext_modules.append(Extension('borg.platform.posix', [platform_posix_source]))

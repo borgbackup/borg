@@ -223,12 +223,10 @@ class UNENCRYPTED:
         return 0
 
 
-cdef class AES256_CTR_HMAC_SHA256:
-    # Layout: HEADER + HMAC 32 + IV 8 + CT (same as attic / borg < 1.2 IF HEADER = TYPE_BYTE, no AAD)
+cdef class AES256_CTR_BASE:
+    # Layout: HEADER + MAC 32 + IV 8 + CT (same as attic / borg < 1.2 IF HEADER = TYPE_BYTE, no AAD)
 
     cdef EVP_CIPHER_CTX *ctx
-    cdef HMAC_CTX *hmac_ctx
-    cdef unsigned char *mac_key
     cdef unsigned char *enc_key
     cdef int cipher_blk_len
     cdef int iv_len, iv_len_short
@@ -245,7 +243,6 @@ cdef class AES256_CTR_HMAC_SHA256:
 
     def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         self.requirements_check()
-        assert isinstance(mac_key, bytes) and len(mac_key) == 32
         assert isinstance(enc_key, bytes) and len(enc_key) == 32
         self.cipher_blk_len = 16
         self.iv_len = sizeof(self.iv)
@@ -254,7 +251,6 @@ cdef class AES256_CTR_HMAC_SHA256:
         self.aad_offset = aad_offset
         self.header_len = header_len
         self.mac_len = 32
-        self.mac_key = mac_key
         self.enc_key = enc_key
         if iv is not None:
             self.set_iv(iv)
@@ -263,11 +259,19 @@ cdef class AES256_CTR_HMAC_SHA256:
 
     def __cinit__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         self.ctx = EVP_CIPHER_CTX_new()
-        self.hmac_ctx = HMAC_CTX_new()
 
     def __dealloc__(self):
         EVP_CIPHER_CTX_free(self.ctx)
-        HMAC_CTX_free(self.hmac_ctx)
+
+    cdef mac_compute(self, const unsigned char *data1, int data1_len,
+                     const unsigned char *data2, int data2_len,
+                     const unsigned char *mac_buf):
+        raise NotImplementedError
+
+    cdef mac_verify(self, const unsigned char *data1, int data1_len,
+                    const unsigned char *data2, int data2_len,
+                    const unsigned char *mac_buf, const unsigned char *mac_wanted):
+        raise NotImplementedError
 
     def encrypt(self, data, header=b'', iv=None):
         """
@@ -309,14 +313,9 @@ cdef class AES256_CTR_HMAC_SHA256:
             if not rc:
                 raise CryptoError('EVP_EncryptFinal_ex failed')
             offset += olen
-            if not HMAC_Init_ex(self.hmac_ctx, self.mac_key, self.mac_len, EVP_sha256(), NULL):
-                raise CryptoError('HMAC_Init_ex failed')
-            if not HMAC_Update(self.hmac_ctx, <const unsigned char *> hdata.buf+aoffset, alen):
-                raise CryptoError('HMAC_Update failed')
-            if not HMAC_Update(self.hmac_ctx, odata+hlen+self.mac_len, offset-hlen-self.mac_len):
-                raise CryptoError('HMAC_Update failed')
-            if not HMAC_Final(self.hmac_ctx, odata+hlen, NULL):
-                raise CryptoError('HMAC_Final failed')
+            self.mac_compute(<const unsigned char *> hdata.buf+aoffset, alen,
+                              odata+hlen+self.mac_len, offset-hlen-self.mac_len,
+                              odata+hlen)
             self.blocks += self.block_count(ilen)
             return odata[:offset]
         finally:
@@ -338,20 +337,13 @@ cdef class AES256_CTR_HMAC_SHA256:
             raise MemoryError
         cdef int olen
         cdef int offset
-        cdef unsigned char hmac_buf[32]
-        assert sizeof(hmac_buf) == self.mac_len
+        cdef unsigned char mac_buf[32]
+        assert sizeof(mac_buf) == self.mac_len
         cdef Py_buffer idata = ro_buffer(envelope)
         try:
-            if not HMAC_Init_ex(self.hmac_ctx, self.mac_key, self.mac_len, EVP_sha256(), NULL):
-                raise CryptoError('HMAC_Init_ex failed')
-            if not HMAC_Update(self.hmac_ctx, <const unsigned char *> idata.buf+aoffset, alen):
-                raise CryptoError('HMAC_Update failed')
-            if not HMAC_Update(self.hmac_ctx, <const unsigned char *> idata.buf+hlen+self.mac_len, ilen-hlen-self.mac_len):
-                raise CryptoError('HMAC_Update failed')
-            if not HMAC_Final(self.hmac_ctx, hmac_buf, NULL):
-                raise CryptoError('HMAC_Final failed')
-            if CRYPTO_memcmp(hmac_buf, idata.buf+hlen, self.mac_len):
-                raise IntegrityError('HMAC Authentication failed')
+            self.mac_verify(<const unsigned char *> idata.buf+aoffset, alen,
+                             <const unsigned char *> idata.buf+hlen+self.mac_len, ilen-hlen-self.mac_len,
+                             mac_buf, <const unsigned char *> idata.buf+hlen)
             iv = self.fetch_iv(<unsigned char *> idata.buf+hlen+self.mac_len)
             self.set_iv(iv)
             if not EVP_DecryptInit_ex(self.ctx, EVP_aes_256_ctr(), NULL, self.enc_key, iv):
@@ -405,7 +397,81 @@ cdef class AES256_CTR_HMAC_SHA256:
         return bytes_to_long(envelope[offset:offset+self.iv_len_short])
 
 
-AES256_CTR_BLAKE2b = AES256_CTR_HMAC_SHA256  # TODO this is a dummy
+cdef class AES256_CTR_HMAC_SHA256(AES256_CTR_BASE):
+    cdef HMAC_CTX *hmac_ctx
+    cdef unsigned char *mac_key
+
+    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+        assert isinstance(mac_key, bytes) and len(mac_key) == 32
+        self.mac_key = mac_key
+        super().__init__(mac_key, enc_key, iv=iv, header_len=header_len, aad_offset=aad_offset)
+
+    def __cinit__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+        self.hmac_ctx = HMAC_CTX_new()
+
+    def __dealloc__(self):
+        HMAC_CTX_free(self.hmac_ctx)
+
+    cdef mac_compute(self, const unsigned char *data1, int data1_len,
+                     const unsigned char *data2, int data2_len,
+                     const unsigned char *mac_buf):
+        if not HMAC_Init_ex(self.hmac_ctx, self.mac_key, self.mac_len, EVP_sha256(), NULL):
+            raise CryptoError('HMAC_Init_ex failed')
+        if not HMAC_Update(self.hmac_ctx, data1, data1_len):
+            raise CryptoError('HMAC_Update failed')
+        if not HMAC_Update(self.hmac_ctx, data2, data2_len):
+            raise CryptoError('HMAC_Update failed')
+        if not HMAC_Final(self.hmac_ctx, mac_buf, NULL):
+            raise CryptoError('HMAC_Final failed')
+
+    cdef mac_verify(self, const unsigned char *data1, int data1_len,
+                    const unsigned char *data2, int data2_len,
+                    const unsigned char *mac_buf, const unsigned char *mac_wanted):
+        self.mac_compute(data1, data1_len, data2, data2_len, mac_buf)
+        if CRYPTO_memcmp(mac_buf, mac_wanted, self.mac_len):
+            raise IntegrityError('MAC Authentication failed')
+
+
+cdef class AES256_CTR_BLAKE2b(AES256_CTR_BASE):
+    cdef unsigned char *mac_key
+
+    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+        assert isinstance(mac_key, bytes) and len(mac_key) == 128
+        self.mac_key = mac_key
+        super().__init__(mac_key, enc_key, iv=iv, header_len=header_len, aad_offset=aad_offset)
+
+    def __cinit__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+        pass
+
+    def __dealloc__(self):
+        pass
+
+    cdef mac_compute(self, const unsigned char *data1, int data1_len,
+                     const unsigned char *data2, int data2_len,
+                     const unsigned char *mac_buf):
+        cdef blake2b_state state
+        cdef int rc
+        rc = blake2b_init(&state, self.mac_len)
+        if rc == -1:
+            raise Exception('blake2b_init() failed')
+        with nogil:
+            rc = blake2b_update(&state, self.mac_key, 128)
+            if rc != -1:
+                rc = blake2b_update(&state, data1, data1_len)
+                if rc != -1:
+                    rc = blake2b_update(&state, data2, data2_len)
+        if rc == -1:
+            raise Exception('blake2b_update() failed')
+        rc = blake2b_final(&state, mac_buf, self.mac_len)
+        if rc == -1:
+            raise Exception('blake2b_final() failed')
+
+    cdef mac_verify(self, const unsigned char *data1, int data1_len,
+                    const unsigned char *data2, int data2_len,
+                    const unsigned char *mac_buf, const unsigned char *mac_wanted):
+        self.mac_compute(data1, data1_len, data2, data2_len, mac_buf)
+        if CRYPTO_memcmp(mac_buf, mac_wanted, self.mac_len):
+            raise IntegrityError('MAC Authentication failed')
 
 
 ctypedef const EVP_CIPHER * (* CIPHER)()

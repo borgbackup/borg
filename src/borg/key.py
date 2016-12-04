@@ -226,6 +226,8 @@ class AESKeyBase(KeyBase):
         self.nonce_manager.ensure_reservation(num_aes_blocks(len(chunk.data)))
         self.enc_cipher.reset()
         data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(chunk.data)))
+        assert (self.MAC is blake2b_256 and len(self.enc_hmac_key) == 128 or
+                self.MAC is hmac_sha256 and len(self.enc_hmac_key) == 32)
         hmac = self.MAC(self.enc_hmac_key, data)
         return b''.join((self.TYPE_STR, hmac, data))
 
@@ -236,6 +238,8 @@ class AESKeyBase(KeyBase):
             raise IntegrityError('Chunk %s: Invalid encryption envelope' % id_str)
         data_view = memoryview(data)
         hmac_given = data_view[1:33]
+        assert (self.MAC is blake2b_256 and len(self.enc_hmac_key) == 128 or
+                self.MAC is hmac_sha256 and len(self.enc_hmac_key) == 32)
         hmac_computed = memoryview(self.MAC(self.enc_hmac_key, data_view[33:]))
         if not compare_digest(hmac_computed, hmac_given):
             id_str = bin_to_hex(id) if id is not None else '(unknown)'

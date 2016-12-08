@@ -125,7 +125,7 @@ Links
 * `Web-Chat (IRC) <http://webchat.freenode.net/?randomnick=1&channels=%23borgbackup&uio=MTY9dHJ1ZSY5PXRydWUa8>`_ and
   `Mailing List <https://mail.python.org/mailman/listinfo/borgbackup>`_
 * `License <https://borgbackup.readthedocs.org/en/stable/authors.html#license>`_
-* `Security contact <https://borgbackup.readthedocs.org/en/stable/support.html#security-contact>`_
+* `Security contact <https://borgbackup.readthedocs.io/en/stable/index.html#checking-release-authenticity-and-security-contact>`_
 
 Compatibility notes
 -------------------

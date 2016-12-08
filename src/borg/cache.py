@@ -435,10 +435,8 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     if not isinstance(item, dict):
                         logger.error('Error: Did not get expected metadata dict - archive corrupted!')
                         continue
-                    item = Item(internal_dict=item)
-                    if 'chunks' in item:
-                        for chunk_id, size, csize in item.chunks:
-                            chunk_idx.add(chunk_id, 1, size, csize)
+                    for chunk_id, size, csize in item.get(b'chunks', []):
+                        chunk_idx.add(chunk_id, 1, size, csize)
             if self.do_cache:
                 fn = mkpath(archive_id)
                 fn_tmp = mkpath(archive_id, suffix='.tmp')

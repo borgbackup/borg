@@ -71,6 +71,32 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
+Version 1.0.9 (not released yet)
+--------------------------------
+
+Bug fixes:
+
+- borg check:
+
+  - rebuild manifest if it's corrupted
+  - skip corrupted chunks during manifest rebuild
+- fix TypeError in errorhandler, #1903, #1894
+
+Other changes:
+
+- docs:
+
+  - add python3-devel as a dependency for cygwin-based installation
+  - clarify extract is relative to current directory
+  - FAQ: fix link to changelog
+  - markup fixes
+- tests: test_get_(cache|keys)_dir: clean env state, #1897
+- setup.py build_usage:
+
+  - fixed build_usage not processing all commands
+  - fixed build_usage not generating includes for debug commands
+
+
 Version 1.0.9rc1 (2016-11-27)
 -----------------------------
 

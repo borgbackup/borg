@@ -791,7 +791,7 @@ class Location:
     # regexes for misc. kinds of supported location specifiers:
     ssh_re = re.compile(r"""
         (?P<proto>ssh)://                                   # ssh://
-        (?:(?P<user>[^@]+)@)?                               # user@  (optional)
+        (?:(?P<user>[^@:/]+)@)?                             # user@  (optional) - username must not contain : or /
         (?P<host>[^:/]+)(?::(?P<port>\d+))?                 # host or host:port
         """ + path_re + optional_archive_re, re.VERBOSE)    # path or path::archive
 
@@ -802,7 +802,7 @@ class Location:
     # note: scp_re is also use for local pathes
     scp_re = re.compile(r"""
         (
-            (?:(?P<user>[^@]+)@)?                           # user@  (optional)
+            (?:(?P<user>[^@:/]+)@)?                         # user@  (optional) - username must not contain : or /
             (?P<host>[^:/]+):                               # host: (don't match / in host to disambiguate from file:)
         )?                                                  # user@host: part is optional
         """ + path_re + optional_archive_re, re.VERBOSE)    # path with optional archive

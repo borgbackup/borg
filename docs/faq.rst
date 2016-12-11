@@ -237,6 +237,8 @@ serialized way in a single script, you need to give them --lock-wait N (with N
 being a bit more than the time the server needs to terminate broken down
 connections and release the lock).
 
+.. _disable_archive_chunks:
+
 The borg cache eats way too much disk space, what can I do?
 -----------------------------------------------------------
 

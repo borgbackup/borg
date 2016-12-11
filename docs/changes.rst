@@ -135,20 +135,15 @@ Version 1.1.0b3 (not released yet)
 
 Bug fixes:
 
-- borg recreate:
-
-  - fix rechunking dropping all chunks on the floor
-  - fix crash on checkpoint
-  - don't rechunkify unless explicitly told so
-  - repo-only location: fix only one archive being processed
-- borg info:fixed bug when called without arguments, #1914
+- borg recreate: don't rechunkify unless explicitly told so
+- borg info: fixed bug when called without arguments, #1914
 - borg init: fix free space check crashing if disk is full, #1821
 - borg debug delete/get obj: fix wrong reference to exception
 
 New features:
 
-- add blake2b key modes (use blake2b as MAC)
-- crypto: link against system libb2, if possible, otherwise use bundled code
+- add blake2b key modes (use blake2b as MAC). This links against system libb2,
+  if possible, otherwise uses bundled code
 - automatically remove stale locks - set BORG_HOSTNAME_IS_UNIQUE env var
   to enable stale lock killing. If set, stale locks in both cache and
   repository are deleted. #562
@@ -172,6 +167,9 @@ Other changes:
   - re-use existing checkpoint functionality
   - archiver tests: add check_cache tool - lints refcounts
 
+- fixed cache sync performance regression from 1.1.0b1 onwards, #1940
+- syncing the cache without chunks.archive.d (see :ref:`disable_archive_chunks`)
+  now avoids any merges and is thus faster, #1940
 - borg check --verify-data: faster due to linear on-disk-order scan
 - borg debug-xxx commands removed, we use "debug xxx" subcommands now, #1627
 - improve metadata handling speed

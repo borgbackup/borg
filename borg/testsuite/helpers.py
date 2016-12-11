@@ -11,7 +11,7 @@ import msgpack.fallback
 import time
 
 from ..helpers import Location, format_file_size, format_timedelta, format_line, PlaceholderError, make_path_safe, \
-    prune_within, prune_split, get_cache_dir, get_keys_dir, Statistics, is_slow_msgpack, \
+    prune_within, prune_split, get_cache_dir, get_keys_dir, get_security_dir, Statistics, is_slow_msgpack, \
     yes, TRUISH, FALSISH, DEFAULTISH, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
     ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
@@ -652,6 +652,18 @@ def test_get_keys_dir(monkeypatch):
     assert get_keys_dir() == os.path.join('/var/tmp/.config', 'borg', 'keys')
     monkeypatch.setenv('BORG_KEYS_DIR', '/var/tmp')
     assert get_keys_dir() == '/var/tmp'
+
+
+def test_get_security_dir(monkeypatch):
+    """test that get_security_dir respects environment"""
+    monkeypatch.delenv('BORG_SECURITY_DIR', raising=False)
+    monkeypatch.delenv('XDG_CONFIG_HOME', raising=False)
+    assert get_security_dir() == os.path.join(os.path.expanduser('~'), '.config', 'borg', 'security')
+    assert get_security_dir(repository_id='1234') == os.path.join(os.path.expanduser('~'), '.config', 'borg', 'security', '1234')
+    monkeypatch.setenv('XDG_CONFIG_HOME', '/var/tmp/.config')
+    assert get_security_dir() == os.path.join('/var/tmp/.config', 'borg', 'security')
+    monkeypatch.setenv('BORG_SECURITY_DIR', '/var/tmp')
+    assert get_security_dir() == '/var/tmp'
 
 
 @pytest.fixture()

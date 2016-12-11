@@ -86,7 +86,7 @@ def check_extension_modules():
         raise ExtensionModuleError
     if chunker.API_VERSION != 2:
         raise ExtensionModuleError
-    if crypto.API_VERSION != 2:
+    if crypto.API_VERSION != 3:
         raise ExtensionModuleError
     if platform.API_VERSION != 3:
         raise ExtensionModuleError
@@ -103,10 +103,11 @@ class Manifest:
         self.key = key
         self.repository = repository
         self.item_keys = frozenset(item_keys) if item_keys is not None else ITEM_KEYS
+        self.tam_verified = False
 
     @classmethod
-    def load(cls, repository, key=None):
-        from .key import key_factory
+    def load(cls, repository, key=None, force_tam_not_required=False):
+        from .key import key_factory, tam_required_file, tam_required
         from .repository import Repository
         from .archive import ITEM_KEYS
         try:
@@ -117,8 +118,8 @@ class Manifest:
             key = key_factory(repository, cdata)
         manifest = cls(key, repository)
         data = key.decrypt(None, cdata)
+        m, manifest.tam_verified = key.unpack_and_verify_manifest(data, force_tam_not_required=force_tam_not_required)
         manifest.id = key.id_hash(data)
-        m = msgpack.unpackb(data)
         if not m.get(b'version') == 1:
             raise ValueError('Invalid manifest version')
         manifest.archives = dict((k.decode('utf-8'), v) for k, v in m[b'archives'].items())
@@ -128,19 +129,27 @@ class Manifest:
         manifest.config = m[b'config']
         # valid item keys are whatever is known in the repo or every key we know
         manifest.item_keys = frozenset(m.get(b'item_keys', [])) | ITEM_KEYS
+        if manifest.config.get(b'tam_required', False) and manifest.tam_verified and not tam_required(repository):
+            logger.debug('Manifest is TAM verified and says TAM is required, updating security database...')
+            file = tam_required_file(repository)
+            open(file, 'w').close()
         return manifest, key
 
     def write(self):
+        if self.key.tam_required:
+            self.config[b'tam_required'] = True
         self.timestamp = datetime.utcnow().isoformat()
-        data = msgpack.packb(StableDict({
+        m = {
             'version': 1,
-            'archives': self.archives,
+            'archives': StableDict((name, StableDict(archive)) for name, archive in self.archives.items()),
             'timestamp': self.timestamp,
-            'config': self.config,
-            'item_keys': tuple(self.item_keys),
-        }))
+            'config': StableDict(self.config),
+            'item_keys': tuple(sorted(self.item_keys)),
+        }
+        self.tam_verified = True
+        data = self.key.pack_and_authenticate_metadata(m)
         self.id = self.key.id_hash(data)
-        self.repository.put(self.MANIFEST_ID, self.key.encrypt(data))
+        self.repository.put(self.MANIFEST_ID, self.key.encrypt(data, none_compression=True))
 
     def list_archive_infos(self, sort_by=None, reverse=False):
         # inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
@@ -247,6 +256,18 @@ def get_keys_dir():
         os.makedirs(keys_dir)
         os.chmod(keys_dir, stat.S_IRWXU)
     return keys_dir
+
+
+def get_security_dir(repository_id=None):
+    """Determine where to store local security information."""
+    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(os.path.expanduser('~'), '.config'))
+    security_dir = os.environ.get('BORG_SECURITY_DIR', os.path.join(xdg_config, 'borg', 'security'))
+    if repository_id:
+        security_dir = os.path.join(security_dir, repository_id)
+    if not os.path.exists(security_dir):
+        os.makedirs(security_dir)
+        os.chmod(security_dir, stat.S_IRWXU)
+    return security_dir
 
 
 def get_cache_dir():

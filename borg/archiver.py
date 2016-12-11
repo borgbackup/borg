@@ -30,7 +30,7 @@ from .compress import Compressor
 from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 from .repository import Repository
 from .cache import Cache
-from .key import key_creator, RepoKey, PassphraseKey
+from .key import key_creator, tam_required_file, tam_required, RepoKey, PassphraseKey
 from .keymanager import KeyManager
 from .archive import backup_io, BackupOSError, Archive, ArchiveChecker, CHUNKER_PARAMS, is_special
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
@@ -51,7 +51,7 @@ def argument(args, str_or_bool):
     return str_or_bool
 
 
-def with_repository(fake=False, create=False, lock=True, exclusive=False, manifest=True, cache=False):
+def with_repository(fake=False, invert_fake=False, create=False, lock=True, exclusive=False, manifest=True, cache=False):
     """
     Method decorator for subcommand-handling methods: do_XYZ(self, args, repository, …)
 
@@ -68,7 +68,7 @@ def with_repository(fake=False, create=False, lock=True, exclusive=False, manife
         def wrapper(self, args, **kwargs):
             location = args.location  # note: 'location' must be always present in args
             append_only = getattr(args, 'append_only', False)
-            if argument(args, fake):
+            if argument(args, fake) ^ invert_fake:
                 return method(self, args, repository=None, **kwargs)
             elif location.proto == 'ssh':
                 repository = RemoteRepository(location, create=create, exclusive=argument(args, exclusive),
@@ -135,6 +135,8 @@ class Archiver:
         repository.commit()
         with Cache(repository, key, manifest, warn_if_unencrypted=False):
             pass
+        tam_file = tam_required_file(repository)
+        open(tam_file, 'w').close()
         return self.exit_code
 
     @with_repository(exclusive=True, manifest=False)
@@ -161,6 +163,7 @@ class Archiver:
     def do_change_passphrase(self, args, repository, manifest, key):
         """Change repository key file passphrase"""
         key.change_passphrase()
+        logger.info('Key updated')
         return EXIT_SUCCESS
 
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
@@ -209,6 +212,7 @@ class Archiver:
         key_new.id_key = key_old.id_key
         key_new.chunk_seed = key_old.chunk_seed
         key_new.change_passphrase()  # option to change key protection passphrase, save
+        logger.info('Key updated')
         return EXIT_SUCCESS
 
     @with_repository(fake='dry_run', exclusive=True)
@@ -705,21 +709,43 @@ class Archiver:
                           DASHES)
         return self.exit_code
 
-    def do_upgrade(self, args):
+    @with_repository(fake='tam', invert_fake=True, manifest=False, exclusive=True)
+    def do_upgrade(self, args, repository, manifest=None, key=None):
         """upgrade a repository from a previous version"""
-        # mainly for upgrades from Attic repositories,
-        # but also supports borg 0.xx -> 1.0 upgrade.
+        if args.tam:
+            manifest, key = Manifest.load(repository, force_tam_not_required=args.force)
 
-        repo = AtticRepositoryUpgrader(args.location.path, create=False)
-        try:
-            repo.upgrade(args.dry_run, inplace=args.inplace, progress=args.progress)
-        except NotImplementedError as e:
-            print("warning: %s" % e)
-        repo = BorgRepositoryUpgrader(args.location.path, create=False)
-        try:
-            repo.upgrade(args.dry_run, inplace=args.inplace, progress=args.progress)
-        except NotImplementedError as e:
-            print("warning: %s" % e)
+            if not manifest.tam_verified:
+                # The standard archive listing doesn't include the archive ID like in borg 1.1.x
+                print('Manifest contents:')
+                for archive_info in manifest.list_archive_infos(sort_by='ts'):
+                    print(format_archive(archive_info), '[%s]' % bin_to_hex(archive_info.id))
+                manifest.write()
+                repository.commit()
+            if not key.tam_required:
+                key.tam_required = True
+                key.change_passphrase(key._passphrase)
+                print('Updated key')
+                if hasattr(key, 'find_key'):
+                    print('Key location:', key.find_key())
+            if not tam_required(repository):
+                tam_file = tam_required_file(repository)
+                open(tam_file, 'w').close()
+                print('Updated security database')
+        else:
+            # mainly for upgrades from Attic repositories,
+            # but also supports borg 0.xx -> 1.0 upgrade.
+
+            repo = AtticRepositoryUpgrader(args.location.path, create=False)
+            try:
+                repo.upgrade(args.dry_run, inplace=args.inplace, progress=args.progress)
+            except NotImplementedError as e:
+                print("warning: %s" % e)
+            repo = BorgRepositoryUpgrader(args.location.path, create=False)
+            try:
+                repo.upgrade(args.dry_run, inplace=args.inplace, progress=args.progress)
+            except NotImplementedError as e:
+                print("warning: %s" % e)
         return self.exit_code
 
     def do_debug_info(self, args):
@@ -1613,6 +1639,28 @@ class Archiver:
 
         upgrade_epilog = textwrap.dedent("""
         Upgrade an existing Borg repository.
+
+        Borg 1.x.y upgrades
+        -------------------
+
+        Use ``borg upgrade --tam REPO`` to require manifest authentication
+        introduced with Borg 1.0.9 to address security issues. This means
+        that modifying the repository after doing this with a version prior
+        to 1.0.9 will raise a validation error, so only perform this upgrade
+        after updating all clients using the repository to 1.0.9 or newer.
+
+        This upgrade should be done on each client for safety reasons.
+
+        If a repository is accidentally modified with a pre-1.0.9 client after
+        this upgrade, use ``borg upgrade --tam --force REPO`` to remedy it.
+
+        See
+        https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability
+        for details.
+
+        Attic and Borg 0.xx to Borg 1.x
+        -------------------------------
+
         This currently supports converting an Attic repository to Borg and also
         helps with converting Borg 0.xx to 1.0.
 
@@ -1665,6 +1713,10 @@ class Archiver:
                                default=False, action='store_true',
                                help="""rewrite repository in place, with no chance of going back to older
                                versions of the repository.""")
+        subparser.add_argument('--force', dest='force', action='store_true',
+                               help="""Force upgrade""")
+        subparser.add_argument('--tam', dest='tam', action='store_true',
+                               help="""Enable manifest authentication (in key and cache) (Borg 1.0.9 and later)""")
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')

@@ -373,10 +373,9 @@ Number of files: {0.stats.nfiles}'''.format(
         del self.manifest.archives[self.checkpoint_name]
         self.cache.chunk_decref(self.id, self.stats)
 
-
     def get_summary(self):
-        summary = namedtuple('Summary', ['name','fingerprint', 'comment',
-        'hostname','username','time_start','time_end','duration','command_line'])
+        summary = namedtuple('Summary', ['name', 'fingerprint', 'comment',
+        'hostname', 'username', 'time_start', 'time_end', 'duration', 'command_line'])
         return summary(*self.summarize())._asdict()
 
     def summarize(self):

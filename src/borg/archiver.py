@@ -928,7 +928,7 @@ class Archiver:
         else:
             return self._info_repository(repository, key, cache, args.export_file)
 
-    def _info_archives(self, args, repository, manifest, key, cache, export_file = None):
+    def _info_archives(self, args, repository, manifest, key, cache, export_file=None):
         def format_cmdline(cmdline):
             return remove_surrogates(' '.join(shlex.quote(x) for x in cmdline))
 
@@ -951,9 +951,9 @@ class Archiver:
 
             if export_file:
                 archive_info = {
-                    'metadata' : archiveSummary,
-                    'stats' : statsSummary,
-                    'cache' : cacheSummary,
+                    'metadata': archiveSummary,
+                    'stats': statsSummary,
+                    'cache': cacheSummary,
                 }
                 archives.append(archive_info)
             print('Archive name: %s' % archiveSummary['name'])
@@ -979,7 +979,7 @@ class Archiver:
             export_data(archives, export_file)
         return self.exit_code
 
-    def _info_repository(self, repository, key, cache, export_file = None):
+    def _info_repository(self, repository, key, cache, export_file=None):
         print('Repository ID: %s' % bin_to_hex(repository.id))
         if key.NAME == 'plaintext':
             encrypted = 'No'
@@ -996,14 +996,14 @@ class Archiver:
         print(str(cache))
 
         if export_file:
-            repository_info ={
-                'encripted' : encrypted,
-                'key_file' : key.find_key(),
-                'security_dir' : cache.security_manager.dir,
-                'cache_dir' : cache.path,
-                'cache_info' : cache.get_summary()
+            repository_info = {
+                'encripted': encrypted,
+                'key_file': key.find_key(),
+                'security_dir': cache.security_manager.dir,
+                'cache_dir': cache.path,
+                'cache_info': cache.get_summary()
             }
-            export_data(repository_info,export_file)
+            export_data(repository_info, export_file)
 
         return self.exit_code
 

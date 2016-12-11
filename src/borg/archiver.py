@@ -52,6 +52,7 @@ from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 from .repository import Repository
 from .selftest import selftest
 from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
+from .exporter import export_data
 
 
 STATS_HEADER = "                       Original size      Compressed size    Deduplicated size"
@@ -923,11 +924,11 @@ class Archiver:
     def do_info(self, args, repository, manifest, key, cache):
         """Show archive details such as disk space used"""
         if any((args.location.archive, args.first, args.last, args.prefix)):
-            return self._info_archives(args, repository, manifest, key, cache)
+            return self._info_archives(args, repository, manifest, key, cache, args.export_file)
         else:
-            return self._info_repository(repository, key, cache)
+            return self._info_repository(repository, key, cache, args.export_file)
 
-    def _info_archives(self, args, repository, manifest, key, cache):
+    def _info_archives(self, args, repository, manifest, key, cache, export_file = None):
         def format_cmdline(cmdline):
             return remove_surrogates(' '.join(shlex.quote(x) for x in cmdline))
 
@@ -938,20 +939,33 @@ class Archiver:
             if not archive_names:
                 return self.exit_code
 
+        archives = []
         for i, archive_name in enumerate(archive_names, 1):
             archive = Archive(repository, key, manifest, archive_name, cache=cache,
                               consider_part_files=args.consider_part_files)
             stats = archive.calc_stats(cache)
-            print('Archive name: %s' % archive.name)
-            print('Archive fingerprint: %s' % archive.fpr)
-            print('Comment: %s' % archive.metadata.get('comment', ''))
-            print('Hostname: %s' % archive.metadata.hostname)
-            print('Username: %s' % archive.metadata.username)
-            print('Time (start): %s' % format_time(to_localtime(archive.ts)))
-            print('Time (end):   %s' % format_time(to_localtime(archive.ts_end)))
-            print('Duration: %s' % archive.duration_from_meta)
-            print('Number of files: %d' % stats.nfiles)
-            print('Command line: %s' % format_cmdline(archive.metadata.cmdline))
+
+            archiveSummary = archive.get_summary()
+            statsSummary = stats.get_summary()
+            cacheSummary = cache.get_summary()
+
+            if export_file:
+                archive_info = {
+                    'metadata' : archiveSummary,
+                    'stats' : statsSummary,
+                    'cache' : cacheSummary,
+                }
+                archives.append(archive_info)
+            print('Archive name: %s' % archiveSummary['name'])
+            print('Archive fingerprint: %s' % archiveSummary['fingerprint'])
+            print('Comment: %s' % archiveSummary['comment'])
+            print('Hostname: %s' % archiveSummary['hostname'])
+            print('Username: %s' % archiveSummary['username'])
+            print('Time (start): %s' % archiveSummary['time_start'])
+            print('Time (end):   %s' % archiveSummary['time_end'])
+            print('Duration: %s' % archiveSummary['duration'])
+            print('Number of files: %d' % statsSummary['number_files'])
+            print('Command line: %s' % format_cmdline(archiveSummary['command_line']))
             print(DASHES)
             print(STATS_HEADER)
             print(str(stats))
@@ -960,14 +974,18 @@ class Archiver:
                 break
             if len(archive_names) - i:
                 print()
+
+        if export_file:
+            export_data(archives, export_file)
         return self.exit_code
 
-    def _info_repository(self, repository, key, cache):
+    def _info_repository(self, repository, key, cache, export_file = None):
         print('Repository ID: %s' % bin_to_hex(repository.id))
         if key.NAME == 'plaintext':
             encrypted = 'No'
         else:
             encrypted = 'Yes (%s)' % key.NAME
+
         print('Encrypted: %s' % encrypted)
         if key.NAME.startswith('key file'):
             print('Key file: %s' % key.find_key())
@@ -976,6 +994,17 @@ class Archiver:
         print(DASHES)
         print(STATS_HEADER)
         print(str(cache))
+
+        if export_file:
+            repository_info ={
+                'encripted' : encrypted,
+                'key_file' : key.find_key(),
+                'security_dir' : cache.security_manager.dir,
+                'cache_dir' : cache.path,
+                'cache_info' : cache.get_summary()
+            }
+            export_data(repository_info,export_file)
+
         return self.exit_code
 
     @with_repository(exclusive=True)
@@ -2195,6 +2224,8 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='archive or repository to display information about')
+        subparser.add_argument('--export-file', dest='export_file', metavar='PATH', default='',
+                                  help='set export path to export some data')
         self.add_archives_filters_args(subparser)
 
         break_lock_epilog = textwrap.dedent("""

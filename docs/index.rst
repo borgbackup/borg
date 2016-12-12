@@ -13,10 +13,10 @@ Borg Documentation
 
    installation
    quickstart
+   support
    usage
    deployment
    faq
-   support
    resources
    changes
    internals

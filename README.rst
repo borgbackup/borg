@@ -141,6 +141,9 @@ see ``docs/suppport.rst`` in the source distribution).
 
 .. start-badges
 
+Security issues should be reported to the `Security contact`_ (or
+see ``docs/suppport.rst`` in the source distribution).
+
 |doc| |build| |coverage| |bestpractices|
 
 .. |doc| image:: https://readthedocs.org/projects/borgbackup/badge/?version=stable

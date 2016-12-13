@@ -81,6 +81,7 @@ Bug fixes:
   - rebuild manifest if it's corrupted
   - skip corrupted chunks during manifest rebuild
 - fix TypeError in errorhandler, #1903, #1894
+- fix location parser for archives with @ char, #1930
 
 Other changes:
 
@@ -90,7 +91,10 @@ Other changes:
   - clarify extract is relative to current directory
   - FAQ: fix link to changelog
   - markup fixes
-- tests: test_get_(cache|keys)_dir: clean env state, #1897
+- tests:
+
+  - test_get_(cache|keys)_dir: clean env state, #1897
+  - get back pytest's pretty assertion failures, #1938
 - setup.py build_usage:
 
   - fixed build_usage not processing all commands

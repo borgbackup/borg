@@ -80,7 +80,7 @@ Bug fixes:
 
   - rebuild manifest if it's corrupted
   - skip corrupted chunks during manifest rebuild
-- fix TypeError in errorhandler, #1903, #1894
+- fix TypeError in integrity error handler, #1903, #1894
 - fix location parser for archives with @ char (regression introduced in 1.0.8), #1930
 
 Other changes:

@@ -3,6 +3,9 @@
 
 # Automated creation of testing environments / binaries on misc. platforms
 
+# Note that for using the AWS (EC2) provider you need the vagrant-aws plugin and
+# also set up the ENV vars with your credentials (see below in AWS global section).
+
 def packages_prepare_wheezy
   return <<-EOF
       # debian 7 wheezy does not have lz4, but it is available from wheezy-backports:
@@ -355,11 +358,26 @@ Vagrant.configure(2) do |config|
     v.cpus = 1
   end
 
+  config.vm.provider :aws do |aws, override|
+      aws.access_key_id = ENV['AWS_KEY']
+      aws.secret_access_key = ENV['AWS_SECRET']
+      aws.keypair_name = ENV['AWS_KEYNAME']
+      override.ssh.private_key_path = ENV['AWS_KEYPATH']
+      override.vm.box = "dummy"
+  end
+
   # Linux
   config.vm.define "centos7_64" do |b|
     b.vm.box = "centos/7"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
+    end
+    b.vm.provider :aws do |aws, override|
+      aws.ami = "ami-9bf712f4"
+      aws.region = "eu-central-1"
+      aws.instance_type = "m3.medium"
+      override.ssh.username = "centos"
+      # sudo: sorry, you must have a tty to run sudo
     end
     b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos7_64")
@@ -397,6 +415,12 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
+    b.vm.provider :aws do |aws, override|
+      aws.ami = "ami-8504fdea"
+      aws.region = "eu-central-1"
+      aws.instance_type = "m3.medium"
+      override.ssh.username = "ubuntu"
+    end
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("xenial64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
@@ -408,6 +432,12 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
+    b.vm.provider :aws do |aws, override|
+      aws.ami = "ami-0bf03764"
+      aws.region = "eu-central-1"
+      aws.instance_type = "m3.medium"
+      override.ssh.username = "ubuntu"
+    end
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("trusty64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
@@ -418,6 +448,12 @@ Vagrant.configure(2) do |config|
     b.vm.box = "debian/jessie64"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
+    end
+    b.vm.provider :aws do |aws, override|
+      aws.ami = "ami-429d5a2d"
+      aws.region = "eu-central-1"
+      aws.instance_type = "m3.medium"
+      override.ssh.username = "admin"
     end
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("jessie64")
@@ -470,6 +506,13 @@ Vagrant.configure(2) do |config|
     b.vm.box = "geoffgarside/freebsd-10.2"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
+    end
+    b.vm.provider :aws do |aws, override|
+      aws.ami = "ami-a3958bcf"
+      aws.region = "eu-central-1"
+      aws.instance_type = "m3.medium"
+      override.ssh.username = "ec2-user"
+      override.ssh.shell = "sh"
     end
     b.vm.provision "install system packages", :type => :shell, :inline => packages_freebsd
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("freebsd")

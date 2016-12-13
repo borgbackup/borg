@@ -773,6 +773,17 @@ class Location:
     """
     proto = user = host = port = path = archive = None
 
+    # user must not contain "@", ":" or "/".
+    # Quoting adduser error message:
+    # "To avoid problems, the username should consist only of letters, digits,
+    # underscores, periods, at signs and dashes, and not start with a dash
+    # (as defined by IEEE Std 1003.1-2001)."
+    # We use "@" as separator between username and hostname, so we must
+    # disallow it within the pure username part.
+    optional_user_re = r"""
+        (?:(?P<user>[^@:/]+)@)?
+    """
+
     # path must not contain :: (it ends at :: or string end), but may contain single colons.
     # to avoid ambiguities with other regexes, it must also not start with ":".
     path_re = r"""
@@ -791,7 +802,7 @@ class Location:
     # regexes for misc. kinds of supported location specifiers:
     ssh_re = re.compile(r"""
         (?P<proto>ssh)://                                   # ssh://
-        (?:(?P<user>[^@]+)@)?                               # user@  (optional)
+        """ + optional_user_re + r"""                       # user@  (optional)
         (?P<host>[^:/]+)(?::(?P<port>\d+))?                 # host or host:port
         """ + path_re + optional_archive_re, re.VERBOSE)    # path or path::archive
 
@@ -802,7 +813,7 @@ class Location:
     # note: scp_re is also use for local pathes
     scp_re = re.compile(r"""
         (
-            (?:(?P<user>[^@]+)@)?                           # user@  (optional)
+            """ + optional_user_re + r"""                   # user@  (optional)
             (?P<host>[^:/]+):                               # host: (don't match / in host to disambiguate from file:)
         )?                                                  # user@host: part is optional
         """ + path_re + optional_archive_re, re.VERBOSE)    # path with optional archive

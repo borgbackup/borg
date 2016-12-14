@@ -365,7 +365,7 @@ class Archiver:
             try:
                 st = os.lstat(path)
             except OSError as e:
-                self.print_warning('%s: %s', path, e)
+                self.print_warning('%s: stat: %s', path, e)
                 return
         if (st.st_ino, st.st_dev) in skip_inodes:
             return
@@ -380,7 +380,7 @@ class Archiver:
                 self.print_file_status('x', path)
                 return
         except OSError as e:
-            self.print_warning('%s: %s', path, e)
+            self.print_warning('%s: flags: %s', path, e)
             return
         if stat.S_ISREG(st.st_mode):
             if not dry_run:
@@ -407,7 +407,7 @@ class Archiver:
                     entries = helpers.scandir_inorder(path)
                 except OSError as e:
                     status = 'E'
-                    self.print_warning('%s: %s', path, e)
+                    self.print_warning('%s: scandir: %s', path, e)
                 else:
                     for dirent in entries:
                         normpath = os.path.normpath(dirent.path)

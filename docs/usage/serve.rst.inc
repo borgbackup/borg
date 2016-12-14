@@ -10,7 +10,7 @@ borg serve
 
 optional arguments
     ``--restrict-to-path PATH``
-        | restrict repository access to PATH
+        | restrict repository access to PATH. Can be specified multiple times to allow the client access to several directories. Access to all sub-directories is granted implicitly; PATH doesn't need to directly point to a repository.
     ``--append-only``
         | only allow appending to repository segment files
 

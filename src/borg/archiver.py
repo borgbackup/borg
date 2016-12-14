@@ -1485,6 +1485,11 @@ class Archiver:
             parser.error('No help available on %s' % (args.topic,))
         return self.exit_code
 
+    def do_subcommand_help(self, parser, args):
+        """display infos about subcommand"""
+        parser.print_help()
+        return EXIT_SUCCESS
+
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new', 'Warning: "--old" has been deprecated. Use "--new" instead.'),
@@ -1723,13 +1728,14 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 
-        subparser = subparsers.add_parser('key', add_help=True,
+        subparser = subparsers.add_parser('key', parents=[common_parser], add_help=False,
                                           description="Manage a keyfile or repokey of a repository",
                                           epilog="",
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='manage repository key')
 
         key_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
+        subparser.set_defaults(func=functools.partial(self.do_subcommand_help, subparser))
 
         key_export_epilog = textwrap.dedent("""
         If repository encryption is used, the repository is inaccessible
@@ -2512,13 +2518,14 @@ class Archiver:
         in case you ever run into some severe malfunction. Use them only if you know
         what you are doing or if a trusted developer tells you what to do.""")
 
-        subparser = subparsers.add_parser('debug', add_help=True,
+        subparser = subparsers.add_parser('debug', parents=[common_parser], add_help=False,
                                           description='debugging command (not intended for normal use)',
                                           epilog=debug_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='debugging command (not intended for normal use)')
 
         debug_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
+        subparser.set_defaults(func=functools.partial(self.do_subcommand_help, subparser))
 
         debug_info_epilog = textwrap.dedent("""
         This command displays some system information that might be useful for bug

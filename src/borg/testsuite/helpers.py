@@ -97,6 +97,13 @@ class TestLocationWithoutEnv:
         assert repr(Location('/abs/path:with:colons')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/abs/path:with:colons', archive=None)"
 
+    def test_user_parsing(self):
+        # see issue #1930
+        assert repr(Location('host:path::2016-12-31@23:59:59')) == \
+            "Location(proto='ssh', user=None, host='host', port=None, path='path', archive='2016-12-31@23:59:59')"
+        assert repr(Location('ssh://host/path::2016-12-31@23:59:59')) == \
+            "Location(proto='ssh', user=None, host='host', port=None, path='/path', archive='2016-12-31@23:59:59')"
+
     def test_underspecified(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
         with pytest.raises(ValueError):

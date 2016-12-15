@@ -935,8 +935,18 @@ class ArchiveChecker:
             except (TypeError, ValueError, StopIteration):
                 continue
             if valid_archive(archive):
-                logger.info('Found archive %s', archive[b'name'].decode('utf-8'))
-                manifest.archives[archive[b'name'].decode('utf-8')] = {b'id': chunk_id, b'time': archive[b'time']}
+                name = archive[b'name'].decode()
+                logger.info('Found archive %s', name)
+                if name in manifest.archives:
+                    i = 1
+                    while True:
+                        new_name = '%s.%d' % (name, i)
+                        if new_name not in manifest.archives:
+                            break
+                        i += 1
+                    logger.warning('Duplicate archive name %s, storing as %s', name, new_name)
+                    name = new_name
+                manifest.archives[name] = {b'id': chunk_id, b'time': archive[b'time']}
         logger.info('Manifest rebuild complete.')
         return manifest
 

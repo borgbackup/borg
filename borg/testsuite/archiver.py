@@ -1468,6 +1468,33 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.assert_in('archive2', output)
         self.cmd('check', self.repository_location, exit_code=0)
 
+    def test_manifest_rebuild_duplicate_archive(self):
+        archive, repository = self.open_archive('archive1')
+        key = archive.key
+        with repository:
+            manifest = repository.get(Manifest.MANIFEST_ID)
+            corrupted_manifest = manifest + b'corrupted!'
+            repository.put(Manifest.MANIFEST_ID, corrupted_manifest)
+
+            archive = msgpack.packb({
+                'cmdline': [],
+                'items': [],
+                'hostname': 'foo',
+                'username': 'bar',
+                'name': 'archive1',
+                'time': '2016-12-15T18:49:51.849711',
+                'version': 1,
+            })
+            archive_id = key.id_hash(archive)
+            repository.put(archive_id, key.encrypt(archive))
+            repository.commit()
+        self.cmd('check', self.repository_location, exit_code=1)
+        self.cmd('check', '--repair', self.repository_location, exit_code=0)
+        output = self.cmd('list', self.repository_location)
+        self.assert_in('archive1', output)
+        self.assert_in('archive1.1', output)
+        self.assert_in('archive2', output)
+
     def test_extra_chunks(self):
         self.cmd('check', self.repository_location, exit_code=0)
         with Repository(self.repository_location, exclusive=True) as repository:

@@ -134,6 +134,9 @@ Security fixes:
 - A flaw in the cryptographic authentication scheme in Borg allowed an attacker
   to spoof the manifest. See :ref:`tam_vuln` above for the steps you should
   take.
+- borg check: When rebuilding the manifest (which should only be needed very rarely)
+  duplicate archive names would be handled on a "first come first serve" basis, allowing
+  an attacker to apparently replace archives.
 
 Bug fixes:
 

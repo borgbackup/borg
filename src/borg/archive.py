@@ -114,29 +114,40 @@ class BackupOSError(Exception):
 
     Any unwrapped IO error is critical and aborts execution (for example repository IO failure).
     """
-    def __init__(self, os_error):
+    def __init__(self, op, os_error):
+        self.op = op
         self.os_error = os_error
         self.errno = os_error.errno
         self.strerror = os_error.strerror
         self.filename = os_error.filename
 
     def __str__(self):
-        return str(self.os_error)
+        if self.op:
+            return '%s: %s' % (self.op, self.os_error)
+        else:
+            return str(self.os_error)
 
 
 class BackupIO:
+    op = ''
+
+    def __call__(self, op=''):
+        self.op = op
+        return self
+
     def __enter__(self):
         pass
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type and issubclass(exc_type, OSError):
-            raise BackupOSError(exc_val) from exc_val
+            raise BackupOSError(self.op, exc_val) from exc_val
 
 
 backup_io = BackupIO()
 
 
 def backup_io_iter(iterator):
+    backup_io.op = 'read'
     while True:
         try:
             with backup_io:
@@ -477,13 +488,13 @@ Number of files: {0.stats.nfiles}'''.format(
             pass
         mode = item.mode
         if stat.S_ISREG(mode):
-            with backup_io:
+            with backup_io('makedirs'):
                 if not os.path.exists(os.path.dirname(path)):
                     os.makedirs(os.path.dirname(path))
             # Hard link?
             if 'source' in item:
                 source = os.path.join(dest, *item.source.split(os.sep)[stripped_components:])
-                with backup_io:
+                with backup_io('link'):
                     if os.path.exists(path):
                         os.unlink(path)
                     if item.source not in hardlink_masters:
@@ -496,20 +507,20 @@ Number of files: {0.stats.nfiles}'''.format(
                         os.link(link_target, path)
                     return
                 # Extract chunks, since the item which had the chunks was not extracted
-            with backup_io:
+            with backup_io('open'):
                 fd = open(path, 'wb')
             with fd:
                 ids = [c.id for c in item.chunks]
                 for _, data in self.pipeline.fetch_many(ids, is_preloaded=True):
                     if pi:
                         pi.show(increase=len(data), info=[remove_surrogates(item.path)])
-                    with backup_io:
+                    with backup_io('write'):
                         if sparse and self.zeros.startswith(data):
                             # all-zero chunk: create a hole in a sparse file
                             fd.seek(len(data), 1)
                         else:
                             fd.write(data)
-                with backup_io:
+                with backup_io('truncate'):
                     pos = fd.tell()
                     fd.truncate(pos)
                     fd.flush()
@@ -556,6 +567,7 @@ Number of files: {0.stats.nfiles}'''.format(
 
         Does not access the repository.
         """
+        backup_io.op = 'attrs'
         uid = gid = None
         if not self.numeric_owner:
             uid = user2uid(item.user)
@@ -707,7 +719,7 @@ Number of files: {0.stats.nfiles}'''.format(
 
     def stat_ext_attrs(self, st, path):
         attrs = {}
-        with backup_io:
+        with backup_io('extended stat'):
             xattrs = xattr.get_all(path, follow_symlinks=False)
             bsdflags = get_flags(path, st)
             acl_get(path, attrs, st, self.numeric_owner)
@@ -744,7 +756,7 @@ Number of files: {0.stats.nfiles}'''.format(
             return 'b'  # block device
 
     def process_symlink(self, path, st):
-        with backup_io:
+        with backup_io('readlink'):
             source = os.readlink(path)
         item = Item(path=make_path_safe(path), source=source)
         item.update(self.stat_attrs(st, path))
@@ -856,7 +868,7 @@ Number of files: {0.stats.nfiles}'''.format(
         else:
             compress = self.compression_decider1.decide(path)
             self.file_compression_logger.debug('%s -> compression %s', path, compress['name'])
-            with backup_io:
+            with backup_io('open'):
                 fh = Archive._open_rb(path)
             with os.fdopen(fh, 'rb') as fd:
                 self.chunk_file(item, cache, self.stats, backup_io_iter(self.chunker.chunkify(fd, fh)), compress=compress)

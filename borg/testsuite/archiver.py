@@ -311,7 +311,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         except PermissionError:
             have_root = False
         except OSError as e:
-            if e.errno != errno.EINVAL:
+            # Note: ENOSYS "Function not implemented" happens as non-root on Win 10 Linux Subsystem.
+            if e.errno not in (errno.EINVAL, errno.ENOSYS):
                 raise
             have_root = False
         return have_root

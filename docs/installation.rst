@@ -257,12 +257,21 @@ and commands to make fuse work for using the mount command.
      sysctl vfs.usermount=1
 
 
+Windows 10's Linux Subsystem
+++++++++++++++++++++++++++++
+
+.. note::
+    Running under Windows 10's Linux Subsystem is experimental and has not been tested much yet.
+
+Just follow the Ubuntu Linux installation steps. You can omit the FUSE stuff, it won't work anyway.
+
+
 Cygwin
 ++++++
 
 .. note::
     Running under Cygwin is experimental and has only been tested with Cygwin
-    (x86-64) v2.5.2.
+    (x86-64) v2.5.2. Remote repositories are known broken, local repositories should work.
 
 Use the Cygwin installer to install the dependencies::
 

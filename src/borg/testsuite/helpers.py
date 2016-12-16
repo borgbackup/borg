@@ -659,6 +659,7 @@ def test_get_keys_dir(monkeypatch):
 
 def test_get_security_dir(monkeypatch):
     """test that get_security_dir respects environment"""
+    monkeypatch.delenv('BORG_SECURITY_DIR', raising=False)
     monkeypatch.delenv('XDG_CONFIG_HOME', raising=False)
     assert get_security_dir() == os.path.join(os.path.expanduser('~'), '.config', 'borg', 'security')
     assert get_security_dir(repository_id='1234') == os.path.join(os.path.expanduser('~'), '.config', 'borg', 'security', '1234')

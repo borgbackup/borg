@@ -307,7 +307,7 @@ class Archive:
 
     def _load_meta(self, id):
         _, data = self.key.decrypt(id, self.repository.get(id))
-        metadata = ArchiveItem(internal_dict=msgpack.unpackb(data))
+        metadata = ArchiveItem(internal_dict=msgpack.unpackb(data, unicode_errors='surrogateescape'))
         if metadata.version != 1:
             raise Exception('Unknown archive metadata version')
         return metadata
@@ -409,7 +409,7 @@ Number of files: {0.stats.nfiles}'''.format(
         }
         metadata.update(additional_metadata or {})
         metadata = ArchiveItem(metadata)
-        data = msgpack.packb(metadata.as_dict(), unicode_errors='surrogateescape')
+        data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b'archive')
         self.id = self.key.id_hash(data)
         self.cache.add_chunk(self.id, Chunk(data), self.stats)
         self.manifest.archives[name] = (self.id, metadata.time)

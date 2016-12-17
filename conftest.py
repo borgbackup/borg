@@ -5,7 +5,8 @@ import sys
 import pytest
 
 # needed to get pretty assertion failures in unit tests:
-pytest.register_assert_rewrite('borg.testsuite')
+if hasattr(pytest, 'register_assert_rewrite'):
+    pytest.register_assert_rewrite('borg.testsuite')
 
 # This is a hack to fix path problems because "borg" (the package) is in the source root.
 # When importing the conftest an "import borg" can incorrectly import the borg from the

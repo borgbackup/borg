@@ -215,7 +215,7 @@ class Archive:
             self.chunker = Chunker(self.key.chunk_seed, *chunker_params)
             if name in manifest.archives:
                 raise self.AlreadyExists(name)
-            self.last_checkpoint = time.time()
+            self.last_checkpoint = time.monotonic()
             i = 0
             while True:
                 self.checkpoint_name = '%s.checkpoint%s' % (name, i and ('.%d' % i) or '')
@@ -290,9 +290,9 @@ Number of files: {0.stats.nfiles}'''.format(
         if self.show_progress:
             self.stats.show_progress(item=item, dt=0.2)
         self.items_buffer.add(item)
-        if time.time() - self.last_checkpoint > self.checkpoint_interval:
+        if time.monotonic() - self.last_checkpoint > self.checkpoint_interval:
             self.write_checkpoint()
-            self.last_checkpoint = time.time()
+            self.last_checkpoint = time.monotonic()
 
     def write_checkpoint(self):
         self.save(self.checkpoint_name)

@@ -1197,8 +1197,18 @@ class ArchiveChecker:
                 continue
             if valid_archive(archive):
                 archive = ArchiveItem(internal_dict=archive)
-                logger.info('Found archive %s', archive.name)
-                manifest.archives[archive.name] = (chunk_id, archive.time)
+                name = archive.name
+                logger.info('Found archive %s', name)
+                if name in manifest.archives:
+                    i = 1
+                    while True:
+                        new_name = '%s.%d' % (name, i)
+                        if new_name not in manifest.archives:
+                            break
+                        i += 1
+                    logger.warning('Duplicate archive name %s, storing as %s', name, new_name)
+                    name = new_name
+                manifest.archives[name] = (chunk_id, archive.time)
         logger.info('Manifest rebuild complete.')
         return manifest
 

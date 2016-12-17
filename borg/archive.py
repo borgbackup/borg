@@ -304,15 +304,17 @@ Number of files: {0.stats.nfiles}'''.format(
         if name in self.manifest.archives:
             raise self.AlreadyExists(name)
         self.items_buffer.flush(flush=True)
+        duration = timedelta(seconds=time.monotonic() - self.start_monotonic)
         if timestamp is None:
             self.end = datetime.utcnow()
-            self.start = self.end - timedelta(seconds=time.monotonic() - self.start_monotonic)
+            self.start = self.end - duration
             start = self.start
             end = self.end
         else:
             self.end = timestamp
-            start = timestamp
-            end = timestamp  # we only have 1 value
+            self.start = timestamp - duration
+            end = timestamp
+            start = self.start
         metadata = StableDict({
             'version': 1,
             'name': name,

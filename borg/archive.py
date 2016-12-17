@@ -305,7 +305,8 @@ Number of files: {0.stats.nfiles}'''.format(
             raise self.AlreadyExists(name)
         self.items_buffer.flush(flush=True)
         if timestamp is None:
-            self.end = self.start + timedelta(seconds=time.monotonic() - self.start_monotonic)
+            self.end = datetime.utcnow()
+            self.start = self.end - timedelta(seconds=time.monotonic() - self.start_monotonic)
             start = self.start
             end = self.end
         else:

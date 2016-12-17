@@ -103,7 +103,7 @@ def test_help(benchmark, cmd):
 
 
 def test_chunk_indexer_setitem(benchmark):
-    max_key = 2**23
+    max_key = 2**17
     # we want 32 byte keys, since that's what we use day to day
     keys = [sha256(H(k)).digest() for k in range(max_key)]
     bucket_val = (0, 0, 0)
@@ -115,11 +115,11 @@ def test_chunk_indexer_setitem(benchmark):
     def do_inserts(index):
         for key in keys:
             index[key] = bucket_val
-    benchmark.pedantic(do_inserts, rounds=5, setup=setup)
+    benchmark.pedantic(do_inserts, rounds=200, setup=setup)
 
 
 def test_chunk_indexer_getitem(benchmark):
-    max_key = 2**23
+    max_key = 2**17
     index = ChunkIndex(max_key)
     keys = [sha256(H(k)).digest() for k in range(max_key)]
     missing_keys = [
@@ -137,4 +137,4 @@ def test_chunk_indexer_getitem(benchmark):
         for key in missing_keys:
             index.get(key)  # noqa
 
-    benchmark.pedantic(do_gets, rounds=5)
+    benchmark.pedantic(do_gets, rounds=200)

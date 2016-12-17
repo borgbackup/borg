@@ -1,0 +1,8 @@
+Thank you for contributing code to Borg, your help is appreciated!
+
+Please, before you submit a pull request, make sure it complies with the
+guidelines given in our documentation:
+
+https://borgbackup.readthedocs.io/en/latest/development.html#contributions
+
+**Please remove all above text before submitting your pull request.**

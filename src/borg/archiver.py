@@ -12,11 +12,11 @@ import stat
 import subprocess
 import sys
 import textwrap
+import time
 import traceback
 from binascii import unhexlify
 from datetime import datetime
 from itertools import zip_longest
-from operator import attrgetter
 
 from .logger import create_logger, setup_logging
 logger = create_logger()
@@ -327,7 +327,6 @@ class Archiver:
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 if args.stats:
-                    archive.end = datetime.utcnow()
                     log_multi(DASHES,
                               str(archive),
                               DASHES,
@@ -341,6 +340,7 @@ class Archiver:
         self.ignore_inode = args.ignore_inode
         dry_run = args.dry_run
         t0 = datetime.utcnow()
+        t0_monotonic = time.monotonic()
         if not dry_run:
             with Cache(repository, key, manifest, do_files=args.cache_files, progress=args.progress,
                        lock_wait=self.lock_wait) as cache:
@@ -348,7 +348,7 @@ class Archiver:
                                   create=True, checkpoint_interval=args.checkpoint_interval,
                                   numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime,
                                   progress=args.progress,
-                                  chunker_params=args.chunker_params, start=t0,
+                                  chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
                                   compression=args.compression, compression_files=args.compression_files)
                 create_inner(archive, cache)
         else:
@@ -1485,6 +1485,11 @@ class Archiver:
             parser.error('No help available on %s' % (args.topic,))
         return self.exit_code
 
+    def do_subcommand_help(self, parser, args):
+        """display infos about subcommand"""
+        parser.print_help()
+        return EXIT_SUCCESS
+
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new', 'Warning: "--old" has been deprecated. Use "--new" instead.'),
@@ -1723,13 +1728,14 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 
-        subparser = subparsers.add_parser('key', add_help=True,
+        subparser = subparsers.add_parser('key', parents=[common_parser], add_help=False,
                                           description="Manage a keyfile or repokey of a repository",
                                           epilog="",
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='manage repository key')
 
         key_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
+        subparser.set_defaults(func=functools.partial(self.do_subcommand_help, subparser))
 
         key_export_epilog = textwrap.dedent("""
         If repository encryption is used, the repository is inaccessible
@@ -2512,13 +2518,14 @@ class Archiver:
         in case you ever run into some severe malfunction. Use them only if you know
         what you are doing or if a trusted developer tells you what to do.""")
 
-        subparser = subparsers.add_parser('debug', add_help=True,
+        subparser = subparsers.add_parser('debug', parents=[common_parser], add_help=False,
                                           description='debugging command (not intended for normal use)',
                                           epilog=debug_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='debugging command (not intended for normal use)')
 
         debug_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
+        subparser.set_defaults(func=functools.partial(self.do_subcommand_help, subparser))
 
         debug_info_epilog = textwrap.dedent("""
         This command displays some system information that might be useful for bug

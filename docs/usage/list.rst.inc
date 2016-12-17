@@ -95,3 +95,5 @@ The following keys are available for --format:
  - archiveid
  - archivename
  - extra: prepends {source} with " -> " for soft links and " link to " for hard links
+
+ - health: either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)

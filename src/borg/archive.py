@@ -5,7 +5,7 @@ import stat
 import sys
 import time
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from functools import partial
 from getpass import getuser
 from io import BytesIO
@@ -81,7 +81,7 @@ class Statistics:
         return format_file_size(self.csize)
 
     def show_progress(self, item=None, final=False, stream=None, dt=None):
-        now = time.time()
+        now = time.monotonic()
         if dt is None or now - self.last_progress > dt:
             self.last_progress = now
             columns, lines = get_terminal_size()
@@ -255,7 +255,7 @@ class Archive:
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False, noatime=False, noctime=False, progress=False,
-                 chunker_params=CHUNKER_PARAMS, start=None, end=None, compression=None, compression_files=None,
+                 chunker_params=CHUNKER_PARAMS, start=None, start_monotonic=None, end=None, compression=None, compression_files=None,
                  consider_part_files=False):
         self.cwd = os.getcwd()
         self.key = key
@@ -270,10 +270,13 @@ class Archive:
         self.numeric_owner = numeric_owner
         self.noatime = noatime
         self.noctime = noctime
+        assert (start is None) == (start_monotonic is None), 'Logic error: if start is given, start_monotonic must be given as well and vice versa.'
         if start is None:
             start = datetime.utcnow()
+            start_monotonic = time.monotonic()
         self.chunker_params = chunker_params
         self.start = start
+        self.start_monotonic = start_monotonic
         if end is None:
             end = datetime.utcnow()
         self.end = end
@@ -288,7 +291,7 @@ class Archive:
             key.compression_decider2 = CompressionDecider2(compression or CompressionSpec('none'))
             if name in manifest.archives:
                 raise self.AlreadyExists(name)
-            self.last_checkpoint = time.time()
+            self.last_checkpoint = time.monotonic()
             i = 0
             while True:
                 self.checkpoint_name = '%s.checkpoint%s' % (name, i and ('.%d' % i) or '')
@@ -381,14 +384,17 @@ Number of files: {0.stats.nfiles}'''.format(
         if name in self.manifest.archives:
             raise self.AlreadyExists(name)
         self.items_buffer.flush(flush=True)
+        duration = timedelta(seconds=time.monotonic() - self.start_monotonic)
         if timestamp is None:
             self.end = datetime.utcnow()
+            self.start = self.end - duration
             start = self.start
             end = self.end
         else:
             self.end = timestamp
-            start = timestamp
-            end = timestamp  # we only have 1 value
+            self.start = timestamp - duration
+            end = timestamp
+            start = self.start
         metadata = {
             'version': 1,
             'name': name,
@@ -787,9 +793,9 @@ Number of files: {0.stats.nfiles}'''.format(
             item.chunks.append(chunk_processor(data))
             if self.show_progress:
                 self.stats.show_progress(item=item, dt=0.2)
-            if self.checkpoint_interval and time.time() - self.last_checkpoint > self.checkpoint_interval:
+            if self.checkpoint_interval and time.monotonic() - self.last_checkpoint > self.checkpoint_interval:
                 from_chunk, part_number = self.write_part_file(item, from_chunk, part_number)
-                self.last_checkpoint = time.time()
+                self.last_checkpoint = time.monotonic()
         else:
             if part_number > 1:
                 if item.chunks[from_chunk:]:
@@ -797,7 +803,7 @@ Number of files: {0.stats.nfiles}'''.format(
                     # chunks (if any) into a part item also (so all parts can be concatenated to get
                     # the complete file):
                     from_chunk, part_number = self.write_part_file(item, from_chunk, part_number)
-                    self.last_checkpoint = time.time()
+                    self.last_checkpoint = time.monotonic()
 
                 # if we created part files, we have referenced all chunks from the part files,
                 # but we also will reference the same chunks also from the final, complete file:

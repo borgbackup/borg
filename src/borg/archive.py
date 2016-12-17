@@ -793,9 +793,9 @@ Number of files: {0.stats.nfiles}'''.format(
             item.chunks.append(chunk_processor(data))
             if self.show_progress:
                 self.stats.show_progress(item=item, dt=0.2)
-            if self.checkpoint_interval and time.time() - self.last_checkpoint > self.checkpoint_interval:
+            if self.checkpoint_interval and time.monotonic() - self.last_checkpoint > self.checkpoint_interval:
                 from_chunk, part_number = self.write_part_file(item, from_chunk, part_number)
-                self.last_checkpoint = time.time()
+                self.last_checkpoint = time.monotonic()
         else:
             if part_number > 1:
                 if item.chunks[from_chunk:]:
@@ -803,7 +803,7 @@ Number of files: {0.stats.nfiles}'''.format(
                     # chunks (if any) into a part item also (so all parts can be concatenated to get
                     # the complete file):
                     from_chunk, part_number = self.write_part_file(item, from_chunk, part_number)
-                    self.last_checkpoint = time.time()
+                    self.last_checkpoint = time.monotonic()
 
                 # if we created part files, we have referenced all chunks from the part files,
                 # but we also will reference the same chunks also from the final, complete file:

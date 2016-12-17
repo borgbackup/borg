@@ -5,7 +5,6 @@ from operator import attrgetter
 import argparse
 import functools
 import inspect
-import io
 import os
 import re
 import shlex
@@ -13,6 +12,7 @@ import signal
 import stat
 import sys
 import textwrap
+import time
 import traceback
 import collections
 
@@ -263,7 +263,6 @@ class Archiver:
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 if args.stats:
-                    archive.end = datetime.utcnow()
                     log_multi(DASHES,
                               str(archive),
                               DASHES,
@@ -276,6 +275,7 @@ class Archiver:
         self.ignore_inode = args.ignore_inode
         dry_run = args.dry_run
         t0 = datetime.utcnow()
+        t0_monotonic = time.monotonic()
         if not dry_run:
             key.compressor = Compressor(**args.compression)
             with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
@@ -283,7 +283,7 @@ class Archiver:
                                   create=True, checkpoint_interval=args.checkpoint_interval,
                                   numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime,
                                   progress=args.progress,
-                                  chunker_params=args.chunker_params, start=t0)
+                                  chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic)
                 create_inner(archive, cache)
         else:
             create_inner(None, None)

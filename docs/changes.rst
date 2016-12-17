@@ -82,6 +82,9 @@ Bug fixes:
   - skip corrupted chunks during manifest rebuild
 - fix TypeError in integrity error handler, #1903, #1894
 - fix location parser for archives with @ char (regression introduced in 1.0.8), #1930
+- fix wrong duration/timestamps if system clock jumped during a create
+- fix progress display not updating if system clock jumps backwards
+- fix checkpoint interval being incorrect if system clock jumps
 
 Other changes:
 

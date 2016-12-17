@@ -3,7 +3,8 @@ import os
 import pytest
 
 # needed to get pretty assertion failures in unit tests:
-pytest.register_assert_rewrite('borg.testsuite')
+if hasattr(pytest, 'register_assert_rewrite'):
+    pytest.register_assert_rewrite('borg.testsuite')
 
 from borg.logger import setup_logging
 

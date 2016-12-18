@@ -127,7 +127,8 @@ class Archiver:
     @with_repository(create=True, exclusive=True, manifest=False)
     def do_init(self, args, repository):
         """Initialize an empty repository"""
-        logger.info('Initializing repository at "%s"' % args.location.canonical_path())
+        path = args.location.canonical_path()
+        logger.info('Initializing repository at "%s"' % path)
         key = key_creator(repository, args)
         manifest = Manifest(key, repository)
         manifest.key = key
@@ -135,8 +136,19 @@ class Archiver:
         repository.commit()
         with Cache(repository, key, manifest, warn_if_unencrypted=False):
             pass
-        tam_file = tam_required_file(repository)
-        open(tam_file, 'w').close()
+        if key.tam_required:
+            tam_file = tam_required_file(repository)
+            open(tam_file, 'w').close()
+            logger.warning(
+                '\n'
+                'By default repositories initialized with this version will produce security\n'
+                'errors if written to with an older version (up to and including Borg 1.0.8).\n'
+                '\n'
+                'If you want to use these older versions, you can disable the check by runnning:\n'
+                'borg upgrade --disable-tam \'%s\'\n'
+                '\n'
+                'See https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability '
+                'for details about the security implications.', path)
         return self.exit_code
 
     @with_repository(exclusive=True, manifest=False)

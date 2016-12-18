@@ -46,7 +46,7 @@ class RepoKeyNotFoundError(Error):
 
 class TAMRequiredError(IntegrityError):
     __doc__ = textwrap.dedent("""
-    Manifest is unauthenticated, but authentication is required for this repository.
+    Manifest is unauthenticated, but it is required for this repository.
 
     This either means that you are under attack, or that you modified this repository
     with a Borg version older than 1.0.9 after TAM authentication was enabled.

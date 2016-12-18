@@ -263,14 +263,26 @@ class RepositoryServer:  # pragma: no cover
         # not a known old format, send newest negotiate this version knows
         return {'server_version': BORG_VERSION}
 
-    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=None, append_only=False):
+    def _resolve_path(self, path):
         if isinstance(path, bytes):
             path = os.fsdecode(path)
-        if path.startswith('/~'):  # /~/x = path x relative to home dir, /~username/x = relative to "user" home dir
-            path = os.path.join(get_home_dir(), path[2:])  # XXX check this (see also 1.0-maint), is it correct for ~u?
+        # Leading slash is always present with URI (ssh://), but not with short-form (who@host:path).
+        if path.startswith('/~/'):  # /~/x = path x relative to home dir
+            path = os.path.join(get_home_dir(), path[3:])
+        elif path.startswith('~/'):
+            path = os.path.join(get_home_dir(), path[2:])
+        elif path.startswith('/~'):  # /~username/x = relative to "user" home dir
+            path = os.path.expanduser(path[1:])
+        elif path.startswith('~'):
+            path = os.path.expanduser(path)
         elif path.startswith('/./'):  # /./x = path x relative to cwd
             path = path[3:]
-        path = os.path.realpath(path)
+        return os.path.realpath(path)
+
+    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=None, append_only=False):
+        logging.debug('Resolving repository path %r', path)
+        path = self._resolve_path(path)
+        logging.debug('Resolved repository path to %r', path)
         if self.restrict_to_paths:
             # if --restrict-to-path P is given, we make sure that we only operate in/below path P.
             # for the prefix check, it is important that the compared pathes both have trailing slashes,

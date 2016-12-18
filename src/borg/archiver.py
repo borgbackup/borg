@@ -61,6 +61,8 @@ def argument(args, str_or_bool):
     """If bool is passed, return it. If str is passed, retrieve named attribute from args."""
     if isinstance(str_or_bool, str):
         return getattr(args, str_or_bool)
+    if isinstance(str_or_bool, (list, tuple)):
+        return any(getattr(args, item) for item in str_or_bool)
     return str_or_bool
 
 
@@ -1062,29 +1064,43 @@ class Archiver:
                           DASHES, logger=logging.getLogger('borg.output.stats'))
         return self.exit_code
 
-    @with_repository(fake='tam', invert_fake=True, manifest=False, exclusive=True)
+    @with_repository(fake=('tam', 'disable_tam'), invert_fake=True, manifest=False, exclusive=True)
     def do_upgrade(self, args, repository, manifest=None, key=None):
         """upgrade a repository from a previous version"""
         if args.tam:
             manifest, key = Manifest.load(repository, force_tam_not_required=args.force)
 
-            if not manifest.tam_verified:
+            if not manifest.tam_verified or not manifest.config.get(b'tam_required', False):
                 # The standard archive listing doesn't include the archive ID like in borg 1.1.x
                 print('Manifest contents:')
                 for archive_info in manifest.archives.list(sort_by=['ts']):
                     print(format_archive(archive_info), '[%s]' % bin_to_hex(archive_info.id))
+                manifest.config[b'tam_required'] = True
                 manifest.write()
                 repository.commit()
             if not key.tam_required:
                 key.tam_required = True
                 key.change_passphrase(key._passphrase)
-                print('Updated key')
+                print('Key updated')
                 if hasattr(key, 'find_key'):
                     print('Key location:', key.find_key())
             if not tam_required(repository):
                 tam_file = tam_required_file(repository)
                 open(tam_file, 'w').close()
                 print('Updated security database')
+        elif args.disable_tam:
+            manifest, key = Manifest.load(repository, force_tam_not_required=True)
+            if tam_required(repository):
+                os.unlink(tam_required_file(repository))
+            if key.tam_required:
+                key.tam_required = False
+                key.change_passphrase(key._passphrase)
+                print('Key updated')
+                if hasattr(key, 'find_key'):
+                    print('Key location:', key.find_key())
+            manifest.config[b'tam_required'] = False
+            manifest.write()
+            repository.commit()
         else:
             # mainly for upgrades from Attic repositories,
             # but also supports borg 0.xx -> 1.0 upgrade.
@@ -2356,6 +2372,10 @@ class Archiver:
         If a repository is accidentally modified with a pre-1.0.9 client after
         this upgrade, use ``borg upgrade --tam --force REPO`` to remedy it.
 
+        If you routinely do this you might not want to enable this upgrade
+        (which will leave you exposed to the security issue). You can
+        reverse the upgrade by issuing ``borg upgrade --disable-tam REPO``.
+
         See
         https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability
         for details.
@@ -2419,6 +2439,8 @@ class Archiver:
                                help="""Force upgrade""")
         subparser.add_argument('--tam', dest='tam', action='store_true',
                                help="""Enable manifest authentication (in key and cache) (Borg 1.0.9 and later)""")
+        subparser.add_argument('--disable-tam', dest='disable_tam', action='store_true',
+                               help="""Disable manifest authentication (in key and cache)""")
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')

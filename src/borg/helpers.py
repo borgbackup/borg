@@ -221,10 +221,17 @@ class Manifest:
         manifest.config = m.config
         # valid item keys are whatever is known in the repo or every key we know
         manifest.item_keys = ITEM_KEYS | frozenset(key.decode() for key in m.get('item_keys', []))
-        if manifest.config.get(b'tam_required', False) and manifest.tam_verified and not tam_required(repository):
-            logger.debug('Manifest is TAM verified and says TAM is required, updating security database...')
-            file = tam_required_file(repository)
-            open(file, 'w').close()
+
+        if manifest.tam_verified:
+            manifest_required = manifest.config.get(b'tam_required', False)
+            security_required = tam_required(repository)
+            if manifest_required and not security_required:
+                logger.debug('Manifest is TAM verified and says TAM is required, updating security database...')
+                file = tam_required_file(repository)
+                open(file, 'w').close()
+            if not manifest_required and security_required:
+                logger.debug('Manifest is TAM verified and says TAM is *not* required, updating security database...')
+                os.unlink(tam_required_file(repository))
         return manifest, key
 
     def write(self):

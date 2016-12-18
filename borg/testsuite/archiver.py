@@ -1534,6 +1534,17 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 
 
 class ManifestAuthenticationTest(ArchiverTestCaseBase):
+    def spoof_manifest(self, repository):
+        with repository:
+            _, key = Manifest.load(repository)
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
+                'version': 1,
+                'archives': {},
+                'config': {},
+                'timestamp': (datetime.utcnow() + timedelta(days=1)).isoformat(),
+            })))
+            repository.commit()
+
     def test_fresh_init_tam_required(self):
         self.cmd('init', self.repository_location)
         repository = Repository(self.repository_path, exclusive=True)
@@ -1573,21 +1584,29 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
         assert 'archive1234' in output
         assert 'TAM-verified manifest' in output
         # Try to spoof / modify pre-1.0.9
-        with repository:
-            _, key = Manifest.load(repository)
-            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
-                'version': 1,
-                'archives': {},
-                'config': {},
-                'timestamp': (datetime.utcnow() + timedelta(days=1)).isoformat(),
-            })))
-            repository.commit()
+        self.spoof_manifest(repository)
         # Fails
         with pytest.raises(TAMRequiredError):
             self.cmd('list', self.repository_location)
         # Force upgrade
         self.cmd('upgrade', '--tam', '--force', self.repository_location)
         self.cmd('list', self.repository_location)
+
+    def test_disable(self):
+        self.cmd('init', self.repository_location)
+        self.create_src_archive('archive1234')
+        self.cmd('upgrade', '--disable-tam', self.repository_location)
+        repository = Repository(self.repository_path, exclusive=True)
+        self.spoof_manifest(repository)
+        assert not self.cmd('list', self.repository_location)
+
+    def test_disable2(self):
+        self.cmd('init', self.repository_location)
+        self.create_src_archive('archive1234')
+        repository = Repository(self.repository_path, exclusive=True)
+        self.spoof_manifest(repository)
+        self.cmd('upgrade', '--disable-tam', self.repository_location)
+        assert not self.cmd('list', self.repository_location)
 
 
 @pytest.mark.skipif(sys.platform == 'cygwin', reason='remote is broken on cygwin and hangs')

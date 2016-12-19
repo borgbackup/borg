@@ -9,6 +9,7 @@ borg upgrade
     usage: borg upgrade [-h] [--critical] [--error] [--warning] [--info] [--debug]
                         [--lock-wait N] [--show-rc] [--no-files-cache] [--umask M]
                         [--remote-path PATH] [-p] [-n] [-i] [--force] [--tam]
+                        [--disable-tam]
                         [REPOSITORY]
     
     upgrade a repository from a previous version
@@ -37,6 +38,7 @@ borg upgrade
       --force               Force upgrade
       --tam                 Enable manifest authentication (in key and cache)
                             (Borg 1.0.9 and later)
+      --disable-tam         Disable manifest authentication (in key and cache)
     
 Description
 ~~~~~~~~~~~
@@ -56,6 +58,10 @@ This upgrade should be done on each client for safety reasons.
 
 If a repository is accidentally modified with a pre-1.0.9 client after
 this upgrade, use ``borg upgrade --tam --force REPO`` to remedy it.
+
+If you routinely do this you might not want to enable this upgrade
+(which will leave you exposed to the security issue). You can
+reverse the upgrade by issuing ``borg upgrade --disable-tam REPO``.
 
 See
 https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability

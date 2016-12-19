@@ -14,6 +14,9 @@ import pytest
 from .archiver import changedir, cmd
 from .hashindex import ChunkIndex
 from .hashindex import H
+import borg.hashindex
+
+bench_getitem = borg.hashindex.bench_getitem
 
 
 @pytest.yield_fixture
@@ -119,22 +122,44 @@ def test_chunk_indexer_setitem(benchmark):
 
 
 def test_chunk_indexer_getitem(benchmark):
-    max_key = 2**17
+    max_key = 2**20
     index = ChunkIndex(max_key)
     keys = [sha256(H(k)).digest() for k in range(max_key)]
-    missing_keys = [
+    missing_keys = b"".join([
         sha256(H(k)).digest()
-        for k in range(max_key, (max_key+int(len(keys)/3)))]
+        for k in range(max_key, (max_key+int(len(keys)/3)))])
     bucket_val = (0, 0, 0)
     for key in keys:
         # we want 32 byte keys, since that's what we use day to day
         index[key] = bucket_val
+    keys = b"".join(keys)
 
-    def do_gets():
-        for key in keys:
+    def do_gets(keys=keys):
+        for i in range(32, len(keys), 32):
+            key = keys[i-32:i]
             # we want 32 byte keys, since that's what we use day to day
             index[key]  # noqa
-        for key in missing_keys:
+        for i in range(32, len(missing_keys), 32):
+            key = keys[i-32:i]
             index.get(key)  # noqa
 
+    benchmark.pedantic(do_gets, rounds=200)
+
+
+def test_chunk_indexer_getitem_c(benchmark):
+    import itertools
+    max_key = 2**20
+    index = ChunkIndex(max_key)
+    keys = [sha256(H(k)).digest() for k in range(max_key)]
+    bucket_val = (0, 0, 0)
+    for key in keys:
+        # we want 32 byte keys, since that's what we use day to day
+        index[key] = bucket_val
+    missing_keys = b"".join([
+        sha256(H(k)).digest()
+        for k in range(max_key, (max_key+int(len(keys)/3)))])
+    keys = b"".join(keys) + missing_keys
+
+    def do_gets(keys=keys):
+        bench_getitem(index, keys, len(keys)//32)
     benchmark.pedantic(do_gets, rounds=200)

@@ -27,6 +27,7 @@ cdef extern from "_hashindex.c":
     int hashindex_set(HashIndex *index, void *key, void *value)
     uint32_t _htole32(uint32_t v)
     uint32_t _le32toh(uint32_t v)
+    void benchmark_getitem(HashIndex *index, char *keys, int key_count)
 
 
 cdef _NoDefault = object()
@@ -360,3 +361,10 @@ cdef class ChunkKeyIterator:
         cdef uint32_t refcount = _le32toh(value[0])
         assert refcount <= MAX_VALUE, "invalid reference count"
         return (<char *>self.key)[:self.key_size], ChunkIndexEntry(refcount, _le32toh(value[1]), _le32toh(value[2]))
+
+
+from cpython.bytes cimport PyBytes_AS_STRING
+
+
+def bench_getitem(ChunkIndex chunk_index, bytes keys, int key_count):
+    benchmark_getitem(chunk_index.index, PyBytes_AS_STRING(keys), key_count)

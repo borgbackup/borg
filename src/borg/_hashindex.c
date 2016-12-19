@@ -506,3 +506,21 @@ hashindex_size(HashIndex *index)
 {
     return sizeof(HashHeader) + index->num_buckets * index->bucket_size;
 }
+
+static void
+benchmark_getitem(HashIndex *index, char *keys, int key_count)
+{
+  char *key = keys;
+  unsigned long hits = 0;
+  unsigned long misses = 0;
+  char *last_addr = key + (32 * key_count);
+  while (key < last_addr) {
+    if (hashindex_get(index, key) != NULL) {
+      hits += 1;
+    } else {
+      misses += 1;
+    }
+    key += 32;
+  }
+  /* printf("hits %lud\nmisses %lud\n", hits, misses); */
+}

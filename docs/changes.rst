@@ -126,7 +126,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.0.9 (2016-12-18)
+Version 1.0.9 (2016-12-20)
 --------------------------
 
 Security fixes:

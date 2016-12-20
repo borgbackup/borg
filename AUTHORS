@@ -31,3 +31,21 @@ Attic Patches and Suggestions
 - Johann Klähn
 - Petros Moisiadis
 - Thomas Waldmann
+
+BLAKE2
+------
+
+Borg includes BLAKE2: Copyright 2012, Samuel Neves <sneves@dei.uc.pt>, licensed under the terms
+of the CC0, the OpenSSL Licence, or the Apache Public License 2.0.
+
+Slicing CRC32
+-------------
+
+Borg includes a fast slice-by-8 implementation of CRC32, Copyright 2011-2015 Stephan Brumme,
+licensed under the terms of a zlib license. See http://create.stephan-brumme.com/crc32/
+
+Folding CRC32
+-------------
+
+Borg includes an extremely fast folding implementation of CRC32, Copyright 2013 Intel Corporation,
+licensed under the terms of the zlib license.

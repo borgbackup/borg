@@ -1789,7 +1789,7 @@ class Archiver:
                                           help='manage repository key')
 
         key_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
-        subparser.set_defaults(func=functools.partial(self.do_subcommand_help, subparser))
+        subparser.set_defaults(fallback_func=functools.partial(self.do_subcommand_help, subparser))
 
         key_export_epilog = textwrap.dedent("""
         If repository encryption is used, the repository is inaccessible
@@ -2611,7 +2611,7 @@ class Archiver:
                                           help='debugging command (not intended for normal use)')
 
         debug_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
-        subparser.set_defaults(func=functools.partial(self.do_subcommand_help, subparser))
+        subparser.set_defaults(fallback_func=functools.partial(self.do_subcommand_help, subparser))
 
         debug_info_epilog = textwrap.dedent("""
         This command displays some system information that might be useful for bug
@@ -2784,7 +2784,9 @@ class Archiver:
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
-        setup_logging(level=args.log_level, is_serve=args.func == self.do_serve)  # do not use loggers before this!
+        # This works around http://bugs.python.org/issue9351
+        func = getattr(args, 'func', None) or getattr(args, 'fallback_func')
+        setup_logging(level=args.log_level, is_serve=func == self.do_serve)  # do not use loggers before this!
         self._setup_implied_logging(vars(args))
         self._setup_topic_debugging(args)
         if args.show_version:
@@ -2792,7 +2794,7 @@ class Archiver:
         self.prerun_checks(logger)
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
-        return args.func(args)
+        return func(args)
 
 
 def sig_info_handler(sig_no, stack):  # pragma: no cover

@@ -126,6 +126,78 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
+Version 1.1.0b3 (not released yet)
+----------------------------------
+
+Bug fixes:
+
+- borg recreate: don't rechunkify unless explicitly told so
+- borg info: fixed bug when called without arguments, #1914
+- borg init: fix free space check crashing if disk is full, #1821
+- borg debug delete/get obj: fix wrong reference to exception
+
+New features:
+
+- add blake2b key modes (use blake2b as MAC). This links against system libb2,
+  if possible, otherwise uses bundled code
+- automatically remove stale locks - set BORG_HOSTNAME_IS_UNIQUE env var
+  to enable stale lock killing. If set, stale locks in both cache and
+  repository are deleted. #562
+- borg info <repo>: print general repo information, #1680
+- borg check --first / --last / --sort / --prefix, #1663
+- borg mount --first / --last / --sort / --prefix, #1542
+- implement "health" item formatter key, #1749
+- BORG_SECURITY_DIR to remember security related infos outside the cache.
+  Key type, location and manifest timestamp checks now survive cache
+  deletion. This also means that you can now delete your cache and avoid
+  previous warnings, since Borg can still tell it's safe.
+- implement BORG_NEW_PASSPHRASE, #1768
+
+Other changes:
+
+- borg recreate:
+
+  - remove special-cased --dry-run
+  - update --help
+  - remove bloat: interruption blah, autocommit blah, resuming blah
+  - re-use existing checkpoint functionality
+  - archiver tests: add check_cache tool - lints refcounts
+
+- fixed cache sync performance regression from 1.1.0b1 onwards, #1940
+- syncing the cache without chunks.archive.d (see :ref:`disable_archive_chunks`)
+  now avoids any merges and is thus faster, #1940
+- borg check --verify-data: faster due to linear on-disk-order scan
+- borg debug-xxx commands removed, we use "debug xxx" subcommands now, #1627
+- improve metadata handling speed
+- shortcut hashindex_set by having hashindex_lookup hint about address
+- improve / add progress displays, #1721
+- check for index vs. segment files object count mismatch
+- make RPC protocol more extensible: use named parameters.
+- RemoteRepository: misc. code cleanups / refactors
+- clarify cache/repository README file
+
+- docs:
+
+  - quickstart: add a comment about other (remote) filesystems
+  - quickstart: only give one possible ssh url syntax, all others are
+    documented in usage chapter.
+  - mention file://
+  - document repo URLs / archive location
+  - clarify borg diff help, #980
+  - deployment: synthesize alternative --restrict-to-path example
+  - improve cache / index docs, esp. files cache docs, #1825
+  - document using "git merge 1.0-maint -s recursive -X rename-threshold=20%"
+    for avoiding troubles when merging the 1.0-maint branch into master.
+
+- tests:
+
+  - fuse tests: catch ENOTSUP on freebsd
+  - fuse tests: test troublesome xattrs last
+  - fix byte range error in test, #1740
+  - use monkeypatch to set env vars, but only on pytest based tests.
+  - point XDG_*_HOME to temp dirs for tests, #1714
+  - remove all BORG_* env vars from the outer environment
+
 Version 1.0.9 (2016-12-20)
 --------------------------
 
@@ -225,80 +297,6 @@ Other changes:
   - fix fuse test for darwin, #1546
   - add windows virtual machine with cygwin
   - Vagrantfile cleanup / code deduplication
-
-
-Version 1.1.0b3 (not released yet)
-----------------------------------
-
-Bug fixes:
-
-- borg recreate: don't rechunkify unless explicitly told so
-- borg info: fixed bug when called without arguments, #1914
-- borg init: fix free space check crashing if disk is full, #1821
-- borg debug delete/get obj: fix wrong reference to exception
-
-New features:
-
-- add blake2b key modes (use blake2b as MAC). This links against system libb2,
-  if possible, otherwise uses bundled code
-- automatically remove stale locks - set BORG_HOSTNAME_IS_UNIQUE env var
-  to enable stale lock killing. If set, stale locks in both cache and
-  repository are deleted. #562
-- borg info <repo>: print general repo information, #1680
-- borg check --first / --last / --sort / --prefix, #1663
-- borg mount --first / --last / --sort / --prefix, #1542
-- implement "health" item formatter key, #1749
-- BORG_SECURITY_DIR to remember security related infos outside the cache.
-  Key type, location and manifest timestamp checks now survive cache
-  deletion. This also means that you can now delete your cache and avoid
-  previous warnings, since Borg can still tell it's safe.
-- implement BORG_NEW_PASSPHRASE, #1768
-
-Other changes:
-
-- borg recreate:
-
-  - remove special-cased --dry-run
-  - update --help
-  - remove bloat: interruption blah, autocommit blah, resuming blah
-  - re-use existing checkpoint functionality
-  - archiver tests: add check_cache tool - lints refcounts
-
-- fixed cache sync performance regression from 1.1.0b1 onwards, #1940
-- syncing the cache without chunks.archive.d (see :ref:`disable_archive_chunks`)
-  now avoids any merges and is thus faster, #1940
-- borg check --verify-data: faster due to linear on-disk-order scan
-- borg debug-xxx commands removed, we use "debug xxx" subcommands now, #1627
-- improve metadata handling speed
-- shortcut hashindex_set by having hashindex_lookup hint about address
-- improve / add progress displays, #1721
-- check for index vs. segment files object count mismatch
-- make RPC protocol more extensible: use named parameters.
-- RemoteRepository: misc. code cleanups / refactors
-- clarify cache/repository README file
-
-- docs:
-
-  - quickstart: add a comment about other (remote) filesystems
-  - quickstart: only give one possible ssh url syntax, all others are
-    documented in usage chapter.
-  - mention file://
-  - document repo URLs / archive location
-  - clarify borg diff help, #980
-  - deployment: synthesize alternative --restrict-to-path example
-  - improve cache / index docs, esp. files cache docs, #1825
-  - document using "git merge 1.0-maint -s recursive -X rename-threshold=20%"
-    for avoiding troubles when merging the 1.0-maint branch into master.
-
-- tests:
-
-  - fuse tests: catch ENOTSUP on freebsd
-  - fuse tests: test troublesome xattrs last
-  - fix byte range error in test, #1740
-  - use monkeypatch to set env vars, but only on pytest based tests.
-  - point XDG_*_HOME to temp dirs for tests, #1714
-  - remove all BORG_* env vars from the outer environment
-
 
 Version 1.1.0b2 (2016-10-01)
 ----------------------------

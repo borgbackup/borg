@@ -20,6 +20,12 @@ optional arguments
     ``-i``, ``--inplace``
         | rewrite repository in place, with no chance of going back to older
         |                                versions of the repository.
+    ``--force``
+        | Force upgrade
+    ``--tam``
+        | Enable manifest authentication (in key and cache) (Borg 1.0.9 and later)
+    ``--disable-tam``
+        | Disable manifest authentication (in key and cache)
 
 `Common options`_
     |
@@ -28,6 +34,32 @@ Description
 ~~~~~~~~~~~
 
 Upgrade an existing Borg repository.
+
+Borg 1.x.y upgrades
+-------------------
+
+Use ``borg upgrade --tam REPO`` to require manifest authentication
+introduced with Borg 1.0.9 to address security issues. This means
+that modifying the repository after doing this with a version prior
+to 1.0.9 will raise a validation error, so only perform this upgrade
+after updating all clients using the repository to 1.0.9 or newer.
+
+This upgrade should be done on each client for safety reasons.
+
+If a repository is accidentally modified with a pre-1.0.9 client after
+this upgrade, use ``borg upgrade --tam --force REPO`` to remedy it.
+
+If you routinely do this you might not want to enable this upgrade
+(which will leave you exposed to the security issue). You can
+reverse the upgrade by issuing ``borg upgrade --disable-tam REPO``.
+
+See
+https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability
+for details.
+
+Attic and Borg 0.xx to Borg 1.x
+-------------------------------
+
 This currently supports converting an Attic repository to Borg and also
 helps with converting Borg 0.xx to 1.0.
 

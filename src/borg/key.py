@@ -148,6 +148,7 @@ class KeyBase:
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
         """
+
     def compress(self, chunk):
         compr_args, chunk = self.compression_decider2.decide(chunk)
         compressor = Compressor(**compr_args)

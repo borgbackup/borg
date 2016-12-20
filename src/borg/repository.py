@@ -8,7 +8,6 @@ from configparser import ConfigParser
 from datetime import datetime
 from functools import partial
 from itertools import islice
-from zlib import crc32
 
 import msgpack
 
@@ -26,6 +25,7 @@ from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .lrucache import LRUCache
 from .platform import SaveFile, SyncFile, sync_dir
+from .crc32 import crc32
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
 MAGIC = b'BORG_SEG'

@@ -27,6 +27,7 @@ from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_s
 from .archive import BackupOSError
 from .cache import Cache
 from .constants import *  # NOQA
+from .crc32 import crc32
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError
 from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
@@ -1190,6 +1191,9 @@ class Archiver:
     def do_debug_info(self, args):
         """display system information for debugging / bug reports"""
         print(sysinfo())
+
+        # Additional debug information
+        print('CRC implementation:', crc32.__name__)
         return EXIT_SUCCESS
 
     @with_repository()

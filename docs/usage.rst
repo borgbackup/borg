@@ -181,6 +181,9 @@ Some automatic "answerers" (if set, they automatically answer confirmation quest
 Directories:
     BORG_KEYS_DIR
         Default to '~/.config/borg/keys'. This directory contains keys for encrypted repositories.
+    BORG_SECURITY_DIR
+        Default to '~/.config/borg/security'. This directory is used by Borg to track various
+        pieces of security-related data.
     BORG_CACHE_DIR
         Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
         of space for dealing with big repositories).

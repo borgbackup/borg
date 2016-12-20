@@ -2,6 +2,8 @@ from binascii import unhexlify, b2a_base64
 from configparser import ConfigParser
 import errno
 import os
+from datetime import datetime
+from datetime import timedelta
 from io import StringIO
 import random
 import stat
@@ -14,6 +16,7 @@ import unittest
 from unittest.mock import patch
 from hashlib import sha256
 
+import msgpack
 import pytest
 
 from .. import xattr
@@ -21,13 +24,15 @@ from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP, flags_noatime, flags_
 from ..archiver import Archiver
 from ..cache import Cache
 from ..crypto import bytes_to_long, num_aes_blocks
-from ..helpers import Manifest, PatternMatcher, parse_pattern, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, bin_to_hex
-from ..key import RepoKey, KeyfileKey, Passphrase
+from ..helpers import Manifest, PatternMatcher, parse_pattern, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, bin_to_hex, \
+    get_security_dir
+from ..key import RepoKey, KeyfileKey, Passphrase, TAMRequiredError
 from ..keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import BaseTestCase, changedir, environment_variable, no_selinux
 from .platform import fakeroot_detected
+from . import key
 
 try:
     import llfuse
@@ -1143,8 +1148,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         def verify_uniqueness():
             with Repository(self.repository_path) as repository:
-                for key, _ in repository.open_index(repository.get_transaction_id()).iteritems():
-                    data = repository.get(key)
+                for id, _ in repository.open_index(repository.get_transaction_id()).iteritems():
+                    data = repository.get(id)
                     hash = sha256(data).digest()
                     if hash not in seen:
                         seen.add(hash)
@@ -1253,7 +1258,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             repo_key = RepoKey(repository)
             repo_key.load(None, Passphrase.env_passphrase())
 
-        backup_key = KeyfileKey(None)
+        backup_key = KeyfileKey(key.KeyTestCase.MockRepository())
         backup_key.load(export_file, Passphrase.env_passphrase())
 
         assert repo_key.enc_key == backup_key.enc_key
@@ -1463,6 +1468,33 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.assert_in('archive2', output)
         self.cmd('check', self.repository_location, exit_code=0)
 
+    def test_manifest_rebuild_duplicate_archive(self):
+        archive, repository = self.open_archive('archive1')
+        key = archive.key
+        with repository:
+            manifest = repository.get(Manifest.MANIFEST_ID)
+            corrupted_manifest = manifest + b'corrupted!'
+            repository.put(Manifest.MANIFEST_ID, corrupted_manifest)
+
+            archive = msgpack.packb({
+                'cmdline': [],
+                'items': [],
+                'hostname': 'foo',
+                'username': 'bar',
+                'name': 'archive1',
+                'time': '2016-12-15T18:49:51.849711',
+                'version': 1,
+            })
+            archive_id = key.id_hash(archive)
+            repository.put(archive_id, key.encrypt(archive))
+            repository.commit()
+        self.cmd('check', self.repository_location, exit_code=1)
+        self.cmd('check', '--repair', self.repository_location, exit_code=0)
+        output = self.cmd('list', self.repository_location)
+        self.assert_in('archive1', output)
+        self.assert_in('archive1.1', output)
+        self.assert_in('archive2', output)
+
     def test_extra_chunks(self):
         self.cmd('check', self.repository_location, exit_code=0)
         with Repository(self.repository_location, exclusive=True) as repository:
@@ -1499,6 +1531,82 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                 })
                 archive.save()
         self.cmd('check', self.repository_location, exit_code=0)
+
+
+class ManifestAuthenticationTest(ArchiverTestCaseBase):
+    def spoof_manifest(self, repository):
+        with repository:
+            _, key = Manifest.load(repository)
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
+                'version': 1,
+                'archives': {},
+                'config': {},
+                'timestamp': (datetime.utcnow() + timedelta(days=1)).isoformat(),
+            })))
+            repository.commit()
+
+    def test_fresh_init_tam_required(self):
+        self.cmd('init', self.repository_location)
+        repository = Repository(self.repository_path, exclusive=True)
+        with repository:
+            manifest, key = Manifest.load(repository)
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
+                'version': 1,
+                'archives': {},
+                'timestamp': (datetime.utcnow() + timedelta(days=1)).isoformat(),
+            })))
+            repository.commit()
+
+        with pytest.raises(TAMRequiredError):
+            self.cmd('list', self.repository_location)
+
+    def test_not_required(self):
+        self.cmd('init', self.repository_location)
+        self.create_src_archive('archive1234')
+        repository = Repository(self.repository_path, exclusive=True)
+        with repository:
+            shutil.rmtree(get_security_dir(bin_to_hex(repository.id)))
+            _, key = Manifest.load(repository)
+            key.tam_required = False
+            key.change_passphrase(key._passphrase)
+
+            manifest = msgpack.unpackb(key.decrypt(None, repository.get(Manifest.MANIFEST_ID)))
+            del manifest[b'tam']
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb(manifest)))
+            repository.commit()
+        output = self.cmd('list', '--debug', self.repository_location)
+        assert 'archive1234' in output
+        assert 'TAM not found and not required' in output
+        # Run upgrade
+        self.cmd('upgrade', '--tam', self.repository_location)
+        # Manifest must be authenticated now
+        output = self.cmd('list', '--debug', self.repository_location)
+        assert 'archive1234' in output
+        assert 'TAM-verified manifest' in output
+        # Try to spoof / modify pre-1.0.9
+        self.spoof_manifest(repository)
+        # Fails
+        with pytest.raises(TAMRequiredError):
+            self.cmd('list', self.repository_location)
+        # Force upgrade
+        self.cmd('upgrade', '--tam', '--force', self.repository_location)
+        self.cmd('list', self.repository_location)
+
+    def test_disable(self):
+        self.cmd('init', self.repository_location)
+        self.create_src_archive('archive1234')
+        self.cmd('upgrade', '--disable-tam', self.repository_location)
+        repository = Repository(self.repository_path, exclusive=True)
+        self.spoof_manifest(repository)
+        assert not self.cmd('list', self.repository_location)
+
+    def test_disable2(self):
+        self.cmd('init', self.repository_location)
+        self.create_src_archive('archive1234')
+        repository = Repository(self.repository_path, exclusive=True)
+        self.spoof_manifest(repository)
+        self.cmd('upgrade', '--disable-tam', self.repository_location)
+        assert not self.cmd('list', self.repository_location)
 
 
 @pytest.mark.skipif(sys.platform == 'cygwin', reason='remote is broken on cygwin and hangs')

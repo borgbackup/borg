@@ -1,7 +1,62 @@
 Important notes
 ===============
 
-This section is used for infos about e.g. security and corruption issues.
+This section is used for infos about security and corruption issues.
+
+.. _tam_vuln:
+
+Pre-1.0.9 manifest spoofing vulnerability
+-----------------------------------------
+
+A flaw in the cryptographic authentication scheme in Borg allowed an attacker
+to spoof the manifest. The attack requires an attacker to be able to
+
+1. insert files (with no additional headers) into backups
+2. gain write access to the repository
+
+This vulnerability does not disclose plaintext to the attacker, nor does it
+affect the authenticity of existing archives.
+
+The vulnerability allows an attacker to create a spoofed manifest (the list of archives).
+Creating plausible fake archives may be feasible for small archives, but is unlikely
+for large archives.
+
+The fix adds a separate authentication tag to the manifest. For compatibility
+with prior versions this authentication tag is *not* required by default
+for existing repositories. Repositories created with 1.0.9 and later require it.
+
+Steps you should take:
+
+1. Upgrade all clients to 1.0.9 or later.
+2. Run ``borg upgrade --tam <repository>`` *on every client* for *each* repository.
+3. This will list all archives, including archive IDs, for easy comparison with your logs.
+4. Done.
+
+Prior versions can access and modify repositories with this measure enabled, however,
+to 1.0.9 or later their modifications are indiscernible from an attack and will
+raise an error until the below procedure is followed. We are aware that this can
+be be annoying in some circumstances, but don't see a way to fix the vulnerability
+otherwise.
+
+In case a version prior to 1.0.9 is used to modify a repository where above procedure
+was completed, and now you get an error message from other clients:
+
+1. ``borg upgrade --tam --force <repository>`` once with *any* client suffices.
+
+This attack is mitigated by:
+
+- Noting/logging ``borg list``, ``borg info``, or ``borg create --stats``, which
+  contain the archive IDs.
+
+We are not aware of others having discovered, disclosed or exploited this vulnerability.
+
+Vulnerability time line:
+
+* 2016-11-14: Vulnerability and fix discovered during review of cryptography by Marian Beermann (@enkore)
+* 2016-11-20: First patch
+* 2016-12-18: Released fixed versions: 1.0.9, 1.1.0b3
+
+.. _attic013_check_corruption:
 
 Pre-1.0.9 potential data loss
 -----------------------------
@@ -71,8 +126,17 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.0.9 (not released yet)
---------------------------------
+Version 1.0.9 (2016-12-20)
+--------------------------
+
+Security fixes:
+
+- A flaw in the cryptographic authentication scheme in Borg allowed an attacker
+  to spoof the manifest. See :ref:`tam_vuln` above for the steps you should
+  take.
+- borg check: When rebuilding the manifest (which should only be needed very rarely)
+  duplicate archive names would be handled on a "first come first serve" basis, allowing
+  an attacker to apparently replace archives.
 
 Bug fixes:
 
@@ -96,7 +160,7 @@ Other changes:
   - markup fixes
 - tests:
 
-  - test_get_(cache|keys)_dir: clean env state, #1897
+  - test_get\_(cache|keys)_dir: clean env state, #1897
   - get back pytest's pretty assertion failures, #1938
 - setup.py build_usage:
 

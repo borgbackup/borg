@@ -126,7 +126,7 @@ certain number of old archives::
     # archives of THIS machine. The '{hostname}-' prefix is very important to
     # limit prune's operation to this machine's archives and not apply to
     # other machine's archives also.
-    borg prune -v $REPOSITORY --prefix '{hostname}-' \
+    borg prune -v --list $REPOSITORY --prefix '{hostname}-' \
         --keep-daily=7 --keep-weekly=4 --keep-monthly=6
 
 Pitfalls with shell variables and environment variables

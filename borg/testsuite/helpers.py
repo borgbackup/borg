@@ -533,7 +533,6 @@ def test_inclexcl_patterns_from_file(tmpdir, lines, expected):
     assert evaluate(str(patternfile)) == (files if expected is None else expected)
 
 
-    
 @pytest.mark.parametrize("pattern, cls", [
     ("", FnmatchPattern),
 

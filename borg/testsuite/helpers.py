@@ -462,7 +462,6 @@ def test_exclude_patterns_from_file(tmpdir, lines, expected):
 ])
 def test_load_patterns_from_file(tmpdir, lines, expected_roots, expected_numpatterns):
     def evaluate(filename):
-        matcher = PatternMatcher(fallback=True)
         roots, inclexclpatterns = load_patterns(open(filename, "rt"))
         return roots, len(inclexclpatterns)
     patternfile = tmpdir.join("exclude.txt")
@@ -476,8 +475,8 @@ def test_load_patterns_from_file(tmpdir, lines, expected_roots, expected_numpatt
 
 
 @pytest.mark.parametrize("lines", [
-    (["X /data"]), # illegal pattern type prefix
-    (["/data"]), # need a pattern type prefix
+    (["X /data"]),  # illegal pattern type prefix
+    (["/data"]),    # need a pattern type prefix
 ])
 def test_load_invalid_patterns_from_file(tmpdir, lines):
     patternfile = tmpdir.join("exclude.txt")
@@ -485,7 +484,6 @@ def test_load_invalid_patterns_from_file(tmpdir, lines):
         fh.write("\n".join(lines))
     filename = str(patternfile)
     with pytest.raises(argparse.ArgumentTypeError):
-        matcher = PatternMatcher(fallback=True)
         roots, inclexclpatterns = load_patterns(open(filename, "rt"))
 
 

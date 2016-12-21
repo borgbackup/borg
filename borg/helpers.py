@@ -518,6 +518,7 @@ _PATTERN_STYLE_BY_PREFIX = dict((i.PREFIX, i) for i in _PATTERN_STYLES)
 InclExclPattern = namedtuple('InclExclPattern', 'pattern ptype')
 RootPath = object()
 
+
 def parse_pattern(pattern, fallback=FnmatchPattern):
     """Read pattern from string and return an instance of the appropriate implementation class.
     """

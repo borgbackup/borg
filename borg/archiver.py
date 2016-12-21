@@ -1133,6 +1133,9 @@ class Archiver:
                                    help='show version number and exit')
         subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
 
+        # some empty defaults for all subparsers
+        common_parser.set_defaults(exclude_files=[], pattern_files=[])
+
         serve_epilog = textwrap.dedent("""
         This command starts a repository server process. This command is usually not used manually.
         """)
@@ -1376,11 +1379,11 @@ class Archiver:
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
                                help='only display items with the given status characters')
-        subparser.add_argument('-e', '--exclude', dest='excludes',
-                               type=parse_exclude_pattern, action='append', dest='pattern',
+        subparser.add_argument('-e', '--exclude', dest='pattern',
+                               type=parse_exclude_pattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
         subparser.add_argument('--exclude-from', dest='exclude_files',
-                               type=argparse.FileType('r'), action='append', default=[],
+                               type=argparse.FileType('r'), action='append',
                                metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
         subparser.add_argument('--exclude-caches', dest='exclude_caches',
                                action='store_true', default=False,
@@ -1396,7 +1399,7 @@ class Archiver:
                                metavar="PATTERN", help='include/exclude paths matching PATTERN')
         subparser.set_defaults(pattern=[])
         subparser.add_argument('--patterns-from', dest='pattern_files',
-                               type=argparse.FileType('r'), action='append', default=[],
+                               type=argparse.FileType('r'), action='append',
                                metavar='PATTERNFILE', help='read include/exclude patterns from PATTERNFILE, one per line')
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                type=int, default=300, metavar='SECONDS',
@@ -1467,18 +1470,18 @@ class Archiver:
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
                                help='do not actually change any files')
-        subparser.add_argument('-e', '--exclude', dest='excludes',
-                               type=parse_exclude_pattern, action='append', dest='pattern',
+        subparser.add_argument('-e', '--exclude', dest='pattern',
+                               type=parse_exclude_pattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
         subparser.add_argument('--exclude-from', dest='exclude_files',
-                               type=argparse.FileType('r'), action='append', default=[],
+                               type=argparse.FileType('r'), action='append',
                                metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
         subparser.add_argument('--pattern', dest='pattern',
                                type=parse_inclexcl_pattern, action='append',
                                metavar="PATTERN", help='include/exclude paths matching PATTERN')
         subparser.set_defaults(pattern=[])
         subparser.add_argument('--patterns-from', dest='pattern_files',
-                               type=argparse.FileType('r'), action='append', default=[],
+                               type=argparse.FileType('r'), action='append',
                                metavar='PATTERNFILE', help='read include/exclude patterns from PATTERNFILE, one per line')
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,

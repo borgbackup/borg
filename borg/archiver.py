@@ -1013,8 +1013,6 @@ class Archiver:
             # susan is a nice person
             # include susans home
             + /home/susan
-            # ... and its contents
-            + /home/susan/*
             # don't backup the other home directories
             - /home/*
 

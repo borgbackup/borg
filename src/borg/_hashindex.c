@@ -126,7 +126,8 @@ hashindex_lookup(HashIndex *index, const void *key, int *skip_hint)
     int start = hashindex_index(index, key);
     int idx = start;
     int num_buckets = index->num_buckets;
-    for(int offset = 0;; offset++) {
+    int offset;
+    for(offset=0; ; offset++) {
         if (skip_hint != NULL) {
             (*skip_hint) = offset;
         }

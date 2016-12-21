@@ -93,7 +93,7 @@ def check_extension_modules():
         raise ExtensionModuleError
     if compress.API_VERSION != 2:
         raise ExtensionModuleError
-    if crypto.API_VERSION != 3:
+    if crypto.API_VERSION != 4:
         raise ExtensionModuleError
     if platform.API_VERSION != platform.OS_API_VERSION != 5:
         raise ExtensionModuleError
@@ -192,15 +192,16 @@ class Manifest:
         self.key = key
         self.repository = repository
         self.item_keys = frozenset(item_keys) if item_keys is not None else ITEM_KEYS
+        self.tam_verified = False
 
     @property
     def id_str(self):
         return bin_to_hex(self.id)
 
     @classmethod
-    def load(cls, repository, key=None):
+    def load(cls, repository, key=None, force_tam_not_required=False):
         from .item import ManifestItem
-        from .key import key_factory
+        from .key import key_factory, tam_required_file, tam_required
         from .repository import Repository
         try:
             cdata = repository.get(cls.MANIFEST_ID)
@@ -209,9 +210,10 @@ class Manifest:
         if not key:
             key = key_factory(repository, cdata)
         manifest = cls(key, repository)
-        _, data = key.decrypt(None, cdata)
+        data = key.decrypt(None, cdata).data
+        manifest_dict, manifest.tam_verified = key.unpack_and_verify_manifest(data, force_tam_not_required=force_tam_not_required)
+        m = ManifestItem(internal_dict=manifest_dict)
         manifest.id = key.id_hash(data)
-        m = ManifestItem(internal_dict=msgpack.unpackb(data))
         if m.get('version') != 1:
             raise ValueError('Invalid manifest version')
         manifest.archives.set_raw_dict(m.archives)
@@ -219,21 +221,35 @@ class Manifest:
         manifest.config = m.config
         # valid item keys are whatever is known in the repo or every key we know
         manifest.item_keys = ITEM_KEYS | frozenset(key.decode() for key in m.get('item_keys', []))
+
+        if manifest.tam_verified:
+            manifest_required = manifest.config.get(b'tam_required', False)
+            security_required = tam_required(repository)
+            if manifest_required and not security_required:
+                logger.debug('Manifest is TAM verified and says TAM is required, updating security database...')
+                file = tam_required_file(repository)
+                open(file, 'w').close()
+            if not manifest_required and security_required:
+                logger.debug('Manifest is TAM verified and says TAM is *not* required, updating security database...')
+                os.unlink(tam_required_file(repository))
         return manifest, key
 
     def write(self):
         from .item import ManifestItem
+        if self.key.tam_required:
+            self.config[b'tam_required'] = True
         self.timestamp = datetime.utcnow().isoformat()
         manifest = ManifestItem(
             version=1,
-            archives=self.archives.get_raw_dict(),
+            archives=StableDict(self.archives.get_raw_dict()),
             timestamp=self.timestamp,
-            config=self.config,
-            item_keys=tuple(self.item_keys),
+            config=StableDict(self.config),
+            item_keys=tuple(sorted(self.item_keys)),
         )
-        data = msgpack.packb(manifest.as_dict())
+        self.tam_verified = True
+        data = self.key.pack_and_authenticate_metadata(manifest.as_dict())
         self.id = self.key.id_hash(data)
-        self.repository.put(self.MANIFEST_ID, self.key.encrypt(Chunk(data)))
+        self.repository.put(self.MANIFEST_ID, self.key.encrypt(Chunk(data, compression={'name': 'none'})))
 
 
 def prune_within(archives, within):
@@ -292,7 +308,6 @@ def get_keys_dir():
 
 def get_security_dir(repository_id=None):
     """Determine where to store local security information."""
-
     xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(get_home_dir(), '.config'))
     security_dir = os.environ.get('BORG_SECURITY_DIR', os.path.join(xdg_config, 'borg', 'security'))
     if repository_id:

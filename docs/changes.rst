@@ -1,7 +1,62 @@
 Important notes
 ===============
 
-This section is used for infos about e.g. security and corruption issues.
+This section is used for infos about security and corruption issues.
+
+.. _tam_vuln:
+
+Pre-1.0.9 manifest spoofing vulnerability
+-----------------------------------------
+
+A flaw in the cryptographic authentication scheme in Borg allowed an attacker
+to spoof the manifest. The attack requires an attacker to be able to
+
+1. insert files (with no additional headers) into backups
+2. gain write access to the repository
+
+This vulnerability does not disclose plaintext to the attacker, nor does it
+affect the authenticity of existing archives.
+
+The vulnerability allows an attacker to create a spoofed manifest (the list of archives).
+Creating plausible fake archives may be feasible for small archives, but is unlikely
+for large archives.
+
+The fix adds a separate authentication tag to the manifest. For compatibility
+with prior versions this authentication tag is *not* required by default
+for existing repositories. Repositories created with 1.0.9 and later require it.
+
+Steps you should take:
+
+1. Upgrade all clients to 1.0.9 or later.
+2. Run ``borg upgrade --tam <repository>`` *on every client* for *each* repository.
+3. This will list all archives, including archive IDs, for easy comparison with your logs.
+4. Done.
+
+Prior versions can access and modify repositories with this measure enabled, however,
+to 1.0.9 or later their modifications are indiscernible from an attack and will
+raise an error until the below procedure is followed. We are aware that this can
+be be annoying in some circumstances, but don't see a way to fix the vulnerability
+otherwise.
+
+In case a version prior to 1.0.9 is used to modify a repository where above procedure
+was completed, and now you get an error message from other clients:
+
+1. ``borg upgrade --tam --force <repository>`` once with *any* client suffices.
+
+This attack is mitigated by:
+
+- Noting/logging ``borg list``, ``borg info``, or ``borg create --stats``, which
+  contain the archive IDs.
+
+We are not aware of others having discovered, disclosed or exploited this vulnerability.
+
+Vulnerability time line:
+
+* 2016-11-14: Vulnerability and fix discovered during review of cryptography by Marian Beermann (@enkore)
+* 2016-11-20: First patch
+* 2016-12-18: Released fixed versions: 1.0.9, 1.1.0b3
+
+.. _attic013_check_corruption:
 
 Pre-1.0.9 potential data loss
 -----------------------------
@@ -70,98 +125,6 @@ The best check that everything is ok is to run a dry-run extraction::
 
 Changelog
 =========
-
-Version 1.0.9 (not released yet)
---------------------------------
-
-Bug fixes:
-
-- borg check:
-
-  - rebuild manifest if it's corrupted
-  - skip corrupted chunks during manifest rebuild
-- fix TypeError in integrity error handler, #1903, #1894
-- fix location parser for archives with @ char (regression introduced in 1.0.8), #1930
-- fix wrong duration/timestamps if system clock jumped during a create
-- fix progress display not updating if system clock jumps backwards
-- fix checkpoint interval being incorrect if system clock jumps
-
-Other changes:
-
-- docs:
-
-  - add python3-devel as a dependency for cygwin-based installation
-  - clarify extract is relative to current directory
-  - FAQ: fix link to changelog
-  - markup fixes
-- tests:
-
-  - test_get_(cache|keys)_dir: clean env state, #1897
-  - get back pytest's pretty assertion failures, #1938
-- setup.py build_usage:
-
-  - fixed build_usage not processing all commands
-  - fixed build_usage not generating includes for debug commands
-
-
-Version 1.0.9rc1 (2016-11-27)
------------------------------
-
-Bug fixes:
-
-- files cache: fix determination of newest mtime in backup set (which is
-  used in cache cleanup and led to wrong "A" [added] status for unchanged
-  files in next backup), #1860.
-
-- borg check:
-
-  - fix incorrectly reporting attic 0.13 and earlier archives as corrupt
-  - handle repo w/o objects gracefully and also bail out early if repo is
-    *completely* empty, #1815.
-- fix tox/pybuild in 1.0-maint
-- at xattr module import time, loggers are not initialized yet
-
-New features:
-
-- borg umount <mountpoint>
-  exposed already existing umount code via the CLI api, so users can use it,
-  which is more consistent than using borg to mount and fusermount -u (or
-  umount) to un-mount, #1855.
-- implement borg create --noatime --noctime, fixes #1853
-
-Other changes:
-
-- docs:
-
-  - display README correctly on PyPI
-  - improve cache / index docs, esp. files cache docs, fixes #1825
-  - different pattern matching for --exclude, #1779
-  - datetime formatting examples for {now} placeholder, #1822
-  - clarify passphrase mode attic repo upgrade, #1854
-  - clarify --umask usage, #1859
-  - clarify how to choose PR target branch
-  - clarify prune behavior for different archive contents, #1824
-  - fix PDF issues, add logo, fix authors, headings, TOC
-  - move security verification to support section
-  - fix links in standalone README (:ref: tags)
-  - add link to security contact in README
-  - add FAQ about security
-  - move fork differences to FAQ
-  - add more details about resource usage
-- tests: skip remote tests on cygwin, #1268
-- travis:
-
-  - allow OS X failures until the brew cask osxfuse issue is fixed
-  - caskroom osxfuse-beta gone, it's osxfuse now (3.5.3)
-- vagrant:
-
-  - upgrade OSXfuse / FUSE for macOS to 3.5.3
-  - remove llfuse from tox.ini at a central place
-  - do not try to install llfuse on centos6
-  - fix fuse test for darwin, #1546
-  - add windows virtual machine with cygwin
-  - Vagrantfile cleanup / code deduplication
-
 
 Version 1.1.0b3 (not released yet)
 ----------------------------------
@@ -235,6 +198,105 @@ Other changes:
   - point XDG_*_HOME to temp dirs for tests, #1714
   - remove all BORG_* env vars from the outer environment
 
+Version 1.0.9 (2016-12-20)
+--------------------------
+
+Security fixes:
+
+- A flaw in the cryptographic authentication scheme in Borg allowed an attacker
+  to spoof the manifest. See :ref:`tam_vuln` above for the steps you should
+  take.
+- borg check: When rebuilding the manifest (which should only be needed very rarely)
+  duplicate archive names would be handled on a "first come first serve" basis, allowing
+  an attacker to apparently replace archives.
+
+Bug fixes:
+
+- borg check:
+
+  - rebuild manifest if it's corrupted
+  - skip corrupted chunks during manifest rebuild
+- fix TypeError in integrity error handler, #1903, #1894
+- fix location parser for archives with @ char (regression introduced in 1.0.8), #1930
+- fix wrong duration/timestamps if system clock jumped during a create
+- fix progress display not updating if system clock jumps backwards
+- fix checkpoint interval being incorrect if system clock jumps
+
+Other changes:
+
+- docs:
+
+  - add python3-devel as a dependency for cygwin-based installation
+  - clarify extract is relative to current directory
+  - FAQ: fix link to changelog
+  - markup fixes
+- tests:
+
+  - test_get\_(cache|keys)_dir: clean env state, #1897
+  - get back pytest's pretty assertion failures, #1938
+- setup.py build_usage:
+
+  - fixed build_usage not processing all commands
+  - fixed build_usage not generating includes for debug commands
+
+
+Version 1.0.9rc1 (2016-11-27)
+-----------------------------
+
+Bug fixes:
+
+- files cache: fix determination of newest mtime in backup set (which is
+  used in cache cleanup and led to wrong "A" [added] status for unchanged
+  files in next backup), #1860.
+
+- borg check:
+
+  - fix incorrectly reporting attic 0.13 and earlier archives as corrupt
+  - handle repo w/o objects gracefully and also bail out early if repo is
+    *completely* empty, #1815.
+- fix tox/pybuild in 1.0-maint
+- at xattr module import time, loggers are not initialized yet
+
+New features:
+
+- borg umount <mountpoint>
+  exposed already existing umount code via the CLI api, so users can use it,
+  which is more consistent than using borg to mount and fusermount -u (or
+  umount) to un-mount, #1855.
+- implement borg create --noatime --noctime, fixes #1853
+
+Other changes:
+
+- docs:
+
+  - display README correctly on PyPI
+  - improve cache / index docs, esp. files cache docs, fixes #1825
+  - different pattern matching for --exclude, #1779
+  - datetime formatting examples for {now} placeholder, #1822
+  - clarify passphrase mode attic repo upgrade, #1854
+  - clarify --umask usage, #1859
+  - clarify how to choose PR target branch
+  - clarify prune behavior for different archive contents, #1824
+  - fix PDF issues, add logo, fix authors, headings, TOC
+  - move security verification to support section
+  - fix links in standalone README (:ref: tags)
+  - add link to security contact in README
+  - add FAQ about security
+  - move fork differences to FAQ
+  - add more details about resource usage
+- tests: skip remote tests on cygwin, #1268
+- travis:
+
+  - allow OS X failures until the brew cask osxfuse issue is fixed
+  - caskroom osxfuse-beta gone, it's osxfuse now (3.5.3)
+- vagrant:
+
+  - upgrade OSXfuse / FUSE for macOS to 3.5.3
+  - remove llfuse from tox.ini at a central place
+  - do not try to install llfuse on centos6
+  - fix fuse test for darwin, #1546
+  - add windows virtual machine with cygwin
+  - Vagrantfile cleanup / code deduplication
 
 Version 1.1.0b2 (2016-10-01)
 ----------------------------

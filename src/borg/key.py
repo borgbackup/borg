@@ -4,8 +4,8 @@ import os
 import sys
 import textwrap
 from binascii import a2b_base64, b2a_base64, hexlify, unhexlify
-from hashlib import sha256, pbkdf2_hmac
-from hmac import compare_digest
+from hashlib import sha256, sha512, pbkdf2_hmac
+from hmac import HMAC, compare_digest
 
 import msgpack
 
@@ -14,11 +14,11 @@ logger = create_logger()
 
 from .constants import *  # NOQA
 from .compress import Compressor, get_compressor
-from .crypto import AES, bytes_to_long, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256
-from .helpers import Chunk
+from .crypto import AES, bytes_to_long, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
+from .helpers import Chunk, StableDict
 from .helpers import Error, IntegrityError
 from .helpers import yes
-from .helpers import get_keys_dir
+from .helpers import get_keys_dir, get_security_dir
 from .helpers import bin_to_hex
 from .helpers import CompressionDecider2, CompressionSpec
 from .item import Key, EncryptedKey
@@ -41,6 +41,10 @@ class UnsupportedPayloadError(Error):
     """Unsupported payload type {}. A newer version is required to access this repository."""
 
 
+class UnsupportedManifestError(Error):
+    """Unsupported manifest envelope. A newer version is required to access this repository."""
+
+
 class KeyfileNotFoundError(Error):
     """No key file for repository {} found in {}."""
 
@@ -55,6 +59,32 @@ class KeyfileMismatchError(Error):
 
 class RepoKeyNotFoundError(Error):
     """No key entry found in the config of repository {}."""
+
+
+class TAMRequiredError(IntegrityError):
+    __doc__ = textwrap.dedent("""
+    Manifest is unauthenticated, but it is required for this repository.
+
+    This either means that you are under attack, or that you modified this repository
+    with a Borg version older than 1.0.9 after TAM authentication was enabled.
+
+    In the latter case, use "borg upgrade --tam --force '{}'" to re-authenticate the manifest.
+    """).strip()
+    traceback = False
+
+
+class TAMInvalid(IntegrityError):
+    __doc__ = IntegrityError.__doc__
+    traceback = False
+
+    def __init__(self):
+        # Error message becomes: "Data integrity error: Manifest authentication did not verify"
+        super().__init__('Manifest authentication did not verify')
+
+
+class TAMUnsupportedSuiteError(IntegrityError):
+    """Could not verify manifest: Unsupported suite {!r}; a newer version is needed."""
+    traceback = False
 
 
 def key_creator(repository, args):
@@ -94,6 +124,16 @@ def key_factory(repository, manifest_data):
         raise UnsupportedPayloadError(key_type)
 
 
+def tam_required_file(repository):
+    security_dir = get_security_dir(bin_to_hex(repository.id))
+    return os.path.join(security_dir, 'tam_required')
+
+
+def tam_required(repository):
+    file = tam_required_file(repository)
+    return os.path.isfile(file)
+
+
 class KeyBase:
     TYPE = None  # override in subclasses
 
@@ -103,6 +143,7 @@ class KeyBase:
         self.target = None  # key location file path / repo obj
         self.compression_decider2 = CompressionDecider2(CompressionSpec('none'))
         self.compressor = Compressor('none')  # for decompression
+        self.tam_required = True
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
@@ -127,12 +168,78 @@ class KeyBase:
             if not compare_digest(id_computed, id):
                 raise IntegrityError('Chunk %s: id verification failed' % bin_to_hex(id))
 
+    def _tam_key(self, salt, context):
+        return hkdf_hmac_sha512(
+            ikm=self.id_key + self.enc_key + self.enc_hmac_key,
+            salt=salt,
+            info=b'borg-metadata-authentication-' + context,
+            output_length=64
+        )
+
+    def pack_and_authenticate_metadata(self, metadata_dict, context=b'manifest'):
+        metadata_dict = StableDict(metadata_dict)
+        tam = metadata_dict['tam'] = StableDict({
+            'type': 'HKDF_HMAC_SHA512',
+            'hmac': bytes(64),
+            'salt': os.urandom(64),
+        })
+        packed = msgpack.packb(metadata_dict, unicode_errors='surrogateescape')
+        tam_key = self._tam_key(tam['salt'], context)
+        tam['hmac'] = HMAC(tam_key, packed, sha512).digest()
+        return msgpack.packb(metadata_dict, unicode_errors='surrogateescape')
+
+    def unpack_and_verify_manifest(self, data, force_tam_not_required=False):
+        """Unpack msgpacked *data* and return (object, did_verify)."""
+        if data.startswith(b'\xc1' * 4):
+            # This is a manifest from the future, we can't read it.
+            raise UnsupportedManifestError()
+        tam_required = self.tam_required
+        if force_tam_not_required and tam_required:
+            logger.warning('Manifest authentication DISABLED.')
+            tam_required = False
+        data = bytearray(data)
+        # Since we don't trust these bytes we use the slower Python unpacker,
+        # which is assumed to have a lower probability of security issues.
+        unpacked = msgpack.fallback.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape')
+        if b'tam' not in unpacked:
+            if tam_required:
+                raise TAMRequiredError(self.repository._location.canonical_path())
+            else:
+                logger.debug('TAM not found and not required')
+                return unpacked, False
+        tam = unpacked.pop(b'tam', None)
+        if not isinstance(tam, dict):
+            raise TAMInvalid()
+        tam_type = tam.get(b'type', b'<none>').decode('ascii', 'replace')
+        if tam_type != 'HKDF_HMAC_SHA512':
+            if tam_required:
+                raise TAMUnsupportedSuiteError(repr(tam_type))
+            else:
+                logger.debug('Ignoring TAM made with unsupported suite, since TAM is not required: %r', tam_type)
+                return unpacked, False
+        tam_hmac = tam.get(b'hmac')
+        tam_salt = tam.get(b'salt')
+        if not isinstance(tam_salt, bytes) or not isinstance(tam_hmac, bytes):
+            raise TAMInvalid()
+        offset = data.index(tam_hmac)
+        data[offset:offset + 64] = bytes(64)
+        tam_key = self._tam_key(tam_salt, context=b'manifest')
+        calculated_hmac = HMAC(tam_key, data, sha512).digest()
+        if not compare_digest(calculated_hmac, tam_hmac):
+            raise TAMInvalid()
+        logger.debug('TAM-verified manifest')
+        return unpacked, True
+
 
 class PlaintextKey(KeyBase):
     TYPE = 0x02
     NAME = 'plaintext'
 
     chunk_seed = 0
+
+    def __init__(self, repository):
+        super().__init__(repository)
+        self.tam_required = False
 
     @classmethod
     def create(cls, repository, args):
@@ -160,6 +267,9 @@ class PlaintextKey(KeyBase):
         data = self.compressor.decompress(payload)
         self.assert_id(id, data)
         return Chunk(data)
+
+    def _tam_key(self, salt, context):
+        return salt + context
 
 
 def random_blake2b_256_key():
@@ -373,6 +483,7 @@ class PassphraseKey(ID_HMAC_SHA_256, AESKeyBase):
                 key.decrypt(None, manifest_data)
                 num_blocks = num_aes_blocks(len(manifest_data) - 41)
                 key.init_ciphers(key.extract_nonce(manifest_data) + num_blocks)
+                key._passphrase = passphrase
                 return key
             except IntegrityError:
                 passphrase = Passphrase.getpass(prompt)
@@ -388,6 +499,7 @@ class PassphraseKey(ID_HMAC_SHA_256, AESKeyBase):
     def init(self, repository, passphrase):
         self.init_from_random_data(passphrase.kdf(repository.id, self.iterations, 100))
         self.init_ciphers()
+        self.tam_required = False
 
 
 class KeyfileKeyBase(AESKeyBase):
@@ -411,6 +523,7 @@ class KeyfileKeyBase(AESKeyBase):
                 raise PassphraseWrong
         num_blocks = num_aes_blocks(len(manifest_data) - 41)
         key.init_ciphers(key.extract_nonce(manifest_data) + num_blocks)
+        key._passphrase = passphrase
         return key
 
     def find_key(self):
@@ -432,6 +545,7 @@ class KeyfileKeyBase(AESKeyBase):
             self.enc_hmac_key = key.enc_hmac_key
             self.id_key = key.id_key
             self.chunk_seed = key.chunk_seed
+            self.tam_required = key.get('tam_required', tam_required(self.repository))
             return True
         return False
 
@@ -469,15 +583,16 @@ class KeyfileKeyBase(AESKeyBase):
             enc_hmac_key=self.enc_hmac_key,
             id_key=self.id_key,
             chunk_seed=self.chunk_seed,
+            tam_required=self.tam_required,
         )
         data = self.encrypt_key_file(msgpack.packb(key.as_dict()), passphrase)
         key_data = '\n'.join(textwrap.wrap(b2a_base64(data).decode('ascii')))
         return key_data
 
-    def change_passphrase(self):
-        passphrase = Passphrase.new(allow_empty=True)
+    def change_passphrase(self, passphrase=None):
+        if passphrase is None:
+            passphrase = Passphrase.new(allow_empty=True)
         self.save(self.target, passphrase)
-        logger.info('Key updated')
 
     @classmethod
     def create(cls, repository, args):

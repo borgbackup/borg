@@ -307,7 +307,7 @@ class Archive:
 
     def _load_meta(self, id):
         _, data = self.key.decrypt(id, self.repository.get(id))
-        metadata = ArchiveItem(internal_dict=msgpack.unpackb(data))
+        metadata = ArchiveItem(internal_dict=msgpack.unpackb(data, unicode_errors='surrogateescape'))
         if metadata.version != 1:
             raise Exception('Unknown archive metadata version')
         return metadata
@@ -409,7 +409,7 @@ Number of files: {0.stats.nfiles}'''.format(
         }
         metadata.update(additional_metadata or {})
         metadata = ArchiveItem(metadata)
-        data = msgpack.packb(metadata.as_dict(), unicode_errors='surrogateescape')
+        data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b'archive')
         self.id = self.key.id_hash(data)
         self.cache.add_chunk(self.id, Chunk(data), self.stats)
         self.manifest.archives[name] = (self.id, metadata.time)
@@ -1197,8 +1197,18 @@ class ArchiveChecker:
                 continue
             if valid_archive(archive):
                 archive = ArchiveItem(internal_dict=archive)
-                logger.info('Found archive %s', archive.name)
-                manifest.archives[archive.name] = (chunk_id, archive.time)
+                name = archive.name
+                logger.info('Found archive %s', name)
+                if name in manifest.archives:
+                    i = 1
+                    while True:
+                        new_name = '%s.%d' % (name, i)
+                        if new_name not in manifest.archives:
+                            break
+                        i += 1
+                    logger.warning('Duplicate archive name %s, storing as %s', name, new_name)
+                    name = new_name
+                manifest.archives[name] = (chunk_id, archive.time)
         logger.info('Manifest rebuild complete.')
         return manifest
 

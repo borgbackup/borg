@@ -1,9 +1,13 @@
 """A thin OpenSSL wrapper"""
 
+import hashlib
+import hmac
+from math import ceil
+
 from libc.stdlib cimport malloc, free
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 
-API_VERSION = 3
+API_VERSION = 4
 
 
 cdef extern from "blake2-libselect.h":
@@ -247,3 +251,30 @@ def blake2b_256(key, data):
         raise Exception('blake2b_final() failed')
 
     return md
+
+
+def hkdf_hmac_sha512(ikm, salt, info, output_length):
+    """
+    Compute HKDF-HMAC-SHA512 with input key material *ikm*, *salt* and *info* to produce *output_length* bytes.
+
+    This is the "HMAC-based Extract-and-Expand Key Derivation Function (HKDF)" (RFC 5869)
+    instantiated with HMAC-SHA512.
+
+    *output_length* must not be greater than 64 * 255 bytes.
+    """
+    digest_length = 64
+    assert output_length <= (255 * digest_length), 'output_length must be <= 255 * 64 bytes'
+    # Step 1. HKDF-Extract (ikm, salt) -> prk
+    if salt is None:
+        salt = bytes(64)
+    prk = hmac.HMAC(salt, ikm, hashlib.sha512).digest()
+
+    # Step 2. HKDF-Expand (prk, info, output_length) -> output key
+    n = ceil(output_length / digest_length)
+    t_n = b''
+    output = b''
+    for i in range(n):
+        msg = t_n + info + (i + 1).to_bytes(1, 'little')
+        t_n = hmac.HMAC(prk, msg, hashlib.sha512).digest()
+        output += t_n
+    return output[:output_length]

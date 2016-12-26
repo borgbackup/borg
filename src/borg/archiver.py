@@ -408,15 +408,17 @@ class Archiver:
                     status = 'E'
                     self.print_warning('%s: %s', path, e)
         elif stat.S_ISDIR(st.st_mode):
+            def process_recursively(path_):
+                self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
+                              keep_tag_files, skip_inodes, path_, restrict_dev,
+                              read_special=read_special, dry_run=dry_run)
             if recurse:
                 tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)
                 if tag_paths:
                     if keep_tag_files and not dry_run:
                         archive.process_dir(path, st)
                         for tag_path in tag_paths:
-                            self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
-                                          keep_tag_files, skip_inodes, tag_path, restrict_dev,
-                                          read_special=read_special, dry_run=dry_run)
+                            process_recursively(tag_path)
                     return
             if not dry_run:
                 status = archive.process_dir(path, st)
@@ -428,10 +430,7 @@ class Archiver:
                     self.print_warning('%s: scandir: %s', path, e)
                 else:
                     for dirent in entries:
-                        normpath = os.path.normpath(dirent.path)
-                        self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
-                                      keep_tag_files, skip_inodes, normpath, restrict_dev,
-                                      read_special=read_special, dry_run=dry_run)
+                        process_recursively(os.path.normpath(dirent.path))
         elif stat.S_ISLNK(st.st_mode):
             if not dry_run:
                 if not read_special:

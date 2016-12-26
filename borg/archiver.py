@@ -2038,6 +2038,9 @@ def main():  # pragma: no cover
     # SIGHUP is important especially for systemd systems, where logind
     # sends it when a session exits, in addition to any traditional use.
     # Output some info if we receive SIGUSR1 or SIGINFO (ctrl-t).
+
+    # Register fault handler for SIGSEGV, SIGFPE, SIGABRT, SIGBUS and SIGILL.
+    faulthandler.enable()
     with signal_handler('SIGINT', raising_signal_handler(KeyboardInterrupt)), \
          signal_handler('SIGHUP', raising_signal_handler(SigHup)), \
          signal_handler('SIGTERM', raising_signal_handler(SigTerm)), \

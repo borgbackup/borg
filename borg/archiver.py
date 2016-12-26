@@ -3,6 +3,7 @@ from datetime import datetime
 from hashlib import sha256
 from operator import attrgetter
 import argparse
+import faulthandler
 import functools
 import inspect
 import os
@@ -2021,6 +2022,11 @@ def sig_info_handler(sig_no, stack):  # pragma: no cover
                 break
 
 
+def sig_trace_handler(sig_no, stack):  # pragma: no cover
+    print('\nReceived SIGUSR2 at %s, dumping trace...' % datetime.now().replace(microsecond=0), file=sys.stderr)
+    faulthandler.dump_traceback()
+
+
 def main():  # pragma: no cover
     # Make sure stdout and stderr have errors='replace') to avoid unicode
     # issues when print()-ing unicode file names
@@ -2032,10 +2038,14 @@ def main():  # pragma: no cover
     # SIGHUP is important especially for systemd systems, where logind
     # sends it when a session exits, in addition to any traditional use.
     # Output some info if we receive SIGUSR1 or SIGINFO (ctrl-t).
+
+    # Register fault handler for SIGSEGV, SIGFPE, SIGABRT, SIGBUS and SIGILL.
+    faulthandler.enable()
     with signal_handler('SIGINT', raising_signal_handler(KeyboardInterrupt)), \
          signal_handler('SIGHUP', raising_signal_handler(SigHup)), \
          signal_handler('SIGTERM', raising_signal_handler(SigTerm)), \
          signal_handler('SIGUSR1', sig_info_handler), \
+         signal_handler('SIGUSR2', sig_trace_handler), \
          signal_handler('SIGINFO', sig_info_handler):
         archiver = Archiver()
         msg = None

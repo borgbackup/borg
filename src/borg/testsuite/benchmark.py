@@ -148,7 +148,7 @@ def test_chunk_indexer_getitem(benchmark):
 
 def test_chunk_indexer_getitem_c(benchmark):
     import itertools
-    max_key = 2**20
+    max_key = int(1287917 * 0.93 - 10)
     index = ChunkIndex(max_key)
     keys = [sha256(H(k)).digest() for k in range(max_key)]
     bucket_val = (0, 0, 0)

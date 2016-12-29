@@ -17,6 +17,7 @@ from .hashindex import H
 import borg.hashindex
 
 bench_getitem = borg.hashindex.bench_getitem
+bench_setitem = borg.hashindex.bench_setitem
 
 
 @pytest.yield_fixture
@@ -125,31 +126,31 @@ def test_chunk_indexer_getitem(benchmark):
     max_key = 2**20
     index = ChunkIndex(max_key)
     keys = [sha256(H(k)).digest() for k in range(max_key)]
-    missing_keys = b"".join([
+    missing_keys = [
         sha256(H(k)).digest()
-        for k in range(max_key, (max_key+int(len(keys)/3)))])
+        for k in range(max_key, (max_key+int(len(keys)/3)))]
     bucket_val = (0, 0, 0)
-    for key in keys:
+    for i, key in enumerate(keys):
         # we want 32 byte keys, since that's what we use day to day
-        index[key] = bucket_val
-    keys = b"".join(keys)
+        index[key] = (i, i, i)
 
     def do_gets(keys=keys):
-        for i in range(32, len(keys), 32):
-            key = keys[i-32:i]
+        for i, key in enumerate(keys):
             # we want 32 byte keys, since that's what we use day to day
-            index[key]  # noqa
+            assert index[key] == (i, i, i)  # noqa
         for i in range(32, len(missing_keys), 32):
-            key = keys[i-32:i]
             index.get(key)  # noqa
 
     benchmark.pedantic(do_gets, rounds=200)
 
 
 def test_chunk_indexer_getitem_c(benchmark):
-    max_key = int(445649 * 0.93 - 10)
+    max_key = int(445649 * 0.95 - 10)
     index = ChunkIndex(max_key)
-    keys = [sha256(H(k)).digest() for k in range(max_key)]
+    # keys = [b'00'+sha256(H(k)).digest()[2:-2]+b'00'
+    #  for k in range(max_key)]
+    keys = [sha256(H(k)).digest()
+     for k in range(max_key)]
     bucket_val = (0, 0, 0)
     for key in keys:
         # we want 32 byte keys, since that's what we use day to day
@@ -161,4 +162,15 @@ def test_chunk_indexer_getitem_c(benchmark):
 
     def do_gets(keys=keys):
         bench_getitem(index, keys, len(keys)//32)
-    benchmark.pedantic(do_gets, rounds=50)
+    benchmark.pedantic(do_gets, rounds=200)
+
+
+def test_chunk_indexer_setitem_c(benchmark):
+    max_key = int(445649 * 0.75 - 10)
+    index = ChunkIndex(max_key)
+    keys = b"".join((sha256(H(k)).digest()
+            for k in range(max_key)))
+
+    def do_sets(keys=keys):
+        bench_setitem(index, keys, len(keys)//32)
+    benchmark.pedantic(do_sets, rounds=200)

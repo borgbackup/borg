@@ -1010,7 +1010,7 @@ class ArchiveChecker:
         """
         # Explicitly set the initial hash table capacity to avoid performance issues
         # due to hash table "resonance"
-        capacity = int(len(self.repository) * (1/0.93) + 1)  # > len * 1.0 / HASH_MAX_LOAD (see _hashindex.c)
+        capacity = int(len(self.repository) * (1/0.99) + 1)  # > len * 1.0 / HASH_MAX_LOAD (see _hashindex.c)
         self.chunks = ChunkIndex(capacity)
         marker = None
         while True:

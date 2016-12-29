@@ -27,6 +27,17 @@
 #define MAGIC "BORG_IDX"
 #define MAGIC_LEN 8
 
+#define DEBUG 0
+
+#define debug_print(fmt, ...)                   \
+  do {                                          \
+    if (DEBUG) {                                \
+      fprintf(stderr, fmt, __VA_ARGS__);        \
+      fflush(NULL);                             \
+    }                                           \
+  } while (0)
+
+
 typedef struct {
     char magic[MAGIC_LEN];
     int32_t num_entries;
@@ -119,12 +130,12 @@ distance(int num_buckets, int current_idx, int ideal_idx)
 }
 
 
-/* static long unsigned lookups = 0; */
-/* static long unsigned collisions = 0; */
-/* static long unsigned swaps = 0; */
-/* static long unsigned updates = 0; */
-/* static long unsigned inserts = 0; */
-/* static long unsigned shortcuts = 0; */
+static long unsigned lookups = 0;
+static long unsigned collisions = 0;
+static long unsigned swaps = 0;
+static long unsigned updates = 0;
+static long unsigned inserts = 0;
+static long unsigned shortcuts = 0;
 
 static int
 hashindex_lookup(HashIndex *index, const void *key, int *skip_hint)
@@ -134,8 +145,10 @@ hashindex_lookup(HashIndex *index, const void *key, int *skip_hint)
     int idx = start;
     int num_buckets = index->num_buckets;
     int offset;
-    for(offset=0; ; offset++) {
-      /* lookups ++;  //TRACE_PERF */
+    for(offset=0; ;offset++) {
+        if (DEBUG) {
+            lookups ++;
+        }
         if (skip_hint != NULL) {
             (*skip_hint) = offset;
         }
@@ -143,11 +156,10 @@ hashindex_lookup(HashIndex *index, const void *key, int *skip_hint)
         {
             return -1;
         }
-        /* if (lookups % 1000 == 0){ */
-        /*   printf("> %d - %d = %d; %d\n", idx, start, distance(num_buckets, idx, start), offset); */
-        /* } */
         if(offset > distance(num_buckets, idx, hashindex_index(index, BUCKET_ADDR(index, idx)))) {
-          /* shortcuts ++;  //TRACE_PERF */
+            if (DEBUG) {
+                shortcuts ++;
+            }
             return -1;
         }
         if(BUCKET_IS_DELETED(index, idx)) {
@@ -426,6 +438,7 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
     int entry_size = (index->key_size + index->value_size);
     static void *entry_to_insert = NULL;
     static void *tmp_entry = NULL;
+    /* uint8_t entry_to_insert[index->key_size + index->value_size]; */
     int num_buckets = index->num_buckets;
     if (entry_to_insert == NULL) {
         entry_to_insert = malloc(entry_size * 2);
@@ -434,10 +447,11 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
     if(idx < 0)
     {
         /* we don't have the key in the index we need to find an appropriate address */
-      /* inserts ++;  //TRACE_PERF */
+        if (DEBUG) {
+            inserts ++;
+        }
         if(index->num_entries > index->upper_limit) {
             /* we need to grow the hashindex */
-          printf("resizing \n");
             if(!hashindex_resize(index, grow_size(index->num_buckets))) {
                 return 0;
             }
@@ -447,19 +461,25 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
         memcpy(entry_to_insert, key, index->key_size);
         memcpy(entry_to_insert + index->key_size, value, index->value_size);
         bucket_ptr = BUCKET_ADDR(index, idx);
-        /* collisions += offset;  //TRACE_PERF */
+        if (DEBUG) {
+            collisions += offset;
+        }
         while(!BUCKET_IS_EMPTY(index, idx) && !BUCKET_IS_DELETED(index, idx)) {
             /* we have a collision */
             other_offset = distance(
                 num_buckets, idx, hashindex_index(index, bucket_ptr));
-              /* collisions++;  //TRACE_PERF */
+            if (DEBUG) {
+                collisions++;
+            }
             if(other_offset < offset) {
                 /* Swap the bucket at idx with the current entry_to_insert.
                    This is the gist of robin-hood hashing, we rob from the key with the
                    lower distance to its optimal address by swapping places with it. */
                 memswap(bucket_ptr, entry_to_insert, tmp_entry, entry_size);
                 offset = other_offset;
-              /* swaps++;  //TRACE_PERF */
+                if (DEBUG) {
+                    swaps++;
+                }
             }
             offset++;
             idx = (idx + 1) % index->num_buckets;
@@ -472,7 +492,9 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
     {
         /* we already have the key in the index we just need to update its value */
         memcpy(BUCKET_ADDR(index, idx) + index->key_size, value, index->value_size);
-        /* updates++;  //TRACE_PERF */
+        if (DEBUG) {
+            updates++;
+        }
     }
     return 1;
 }
@@ -528,57 +550,41 @@ hashindex_size(HashIndex *index)
 static void
 benchmark_getitem(HashIndex *index, char *keys, int key_count)
 {
-  char *key = keys;
-  char *last_addr = key + (32 * key_count);
-  while (key < last_addr) {
-    hashindex_get(index, key);
-    key += 32;
+    char *key = keys;
+    char *last_addr = key + (32 * key_count);
+    if (DEBUG){
+        lookups = 0; collisions = 0; swaps = 0; updates = 0; shortcuts = 0; inserts = 0;
+    }
+    while (key < last_addr) {
+        hashindex_get(index, key);
+        key += 32;
+    }
+    if (DEBUG){
+        printf("\n\n\nlookups %f; collisions: %lu; swaps %lu; updates %lu; "
+               "shorts %lu; inserts %lu; buckets %d\n\n\n",
+               (double)(lookups) / key_count, collisions, swaps, updates, shortcuts,
+               inserts, index->num_buckets);
   }
-  /* printf("\n\n\nlookups %f; collisions: %lu; swaps %lu; updates %lu; shorts %lu; inserts %lu; buckets %d\n\n\n", */
-  /*        (double)(lookups) / key_count, */
-  /*        collisions, */
-  /*        swaps, */
-  /*        updates, */
-  /*        shortcuts, */
-  /*        inserts, */
-  /*        index->num_buckets */
-  /*        ); */
 }
 
 static void
 benchmark_setitem(HashIndex *index, char *keys, int key_count)
 {
-  char *key = keys;
-  char *last_addr = key + (32 * key_count);
-  uint32_t data[3] = {0, 0, 0};
-  while (key < last_addr) {
-    hashindex_set(index, key, data);
-    key += 32;
-  }
-  data[0] = 1;
-  data[1] = 1;
-  data[2] = 1;
-  key = keys;
-  while (key < last_addr) {
-    hashindex_set(index, key, data);
-    key += 32;
-  }
-  data[0] = 2;
-  data[1] = 2;
-  data[2] = 2;
-  key = keys;
-  while (key < last_addr) {
-    hashindex_set(index, key, data);
-    key += 32;
-  }
+    char *key = keys;
+    char *last_addr = key + (32 * key_count);
+    uint32_t data[3] = {0, 0, 0};
+    if (DEBUG){
+        lookups = 0; collisions = 0; swaps = 0; updates = 0; shortcuts = 0; inserts = 0;
+    }
+    while (key < last_addr) {
+        hashindex_set(index, key, data);
+        key += 32;
+    }
+    if (DEBUG) {
+        printf("\n\n\nlookups %f; collisions: %lu; swaps %lu; updates %lu; shorts %lu; "
+               "inserts %lu; buckets %d\n\n\n",
+               (double)(lookups) / key_count, collisions, swaps, updates, shortcuts,
+               inserts, index->num_buckets);
+    }
 
-  /* printf("\n\n\nlookups %f; collisions: %lu; swaps %lu; updates %lu; shorts %lu; inserts %lu; buckets %d\n\n\n", */
-  /*        (double)(lookups) / key_count, */
-  /*        collisions, */
-  /*        swaps, */
-  /*        updates, */
-  /*        shortcuts, */
-  /*        inserts, */
-  /*        index->num_buckets */
-  /*        ); */
 }

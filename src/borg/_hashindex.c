@@ -361,13 +361,6 @@ hashindex_init(int capacity, int key_size, int value_size)
         free(index);
         return NULL;
     }
-    /* if(!(index->entry_to_insert = malloc((key_size + value_size) * 2))){ */
-    /*     EPRINTF("malloc bucket swap space failed"); */
-    /*     free(index->buckets); */
-    /*     free(index); */
-    /*     return NULL; */
-    /* } */
-    /* index->tmp_entry = index->entry_to_insert + (key_size + value_size); */
 
     index->num_entries = 0;
     index->key_size = key_size;
@@ -386,7 +379,6 @@ static void
 hashindex_free(HashIndex *index)
 {
     free(index->buckets);
-    /* free(index->entry_to_insert); */
     free(index);
 }
 
@@ -447,18 +439,9 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
     uint8_t *bucket_ptr;
     int other_offset;
     int entry_size = (index->key_size + index->value_size);
-    /* void *entry_to_insert = index->entry_to_insert; */
-    /* void *tmp_entry = index->tmp_entry; */
-
-    /* static void *entry_to_insert = NULL; */
-    /* static void *tmp_entry = NULL; */
     uint8_t entry_to_insert[entry_size];
     uint8_t tmp_entry[entry_size];
     int num_buckets = index->num_buckets;
-    /* if (entry_to_insert == NULL) { */
-    /*     entry_to_insert = malloc(entry_size * 2); */
-    /*     tmp_entry = entry_to_insert + entry_size; */
-    /* } */
     if(idx < 0)
     {
         /* we don't have the key in the index we need to find an appropriate address */

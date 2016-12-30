@@ -144,8 +144,11 @@ def test_chunk_indexer_getitem(benchmark):
     benchmark.pedantic(do_gets, rounds=200)
 
 
+rounds = 50
+
+
 def test_chunk_indexer_getitem_c(benchmark):
-    max_key = int(445649 * 0.95 - 10)
+    max_key = int(445649 * 0.93 - 10)
     index = ChunkIndex(max_key)
     # keys = [b'00'+sha256(H(k)).digest()[2:-2]+b'00'
     #  for k in range(max_key)]
@@ -155,16 +158,15 @@ def test_chunk_indexer_getitem_c(benchmark):
     for key in keys:
         # we want 32 byte keys, since that's what we use day to day
         index[key] = bucket_val
-    # missing_keys = b"".join([
-    #     sha256(H(k)).digest()
-    #     for k in range(max_key, (max_key+int(len(keys)/3)))])
-    keys = b"".join(keys) # + missing_keys
+    missing_keys = b"".join([
+        sha256(H(k)).digest()
+        for k in range(max_key, (max_key+int(len(keys)/3)))])
+    keys = b"".join(keys) + missing_keys
 
     def do_gets(keys=keys):
         bench_getitem(index, keys, len(keys)//32)
-    benchmark.pedantic(do_gets, rounds=20)
+    benchmark.pedantic(do_gets, rounds=rounds)
 
-rounds = 50
 
 def test_chunk_indexer_setitem_c_update(benchmark):
     max_key = int(445649 * 0.93 - 10)

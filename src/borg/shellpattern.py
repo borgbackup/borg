@@ -12,7 +12,7 @@ def translate(pat):
 
     This function is derived from the "fnmatch" module distributed with the Python standard library.
 
-    Copyright (C) 2001-2016 Python Software Foundation. All rights reserved.
+    Copyright (C) 2001-2017 Python Software Foundation. All rights reserved.
 
     TODO: support {alt1,alt2} shell-style alternatives
 

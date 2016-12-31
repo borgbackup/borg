@@ -147,7 +147,7 @@ def test_chunk_indexer_getitem(benchmark):
 rounds = 50
 
 
-def test_chunk_indexer_getitem_c(benchmark):
+def test_chunk_indexer_c_getitem(benchmark):
     max_key = int(445649 * 0.93 - 10)
     index = ChunkIndex(max_key)
     # keys = [b'00'+sha256(H(k)).digest()[2:-2]+b'00'
@@ -168,7 +168,7 @@ def test_chunk_indexer_getitem_c(benchmark):
     benchmark.pedantic(do_gets, rounds=rounds)
 
 
-def test_chunk_indexer_setitem_c_update(benchmark):
+def test_chunk_indexer_c_setitem_update(benchmark):
     max_key = int(445649 * 0.93 - 10)
     index = ChunkIndex(max_key)
     keys = b"".join((sha256(H(k)).digest()
@@ -183,7 +183,7 @@ def test_chunk_indexer_setitem_c_update(benchmark):
     benchmark.pedantic(do_sets, rounds=rounds)
 
 
-def test_chunk_indexer_setitem_c(benchmark):
+def test_chunk_indexer_c_setitem(benchmark):
     max_key = int(445649 * 0.93 - 10)
     keys = b"".join((sha256(H(k)).digest()
                      for k in range(max_key)))

@@ -150,6 +150,22 @@ rounds = 50
 def test_chunk_indexer_c_getitem(benchmark):
     max_key = int(445649 * 0.93 - 10)
     index = ChunkIndex(max_key)
+    keys = [sha256(H(k)).digest()
+     for k in range(max_key)]
+    bucket_val = (0, 0, 0)
+    for key in keys:
+        # we want 32 byte keys, since that's what we use day to day
+        index[key] = bucket_val
+    keys = b"".join(keys)
+
+    def do_gets(keys=keys):
+        bench_getitem(index, keys, len(keys)//32)
+    benchmark.pedantic(do_gets, rounds=rounds)
+
+
+def test_chunk_indexer_c_getitem_with_misses(benchmark):
+    max_key = int(445649 * 0.93 - 10)
+    index = ChunkIndex(max_key)
     # keys = [b'00'+sha256(H(k)).digest()[2:-2]+b'00'
     #  for k in range(max_key)]
     keys = [sha256(H(k)).digest()

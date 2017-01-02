@@ -8,6 +8,8 @@ hashindex.c
 chunker.c
 compress.c
 crypto.c
+item.c
+src/borg/crc32.c
 src/borg/platform/darwin.c
 src/borg/platform/freebsd.c
 src/borg/platform/linux.c

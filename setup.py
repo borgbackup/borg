@@ -51,6 +51,7 @@ crypto_source = 'src/borg/crypto.pyx'
 chunker_source = 'src/borg/chunker.pyx'
 hashindex_source = 'src/borg/hashindex.pyx'
 item_source = 'src/borg/item.pyx'
+crc32_source = 'src/borg/crc32.pyx'
 platform_posix_source = 'src/borg/platform/posix.pyx'
 platform_linux_source = 'src/borg/platform/linux.pyx'
 platform_darwin_source = 'src/borg/platform/darwin.pyx'
@@ -86,6 +87,8 @@ try:
                 'src/borg/chunker.c', 'src/borg/_chunker.c',
                 'src/borg/hashindex.c', 'src/borg/_hashindex.c',
                 'src/borg/item.c',
+                'src/borg/crc32.c',
+                'src/borg/_crc32/crc32.c', 'src/borg/_crc32/clmul.c', 'src/borg/_crc32/slice_by_8.c',
                 'src/borg/platform/posix.c',
                 'src/borg/platform/linux.c',
                 'src/borg/platform/freebsd.c',
@@ -103,13 +106,14 @@ except ImportError:
     chunker_source = chunker_source.replace('.pyx', '.c')
     hashindex_source = hashindex_source.replace('.pyx', '.c')
     item_source = item_source.replace('.pyx', '.c')
+    crc32_source = crc32_source.replace('.pyx', '.c')
     platform_posix_source = platform_posix_source.replace('.pyx', '.c')
     platform_linux_source = platform_linux_source.replace('.pyx', '.c')
     platform_freebsd_source = platform_freebsd_source.replace('.pyx', '.c')
     platform_darwin_source = platform_darwin_source.replace('.pyx', '.c')
     from distutils.command.build_ext import build_ext
     if not on_rtd and not all(os.path.exists(path) for path in [
-        compress_source, crypto_source, chunker_source, hashindex_source, item_source,
+        compress_source, crypto_source, chunker_source, hashindex_source, item_source, crc32_source,
         platform_posix_source, platform_linux_source, platform_freebsd_source, platform_darwin_source]):
         raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 
@@ -367,6 +371,7 @@ if not on_rtd:
     Extension('borg.chunker', [chunker_source]),
     Extension('borg.hashindex', [hashindex_source]),
     Extension('borg.item', [item_source]),
+    Extension('borg.crc32', [crc32_source]),
 ]
     if sys.platform.startswith(('linux', 'freebsd', 'darwin')):
         ext_modules.append(Extension('borg.platform.posix', [platform_posix_source]))

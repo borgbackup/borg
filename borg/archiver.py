@@ -730,6 +730,10 @@ class Archiver:
         if args.tam:
             manifest, key = Manifest.load(repository, force_tam_not_required=args.force)
 
+            if not hasattr(key, 'change_passphrase'):
+                print('This repository is not encrypted, cannot enable TAM.')
+                return EXIT_ERROR
+
             if not manifest.tam_verified or not manifest.config.get(b'tam_required', False):
                 # The standard archive listing doesn't include the archive ID like in borg 1.1.x
                 print('Manifest contents:')

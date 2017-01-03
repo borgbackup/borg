@@ -10,7 +10,7 @@ from ctypes import CDLL, create_string_buffer, c_ssize_t, c_size_t, c_char_p, c_
 from ctypes.util import find_library
 from distutils.version import LooseVersion
 
-from .helpers import Buffer, Error
+from .helpers import Buffer
 
 
 try:
@@ -113,11 +113,8 @@ def split_lstring(buf):
     return result
 
 
-class BufferTooSmallError(OSError):
-    """insufficient buffer memory for completing a xattr operation."""
-
-    def __str__(self):
-        return self.__doc__
+class BufferTooSmallError(Exception):
+    """the buffer given to an xattr function was too small for the result."""
 
 
 def _check(rv, path=None, detect_buffer_too_small=False):

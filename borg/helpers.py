@@ -55,8 +55,14 @@ class Error(Exception):
     # show a traceback?
     traceback = False
 
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.args = args
+
     def get_message(self):
         return type(self).__doc__.format(*self.args)
+
+    __str__ = get_message
 
 
 class ErrorWithTraceback(Error):
@@ -699,6 +705,10 @@ class Buffer:
     """
     provide a thread-local buffer
     """
+
+    class MemoryLimitExceeded(Error, OSError):
+        """Requested buffer size {} is above the limit of {}."""
+
     def __init__(self, allocator, size=4096, limit=None):
         """
         Initialize the buffer: use allocator(size) call to allocate a buffer.
@@ -718,11 +728,11 @@ class Buffer:
         """
         resize the buffer - to avoid frequent reallocation, we usually always grow (if needed).
         giving init=True it is possible to first-time initialize or shrink the buffer.
-        if a buffer size beyond the limit is requested, raise ValueError.
+        if a buffer size beyond the limit is requested, raise Buffer.MemoryLimitExceeded (OSError).
         """
         size = int(size)
         if self.limit is not None and size > self.limit:
-            raise ValueError('Requested buffer size %d is above the limit of %d.' % (size, self.limit))
+            raise Buffer.MemoryLimitExceeded(size, self.limit)
         if init or len(self) < size:
             self._thread_local.buffer = self.allocator(size)
 

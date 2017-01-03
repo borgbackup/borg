@@ -182,6 +182,9 @@ class Archiver:
             return EXIT_ERROR
         key.change_passphrase()
         logger.info('Key updated')
+        if hasattr(key, 'find_key'):
+            # print key location to make backing it up easier
+            logger.info('Key location: %s', key.find_key())
         return EXIT_SUCCESS
 
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)

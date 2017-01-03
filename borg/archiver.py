@@ -177,6 +177,9 @@ class Archiver:
     @with_repository()
     def do_change_passphrase(self, args, repository, manifest, key):
         """Change repository key file passphrase"""
+        if not hasattr(key, 'change_passphrase'):
+            print('This repository is not encrypted, cannot change the passphrase.')
+            return EXIT_ERROR
         key.change_passphrase()
         logger.info('Key updated')
         return EXIT_SUCCESS

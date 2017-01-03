@@ -126,6 +126,14 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
+Version 1.0.10rc1 (not released yet)
+------------------------------------
+
+Bug fixes:
+
+- Avoid triggering an ObjectiveFS bug in xattr retrieval, #1992
+- When running out of buffer memory when reading xattrs, only skip the current file, #1993
+
 Version 1.0.9 (2016-12-20)
 --------------------------
 

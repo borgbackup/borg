@@ -205,7 +205,7 @@ if sys.platform.startswith('linux'):  # pragma: linux only
 
         n, buf = _listxattr_inner(func, path)
         return [os.fsdecode(name) for name in split_string0(buf[:n])
-                if not name.startswith(b'system.posix_acl_')]
+                if name and not name.startswith(b'system.posix_acl_')]
 
     def getxattr(path, name, *, follow_symlinks=True):
         def func(path, name, buf, size):
@@ -261,7 +261,7 @@ elif sys.platform == 'darwin':  # pragma: darwin only
                     return libc.listxattr(path, buf, size, XATTR_NOFOLLOW)
 
         n, buf = _listxattr_inner(func, path)
-        return [os.fsdecode(name) for name in split_string0(buf[:n])]
+        return [os.fsdecode(name) for name in split_string0(buf[:n]) if name]
 
     def getxattr(path, name, *, follow_symlinks=True):
         def func(path, name, buf, size):
@@ -320,7 +320,7 @@ elif sys.platform.startswith('freebsd'):  # pragma: freebsd only
                     return libc.extattr_list_link(path, ns, buf, size)
 
         n, buf = _listxattr_inner(func, path)
-        return [os.fsdecode(name) for name in split_lstring(buf[:n])]
+        return [os.fsdecode(name) for name in split_lstring(buf[:n]) if name]
 
     def getxattr(path, name, *, follow_symlinks=True):
         def func(path, name, buf, size):

@@ -177,8 +177,14 @@ class Archiver:
     @with_repository()
     def do_change_passphrase(self, args, repository, manifest, key):
         """Change repository key file passphrase"""
+        if not hasattr(key, 'change_passphrase'):
+            print('This repository is not encrypted, cannot change the passphrase.')
+            return EXIT_ERROR
         key.change_passphrase()
         logger.info('Key updated')
+        if hasattr(key, 'find_key'):
+            # print key location to make backing it up easier
+            logger.info('Key location: %s', key.find_key())
         return EXIT_SUCCESS
 
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
@@ -729,6 +735,10 @@ class Archiver:
         """upgrade a repository from a previous version"""
         if args.tam:
             manifest, key = Manifest.load(repository, force_tam_not_required=args.force)
+
+            if not hasattr(key, 'change_passphrase'):
+                print('This repository is not encrypted, cannot enable TAM.')
+                return EXIT_ERROR
 
             if not manifest.tam_verified or not manifest.config.get(b'tam_required', False):
                 # The standard archive listing doesn't include the archive ID like in borg 1.1.x

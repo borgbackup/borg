@@ -133,6 +133,9 @@ Bug fixes:
 
 - Avoid triggering an ObjectiveFS bug in xattr retrieval, #1992
 - When running out of buffer memory when reading xattrs, only skip the current file, #1993
+- Fixed "borg upgrade --tam" crashing with unencrypted repositories. Since :ref:`the issue <tam_vuln>` is
+  not relevant for unencrypted repositories, it now does nothing and prints an error, #1981.
+- Fixed change-passphrase crashing with unencrypted repositories, #1978
 
 Version 1.0.9 (2016-12-20)
 --------------------------

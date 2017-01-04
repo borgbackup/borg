@@ -1107,6 +1107,10 @@ class ArchiveChecker:
             archive_items = [item for item in self.manifest.archives.items() if item[0] == archive]
             num_archives = 1
             end = 1
+            if not archive_items:
+                logger.error('Archive %s does not exist', archive)
+                self.error_found = True
+                return
 
         with cache_if_remote(self.repository) as repository:
             for i, (name, info) in enumerate(archive_items[:end]):

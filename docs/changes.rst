@@ -136,6 +136,7 @@ Bug fixes:
 - Fixed "borg upgrade --tam" crashing with unencrypted repositories. Since :ref:`the issue <tam_vuln>` is
   not relevant for unencrypted repositories, it now does nothing and prints an error, #1981.
 - Fixed change-passphrase crashing with unencrypted repositories, #1978
+- Fixed "borg check repo::archive" indicating success if "archive" does not exist, #1997
 
 Version 1.0.9 (2016-12-20)
 --------------------------

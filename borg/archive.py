@@ -1100,8 +1100,12 @@ class ArchiveChecker:
                                    key=lambda name_info: name_info[1][b'time'])
             if prefix is not None:
                 archive_items = [item for item in archive_items if item[0].startswith(prefix)]
+                if not archive_items:
+                    logger.warning('--prefix %s does not match any archives', prefix)
             num_archives = len(archive_items)
             end = None if last is None else min(num_archives, last)
+            if last is not None and end < last:
+                logger.warning('--last %d archives: only found %d archives', last, end)
         else:
             # we only want one specific archive
             archive_items = [item for item in self.manifest.archives.items() if item[0] == archive]

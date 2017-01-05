@@ -793,7 +793,7 @@ class TestBuffer:
         buffer = Buffer(bytearray, size=100, limit=200)
         buffer.resize(200)
         assert len(buffer) == 200
-        with pytest.raises(ValueError):
+        with pytest.raises(Buffer.MemoryLimitExceeded):
             buffer.resize(201)
         assert len(buffer) == 200
 
@@ -807,7 +807,7 @@ class TestBuffer:
         b3 = buffer.get(200)
         assert len(b3) == 200
         assert b3 is not b2  # new, resized buffer
-        with pytest.raises(ValueError):
+        with pytest.raises(Buffer.MemoryLimitExceeded):
             buffer.get(201)  # beyond limit
         assert len(buffer) == 200
 

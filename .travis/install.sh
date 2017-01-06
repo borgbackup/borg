@@ -28,6 +28,10 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
             pyenv install 3.5.1
             pyenv global 3.5.1
             ;;
+        py36)
+            pyenv install 3.6.0
+            pyenv global 3.6.0
+            ;;
     esac
     pyenv rehash
     python -m pip install --user 'virtualenv<14.0'

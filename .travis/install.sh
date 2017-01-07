@@ -17,7 +17,7 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
     brew install lz4
     brew outdated pyenv || brew upgrade pyenv
     brew install pkg-config
-    brew install Caskroom/versions/osxfuse
+    brew install Caskroom/cask/osxfuse
 
     case "${TOXENV}" in
         py34)
@@ -27,6 +27,10 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
         py35)
             pyenv install 3.5.1
             pyenv global 3.5.1
+            ;;
+        py36)
+            pyenv install 3.6.0
+            pyenv global 3.6.0
             ;;
     esac
     pyenv rehash

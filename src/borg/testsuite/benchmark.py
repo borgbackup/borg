@@ -144,9 +144,9 @@ def test_chunk_indexer_getitem(benchmark):
     benchmark.pedantic(do_gets, rounds=200)
 
 
-rounds = 20
+rounds = 10
 @pytest.fixture(
-    params=[.30, .50, .75, .80, .93, .95]
+    params=[.30, .50, .75, .80, .85, .90, .93, .95]
 )
 def fill(request):
     return request.param

@@ -144,11 +144,16 @@ def test_chunk_indexer_getitem(benchmark):
     benchmark.pedantic(do_gets, rounds=200)
 
 
-rounds = 50
+rounds = 20
+@pytest.fixture(
+    params=[.30, .50, .75, .80, .93, .95]
+)
+def fill(request):
+    return request.param
 
 
-def test_chunk_indexer_c_getitem(benchmark):
-    max_key = int(445649 * 0.93 - 10)
+def test_chunk_indexer_c_getitem(benchmark, fill):
+    max_key = int(445649 * fill - 10)
     index = ChunkIndex(max_key)
     keys = [sha256(H(k)).digest()
      for k in range(max_key)]
@@ -160,11 +165,14 @@ def test_chunk_indexer_c_getitem(benchmark):
 
     def do_gets(keys=keys):
         bench_getitem(index, keys, len(keys)//32)
+    # import yep
+    # yep.start('getitem.perf')
     benchmark.pedantic(do_gets, rounds=rounds)
+    # yep.stop()
 
 
-def test_chunk_indexer_c_getitem_with_misses(benchmark):
-    max_key = int(445649 * 0.93 - 10)
+def test_chunk_indexer_c_getitem_with_misses(benchmark, fill):
+    max_key = int(445649 * fill - 10)
     index = ChunkIndex(max_key)
     # keys = [b'00'+sha256(H(k)).digest()[2:-2]+b'00'
     #  for k in range(max_key)]
@@ -184,8 +192,8 @@ def test_chunk_indexer_c_getitem_with_misses(benchmark):
     benchmark.pedantic(do_gets, rounds=rounds)
 
 
-def test_chunk_indexer_c_setitem_update(benchmark):
-    max_key = int(445649 * 0.93 - 10)
+def test_chunk_indexer_c_setitem_update(benchmark, fill):
+    max_key = int(445649 * fill - 10)
     index = ChunkIndex(max_key)
     keys = b"".join((sha256(H(k)).digest()
             for k in range(max_key)))
@@ -196,11 +204,13 @@ def test_chunk_indexer_c_setitem_update(benchmark):
 
     def do_sets():
         bench_setitem(index, keys, len(keys)//32)
+    # import yep
+    # yep.start('setitem.perf')
     benchmark.pedantic(do_sets, rounds=rounds)
+    # yep.stop()
 
-
-def test_chunk_indexer_c_setitem(benchmark):
-    max_key = int(445649 * 0.93 - 10)
+def test_chunk_indexer_c_setitem(benchmark, fill):
+    max_key = int(445649 * fill - 10)
     keys = b"".join((sha256(H(k)).digest()
                      for k in range(max_key)))
     def setup():

@@ -124,13 +124,12 @@ hashindex_index(HashIndex *index, const void *key)
 }
 
 inline int
-distance(int num_buckets, int current_idx, int ideal_idx)
+distance(int current_idx, int ideal_idx, int num_buckets)
 {
     /* If the current index is smaller than the ideal index we've wrapped
        around the end of the bucket array and need to compensate for that. */
     return current_idx - ideal_idx + ( (current_idx < ideal_idx) ? num_buckets : 0 );
 }
-
 
 static long unsigned lookups = 0;
 static long unsigned collisions = 0;
@@ -142,48 +141,63 @@ static long unsigned shortcuts = 0;
 static int
 hashindex_lookup(HashIndex *index, const void *key, int *skip_hint)
 {
-    int didx = -1;  // deleted index
+    /* int didx = -1;  // deleted index */
     int start = hashindex_index(index, key);
     int idx = start;
-    int num_buckets = index->num_buckets;
     int offset;
+    int rv = -1;
+    int period = 0;
     for(offset=0; ;offset++) {
         if (DEBUG) {
             lookups ++;
         }
-        if (skip_hint != NULL) {
-            (*skip_hint) = offset;
+        if(BUCKET_IS_EMPTY(index, idx)) {
+            rv = -1;
+            break;
         }
-        if(BUCKET_IS_EMPTY(index, idx))
-        {
-            return -1;
-        }
-        if(offset > distance(num_buckets, idx, hashindex_index(index, BUCKET_ADDR(index, idx)))) {
-            if (DEBUG) {
-                shortcuts ++;
-            }
-            return -1;
-        }
-        if(BUCKET_IS_DELETED(index, idx)) {
-            /* TODO: don't hint at skipping deleted buckets */
-            if(didx == -1) {
-                didx = idx;
-            }
-        }
-        else if(BUCKET_MATCHES_KEY(index, idx, key)) {
-            if (didx != -1) {
-                /* we found a tombstone earlier, so we can move this key on top of it */
-                memcpy(BUCKET_ADDR(index, didx), BUCKET_ADDR(index, idx), index->bucket_size);
-                BUCKET_MARK_DELETED(index, idx);
-                idx = didx;
-            }
+        /* if(BUCKET_IS_DELETED(index, idx)) { */
+        /*     /\* TODO: don't hint at skipping deleted buckets *\/ */
+        /*     if(didx == -1) { */
+        /*         didx = idx; */
+        /*     } */
+        /* } */
+        /* else */
+        if(BUCKET_MATCHES_KEY(index, idx, key)) {
+            /* if (didx != -1) { */
+            /*     /\* we found a tombstone earlier, so we can move this key on top of it *\/ */
+            /*     memcpy(BUCKET_ADDR(index, didx), BUCKET_ADDR(index, idx), index->bucket_size); */
+            /*     BUCKET_MARK_DELETED(index, idx); */
+            /*     idx = didx; */
+            /* } */
             return idx;
         }
-        idx = (idx + 1) % index->num_buckets;
+	/* if(16 == period++) { */
+	/*     period = 0; */
+	/* } */
+        /* if((skip_hint || period==0) && (offset > distance(idx, hashindex_index(index, BUCKET_ADDR(index, idx)), index->num_buckets))) { */
+        if(skip_hint || period++ == 15){
+	    period = 0;
+	    if (offset > distance(idx, hashindex_index(index, BUCKET_ADDR(index, idx)), index->num_buckets)) {
+		if (DEBUG) {
+		    shortcuts ++;
+		}
+		rv = -1;
+		break;
+	    }
+	}
+        idx ++;
+        if (idx >= index->num_buckets) {
+            idx = 0;
+        }
         if(idx == start) {
-            return -1;
+            rv = -1;
+            break;
         }
     }
+    if (skip_hint != NULL) {
+        (*skip_hint) = offset;
+    }
+    return rv;
 }
 
 static int
@@ -425,6 +439,14 @@ hashindex_get(HashIndex *index, const void *key)
 }
 
 inline void
+/* memswap(uint8_t a[], uint8_t b[], void *tmp, size_t entry_size) { */
+/*     uint8_t t; */
+/*     unsigned int i; */
+/*     for (i=0; i<entry_size; i++){ */
+/* 	t = a[i]; */
+/* 	a[i] = b[i]; */
+/* 	b[i] = t; */
+/*     } */
 memswap(void *a, void *b, void *tmp, size_t entry_size) {
     memcpy(tmp, a, entry_size);
     memcpy(a, b, entry_size);
@@ -441,8 +463,15 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
     int entry_size = (index->key_size + index->value_size);
     uint8_t entry_to_insert[entry_size];
     uint8_t tmp_entry[entry_size];
-    int num_buckets = index->num_buckets;
-    if(idx < 0)
+    if(idx >= 0)
+    {
+        /* we already have the key in the index we just need to update its value */
+        memcpy(BUCKET_ADDR(index, idx) + index->key_size, value, index->value_size);
+        if (DEBUG) {
+            updates++;
+        }
+    }
+    else
     {
         /* we don't have the key in the index we need to find an appropriate address */
         if (DEBUG) {
@@ -455,7 +484,10 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
             }
             offset = 0;
         }
-        idx = (hashindex_index(index, key) + offset) % index->num_buckets;
+        idx = hashindex_index(index, key) + offset;
+        if (idx >= index->num_buckets){
+            idx = idx - index->num_buckets;
+        }
         memcpy(entry_to_insert, key, index->key_size);
         memcpy(entry_to_insert + index->key_size, value, index->value_size);
         bucket_ptr = BUCKET_ADDR(index, idx);
@@ -464,8 +496,7 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
         }
         while(!BUCKET_IS_EMPTY(index, idx) && !BUCKET_IS_DELETED(index, idx)) {
             /* we have a collision */
-            other_offset = distance(
-                num_buckets, idx, hashindex_index(index, bucket_ptr));
+            other_offset = distance(idx, hashindex_index(index, bucket_ptr), index->num_buckets);
             if (DEBUG) {
                 collisions++;
             }
@@ -480,19 +511,15 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
                 }
             }
             offset++;
-            idx = (idx + 1) % index->num_buckets;
+            idx ++;
+            if (idx >= index->num_buckets) {
+                idx = 0;
+            }
+            /* idx = (idx + 1) % index->num_buckets; */
             bucket_ptr = BUCKET_ADDR(index, idx);
         }
         memcpy(bucket_ptr, entry_to_insert, entry_size);
         index->num_entries += 1;
-    }
-    else
-    {
-        /* we already have the key in the index we just need to update its value */
-        memcpy(BUCKET_ADDR(index, idx) + index->key_size, value, index->value_size);
-        if (DEBUG) {
-            updates++;
-        }
     }
     return 1;
 }

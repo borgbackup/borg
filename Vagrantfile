@@ -174,8 +174,9 @@ def packages_cygwin(version)
     set OURPATH=%cd%
     set CYGBUILD="C:\\cygwin\\CygWin"
     set CYGMIRROR=ftp://mirrors.kernel.org/sourceware/cygwin/
-    set BUILDPKGS=python3,python3-setuptools,binutils,gcc-g++,libopenssl,openssl-devel,git,make,openssh,liblz4-devel,liblz4_1,rsync,curl,python-devel
-    %CYGSETUP% -q -B -o -n -R %CYGBUILD% -L -D -s %CYGMIRROR% -P %BUILDPKGS%
+    set BASEPKGS=openssh,rsync
+    set BUILDPKGS=python3,python3-setuptools,python-devel,binutils,gcc-g++,libopenssl,openssl-devel,git,make,liblz4-devel,liblz4_1,curl
+    %CYGSETUP% -q -B -o -n -R %CYGBUILD% -L -D -s %CYGMIRROR% -P %BASEPKGS%,%BUILDPKGS%
     cd /d C:\\cygwin\\CygWin\\bin
     regtool set /HKLM/SYSTEM/CurrentControlSet/Services/OpenSSHd/ImagePath "C:\\cygwin\\CygWin\\bin\\cygrunsrv.exe"
     bash -c "ssh-host-config --no"

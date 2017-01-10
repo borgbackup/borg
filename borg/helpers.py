@@ -338,11 +338,24 @@ def update_patterns(args):
     for file in args.pattern_files:
         roots, inclexclpatterns = load_patterns(file)
         args.paths += roots
-        args.pattern += inclexclpatterns
+        args.patterns += inclexclpatterns
         file.close()
     for file in args.exclude_files:
-        args.pattern += load_excludes(file)
+        args.patterns += load_excludes(file)
         file.close()
+
+
+class ArgparsePatternAction(argparse.Action):
+    def __init__(self, nargs=1, **kw):
+        super().__init__(nargs=nargs, **kw)
+
+    def __call__(self, parser, args, values, option_string=None):
+        pattern = parse_inclexcl_pattern(values[0])
+        if pattern:
+            if pattern.ptype is RootPath:
+                args.paths.append(pattern.pattern)
+            else:
+                args.patterns.append(pattern)
 
 
 class PatternMatcher:
@@ -550,11 +563,12 @@ def parse_inclexcl_pattern(pattern, fallback=ShellPattern):
         'R': RootPath,
         'r': RootPath,
     }
-    ptype = None
-    if len(pattern) > 1 and pattern[0] in type_prefix_map:
-        (ptype, pattern) = (type_prefix_map[pattern[0]], pattern[1:])
-        pattern = pattern.lstrip()
-    if ptype is None or not pattern:
+    try:
+        ptype = type_prefix_map[pattern[0]]
+        pattern = pattern[1:].lstrip()
+        if not pattern:
+            raise ValueError("Missing pattern!")
+    except (IndexError, KeyError, ValueError):
         raise argparse.ArgumentTypeError("Unable to parse pattern: {}".format(pattern))
     if ptype is RootPath:
         pobj = pattern

@@ -18,7 +18,7 @@ import collections
 
 from . import __version__
 from .helpers import Error, location_validator, archivename_validator, format_line, format_time, format_file_size, \
-    parse_pattern, parse_exclude_pattern, parse_inclexcl_pattern, PathPrefixPattern, to_localtime, timestamp, \
+    parse_pattern, parse_exclude_pattern, ArgparsePatternAction, PathPrefixPattern, to_localtime, timestamp, \
     safe_timestamp, bin_to_hex, get_cache_dir, prune_within, prune_split, \
     Manifest, NoManifestError, remove_surrogates, update_patterns, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, PrefixSpec, is_slow_msgpack, yes, sysinfo, \
@@ -245,7 +245,7 @@ class Archiver:
     def do_create(self, args, repository, manifest=None, key=None):
         """Create new archive"""
         matcher = PatternMatcher(fallback=True)
-        matcher.add_inclexcl(args.pattern)
+        matcher.add_inclexcl(args.patterns)
 
         def create_inner(archive, cache):
             # Add cache dir to inode_skip list
@@ -435,7 +435,7 @@ class Archiver:
             if sys.platform.startswith(('linux', 'freebsd', 'netbsd', 'openbsd', 'darwin', )):
                 logger.warning('Hint: You likely need to fix your locale setup. E.g. install locales and use: LANG=en_US.UTF-8')
 
-        matcher, include_patterns = self.build_matcher(args.pattern, args.paths)
+        matcher, include_patterns = self.build_matcher(args.patterns, args.paths)
 
         output_list = args.output_list
         dry_run = args.dry_run
@@ -1016,6 +1016,10 @@ class Archiver:
             # don't backup the other home directories
             - /home/*
 
+        Patterns (`--pattern`) and excludes (`--exclude`) from the command line are
+        considered first (in the order of appearance). Then patterns from `--pattern-from`
+        are added. Exclusion patterns from `--exclude-from` files are appended last.
+
 \n\n''')
     helptext['placeholders'] = textwrap.dedent('''
         Repository (or Archive) URLs, --prefix and --remote-path values support these
@@ -1134,7 +1138,7 @@ class Archiver:
         subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
 
         # some empty defaults for all subparsers
-        common_parser.set_defaults(exclude_files=[], pattern_files=[])
+        common_parser.set_defaults(exclude_files=[], patterns=[], pattern_files=[])
 
         serve_epilog = textwrap.dedent("""
         This command starts a repository server process. This command is usually not used manually.
@@ -1379,7 +1383,7 @@ class Archiver:
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
                                help='only display items with the given status characters')
-        subparser.add_argument('-e', '--exclude', dest='pattern',
+        subparser.add_argument('-e', '--exclude', dest='patterns',
                                type=parse_exclude_pattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
         subparser.add_argument('--exclude-from', dest='exclude_files',
@@ -1394,10 +1398,8 @@ class Archiver:
         subparser.add_argument('--keep-tag-files', dest='keep_tag_files',
                                action='store_true', default=False,
                                help='keep tag files of excluded caches/directories')
-        subparser.add_argument('--pattern', dest='pattern',
-                               type=parse_inclexcl_pattern, action='append',
+        subparser.add_argument('--pattern', action=ArgparsePatternAction,
                                metavar="PATTERN", help='include/exclude paths matching PATTERN')
-        subparser.set_defaults(pattern=[])
         subparser.add_argument('--patterns-from', dest='pattern_files',
                                type=argparse.FileType('r'), action='append',
                                metavar='PATTERNFILE', help='read include/exclude patterns from PATTERNFILE, one per line')
@@ -1470,16 +1472,14 @@ class Archiver:
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
                                help='do not actually change any files')
-        subparser.add_argument('-e', '--exclude', dest='pattern',
+        subparser.add_argument('-e', '--exclude', dest='patterns',
                                type=parse_exclude_pattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
         subparser.add_argument('--exclude-from', dest='exclude_files',
                                type=argparse.FileType('r'), action='append',
                                metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
-        subparser.add_argument('--pattern', dest='pattern',
-                               type=parse_inclexcl_pattern, action='append',
+        subparser.add_argument('--pattern', action=ArgparsePatternAction,
                                metavar="PATTERN", help='include/exclude paths matching PATTERN')
-        subparser.set_defaults(pattern=[])
         subparser.add_argument('--patterns-from', dest='pattern_files',
                                type=argparse.FileType('r'), action='append',
                                metavar='PATTERNFILE', help='read include/exclude patterns from PATTERNFILE, one per line')

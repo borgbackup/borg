@@ -464,7 +464,7 @@ def test_load_patterns_from_file(tmpdir, lines, expected_roots, expected_numpatt
     def evaluate(filename):
         roots, inclexclpatterns = load_patterns(open(filename, "rt"))
         return roots, len(inclexclpatterns)
-    patternfile = tmpdir.join("exclude.txt")
+    patternfile = tmpdir.join("patterns.txt")
 
     with patternfile.open("wt") as fh:
         fh.write("\n".join(lines))
@@ -479,7 +479,7 @@ def test_load_patterns_from_file(tmpdir, lines, expected_roots, expected_numpatt
     (["/data"]),    # need a pattern type prefix
 ])
 def test_load_invalid_patterns_from_file(tmpdir, lines):
-    patternfile = tmpdir.join("exclude.txt")
+    patternfile = tmpdir.join("patterns.txt")
     with patternfile.open("wt") as fh:
         fh.write("\n".join(lines))
     filename = str(patternfile)
@@ -525,7 +525,7 @@ def test_inclexcl_patterns_from_file(tmpdir, lines, expected):
         matcher.add_inclexcl(inclexclpatterns)
         return [path for path in files if matcher.match(path)]
 
-    patternfile = tmpdir.join("exclude.txt")
+    patternfile = tmpdir.join("patterns.txt")
 
     with patternfile.open("wt") as fh:
         fh.write("\n".join(lines))

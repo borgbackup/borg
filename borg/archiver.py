@@ -894,7 +894,7 @@ class Archiver:
 
     helptext = collections.OrderedDict()
     helptext['patterns'] = textwrap.dedent('''
-        File patterns support four separate styles, fnmatch, shell, regular
+        File patterns support four separate styles: fnmatch, shell, regular
         expressions and path prefixes. By default, fnmatch is used for
         `--exclude` patterns and shell-style is used for `--pattern`. If followed
         by a colon (':') the first two characters of a pattern are used as a
@@ -983,25 +983,23 @@ class Archiver:
             EOF
             $ borg create --exclude-from exclude.txt backup /
 
-            # exclude the contents of /data/docs/ but not /data/docs/pdf
-            $ borg create -e +/data/docs/pdf -e /data/docs/ backup /
-            # equivalent:
-            $ borg create -e +pm:/data/docs/pdf -e -pm:/data/docs/ backup /
 
-
-        A more general way to define filename matching patterns may be passed via
-        `--pattern` and `--patterns-from`. Using these options, you may specify the
-        backup roots (starting points) and patterns for inclusion/exclusion. A
+        A more general and easier to use way to define filename matching patterns exists
+        with the `--pattern` and `--patterns-from` options. Using these, you may specify
+        the backup roots (starting points) and patterns for inclusion/exclusion. A
         root path starts with the prefix `R`, followed by a path (a plain path, not a
-        file pattern). An include rule is specified by `+` followed by a pattern.
-        Exclude rules start with a `-`.
-        Inclusion patterns are useful to e.g. exclude the contents of a directory
-        except for some important files in this directory. The first matching pattern
-        is used so if an include pattern matches before an exclude pattern, the file
-        is backed up.
+        file pattern). An include rule starts with the prefix +, an exclude rule starts
+        with the prefix -, both followed by a pattern.
+        Inclusion patterns are useful to include pathes that are contained in an excluded
+        path. The first matching pattern is used so if an include pattern matches before
+        an exclude pattern, the file is backed up.
 
         Note that the default pattern style for `--pattern` and `--patterns-from` is
         shell style (`sh:`), so those patterns behave like rsync include/exclude patterns.
+
+        Patterns (`--pattern`) and excludes (`--exclude`) from the command line are
+        considered first (in the order of appearance). Then patterns from `--pattern-from`
+        are added. Exclusion patterns from `--exclude-from` files are appended last.
 
         An example `--patterns-from` file could look like that::
 
@@ -1014,13 +1012,7 @@ class Archiver:
             # include susans home
             + /home/susan
             # don't backup the other home directories
-            - /home/*
-
-        Patterns (`--pattern`) and excludes (`--exclude`) from the command line are
-        considered first (in the order of appearance). Then patterns from `--pattern-from`
-        are added. Exclusion patterns from `--exclude-from` files are appended last.
-
-\n\n''')
+            - /home/*\n\n''')
     helptext['placeholders'] = textwrap.dedent('''
         Repository (or Archive) URLs, --prefix and --remote-path values support these
         placeholders:

@@ -322,23 +322,22 @@ def load_patterns(fh):
     """
     patternlines = (line for line in (i.strip() for i in fh) if not line.startswith('#'))
     roots = []
-    inclexclpatterns = []
+    inclexcl_patterns = []
     for patternline in patternlines:
         pattern = parse_inclexcl_pattern(patternline)
-        if pattern:
-            if pattern.ptype is RootPath:
-                roots.append(pattern.pattern)
-            else:
-                inclexclpatterns.append(pattern)
-    return roots, inclexclpatterns
+        if pattern.ptype is RootPath:
+            roots.append(pattern.pattern)
+        else:
+            inclexcl_patterns.append(pattern)
+    return roots, inclexcl_patterns
 
 
 def update_patterns(args):
     """Merge patterns from exclude- and pattern-files with those on command line."""
     for file in args.pattern_files:
-        roots, inclexclpatterns = load_patterns(file)
+        roots, inclexcl_patterns = load_patterns(file)
         args.paths += roots
-        args.patterns += inclexclpatterns
+        args.patterns += inclexcl_patterns
         file.close()
     for file in args.exclude_files:
         args.patterns += load_excludes(file)
@@ -351,11 +350,10 @@ class ArgparsePatternAction(argparse.Action):
 
     def __call__(self, parser, args, values, option_string=None):
         pattern = parse_inclexcl_pattern(values[0])
-        if pattern:
-            if pattern.ptype is RootPath:
-                args.paths.append(pattern.pattern)
-            else:
-                args.patterns.append(pattern)
+        if pattern.ptype is RootPath:
+            args.paths.append(pattern.pattern)
+        else:
+            args.patterns.append(pattern)
 
 
 class PatternMatcher:

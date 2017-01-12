@@ -387,6 +387,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "centos6_64" do |b|
+    b.vm.box = "bento/centos-6.8"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
 

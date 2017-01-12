@@ -17,7 +17,7 @@ matrix:
           os: linux
           dist: trusty
           env: TOXENV=py35
-        - python: 3.6-dev
+        - python: 3.6
           os: linux
           dist: trusty
           env: TOXENV=py36
@@ -33,6 +33,10 @@ matrix:
           os: osx
           osx_image: xcode6.4
           env: TOXENV=py35
+        - language: generic
+          os: osx
+          osx_image: xcode6.4
+          env: TOXENV=py36
     allow_failures:
         - os: osx
 

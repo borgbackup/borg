@@ -129,20 +129,26 @@ Changelog
 Version 1.1.0b3 (not released yet)
 ----------------------------------
 
+Compatibility notes:
+
+- borg init: removed the default of "--encryption/-e", #1979
+
 Bug fixes:
 
 - borg recreate: don't rechunkify unless explicitly told so
 - borg info: fixed bug when called without arguments, #1914
 - borg init: fix free space check crashing if disk is full, #1821
 - borg debug delete/get obj: fix wrong reference to exception
+- fix processing of remote ~/ and ~user/ paths (regressed since 1.1.0b1), #1759
 
 New features:
 
+- new CRC32 implementations that are much faster than the zlib one used previously, #1970
 - add blake2b key modes (use blake2b as MAC). This links against system libb2,
   if possible, otherwise uses bundled code
 - automatically remove stale locks - set BORG_HOSTNAME_IS_UNIQUE env var
   to enable stale lock killing. If set, stale locks in both cache and
-  repository are deleted. #562
+  repository are deleted. #562 #1253
 - borg info <repo>: print general repo information, #1680
 - borg check --first / --last / --sort / --prefix, #1663
 - borg mount --first / --last / --sort / --prefix, #1542

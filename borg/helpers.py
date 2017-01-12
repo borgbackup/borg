@@ -823,11 +823,17 @@ class Location:
     """
 
     # path must not contain :: (it ends at :: or string end), but may contain single colons.
-    # to avoid ambiguities with other regexes, it must also not start with ":".
+    # to avoid ambiguities with other regexes, it must also not start with ":" nor with "//" nor with "ssh://".
     path_re = r"""
-        (?!:)                                               # not starting with ":"
+        (?!(:|//|ssh://))                                   # not starting with ":" or // or ssh://
         (?P<path>([^:]|(:(?!:)))+)                          # any chars, but no "::"
         """
+    # abs_path must not contain :: (it ends at :: or string end), but may contain single colons.
+    # it must start with a / and that slash is part of the path.
+    abs_path_re = r"""
+        (?P<path>(/([^:]|(:(?!:)))+))                       # start with /, then any chars, but no "::"
+        """
+
     # optional ::archive_name at the end, archive name must not contain "/".
     # borg mount's FUSE filesystem creates one level of directories from
     # the archive names and of course "/" is not valid in a directory name.
@@ -842,7 +848,7 @@ class Location:
         (?P<proto>ssh)://                                   # ssh://
         """ + optional_user_re + r"""                       # user@  (optional)
         (?P<host>[^:/]+)(?::(?P<port>\d+))?                 # host or host:port
-        """ + path_re + optional_archive_re, re.VERBOSE)    # path or path::archive
+        """ + abs_path_re + optional_archive_re, re.VERBOSE)  # path or path::archive
 
     file_re = re.compile(r"""
         (?P<proto>file)://                                  # file://

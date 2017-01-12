@@ -4,14 +4,16 @@ import logging
 import os
 import select
 import shlex
-from subprocess import Popen, PIPE
 import sys
 import tempfile
+import textwrap
+from subprocess import Popen, PIPE
 
 from . import __version__
 
 from .helpers import Error, IntegrityError, sysinfo
 from .helpers import replace_placeholders
+from .helpers import bin_to_hex
 from .repository import Repository
 from .logger import create_logger
 
@@ -47,7 +49,16 @@ class UnexpectedRPCDataFormatFromClient(Error):
 
 
 class UnexpectedRPCDataFormatFromServer(Error):
-    """Got unexpected RPC data format from server."""
+    """Got unexpected RPC data format from server:\n{}"""
+
+    def __init__(self, data):
+        try:
+            data = data.decode()[:128]
+        except UnicodeDecodeError:
+            data = data[:128]
+            data = ['%02X' % byte for byte in data]
+            data = textwrap.fill(' '.join(data), 16 * 3)
+        super().__init__(data)
 
 
 class RepositoryServer:  # pragma: no cover
@@ -350,7 +361,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     self.unpacker.feed(data)
                     for unpacked in self.unpacker:
                         if not (isinstance(unpacked, tuple) and len(unpacked) == 4):
-                            raise UnexpectedRPCDataFormatFromServer()
+                            raise UnexpectedRPCDataFormatFromServer(data)
                         type, msgid, error, res = unpacked
                         if msgid in self.ignore_responses:
                             self.ignore_responses.remove(msgid)

@@ -2,7 +2,6 @@ from binascii import unhexlify, b2a_base64
 from configparser import ConfigParser
 import errno
 import os
-import inspect
 from datetime import datetime
 from datetime import timedelta
 from io import StringIO
@@ -2280,6 +2279,82 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                 archive.save()
         self.cmd('check', self.repository_location, exit_code=0)
         self.cmd('list', self.repository_location + '::0.13', exit_code=0)
+
+
+class ManifestAuthenticationTest(ArchiverTestCaseBase):
+    def spoof_manifest(self, repository):
+        with repository:
+            _, key = Manifest.load(repository)
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(Chunk(msgpack.packb({
+                'version': 1,
+                'archives': {},
+                'config': {},
+                'timestamp': (datetime.utcnow() + timedelta(days=1)).isoformat(),
+            }))))
+            repository.commit()
+
+    def test_fresh_init_tam_required(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        repository = Repository(self.repository_path, exclusive=True)
+        with repository:
+            manifest, key = Manifest.load(repository)
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(Chunk(msgpack.packb({
+                'version': 1,
+                'archives': {},
+                'timestamp': (datetime.utcnow() + timedelta(days=1)).isoformat(),
+            }))))
+            repository.commit()
+
+        with pytest.raises(TAMRequiredError):
+            self.cmd('list', self.repository_location)
+
+    def test_not_required(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_src_archive('archive1234')
+        repository = Repository(self.repository_path, exclusive=True)
+        with repository:
+            shutil.rmtree(get_security_dir(bin_to_hex(repository.id)))
+            _, key = Manifest.load(repository)
+            key.tam_required = False
+            key.change_passphrase(key._passphrase)
+
+            manifest = msgpack.unpackb(key.decrypt(None, repository.get(Manifest.MANIFEST_ID)).data)
+            del manifest[b'tam']
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(Chunk(msgpack.packb(manifest))))
+            repository.commit()
+        output = self.cmd('list', '--debug', self.repository_location)
+        assert 'archive1234' in output
+        assert 'TAM not found and not required' in output
+        # Run upgrade
+        self.cmd('upgrade', '--tam', self.repository_location)
+        # Manifest must be authenticated now
+        output = self.cmd('list', '--debug', self.repository_location)
+        assert 'archive1234' in output
+        assert 'TAM-verified manifest' in output
+        # Try to spoof / modify pre-1.0.9
+        self.spoof_manifest(repository)
+        # Fails
+        with pytest.raises(TAMRequiredError):
+            self.cmd('list', self.repository_location)
+        # Force upgrade
+        self.cmd('upgrade', '--tam', '--force', self.repository_location)
+        self.cmd('list', self.repository_location)
+
+    def test_disable(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_src_archive('archive1234')
+        self.cmd('upgrade', '--disable-tam', self.repository_location)
+        repository = Repository(self.repository_path, exclusive=True)
+        self.spoof_manifest(repository)
+        assert not self.cmd('list', self.repository_location)
+
+    def test_disable2(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_src_archive('archive1234')
+        repository = Repository(self.repository_path, exclusive=True)
+        self.spoof_manifest(repository)
+        self.cmd('upgrade', '--disable-tam', self.repository_location)
+        assert not self.cmd('list', self.repository_location)
 
 
 class ManifestAuthenticationTest(ArchiverTestCaseBase):

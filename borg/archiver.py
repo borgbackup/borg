@@ -1680,7 +1680,7 @@ class Archiver:
         Upgrade an existing Borg repository.
 
         Borg 1.x.y upgrades
-        -------------------
+        +++++++++++++++++++
 
         Use ``borg upgrade --tam REPO`` to require manifest authentication
         introduced with Borg 1.0.9 to address security issues. This means
@@ -1702,7 +1702,7 @@ class Archiver:
         for details.
 
         Attic and Borg 0.xx to Borg 1.x
-        -------------------------------
+        +++++++++++++++++++++++++++++++
 
         This currently supports converting an Attic repository to Borg and also
         helps with converting Borg 0.xx to 1.0.

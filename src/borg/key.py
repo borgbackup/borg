@@ -13,7 +13,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from .constants import *  # NOQA
-from .compress import Compressor, get_compressor
+from .compress import Compressor
 from .crypto import AES, bytes_to_long, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
 from .helpers import Chunk, StableDict
 from .helpers import Error, IntegrityError
@@ -156,7 +156,7 @@ class KeyBase:
         data = compressor.compress(data)
         return Chunk(data, **meta)
 
-    def encrypt(self, chunk):
+    def encrypt(self, chunk, none_compression=False):
         pass
 
     def decrypt(self, id, data, decompress=True):
@@ -253,7 +253,9 @@ class PlaintextKey(KeyBase):
     def id_hash(self, data):
         return sha256(data).digest()
 
-    def encrypt(self, chunk):
+    def encrypt(self, chunk, none_compression=False):
+        if none_compression:
+            chunk.meta['compress'] = CompressionSpec('none')
         chunk = self.compress(chunk)
         return b''.join([self.TYPE_STR, chunk.data])
 
@@ -313,6 +315,9 @@ class ID_HMAC_SHA_256:
     def id_hash(self, data):
         return hmac_sha256(self.id_key, data)
 
+    def _tam_key(self, salt, context):
+        return salt + context
+
 
 class AESKeyBase(KeyBase):
     """Common base class shared by KeyfileKey and PassphraseKey
@@ -331,7 +336,9 @@ class AESKeyBase(KeyBase):
 
     MAC = hmac_sha256
 
-    def encrypt(self, chunk):
+    def encrypt(self, chunk, none_compression=False):
+        if none_compression:
+            chunk.meta['compress'] = CompressionSpec('none')
         chunk = self.compress(chunk)
         self.nonce_manager.ensure_reservation(num_aes_blocks(len(chunk.data)))
         self.enc_cipher.reset()

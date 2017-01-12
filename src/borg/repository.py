@@ -11,8 +11,8 @@ from itertools import islice
 
 import msgpack
 
-import logging
-logger = logging.getLogger(__name__)
+from .logger import create_logger
+logger = create_logger()
 
 from .constants import *  # NOQA
 from .hashindex import NSIndex

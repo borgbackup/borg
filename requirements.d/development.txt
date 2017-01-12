@@ -1,6 +1,7 @@
 virtualenv
 tox
 pytest
+pytest-xdist
 pytest-cov
 pytest-benchmark
 Cython

@@ -37,21 +37,28 @@ class TestKey:
 
     keyfile_blake2_key_file = """
         BORG_KEY 0000000000000000000000000000000000000000000000000000000000000000
-        hqlhbGdvcml0aG2mc2hhMjU2pGRhdGHaANAwo4EbUPF/kLQXhQnT4LxRc1advS8lUiegDa
-        q2Q6oOkP1Jc7MwBa7ZVMgoBG1sBeKYO6Sn6W6BBrHbMR8Dxv7xquaQIh8jIpnjLWpzyFIk
-        JlijFiTWI58Sxj+2D19b2ayFolnGkF9PJSARgfaieo0GkryqjcIgcXuKHO/H9NfaUDk5YJ
-        UqrJ9TUMohXSQzwF1pO4ak2BHPZKnbeJ7XL/8fFN8VFQZl27R0et4WlTFRBI1qQYyQaTiL
-        +/1ICMUpVsQM0mvyW6dc8/zGMsAlmZVApGhhc2jaACDdRF7uPv90UN3zsZy5Be89728RBl
-        zKvtzupDyTsfrJMqppdGVyYXRpb25zzgABhqCkc2FsdNoAIGTK3TR09UZqw1bPi17gyHOi
-        7YtSp4BVK7XptWeKh6Vip3ZlcnNpb24B""".strip()
+        hqlhbGdvcml0aG2mc2hhMjU2pGRhdGHaAZBu680Do3CmfWzeMCwe48KJi3Vps9mEDy7MKF
+        TastsEhiAd1RQMuxfZpklkLeddMMWk+aPtFiURRFb02JLXV5cKRC1o2ZDdiNa0nao+o6+i
+        gUjjsea9TAu25t3vxh8uQWs5BuKRLBRr0nUgrSd0IYMUgn+iVbLJRzCCssvxsklkwQxN3F
+        Y+MvBnn8kUXSeoSoQ2l0fBHzq94Y7LMOm/owMam5URnE8/UEc6ZXBrbyX4EXxDtUqJcs+D
+        i451thtlGdigDLpvf9nyK66mjiCpPCTCgtlzq0Pe1jcdhnsUYLg+qWzXZ7e2opEZoC6XxS
+        3DIuBOxG3Odqj9IKB+6/kl94vz98awPWFSpYcLZVWu7sIP38ZkUK+ad5MHTo/LvTuZdFnd
+        iqKzZIDUJl3Zl1WGmP/0xVOmfIlznkCZy4d3SMuujwIcqQ5kDvwDRPpdhBBk+UWQY5vFXk
+        kR1NBNLSTyhAzu3fiUmFl0qZ+UWPRkGAEBy/NuoEibrWwab8BX97cATyvnmOqYkU9PT0C6
+        l2l9E4bPpGhhc2jaACDnIa8KgKv84/b5sjaMgSZeIVkuKSLJy2NN8zoH8lnd36ppdGVyYX
+        Rpb25zzgABhqCkc2FsdNoAIEJLlLh7q74j3q53856H5GgzA1HH+aW5bA/as544+PGkp3Zl
+        cnNpb24B""".strip()
 
-    keyfile_blake2_cdata = bytes.fromhex('045d225d745e07af9002d739391e4e7509ff82a04f98debd74'
-                                         '012f09b82cc1d07e0404040404040408ec852921309243b164')
-    # Verified against b2sum. Entire string passed to BLAKE2, including the 32 byte key contained in
+    keyfile_blake2_cdata = bytes.fromhex('04fdf9475cf2323c0ba7a99ddc011064f2e7d039f539f2e448'
+                                         '0e6f5fc6ff9993d604040404040404098c8cee1c6db8c28947')
+    # Verified against b2sum. Entire string passed to BLAKE2, including the padded 64 byte key contained in
     # keyfile_blake2_key_file above is
-    # 037fb9b75b20d623f1d5a568050fccde4a1b7c5f5047432925e941a17c7a2d0d7061796c6f6164
-    #                                                                 p a y l o a d
-    keyfile_blake2_id = bytes.fromhex('a22d4fc81bb61c3846c334a09eaf28d22dd7df08c9a7a41e713ef28d80eebd45')
+    # 19280471de95185ec27ecb6fc9edbb4f4db26974c315ede1cd505fab4250ce7cd0d081ea66946c
+    # 95f0db934d5f616921efbd869257e8ded2bd9bd93d7f07b1a30000000000000000000000000000
+    # 000000000000000000000000000000000000000000000000000000000000000000000000000000
+    # 00000000000000000000007061796c6f6164
+    #                       p a y l o a d
+    keyfile_blake2_id = bytes.fromhex('d8bc68e961c79f99be39061589e5179b2113cd9226e07b08ddd4a1fef7ce93fb')
 
     @pytest.fixture
     def keys_dir(self, request, monkeypatch, tmpdir):

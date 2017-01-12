@@ -3,15 +3,15 @@ import os
 import shutil
 import time
 
-import logging
-logger = logging.getLogger(__name__)
-
 from .constants import REPOSITORY_README
 from .helpers import get_home_dir, get_keys_dir, get_cache_dir
 from .helpers import ProgressIndicatorPercent
 from .key import KeyfileKey, KeyfileNotFoundError
 from .locking import Lock
 from .repository import Repository, MAGIC
+from .logger import create_logger
+
+logger = create_logger(__name__)
 
 ATTIC_MAGIC = b'ATTICSEG'
 

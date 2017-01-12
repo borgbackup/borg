@@ -1360,8 +1360,12 @@ class ArchiveChecker:
             sort_by = sort_by.split(',')
             if any((first, last, prefix)):
                 archive_infos = self.manifest.archives.list(sort_by=sort_by, prefix=prefix, first=first, last=last)
-                if not archive_infos:
-                    logger.warning('--first/--last/--prefix did not match any archives')
+                if prefix and not archive_infos:
+                    logger.warning('--prefix %s does not match any archives', prefix)
+                if first and len(archive_infos) < first:
+                    logger.warning('--first %d archives: only found %d archives', first, len(archive_infos))
+                if last and len(archive_infos) < last:
+                    logger.warning('--last %d archives: only found %d archives', last, len(archive_infos))
             else:
                 archive_infos = self.manifest.archives.list(sort_by=sort_by)
         else:

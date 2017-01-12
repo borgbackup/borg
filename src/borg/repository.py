@@ -11,9 +11,6 @@ from itertools import islice
 
 import msgpack
 
-import logging
-logger = logging.getLogger(__name__)
-
 from .constants import *  # NOQA
 from .hashindex import NSIndex
 from .helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size, parse_file_size
@@ -26,6 +23,8 @@ from .logger import create_logger
 from .lrucache import LRUCache
 from .platform import SaveFile, SyncFile, sync_dir
 from .crc32 import crc32
+
+logger = create_logger(__name__)
 
 MAX_OBJECT_SIZE = 20 * 1024 * 1024
 MAGIC = b'BORG_SEG'

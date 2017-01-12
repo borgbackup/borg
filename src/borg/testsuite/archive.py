@@ -31,8 +31,8 @@ def test_stats_basic(stats):
     assert stats.usize == 10
 
 
-def tests_stats_progress(stats, columns=80):
-    os.environ['COLUMNS'] = str(columns)
+def tests_stats_progress(stats, monkeypatch, columns=80):
+    monkeypatch.setenv('COLUMNS', str(columns))
     out = StringIO()
     stats.show_progress(stream=out)
     s = '20 B O 10 B C 10 B D 0 N '

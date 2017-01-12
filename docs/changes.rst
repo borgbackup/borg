@@ -139,6 +139,7 @@ Bug fixes:
   it now does nothing and prints an error, #1981.
 - Fixed change-passphrase crashing with unencrypted repositories, #1978
 - Fixed "borg check repo::archive" indicating success if "archive" does not exist, #1997
+- borg check: print non-exit-code warning if --last or --prefix aren't fulfilled
 
 Other changes:
 
@@ -152,6 +153,13 @@ Other changes:
 
   - vagrant / travis / tox: add Python 3.6 based testing
   - travis: fix osxfuse install (fixes OS X testing on Travis CI)
+  - use pytest-xdist to parallelize testing
+- docs:
+
+  - language clarification - VM backup FAQ
+- fix typos (taken from Debian package patch)
+- remote: include data hexdump in "unexpected RPC data" error message
+- remote: log SSH command line at debug level
 
 
 Version 1.0.9 (2016-12-20)

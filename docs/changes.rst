@@ -132,10 +132,26 @@ Version 1.0.10rc1 (not released yet)
 Bug fixes:
 
 - Avoid triggering an ObjectiveFS bug in xattr retrieval, #1992
-- When running out of buffer memory when reading xattrs, only skip the current file, #1993
-- Fixed "borg upgrade --tam" crashing with unencrypted repositories. Since :ref:`the issue <tam_vuln>` is
-  not relevant for unencrypted repositories, it now does nothing and prints an error, #1981.
+- When running out of buffer memory when reading xattrs, only skip the
+  current file, #1993
+- Fixed "borg upgrade --tam" crashing with unencrypted repositories. Since
+  :ref:`the issue <tam_vuln>` is not relevant for unencrypted repositories,
+  it now does nothing and prints an error, #1981.
 - Fixed change-passphrase crashing with unencrypted repositories, #1978
+
+Other changes:
+
+- xattr: ignore empty names returned by llistxattr(2) et al
+- Enable the fault handler: install handlers for the SIGSEGV, SIGFPE, SIGABRT,
+  SIGBUS and SIGILL signals to dump the Python traceback.
+- Also print a traceback on SIGUSR2.
+- borg change-passphrase: print key location (simplify making a backup of it)
+- officially support Python 3.6 (setup.py: add Python 3.6 qualifier)
+- tests:
+
+  - vagrant / travis / tox: add Python 3.6 based testing
+  - travis: fix osxfuse install (fixes OS X testing on Travis CI)
+
 
 Version 1.0.9 (2016-12-20)
 --------------------------

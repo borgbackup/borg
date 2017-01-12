@@ -48,7 +48,7 @@ from .helpers import ProgressIndicatorPercent
 from .item import Item
 from .key import key_creator, tam_required_file, tam_required, RepoKey, PassphraseKey
 from .keymanager import KeyManager
-from .platform import get_flags, umount
+from .platform import get_flags, umount, get_process_id
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 from .repository import Repository
 from .selftest import selftest
@@ -1194,6 +1194,7 @@ class Archiver:
 
         # Additional debug information
         print('CRC implementation:', crc32.__name__)
+        print('Process ID:', get_process_id())
         return EXIT_SUCCESS
 
     @with_repository()

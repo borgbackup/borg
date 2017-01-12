@@ -1,11 +1,13 @@
 import errno
 import os
+import uuid
 import socket
 import subprocess
 
 
 cdef extern from "wchar.h":
     cdef int wcswidth(const Py_UNICODE *str, size_t n)
+
 
 def swidth(s):
     str_len = len(s)
@@ -21,7 +23,7 @@ def swidth(s):
 # the lock made by the parent, so it needs to use the same PID for that.
 _pid = os.getpid()
 # XXX this sometimes requires live internet access for issuing a DNS query in the background.
-_hostname = socket.gethostname()
+_hostname = '%s@%s' % (socket.getfqdn(), uuid.getnode())
 
 
 def get_process_id():
@@ -75,5 +77,3 @@ def local_pid_alive(pid):
 # most POSIX platforms (but not Linux)
 def umount(mountpoint):
     return subprocess.call(['umount', mountpoint])
-
-

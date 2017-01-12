@@ -10,6 +10,7 @@ import sys
 import tempfile
 import time
 import traceback
+import textwrap
 from subprocess import Popen, PIPE
 
 import msgpack
@@ -23,6 +24,9 @@ from .helpers import replace_placeholders
 from .helpers import yes
 from .repository import Repository
 from .version import parse_version, format_version
+from .logger import create_logger
+
+logger = create_logger(__name__)
 
 RPC_PROTOCOL_VERSION = 2
 BORG_VERSION = parse_version(__version__)
@@ -56,7 +60,16 @@ class UnexpectedRPCDataFormatFromClient(Error):
 
 
 class UnexpectedRPCDataFormatFromServer(Error):
-    """Got unexpected RPC data format from server."""
+    """Got unexpected RPC data format from server:\n{}"""
+
+    def __init__(self, data):
+        try:
+            data = data.decode()[:128]
+        except UnicodeDecodeError:
+            data = data[:128]
+            data = ['%02X' % byte for byte in data]
+            data = textwrap.fill(' '.join(data), 16 * 3)
+        super().__init__(data)
 
 
 # Protocol compatibility:
@@ -476,6 +489,7 @@ class RemoteRepository:
                 env.pop(lp_key, None)
         env.pop('BORG_PASSPHRASE', None)  # security: do not give secrets to subprocess
         env['BORG_VERSION'] = __version__
+        logger.debug('SSH command line: %s', borg_cmd)
         self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()
@@ -685,7 +699,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                             else:
                                 unpacked = {MSGID: msgid, RESULT: res}
                         else:
-                            raise UnexpectedRPCDataFormatFromServer()
+                            raise UnexpectedRPCDataFormatFromServer(data)
                         if msgid in self.ignore_responses:
                             self.ignore_responses.remove(msgid)
                             if b'exception_class' in unpacked:

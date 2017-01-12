@@ -1360,16 +1360,18 @@ class ArchiveChecker:
             sort_by = sort_by.split(',')
             if any((first, last, prefix)):
                 archive_infos = self.manifest.archives.list(sort_by=sort_by, prefix=prefix, first=first, last=last)
+                if not archive_infos:
+                    logger.warning('--first/--last/--prefix did not match any archives')
             else:
                 archive_infos = self.manifest.archives.list(sort_by=sort_by)
         else:
             # we only want one specific archive
-            info = self.manifest.archives.get(archive)
-            if info is None:
+            try:
+                archive_infos = [self.manifest.archives[archive]]
+            except KeyError:
                 logger.error("Archive '%s' not found.", archive)
-                archive_infos = []
-            else:
-                archive_infos = [info]
+                self.error_found = True
+                return
         num_archives = len(archive_infos)
 
         with cache_if_remote(self.repository) as repository:

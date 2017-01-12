@@ -1,5 +1,6 @@
 import argparse
 import collections
+import faulthandler
 import functools
 import hashlib
 import inspect
@@ -240,8 +241,14 @@ class Archiver:
     @with_repository()
     def do_change_passphrase(self, args, repository, manifest, key):
         """Change repository key file passphrase"""
+        if not hasattr(key, 'change_passphrase'):
+            print('This repository is not encrypted, cannot change the passphrase.')
+            return EXIT_ERROR
         key.change_passphrase()
         logger.info('Key updated')
+        if hasattr(key, 'find_key'):
+            # print key location to make backing it up easier
+            logger.info('Key location: %s', key.find_key())
         return EXIT_SUCCESS
 
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
@@ -1077,6 +1084,10 @@ class Archiver:
         """upgrade a repository from a previous version"""
         if args.tam:
             manifest, key = Manifest.load(repository, force_tam_not_required=args.force)
+
+            if not hasattr(key, 'change_passphrase'):
+                print('This repository is not encrypted, cannot enable TAM.')
+                return EXIT_ERROR
 
             if not manifest.tam_verified or not manifest.config.get(b'tam_required', False):
                 # The standard archive listing doesn't include the archive ID like in borg 1.1.x
@@ -2390,7 +2401,7 @@ class Archiver:
         Upgrade an existing Borg repository.
 
         Borg 1.x.y upgrades
-        -------------------
+        +++++++++++++++++++
 
         Use ``borg upgrade --tam REPO`` to require manifest authentication
         introduced with Borg 1.0.9 to address security issues. This means
@@ -2412,7 +2423,7 @@ class Archiver:
         for details.
 
         Attic and Borg 0.xx to Borg 1.x
-        -------------------------------
+        +++++++++++++++++++++++++++++++
 
         This currently supports converting an Attic repository to Borg and also
         helps with converting Borg 0.xx to 1.0.
@@ -2852,6 +2863,11 @@ def sig_info_handler(sig_no, stack):  # pragma: no cover
                 break
 
 
+def sig_trace_handler(sig_no, stack):  # pragma: no cover
+    print('\nReceived SIGUSR2 at %s, dumping trace...' % datetime.now().replace(microsecond=0), file=sys.stderr)
+    faulthandler.dump_traceback()
+
+
 def main():  # pragma: no cover
     # provide 'borg mount' behaviour when the main script/executable is named borgfs
     if os.path.basename(sys.argv[0]) == "borgfs":
@@ -2868,10 +2884,14 @@ def main():  # pragma: no cover
     # SIGHUP is important especially for systemd systems, where logind
     # sends it when a session exits, in addition to any traditional use.
     # Output some info if we receive SIGUSR1 or SIGINFO (ctrl-t).
+
+    # Register fault handler for SIGSEGV, SIGFPE, SIGABRT, SIGBUS and SIGILL.
+    faulthandler.enable()
     with signal_handler('SIGINT', raising_signal_handler(KeyboardInterrupt)), \
          signal_handler('SIGHUP', raising_signal_handler(SigHup)), \
          signal_handler('SIGTERM', raising_signal_handler(SigTerm)), \
          signal_handler('SIGUSR1', sig_info_handler), \
+         signal_handler('SIGUSR2', sig_trace_handler), \
          signal_handler('SIGINFO', sig_info_handler):
         archiver = Archiver()
         msg = tb = None

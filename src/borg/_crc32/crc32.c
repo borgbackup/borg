@@ -3,6 +3,11 @@
 #include "slice_by_8.c"
 
 #ifdef __GNUC__
+/*
+ * clang also has or had GCC bug #56298 explained below, but doesn't support
+ * target attributes or the options stack. So we disable this faster code path for clang.
+ */
+#ifndef __clang__
 #if __x86_64__
 /*
  * Because we don't want a configure script we need compiler-dependent pre-defined macros for detecting this,
@@ -29,9 +34,6 @@
  * Part 2 of 2 follows below.
  */
 
-/* clang also defines __GNUC__, but doesn't need this, it emits warnings instead */
-#ifndef __clang__
-
 #ifndef __PCLMUL__
 #pragma GCC push_options
 #pragma GCC target("pclmul")
@@ -56,9 +58,8 @@
 #define __BORG_DISABLE_SSE4_1__
 #endif
 
-#endif /* ifdef __clang__ */
-
 #endif /* if __x86_64__ */
+#endif /* ifndef __clang__ */
 #endif /* ifdef __GNUC__ */
 
 #ifdef FOLDING_CRC

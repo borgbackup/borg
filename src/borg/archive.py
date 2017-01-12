@@ -1196,12 +1196,8 @@ class ArchiveChecker:
             except (TypeError, ValueError, StopIteration):
                 continue
             if valid_archive(archive):
-#<<<<<<< HEAD:src/borg/archive.py FIXME XXX
                 archive = ArchiveItem(internal_dict=archive)
                 name = archive.name
-#=======
-#               name = archive[b'name'].decode()
-#>>>>>>> 1.0-maint:borg/archive.py
                 logger.info('Found archive %s', name)
                 if name in manifest.archives:
                     i = 1
@@ -1212,11 +1208,7 @@ class ArchiveChecker:
                         i += 1
                     logger.warning('Duplicate archive name %s, storing as %s', name, new_name)
                     name = new_name
-#<<<<<<< HEAD:src/borg/archive.py FIXME XXX
                 manifest.archives[name] = (chunk_id, archive.time)
-#=======
-#               manifest.archives[name] = {b'id': chunk_id, b'time': archive[b'time']}
-#>>>>>>> 1.0-maint:borg/archive.py
         logger.info('Manifest rebuild complete.')
         return manifest
 

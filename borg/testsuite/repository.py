@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import sys
@@ -440,6 +441,8 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
 
         assert self.repository.borg_cmd(None, testing=True) == [sys.executable, '-m', 'borg.archiver', 'serve']
         args = MockArgs()
+        # XXX without next line we get spurious test fails when using pytest-xdist, root cause unknown:
+        logging.getLogger().setLevel(logging.INFO)
         # note: test logger is on info log level, so --info gets added automagically
         assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--umask=077', '--info']
         args.remote_path = 'borg-0.28.2'

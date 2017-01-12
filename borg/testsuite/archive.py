@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from datetime import datetime, timezone
 from unittest.mock import Mock
 
@@ -131,11 +132,15 @@ def test_invalid_msgpacked_item(packed, item_keys_serialized):
     assert not valid_msgpacked_dict(packed, item_keys_serialized)
 
 
+# pytest-xdist requires always same order for the keys and dicts:
+IK = sorted(list(ITEM_KEYS))
+
+
 @pytest.mark.parametrize('packed',
     [msgpack.packb(o) for o in [
         {b'path': b'/a/b/c'},  # small (different msgpack mapping type!)
-        dict((k, b'') for k in ITEM_KEYS),  # as big (key count) as it gets
-        dict((k, b'x' * 1000) for k in ITEM_KEYS),  # as big (key count and volume) as it gets
+        OrderedDict((k, b'') for k in IK),  # as big (key count) as it gets
+        OrderedDict((k, b'x' * 1000) for k in IK),  # as big (key count and volume) as it gets
     ]])
 def test_valid_msgpacked_items(packed, item_keys_serialized):
     assert valid_msgpacked_dict(packed, item_keys_serialized)

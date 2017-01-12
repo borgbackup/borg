@@ -3,15 +3,16 @@ from binascii import unhexlify
 from datetime import datetime
 from itertools import islice
 import errno
-import logging
-logger = logging.getLogger(__name__)
-
 import os
 import shutil
 import struct
 from zlib import crc32
 
 import msgpack
+
+from .logger import create_logger
+logger = create_logger()
+
 from .helpers import Error, ErrorWithTraceback, IntegrityError, Location, ProgressIndicatorPercent, bin_to_hex
 from .hashindex import NSIndex
 from .locking import Lock, LockError, LockErrorT

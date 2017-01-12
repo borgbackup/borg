@@ -1,9 +1,10 @@
 import datetime
-import logging
-logger = logging.getLogger(__name__)
 import os
 import shutil
 import time
+
+from .logger import create_logger
+logger = create_logger()
 
 from .helpers import get_keys_dir, get_cache_dir, ProgressIndicatorPercent, bin_to_hex
 from .locking import Lock

@@ -13,8 +13,11 @@ from . import __version__
 from .helpers import Error, IntegrityError, sysinfo
 from .helpers import replace_placeholders
 from .repository import Repository
+from .logger import create_logger
 
 import msgpack
+
+logger = create_logger(__name__)
 
 RPC_PROTOCOL_VERSION = 2
 
@@ -185,6 +188,7 @@ class RemoteRepository:
             env.pop('LD_LIBRARY_PATH', None)
         env.pop('BORG_PASSPHRASE', None)  # security: do not give secrets to subprocess
         env['BORG_VERSION'] = __version__
+        logger.debug('SSH command line: %s', borg_cmd)
         self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()

@@ -655,9 +655,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_create_without_root(self):
         """test create without a root"""
         self.cmd('init', self.repository_location)
-        args = [ 'create', self.repository_location + '::test' ]
+        args = ['create', self.repository_location + '::test']
         if self.FORK_DEFAULT:
-            output = self.cmd(*args, exit_code=2)
+            self.cmd(*args, exit_code=2)
         else:
             self.assert_raises(SystemExit, lambda: self.cmd(*args))
 

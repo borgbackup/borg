@@ -30,7 +30,7 @@ elif sys.platform.startswith('freebsd'):  # pragma: freebsd only
 elif sys.platform == 'darwin':  # pragma: darwin only
     from .platform_darwin import acl_get, acl_set, API_VERSION
 else:  # pragma: unknown platform only
-    API_VERSION = 3
+    API_VERSION = '1.0_01'
 
     def acl_get(path, item, st, numeric_owner=False):
         pass

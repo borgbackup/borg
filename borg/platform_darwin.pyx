@@ -1,7 +1,7 @@
 import os
 from .helpers import user2uid, group2gid, safe_decode, safe_encode
 
-API_VERSION = 3
+API_VERSION = '1.0_01'
 
 cdef extern from "sys/acl.h":
     ctypedef struct _acl_t:

@@ -4,7 +4,7 @@ import subprocess
 from stat import S_ISLNK
 from .helpers import posix_acl_use_stored_uid_gid, user2uid, group2gid, safe_decode, safe_encode
 
-API_VERSION = 3
+API_VERSION = '1.0_01'
 
 cdef extern from "sys/types.h":
     int ACL_TYPE_ACCESS

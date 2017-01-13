@@ -8,7 +8,7 @@ from math import ceil
 
 from libc.stdlib cimport malloc, free
 
-API_VERSION = 3
+API_VERSION = '1.0_01'
 
 cdef extern from "openssl/rand.h":
     int  RAND_bytes(unsigned char *buf, int num)

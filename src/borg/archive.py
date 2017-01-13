@@ -438,10 +438,10 @@ Number of files: {0.stats.nfiles}'''.format(
             _, data = self.key.decrypt(id, chunk)
             unpacker.feed(data)
             for item in unpacker:
-                item = Item(internal_dict=item)
-                if 'chunks' in item:
+                chunks = item.get(b'chunks')
+                if chunks is not None:
                     stats.nfiles += 1
-                    add_file_chunks(item.chunks)
+                    add_file_chunks(chunks)
         cache.rollback()
         return stats
 

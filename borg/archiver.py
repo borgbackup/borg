@@ -995,7 +995,8 @@ class Archiver:
         an exclude pattern, the file is backed up.
 
         Note that the default pattern style for `--pattern` and `--patterns-from` is
-        shell style (`sh:`), so those patterns behave like rsync include/exclude patterns.
+        shell style (`sh:`), so those patterns behave similar to rsync include/exclude
+        patterns.
 
         Patterns (`--pattern`) and excludes (`--exclude`) from the command line are
         considered first (in the order of appearance). Then patterns from `--pattern-from`

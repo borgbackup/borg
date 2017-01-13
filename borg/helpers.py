@@ -312,8 +312,7 @@ def load_excludes(fh):
     both line ends are ignored.
     """
     patterns = (line for line in (i.strip() for i in fh) if not line.startswith('#'))
-    return [parse_exclude_pattern(pattern)
-            for pattern in patterns if pattern]
+    return [parse_exclude_pattern(pattern) for pattern in patterns if pattern]
 
 
 def load_patterns(fh):

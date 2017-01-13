@@ -12,8 +12,6 @@
 /// compute CRC32 (Slicing-by-8 algorithm), unroll inner loop 4 times
 uint32_t crc32_4x8bytes(const void* data, size_t length, uint32_t previousCrc32);
 
-
-
 // //////////////////////////////////////////////////////////
 // Crc32.cpp
 // Copyright (c) 2011-2016 Stephan Brumme. All rights reserved.
@@ -22,55 +20,25 @@ uint32_t crc32_4x8bytes(const void* data, size_t length, uint32_t previousCrc32)
 // see http://create.stephan-brumme.com/disclaimer.html
 //
 
-// if running on an embedded system, you might consider shrinking the
-// big Crc32Lookup table:
-// - crc32_bitwise  doesn't need it at all
-// - crc32_halfbyte has its own small lookup table
-// - crc32_1byte    needs only Crc32Lookup[0]
-// - crc32_4bytes   needs only Crc32Lookup[0..3]
-// - crc32_8bytes   needs only Crc32Lookup[0..7]
-// - crc32_4x8bytes needs only Crc32Lookup[0..7]
-// - crc32_16bytes  needs all of Crc32Lookup
-
-// define endianess and some integer data types
-#if defined(_MSC_VER) || defined(__MINGW32__)
-  #define __LITTLE_ENDIAN 1234
-  #define __BIG_ENDIAN    4321
-  #define __BYTE_ORDER    __LITTLE_ENDIAN
-
-  #include <xmmintrin.h>
-  #ifdef __MINGW32__
-    #define PREFETCH(location) __builtin_prefetch(location)
-  #else
-    #define PREFETCH(location) _mm_prefetch(location, _MM_HINT_T0)
-  #endif
-#else
-  // defines __BYTE_ORDER as __LITTLE_ENDIAN or __BIG_ENDIAN
-  #include <sys/param.h>
-
-  #ifdef __GNUC__
-    #define PREFETCH(location) __builtin_prefetch(location)
-  #else
-    #define PREFETCH(location) ;
-  #endif
-#endif
-
-
 /// zlib's CRC32 polynomial
 const uint32_t Polynomial = 0xEDB88320;
 
 /// swap endianess
-static inline uint32_t swap(uint32_t x)
-{
-#if defined(__GNUC__) || defined(__clang__)
-  return __builtin_bswap32(x);
-#else
-  return (x >> 24) |
-        ((x >>  8) & 0x0000FF00) |
-        ((x <<  8) & 0x00FF0000) |
-         (x << 24);
+#if defined (__SVR4) && defined (__sun)
+#include <sys/isa_defs.h>
 #endif
-}
+
+#if (defined(BYTE_ORDER)&&(BYTE_ORDER == BIG_ENDIAN)) ||  \
+    (defined(_BIG_ENDIAN)&&defined(__SVR4)&&defined(__sun))
+#define _le32toh(x) __builtin_bswap32(x)
+#define BORG_BIG_ENDIAN
+#elif (defined(BYTE_ORDER)&&(BYTE_ORDER == LITTLE_ENDIAN)) || \
+      (defined(_LITTLE_ENDIAN)&&defined(__SVR4)&&defined(__sun))
+#define _le32toh(x) (x)
+#define BORG_LITTLE_ENDIAN
+#else
+#error Unknown byte order
+#endif
 
 // //////////////////////////////////////////////////////////
 // constants
@@ -389,8 +357,8 @@ uint32_t crc32_slice_by_8(const void* data, size_t length, uint32_t previousCrc3
     size_t unrolling;
     for (unrolling = 0; unrolling < Unroll; unrolling++)
     {
-#if __BYTE_ORDER == __BIG_ENDIAN
-      uint32_t one = *current++ ^ swap(crc);
+#ifdef BORG_BIG_ENDIAN
+      uint32_t one = *current++ ^ _le32toh(crc);
       uint32_t two = *current++;
       crc = Crc32Lookup[0][ two      & 0xFF] ^
             Crc32Lookup[1][(two>> 8) & 0xFF] ^

@@ -15,7 +15,7 @@ from ..helpers import Location, format_file_size, format_timedelta, format_line,
     prune_within, prune_split, get_cache_dir, get_keys_dir, get_security_dir, Statistics, is_slow_msgpack, \
     yes, TRUISH, FALSISH, DEFAULTISH, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
-    ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, load_patterns, parse_pattern, \
+    ProgressIndicatorPercent, ProgressIndicatorEndless, parse_pattern, load_exclude_file, load_pattern_file, \
     PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, \
     Buffer
 from . import BaseTestCase, FakeInputs
@@ -434,8 +434,10 @@ def test_exclude_patterns_from_file(tmpdir, lines, expected):
     ]
 
     def evaluate(filename):
+        patterns = []
+        load_exclude_file(open(filename, "rt"), patterns)
         matcher = PatternMatcher(fallback=True)
-        matcher.add_inclexcl(load_excludes(open(filename, "rt")))
+        matcher.add_inclexcl(patterns)
         return [path for path in files if matcher.match(path)]
 
     exclfile = tmpdir.join("exclude.txt")
@@ -462,7 +464,9 @@ def test_exclude_patterns_from_file(tmpdir, lines, expected):
 ])
 def test_load_patterns_from_file(tmpdir, lines, expected_roots, expected_numpatterns):
     def evaluate(filename):
-        roots, inclexclpatterns = load_patterns(open(filename, "rt"))
+        roots = []
+        inclexclpatterns = []
+        load_pattern_file(open(filename, "rt"), roots, inclexclpatterns)
         return roots, len(inclexclpatterns)
     patternfile = tmpdir.join("patterns.txt")
 
@@ -484,7 +488,9 @@ def test_load_invalid_patterns_from_file(tmpdir, lines):
         fh.write("\n".join(lines))
     filename = str(patternfile)
     with pytest.raises(argparse.ArgumentTypeError):
-        roots, inclexclpatterns = load_patterns(open(filename, "rt"))
+        roots = []
+        inclexclpatterns = []
+        load_pattern_file(open(filename, "rt"), roots, inclexclpatterns)
 
 
 @pytest.mark.parametrize("lines, expected", [
@@ -521,7 +527,9 @@ def test_inclexcl_patterns_from_file(tmpdir, lines, expected):
 
     def evaluate(filename):
         matcher = PatternMatcher(fallback=True)
-        roots, inclexclpatterns = load_patterns(open(filename, "rt"))
+        roots = []
+        inclexclpatterns = []
+        load_pattern_file(open(filename, "rt"), roots, inclexclpatterns)
         matcher.add_inclexcl(inclexclpatterns)
         return [path for path in files if matcher.match(path)]
 

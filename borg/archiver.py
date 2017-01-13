@@ -18,9 +18,9 @@ import collections
 
 from . import __version__
 from .helpers import Error, location_validator, archivename_validator, format_line, format_time, format_file_size, \
-    parse_pattern, parse_exclude_pattern, ArgparsePatternAction, PathPrefixPattern, to_localtime, timestamp, \
-    safe_timestamp, bin_to_hex, get_cache_dir, prune_within, prune_split, \
-    Manifest, NoManifestError, remove_surrogates, update_patterns, format_archive, check_extension_modules, Statistics, \
+    parse_pattern, parse_exclude_pattern, ArgparsePatternAction, ArgparsePatternFileAction, ArgparseExcludeFileAction, \
+    PathPrefixPattern, to_localtime, timestamp, safe_timestamp, bin_to_hex, get_cache_dir, prune_within, prune_split, \
+    Manifest, NoManifestError, remove_surrogates, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, PrefixSpec, is_slow_msgpack, yes, sysinfo, \
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ErrorIgnoringTextIOWrapper
 from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
@@ -999,7 +999,7 @@ class Archiver:
         patterns.
 
         Patterns (`--pattern`) and excludes (`--exclude`) from the command line are
-        considered first (in the order of appearance). Then patterns from `--pattern-from`
+        considered first (in the order of appearance). Then patterns from `--patterns-from`
         are added. Exclusion patterns from `--exclude-from` files are appended last.
 
         An example `--patterns-from` file could look like that::
@@ -1131,7 +1131,7 @@ class Archiver:
         subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
 
         # some empty defaults for all subparsers
-        common_parser.set_defaults(exclude_files=[], patterns=[], pattern_files=[])
+        common_parser.set_defaults(paths=[], patterns=[])
 
         serve_epilog = textwrap.dedent("""
         This command starts a repository server process. This command is usually not used manually.
@@ -1379,8 +1379,7 @@ class Archiver:
         subparser.add_argument('-e', '--exclude', dest='patterns',
                                type=parse_exclude_pattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
-        subparser.add_argument('--exclude-from', dest='exclude_files',
-                               type=argparse.FileType('r'), action='append',
+        subparser.add_argument('--exclude-from', action=ArgparseExcludeFileAction,
                                metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
         subparser.add_argument('--exclude-caches', dest='exclude_caches',
                                action='store_true', default=False,
@@ -1393,8 +1392,7 @@ class Archiver:
                                help='keep tag files of excluded caches/directories')
         subparser.add_argument('--pattern', action=ArgparsePatternAction,
                                metavar="PATTERN", help='include/exclude paths matching PATTERN')
-        subparser.add_argument('--patterns-from', dest='pattern_files',
-                               type=argparse.FileType('r'), action='append',
+        subparser.add_argument('--patterns-from', action=ArgparsePatternFileAction,
                                metavar='PATTERNFILE', help='read include/exclude patterns from PATTERNFILE, one per line')
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                type=int, default=300, metavar='SECONDS',
@@ -1442,7 +1440,7 @@ class Archiver:
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='name of archive to create (must be also a valid directory name)')
-        subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to archive')
 
         extract_epilog = textwrap.dedent("""
@@ -1468,13 +1466,11 @@ class Archiver:
         subparser.add_argument('-e', '--exclude', dest='patterns',
                                type=parse_exclude_pattern, action='append',
                                metavar="PATTERN", help='exclude paths matching PATTERN')
-        subparser.add_argument('--exclude-from', dest='exclude_files',
-                               type=argparse.FileType('r'), action='append',
+        subparser.add_argument('--exclude-from', action=ArgparseExcludeFileAction,
                                metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
         subparser.add_argument('--pattern', action=ArgparsePatternAction,
                                metavar="PATTERN", help='include/exclude paths matching PATTERN')
-        subparser.add_argument('--patterns-from', dest='pattern_files',
-                               type=argparse.FileType('r'), action='append',
+        subparser.add_argument('--patterns-from', action=ArgparsePatternFileAction,
                                metavar='PATTERNFILE', help='read include/exclude patterns from PATTERNFILE, one per line')
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,
@@ -2030,7 +2026,10 @@ class Archiver:
             args = self.preprocess_args(args)
         parser = self.build_parser(args)
         args = parser.parse_args(args or ['-h'])
-        update_patterns(args)
+        if args.func == self.do_create:
+            # need at least 1 path but args.paths may also be populated from patterns
+            if not args.paths:
+                parser.error('Need at least one PATH argument.')
         return args
 
     def run(self, args):

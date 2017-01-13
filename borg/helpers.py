@@ -307,40 +307,31 @@ def parse_timestamp(timestamp):
         return datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
 
 
-def load_excludes(fh):
-    """Load and parse exclude patterns from file object. Lines empty or starting with '#' after stripping whitespace on
-    both line ends are ignored.
-    """
-    patterns = (line for line in (i.strip() for i in fh) if not line.startswith('#'))
-    return [parse_exclude_pattern(pattern) for pattern in patterns if pattern]
+def parse_add_pattern(patternstr, roots, patterns):
+    """Parse a pattern string and add it to roots or patterns depending on the pattern type."""
+    pattern = parse_inclexcl_pattern(patternstr)
+    if pattern.ptype is RootPath:
+        roots.append(pattern.pattern)
+    else:
+        patterns.append(pattern)
 
 
-def load_patterns(fh):
-    """Load and parse include/exclude/root patterns from file object.
-    Lines empty or starting with '#' after stripping whitespace on both line ends are ignored.
-    """
-    patternlines = (line for line in (i.strip() for i in fh) if not line.startswith('#'))
-    roots = []
-    inclexcl_patterns = []
-    for patternline in patternlines:
-        pattern = parse_inclexcl_pattern(patternline)
-        if pattern.ptype is RootPath:
-            roots.append(pattern.pattern)
-        else:
-            inclexcl_patterns.append(pattern)
-    return roots, inclexcl_patterns
+def pattern_file_iter(fileobj):
+    for line in fileobj:
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        yield line
 
 
-def update_patterns(args):
-    """Merge patterns from exclude- and pattern-files with those on command line."""
-    for file in args.pattern_files:
-        roots, inclexcl_patterns = load_patterns(file)
-        args.paths += roots
-        args.patterns += inclexcl_patterns
-        file.close()
-    for file in args.exclude_files:
-        args.patterns += load_excludes(file)
-        file.close()
+def load_pattern_file(fileobj, roots, patterns):
+    for patternstr in pattern_file_iter(fileobj):
+        parse_add_pattern(patternstr, roots, patterns)
+
+
+def load_exclude_file(fileobj, patterns):
+    for patternstr in pattern_file_iter(fileobj):
+        patterns.append(parse_exclude_pattern(patternstr))
 
 
 class ArgparsePatternAction(argparse.Action):
@@ -348,11 +339,28 @@ class ArgparsePatternAction(argparse.Action):
         super().__init__(nargs=nargs, **kw)
 
     def __call__(self, parser, args, values, option_string=None):
-        pattern = parse_inclexcl_pattern(values[0])
-        if pattern.ptype is RootPath:
-            args.paths.append(pattern.pattern)
-        else:
-            args.patterns.append(pattern)
+        parse_add_pattern(values[0], args.paths, args.patterns)
+
+
+class ArgparsePatternFileAction(argparse.Action):
+    def __init__(self, nargs=1, **kw):
+        super().__init__(nargs=nargs, **kw)
+
+    def __call__(self, parser, args, values, option_string=None):
+        """Load and parse patterns from a file.
+        Lines empty or starting with '#' after stripping whitespace on both line ends are ignored.
+        """
+        filename = values[0]
+        with open(filename) as f:
+            self.parse(f, args)
+
+    def parse(self, fobj, args):
+        load_pattern_file(fobj, args.roots, args.patterns)
+
+
+class ArgparseExcludeFileAction(ArgparsePatternFileAction):
+    def parse(self, fobj, args):
+        load_exclude_file(fobj, args.patterns)
 
 
 class PatternMatcher:

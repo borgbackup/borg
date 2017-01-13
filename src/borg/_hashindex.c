@@ -528,10 +528,30 @@ static int
 hashindex_delete(HashIndex *index, const void *key)
 {
     int idx = hashindex_lookup(index, key, NULL);
+    int next;
+    int entry_size = (index->key_size + index->value_size);
+    uint8_t tmp_entry[entry_size];
+    uint8_t *bucket_ptr;
     if (idx < 0) {
-        return 1;
+        return 1;  // not in index, nothing to do
     }
-    BUCKET_MARK_DELETED(index, idx);
+    while (1) {
+        next = idx+1;
+        if (next >= index->num_buckets) {
+            next = 0;
+        }
+        bucket_ptr = BUCKET_ADDR(index, next);
+        if (distance(next, hashindex_index(index, bucket_ptr), index->num_buckets)){
+            memswap(bucket_ptr, BUCKET_ADDR(index, idx), tmp_entry, entry_size);
+            idx++;
+            if (idx >= index->num_buckets) {
+                idx = 0;
+            }
+        } else {
+            break;
+        }
+    }
+    BUCKET_MARK_EMPTY(index, idx);
     index->num_entries -= 1;
     if(index->num_entries < index->lower_limit) {
         if(!hashindex_resize(index, shrink_size(index->num_buckets))) {

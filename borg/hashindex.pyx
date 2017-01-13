@@ -4,7 +4,7 @@ import os
 cimport cython
 from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
 
-API_VERSION = 3
+API_VERSION = '1.0_01'
 
 
 cdef extern from "_hashindex.c":

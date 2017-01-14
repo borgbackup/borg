@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-API_VERSION = 2
+API_VERSION = '1.1_01'
 
 from libc.stdlib cimport free
 

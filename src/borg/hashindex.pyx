@@ -8,7 +8,7 @@ from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
 from libc.errno cimport errno
 from cpython.exc cimport PyErr_SetFromErrnoWithFilename
 
-API_VERSION = 4
+API_VERSION = '1.1_01'
 
 
 cdef extern from "_hashindex.c":

@@ -2,7 +2,7 @@ from .constants import ITEM_KEYS
 from .helpers import safe_encode, safe_decode
 from .helpers import StableDict
 
-API_VERSION = 1
+API_VERSION = '1.1_01'
 
 
 class PropDict:

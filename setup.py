@@ -373,7 +373,7 @@ if not on_rtd:
     Extension('borg.item', [item_source]),
     Extension('borg.crc32', [crc32_source]),
 ]
-    if sys.platform.startswith(('linux', 'freebsd', 'darwin')):
+    if not sys.platform.startswith(('win32', )):
         ext_modules.append(Extension('borg.platform.posix', [platform_posix_source]))
 
     if sys.platform == 'linux':

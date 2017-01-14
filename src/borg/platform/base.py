@@ -162,3 +162,23 @@ def swidth(s):
 def umount(mountpoint):
     """un-mount the FUSE filesystem mounted at <mountpoint>"""
     return 0  # dummy, see also posix module
+
+
+def get_process_id():
+    """
+    Return identification tuple (hostname, pid, thread_id) for 'us'. If this is a FUSE process, then the PID will be
+    that of the parent, not the forked FUSE child.
+    """
+    raise NotImplementedError
+
+
+def process_alive(host, pid, thread):
+    """
+    Check if the (host, pid, thread_id) combination corresponds to a potentially alive process.
+    """
+    raise NotImplementedError
+
+
+def local_pid_alive(pid):
+    """Return whether *pid* is alive."""
+    raise NotImplementedError

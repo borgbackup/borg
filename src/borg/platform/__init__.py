@@ -10,10 +10,13 @@ from .base import acl_get, acl_set
 from .base import set_flags, get_flags
 from .base import SaveFile, SyncFile, sync_dir, fdatasync
 from .base import swidth, umount, API_VERSION
-from .posix import process_alive, get_process_id, local_pid_alive
-
+from .base import process_alive, get_process_id, local_pid_alive
 
 OS_API_VERSION = API_VERSION
+
+if not sys.platform.startswith(('win32', )):
+    from .posix import process_alive, get_process_id, local_pid_alive
+
 if sys.platform.startswith('linux'):  # pragma: linux only
     from .linux import API_VERSION as OS_API_VERSION
     from .linux import acl_get, acl_set

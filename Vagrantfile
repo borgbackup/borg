@@ -467,11 +467,13 @@ Vagrant.configure(2) do |config|
   end
 
   # BSD
+  # note: the FreeBSD-10.3-STABLE box needs "vagrant up" twice to start.
   config.vm.define "freebsd64" do |b|
-    b.vm.box = "geoffgarside/freebsd-10.2"
+    b.vm.box = "freebsd/FreeBSD-10.3-STABLE"
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end
+    b.ssh.shell = "sh"
     b.vm.provision "install system packages", :type => :shell, :inline => packages_freebsd
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("freebsd")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("freebsd")

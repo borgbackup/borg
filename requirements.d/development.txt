@@ -1,3 +1,5 @@
+setuptools
+pip
 virtualenv<14.0
 tox
 pytest

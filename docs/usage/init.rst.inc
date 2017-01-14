@@ -14,7 +14,7 @@ positional arguments
 
 optional arguments
     ``-e``, ``--encryption``
-        | select encryption key mode (default: "repokey")
+        | select encryption key mode (default: "None")
     ``-a``, ``--append-only``
         | create an append-only mode repository
 
@@ -27,21 +27,22 @@ Description
 This command initializes an empty repository. A repository is a filesystem
 directory containing the deduplicated data from zero or more archives.
 
-Encryption can be enabled at repository init time (the default).
+Encryption can be enabled at repository init time.
 
-It is not recommended to disable encryption. Repository encryption protects you
-e.g. against the case that an attacker has access to your backup repository.
+It is not recommended to work without encryption. Repository encryption protects
+you e.g. against the case that an attacker has access to your backup repository.
 
 But be careful with the key / the passphrase:
 
-If you want "passphrase-only" security, use the repokey mode. The key will
-be stored inside the repository (in its "config" file). In above mentioned
-attack scenario, the attacker will have the key (but not the passphrase).
+If you want "passphrase-only" security, use one of the repokey modes. The
+key will be stored inside the repository (in its "config" file). In above
+mentioned attack scenario, the attacker will have the key (but not the
+passphrase).
 
-If you want "passphrase and having-the-key" security, use the keyfile mode.
-The key will be stored in your home directory (in .config/borg/keys). In
-the attack scenario, the attacker who has just access to your repo won't have
-the key (and also not the passphrase).
+If you want "passphrase and having-the-key" security, use one of the keyfile
+modes. The key will be stored in your home directory (in .config/borg/keys).
+In the attack scenario, the attacker who has just access to your repo won't
+have the key (and also not the passphrase).
 
 Make a backup copy of the key file (keyfile mode) or repo config file
 (repokey mode) and keep it at a safe place, so you still have the key in
@@ -72,12 +73,27 @@ Encryption modes
 repokey and keyfile use AES-CTR-256 for encryption and HMAC-SHA256 for
 authentication in an encrypt-then-MAC (EtM) construction. The chunk ID hash
 is HMAC-SHA256 as well (with a separate key).
+These modes are compatible with borg 1.0.x.
 
-repokey-blake2 and keyfile-blake2 use the same authenticated encryption, but
-use a keyed BLAKE2b-256 hash for the chunk ID hash.
+repokey-blake2 and keyfile-blake2 are also authenticated encryption modes,
+but use BLAKE2b-256 instead of HMAC-SHA256 for authentication. The chunk ID
+hash is a keyed BLAKE2b-256 hash.
+These modes are new and not compatible with borg 1.0.x.
 
 "authenticated" mode uses no encryption, but authenticates repository contents
-through the same keyed BLAKE2b-256 hash as the other blake2 modes.
-The key is stored like repokey.
+through the same keyed BLAKE2b-256 hash as the other blake2 modes (it uses it
+as chunk ID hash). The key is stored like repokey.
+This mode is new and not compatible with borg 1.0.x.
+
+"none" mode uses no encryption and no authentication. It uses sha256 as chunk
+ID hash. Not recommended, rather consider using an authenticated or
+authenticated/encrypted mode.
+This mode is compatible with borg 1.0.x.
 
 Hardware acceleration will be used automatically.
+
+On modern Intel/AMD CPUs (except very cheap ones), AES is usually hw
+accelerated. BLAKE2b is faster than sha256 on Intel/AMD 64bit CPUs.
+
+On modern ARM CPUs, NEON provides hw acceleration for sha256 making it faster
+than BLAKE2b-256 there.

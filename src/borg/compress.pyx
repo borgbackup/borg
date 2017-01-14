@@ -6,7 +6,7 @@ except ImportError:
 
 from .helpers import Buffer
 
-API_VERSION = 2
+API_VERSION = '1.1_01'
 
 cdef extern from "lz4.h":
     int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize) nogil

@@ -7,7 +7,7 @@ from math import ceil
 from libc.stdlib cimport malloc, free
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 
-API_VERSION = 4
+API_VERSION = '1.1_01'
 
 
 cdef extern from "blake2-libselect.h":

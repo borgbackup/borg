@@ -11,6 +11,7 @@ import tempfile
 import time
 import traceback
 import textwrap
+import time
 from subprocess import Popen, PIPE
 
 import msgpack
@@ -37,6 +38,23 @@ BUFSIZE = 10 * 1024 * 1024
 MAX_INFLIGHT = 100
 
 RATELIMIT_PERIOD = 0.1
+
+
+def os_write(fd, data):
+    """os.write wrapper so we do not lose data for partial writes."""
+    # This is happening frequently on cygwin due to its small pipe buffer size of only 64kiB
+    # and also due to its different blocking pipe behaviour compared to Linux/*BSD.
+    # Neither Linux nor *BSD ever do partial writes on blocking pipes, unless interrupted by a
+    # signal, in which case serve() would terminate.
+    amount = remaining = len(data)
+    while remaining:
+        count = os.write(fd, data)
+        remaining -= count
+        if not remaining:
+            break
+        data = data[count:]
+        time.sleep(count * 1e-09)
+    return amount
 
 
 class ConnectionClosed(Error):
@@ -176,7 +194,7 @@ class RepositoryServer:  # pragma: no cover
                     if self.repository is not None:
                         self.repository.close()
                     else:
-                        os.write(stderr_fd, 'Borg {}: Got connection close before repository was opened.\n'
+                        os_write(stderr_fd, 'Borg {}: Got connection close before repository was opened.\n'
                                  .format(__version__).encode())
                     return
                 unpacker.feed(data)
@@ -235,7 +253,7 @@ class RepositoryServer:  # pragma: no cover
                                                     b'exception_short': ex_short,
                                                     b'sysinfo': sysinfo()})
 
-                            os.write(stdout_fd, msg)
+                            os_write(stdout_fd, msg)
                         else:
                             if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
                                 # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
@@ -253,12 +271,12 @@ class RepositoryServer:  # pragma: no cover
                                 logging.error(msg)
                                 logging.log(tb_log_level, tb)
                             exc = 'Remote Exception (see remote log for the traceback)'
-                            os.write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc)))
+                            os_write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc)))
                     else:
                         if dictFormat:
-                            os.write(stdout_fd, msgpack.packb({MSGID: msgid, RESULT: res}))
+                            os_write(stdout_fd, msgpack.packb({MSGID: msgid, RESULT: res}))
                         else:
-                            os.write(stdout_fd, msgpack.packb((1, msgid, None, res)))
+                            os_write(stdout_fd, msgpack.packb((1, msgid, None, res)))
             if es:
                 self.repository.close()
                 return

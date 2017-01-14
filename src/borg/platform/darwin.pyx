@@ -4,7 +4,7 @@ from ..helpers import user2uid, group2gid
 from ..helpers import safe_decode, safe_encode
 from .posix import swidth, umount
 
-API_VERSION = 5
+API_VERSION = '1.1_01'
 
 cdef extern from "sys/acl.h":
     ctypedef struct _acl_t:

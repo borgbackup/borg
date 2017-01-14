@@ -13,7 +13,7 @@ platform API: that way platform APIs provided by the platform-specific support m
 are correctly composed into the base functionality.
 """
 
-API_VERSION = 5
+API_VERSION = '1.1_01'
 
 fdatasync = getattr(os, 'fdatasync', os.fsync)
 

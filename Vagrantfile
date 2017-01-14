@@ -111,6 +111,8 @@ end
 
 def packages_openbsd
   return <<-EOF
+    echo 'installpath = http://ftp.hostserver.de/pub/OpenBSD/6.0/packages/amd64/' > /etc/pkg.conf
+    echo 'export PKG_PATH=http://ftp.hostserver.de/pub/OpenBSD/6.0/packages/amd64/' >> ~/.profile
     . ~/.profile
     pkg_add bash
     chsh -s /usr/local/bin/bash vagrant

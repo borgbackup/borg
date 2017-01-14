@@ -11,7 +11,7 @@ class XattrTestCase(BaseTestCase):
 
     def setUp(self):
         self.tmpfile = tempfile.NamedTemporaryFile()
-        self.symlink = os.path.join(os.path.dirname(self.tmpfile.name), 'symlink')
+        self.symlink = self.tmpfile.name + '.symlink'
         os.symlink(self.tmpfile.name, self.symlink)
 
     def tearDown(self):

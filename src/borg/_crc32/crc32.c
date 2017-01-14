@@ -8,6 +8,11 @@
  * target attributes or the options stack. So we disable this faster code path for clang.
  */
 #ifndef __clang__
+/*
+ * While OpenBSD uses GCC, they don't have Intel intrinsics, so we can't compile this code
+ * on OpenBSD.
+ */
+#ifndef __OpenBSD__
 #if __x86_64__
 /*
  * Because we don't want a configure script we need compiler-dependent pre-defined macros for detecting this,
@@ -59,6 +64,7 @@
 #endif
 
 #endif /* if __x86_64__ */
+#endif /* ifndef __OpenBSD__ */
 #endif /* ifndef __clang__ */
 #endif /* ifdef __GNUC__ */
 

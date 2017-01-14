@@ -63,6 +63,7 @@ cython_sources = [
     chunker_source,
     hashindex_source,
     item_source,
+    crc32_source,
 
     platform_posix_source,
     platform_linux_source,

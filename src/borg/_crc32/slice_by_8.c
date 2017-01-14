@@ -350,6 +350,7 @@ uint32_t crc32_slice_by_8(const void* data, size_t length, uint32_t previousCrc3
   // enabling optimization (at least -O2) automatically unrolls the inner for-loop
   const size_t Unroll = 4;
   const size_t BytesAtOnce = 8 * Unroll;
+  const uint8_t* currentChar;
 
   // process 4x eight bytes at once (Slicing-by-8)
   while (length >= BytesAtOnce)
@@ -386,7 +387,7 @@ uint32_t crc32_slice_by_8(const void* data, size_t length, uint32_t previousCrc3
     length -= BytesAtOnce;
   }
 
-  const uint8_t* currentChar = (const uint8_t*) current;
+  currentChar = (const uint8_t*) current;
   // remaining 1 to 31 bytes (standard algorithm)
   while (length-- != 0)
     crc = (crc >> 8) ^ Crc32Lookup[0][(crc & 0xFF) ^ *currentChar++];

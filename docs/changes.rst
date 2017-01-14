@@ -210,6 +210,8 @@ Version 1.0.10rc1 (not released yet)
 
 Bug fixes:
 
+- borg serve: fix transmission data loss of pipe writes, #1268
+  This affects only the cygwin platform (not Linux, *BSD, OS X).
 - Avoid triggering an ObjectiveFS bug in xattr retrieval, #1992
 - When running out of buffer memory when reading xattrs, only skip the
   current file, #1993
@@ -231,14 +233,19 @@ Other changes:
 - tests:
 
   - vagrant / travis / tox: add Python 3.6 based testing
+  - vagrant: fix openbsd repo, fixes #2042
   - travis: fix osxfuse install (fixes OS X testing on Travis CI)
+  - travis: require succeeding OS X tests, #2028
   - use pytest-xdist to parallelize testing
 - docs:
 
   - language clarification - VM backup FAQ
+  - borg create: document how to backup stdin, #2013
+  - borg upgrade: fix incorrect title levels
 - fix typos (taken from Debian package patch)
 - remote: include data hexdump in "unexpected RPC data" error message
 - remote: log SSH command line at debug level
+- API_VERSION: use numberspaces, #2023
 
 
 Version 1.0.9 (2016-12-20)

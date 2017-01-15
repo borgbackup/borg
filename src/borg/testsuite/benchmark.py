@@ -19,6 +19,7 @@ import borg.hashindex
 bench_getitem = borg.hashindex.bench_getitem
 bench_setitem = borg.hashindex.bench_setitem
 bench_delete = borg.hashindex.bench_delete
+bench_churn = borg.hashindex.bench_churn
 
 
 @pytest.yield_fixture
@@ -292,5 +293,5 @@ def test_chunk_indexer_c_churn(benchmark, fill):
         return [ChunkIndex(max_key), ], dict()
 
     def do_sets(index):
-        bench_setitem(index, keys, len(keys)//32)
+        bench_churn(index, keys, len(keys)//32)
     benchmark.pedantic(do_sets, rounds=rounds, setup=setup)

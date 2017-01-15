@@ -377,3 +377,6 @@ def bench_setitem(ChunkIndex chunk_index, bytes keys, int key_count):
 
 def bench_delete(ChunkIndex chunk_index, bytes keys, int key_count):
     benchmark_delete(chunk_index.index, PyBytes_AS_STRING(keys), key_count)
+
+def bench_churn(ChunkIndex chunk_index, bytes keys, int key_count):
+    benchmark_churn(chunk_index.index, PyBytes_AS_STRING(keys), key_count)

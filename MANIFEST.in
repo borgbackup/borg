@@ -7,4 +7,5 @@ recursive-exclude docs *.pyc
 recursive-exclude docs *.pyo
 prune docs/_build
 prune .travis
+prune .github
 exclude .coveragerc .gitattributes .gitignore .travis.yml Vagrantfile

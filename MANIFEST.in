@@ -1,10 +1,9 @@
 include README.rst AUTHORS LICENSE CHANGES.rst MANIFEST.in
 graft src
-recursive-exclude src *.pyc
-recursive-exclude src *.pyo
-recursive-include docs *
-recursive-exclude docs *.pyc
-recursive-exclude docs *.pyo
+global-exclude src *.py[co]
+recursive-exclude src *.so
+recursive-exclude src *.dll
+graft docs
 prune docs/_build
 prune .travis
 prune .github

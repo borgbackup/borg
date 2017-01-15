@@ -126,12 +126,13 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.0b3 (not released yet)
-----------------------------------
+Version 1.1.0b3 (2017-01-15)
+----------------------------
 
 Compatibility notes:
 
 - borg init: removed the default of "--encryption/-e", #1979
+  This was done so users do a informed decision about -e mode.
 
 Bug fixes:
 
@@ -140,6 +141,7 @@ Bug fixes:
 - borg init: fix free space check crashing if disk is full, #1821
 - borg debug delete/get obj: fix wrong reference to exception
 - fix processing of remote ~/ and ~user/ paths (regressed since 1.1.0b1), #1759
+- posix platform module: only build / import on non-win32 platforms, #2041
 
 New features:
 

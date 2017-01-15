@@ -2,6 +2,7 @@ include README.rst AUTHORS LICENSE CHANGES.rst MANIFEST.in
 graft src
 recursive-exclude src *.pyc
 recursive-exclude src *.pyo
+recursive-exclude src *.so
 recursive-include docs *
 recursive-exclude docs *.pyc
 recursive-exclude docs *.pyo

@@ -155,9 +155,13 @@ Other changes:
 
   - vagrant / travis / tox: add Python 3.6 based testing
   - vagrant: fix openbsd repo, fixes #2042
+  - vagrant: fix the freebsd64 machine, #2037
   - travis: fix osxfuse install (fixes OS X testing on Travis CI)
   - travis: require succeeding OS X tests, #2028
+  - travis: use latest pythons for OS X based testing
   - use pytest-xdist to parallelize testing
+  - fix xattr test race condition, #2047
+  - setup.cfg: fix pytest deprecation warning, #2050
 - docs:
 
   - language clarification - VM backup FAQ
@@ -167,6 +171,8 @@ Other changes:
 - remote: include data hexdump in "unexpected RPC data" error message
 - remote: log SSH command line at debug level
 - API_VERSION: use numberspaces, #2023
+- remove .github from pypi package, #2051
+- add pip and setuptools to requirements file, #2030
 
 
 Version 1.0.9 (2016-12-20)

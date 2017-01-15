@@ -633,3 +633,67 @@ benchmark_setitem(HashIndex *index, char *keys, int key_count)
     }
 
 }
+
+
+static void
+benchmark_delete(HashIndex *index, char *keys, int key_count)
+{
+    char *key = keys;
+    char *last_addr = key + (32 * key_count);
+    if (DEBUG){
+        lookups = 0; collisions = 0; swaps = 0; updates = 0; shortcuts = 0; inserts = 0;
+    }
+    while (key < last_addr) {
+        hashindex_delete(index, key);
+        key += 32;
+    }
+    if (DEBUG) {
+        printf("\n\n\nlookups %f; collisions: %lu; swaps %lu; updates %lu; shorts %lu; "
+               "inserts %lu; buckets %d\n\n\n",
+               (double)(lookups) / key_count, collisions, swaps, updates, shortcuts,
+               inserts, index->num_buckets);
+    }
+
+}
+
+
+static void
+benchmark_churn(HashIndex *index, char *keys, int key_count)
+{
+    char *key = keys;
+    char *last_addr = key + (32 * key_count);
+    uint32_t data[3] = {0, 0, 0};
+    size_t key_size = index->key_size;
+    uint8_t deleted_key[key_size];
+    unsigned int period = 0;
+    if (DEBUG){
+        lookups = 0; collisions = 0; swaps = 0; updates = 0; shortcuts = 0; inserts = 0;
+    }
+    while (key < last_addr) {
+        switch (period) {
+        case 0:
+            memcpy(deleted_key, key, key_size);
+            hashindex_delete(index, key);
+            break;
+        case 1 ... 6:
+            hashindex_set(index, key, data);
+            break;
+        case 7 ... 9:
+            hashindex_get(index, key);
+            break;
+        case 10:
+            period = 0;
+            hashindex_set(index, deleted_key, data);
+            continue;
+        }
+        period ++;
+        key += 32;
+    }
+    if (DEBUG) {
+        printf("\n\n\nlookups %f; collisions: %lu; swaps %lu; updates %lu; shorts %lu; "
+               "inserts %lu; buckets %d\n\n\n",
+               (double)(lookups) / key_count, collisions, swaps, updates, shortcuts,
+               inserts, index->num_buckets);
+    }
+
+}

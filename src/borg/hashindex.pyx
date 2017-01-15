@@ -29,6 +29,8 @@ cdef extern from "_hashindex.c":
     uint32_t _le32toh(uint32_t v)
     void benchmark_getitem(HashIndex *index, char *keys, int key_count)
     void benchmark_setitem(HashIndex *index, char *keys, int key_count)
+    void benchmark_delete(HashIndex *index, char *keys, int key_count)
+    void benchmark_churn(HashIndex *index, char *keys, int key_count)
 
 
 cdef _NoDefault = object()
@@ -372,3 +374,6 @@ def bench_getitem(ChunkIndex chunk_index, bytes keys, int key_count):
 
 def bench_setitem(ChunkIndex chunk_index, bytes keys, int key_count):
     benchmark_setitem(chunk_index.index, PyBytes_AS_STRING(keys), key_count)
+
+def bench_delete(ChunkIndex chunk_index, bytes keys, int key_count):
+    benchmark_delete(chunk_index.index, PyBytes_AS_STRING(keys), key_count)

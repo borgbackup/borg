@@ -18,6 +18,7 @@ import borg.hashindex
 
 bench_getitem = borg.hashindex.bench_getitem
 bench_setitem = borg.hashindex.bench_setitem
+bench_delete = borg.hashindex.bench_delete
 
 
 @pytest.yield_fixture
@@ -146,7 +147,9 @@ def test_chunk_indexer_getitem(benchmark):
 
 rounds = 10
 @pytest.fixture(
-    params=[.30, .50, .75, .80, .85, .90, .93, .95]
+    # params=[.30, .50, .75, .80, .85, .90, .93, .95]
+    params=[.30, .50, .75, .85, .93, .95]
+    # params=[.75, .93]
 )
 def fill(request):
     return request.param
@@ -209,6 +212,7 @@ def test_chunk_indexer_c_setitem_update(benchmark, fill):
     benchmark.pedantic(do_sets, rounds=rounds)
     # yep.stop()
 
+
 def test_chunk_indexer_c_setitem(benchmark, fill):
     max_key = int(445649 * fill - 10)
     keys = b"".join((sha256(H(k)).digest()
@@ -218,6 +222,71 @@ def test_chunk_indexer_c_setitem(benchmark, fill):
         index = ChunkIndex(max_key)
         bucket_val = (5, 5, 5)
         for i in range(0, 32*max_key, 32):
+            key = keys[i:i+32]
+            index[key] = bucket_val
+        return [ChunkIndex(max_key), ], dict()
+
+    def do_sets(index):
+        bench_setitem(index, keys, len(keys)//32)
+    benchmark.pedantic(do_sets, rounds=rounds, setup=setup)
+
+
+def test_chunk_indexer_c_delete(benchmark, fill):
+    max_key = int(445649 * fill - 10)
+    keys = b"".join((sha256(H(k)).digest()
+                     for k in range(max_key)))
+    delete_keys = b"".join((sha256(H(k)).digest()
+                            for k in range(0, max_key, 3)))
+    def setup():
+        # return *args, **kwargs for the benchmarked function
+        index = ChunkIndex(max_key)
+        bucket_val = (5, 5, 5)
+        for i in range(0, 32*max_key, 32):
+            key = keys[i:i+32]
+            index[key] = bucket_val
+        return [ChunkIndex(max_key), ], dict()
+
+    def do_delete(index):
+        bench_delete(index, delete_keys, len(keys)//32)
+    benchmark.pedantic(do_delete, rounds=rounds, setup=setup)
+
+
+def test_chunk_indexer_c_setitem_after_deletion(benchmark, fill):
+    max_key = int(445649 * fill - 10)
+    keys = b"".join((sha256(H(k)).digest()
+                     for k in range(max_key)
+                     if k%5))
+    delete_keys = b"".join((sha256(H(k)).digest()
+                     for k in range(0, max_key, 5)))
+    def setup():
+        # return *args, **kwargs for the benchmarked function
+        index = ChunkIndex(max_key)
+        bucket_val = (5, 5, 5)
+        for i in range(0, len(delete_keys), 32):
+            key = delete_keys[i:i+32]
+            index[key] = bucket_val
+        for i in range(0, len(keys), 32):
+            key = keys[i:i+32]
+            index[key] = bucket_val
+        for i in range(0, len(delete_keys), 32):
+            key = delete_keys[i:i+32]
+            del index[key]
+        return [ChunkIndex(max_key), ], dict()
+
+    def do_sets(index):
+        bench_setitem(index, keys, len(keys)//32)
+    benchmark.pedantic(do_sets, rounds=rounds, setup=setup)
+
+
+def test_chunk_indexer_c_churn(benchmark, fill):
+    max_key = int(445649 * fill - 10)
+    keys = b"".join((sha256(H(k)).digest()
+                     for k in range(max_key)))
+    def setup():
+        # return *args, **kwargs for the benchmarked function
+        index = ChunkIndex(max_key)
+        bucket_val = (5, 5, 5)
+        for i in range(0, len(keys), 32):
             key = keys[i:i+32]
             index[key] = bucket_val
         return [ChunkIndex(max_key), ], dict()

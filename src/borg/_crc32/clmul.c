@@ -74,10 +74,12 @@ static int
 have_clmul(void)
 {
     unsigned eax, ebx, ecx, edx;
+    int has_pclmulqdq;
+    int has_sse41;
     cpuid(1 /* feature bits */, &eax, &ebx, &ecx, &edx);
 
-    int has_pclmulqdq = ecx & 0x2; /* bit 1 */
-    int has_sse41 = ecx & 0x80000; /* bit 19 */
+    has_pclmulqdq = ecx & 0x2; /* bit 1 */
+    has_sse41 = ecx & 0x80000; /* bit 19 */
 
     return has_pclmulqdq && has_sse41;
 }
@@ -345,6 +347,13 @@ crc32_clmul(const uint8_t *src, long len, uint32_t initial_crc)
 
     int first = 1;
 
+    /* fold 512 to 32 step variable declarations for ISO-C90 compat. */
+    const __m128i xmm_mask  = _mm_load_si128((__m128i *)crc_mask);
+    const __m128i xmm_mask2 = _mm_load_si128((__m128i *)crc_mask2);
+
+    uint32_t crc;
+    __m128i x_tmp0, x_tmp1, x_tmp2, crc_fold;
+
     if (len < 16) {
         if (len == 0)
             return initial_crc;
@@ -464,11 +473,6 @@ done:
     (void)0;
 
     /* fold 512 to 32 */
-    const __m128i xmm_mask  = _mm_load_si128((__m128i *)crc_mask);
-    const __m128i xmm_mask2 = _mm_load_si128((__m128i *)crc_mask2);
-
-    uint32_t crc;
-    __m128i x_tmp0, x_tmp1, x_tmp2, crc_fold;
 
     /*
      * k1

@@ -316,21 +316,13 @@ def parse_add_pattern(patternstr, roots, patterns):
         patterns.append(pattern)
 
 
-def pattern_file_iter(fileobj):
-    for line in fileobj:
-        line = line.strip()
-        if not line or line.startswith('#'):
-            continue
-        yield line
-
-
 def load_pattern_file(fileobj, roots, patterns):
-    for patternstr in pattern_file_iter(fileobj):
+    for patternstr in clean_lines(fileobj):
         parse_add_pattern(patternstr, roots, patterns)
 
 
 def load_exclude_file(fileobj, patterns):
-    for patternstr in pattern_file_iter(fileobj):
+    for patternstr in clean_lines(fileobj):
         patterns.append(parse_exclude_pattern(patternstr))
 
 
@@ -1355,6 +1347,30 @@ def signal_handler(sig, handler):
     finally:
         if sig is not None:
             signal.signal(sig, orig_handler)
+
+
+def clean_lines(lines, lstrip=None, rstrip=None, remove_empty=True, remove_comments=True):
+    """
+    clean lines (usually read from a config file):
+    1. strip whitespace (left and right), 2. remove empty lines, 3. remove comments.
+    note: only "pure comment lines" are supported, no support for "trailing comments".
+    :param lines: input line iterator (e.g. list or open text file) that gives unclean input lines
+    :param lstrip: lstrip call arguments or False, if lstripping is not desired
+    :param rstrip: rstrip call arguments or False, if rstripping is not desired
+    :param remove_comments: remove comment lines (lines starting with "#")
+    :param remove_empty: remove empty lines
+    :return: yields processed lines
+    """
+    for line in lines:
+        if lstrip is not False:
+            line = line.lstrip(lstrip)
+        if rstrip is not False:
+            line = line.rstrip(rstrip)
+        if remove_empty and not line:
+            continue
+        if remove_comments and line.startswith('#'):
+            continue
+        yield line
 
 
 def raising_signal_handler(exc_cls):

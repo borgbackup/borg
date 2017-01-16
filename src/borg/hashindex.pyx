@@ -369,14 +369,18 @@ cdef class ChunkKeyIterator:
 from cpython.bytes cimport PyBytes_AS_STRING
 
 
-def bench_getitem(ChunkIndex chunk_index, bytes keys, int key_count):
+def bench_getitem(ChunkIndex chunk_index, bytes keys):
+    cdef key_count = len(keys) // chunk_index.key_size
     benchmark_getitem(chunk_index.index, PyBytes_AS_STRING(keys), key_count)
 
-def bench_setitem(ChunkIndex chunk_index, bytes keys, int key_count):
+def bench_setitem(ChunkIndex chunk_index, bytes keys):
+    cdef key_count = len(keys) // chunk_index.key_size
     benchmark_setitem(chunk_index.index, PyBytes_AS_STRING(keys), key_count)
 
-def bench_delete(ChunkIndex chunk_index, bytes keys, int key_count):
+def bench_delete(ChunkIndex chunk_index, bytes keys):
+    cdef key_count = len(keys) // chunk_index.key_size
     benchmark_delete(chunk_index.index, PyBytes_AS_STRING(keys), key_count)
 
-def bench_churn(ChunkIndex chunk_index, bytes keys, int key_count):
+def bench_churn(ChunkIndex chunk_index, bytes keys):
+    cdef key_count = len(keys) // chunk_index.key_size
     benchmark_churn(chunk_index.index, PyBytes_AS_STRING(keys), key_count)

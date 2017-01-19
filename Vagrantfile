@@ -283,9 +283,10 @@ def install_pyinstaller(bootloader)
     . ~/.bash_profile
     cd /vagrant/borg
     . borg-env/bin/activate
-    git clone https://github.com/pyinstaller/pyinstaller.git
+    git clone https://github.com/thomaswaldmann/pyinstaller.git
     cd pyinstaller
-    git checkout v3.1.1
+    # develop branch, with fixed / freshly rebuilt bootloaders
+    git checkout fresh-bootloader
   EOF
   if bootloader
     script += <<-EOF

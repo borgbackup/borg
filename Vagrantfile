@@ -279,28 +279,16 @@ def install_borg(fuse)
   return script
 end
 
-def install_pyinstaller(bootloader)
-  script = <<-EOF
+def install_pyinstaller()
+  return <<-EOF
     . ~/.bash_profile
     cd /vagrant/borg
     . borg-env/bin/activate
     git clone https://github.com/thomaswaldmann/pyinstaller.git
     cd pyinstaller
-    # develop branch, with fixed / freshly rebuilt bootloaders
-    git checkout fresh-bootloader
+    git checkout v3.2.1
+    python setup.py install
   EOF
-  if bootloader
-    script += <<-EOF
-      # build bootloader, if it is not included
-      cd bootloader
-      python ./waf all
-      cd ..
-    EOF
-  end
-  script += <<-EOF
-    pip install -e .
-  EOF
-  return script
 end
 
 def build_binary_with_pyinstaller(boxname)
@@ -437,7 +425,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("wheezy32")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("wheezy32")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller(false)
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("wheezy32")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("wheezy32")
   end
@@ -450,7 +438,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("wheezy64")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("wheezy64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller(false)
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("wheezy64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("wheezy64")
   end
@@ -464,7 +452,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("darwin64")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("darwin64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller(false)
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("darwin64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("darwin64")
   end
@@ -482,7 +470,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("freebsd")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("freebsd")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller(true)
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("freebsd")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd")
   end

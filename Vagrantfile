@@ -83,11 +83,13 @@ end
 
 def packages_freebsd
   return <<-EOF
+    # VM has no hostname set
+    hostname freebsd
     # install all the (security and other) updates, base system
     freebsd-update --not-running-from-cron fetch install
     # for building borgbackup and dependencies:
     pkg install -y openssl liblz4 fusefs-libs pkgconf
-    pkg install -y fakeroot git bash
+    pkg install -y git bash
     # for building python:
     pkg install -y sqlite3
     # make bash default / work:
@@ -468,11 +470,11 @@ Vagrant.configure(2) do |config|
   end
 
   # BSD
-  # note: the FreeBSD-10.3-STABLE box needs "vagrant up" twice to start.
+  # note: the FreeBSD-10.3-RELEASE box needs "vagrant up" twice to start.
   config.vm.define "freebsd64" do |b|
-    b.vm.box = "freebsd/FreeBSD-10.3-STABLE"
+    b.vm.box = "freebsd/FreeBSD-10.3-RELEASE"
     b.vm.provider :virtualbox do |v|
-      v.memory = 768
+      v.memory = 1536
     end
     b.ssh.shell = "sh"
     b.vm.provision "install system packages", :type => :shell, :inline => packages_freebsd

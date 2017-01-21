@@ -1,10 +1,8 @@
 include README.rst AUTHORS LICENSE CHANGES.rst MANIFEST.in
-recursive-include borg *.pyx
-recursive-include docs *
-recursive-exclude docs *.pyc
-recursive-exclude docs *.pyo
-prune docs/_build
+exclude .coveragerc .gitattributes .gitignore .travis.yml Vagrantfile
 prune .travis
 prune .github
-exclude .coveragerc .gitattributes .gitignore .travis.yml Vagrantfile
-include borg/_version.py
+graft borg
+graft docs
+prune docs/_build
+global-exclude *.py[co] *.orig *.so *.dll

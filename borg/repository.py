@@ -829,8 +829,9 @@ class LoggedIO:
                 # tell the OS that it does not need to cache what we just wrote,
                 # avoids spoiling the cache for the OS and other processes.
                 os.posix_fadvise(self._write_fd.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
+            dirname = os.path.dirname(self._write_fd.name)
             self._write_fd.close()
-            sync_dir(os.path.dirname(self._write_fd.name))
+            sync_dir(dirname)
             self._write_fd = None
 
 

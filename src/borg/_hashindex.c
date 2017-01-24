@@ -55,8 +55,8 @@ typedef struct {
     off_t bucket_size;
     int lower_limit;
     int upper_limit;
-    /* void *entry_to_insert; */
-    /* void *tmp_entry; */
+    void *entry_to_insert;
+    void *tmp_entry;
 } HashIndex;
 
 /* prime (or w/ big prime factors) hash table sizes
@@ -330,6 +330,14 @@ hashindex_read(const char *path)
         index = NULL;
         goto fail;
     }
+    if(!(index->entry_to_insert = malloc(2 * (header.key_size + header.value_size)))) {
+        EPRINTF_PATH(path, "malloc temp entry failed");
+        free(index->buckets);
+        free(index);
+        index = NULL;
+        goto fail;
+    }
+    index->tmp_entry = index->entry_to_insert + (header.key_size + header.value_size);
     bytes_read = fread(index->buckets, 1, buckets_length, fd);
     if(bytes_read != buckets_length) {
         if(ferror(fd)) {
@@ -375,7 +383,14 @@ hashindex_init(int capacity, int key_size, int value_size)
         free(index);
         return NULL;
     }
-
+    if(!(index->entry_to_insert = malloc(2 * (key_size + value_size)))) {
+        EPRINTF("malloc temp entry failed");
+        free(index->buckets);
+        free(index);
+        return NULL;
+    }
+    index->tmp_entry = index->entry_to_insert + (key_size + value_size);
+    
     index->num_entries = 0;
     index->key_size = key_size;
     index->value_size = value_size;
@@ -461,8 +476,10 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
     uint8_t *bucket_ptr;
     int other_offset;
     int entry_size = (index->key_size + index->value_size);
-    uint8_t entry_to_insert[entry_size];
-    uint8_t tmp_entry[entry_size];
+    /* uint8_t entry_to_insert[entry_size]; */
+    void *entry_to_insert = index->entry_to_insert;
+    /* uint8_t tmp_entry[entry_size]; */
+    void *tmp_entry = index->tmp_entry;
     if(idx >= 0)
     {
         /* we already have the key in the index we just need to update its value */

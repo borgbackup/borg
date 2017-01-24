@@ -128,15 +128,21 @@ class FuseOperations(llfuse.Operations):
                 else:
                     self.items[inode] = item
                     continue
-                segments = prefix + os.fsencode(os.path.normpath(item[b'path'])).split(b'/')
-                del item[b'path']
+                path = item.pop(b'path')
+                segments = prefix + os.fsencode(os.path.normpath(path)).split(b'/')
                 num_segments = len(segments)
                 parent = 1
                 for i, segment in enumerate(segments, 1):
                     # Leaf segment?
                     if i == num_segments:
                         if b'source' in item and stat.S_ISREG(item[b'mode']):
-                            inode = self._find_inode(item[b'source'], prefix)
+                            try:
+                                inode = self._find_inode(item[b'source'], prefix)
+                            except KeyError:
+                                file = path.decode(errors='surrogateescape')
+                                source = item[b'source'].decode(errors='surrogateescape')
+                                logger.warning('Skipping broken hard link: %s -> %s', file, source)
+                                continue
                             item = self.cache.get(inode)
                             item[b'nlink'] = item.get(b'nlink', 1) + 1
                             self.items[inode] = item

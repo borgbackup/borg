@@ -424,6 +424,11 @@ def test_invalid_unicode_pattern(pattern):
     (["pp:/"], [" #/wsfoobar", "\tstart/whitespace"]),
     (["pp:aaabbb"], None),
     (["pp:/data", "pp: #/", "pp:\tstart", "pp:/whitespace"], ["/more/data", "/home"]),
+    (["/nomatch", "/more/*"],
+     ['/data/something00.txt', '/home', ' #/wsfoobar', '\tstart/whitespace', '/whitespace/end\t']),
+    # the order of exclude patterns shouldn't matter
+    (["/more/*", "/nomatch"],
+     ['/data/something00.txt', '/home', ' #/wsfoobar', '\tstart/whitespace', '/whitespace/end\t']),
     ])
 def test_exclude_patterns_from_file(tmpdir, lines, expected):
     files = [
@@ -512,9 +517,14 @@ def test_load_invalid_patterns_from_file(tmpdir, lines):
     (["+fm:*/something00.txt",
       "-/data"],
      ["/data/something00.txt", '/home', '/home/leo', '/home/leo/t', '/home/other']),
+    # include /home/leo and exclude the rest of /home:
     (["+/home/leo",
       "-/home/*"],
      ['/data', '/data/something00.txt', '/data/subdir/something01.txt', '/home', '/home/leo', '/home/leo/t']),
+    # wrong order, /home/leo is already excluded by -/home/*:
+    (["-/home/*",
+      "+/home/leo"],
+     ['/data', '/data/something00.txt', '/data/subdir/something01.txt', '/home']),
     (["+fm:/home/leo",
       "-/home/"],
      ['/data', '/data/something00.txt', '/data/subdir/something01.txt', '/home', '/home/leo', '/home/leo/t']),

@@ -5,8 +5,8 @@ This section is used for infos about security and corruption issues.
 
 .. _tam_vuln:
 
-Pre-1.0.9 manifest spoofing vulnerability
------------------------------------------
+Pre-1.0.9 manifest spoofing vulnerability (CVE-2016-10099)
+----------------------------------------------------------
 
 A flaw in the cryptographic authentication scheme in Borg allowed an attacker
 to spoof the manifest. The attack requires an attacker to be able to
@@ -54,7 +54,9 @@ Vulnerability time line:
 
 * 2016-11-14: Vulnerability and fix discovered during review of cryptography by Marian Beermann (@enkore)
 * 2016-11-20: First patch
-* 2016-12-18: Released fixed versions: 1.0.9, 1.1.0b3
+* 2016-12-20: Released fixed version 1.0.9
+* 2017-01-02: CVE was assigned
+* 2017-01-15: Released fixed version 1.1.0b3 (fix was previously only available from source)
 
 .. _attic013_check_corruption:
 
@@ -183,9 +185,13 @@ Security fixes:
 - A flaw in the cryptographic authentication scheme in Borg allowed an attacker
   to spoof the manifest. See :ref:`tam_vuln` above for the steps you should
   take.
+
+  CVE-2016-10099 was assigned to this vulnerability.
 - borg check: When rebuilding the manifest (which should only be needed very rarely)
   duplicate archive names would be handled on a "first come first serve" basis, allowing
   an attacker to apparently replace archives.
+
+  CVE-2016-10100 was assigned to this vulnerability.
 
 Bug fixes:
 

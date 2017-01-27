@@ -833,9 +833,19 @@ class LoggedIO:
                 fileno = fd.fileno()
                 os.fsync(fileno)
                 if hasattr(os, 'posix_fadvise'):  # only on UNIX
-                    # tell the OS that it does not need to cache what we just wrote,
-                    # avoids spoiling the cache for the OS and other processes.
-                    os.posix_fadvise(fileno, 0, 0, os.POSIX_FADV_DONTNEED)
+                    try:
+                        # tell the OS that it does not need to cache what we just wrote,
+                        # avoids spoiling the cache for the OS and other processes.
+                        os.posix_fadvise(fileno, 0, 0, os.POSIX_FADV_DONTNEED)
+                    except OSError:
+                        # usually, posix_fadvise can't fail for us, but there seem to
+                        # be failures when running borg under docker on ARM, likely due
+                        # to a bug outside of borg.
+                        # also, there is a python wrapper bug, always giving errno = 0.
+                        # https://github.com/borgbackup/borg/issues/2095
+                        # as this call is not critical for correct function (just to
+                        # optimize cache usage), we ignore these errors.
+                        pass
             finally:
                 fd.close()
                 if dirname:

@@ -821,19 +821,35 @@ class LoggedIO:
         self.close_segment()  # after-commit fsync()
 
     def close_segment(self):
-        if self._write_fd:
-            self.segment += 1
-            self.offset = 0
-            self._write_fd.flush()
-            os.fsync(self._write_fd.fileno())
-            if hasattr(os, 'posix_fadvise'):  # only on UNIX
-                # tell the OS that it does not need to cache what we just wrote,
-                # avoids spoiling the cache for the OS and other processes.
-                os.posix_fadvise(self._write_fd.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
-            dirname = os.path.dirname(self._write_fd.name)
-            self._write_fd.close()
-            sync_dir(dirname)
-            self._write_fd = None
+        # set self._write_fd to None early to guard against reentry from error handling code pathes:
+        fd, self._write_fd = self._write_fd, None
+        if fd is not None:
+            dirname = None
+            try:
+                self.segment += 1
+                self.offset = 0
+                dirname = os.path.dirname(fd.name)
+                fd.flush()
+                fileno = fd.fileno()
+                os.fsync(fileno)
+                if hasattr(os, 'posix_fadvise'):  # only on UNIX
+                    try:
+                        # tell the OS that it does not need to cache what we just wrote,
+                        # avoids spoiling the cache for the OS and other processes.
+                        os.posix_fadvise(fileno, 0, 0, os.POSIX_FADV_DONTNEED)
+                    except OSError:
+                        # usually, posix_fadvise can't fail for us, but there seem to
+                        # be failures when running borg under docker on ARM, likely due
+                        # to a bug outside of borg.
+                        # also, there is a python wrapper bug, always giving errno = 0.
+                        # https://github.com/borgbackup/borg/issues/2095
+                        # as this call is not critical for correct function (just to
+                        # optimize cache usage), we ignore these errors.
+                        pass
+            finally:
+                fd.close()
+                if dirname:
+                    sync_dir(dirname)
 
 
 MAX_DATA_SIZE = MAX_OBJECT_SIZE - LoggedIO.put_header_fmt.size

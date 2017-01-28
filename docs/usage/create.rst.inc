@@ -84,8 +84,12 @@ Description
 ~~~~~~~~~~~
 
 This command creates a backup archive containing all files found while recursively
-traversing all paths specified. The archive will consume almost no disk space for
-files or parts of files that have already been stored in other archives.
+traversing all paths specified. When giving '-' as path, borg will read data
+from standard input and create a file 'stdin' in the created archive from that
+data.
+
+The archive will consume almost no disk space for files or parts of files that
+have already been stored in other archives.
 
 The archive name needs to be unique. It must not end in '.checkpoint' or
 '.checkpoint.N' (with N being a number), because these names are used for

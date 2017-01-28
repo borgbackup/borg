@@ -6,6 +6,7 @@ import os
 import stat
 import tempfile
 import time
+from signal import SIGINT
 from distutils.version import LooseVersion
 
 import msgpack
@@ -98,7 +99,8 @@ class FuseOperations(llfuse.Operations):
         umount = False
         try:
             signal = fuse_main()
-            umount = (signal is None)  # no crash and no signal -> umount request
+            # no crash and no signal (or it's ^C and we're in the foreground) -> umount request
+            umount = (signal is None or (signal == SIGINT and foreground))
         finally:
             llfuse.close(umount)
 

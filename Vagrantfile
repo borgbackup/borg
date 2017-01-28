@@ -63,6 +63,8 @@ end
 def packages_darwin
   return <<-EOF
     # install all the (security and other) updates
+    sudo softwareupdate --ignore iTunesX
+    sudo softwareupdate --ignore iTunes
     sudo softwareupdate --install --all
     # get osxfuse 3.x release code from github:
     curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.5.4/osxfuse-3.5.4.dmg >osxfuse.dmg
@@ -458,6 +460,16 @@ Vagrant.configure(2) do |config|
   # OS X
   config.vm.define "darwin64" do |b|
     b.vm.box = "jhcook/yosemite-clitools"
+    b.vm.provider :virtualbox do |v|
+      v.customize ['modifyvm', :id, '--ostype', 'MacOS1010_64']
+      v.customize ['modifyvm', :id, '--paravirtprovider', 'default']
+      # Adjust CPU settings according to
+      # https://github.com/geerlingguy/macos-virtualbox-vm
+      v.customize ['modifyvm', :id, '--cpuidset',
+                   '00000001', '000306a9', '00020800', '80000201', '178bfbff']
+      # Disable USB variant requiring Virtualbox proprietary extension pack
+      v.customize ["modifyvm", :id, '--usbehci', 'off', '--usbxhci', 'off']
+    end
     b.vm.provision "packages darwin", :type => :shell, :privileged => false, :inline => packages_darwin
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("darwin64")
     b.vm.provision "fix pyenv", :type => :shell, :privileged => false, :inline => fix_pyenv_darwin("darwin64")

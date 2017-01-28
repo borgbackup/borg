@@ -175,12 +175,18 @@ hashindex_lookup(HashIndex *index, const void *key, int *skip_hint)
 	/*     period = 0; */
 	/* } */
         /* if((skip_hint || period==0) && (offset > distance(idx, hashindex_index(index, BUCKET_ADDR(index, idx)), index->num_buckets))) { */
-        if(skip_hint || period++ == 15){
+        if(period++ == 15){
 	    period = 0;
 	    if (offset > distance(idx, hashindex_index(index, BUCKET_ADDR(index, idx)), index->num_buckets)) {
 		if (DEBUG) {
 		    shortcuts ++;
 		}
+                /* compensate for the period, hashindex_set will need to re-examine the last
+                   16 buckets for a suitable bucket to insert it's value */
+                offset = offset - 16;
+                if (offset < 0) {
+                    offset += index->num_buckets;
+                }
 		rv = -1;
 		break;
 	    }
@@ -390,7 +396,7 @@ hashindex_init(int capacity, int key_size, int value_size)
         return NULL;
     }
     index->tmp_entry = index->entry_to_insert + (key_size + value_size);
-    
+
     index->num_entries = 0;
     index->key_size = key_size;
     index->value_size = value_size;

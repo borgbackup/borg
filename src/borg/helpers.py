@@ -1,5 +1,6 @@
 import argparse
 import contextlib
+import collections
 import grp
 import hashlib
 import logging
@@ -1091,6 +1092,49 @@ def decode_dict(d, keys, encoding='utf-8', errors='surrogateescape'):
         if isinstance(d.get(key), bytes):
             d[key] = d[key].decode(encoding, errors)
     return d
+
+
+def prepare_dump_dict(d):
+    def decode_bytes(value):
+        # this should somehow be reversable later, but usual strings should
+        # look nice and chunk ids should mostly show in hex. Use a special
+        # inband signaling character (ASCII DEL) to distinguish between
+        # decoded and hex mode.
+        if not value.startswith(b'\x7f'):
+            try:
+                value = value.decode()
+                return value
+            except UnicodeDecodeError:
+                pass
+        return '\u007f' + bin_to_hex(value)
+
+    def decode_tuple(t):
+        res = []
+        for value in t:
+            if isinstance(value, dict):
+                value = decode(value)
+            elif isinstance(value, tuple) or isinstance(value, list):
+                value = decode_tuple(value)
+            elif isinstance(value, bytes):
+                value = decode_bytes(value)
+            res.append(value)
+        return res
+
+    def decode(d):
+        res = collections.OrderedDict()
+        for key, value in d.items():
+            if isinstance(value, dict):
+                value = decode(value)
+            elif isinstance(value, (tuple, list)):
+                value = decode_tuple(value)
+            elif isinstance(value, bytes):
+                value = decode_bytes(value)
+            if isinstance(key, bytes):
+                key = key.decode()
+            res[key] = value
+        return res
+
+    return decode(d)
 
 
 def remove_surrogates(s, errors='replace'):

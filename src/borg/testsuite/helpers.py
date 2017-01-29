@@ -137,6 +137,11 @@ class TestLocationWithoutEnv:
         location_time2 = Location('/some/path::archive{now:%s}')
         assert location_time1.archive != location_time2.archive
 
+    def test_bad_syntax(self):
+        with pytest.raises(ValueError):
+            # this is invalid due to the 2nd colon, correct: 'ssh://user@host/path'
+            Location('ssh://user@host:/path')
+
 
 class TestLocationWithEnv:
     def test_ssh(self, monkeypatch):

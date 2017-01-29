@@ -21,7 +21,7 @@ from .helpers import yes
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .lrucache import LRUCache
-from .platform import SaveFile, SyncFile, sync_dir
+from .platform import SaveFile, SyncFile, sync_dir, safe_fadvise
 from .crc32 import crc32
 
 logger = create_logger(__name__)
@@ -909,8 +909,7 @@ class LoggedIO:
         self.fds = None  # Just to make sure we're disabled
 
     def close_fd(self, fd):
-        if hasattr(os, 'posix_fadvise'):  # only on UNIX
-            os.posix_fadvise(fd.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
+        safe_fadvise(fd.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
         fd.close()
 
     def segment_iterator(self, segment=None, reverse=False):
@@ -1017,11 +1016,12 @@ class LoggedIO:
             return fd
 
     def close_segment(self):
-        if self._write_fd:
+        # set self._write_fd to None early to guard against reentry from error handling code pathes:
+        fd, self._write_fd = self._write_fd, None
+        if fd is not None:
             self.segment += 1
             self.offset = 0
-            self._write_fd.close()
-            self._write_fd = None
+            fd.close()
 
     def delete_segment(self, segment):
         if segment in self.fds:

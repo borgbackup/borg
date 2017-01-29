@@ -2244,6 +2244,13 @@ class Archiver:
         to tweak the performance. It sets the number of cached data chunks; additional
         memory usage can be up to ~8 MiB times this number. The default is the number
         of CPU cores.
+
+        When the daemonized process receives a signal or crashes, it does not unmount.
+        Unmounting in these cases could cause an active rsync or similar process
+        to unintentionally delete data.
+
+        When running in the foreground ^C/SIGINT unmounts cleanly, but other
+        signals or crashes do not.
         """)
         subparser = subparsers.add_parser('mount', parents=[common_parser], add_help=False,
                                           description=self.do_mount.__doc__,

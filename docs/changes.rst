@@ -126,6 +126,18 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
+Version 1.1.0b4 (not released yet)
+----------------------------------
+
+New features:
+
+- the --exclude-if-present option now supports tagging a folder with any
+  filesystem object type (file, folder, etc), instead of expecting only files
+  as tags, #1999
+- the --keep-tag-files option has been deprecated in favor of the new 
+  --keep-exclude-tags, to account for the change mentioned above.
+
+
 Version 1.1.0b3 (2017-01-15)
 ----------------------------
 

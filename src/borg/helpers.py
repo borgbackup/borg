@@ -633,9 +633,9 @@ def dir_is_cachedir(path):
 
 def dir_is_tagged(path, exclude_caches, exclude_if_present):
     """Determines whether the specified path is excluded by being a cache
-    directory or containing user-specified tag files. Returns a list of the
-    paths of the tag files (either CACHEDIR.TAG or the matching
-    user-specified files).
+    directory or containing user-specified tag files/directories. Returns a
+    list of the paths of the tag files/directories (either CACHEDIR.TAG or the
+    matching user-specified files/directories).
     """
     tag_paths = []
     if exclude_caches and dir_is_cachedir(path):
@@ -643,7 +643,7 @@ def dir_is_tagged(path, exclude_caches, exclude_if_present):
     if exclude_if_present is not None:
         for tag in exclude_if_present:
             tag_path = os.path.join(path, tag)
-            if os.path.isfile(tag_path):
+            if os.path.exists(tag_path):
                 tag_paths.append(tag_path)
     return tag_paths
 

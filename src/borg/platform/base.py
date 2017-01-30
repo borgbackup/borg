@@ -65,6 +65,7 @@ def sync_dir(path):
 
 def safe_fadvise(fd, offset, len, advice):
     if hasattr(os, 'posix_fadvise'):
+        advice = getattr(os, 'POSIX_FADV_' + advice)
         try:
             os.posix_fadvise(fd, offset, len, advice)
         except OSError:
@@ -120,7 +121,7 @@ class SyncFile:
         platform.fdatasync(self.fileno)
         # tell the OS that it does not need to cache what we just wrote,
         # avoids spoiling the cache for the OS and other processes.
-        safe_fadvise(self.fileno, 0, 0, os.POSIX_FADV_DONTNEED)
+        safe_fadvise(self.fileno, 0, 0, 'DONTNEED')
 
     def close(self):
         """sync() and close."""

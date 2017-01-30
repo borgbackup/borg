@@ -909,7 +909,7 @@ class LoggedIO:
         self.fds = None  # Just to make sure we're disabled
 
     def close_fd(self, fd):
-        safe_fadvise(fd.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
+        safe_fadvise(fd.fileno(), 0, 0, 'DONTNEED')
         fd.close()
 
     def segment_iterator(self, segment=None, reverse=False):

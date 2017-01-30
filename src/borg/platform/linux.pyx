@@ -217,7 +217,7 @@ cdef _sync_file_range(fd, offset, length, flags):
     assert length & PAGE_MASK == 0, "length %d not page-aligned" % length
     if sync_file_range(fd, offset, length, flags) != 0:
         raise OSError(errno.errno, os.strerror(errno.errno))
-    safe_fadvise(fd, offset, length, os.POSIX_FADV_DONTNEED)
+    safe_fadvise(fd, offset, length, 'DONTNEED')
 
 cdef unsigned PAGE_MASK = resource.getpagesize() - 1
 
@@ -254,7 +254,7 @@ class SyncFile(BaseSyncFile):
         os.fdatasync(self.fileno)
         # tell the OS that it does not need to cache what we just wrote,
         # avoids spoiling the cache for the OS and other processes.
-        safe_fadvise(self.fileno, 0, 0, os.POSIX_FADV_DONTNEED)
+        safe_fadvise(self.fileno, 0, 0, 'DONTNEED')
 
 
 def umount(mountpoint):

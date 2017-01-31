@@ -898,12 +898,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('tagged1/.NOBACKUP')
         self.create_regular_file('tagged2/00-NOBACKUP')
-        self.create_regular_file('tagged3/.NOBACKUP/file2')
+        self.create_regular_file('tagged3/.NOBACKUP/file2', size=1024)
 
     def _assert_test_tagged(self):
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
-        self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'tagged3'])
+        self.assert_equal(sorted(os.listdir('output/input')), ['file1'])
 
     def test_exclude_tagged(self):
         self._create_test_tagged()
@@ -922,13 +922,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file0', size=1024)
         self.create_regular_file('tagged1/.NOBACKUP1')
         self.create_regular_file('tagged1/file1', size=1024)
-        self.create_regular_file('tagged2/.NOBACKUP2')
+        self.create_regular_file('tagged2/.NOBACKUP2/subfile1', size=1024)
         self.create_regular_file('tagged2/file2', size=1024)
         self.create_regular_file('tagged3/%s' % CACHE_TAG_NAME,
                                  contents=CACHE_TAG_CONTENTS + b' extra stuff')
         self.create_regular_file('tagged3/file3', size=1024)
         self.create_regular_file('taggedall/.NOBACKUP1')
-        self.create_regular_file('taggedall/.NOBACKUP2')
+        self.create_regular_file('taggedall/.NOBACKUP2/subfile1', size=1024)
         self.create_regular_file('taggedall/%s' % CACHE_TAG_NAME,
                                  contents=CACHE_TAG_CONTENTS + b' extra stuff')
         self.create_regular_file('taggedall/file4', size=1024)
@@ -943,17 +943,22 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_equal(sorted(os.listdir('output/input/taggedall')),
                           ['.NOBACKUP1', '.NOBACKUP2', CACHE_TAG_NAME, ])
 
+    def test_exclude_keep_tagged_deprecation(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        output_warn = self.cmd('create', '--exclude-caches', '--keep-tag-files', self.repository_location + '::test', src_dir)
+        self.assert_in('--keep-tag-files" has been deprecated.', output_warn)
+
     def test_exclude_keep_tagged(self):
         self._create_test_keep_tagged()
         self.cmd('create', '--exclude-if-present', '.NOBACKUP1', '--exclude-if-present', '.NOBACKUP2',
-                 '--exclude-caches', '--keep-tag-files', self.repository_location + '::test', 'input')
+                 '--exclude-caches', '--keep-exclude-tags', self.repository_location + '::test', 'input')
         self._assert_test_keep_tagged()
 
     def test_recreate_exclude_keep_tagged(self):
         self._create_test_keep_tagged()
         self.cmd('create', self.repository_location + '::test', 'input')
         self.cmd('recreate', '--exclude-if-present', '.NOBACKUP1', '--exclude-if-present', '.NOBACKUP2',
-                 '--exclude-caches', '--keep-tag-files', self.repository_location + '::test')
+                 '--exclude-caches', '--keep-exclude-tags', self.repository_location + '::test')
         self._assert_test_keep_tagged()
 
     @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='Linux capabilities test, requires fakeroot >= 1.20.2')

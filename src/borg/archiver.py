@@ -346,7 +346,7 @@ class Archiver:
                 else:
                     restrict_dev = None
                 self._process(archive, cache, matcher, args.exclude_caches, args.exclude_if_present,
-                              args.keep_tag_files, skip_inodes, path, restrict_dev,
+                              args.keep_exclude_tags, skip_inodes, path, restrict_dev,
                               read_special=args.read_special, dry_run=dry_run, st=st)
             if not dry_run:
                 archive.save(comment=args.comment, timestamp=args.timestamp)
@@ -382,7 +382,7 @@ class Archiver:
         return self.exit_code
 
     def _process(self, archive, cache, matcher, exclude_caches, exclude_if_present,
-                 keep_tag_files, skip_inodes, path, restrict_dev,
+                 keep_exclude_tags, skip_inodes, path, restrict_dev,
                  read_special=False, dry_run=False, st=None):
         if not matcher.match(path):
             self.print_file_status('x', path)
@@ -419,11 +419,11 @@ class Archiver:
             if recurse:
                 tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)
                 if tag_paths:
-                    if keep_tag_files and not dry_run:
+                    if keep_exclude_tags and not dry_run:
                         archive.process_dir(path, st)
                         for tag_path in tag_paths:
                             self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
-                                          keep_tag_files, skip_inodes, tag_path, restrict_dev,
+                                          keep_exclude_tags, skip_inodes, tag_path, restrict_dev,
                                           read_special=read_special, dry_run=dry_run)
                     return
             if not dry_run:
@@ -438,7 +438,7 @@ class Archiver:
                     for dirent in entries:
                         normpath = os.path.normpath(dirent.path)
                         self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
-                                      keep_tag_files, skip_inodes, normpath, restrict_dev,
+                                      keep_exclude_tags, skip_inodes, normpath, restrict_dev,
                                       read_special=read_special, dry_run=dry_run)
         elif stat.S_ISLNK(st.st_mode):
             if not dry_run:
@@ -1151,7 +1151,7 @@ class Archiver:
 
         recreater = ArchiveRecreater(repository, manifest, key, cache, matcher,
                                      exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
-                                     keep_tag_files=args.keep_tag_files, chunker_params=args.chunker_params,
+                                     keep_exclude_tags=args.keep_exclude_tags, chunker_params=args.chunker_params,
                                      compression=args.compression, compression_files=args.compression_files,
                                      always_recompress=args.always_recompress,
                                      progress=args.progress, stats=args.stats,
@@ -1571,6 +1571,7 @@ class Archiver:
         deprecations = [
             # ('--old', '--new', 'Warning: "--old" has been deprecated. Use "--new" instead.'),
             ('--list-format', '--format', 'Warning: "--list-format" has been deprecated. Use "--format" instead.'),
+            ('--keep-tag-files', '--keep-exclude-tags', 'Warning: "--keep-tag-files" has been deprecated. Use "--keep-exclude-tags" instead.'),
         ]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
@@ -1974,11 +1975,13 @@ class Archiver:
                                    help='exclude directories that contain a CACHEDIR.TAG file ('
                                         'http://www.brynosaurus.com/cachedir/spec.html)')
         exclude_group.add_argument('--exclude-if-present', dest='exclude_if_present',
-                                   metavar='FILENAME', action='append', type=str,
-                                   help='exclude directories that contain the specified file')
-        exclude_group.add_argument('--keep-tag-files', dest='keep_tag_files',
+                                   metavar='NAME', action='append', type=str,
+                                   help='exclude directories that are tagged by containing a filesystem object with \
+                                         the given NAME')
+        exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
                                    action='store_true', default=False,
-                                   help='keep tag files of excluded caches/directories')
+                                   help='keep tag objects (i.e.: arguments to --exclude-if-present) in otherwise \
+                                         excluded caches/directories')
 
         fs_group = subparser.add_argument_group('Filesystem options')
         fs_group.add_argument('-x', '--one-file-system', dest='one_file_system',
@@ -2562,11 +2565,13 @@ class Archiver:
                                    help='exclude directories that contain a CACHEDIR.TAG file ('
                                         'http://www.brynosaurus.com/cachedir/spec.html)')
         exclude_group.add_argument('--exclude-if-present', dest='exclude_if_present',
-                                   metavar='FILENAME', action='append', type=str,
-                                   help='exclude directories that contain the specified file')
-        exclude_group.add_argument('--keep-tag-files', dest='keep_tag_files',
+                                   metavar='NAME', action='append', type=str,
+                                   help='exclude directories that are tagged by containing a filesystem object with \
+                                         the given NAME')
+        exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
                                    action='store_true', default=False,
-                                   help='keep tag files of excluded caches/directories')
+                                   help='keep tag objects (i.e.: arguments to --exclude-if-present) in otherwise \
+                                         excluded caches/directories')
 
         archive_group = subparser.add_argument_group('Archive options')
         archive_group.add_argument('--target', dest='target', metavar='TARGET', default=None,

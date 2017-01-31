@@ -1439,7 +1439,7 @@ class ArchiveRecreater:
         return archive_name.endswith('.recreate')
 
     def __init__(self, repository, manifest, key, cache, matcher,
-                 exclude_caches=False, exclude_if_present=None, keep_tag_files=False,
+                 exclude_caches=False, exclude_if_present=None, keep_exclude_tags=False,
                  chunker_params=None, compression=None, compression_files=None, always_recompress=False,
                  dry_run=False, stats=False, progress=False, file_status_printer=None,
                  checkpoint_interval=1800):
@@ -1451,7 +1451,7 @@ class ArchiveRecreater:
         self.matcher = matcher
         self.exclude_caches = exclude_caches
         self.exclude_if_present = exclude_if_present or []
-        self.keep_tag_files = keep_tag_files
+        self.keep_exclude_tags = keep_exclude_tags
 
         self.rechunkify = chunker_params is not None
         if self.rechunkify:
@@ -1591,7 +1591,7 @@ class ArchiveRecreater:
     def matcher_add_tagged_dirs(self, archive):
         """Add excludes to the matcher created by exclude_cache and exclude_if_present."""
         def exclude(dir, tag_item):
-            if self.keep_tag_files:
+            if self.keep_exclude_tags:
                 tag_files.append(PathPrefixPattern(tag_item.path))
                 tagged_dirs.append(FnmatchPattern(dir + '/'))
             else:
@@ -1607,10 +1607,10 @@ class ArchiveRecreater:
                 filter=lambda item: item.path.endswith(CACHE_TAG_NAME) or matcher.match(item.path)):
             if item.path.endswith(CACHE_TAG_NAME):
                 cachedir_masters[item.path] = item
+            dir, tag_file = os.path.split(item.path)
+            if tag_file in self.exclude_if_present:
+                exclude(dir, item)
             if stat.S_ISREG(item.mode):
-                dir, tag_file = os.path.split(item.path)
-                if tag_file in self.exclude_if_present:
-                    exclude(dir, item)
                 if self.exclude_caches and tag_file == CACHE_TAG_NAME:
                     if 'chunks' in item:
                         file = open_item(archive, item)

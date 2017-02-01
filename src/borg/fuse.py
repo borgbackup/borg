@@ -5,6 +5,7 @@ import stat
 import tempfile
 import time
 from collections import defaultdict
+from signal import SIGINT
 from distutils.version import LooseVersion
 from zlib import adler32
 
@@ -125,7 +126,8 @@ class FuseOperations(llfuse.Operations):
         umount = False
         try:
             signal = fuse_main()
-            umount = (signal is None)  # no crash and no signal -> umount request
+            # no crash and no signal (or it's ^C and we're in the foreground) -> umount request
+            umount = (signal is None or (signal == SIGINT and foreground))
         finally:
             llfuse.close(umount)
 
@@ -190,6 +192,7 @@ class FuseOperations(llfuse.Operations):
                 path = os.fsencode(os.path.normpath(item.path))
                 self.file_versions[path] = version
 
+        path = item.path
         del item.path  # safe some space
         if 'source' in item and stat.S_ISREG(item.mode):
             # a hardlink, no contents, <source> is the hardlink master
@@ -199,7 +202,11 @@ class FuseOperations(llfuse.Operations):
                 version = self.file_versions[source]
                 source = make_versioned_name(source, version, add_dir=True)
                 name = make_versioned_name(name, version)
-            inode = self._find_inode(source, prefix)
+            try:
+                inode = self._find_inode(source, prefix)
+            except KeyError:
+                logger.warning('Skipping broken hard link: %s -> %s', path, item.source)
+                return
             item = self.cache.get(inode)
             item.nlink = item.get('nlink', 1) + 1
             self.items[inode] = item

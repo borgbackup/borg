@@ -5,8 +5,8 @@ This section is used for infos about security and corruption issues.
 
 .. _tam_vuln:
 
-Pre-1.0.9 manifest spoofing vulnerability
------------------------------------------
+Pre-1.0.9 manifest spoofing vulnerability (CVE-2016-10099)
+----------------------------------------------------------
 
 A flaw in the cryptographic authentication scheme in Borg allowed an attacker
 to spoof the manifest. The attack requires an attacker to be able to
@@ -54,7 +54,9 @@ Vulnerability time line:
 
 * 2016-11-14: Vulnerability and fix discovered during review of cryptography by Marian Beermann (@enkore)
 * 2016-11-20: First patch
-* 2016-12-18: Released fixed versions: 1.0.9, 1.1.0b3
+* 2016-12-20: Released fixed version 1.0.9
+* 2017-01-02: CVE was assigned
+* 2017-01-15: Released fixed version 1.1.0b3 (fix was previously only available from source)
 
 .. _attic013_check_corruption:
 
@@ -219,8 +221,8 @@ Other changes:
   - remove all BORG_* env vars from the outer environment
 
 
-Version 1.0.10rc1 (not released yet)
-------------------------------------
+Version 1.0.10rc1 (2017-01-29)
+------------------------------
 
 Bug fixes:
 
@@ -235,9 +237,16 @@ Bug fixes:
 - Fixed change-passphrase crashing with unencrypted repositories, #1978
 - Fixed "borg check repo::archive" indicating success if "archive" does not exist, #1997
 - borg check: print non-exit-code warning if --last or --prefix aren't fulfilled
+- fix bad parsing of wrong repo location syntax
+- create: don't create hard link refs to failed files,
+  mount: handle invalid hard link refs, #2092
+- detect mingw byte order, #2073
+- creating a new segment: use "xb" mode, #2099
+- mount: umount on SIGINT/^C when in foreground, #2082
 
 Other changes:
 
+- binary: use fixed AND freshly compiled pyinstaller bootloader, #2002
 - xattr: ignore empty names returned by llistxattr(2) et al
 - Enable the fault handler: install handlers for the SIGSEGV, SIGFPE, SIGABRT,
   SIGBUS and SIGILL signals to dump the Python traceback.
@@ -247,8 +256,11 @@ Other changes:
 - tests:
 
   - vagrant / travis / tox: add Python 3.6 based testing
-  - vagrant: fix openbsd repo, fixes #2042
-  - vagrant: fix the freebsd64 machine, #2037
+  - vagrant: fix openbsd repo, #2042
+  - vagrant: fix the freebsd64 machine, #2037 #2067
+  - vagrant: use python 3.5.3 to build binaries, #2078
+  - vagrant: use osxfuse 3.5.4 for tests / to build binaries
+    vagrant: improve darwin64 VM settings
   - travis: fix osxfuse install (fixes OS X testing on Travis CI)
   - travis: require succeeding OS X tests, #2028
   - travis: use latest pythons for OS X based testing
@@ -260,12 +272,18 @@ Other changes:
   - language clarification - VM backup FAQ
   - borg create: document how to backup stdin, #2013
   - borg upgrade: fix incorrect title levels
+  - add CVE numbers for issues fixed in 1.0.9, #2106
 - fix typos (taken from Debian package patch)
 - remote: include data hexdump in "unexpected RPC data" error message
 - remote: log SSH command line at debug level
 - API_VERSION: use numberspaces, #2023
 - remove .github from pypi package, #2051
 - add pip and setuptools to requirements file, #2030
+- SyncFile: fix use of fd object after close (cosmetic)
+- Manifest.in: simplify, exclude *.{so,dll,orig}, #2066
+- ignore posix_fadvise errors in repository.py, #2095
+  (works around issues with docker on ARM)
+- make LoggedIO.close_segment reentrant, avoid reentrance
 
 
 Version 1.0.9 (2016-12-20)
@@ -276,9 +294,13 @@ Security fixes:
 - A flaw in the cryptographic authentication scheme in Borg allowed an attacker
   to spoof the manifest. See :ref:`tam_vuln` above for the steps you should
   take.
+
+  CVE-2016-10099 was assigned to this vulnerability.
 - borg check: When rebuilding the manifest (which should only be needed very rarely)
   duplicate archive names would be handled on a "first come first serve" basis, allowing
   an attacker to apparently replace archives.
+
+  CVE-2016-10100 was assigned to this vulnerability.
 
 Bug fixes:
 

@@ -63,11 +63,13 @@ end
 def packages_darwin
   return <<-EOF
     # install all the (security and other) updates
+    sudo softwareupdate --ignore iTunesX
+    sudo softwareupdate --ignore iTunes
     sudo softwareupdate --install --all
     # get osxfuse 3.x release code from github:
-    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.5.3/osxfuse-3.5.3.dmg >osxfuse.dmg
+    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.5.4/osxfuse-3.5.4.dmg >osxfuse.dmg
     MOUNTDIR=$(echo `hdiutil mount osxfuse.dmg | tail -1 | awk '{$1="" ; print $0}'` | xargs -0 echo) \
-    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.5.3.pkg" -target /
+    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.5.4.pkg" -target /
     sudo chown -R vagrant /usr/local  # brew must be able to create stuff here
     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     brew update
@@ -83,11 +85,13 @@ end
 
 def packages_freebsd
   return <<-EOF
+    # VM has no hostname set
+    hostname freebsd
     # install all the (security and other) updates, base system
     freebsd-update --not-running-from-cron fetch install
     # for building borgbackup and dependencies:
     pkg install -y openssl liblz4 fusefs-libs pkgconf
-    pkg install -y fakeroot git bash
+    pkg install -y git bash
     # for building python:
     pkg install -y sqlite3
     # make bash default / work:
@@ -227,7 +231,7 @@ def install_pythons(boxname)
     pyenv install 3.4.0  # tests
     pyenv install 3.5.0  # tests
     pyenv install 3.6.0  # tests
-    pyenv install 3.5.2  # binary build, use latest 3.5.x release
+    pyenv install 3.5.3  # binary build, use latest 3.5.x release
     pyenv rehash
   EOF
 end
@@ -245,8 +249,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.5 release
-    pyenv global 3.5.2
-    pyenv virtualenv 3.5.2 borg-env
+    pyenv global 3.5.3
+    pyenv virtualenv 3.5.3 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -446,6 +450,16 @@ Vagrant.configure(2) do |config|
   # OS X
   config.vm.define "darwin64" do |b|
     b.vm.box = "jhcook/yosemite-clitools"
+    b.vm.provider :virtualbox do |v|
+      v.customize ['modifyvm', :id, '--ostype', 'MacOS1010_64']
+      v.customize ['modifyvm', :id, '--paravirtprovider', 'default']
+      # Adjust CPU settings according to
+      # https://github.com/geerlingguy/macos-virtualbox-vm
+      v.customize ['modifyvm', :id, '--cpuidset',
+                   '00000001', '000306a9', '00020800', '80000201', '178bfbff']
+      # Disable USB variant requiring Virtualbox proprietary extension pack
+      v.customize ["modifyvm", :id, '--usbehci', 'off', '--usbxhci', 'off']
+    end
     b.vm.provision "packages darwin", :type => :shell, :privileged => false, :inline => packages_darwin
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("darwin64")
     b.vm.provision "fix pyenv", :type => :shell, :privileged => false, :inline => fix_pyenv_darwin("darwin64")
@@ -458,11 +472,11 @@ Vagrant.configure(2) do |config|
   end
 
   # BSD
-  # note: the FreeBSD-10.3-STABLE box needs "vagrant up" twice to start.
+  # note: the FreeBSD-10.3-RELEASE box needs "vagrant up" twice to start.
   config.vm.define "freebsd64" do |b|
-    b.vm.box = "freebsd/FreeBSD-10.3-STABLE"
+    b.vm.box = "freebsd/FreeBSD-10.3-RELEASE"
     b.vm.provider :virtualbox do |v|
-      v.memory = 768
+      v.memory = 1536
     end
     b.ssh.shell = "sh"
     b.vm.provision "install system packages", :type => :shell, :inline => packages_freebsd

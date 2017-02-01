@@ -1,12 +1,8 @@
 include README.rst AUTHORS LICENSE CHANGES.rst MANIFEST.in
-graft src
-recursive-exclude src *.pyc
-recursive-exclude src *.pyo
-recursive-exclude src *.so
-recursive-include docs *
-recursive-exclude docs *.pyc
-recursive-exclude docs *.pyo
-prune docs/_build
+exclude .coveragerc .gitattributes .gitignore .travis.yml Vagrantfile
 prune .travis
 prune .github
-exclude .coveragerc .gitattributes .gitignore .travis.yml Vagrantfile
+graft src
+graft docs
+prune docs/_build
+global-exclude *.py[co] *.orig *.so *.dll

@@ -838,8 +838,6 @@ Number of files: {0.stats.nfiles}'''.format(
                 self.add_item(item)
                 status = 'h'  # regular file, hardlink (to already seen inodes)
                 return status
-            else:
-                self.hard_links[st.st_ino, st.st_dev] = safe_path
         is_special_file = is_special(st.st_mode)
         if not is_special_file:
             path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
@@ -890,6 +888,9 @@ Number of files: {0.stats.nfiles}'''.format(
             item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
         self.stats.nfiles += 1
         self.add_item(item)
+        if st.st_nlink > 1 and source is None:
+            # Add the hard link reference *after* the file has been added to the archive.
+            self.hard_links[st.st_ino, st.st_dev] = safe_path
         return status
 
     @staticmethod

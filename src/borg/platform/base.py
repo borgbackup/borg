@@ -63,6 +63,22 @@ def sync_dir(path):
         os.close(fd)
 
 
+def safe_fadvise(fd, offset, len, advice):
+    if hasattr(os, 'posix_fadvise'):
+        advice = getattr(os, 'POSIX_FADV_' + advice)
+        try:
+            os.posix_fadvise(fd, offset, len, advice)
+        except OSError:
+            # usually, posix_fadvise can't fail for us, but there seem to
+            # be failures when running borg under docker on ARM, likely due
+            # to a bug outside of borg.
+            # also, there is a python wrapper bug, always giving errno = 0.
+            # https://github.com/borgbackup/borg/issues/2095
+            # as this call is not critical for correct function (just to
+            # optimize cache usage), we ignore these errors.
+            pass
+
+
 class SyncFile:
     """
     A file class that is supposed to enable write ordering (one way or another) and data durability after close().
@@ -103,15 +119,21 @@ class SyncFile:
         from .. import platform
         self.fd.flush()
         platform.fdatasync(self.fileno)
-        if hasattr(os, 'posix_fadvise'):
-            os.posix_fadvise(self.fileno, 0, 0, os.POSIX_FADV_DONTNEED)
+        # tell the OS that it does not need to cache what we just wrote,
+        # avoids spoiling the cache for the OS and other processes.
+        safe_fadvise(self.fileno, 0, 0, 'DONTNEED')
 
     def close(self):
         """sync() and close."""
         from .. import platform
-        self.sync()
-        self.fd.close()
-        platform.sync_dir(os.path.dirname(self.fd.name))
+        dirname = None
+        try:
+            dirname = os.path.dirname(self.fd.name)
+            self.sync()
+        finally:
+            self.fd.close()
+            if dirname:
+                platform.sync_dir(dirname)
 
 
 class SaveFile:

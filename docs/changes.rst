@@ -131,6 +131,10 @@ Changelog
 Version 1.1.0b4 (not released yet)
 ----------------------------------
 
+Compatibility notes:
+
+- Moved "borg migrate-to-repokey" to "borg key migrate-to-repokey".
+
 New features:
 
 - the --exclude-if-present option now supports tagging a folder with any

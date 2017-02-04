@@ -774,7 +774,7 @@ Thus, to upgrade a "passphrase" attic repo to a "repokey" borg repo, 2 steps
 are needed, in this order:
 
 - borg upgrade repo
-- borg migrate-to-repokey repo
+- borg key migrate-to-repokey repo
 
 
 .. include:: usage/recreate.rst.inc

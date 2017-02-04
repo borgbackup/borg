@@ -1904,7 +1904,7 @@ class Archiver:
         But please note: the secrets will always stay the same and they could always
         be derived from your (old) passphrase-mode passphrase.
         """)
-        subparser = subparsers.add_parser('migrate-to-repokey', parents=[common_parser], add_help=False,
+        subparser = key_parsers.add_parser('migrate-to-repokey', parents=[common_parser], add_help=False,
                                           description=self.do_migrate_to_repokey.__doc__,
                                           epilog=migrate_to_repokey_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,

@@ -687,8 +687,9 @@ borgfs
 
 .. include:: usage/key_import.rst.inc
 
+.. _borg-change-passphrase:
 
-.. include:: usage/change-passphrase.rst.inc
+.. include:: usage/key_change-passphrase.rst.inc
 
 Examples
 ~~~~~~~~
@@ -707,7 +708,7 @@ Examples
     Done.
 
     # Change key file passphrase
-    $ borg change-passphrase -v /path/to/repo
+    $ borg key change-passphrase -v /path/to/repo
     Enter passphrase for key /root/.config/borg/keys/mnt_backup:
     Enter new passphrase:
     Enter same passphrase again:
@@ -720,7 +721,7 @@ Fully automated using environment variables:
 
     $ BORG_NEW_PASSPHRASE=old borg init repo
     # now "old" is the current passphrase.
-    $ BORG_PASSPHRASE=old BORG_NEW_PASSPHRASE=new borg change-passphrase repo
+    $ BORG_PASSPHRASE=old BORG_NEW_PASSPHRASE=new borg key change-passphrase repo
     # now "new" is the current passphrase.
 
 

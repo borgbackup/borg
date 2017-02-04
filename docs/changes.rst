@@ -134,6 +134,7 @@ Version 1.1.0b4 (not released yet)
 Compatibility notes:
 
 - Moved "borg migrate-to-repokey" to "borg key migrate-to-repokey".
+- "borg change-passphrase" is deprecated, use "borg key change-passphrase" instead.
 
 New features:
 

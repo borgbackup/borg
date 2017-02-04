@@ -110,6 +110,7 @@ class Manifest:
         self.repository = repository
         self.item_keys = frozenset(item_keys) if item_keys is not None else ITEM_KEYS
         self.tam_verified = False
+        self.timestamp = None
 
     @classmethod
     def load(cls, repository, key=None, force_tam_not_required=False):
@@ -151,7 +152,13 @@ class Manifest:
     def write(self):
         if self.key.tam_required:
             self.config[b'tam_required'] = True
-        self.timestamp = datetime.utcnow().isoformat()
+        # self.timestamp needs to be strictly monotonically increasing. Clocks often are not set correctly
+        if self.timestamp is None:
+            self.timestamp = datetime.utcnow().isoformat()
+        else:
+            prev_ts = datetime.strptime(self.timestamp, "%Y-%m-%dT%H:%M:%S.%f")
+            incremented = (prev_ts + timedelta(microseconds=1)).isoformat()
+            self.timestamp = max(incremented, datetime.utcnow().isoformat())
         m = {
             'version': 1,
             'archives': StableDict((name, StableDict(archive)) for name, archive in self.archives.items()),

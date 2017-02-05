@@ -57,7 +57,7 @@ automated backup scripts wanting to keep a certain number of historic backups.
 Also, prune automatically removes checkpoint archives (incomplete archives left
 behind by interrupted backup runs) except if the checkpoint is the latest
 archive (and thus still needed). Checkpoint archives are not considered when
-comparing archive counts against the retention limits (--keep-*).
+comparing archive counts against the retention limits (--keep-X).
 
 If a prefix is set with -P, then only archives that start with the prefix are
 considered for deletion and only those archives count towards the totals

@@ -353,6 +353,7 @@ class build_man(Command):
     .. role:: ref(title)
 
     .. |project_name| replace:: Borg
+
     """)
 
     def initialize_options(self):
@@ -372,6 +373,7 @@ class build_man(Command):
 
         self.generate_level('', parser, Archiver)
         self.build_topic_pages(Archiver)
+        self.build_intro_page()
 
     def generate_level(self, prefix, parser, Archiver):
         is_subcommand = False
@@ -447,6 +449,12 @@ class build_man(Command):
             write(text)
             self.gen_man_page(man_title, doc.getvalue())
 
+    def build_intro_page(self):
+        print('building man page borg(1)', file=sys.stderr)
+        with open('docs/man_intro.rst') as fd:
+            man_intro = fd.read()
+        self.gen_man_page('borg', self.rst_prelude + man_intro)
+
     def new_doc(self):
         doc = io.StringIO(self.rst_prelude)
         doc.read()
@@ -502,7 +510,9 @@ class build_man(Command):
     def gen_man_page(self, name, rst):
         from docutils.writers import manpage
         from docutils.core import publish_string
-        man_page = publish_string(source=rst, writer=manpage.Writer())
+        # We give the source_path so that docutils can find relative includes
+        # as-if the document where located in the docs/ directory.
+        man_page = publish_string(source=rst, source_path='docs/virtmanpage.rst', writer=manpage.Writer())
         with open('docs/man/%s.1' % name, 'wb') as fd:
             fd.write(man_page)
 

@@ -36,10 +36,10 @@ Exclusion options
         | read exclude patterns from EXCLUDEFILE, one per line
     ``--exclude-caches``
         | exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)
-    ``--exclude-if-present FILENAME``
-        | exclude directories that contain the specified file
-    ``--keep-tag-files``
-        | keep tag files of excluded caches/directories
+    ``--exclude-if-present NAME``
+        | exclude directories that are tagged by containing a filesystem object with                                          the given NAME
+    ``--keep-exclude-tags``, ``--keep-tag-files``
+        | keep tag objects (i.e.: arguments to --exclude-if-present) in otherwise                                          excluded caches/directories
 
 Archive options
     ``--target TARGET``
@@ -48,16 +48,16 @@ Archive options
         | write checkpoint every SECONDS seconds (Default: 1800)
     ``--comment COMMENT``
         | add a comment text to the archive
-    ``--timestamp yyyy-mm-ddThh:mm:ss``
-        | manually specify the archive creation date/time (UTC). alternatively, give a reference file/directory.
+    ``--timestamp TIMESTAMP``
+        | manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). alternatively, give a reference file/directory.
     ``-C COMPRESSION``, ``--compression COMPRESSION``
         | select compression algorithm, see the output of the "borg help compression" command for details.
     ``--always-recompress``
         | always recompress chunks, don't skip chunks already compressed with the same algorithm.
     ``--compression-from COMPRESSIONCONFIG``
         | read compression patterns from COMPRESSIONCONFIG, see the output of the "borg help compression" command for details.
-    ``--chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE``
-        | specify the chunker parameters (or "default").
+    ``--chunker-params PARAMS``
+        | specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or "default" to use the current defaults. default: 19,23,21,4095
 
 Description
 ~~~~~~~~~~~

@@ -14,7 +14,7 @@ positional arguments
 
 optional arguments
     ``-e``, ``--encryption``
-        | select encryption key mode (default: "None")
+        | select encryption key mode
     ``-a``, ``--append-only``
         | create an append-only mode repository
 
@@ -70,30 +70,31 @@ the encryption/decryption key or other secrets.
 Encryption modes
 ++++++++++++++++
 
-repokey and keyfile use AES-CTR-256 for encryption and HMAC-SHA256 for
+`repokey` and `keyfile` use AES-CTR-256 for encryption and HMAC-SHA256 for
 authentication in an encrypt-then-MAC (EtM) construction. The chunk ID hash
 is HMAC-SHA256 as well (with a separate key).
 These modes are compatible with borg 1.0.x.
 
-repokey-blake2 and keyfile-blake2 are also authenticated encryption modes,
+`repokey-blake2` and `keyfile-blake2` are also authenticated encryption modes,
 but use BLAKE2b-256 instead of HMAC-SHA256 for authentication. The chunk ID
 hash is a keyed BLAKE2b-256 hash.
-These modes are new and not compatible with borg 1.0.x.
+These modes are new and *not* compatible with borg 1.0.x.
 
-"authenticated" mode uses no encryption, but authenticates repository contents
+`authenticated` mode uses no encryption, but authenticates repository contents
 through the same keyed BLAKE2b-256 hash as the other blake2 modes (it uses it
 as chunk ID hash). The key is stored like repokey.
 This mode is new and not compatible with borg 1.0.x.
 
-"none" mode uses no encryption and no authentication. It uses sha256 as chunk
+`none` mode uses no encryption and no authentication. It uses sha256 as chunk
 ID hash. Not recommended, rather consider using an authenticated or
 authenticated/encrypted mode.
 This mode is compatible with borg 1.0.x.
 
 Hardware acceleration will be used automatically.
 
-On modern Intel/AMD CPUs (except very cheap ones), AES is usually hw
-accelerated. BLAKE2b is faster than sha256 on Intel/AMD 64bit CPUs.
+On modern Intel/AMD CPUs (except very cheap ones), AES is usually
+hardware-accelerated. BLAKE2b is faster than SHA256 on Intel/AMD 64bit CPUs,
+which makes `authenticated` faster than `none`.
 
-On modern ARM CPUs, NEON provides hw acceleration for sha256 making it faster
+On modern ARM CPUs, NEON provides hardware acceleration for SHA256 making it faster
 than BLAKE2b-256 there.

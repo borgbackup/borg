@@ -2037,6 +2037,11 @@ class Archiver:
 
         .. man NOTES
 
+        The --exclude patterns are not like tar. In tar --exclude .bundler/gems will
+        exclude foo/.bundler/gems. In borg it will not, you need to use --exclude
+        '\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
+        more information.
+
         Item flags
         ++++++++++
 
@@ -2115,12 +2120,12 @@ class Archiver:
                                         'http://www.brynosaurus.com/cachedir/spec.html)')
         exclude_group.add_argument('--exclude-if-present', dest='exclude_if_present',
                                    metavar='NAME', action='append', type=str,
-                                   help='exclude directories that are tagged by containing a filesystem object with \
-                                         the given NAME')
+                                   help='exclude directories that are tagged by containing a filesystem object with '
+                                        'the given NAME')
         exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
                                    action='store_true', default=False,
-                                   help='keep tag objects (i.e.: arguments to --exclude-if-present) in otherwise \
-                                         excluded caches/directories')
+                                   help='keep tag objects (i.e.: arguments to --exclude-if-present) in otherwise '
+                                        'excluded caches/directories')
 
         fs_group = subparser.add_argument_group('Filesystem options')
         fs_group.add_argument('-x', '--one-file-system', dest='one_file_system',

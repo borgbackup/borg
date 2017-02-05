@@ -437,14 +437,6 @@ Examples
     # As above, but add nanoseconds
     $ borg create /path/to/repo::{hostname}-{user}-{now:%Y-%m-%dT%H:%M:%S.%f} ~
 
-Notes
-~~~~~
-
-- the --exclude patterns are not like tar. In tar --exclude .bundler/gems will
-  exclude foo/.bundler/gems. In borg it will not, you need to use --exclude
-  '\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
-  more information.
-
 
 .. include:: usage/extract.rst.inc
 

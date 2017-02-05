@@ -347,6 +347,12 @@ class build_man(Command):
         'extract': ('mount', ),
     }
 
+    rst_prelude = textwrap.dedent("""
+    .. role:: ref(title)
+
+    .. |project_name| replace:: Borg
+    """)
+
     def initialize_options(self):
         pass
 
@@ -379,14 +385,12 @@ class build_man(Command):
                 continue
 
             man_title = 'borg-' + command.replace(' ', '-')
-            print('building man page %-40s' % (man_title + '(1)'), end='\r', file=sys.stderr)
+            print('building man page', man_title + '(1)', file=sys.stderr)
 
             if self.generate_level(command + ' ', parser, Archiver):
                 continue
 
-            doc = io.StringIO()
-            write = self.printer(doc)
-
+            doc, write = self.new_doc()
             self.write_man_header(write, man_title, parser.description)
 
             self.write_heading(write, 'SYNOPSIS')
@@ -402,14 +406,15 @@ class build_man(Command):
             write()
             self.write_options(write, parser)
 
+            self.write_examples(write, command)
+
             self.write_see_also(write, man_title)
 
             self.gen_man_page(man_title, doc.getvalue())
 
         # Generate the borg-common(1) man page with the common options.
         if 'create' in choices:
-            doc = io.StringIO()
-            write = self.printer(doc)
+            doc, write = self.new_doc()
             man_title = 'borg-common'
             self.write_man_header(write, man_title, 'Common options of Borg commands')
 
@@ -424,15 +429,20 @@ class build_man(Command):
 
     def build_topic_pages(self, Archiver):
         for topic, text in Archiver.helptext.items():
-            doc = io.StringIO()
-            write = self.printer(doc)
+            doc, write = self.new_doc()
             man_title = 'borg-' + topic
-            print('building man page %-40s' % (man_title + '(1)'), end='\r', file=sys.stderr)
+            print('building man page', man_title + '(1)', file=sys.stderr)
 
             self.write_man_header(write, man_title, 'Details regarding ' + topic)
             self.write_heading(write, 'DESCRIPTION')
             write(text)
             self.gen_man_page(man_title, doc.getvalue())
+
+    def new_doc(self):
+        doc = io.StringIO(self.rst_prelude)
+        doc.read()
+        write = self.printer(doc)
+        return doc, write
 
     def printer(self, fd):
         def write(*args, **kwargs):
@@ -456,6 +466,22 @@ class build_man(Command):
         write(':Manual section: 1')
         write(':Manual group: borg backup tool')
         write()
+
+    def write_examples(self, write, command):
+        with open('docs/usage.rst') as fd:
+            usage = fd.read()
+            usage_include = '.. include:: usage/%s.rst.inc' % command
+            begin = usage.find(usage_include)
+            end = usage.find('.. include', begin + 1)
+            examples = usage[begin:end]
+            examples = examples.replace(usage_include, '')
+            examples = examples.replace('Examples\n~~~~~~~~', '')
+            examples = examples.replace('Miscellaneous Help\n------------------', '')
+            examples = re.sub('^(~+)$', lambda matches: '+' * len(matches.group(0)), examples, flags=re.MULTILINE)
+            examples = examples.strip()
+        if examples:
+            self.write_heading(write, 'EXAMPLES', '-')
+            write(examples)
 
     def write_see_also(self, write, man_title):
         see_also = self.see_also.get(man_title.replace('borg-', ''), ())

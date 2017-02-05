@@ -460,7 +460,7 @@ class build_man(Command):
     def write_see_also(self, write, man_title):
         see_also = self.see_also.get(man_title.replace('borg-', ''), ())
         see_also = ['`borg-%s(1)`' % s for s in see_also]
-        see_also.insert(0, '`borg(1)`')
+        see_also.insert(0, '`borg-common(1)`')
         self.write_heading(write, 'SEE ALSO')
         write(', '.join(see_also))
 

@@ -1,0 +1,144 @@
+.\" Man page generated from reStructuredText.
+.
+.TH BORG-PATTERNS 1 "2017-02-05" "" "borg backup tool"
+.SH NAME
+borg-patterns \- Details regarding patterns
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.SH DESCRIPTION
+.sp
+Exclusion patterns support four separate styles, fnmatch, shell, regular
+expressions and path prefixes. By default, fnmatch is used. If followed
+by a colon (\(aq:\(aq) the first two characters of a pattern are used as a
+style selector. Explicit style selection is necessary when a
+non\-default style is desired or when the desired pattern starts with
+two alphanumeric characters followed by a colon (i.e. \fIaa:something/*\fP).
+.sp
+\fI\%Fnmatch\fP, selector \fIfm:\fP
+.INDENT 0.0
+.INDENT 3.5
+This is the default style.  These patterns use a variant of shell
+pattern syntax, with \(aq*\(aq matching any number of characters, \(aq?\(aq
+matching any single character, \(aq[...]\(aq matching any single
+character specified, including ranges, and \(aq[!...]\(aq matching any
+character not specified. For the purpose of these patterns, the
+path separator (\(aq\(aq for Windows and \(aq/\(aq on other systems) is not
+treated specially. Wrap meta\-characters in brackets for a literal
+match (i.e. \fI[?]\fP to match the literal character \fI?\fP). For a path
+to match a pattern, it must completely match from start to end, or
+must match from the start to just before a path separator. Except
+for the root path, paths will never end in the path separator when
+matching is attempted.  Thus, if a given pattern ends in a path
+separator, a \(aq*\(aq is appended before matching is attempted.
+.UNINDENT
+.UNINDENT
+.sp
+Shell\-style patterns, selector \fIsh:\fP
+.INDENT 0.0
+.INDENT 3.5
+Like fnmatch patterns these are similar to shell patterns. The difference
+is that the pattern may include \fI**/\fP for matching zero or more directory
+levels, \fI*\fP for matching zero or more arbitrary characters with the
+exception of any path separator.
+.UNINDENT
+.UNINDENT
+.sp
+Regular expressions, selector \fIre:\fP
+.INDENT 0.0
+.INDENT 3.5
+Regular expressions similar to those found in Perl are supported. Unlike
+shell patterns regular expressions are not required to match the complete
+path and any substring match is sufficient. It is strongly recommended to
+anchor patterns to the start (\(aq^\(aq), to the end (\(aq$\(aq) or both. Path
+separators (\(aq\(aq for Windows and \(aq/\(aq on other systems) in paths are
+always normalized to a forward slash (\(aq/\(aq) before applying a pattern. The
+regular expression syntax is described in the \fI\%Python documentation for
+the re module\fP\&.
+.UNINDENT
+.UNINDENT
+.sp
+Prefix path, selector \fIpp:\fP
+.INDENT 0.0
+.INDENT 3.5
+This pattern style is useful to match whole sub\-directories. The pattern
+\fIpp:/data/bar\fP matches \fI/data/bar\fP and everything therein.
+.UNINDENT
+.UNINDENT
+.sp
+Exclusions can be passed via the command line option \fI\-\-exclude\fP\&. When used
+from within a shell the patterns should be quoted to protect them from
+expansion.
+.sp
+The \fI\-\-exclude\-from\fP option permits loading exclusion patterns from a text
+file with one pattern per line. Lines empty or starting with the number sign
+(\(aq#\(aq) after removing whitespace on both ends are ignored. The optional style
+selector prefix is also supported for patterns loaded from a file. Due to
+whitespace removal paths with whitespace at the beginning or end can only be
+excluded using regular expressions.
+.sp
+Examples:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+# Exclude \(aq/home/user/file.o\(aq but not \(aq/home/user/file.odt\(aq:
+$ borg create \-e \(aq*.o\(aq backup /
+
+# Exclude \(aq/home/user/junk\(aq and \(aq/home/user/subdir/junk\(aq but
+# not \(aq/home/user/importantjunk\(aq or \(aq/etc/junk\(aq:
+$ borg create \-e \(aq/home/*/junk\(aq backup /
+
+# Exclude the contents of \(aq/home/user/cache\(aq but not the directory itself:
+$ borg create \-e /home/user/cache/ backup /
+
+# The file \(aq/home/user/cache/important\(aq is *not* backed up:
+$ borg create \-e /home/user/cache/ backup / /home/user/cache/important
+
+# The contents of directories in \(aq/home\(aq are not backed up when their name
+# ends in \(aq.tmp\(aq
+$ borg create \-\-exclude \(aqre:^/home/[^/]+\e.tmp/\(aq backup /
+
+# Load exclusions from file
+$ cat >exclude.txt <<EOF
+# Comment line
+/home/*/junk
+*.tmp
+fm:aa:something/*
+re:^/home/[^/]\e.tmp/
+sh:/home/*/.thumbnails
+EOF
+$ borg create \-\-exclude\-from exclude.txt backup /
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SH AUTHOR
+The Borg Collective
+.\" Generated by docutils manpage writer.
+.

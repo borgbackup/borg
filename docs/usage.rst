@@ -359,14 +359,14 @@ Examples
 ~~~~~~~~
 ::
 
-    # Local repository (default is to use encryption in repokey mode)
-    $ borg init /path/to/repo
+    # Local repository, repokey encryption, BLAKE2b (often faster, since Borg 1.1)
+    $ borg init --encryption=repokey-blake2 /path/to/repo
 
     # Local repository (no encryption)
     $ borg init --encryption=none /path/to/repo
 
     # Remote repository (accesses a remote borg via ssh)
-    $ borg init user@hostname:backup
+    $ borg init --encryption=repokey-blake2 user@hostname:backup
 
     # Remote repository (store the key your home dir)
     $ borg init --encryption=keyfile user@hostname:backup
@@ -528,7 +528,7 @@ Examples
 ~~~~~~~~
 ::
 
-    $ borg init testrepo
+    $ borg init -e=none testrepo
     $ mkdir testdir
     $ cd testdir
     $ echo asdf > file1
@@ -719,7 +719,7 @@ Fully automated using environment variables:
 
 ::
 
-    $ BORG_NEW_PASSPHRASE=old borg init repo
+    $ BORG_NEW_PASSPHRASE=old borg init -e=repokey repo
     # now "old" is the current passphrase.
     $ BORG_PASSPHRASE=old BORG_NEW_PASSPHRASE=new borg key change-passphrase repo
     # now "new" is the current passphrase.

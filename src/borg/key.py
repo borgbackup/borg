@@ -476,7 +476,7 @@ class PassphraseKey(ID_HMAC_SHA_256, AESKeyBase):
 
     @classmethod
     def detect(cls, repository, manifest_data):
-        prompt = 'Enter passphrase for %s: ' % repository._location.orig
+        prompt = 'Enter passphrase for %s: ' % repository._location.canonical_path()
         key = cls(repository)
         passphrase = Passphrase.env_passphrase()
         if passphrase is None:

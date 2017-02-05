@@ -251,6 +251,11 @@ class Archiver:
             logger.info('Key location: %s', key.find_key())
         return EXIT_SUCCESS
 
+    def do_change_passphrase_deprecated(self, args):
+        logger.warning('"borg change-passphrase" is deprecated and will be removed in Borg 1.2.\n'
+                       'Use "borg key change-passphrase" instead.')
+        return self.do_change_passphrase(args)
+
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
     def do_key_export(self, args, repository):
         """Export the repository key for backup"""
@@ -1809,19 +1814,6 @@ class Archiver:
                                help="""show progress display while checking""")
         self.add_archives_filters_args(subparser)
 
-        change_passphrase_epilog = textwrap.dedent("""
-        The key files used for repository encryption are optionally passphrase
-        protected. This command can be used to change this passphrase.
-        """)
-        subparser = subparsers.add_parser('change-passphrase', parents=[common_parser], add_help=False,
-                                          description=self.do_change_passphrase.__doc__,
-                                          epilog=change_passphrase_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='change repository passphrase')
-        subparser.set_defaults(func=self.do_change_passphrase)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False))
-
         subparser = subparsers.add_parser('key', parents=[common_parser], add_help=False,
                                           description="Manage a keyfile or repokey of a repository",
                                           epilog="",
@@ -1886,9 +1878,32 @@ class Archiver:
                                default=False,
                                help='interactively import from a backup done with --paper')
 
+        change_passphrase_epilog = textwrap.dedent("""
+        The key files used for repository encryption are optionally passphrase
+        protected. This command can be used to change this passphrase.
+        """)
+        subparser = key_parsers.add_parser('change-passphrase', parents=[common_parser], add_help=False,
+                                          description=self.do_change_passphrase.__doc__,
+                                          epilog=change_passphrase_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='change repository passphrase')
+        subparser.set_defaults(func=self.do_change_passphrase)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False))
+
+        # Borg 1.0 alias for change passphrase (without the "key" subcommand)
+        subparser = subparsers.add_parser('change-passphrase', parents=[common_parser], add_help=False,
+                                          description=self.do_change_passphrase.__doc__,
+                                          epilog=change_passphrase_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='change repository passphrase')
+        subparser.set_defaults(func=self.do_change_passphrase_deprecated)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False))
+
         migrate_to_repokey_epilog = textwrap.dedent("""
-        This command migrates a repository from passphrase mode (not supported any
-        more) to repokey mode.
+        This command migrates a repository from passphrase mode (removed in Borg 1.0)
+        to repokey mode.
 
         You will be first asked for the repository passphrase (to open it in passphrase
         mode). This is the same passphrase as you used to use for this repo before 1.0.
@@ -1904,7 +1919,7 @@ class Archiver:
         But please note: the secrets will always stay the same and they could always
         be derived from your (old) passphrase-mode passphrase.
         """)
-        subparser = subparsers.add_parser('migrate-to-repokey', parents=[common_parser], add_help=False,
+        subparser = key_parsers.add_parser('migrate-to-repokey', parents=[common_parser], add_help=False,
                                           description=self.do_migrate_to_repokey.__doc__,
                                           epilog=migrate_to_repokey_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,

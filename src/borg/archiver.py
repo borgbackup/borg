@@ -2204,12 +2204,15 @@ class Archiver:
         See the "borg help patterns" command for more help on exclude patterns.
 
         The following keys are available for --format:
+
         """) + BaseFormatter.keys_help() + textwrap.dedent("""
 
-        -- Keys for listing repository archives:
+        Keys for listing repository archives:
+
         """) + ArchiveFormatter.keys_help() + textwrap.dedent("""
 
-        -- Keys for listing archive files:
+        Keys for listing archive files:
+
         """) + ItemFormatter.keys_help()
         subparser = subparsers.add_parser('list', parents=[common_parser], add_help=False,
                                           description=self.do_list.__doc__,

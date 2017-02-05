@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-LIST 1 "2017-02-05" "" "borg backup tool"
+.TH BORG-LIST 1 "2017-02-12" "" "borg backup tool"
 .SH NAME
 borg-list \- List archive or repository contents
 .
@@ -38,6 +38,81 @@ borg list <options> REPOSITORY_OR_ARCHIVE PATH
 This command lists the contents of a repository or an archive.
 .sp
 See the "borg help patterns" command for more help on exclude patterns.
+.SH OPTIONS
+.sp
+See \fIborg\-common(1)\fP for common options of Borg commands.
+.SS arguments
+.INDENT 0.0
+.TP
+.B REPOSITORY_OR_ARCHIVE
+repository/archive to list contents of
+.TP
+.B PATH
+paths to list; patterns are supported
+.UNINDENT
+.SS optional arguments
+.INDENT 0.0
+.TP
+.B \-\-short
+only print file/directory names, nothing else
+.TP
+.B \-\-format\fP,\fB  \-\-list\-format
+specify format for file listing
+(default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")
+.TP
+.BI \-e \ PATTERN\fP,\fB \ \-\-exclude \ PATTERN
+exclude paths matching PATTERN
+.TP
+.BI \-\-exclude\-from \ EXCLUDEFILE
+read exclude patterns from EXCLUDEFILE, one per line
+.UNINDENT
+.SS filters
+.INDENT 0.0
+.TP
+.B \-P\fP,\fB  \-\-prefix
+only consider archive names starting with this prefix
+.TP
+.B \-\-sort\-by
+Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
+.TP
+.BI \-\-first \ N
+consider first N archives after other filters were applied
+.TP
+.BI \-\-last \ N
+consider last N archives after other filters were applied
+.UNINDENT
+.SH EXAMPLES
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ borg list /path/to/repo
+Monday                               Mon, 2016\-02\-15 19:15:11
+repo                                 Mon, 2016\-02\-15 19:26:54
+root\-2016\-02\-15                      Mon, 2016\-02\-15 19:36:29
+newname                              Mon, 2016\-02\-15 19:50:19
+\&...
+
+$ borg list /path/to/repo::root\-2016\-02\-15
+drwxr\-xr\-x root   root          0 Mon, 2016\-02\-15 17:44:27 .
+drwxrwxr\-x root   root          0 Mon, 2016\-02\-15 19:04:49 bin
+\-rwxr\-xr\-x root   root    1029624 Thu, 2014\-11\-13 00:08:51 bin/bash
+lrwxrwxrwx root   root          0 Fri, 2015\-03\-27 20:24:26 bin/bzcmp \-> bzdiff
+\-rwxr\-xr\-x root   root       2140 Fri, 2015\-03\-27 20:24:22 bin/bzdiff
+\&...
+
+$ borg list /path/to/repo::archiveA \-\-list\-format="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}"
+drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 .
+drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code
+drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code/myproject
+\-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.ext
+\&...
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SH NOTES
 .sp
 The following keys are available for \-\-format:
 .INDENT 0.0
@@ -160,80 +235,6 @@ extra: prepends {source} with " \-> " for soft links and " link to " for hard li
 .IP \(bu 2
 health: either "healthy" (file ok) or "broken" (if file has all\-zero replacement chunks)
 .UNINDENT
-.UNINDENT
-.UNINDENT
-.SH OPTIONS
-.sp
-See \fIborg\-common(1)\fP for common options of Borg commands.
-.SS arguments
-.INDENT 0.0
-.TP
-.B REPOSITORY_OR_ARCHIVE
-repository/archive to list contents of
-.TP
-.B PATH
-paths to list; patterns are supported
-.UNINDENT
-.SS optional arguments
-.INDENT 0.0
-.TP
-.B \-\-short
-only print file/directory names, nothing else
-.TP
-.B \-\-format\fP,\fB  \-\-list\-format
-specify format for file listing
-(default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")
-.TP
-.BI \-e \ PATTERN\fP,\fB \ \-\-exclude \ PATTERN
-exclude paths matching PATTERN
-.TP
-.BI \-\-exclude\-from \ EXCLUDEFILE
-read exclude patterns from EXCLUDEFILE, one per line
-.UNINDENT
-.SS filters
-.INDENT 0.0
-.TP
-.B \-P\fP,\fB  \-\-prefix
-only consider archive names starting with this prefix
-.TP
-.B \-\-sort\-by
-Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
-.TP
-.BI \-\-first \ N
-consider first N archives after other filters were applied
-.TP
-.BI \-\-last \ N
-consider last N archives after other filters were applied
-.UNINDENT
-.SH EXAMPLES
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-$ borg list /path/to/repo
-Monday                               Mon, 2016\-02\-15 19:15:11
-repo                                 Mon, 2016\-02\-15 19:26:54
-root\-2016\-02\-15                      Mon, 2016\-02\-15 19:36:29
-newname                              Mon, 2016\-02\-15 19:50:19
-\&...
-
-$ borg list /path/to/repo::root\-2016\-02\-15
-drwxr\-xr\-x root   root          0 Mon, 2016\-02\-15 17:44:27 .
-drwxrwxr\-x root   root          0 Mon, 2016\-02\-15 19:04:49 bin
-\-rwxr\-xr\-x root   root    1029624 Thu, 2014\-11\-13 00:08:51 bin/bash
-lrwxrwxrwx root   root          0 Fri, 2015\-03\-27 20:24:26 bin/bzcmp \-> bzdiff
-\-rwxr\-xr\-x root   root       2140 Fri, 2015\-03\-27 20:24:22 bin/bzdiff
-\&...
-
-$ borg list /path/to/repo::archiveA \-\-list\-format="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}"
-drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 .
-drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code
-drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code/myproject
-\-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.ext
-\&...
-.ft P
-.fi
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

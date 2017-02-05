@@ -25,6 +25,7 @@ logger = create_logger()
 
 import msgpack
 
+import borg
 from . import __version__
 from . import helpers
 from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
@@ -1657,6 +1658,16 @@ class Archiver:
         return args
 
     def build_parser(self, prog=None):
+        def process_epilog(epilog):
+            epilog = textwrap.dedent(epilog).splitlines()
+            try:
+                mode = borg.doc_mode
+            except AttributeError:
+                mode = 'command-line'
+            if mode in ('command-line', 'build_usage'):
+                epilog = [line for line in epilog if not line.startswith('.. man')]
+            return '\n'.join(epilog)
+
         common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
 
         common_group = common_parser.add_argument_group('Common options')
@@ -1703,7 +1714,7 @@ class Archiver:
                             help='show version number and exit')
         subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
 
-        serve_epilog = textwrap.dedent("""
+        serve_epilog = process_epilog("""
         This command starts a repository server process. This command is usually not used manually.
         """)
         subparser = subparsers.add_parser('serve', parents=[common_parser], add_help=False,
@@ -1718,7 +1729,7 @@ class Archiver:
         subparser.add_argument('--append-only', dest='append_only', action='store_true',
                                help='only allow appending to repository segment files')
 
-        init_epilog = textwrap.dedent("""
+        init_epilog = process_epilog("""
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
 
@@ -1809,7 +1820,7 @@ class Archiver:
         subparser.add_argument('-a', '--append-only', dest='append_only', action='store_true',
                                help='create an append-only mode repository')
 
-        check_epilog = textwrap.dedent("""
+        check_epilog = process_epilog("""
         The check command verifies the consistency of a repository and the corresponding archives.
 
         First, the underlying repository data files are checked:
@@ -1895,7 +1906,7 @@ class Archiver:
         key_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
         subparser.set_defaults(fallback_func=functools.partial(self.do_subcommand_help, subparser))
 
-        key_export_epilog = textwrap.dedent("""
+        key_export_epilog = process_epilog("""
         If repository encryption is used, the repository is inaccessible
         without the key. This command allows to backup this essential key.
 
@@ -1928,7 +1939,7 @@ class Archiver:
                                default=False,
                                help='Create an export suitable for printing and later type-in')
 
-        key_import_epilog = textwrap.dedent("""
+        key_import_epilog = process_epilog("""
         This command allows to restore a key previously backed up with the
         export command.
 
@@ -1950,7 +1961,7 @@ class Archiver:
                                default=False,
                                help='interactively import from a backup done with --paper')
 
-        change_passphrase_epilog = textwrap.dedent("""
+        change_passphrase_epilog = process_epilog("""
         The key files used for repository encryption are optionally passphrase
         protected. This command can be used to change this passphrase.
         """)
@@ -1973,7 +1984,7 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 
-        migrate_to_repokey_epilog = textwrap.dedent("""
+        migrate_to_repokey_epilog = process_epilog("""
         This command migrates a repository from passphrase mode (removed in Borg 1.0)
         to repokey mode.
 
@@ -2000,7 +2011,7 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 
-        create_epilog = textwrap.dedent("""
+        create_epilog = process_epilog("""
         This command creates a backup archive containing all files found while recursively
         traversing all paths specified. When giving '-' as path, borg will read data
         from standard input and create a file 'stdin' in the created archive from that
@@ -2023,6 +2034,47 @@ class Archiver:
 
         See the output of the "borg help patterns" command for more help on exclude patterns.
         See the output of the "borg help placeholders" command for more help on placeholders.
+
+        .. man NOTES
+
+        Item flags
+        ++++++++++
+
+        ``--list`` outputs a list of all files, directories and other
+        file system items it considered (no matter whether they had content changes
+        or not). For each item, it prefixes a single-letter flag that indicates type
+        and/or status of the item.
+
+        If you are interested only in a subset of that output, you can give e.g.
+        ``--filter=AME`` and it will only show regular files with A, M or E status (see
+        below).
+
+        A uppercase character represents the status of a regular file relative to the
+        "files" cache (not relative to the repo -- this is an issue if the files cache
+        is not used). Metadata is stored in any case and for 'A' and 'M' also new data
+        chunks are stored. For 'U' all data chunks refer to already existing chunks.
+
+        - 'A' = regular file, added (see also :ref:`a_status_oddity` in the FAQ)
+        - 'M' = regular file, modified
+        - 'U' = regular file, unchanged
+        - 'E' = regular file, an error happened while accessing/reading *this* file
+
+        A lowercase character means a file type other than a regular file,
+        borg usually just stores their metadata:
+
+        - 'd' = directory
+        - 'b' = block device
+        - 'c' = char device
+        - 'h' = regular file, hardlink (to already seen inodes)
+        - 's' = symlink
+        - 'f' = fifo
+
+        Other flags used include:
+
+        - 'i' = backup data was read from standard input (stdin)
+        - '-' = dry run, item was *not* backed up
+        - 'x' = excluded, item was *not* backed up
+        - '?' = missing status code (if you see this, please file a bug report!)
         """)
 
         subparser = subparsers.add_parser('create', parents=[common_parser], add_help=False,
@@ -2123,7 +2175,7 @@ class Archiver:
         subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
                                help='paths to archive')
 
-        extract_epilog = textwrap.dedent("""
+        extract_epilog = process_epilog("""
         This command extracts the contents of an archive. By default the entire
         archive is extracted but a subset of files and directories can be selected
         by passing a list of ``PATHs`` as arguments. The file selection can further
@@ -2174,7 +2226,7 @@ class Archiver:
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to extract; patterns are supported')
 
-        diff_epilog = textwrap.dedent("""
+        diff_epilog = process_epilog("""
             This command finds differences (file contents, user/group/mode) between archives.
 
             A repository location and an archive name must be specified for REPO_ARCHIVE1.
@@ -2222,7 +2274,7 @@ class Archiver:
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths of items inside the archives to compare; patterns are supported')
 
-        rename_epilog = textwrap.dedent("""
+        rename_epilog = process_epilog("""
         This command renames an archive in the repository.
 
         This results in a different archive ID.
@@ -2240,7 +2292,7 @@ class Archiver:
                                type=archivename_validator(),
                                help='the new archive name to use')
 
-        delete_epilog = textwrap.dedent("""
+        delete_epilog = process_epilog("""
         This command deletes an archive from the repository or the complete repository.
         Disk space is reclaimed accordingly. If you delete the complete repository, the
         local cache for it (if any) is also deleted.
@@ -2271,12 +2323,15 @@ class Archiver:
                                help='archive or repository to delete')
         self.add_archives_filters_args(subparser)
 
-        list_epilog = textwrap.dedent("""
+        list_epilog = process_epilog("""
         This command lists the contents of a repository or an archive.
 
         See the "borg help patterns" command for more help on exclude patterns.
 
+        .. man NOTES
+
         The following keys are available for --format:
+
 
         """) + BaseFormatter.keys_help() + textwrap.dedent("""
 
@@ -2312,7 +2367,7 @@ class Archiver:
                                help='paths to list; patterns are supported')
         self.add_archives_filters_args(subparser)
 
-        mount_epilog = textwrap.dedent("""
+        mount_epilog = process_epilog("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
         browsing an archive or restoring individual files. Unless the ``--foreground``
         option is given the command will run in the background until the filesystem
@@ -2363,7 +2418,7 @@ class Archiver:
                                help='Extra mount options')
         self.add_archives_filters_args(subparser)
 
-        umount_epilog = textwrap.dedent("""
+        umount_epilog = process_epilog("""
         This command un-mounts a FUSE filesystem that was mounted with ``borg mount``.
 
         This is a convenience wrapper that just calls the platform-specific shell
@@ -2378,7 +2433,7 @@ class Archiver:
         subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
                                help='mountpoint of the filesystem to umount')
 
-        info_epilog = textwrap.dedent("""
+        info_epilog = process_epilog("""
         This command displays detailed information about the specified archive or repository.
 
         Please note that the deduplicated sizes of the individual archives do not add
@@ -2401,7 +2456,7 @@ class Archiver:
                                help='archive or repository to display information about')
         self.add_archives_filters_args(subparser)
 
-        break_lock_epilog = textwrap.dedent("""
+        break_lock_epilog = process_epilog("""
         This command breaks the repository and cache locks.
         Please use carefully and only while no borg process (on any machine) is
         trying to access the Cache or the Repository.
@@ -2416,7 +2471,7 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='repository for which to break the locks')
 
-        prune_epilog = textwrap.dedent("""
+        prune_epilog = process_epilog("""
         The prune command prunes a repository by deleting all archives not matching
         any of the specified retention options. This command is normally used by
         automated backup scripts wanting to keep a certain number of historic backups.
@@ -2502,7 +2557,7 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='repository to prune')
 
-        upgrade_epilog = textwrap.dedent("""
+        upgrade_epilog = process_epilog("""
         Upgrade an existing Borg repository.
 
         Borg 1.x.y upgrades
@@ -2592,7 +2647,7 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')
 
-        recreate_epilog = textwrap.dedent("""
+        recreate_epilog = process_epilog("""
         Recreate the contents of existing archives.
 
         This is an *experimental* feature. Do *not* use this on your only backup.
@@ -2711,7 +2766,7 @@ class Archiver:
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to recreate; patterns are supported')
 
-        with_lock_epilog = textwrap.dedent("""
+        with_lock_epilog = process_epilog("""
         This command runs a user-specified command while the repository lock is held.
 
         It will first try to acquire the lock (make sure that no other operation is
@@ -2747,7 +2802,7 @@ class Archiver:
         subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
                                help='additional help on TOPIC')
 
-        debug_epilog = textwrap.dedent("""
+        debug_epilog = process_epilog("""
         These commands are not intended for normal use and potentially very
         dangerous if used incorrectly.
 
@@ -2764,7 +2819,7 @@ class Archiver:
         debug_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
         subparser.set_defaults(fallback_func=functools.partial(self.do_subcommand_help, subparser))
 
-        debug_info_epilog = textwrap.dedent("""
+        debug_info_epilog = process_epilog("""
         This command displays some system information that might be useful for bug
         reports and debugging problems. If a traceback happens, this information is
         already appended at the end of the traceback.
@@ -2776,7 +2831,7 @@ class Archiver:
                                           help='show system infos for debugging / bug reports (debug)')
         subparser.set_defaults(func=self.do_debug_info)
 
-        debug_dump_archive_items_epilog = textwrap.dedent("""
+        debug_dump_archive_items_epilog = process_epilog("""
         This command dumps raw (but decrypted and decompressed) archive items (only metadata) to files.
         """)
         subparser = debug_parsers.add_parser('dump-archive-items', parents=[common_parser], add_help=False,
@@ -2789,7 +2844,7 @@ class Archiver:
                                type=location_validator(archive=True),
                                help='archive to dump')
 
-        debug_dump_archive_epilog = textwrap.dedent("""
+        debug_dump_archive_epilog = process_epilog("""
         This command dumps all metadata of an archive in a decoded form to a file.
         """)
         subparser = debug_parsers.add_parser('dump-archive', parents=[common_parser], add_help=False,
@@ -2804,7 +2859,7 @@ class Archiver:
         subparser.add_argument('path', metavar='PATH', type=str,
                                help='file to dump data into')
 
-        debug_dump_manifest_epilog = textwrap.dedent("""
+        debug_dump_manifest_epilog = process_epilog("""
         This command dumps manifest metadata of a repository in a decoded form to a file.
         """)
         subparser = debug_parsers.add_parser('dump-manifest', parents=[common_parser], add_help=False,
@@ -2819,7 +2874,7 @@ class Archiver:
         subparser.add_argument('path', metavar='PATH', type=str,
                                help='file to dump data into')
 
-        debug_dump_repo_objs_epilog = textwrap.dedent("""
+        debug_dump_repo_objs_epilog = process_epilog("""
         This command dumps raw (but decrypted and decompressed) repo objects to files.
         """)
         subparser = debug_parsers.add_parser('dump-repo-objs', parents=[common_parser], add_help=False,
@@ -2832,7 +2887,7 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='repo to dump')
 
-        debug_get_obj_epilog = textwrap.dedent("""
+        debug_get_obj_epilog = process_epilog("""
         This command gets an object from the repository.
         """)
         subparser = debug_parsers.add_parser('get-obj', parents=[common_parser], add_help=False,
@@ -2849,7 +2904,7 @@ class Archiver:
         subparser.add_argument('path', metavar='PATH', type=str,
                                help='file to write object data into')
 
-        debug_put_obj_epilog = textwrap.dedent("""
+        debug_put_obj_epilog = process_epilog("""
         This command puts objects into the repository.
         """)
         subparser = debug_parsers.add_parser('put-obj', parents=[common_parser], add_help=False,
@@ -2864,7 +2919,7 @@ class Archiver:
         subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
                                help='file(s) to read and create object(s) from')
 
-        debug_delete_obj_epilog = textwrap.dedent("""
+        debug_delete_obj_epilog = process_epilog("""
         This command deletes objects from the repository.
         """)
         subparser = debug_parsers.add_parser('delete-obj', parents=[common_parser], add_help=False,
@@ -2879,7 +2934,7 @@ class Archiver:
         subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
                                help='hex object ID(s) to delete from the repo')
 
-        debug_refcount_obj_epilog = textwrap.dedent("""
+        debug_refcount_obj_epilog = process_epilog("""
         This command displays the reference count for objects from the repository.
         """)
         subparser = debug_parsers.add_parser('refcount-obj', parents=[common_parser], add_help=False,

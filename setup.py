@@ -214,6 +214,8 @@ class build_usage(Command):
 
     def run(self):
         print('generating usage docs')
+        import borg
+        borg.doc_mode = 'build_man'
         if not os.path.exists('docs/usage'):
             os.mkdir('docs/usage')
         # allows us to build docs without the C modules fully loaded during help generation
@@ -361,6 +363,8 @@ class build_man(Command):
 
     def run(self):
         print('building man pages (in docs/man)', file=sys.stderr)
+        import borg
+        borg.doc_mode = 'build_man'
         os.makedirs('docs/man', exist_ok=True)
         # allows us to build docs without the C modules fully loaded during help generation
         from borg.archiver import Archiver
@@ -399,7 +403,8 @@ class build_man(Command):
             write('\n')
 
             self.write_heading(write, 'DESCRIPTION')
-            write(parser.epilog)
+            description, _, notes = parser.epilog.partition('\n.. man NOTES')
+            write(description)
 
             self.write_heading(write, 'OPTIONS')
             write('See `borg-common(1)` for common options of Borg commands.')
@@ -407,6 +412,10 @@ class build_man(Command):
             self.write_options(write, parser)
 
             self.write_examples(write, command)
+
+            if notes:
+                self.write_heading(write, 'NOTES')
+                write(notes)
 
             self.write_see_also(write, man_title)
 

@@ -12,7 +12,7 @@ command in detail.
 General
 -------
 
-.. include:: usage/general.rst.inc
+.. include:: usage_general.rst.inc
 
 In case you are interested in more details (like formulas), please see
 :ref:`internals`.

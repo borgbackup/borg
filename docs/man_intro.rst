@@ -46,7 +46,7 @@ A step-by-step example
 NOTES
 -----
 
-.. include:: usage/general.rst.inc
+.. include:: usage_general.rst.inc
 
 SEE ALSO
 --------

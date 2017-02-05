@@ -1,7 +1,10 @@
 # -*- encoding: utf-8 *-*
 import os
+import io
 import re
 import sys
+from collections import OrderedDict
+from datetime import datetime
 from glob import glob
 
 from distutils.command.build import build
@@ -326,6 +329,191 @@ class build_usage(Command):
         shipout(text)
 
 
+class build_man(Command):
+    description = 'build man pages'
+
+    user_options = []
+
+    see_also = {
+        'create': ('delete', 'prune', 'check', 'patterns', 'placeholders', 'compression'),
+        'recreate': ('patterns', 'placeholders', 'compression'),
+        'list': ('info', 'diff', 'prune', 'patterns'),
+        'info': ('list', 'diff'),
+        'init': ('create', 'delete', 'check', 'list', 'key-import', 'key-export', 'key-change-passphrase'),
+        'key-import': ('key-export', ),
+        'key-export': ('key-import', ),
+        'mount': ('umount', 'extract'),  # Would be cooler if these two were on the same page
+        'umount': ('mount', ),
+        'extract': ('mount', ),
+    }
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        print('building man pages (in docs/man)', file=sys.stderr)
+        os.makedirs('docs/man', exist_ok=True)
+        # allows us to build docs without the C modules fully loaded during help generation
+        from borg.archiver import Archiver
+        parser = Archiver(prog='borg').parser
+
+        self.generate_level('', parser, Archiver)
+        self.build_topic_pages(Archiver)
+
+    def generate_level(self, prefix, parser, Archiver):
+        is_subcommand = False
+        choices = {}
+        for action in parser._actions:
+            if action.choices is not None and 'SubParsersAction' in str(action.__class__):
+                is_subcommand = True
+                for cmd, parser in action.choices.items():
+                    choices[prefix + cmd] = parser
+        if prefix and not choices:
+            return
+
+        for command, parser in sorted(choices.items()):
+            if command.startswith('debug') or command == 'help':
+                continue
+
+            man_title = 'borg-' + command.replace(' ', '-')
+            print('building man page %-40s' % (man_title + '(1)'), end='\r', file=sys.stderr)
+
+            if self.generate_level(command + ' ', parser, Archiver):
+                continue
+
+            doc = io.StringIO()
+            write = self.printer(doc)
+
+            self.write_man_header(write, man_title, parser.description)
+
+            self.write_heading(write, 'SYNOPSIS')
+            write('borg', command, end='')
+            self.write_usage(write, parser)
+            write('\n')
+
+            self.write_heading(write, 'DESCRIPTION')
+            write(parser.epilog)
+
+            self.write_heading(write, 'OPTIONS')
+            write('See `borg-common(1)` for common options of Borg commands.')
+            write()
+            self.write_options(write, parser)
+
+            self.write_see_also(write, man_title)
+
+            self.gen_man_page(man_title, doc.getvalue())
+
+        # Generate the borg-common(1) man page with the common options.
+        if 'create' in choices:
+            doc = io.StringIO()
+            write = self.printer(doc)
+            man_title = 'borg-common'
+            self.write_man_header(write, man_title, 'Common options of Borg commands')
+
+            common_options = [group for group in choices['create']._action_groups if group.title == 'Common options'][0]
+
+            self.write_heading(write, 'SYNOPSIS')
+            self.write_options_group(write, common_options)
+            self.write_see_also(write, man_title)
+            self.gen_man_page(man_title, doc.getvalue())
+
+        return is_subcommand
+
+    def build_topic_pages(self, Archiver):
+        for topic, text in Archiver.helptext.items():
+            doc = io.StringIO()
+            write = self.printer(doc)
+            man_title = 'borg-' + topic
+            print('building man page %-40s' % (man_title + '(1)'), end='\r', file=sys.stderr)
+
+            self.write_man_header(write, man_title, 'Details regarding ' + topic)
+            self.write_heading(write, 'DESCRIPTION')
+            write(text)
+            self.gen_man_page(man_title, doc.getvalue())
+
+    def printer(self, fd):
+        def write(*args, **kwargs):
+            print(*args, file=fd, **kwargs)
+        return write
+
+    def write_heading(self, write, header, char='-', double_sided=False):
+        write()
+        if double_sided:
+            write(char * len(header))
+        write(header)
+        write(char * len(header))
+        write()
+
+    def write_man_header(self, write, title, description):
+        self.write_heading(write, title, '=', double_sided=True)
+        self.write_heading(write, description, double_sided=True)
+        # man page metadata
+        write(':Author: The Borg Collective')
+        write(':Date:', datetime.utcnow().date().isoformat())
+        write(':Manual section: 1')
+        write(':Manual group: borg backup tool')
+        write()
+
+    def write_see_also(self, write, man_title):
+        see_also = self.see_also.get(man_title.replace('borg-', ''), ())
+        see_also = ['`borg-%s(1)`' % s for s in see_also]
+        see_also.insert(0, '`borg(1)`')
+        self.write_heading(write, 'SEE ALSO')
+        write(', '.join(see_also))
+
+    def gen_man_page(self, name, rst):
+        from docutils.writers import manpage
+        from docutils.core import publish_string
+        man_page = publish_string(source=rst, writer=manpage.Writer())
+        with open('docs/man/%s.1' % name, 'wb') as fd:
+            fd.write(man_page)
+
+    def write_usage(self, write, parser):
+        if any(len(o.option_strings) for o in parser._actions):
+            write(' <options> ', end='')
+        for option in parser._actions:
+            if option.option_strings:
+                continue
+            write(option.metavar, end=' ')
+
+    def write_options(self, write, parser):
+        for group in parser._action_groups:
+            if group.title == 'Common options' or not group._group_actions:
+                continue
+            title = 'arguments' if group.title == 'positional arguments' else group.title
+            self.write_heading(write, title, '+')
+            self.write_options_group(write, group)
+
+    def write_options_group(self, write, group):
+        def is_positional_group(group):
+            return any(not o.option_strings for o in group._group_actions)
+
+        if is_positional_group(group):
+            for option in group._group_actions:
+                write(option.metavar)
+                write(textwrap.indent(option.help or '', ' ' * 4))
+            return
+
+        opts = OrderedDict()
+
+        for option in group._group_actions:
+            if option.metavar:
+                option_fmt = '%s ' + option.metavar
+            else:
+                option_fmt = '%s'
+            option_str = ', '.join(option_fmt % s for s in option.option_strings)
+            option_desc = textwrap.dedent((option.help or '') % option.__dict__)
+            opts[option_str] = textwrap.indent(option_desc, ' ' * 4)
+
+        padding = len(max(opts)) + 1
+
+        for option, desc in opts.items():
+            write(option.ljust(padding), desc)
+
+
 class build_api(Command):
     description = "generate a basic api.rst file based on the modules available"
 
@@ -361,6 +549,7 @@ cmdclass = {
     'build_ext': build_ext,
     'build_api': build_api,
     'build_usage': build_usage,
+    'build_man': build_man,
     'sdist': Sdist
 }
 

@@ -179,8 +179,7 @@ class Archiver:
         return matcher, include_patterns
 
     def do_serve(self, args):
-        """Start in server mode. This command is usually not used manually.
-        """
+        """Start in server mode. This command is usually not used manually."""
         return RepositoryServer(restrict_to_paths=args.restrict_to_paths, append_only=args.append_only).serve()
 
     @with_repository(create=True, exclusive=True, manifest=False)
@@ -2024,16 +2023,17 @@ class Archiver:
                                    help='add a comment text to the archive')
         archive_group.add_argument('--timestamp', dest='timestamp',
                                    type=timestamp, default=None,
-                                   metavar='yyyy-mm-ddThh:mm:ss',
-                                   help='manually specify the archive creation date/time (UTC). '
+                                   metavar='TIMESTAMP',
+                                   help='manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). '
                                         'alternatively, give a reference file/directory.')
         archive_group.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                    type=int, default=1800, metavar='SECONDS',
                                    help='write checkpoint every SECONDS seconds (Default: 1800)')
         archive_group.add_argument('--chunker-params', dest='chunker_params',
                                    type=ChunkerParams, default=CHUNKER_PARAMS,
-                                   metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
-                                   help='specify the chunker parameters. default: %d,%d,%d,%d' % CHUNKER_PARAMS)
+                                   metavar='PARAMS',
+                                   help='specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
+                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %d,%d,%d,%d' % CHUNKER_PARAMS)
         archive_group.add_argument('-C', '--compression', dest='compression',
                                    type=CompressionSpec, default=dict(name='none'), metavar='COMPRESSION',
                                    help='select compression algorithm, see the output of the '
@@ -2348,7 +2348,7 @@ class Archiver:
         Also, prune automatically removes checkpoint archives (incomplete archives left
         behind by interrupted backup runs) except if the checkpoint is the latest
         archive (and thus still needed). Checkpoint archives are not considered when
-        comparing archive counts against the retention limits (--keep-*).
+        comparing archive counts against the retention limits (--keep-X).
 
         If a prefix is set with -P, then only archives that start with the prefix are
         considered for deletion and only those archives count towards the totals
@@ -2607,8 +2607,8 @@ class Archiver:
                                    help='add a comment text to the archive')
         archive_group.add_argument('--timestamp', dest='timestamp',
                                    type=timestamp, default=None,
-                                   metavar='yyyy-mm-ddThh:mm:ss',
-                                   help='manually specify the archive creation date/time (UTC). '
+                                   metavar='TIMESTAMP',
+                                   help='manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). '
                                         'alternatively, give a reference file/directory.')
         archive_group.add_argument('-C', '--compression', dest='compression',
                                    type=CompressionSpec, default=None, metavar='COMPRESSION',
@@ -2623,9 +2623,11 @@ class Archiver:
                                    help='read compression patterns from COMPRESSIONCONFIG, see the output of the '
                                         '"borg help compression" command for details.')
         archive_group.add_argument('--chunker-params', dest='chunker_params',
-                                   type=ChunkerParams, default=None,
-                                   metavar='CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE',
-                                   help='specify the chunker parameters (or "default").')
+                                   type=ChunkerParams, default=CHUNKER_PARAMS,
+                                   metavar='PARAMS',
+                                   help='specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
+                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE) or "default" to use the current defaults. '
+                                        'default: %d,%d,%d,%d' % CHUNKER_PARAMS)
 
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),

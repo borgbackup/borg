@@ -289,7 +289,7 @@ class ArchiverTestCaseBase(BaseTestCase):
     def open_archive(self, name):
         repository = Repository(self.repository_path, exclusive=True)
         with repository:
-            manifest, key = Manifest.load(repository)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             archive = Archive(repository, key, manifest, name)
         return archive, repository
 
@@ -1248,7 +1248,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('extract', '--dry-run', self.repository_location + '::test.4')
         # Make sure both archives have been renamed
         with Repository(self.repository_path) as repository:
-            manifest, key = Manifest.load(repository)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         self.assert_equal(len(manifest.archives), 2)
         self.assert_in('test.3', manifest.archives)
         self.assert_in('test.4', manifest.archives)
@@ -1349,7 +1349,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=none', self.repository_location)
         self.create_src_archive('test')
         with Repository(self.repository_path, exclusive=True) as repository:
-            manifest, key = Manifest.load(repository)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             archive = Archive(repository, key, manifest, 'test')
             for item in archive.iter_items():
                 if 'chunks' in item:
@@ -1367,7 +1367,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=none', self.repository_location)
         self.create_src_archive('test')
         with Repository(self.repository_path, exclusive=True) as repository:
-            manifest, key = Manifest.load(repository)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             archive = Archive(repository, key, manifest, 'test')
             id = archive.metadata.items[0]
             repository.put(id, b'corrupted items metadata stream chunk')
@@ -1417,7 +1417,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', '--dry-run', self.repository_location + '::test', 'input')
         # Make sure no archive has been created
         with Repository(self.repository_path) as repository:
-            manifest, key = Manifest.load(repository)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         self.assert_equal(len(manifest.archives), 0)
 
     def test_progress_on(self):
@@ -2091,7 +2091,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('check', self.repository_location)
         # Then check that the cache on disk matches exactly what's in the repo.
         with self.open_repository() as repository:
-            manifest, key = Manifest.load(repository)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             with Cache(repository, key, manifest, sync=False) as cache:
                 original_chunks = cache.chunks
             cache.destroy(repository)
@@ -2112,7 +2112,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
         with self.open_repository() as repository:
-            manifest, key = Manifest.load(repository)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             with Cache(repository, key, manifest, sync=False) as cache:
                 cache.begin_txn()
                 cache.chunks.incref(list(cache.chunks.iteritems())[0][0])
@@ -2750,7 +2750,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 
         archive, repository = self.open_archive('archive1')
         with repository:
-            manifest, key = Manifest.load(repository)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             with Cache(repository, key, manifest) as cache:
                 archive = Archive(repository, key, manifest, '0.13', cache=cache, create=True)
                 archive.items_buffer.add(Attic013Item)
@@ -2762,7 +2762,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 class ManifestAuthenticationTest(ArchiverTestCaseBase):
     def spoof_manifest(self, repository):
         with repository:
-            _, key = Manifest.load(repository)
+            _, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
                 'version': 1,
                 'archives': {},
@@ -2775,7 +2775,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         repository = Repository(self.repository_path, exclusive=True)
         with repository:
-            manifest, key = Manifest.load(repository)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
                 'version': 1,
                 'archives': {},
@@ -2792,7 +2792,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
         repository = Repository(self.repository_path, exclusive=True)
         with repository:
             shutil.rmtree(get_security_dir(bin_to_hex(repository.id)))
-            _, key = Manifest.load(repository)
+            _, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             key.tam_required = False
             key.change_passphrase(key._passphrase)
 

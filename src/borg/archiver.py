@@ -87,8 +87,9 @@ def argument(args, str_or_bool):
     return str_or_bool
 
 
-def with_repository(fake=False, invert_fake=False, create=False, lock=True, exclusive=False, manifest=True, cache=False,
-                    secure=True):
+def with_repository(fake=False, invert_fake=False, create=False, lock=True,
+                    exclusive=False, manifest=True, cache=False, secure=True,
+                    compatibility=None):
     """
     Method decorator for subcommand-handling methods: do_XYZ(self, args, repository, …)
 
@@ -100,7 +101,20 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True, excl
     :param manifest: load manifest and key, pass them as keyword arguments
     :param cache: open cache, pass it as keyword argument (implies manifest)
     :param secure: do assert_secure after loading manifest
+    :param compatibility: mandatory if not create and (manifest or cache), specifies mandatory feature categories to check
     """
+
+    if not create and (manifest or cache):
+        if compatibility is None:
+            raise AssertionError("with_repository decorator used without compatibility argument")
+        if type(compatibility) is not tuple:
+            raise AssertionError("with_repository decorator compatibility argument must be of type tuple")
+    else:
+        if compatibility is not None:
+            raise AssertionError("with_repository called with compatibility argument but would not check" + repr(compatibility))
+        if create:
+            compatibility = Manifest.NO_OPERATION_CHECK
+
     def decorator(method):
         @functools.wraps(method)
         def wrapper(self, args, **kwargs):
@@ -117,7 +131,7 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True, excl
                                         append_only=append_only)
             with repository:
                 if manifest or cache:
-                    kwargs['manifest'], kwargs['key'] = Manifest.load(repository)
+                    kwargs['manifest'], kwargs['key'] = Manifest.load(repository, compatibility)
                     if 'compression' in args:
                         kwargs['key'].compressor = args.compression.compressor
                     if secure:
@@ -276,7 +290,7 @@ class Archiver:
             return EXIT_WARNING
         return EXIT_SUCCESS
 
-    @with_repository()
+    @with_repository(compatibility=(Manifest.Operation.CHECK,))
     def do_change_passphrase(self, args, repository, manifest, key):
         """Change repository key file passphrase"""
         if not hasattr(key, 'change_passphrase'):
@@ -413,7 +427,7 @@ class Archiver:
             print(fmt % ('U', msg, total_size_MB / dt_update, count, file_size_formatted, content, dt_update))
             print(fmt % ('D', msg, total_size_MB / dt_delete, count, file_size_formatted, content, dt_delete))
 
-    @with_repository(fake='dry_run', exclusive=True)
+    @with_repository(fake='dry_run', exclusive=True, compatibility=(Manifest.Operation.WRITE,))
     def do_create(self, args, repository, manifest=None, key=None):
         """Create new archive"""
         matcher = PatternMatcher(fallback=True)
@@ -632,7 +646,7 @@ class Archiver:
                 return matched
         return item_filter
 
-    @with_repository()
+    @with_repository(compatibility=(Manifest.Operation.READ,))
     @with_archive
     def do_extract(self, args, repository, manifest, key, archive):
         """Extract archive contents"""
@@ -714,7 +728,7 @@ class Archiver:
             pi.finish()
         return self.exit_code
 
-    @with_repository()
+    @with_repository(compatibility=(Manifest.Operation.READ,))
     @with_archive
     def do_export_tar(self, args, repository, manifest, key, archive):
         """Export archive contents as a tarball"""
@@ -927,7 +941,7 @@ class Archiver:
             self.print_warning("Include pattern '%s' never matched.", pattern)
         return self.exit_code
 
-    @with_repository()
+    @with_repository(compatibility=(Manifest.Operation.READ,))
     @with_archive
     def do_diff(self, args, repository, manifest, key, archive):
         """Diff contents of two archives"""
@@ -1140,7 +1154,7 @@ class Archiver:
 
         return self.exit_code
 
-    @with_repository(exclusive=True, cache=True)
+    @with_repository(exclusive=True, cache=True, compatibility=(Manifest.Operation.CHECK,))
     @with_archive
     def do_rename(self, args, repository, manifest, key, cache, archive):
         """Rename an existing archive"""
@@ -1161,7 +1175,7 @@ class Archiver:
 
     def _delete_archives(self, args, repository):
         """Delete archives"""
-        manifest, key = Manifest.load(repository)
+        manifest, key = Manifest.load(repository, (Manifest.Operation.DELETE,))
 
         if args.location.archive:
             archive_names = (args.location.archive,)
@@ -1219,7 +1233,7 @@ class Archiver:
         if not args.cache_only:
             msg = []
             try:
-                manifest, key = Manifest.load(repository)
+                manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             except NoManifestError:
                 msg.append("You requested to completely DELETE the repository *including* all archives it may "
                            "contain.")
@@ -1258,7 +1272,7 @@ class Archiver:
 
         return self._do_mount(args)
 
-    @with_repository()
+    @with_repository(compatibility=(Manifest.Operation.READ,))
     def _do_mount(self, args, repository, manifest, key):
         from .fuse import FuseOperations
 
@@ -1276,7 +1290,7 @@ class Archiver:
         """un-mount the FUSE filesystem"""
         return umount(args.mountpoint)
 
-    @with_repository()
+    @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_list(self, args, repository, manifest, key):
         """List archive or repository contents"""
         if not hasattr(sys.stdout, 'buffer'):
@@ -1348,7 +1362,7 @@ class Archiver:
 
         return self.exit_code
 
-    @with_repository(cache=True)
+    @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
     def do_info(self, args, repository, manifest, key, cache):
         """Show archive details such as disk space used"""
         if any((args.location.archive, args.first, args.last, args.prefix)):
@@ -1438,7 +1452,7 @@ class Archiver:
             print(str(cache))
         return self.exit_code
 
-    @with_repository(exclusive=True)
+    @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
     def do_prune(self, args, repository, manifest, key):
         """Prune repository archives according to specified rules"""
         if not any((args.secondly, args.minutely, args.hourly, args.daily,
@@ -1517,7 +1531,7 @@ class Archiver:
     def do_upgrade(self, args, repository, manifest=None, key=None):
         """upgrade a repository from a previous version"""
         if args.tam:
-            manifest, key = Manifest.load(repository, force_tam_not_required=args.force)
+            manifest, key = Manifest.load(repository, (Manifest.Operation.CHECK,), force_tam_not_required=args.force)
 
             if not hasattr(key, 'change_passphrase'):
                 print('This repository is not encrypted, cannot enable TAM.')
@@ -1542,7 +1556,7 @@ class Archiver:
                 open(tam_file, 'w').close()
                 print('Updated security database')
         elif args.disable_tam:
-            manifest, key = Manifest.load(repository, force_tam_not_required=True)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK, force_tam_not_required=True)
             if tam_required(repository):
                 os.unlink(tam_required_file(repository))
             if key.tam_required:
@@ -1570,7 +1584,7 @@ class Archiver:
                 print("warning: %s" % e)
         return self.exit_code
 
-    @with_repository(cache=True, exclusive=True)
+    @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.CHECK,))
     def do_recreate(self, args, repository, manifest, key, cache):
         """Re-create archives"""
         msg = ("recreate is an experimental feature.\n"
@@ -1647,7 +1661,7 @@ class Archiver:
         print('Process ID:', get_process_id())
         return EXIT_SUCCESS
 
-    @with_repository()
+    @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_dump_archive_items(self, args, repository, manifest, key):
         """dump (decrypted, decompressed) archive items metadata (not: data)"""
         archive = Archive(repository, key, manifest, args.location.archive,
@@ -1661,7 +1675,7 @@ class Archiver:
         print('Done.')
         return EXIT_SUCCESS
 
-    @with_repository()
+    @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_dump_archive(self, args, repository, manifest, key):
         """dump decoded archive metadata (not: data)"""
 
@@ -1714,7 +1728,7 @@ class Archiver:
                 output(fd)
         return EXIT_SUCCESS
 
-    @with_repository()
+    @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_dump_manifest(self, args, repository, manifest, key):
         """dump decoded repository manifest"""
 
@@ -1729,7 +1743,7 @@ class Archiver:
                 json.dump(meta, fd, indent=4)
         return EXIT_SUCCESS
 
-    @with_repository()
+    @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_dump_repo_objs(self, args, repository, manifest, key):
         """dump (decrypted, decompressed) repo objects"""
         marker = None
@@ -1803,7 +1817,7 @@ class Archiver:
         print('Done.')
         return EXIT_SUCCESS
 
-    @with_repository(manifest=False, exclusive=True, cache=True)
+    @with_repository(manifest=False, exclusive=True, cache=True, compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_refcount_obj(self, args, repository, manifest, key, cache):
         """display refcounts for the objects with the given IDs"""
         for hex_id in args.ids:

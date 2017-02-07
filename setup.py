@@ -302,6 +302,9 @@ setup(
             'borg = borg.archiver:main',
         ]
     },
+    package_data={
+        'borg': ['paperkey.html']
+    },
     cmdclass=cmdclass,
     ext_modules=ext_modules,
     setup_requires=['setuptools_scm>=1.7'],

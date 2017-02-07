@@ -271,7 +271,10 @@ class Archiver:
             if not args.path:
                 self.print_error("output file to export key to expected")
                 return EXIT_ERROR
-            manager.export(args.path)
+            if args.qr:
+                manager.export_qr(args.path)
+            else:
+                manager.export(args.path)
         return EXIT_SUCCESS
 
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
@@ -1938,6 +1941,9 @@ class Archiver:
         subparser.add_argument('--paper', dest='paper', action='store_true',
                                default=False,
                                help='Create an export suitable for printing and later type-in')
+        subparser.add_argument('--qr-html', dest='qr', action='store_true',
+                               default=False,
+                               help='Create an html file suitable for printing and later type-in or qr scan')
 
         key_import_epilog = process_epilog("""
         This command allows to restore a key previously backed up with the

@@ -393,27 +393,35 @@ class build_man(Command):
             man_title = 'borg-' + command.replace(' ', '-')
             print('building man page', man_title + '(1)', file=sys.stderr)
 
-            if self.generate_level(command + ' ', parser, Archiver):
-                continue
+            is_intermediary = self.generate_level(command + ' ', parser, Archiver)
 
             doc, write = self.new_doc()
             self.write_man_header(write, man_title, parser.description)
 
             self.write_heading(write, 'SYNOPSIS')
-            write('borg', command, end='')
-            self.write_usage(write, parser)
+            if is_intermediary:
+                subparsers = [action for action in parser._actions if 'SubParsersAction' in str(action.__class__)][0]
+                for subcommand in subparsers.choices:
+                    write('| borg', command, subcommand, '...')
+                    self.see_also.setdefault(command, []).append('%s-%s' % (command, subcommand))
+            else:
+                write('borg', command, end='')
+                self.write_usage(write, parser)
             write('\n')
 
-            self.write_heading(write, 'DESCRIPTION')
             description, _, notes = parser.epilog.partition('\n.. man NOTES')
-            write(description)
 
-            self.write_heading(write, 'OPTIONS')
-            write('See `borg-common(1)` for common options of Borg commands.')
-            write()
-            self.write_options(write, parser)
+            if description:
+                self.write_heading(write, 'DESCRIPTION')
+                write(description)
 
-            self.write_examples(write, command)
+            if not is_intermediary:
+                self.write_heading(write, 'OPTIONS')
+                write('See `borg-common(1)` for common options of Borg commands.')
+                write()
+                self.write_options(write, parser)
+
+                self.write_examples(write, command)
 
             if notes:
                 self.write_heading(write, 'NOTES')

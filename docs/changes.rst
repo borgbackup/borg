@@ -162,7 +162,7 @@ Version 1.0.10rc1 (2017-01-29)
 Bug fixes:
 
 - borg serve: fix transmission data loss of pipe writes, #1268
-  This affects only the cygwin platform (not Linux, *BSD, OS X).
+  This affects only the cygwin platform (not Linux, BSD, OS X).
 - Avoid triggering an ObjectiveFS bug in xattr retrieval, #1992
 - When running out of buffer memory when reading xattrs, only skip the
   current file, #1993
@@ -215,7 +215,7 @@ Other changes:
 - remove .github from pypi package, #2051
 - add pip and setuptools to requirements file, #2030
 - SyncFile: fix use of fd object after close (cosmetic)
-- Manifest.in: simplify, exclude *.{so,dll,orig}, #2066
+- Manifest.in: simplify, exclude \*.{so,dll,orig}, #2066
 - ignore posix_fadvise errors in repository.py, #2095
   (works around issues with docker on ARM)
 - make LoggedIO.close_segment reentrant, avoid reentrance

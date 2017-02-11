@@ -3,6 +3,7 @@ from configparser import ConfigParser
 import errno
 import os
 import inspect
+import json
 from datetime import datetime
 from datetime import timedelta
 from io import StringIO
@@ -2019,6 +2020,35 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
  1: 616263 646566 676869 6a6b6c 6d6e6f 707172 - 6d
  2: 737475 - 88
 """
+
+    def test_debug_dump_manifest(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        dump_file = self.output_path + '/dump'
+        output = self.cmd('debug', 'dump-manifest', self.repository_location, dump_file)
+        assert output == ""
+        with open(dump_file, "r") as f:
+            result = json.load(f)
+        assert 'archives' in result
+        assert 'config' in result
+        assert 'item_keys' in result
+        assert 'timestamp' in result
+        assert 'version' in result
+
+    def test_debug_dump_archive(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        dump_file = self.output_path + '/dump'
+        output = self.cmd('debug', 'dump-archive', self.repository_location + "::test", dump_file)
+        assert output == ""
+        with open(dump_file, "r") as f:
+            result = json.load(f)
+        assert '_name' in result
+        assert '_manifest_entry' in result
+        assert '_meta' in result
+        assert '_items' in result
 
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')

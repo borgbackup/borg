@@ -4,6 +4,7 @@ import faulthandler
 import functools
 import hashlib
 import inspect
+import json
 import logging
 import os
 import re
@@ -22,6 +23,8 @@ from itertools import zip_longest
 from .logger import create_logger, setup_logging
 logger = create_logger()
 
+import msgpack
+
 from . import __version__
 from . import helpers
 from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
@@ -34,11 +37,12 @@ from .helpers import Error, NoManifestError
 from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
 from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter, format_time, format_file_size, format_archive
-from .helpers import safe_encode, remove_surrogates, bin_to_hex
+from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict
 from .helpers import prune_within, prune_split
 from .helpers import to_localtime, timestamp
 from .helpers import get_cache_dir
 from .helpers import Manifest
+from .helpers import StableDict
 from .helpers import update_excludes, check_extension_modules
 from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo
 from .helpers import log_multi
@@ -1224,6 +1228,74 @@ class Archiver:
             with open(filename, 'wb') as fd:
                 fd.write(data)
         print('Done.')
+        return EXIT_SUCCESS
+
+    @with_repository()
+    def do_debug_dump_archive(self, args, repository, manifest, key):
+        """dump decoded archive metadata (not: data)"""
+
+        try:
+            archive_meta_orig = manifest.archives.get_raw_dict()[safe_encode(args.location.archive)]
+        except KeyError:
+            raise Archive.DoesNotExist(args.location.archive)
+
+        indent = 4
+
+        def do_indent(d):
+            return textwrap.indent(json.dumps(d, indent=indent), prefix=' ' * indent)
+
+        def output(fd):
+            # this outputs megabytes of data for a modest sized archive, so some manual streaming json output
+            fd.write('{\n')
+            fd.write('    "_name": ' + json.dumps(args.location.archive) + ",\n")
+            fd.write('    "_manifest_entry":\n')
+            fd.write(do_indent(prepare_dump_dict(archive_meta_orig)))
+            fd.write(',\n')
+
+            _, data = key.decrypt(archive_meta_orig[b'id'], repository.get(archive_meta_orig[b'id']))
+            archive_org_dict = msgpack.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape')
+
+            fd.write('    "_meta":\n')
+            fd.write(do_indent(prepare_dump_dict(archive_org_dict)))
+            fd.write(',\n')
+            fd.write('    "_items": [\n')
+
+            unpacker = msgpack.Unpacker(use_list=False, object_hook=StableDict)
+            first = True
+            for item_id in archive_org_dict[b'items']:
+                _, data = key.decrypt(item_id, repository.get(item_id))
+                unpacker.feed(data)
+                for item in unpacker:
+                    item = prepare_dump_dict(item)
+                    if first:
+                        first = False
+                    else:
+                        fd.write(',\n')
+                    fd.write(do_indent(item))
+
+            fd.write('\n')
+            fd.write('    ]\n}\n')
+
+        if args.path == '-':
+            output(sys.stdout)
+        else:
+            with open(args.path, 'w') as fd:
+                output(fd)
+        return EXIT_SUCCESS
+
+    @with_repository()
+    def do_debug_dump_manifest(self, args, repository, manifest, key):
+        """dump decoded repository manifest"""
+
+        _, data = key.decrypt(None, repository.get(manifest.MANIFEST_ID))
+
+        meta = prepare_dump_dict(msgpack.fallback.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape'))
+
+        if args.path == '-':
+            json.dump(meta, sys.stdout, indent=4)
+        else:
+            with open(args.path, 'w') as fd:
+                json.dump(meta, fd, indent=4)
         return EXIT_SUCCESS
 
     @with_repository()
@@ -2715,6 +2787,36 @@ class Archiver:
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to dump')
+
+        debug_dump_archive_epilog = textwrap.dedent("""
+        This command dumps all metadata of an archive in a decoded form to a file.
+        """)
+        subparser = debug_parsers.add_parser('dump-archive', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_dump_archive.__doc__,
+                                          epilog=debug_dump_archive_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='dump decoded archive metadata (debug)')
+        subparser.set_defaults(func=self.do_debug_dump_archive)
+        subparser.add_argument('location', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='archive to dump')
+        subparser.add_argument('path', metavar='PATH', type=str,
+                               help='file to dump data into')
+
+        debug_dump_manifest_epilog = textwrap.dedent("""
+        This command dumps manifest metadata of a repository in a decoded form to a file.
+        """)
+        subparser = debug_parsers.add_parser('dump-manifest', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_dump_manifest.__doc__,
+                                          epilog=debug_dump_manifest_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='dump decoded repository metadata (debug)')
+        subparser.set_defaults(func=self.do_debug_dump_manifest)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repository to dump')
+        subparser.add_argument('path', metavar='PATH', type=str,
+                               help='file to dump data into')
 
         debug_dump_repo_objs_epilog = textwrap.dedent("""
         This command dumps raw (but decrypted and decompressed) repo objects to files.

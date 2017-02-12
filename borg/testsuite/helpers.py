@@ -9,12 +9,13 @@ import sys
 import msgpack
 import msgpack.fallback
 import time
+import argparse
 
 from ..helpers import Location, format_file_size, format_timedelta, format_line, PlaceholderError, make_path_safe, \
     prune_within, prune_split, get_cache_dir, get_keys_dir, get_security_dir, Statistics, is_slow_msgpack, \
     yes, TRUISH, FALSISH, DEFAULTISH, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
-    ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
+    ProgressIndicatorPercent, ProgressIndicatorEndless, parse_pattern, load_exclude_file, load_pattern_file, \
     PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, \
     Buffer
 from . import BaseTestCase, FakeInputs
@@ -428,8 +429,13 @@ def test_invalid_unicode_pattern(pattern):
     (["pp:/"], [" #/wsfoobar", "\tstart/whitespace"]),
     (["pp:aaabbb"], None),
     (["pp:/data", "pp: #/", "pp:\tstart", "pp:/whitespace"], ["/more/data", "/home"]),
+    (["/nomatch", "/more/*"],
+     ['/data/something00.txt', '/home', ' #/wsfoobar', '\tstart/whitespace', '/whitespace/end\t']),
+    # the order of exclude patterns shouldn't matter
+    (["/more/*", "/nomatch"],
+     ['/data/something00.txt', '/home', ' #/wsfoobar', '\tstart/whitespace', '/whitespace/end\t']),
     ])
-def test_patterns_from_file(tmpdir, lines, expected):
+def test_exclude_patterns_from_file(tmpdir, lines, expected):
     files = [
         '/data/something00.txt', '/more/data', '/home',
         ' #/wsfoobar',
@@ -438,8 +444,10 @@ def test_patterns_from_file(tmpdir, lines, expected):
     ]
 
     def evaluate(filename):
+        patterns = []
+        load_exclude_file(open(filename, "rt"), patterns)
         matcher = PatternMatcher(fallback=True)
-        matcher.add(load_excludes(open(filename, "rt")), False)
+        matcher.add_inclexcl(patterns)
         return [path for path in files if matcher.match(path)]
 
     exclfile = tmpdir.join("exclude.txt")
@@ -448,6 +456,104 @@ def test_patterns_from_file(tmpdir, lines, expected):
         fh.write("\n".join(lines))
 
     assert evaluate(str(exclfile)) == (files if expected is None else expected)
+
+
+@pytest.mark.parametrize("lines, expected_roots, expected_numpatterns", [
+    # "None" means all files, i.e. none excluded
+    ([], [], 0),
+    (["# Comment only"], [], 0),
+    (["- *"], [], 1),
+    (["+fm:*/something00.txt",
+      "-/data"], [], 2),
+    (["R /"], ["/"], 0),
+    (["R /",
+      "# comment"], ["/"], 0),
+    (["# comment",
+      "- /data",
+      "R /home"], ["/home"], 1),
+])
+def test_load_patterns_from_file(tmpdir, lines, expected_roots, expected_numpatterns):
+    def evaluate(filename):
+        roots = []
+        inclexclpatterns = []
+        load_pattern_file(open(filename, "rt"), roots, inclexclpatterns)
+        return roots, len(inclexclpatterns)
+    patternfile = tmpdir.join("patterns.txt")
+
+    with patternfile.open("wt") as fh:
+        fh.write("\n".join(lines))
+
+    roots, numpatterns = evaluate(str(patternfile))
+    assert roots == expected_roots
+    assert numpatterns == expected_numpatterns
+
+
+@pytest.mark.parametrize("lines", [
+    (["X /data"]),  # illegal pattern type prefix
+    (["/data"]),    # need a pattern type prefix
+])
+def test_load_invalid_patterns_from_file(tmpdir, lines):
+    patternfile = tmpdir.join("patterns.txt")
+    with patternfile.open("wt") as fh:
+        fh.write("\n".join(lines))
+    filename = str(patternfile)
+    with pytest.raises(argparse.ArgumentTypeError):
+        roots = []
+        inclexclpatterns = []
+        load_pattern_file(open(filename, "rt"), roots, inclexclpatterns)
+
+
+@pytest.mark.parametrize("lines, expected", [
+    # "None" means all files, i.e. none excluded
+    ([], None),
+    (["# Comment only"], None),
+    (["- *"], []),
+    # default match type is sh: for patterns -> * doesn't match a /
+    (["-*/something0?.txt"],
+     ['/data', '/data/something00.txt', '/data/subdir/something01.txt',
+      '/home', '/home/leo', '/home/leo/t', '/home/other']),
+    (["-fm:*/something00.txt"],
+     ['/data', '/data/subdir/something01.txt', '/home', '/home/leo', '/home/leo/t', '/home/other']),
+    (["-fm:*/something0?.txt"],
+     ["/data", '/home', '/home/leo', '/home/leo/t', '/home/other']),
+    (["+/*/something0?.txt",
+      "-/data"],
+     ["/data/something00.txt", '/home', '/home/leo', '/home/leo/t', '/home/other']),
+    (["+fm:*/something00.txt",
+      "-/data"],
+     ["/data/something00.txt", '/home', '/home/leo', '/home/leo/t', '/home/other']),
+    # include /home/leo and exclude the rest of /home:
+    (["+/home/leo",
+      "-/home/*"],
+     ['/data', '/data/something00.txt', '/data/subdir/something01.txt', '/home', '/home/leo', '/home/leo/t']),
+    # wrong order, /home/leo is already excluded by -/home/*:
+    (["-/home/*",
+      "+/home/leo"],
+     ['/data', '/data/something00.txt', '/data/subdir/something01.txt', '/home']),
+    (["+fm:/home/leo",
+      "-/home/"],
+     ['/data', '/data/something00.txt', '/data/subdir/something01.txt', '/home', '/home/leo', '/home/leo/t']),
+])
+def test_inclexcl_patterns_from_file(tmpdir, lines, expected):
+    files = [
+        '/data', '/data/something00.txt', '/data/subdir/something01.txt',
+        '/home', '/home/leo', '/home/leo/t', '/home/other'
+    ]
+
+    def evaluate(filename):
+        matcher = PatternMatcher(fallback=True)
+        roots = []
+        inclexclpatterns = []
+        load_pattern_file(open(filename, "rt"), roots, inclexclpatterns)
+        matcher.add_inclexcl(inclexclpatterns)
+        return [path for path in files if matcher.match(path)]
+
+    patternfile = tmpdir.join("patterns.txt")
+
+    with patternfile.open("wt") as fh:
+        fh.write("\n".join(lines))
+
+    assert evaluate(str(patternfile)) == (files if expected is None else expected)
 
 
 @pytest.mark.parametrize("pattern, cls", [

@@ -22,7 +22,7 @@ API Documentation
     :undoc-members:
 
 .. automodule:: borg.compress
-    :members:
+    :members: get_compressor, Compressor, CompressorBase
     :undoc-members:
 
 .. automodule:: borg.crypto
@@ -65,14 +65,6 @@ API Documentation
     :members:
     :undoc-members:
 
-.. automodule:: borg.platform_darwin
-    :members:
-    :undoc-members:
-
-.. automodule:: borg.platform_freebsd
-    :members:
-    :undoc-members:
-
 .. automodule:: borg.platform_linux
     :members:
     :undoc-members:
@@ -86,10 +78,6 @@ API Documentation
     :undoc-members:
 
 .. automodule:: borg.shellpattern
-    :members:
-    :undoc-members:
-
-.. automodule:: borg.upgrader
     :members:
     :undoc-members:
 

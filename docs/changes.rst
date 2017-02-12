@@ -155,6 +155,7 @@ Other changes:
 
   - language clarification - "borg create --one-file-system" option does not respect
     mount points, but considers different file systems instead, #2141
+- setup.py: build_api: sort file list for determinism
 
 Version 1.0.10rc1 (2017-01-29)
 ------------------------------

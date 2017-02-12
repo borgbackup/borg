@@ -2171,8 +2171,11 @@ if (typeof define == 'function' && define.amd) define([], function() { return Sh
         }
     }
 
-
-
+    /* center the QR code on the page */
+    #qr {
+      width: 100%;
+      text-align: center;
+    }
 </style>
 </head>
 <body>
@@ -2217,7 +2220,7 @@ if (typeof define == 'function' && define.amd) define([], function() { return Sh
     <div id="printout">
         <div id="title" contenteditable>BorgBackup Printable Key Backup</div>
         <div contenteditable>To restore either scan the QR code below, decode it and import it using
-<pre>borg key-import /path/to/repo scannedfile</pre>
+<pre>borg key import /path/to/repo scannedfile</pre>
 
 Or run
 <pre>borg key import --paper /path/to/repo</pre> and type in the text below.<br><br></div>

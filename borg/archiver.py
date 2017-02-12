@@ -1373,7 +1373,7 @@ class Archiver:
                                help='write checkpoint every SECONDS seconds (Default: 300)')
         subparser.add_argument('-x', '--one-file-system', dest='one_file_system',
                                action='store_true', default=False,
-                               help='stay in same file system, do not cross mount points')
+                               help='stay in same file system')
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,
                                help='only store numeric user and group identifiers')

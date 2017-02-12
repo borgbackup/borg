@@ -58,7 +58,7 @@ borg create
       -c SECONDS, --checkpoint-interval SECONDS
                             write checkpoint every SECONDS seconds (Default: 300)
       -x, --one-file-system
-                            stay in same file system, do not cross mount points
+                            stay in same file system
       --numeric-owner       only store numeric user and group identifiers
       --noatime             do not store atime into archive
       --noctime             do not store ctime into archive

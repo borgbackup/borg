@@ -43,7 +43,7 @@ Exclusion options
 
 Filesystem options
     ``-x``, ``--one-file-system``
-        | stay in same file system, do not cross mount points
+        | stay in same file system
     ``--numeric-owner``
         | only store numeric user and group identifiers
     ``--noatime``

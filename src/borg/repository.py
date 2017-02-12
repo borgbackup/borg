@@ -788,6 +788,7 @@ class Repository:
         fetching data in this order does linear reads and reuses stuff from disk cache.
 
         We rely on repository.check() has run already (either now or some time before) and that:
+
         - if we are called from a borg check command, self.index is a valid, fresh, in-sync repo index.
         - if we are called from elsewhere, either self.index or the on-disk index is valid and in-sync.
         - the repository segments are valid (no CRC errors).

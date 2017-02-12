@@ -214,6 +214,8 @@ class build_usage(Command):
 
     def run(self):
         print('generating usage docs')
+        import borg
+        borg.doc_mode = 'build_man'
         if not os.path.exists('docs/usage'):
             os.mkdir('docs/usage')
         # allows us to build docs without the C modules fully loaded during help generation
@@ -351,6 +353,7 @@ class build_man(Command):
     .. role:: ref(title)
 
     .. |project_name| replace:: Borg
+
     """)
 
     def initialize_options(self):
@@ -361,6 +364,8 @@ class build_man(Command):
 
     def run(self):
         print('building man pages (in docs/man)', file=sys.stderr)
+        import borg
+        borg.doc_mode = 'build_man'
         os.makedirs('docs/man', exist_ok=True)
         # allows us to build docs without the C modules fully loaded during help generation
         from borg.archiver import Archiver
@@ -368,6 +373,7 @@ class build_man(Command):
 
         self.generate_level('', parser, Archiver)
         self.build_topic_pages(Archiver)
+        self.build_intro_page()
 
     def generate_level(self, prefix, parser, Archiver):
         is_subcommand = False
@@ -387,26 +393,39 @@ class build_man(Command):
             man_title = 'borg-' + command.replace(' ', '-')
             print('building man page', man_title + '(1)', file=sys.stderr)
 
-            if self.generate_level(command + ' ', parser, Archiver):
-                continue
+            is_intermediary = self.generate_level(command + ' ', parser, Archiver)
 
             doc, write = self.new_doc()
             self.write_man_header(write, man_title, parser.description)
 
             self.write_heading(write, 'SYNOPSIS')
-            write('borg', command, end='')
-            self.write_usage(write, parser)
+            if is_intermediary:
+                subparsers = [action for action in parser._actions if 'SubParsersAction' in str(action.__class__)][0]
+                for subcommand in subparsers.choices:
+                    write('| borg', command, subcommand, '...')
+                    self.see_also.setdefault(command, []).append('%s-%s' % (command, subcommand))
+            else:
+                write('borg', command, end='')
+                self.write_usage(write, parser)
             write('\n')
 
-            self.write_heading(write, 'DESCRIPTION')
-            write(parser.epilog)
+            description, _, notes = parser.epilog.partition('\n.. man NOTES')
 
-            self.write_heading(write, 'OPTIONS')
-            write('See `borg-common(1)` for common options of Borg commands.')
-            write()
-            self.write_options(write, parser)
+            if description:
+                self.write_heading(write, 'DESCRIPTION')
+                write(description)
 
-            self.write_examples(write, command)
+            if not is_intermediary:
+                self.write_heading(write, 'OPTIONS')
+                write('See `borg-common(1)` for common options of Borg commands.')
+                write()
+                self.write_options(write, parser)
+
+                self.write_examples(write, command)
+
+            if notes:
+                self.write_heading(write, 'NOTES')
+                write(notes)
 
             self.write_see_also(write, man_title)
 
@@ -437,6 +456,12 @@ class build_man(Command):
             self.write_heading(write, 'DESCRIPTION')
             write(text)
             self.gen_man_page(man_title, doc.getvalue())
+
+    def build_intro_page(self):
+        print('building man page borg(1)', file=sys.stderr)
+        with open('docs/man_intro.rst') as fd:
+            man_intro = fd.read()
+        self.gen_man_page('borg', self.rst_prelude + man_intro)
 
     def new_doc(self):
         doc = io.StringIO(self.rst_prelude)
@@ -493,7 +518,9 @@ class build_man(Command):
     def gen_man_page(self, name, rst):
         from docutils.writers import manpage
         from docutils.core import publish_string
-        man_page = publish_string(source=rst, writer=manpage.Writer())
+        # We give the source_path so that docutils can find relative includes
+        # as-if the document where located in the docs/ directory.
+        man_page = publish_string(source=rst, source_path='docs/virtmanpage.rst', writer=manpage.Writer())
         with open('docs/man/%s.1' % name, 'wb') as fd:
             fd.write(man_page)
 

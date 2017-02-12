@@ -36,10 +36,10 @@ Exclusion options
         | read exclude patterns from EXCLUDEFILE, one per line
     ``--exclude-caches``
         | exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)
-    ``--exclude-if-present FILENAME``
-        | exclude directories that contain the specified file
-    ``--keep-tag-files``
-        | keep tag files of excluded caches/directories
+    ``--exclude-if-present NAME``
+        | exclude directories that are tagged by containing a filesystem object with the given NAME
+    ``--keep-exclude-tags``, ``--keep-tag-files``
+        | keep tag objects (i.e.: arguments to --exclude-if-present) in otherwise excluded caches/directories
 
 Filesystem options
     ``-x``, ``--one-file-system``
@@ -58,12 +58,12 @@ Filesystem options
 Archive options
     ``--comment COMMENT``
         | add a comment text to the archive
-    ``--timestamp yyyy-mm-ddThh:mm:ss``
-        | manually specify the archive creation date/time (UTC). alternatively, give a reference file/directory.
+    ``--timestamp TIMESTAMP``
+        | manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). alternatively, give a reference file/directory.
     ``-c SECONDS``, ``--checkpoint-interval SECONDS``
         | write checkpoint every SECONDS seconds (Default: 1800)
-    ``--chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE``
-        | specify the chunker parameters. default: 19,23,21,4095
+    ``--chunker-params PARAMS``
+        | specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: 19,23,21,4095
     ``-C COMPRESSION``, ``--compression COMPRESSION``
         | select compression algorithm, see the output of the "borg help compression" command for details.
     ``--compression-from COMPRESSIONCONFIG``
@@ -94,3 +94,49 @@ all files on these file systems.
 
 See the output of the "borg help patterns" command for more help on exclude patterns.
 See the output of the "borg help placeholders" command for more help on placeholders.
+
+.. man NOTES
+
+The --exclude patterns are not like tar. In tar --exclude .bundler/gems will
+exclude foo/.bundler/gems. In borg it will not, you need to use --exclude
+'\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
+more information.
+
+Item flags
+++++++++++
+
+``--list`` outputs a list of all files, directories and other
+file system items it considered (no matter whether they had content changes
+or not). For each item, it prefixes a single-letter flag that indicates type
+and/or status of the item.
+
+If you are interested only in a subset of that output, you can give e.g.
+``--filter=AME`` and it will only show regular files with A, M or E status (see
+below).
+
+A uppercase character represents the status of a regular file relative to the
+"files" cache (not relative to the repo -- this is an issue if the files cache
+is not used). Metadata is stored in any case and for 'A' and 'M' also new data
+chunks are stored. For 'U' all data chunks refer to already existing chunks.
+
+- 'A' = regular file, added (see also :ref:`a_status_oddity` in the FAQ)
+- 'M' = regular file, modified
+- 'U' = regular file, unchanged
+- 'E' = regular file, an error happened while accessing/reading *this* file
+
+A lowercase character means a file type other than a regular file,
+borg usually just stores their metadata:
+
+- 'd' = directory
+- 'b' = block device
+- 'c' = char device
+- 'h' = regular file, hardlink (to already seen inodes)
+- 's' = symlink
+- 'f' = fifo
+
+Other flags used include:
+
+- 'i' = backup data was read from standard input (stdin)
+- '-' = dry run, item was *not* backed up
+- 'x' = excluded, item was *not* backed up
+- '?' = missing status code (if you see this, please file a bug report!)

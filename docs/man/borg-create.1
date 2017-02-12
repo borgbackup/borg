@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2017-02-05" "" "borg backup tool"
+.TH BORG-CREATE 1 "2017-02-12" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -100,10 +100,10 @@ read exclude patterns from EXCLUDEFILE, one per line
 exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.brynosaurus.com/cachedir/spec.html\fP)
 .TP
 .BI \-\-exclude\-if\-present \ NAME
-exclude directories that are tagged by containing a filesystem object with                                          the given NAME
+exclude directories that are tagged by containing a filesystem object with the given NAME
 .TP
 .B \-\-keep\-exclude\-tags\fP,\fB  \-\-keep\-tag\-files
-keep tag objects (i.e.: arguments to \-\-exclude\-if\-present) in otherwise                                          excluded caches/directories
+keep tag objects (i.e.: arguments to \-\-exclude\-if\-present) in otherwise excluded caches/directories
 .UNINDENT
 .SS Filesystem options
 .INDENT 0.0
@@ -216,13 +216,65 @@ $ borg create /path/to/repo::{hostname}\-{user}\-{now:%Y\-%m\-%dT%H:%M:%S.%f} ~
 .fi
 .UNINDENT
 .UNINDENT
-.SS Notes
-.INDENT 0.0
-.IP \(bu 2
-the \-\-exclude patterns are not like tar. In tar \-\-exclude .bundler/gems will
+.SH NOTES
+.sp
+The \-\-exclude patterns are not like tar. In tar \-\-exclude .bundler/gems will
 exclude foo/.bundler/gems. In borg it will not, you need to use \-\-exclude
 \(aq*/.bundler/gems\(aq to get the same effect. See \fBborg help patterns\fP for
 more information.
+.SS Item flags
+.sp
+\fB\-\-list\fP outputs a list of all files, directories and other
+file system items it considered (no matter whether they had content changes
+or not). For each item, it prefixes a single\-letter flag that indicates type
+and/or status of the item.
+.sp
+If you are interested only in a subset of that output, you can give e.g.
+\fB\-\-filter=AME\fP and it will only show regular files with A, M or E status (see
+below).
+.sp
+A uppercase character represents the status of a regular file relative to the
+"files" cache (not relative to the repo \-\- this is an issue if the files cache
+is not used). Metadata is stored in any case and for \(aqA\(aq and \(aqM\(aq also new data
+chunks are stored. For \(aqU\(aq all data chunks refer to already existing chunks.
+.INDENT 0.0
+.IP \(bu 2
+\(aqA\(aq = regular file, added (see also \fIa_status_oddity\fP in the FAQ)
+.IP \(bu 2
+\(aqM\(aq = regular file, modified
+.IP \(bu 2
+\(aqU\(aq = regular file, unchanged
+.IP \(bu 2
+\(aqE\(aq = regular file, an error happened while accessing/reading \fIthis\fP file
+.UNINDENT
+.sp
+A lowercase character means a file type other than a regular file,
+borg usually just stores their metadata:
+.INDENT 0.0
+.IP \(bu 2
+\(aqd\(aq = directory
+.IP \(bu 2
+\(aqb\(aq = block device
+.IP \(bu 2
+\(aqc\(aq = char device
+.IP \(bu 2
+\(aqh\(aq = regular file, hardlink (to already seen inodes)
+.IP \(bu 2
+\(aqs\(aq = symlink
+.IP \(bu 2
+\(aqf\(aq = fifo
+.UNINDENT
+.sp
+Other flags used include:
+.INDENT 0.0
+.IP \(bu 2
+\(aqi\(aq = backup data was read from standard input (stdin)
+.IP \(bu 2
+\(aq\-\(aq = dry run, item was \fInot\fP backed up
+.IP \(bu 2
+\(aqx\(aq = excluded, item was \fInot\fP backed up
+.IP \(bu 2
+\(aq?\(aq = missing status code (if you see this, please file a bug report!)
 .UNINDENT
 .SH SEE ALSO
 .sp

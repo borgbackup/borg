@@ -46,6 +46,7 @@ This command lists the contents of a repository or an archive.
 See the "borg help patterns" command for more help on exclude patterns.
 
 The following keys are available for --format:
+
  - NEWLINE: OS dependent line separator
  - NL: alias of NEWLINE
  - NUL: NUL character for creating print0 / xargs -0 like output, see barchive/bpath
@@ -54,13 +55,15 @@ The following keys are available for --format:
  - CR
  - LF
 
--- Keys for listing repository archives:
+Keys for listing repository archives:
+
  - archive: archive name interpreted as text (might be missing non-text characters, see barchive)
  - barchive: verbatim archive name, can contain any character except NUL
  - time: time of creation of the archive
  - id: internal ID of the archive
 
--- Keys for listing archive files:
+Keys for listing archive files:
+
  - type
  - mode
  - uid

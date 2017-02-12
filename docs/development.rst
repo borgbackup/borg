@@ -141,25 +141,36 @@ Important notes:
 - When using ``--`` to give options to py.test, you MUST also give ``borg.testsuite[.module]``.
 
 
-Regenerate usage files
-----------------------
+Documentation
+-------------
 
-Usage and API documentation is currently committed directly to git,
-although those files are generated automatically from the source
-tree.
+Generated files
+~~~~~~~~~~~~~~~
 
-When a new module is added, the ``docs/api.rst`` file needs to be
-regenerated::
-
-  ./setup.py build_api
+Usage documentation (found in ``docs/usage/``) and man pages
+(``docs/man/``) are generated automatically from the command line
+parsers declared in the program and their documentation, which is
+embedded in the program (see archiver.py). These are committed to git
+for easier use by packagers downstream.
 
 When a command is added, a commandline flag changed, added or removed,
 the usage docs need to be rebuilt as well::
 
-  ./setup.py build_usage
+  python setup.py build_usage
+  python setup.py build_man
+
+However, we prefer to do this as part of our :ref:`releasing`
+preparations, so it is generally not necessary to update these when
+submitting patches that change something about the command line.
+
+The code documentation (which is currently not part of the released
+docs) also uses a generated file (``docs/api.rst``), that needs to be
+updated when a module is added or removed::
+
+  python setup.py build_api
 
 Building the docs with Sphinx
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The documentation (in reStructuredText format, .rst) is in docs/.
 
@@ -230,6 +241,7 @@ therefore we recommend to use these merge parameters::
 
   git merge 1.0-maint -s recursive -X rename-threshold=20%
 
+.. _releasing:
 
 Creating a new release
 ----------------------
@@ -243,7 +255,7 @@ Checklist:
 - update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``
 - check version number of upcoming release in ``CHANGES.rst``
 - verify that ``MANIFEST.in`` and ``setup.py`` are complete
-- ``python setup.py build_api ; python setup.py build_usage`` and commit
+- ``python setup.py build_api ; python setup.py build_usage ; python setup.py build_man`` and commit
 - tag the release::
 
     git tag -s -m "tagged/signed release X.Y.Z" X.Y.Z

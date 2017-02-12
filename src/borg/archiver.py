@@ -2136,7 +2136,7 @@ class Archiver:
         fs_group = subparser.add_argument_group('Filesystem options')
         fs_group.add_argument('-x', '--one-file-system', dest='one_file_system',
                               action='store_true', default=False,
-                              help='stay in same file system, do not cross mount points')
+                              help='stay in the same file system and do not store mount points of other file systems')
         fs_group.add_argument('--numeric-owner', dest='numeric_owner',
                               action='store_true', default=False,
                               help='only store numeric user and group identifiers')

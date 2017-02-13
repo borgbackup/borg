@@ -9,7 +9,7 @@ borg key export
     usage: borg key export [-h] [--critical] [--error] [--warning] [--info]
                            [--debug] [--lock-wait N] [--show-rc]
                            [--no-files-cache] [--umask M] [--remote-path PATH]
-                           [--paper]
+                           [--paper] [--qr-html]
                            [REPOSITORY] [PATH]
     
     Export the repository key for backup
@@ -34,6 +34,8 @@ borg key export
       --remote-path PATH    set remote path to executable (default: "borg")
       --paper               Create an export suitable for printing and later type-
                             in
+      --qr-html             Create an html file suitable for printing and later
+                            type-in or qr scan
     
 Description
 ~~~~~~~~~~~

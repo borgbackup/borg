@@ -1318,6 +1318,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         assert repo_key2.enc_key == repo_key2.enc_key
 
+    def test_key_export_qr(self):
+        export_file = self.output_path + '/exported.html'
+        self.cmd('init', self.repository_location, '--encryption', 'repokey')
+        repo_id = self._extract_repository_id(self.repository_path)
+        self.cmd('key', 'export', '--qr-html', self.repository_location, export_file)
+
+        with open(export_file, 'r', encoding='utf-8') as fd:
+            export_contents = fd.read()
+
+        assert bin_to_hex(repo_id) in export_contents
+        assert export_contents.startswith('<!doctype html>')
+        assert export_contents.endswith('</html>')
+
     def test_key_import_errors(self):
         export_file = self.output_path + '/exported'
         self.cmd('init', self.repository_location, '--encryption', 'keyfile')

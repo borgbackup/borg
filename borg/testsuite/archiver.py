@@ -1280,7 +1280,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         repo_id = self._extract_repository_id(self.repository_path)
         self.cmd('key', 'export', '--qr-html', self.repository_location, export_file)
 
-        with open(export_file, 'r') as fd:
+        with open(export_file, 'r', encoding='utf-8') as fd:
             export_contents = fd.read()
 
         assert bin_to_hex(repo_id) in export_contents

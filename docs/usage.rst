@@ -427,6 +427,7 @@ Examples
     converting borg 0.xx to borg current
     no key file found for repository
 
+.. _borg_key_migrate-to-repokey:
 
 Upgrading a passphrase encrypted attic repo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

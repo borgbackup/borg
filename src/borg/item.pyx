@@ -2,7 +2,7 @@ from .constants import ITEM_KEYS
 from .helpers import safe_encode, safe_decode
 from .helpers import StableDict
 
-API_VERSION = '1.1_01'
+API_VERSION = '1.1_02'
 
 
 class PropDict:
@@ -156,6 +156,10 @@ class Item(PropDict):
     ctime = PropDict._make_property('ctime', int)
     mtime = PropDict._make_property('mtime', int)
 
+    # size is only present for items with a chunk list and then it is sum(chunk_sizes)
+    # compatibility note: this is a new feature, in old archives size will be missing.
+    size = PropDict._make_property('size', int)
+
     hardlink_master = PropDict._make_property('hardlink_master', bool)
 
     chunks = PropDict._make_property('chunks', (list, type(None)), 'list or None')
@@ -169,6 +173,9 @@ class Item(PropDict):
     part = PropDict._make_property('part', int)
 
     def file_size(self, hardlink_masters=None):
+        size = self.get('size')
+        if size is not None:
+            return size
         hardlink_masters = hardlink_masters or {}
         chunks, _ = hardlink_masters.get(self.get('source'), (None, None))
         chunks = self.get('chunks', chunks)

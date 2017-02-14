@@ -600,10 +600,15 @@ class Archiver:
 
         def sum_chunk_size(item, consider_ids=None):
             if item.get('deleted'):
-                return None
+                size = None
             else:
-                return sum(c.size for c in item.chunks
-                           if consider_ids is None or c.id in consider_ids)
+                if consider_ids is not None:  # consider only specific chunks
+                    size = sum(chunk.size for chunk in item.chunks if chunk.id in consider_ids)
+                else:  # consider all chunks
+                    size = item.get('size')
+                    if size is None:
+                        size = sum(chunk.size for chunk in item.chunks)
+            return size
 
         def get_owner(item):
             if args.numeric_owner:

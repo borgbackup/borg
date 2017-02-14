@@ -260,6 +260,7 @@ class FuseOperations(llfuse.Operations):
         size = 0
         dsize = 0
         if 'chunks' in item:
+            # if we would not need to compute dsize, we could get size quickly from item.size, if present.
             for key, chunksize, _ in item.chunks:
                 size += chunksize
                 if self.accounted_chunks.get(key, inode) == inode:

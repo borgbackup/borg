@@ -104,7 +104,7 @@ def check_extension_modules():
         raise ExtensionModuleError
     if platform.API_VERSION != platform.OS_API_VERSION != '1.1_01':
         raise ExtensionModuleError
-    if item.API_VERSION != '1.1_01':
+    if item.API_VERSION != '1.1_02':
         raise ExtensionModuleError
 
 
@@ -1701,6 +1701,9 @@ class ItemFormatter(BaseFormatter):
         return len(item.get('chunks', []))
 
     def calculate_size(self, item):
+        size = item.get('size')
+        if size is not None:
+            return size
         return sum(c.size for c in item.get('chunks', []))
 
     def calculate_csize(self, item):

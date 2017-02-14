@@ -256,10 +256,6 @@ class FuseOperations(llfuse.Operations):
 
     def getattr(self, inode, ctx=None):
         item = self.get_item(inode)
-        size = 0
-        if 'chunks' in item:
-            for key, chunksize, _ in item.chunks:
-                size += chunksize
         entry = llfuse.EntryAttributes()
         entry.st_ino = inode
         entry.generation = 0
@@ -270,9 +266,9 @@ class FuseOperations(llfuse.Operations):
         entry.st_uid = item.uid
         entry.st_gid = item.gid
         entry.st_rdev = item.get('rdev', 0)
-        entry.st_size = size
+        entry.st_size = item.file_size()
         entry.st_blksize = 512
-        entry.st_blocks = (size + entry.st_blksize - 1) // entry.st_blksize
+        entry.st_blocks = (entry.st_size + entry.st_blksize - 1) // entry.st_blksize
         # note: older archives only have mtime (not atime nor ctime)
         mtime_ns = item.mtime
         if have_fuse_xtime_ns:

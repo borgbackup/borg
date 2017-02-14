@@ -24,3 +24,7 @@
 #usage dt code {
     font-weight: normal;
 }
+
+#usage dl dl dd {
+    margin-bottom: 0.5em;
+}

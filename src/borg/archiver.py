@@ -1691,7 +1691,7 @@ class Archiver:
                     print(warning, file=sys.stderr)
         return args
 
-    def build_parser(self, prog=None):
+    def build_parser(self):
         def process_epilog(epilog):
             epilog = textwrap.dedent(epilog).splitlines()
             try:
@@ -1702,7 +1702,7 @@ class Archiver:
                 epilog = [line for line in epilog if not line.startswith('.. man')]
             return '\n'.join(epilog)
 
-        common_parser = argparse.ArgumentParser(add_help=False, prog=prog)
+        common_parser = argparse.ArgumentParser(add_help=False, prog=self.prog)
 
         common_group = common_parser.add_argument_group('Common options')
         common_group.add_argument('-h', '--help', action='help', help='show this help message and exit')
@@ -1743,7 +1743,7 @@ class Archiver:
                                   action='store_true', default=False,
                                   help='treat part files like normal files (e.g. to list/extract them)')
 
-        parser = argparse.ArgumentParser(prog=prog, description='Borg - Deduplicated Backups')
+        parser = argparse.ArgumentParser(prog=self.prog, description='Borg - Deduplicated Backups')
         parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,
                             help='show version number and exit')
         subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
@@ -3079,7 +3079,7 @@ class Archiver:
         # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
         if args:
             args = self.preprocess_args(args)
-        parser = self.build_parser(self.prog)
+        parser = self.build_parser()
         args = parser.parse_args(args or ['-h'])
         if args.func == self.do_create:
             # need at least 1 path but args.paths may also be populated from patterns

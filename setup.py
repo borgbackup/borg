@@ -220,7 +220,7 @@ class build_usage(Command):
             os.mkdir('docs/usage')
         # allows us to build docs without the C modules fully loaded during help generation
         from borg.archiver import Archiver
-        parser = Archiver(prog='borg').parser
+        parser = Archiver(prog='borg').build_parser()
 
         self.generate_level("", parser, Archiver)
 
@@ -369,7 +369,7 @@ class build_man(Command):
         os.makedirs('docs/man', exist_ok=True)
         # allows us to build docs without the C modules fully loaded during help generation
         from borg.archiver import Archiver
-        parser = Archiver(prog='borg').parser
+        parser = Archiver(prog='borg').build_parser()
 
         self.generate_level('', parser, Archiver)
         self.build_topic_pages(Archiver)

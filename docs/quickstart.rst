@@ -188,10 +188,13 @@ For automated backups the passphrase can be specified using the
     You can make backups using :ref:`borg_key_export` subcommand.
 
     If you want to print a backup of your key to paper use the ``--paper``
-    option of this command and print the result.
+    option of this command and print the result, or this print `template`_
+    if you need a version with QR-Code.
 
     A backup inside of the backup that is encrypted with that key/passphrase
     won't help you with that, of course.
+
+.. _template: paperkey.html
 
 .. _remote_repos:
 

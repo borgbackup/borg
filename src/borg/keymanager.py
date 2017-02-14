@@ -2,6 +2,7 @@ from binascii import unhexlify, a2b_base64, b2a_base64
 import binascii
 import textwrap
 from hashlib import sha256
+import pkgutil
 
 from .key import KeyfileKey, RepoKey, PassphraseKey, KeyfileNotFoundError, PlaintextKey
 from .helpers import Manifest, NoManifestError, Error, yes, bin_to_hex
@@ -77,15 +78,26 @@ class KeyManager:
         elif self.keyblob_storage == KEYBLOB_REPO:
             self.repository.save_key(self.keyblob.encode('utf-8'))
 
+    def get_keyfile_data(self):
+        data = '%s %s\n' % (KeyfileKey.FILE_ID, bin_to_hex(self.repository.id))
+        data += self.keyblob
+        if not self.keyblob.endswith('\n'):
+            data += '\n'
+        return data
+
     def store_keyfile(self, target):
         with open(target, 'w') as fd:
-            fd.write('%s %s\n' % (KeyfileKey.FILE_ID, bin_to_hex(self.repository.id)))
-            fd.write(self.keyblob)
-            if not self.keyblob.endswith('\n'):
-                fd.write('\n')
+            fd.write(self.get_keyfile_data())
 
     def export(self, path):
         self.store_keyfile(path)
+
+    def export_qr(self, path):
+        with open(path, 'wb') as fd:
+            key_data = self.get_keyfile_data()
+            html = pkgutil.get_data('borg', 'paperkey.html')
+            html = html.replace(b'</textarea>', key_data.encode() + b'</textarea>')
+            fd.write(html)
 
     def export_paperkey(self, path):
         def grouped(s):

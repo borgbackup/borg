@@ -10,7 +10,9 @@ block_cipher = None
 a = Analysis([os.path.join(basepath, 'src/borg/__main__.py'), ],
              pathex=[basepath, ],
              binaries=[],
-             datas=[],
+             datas=[
+                 ('../src/borg/paperkey.html', 'borg'),
+             ],
              hiddenimports=['borg.platform.posix'],
              hookspath=[],
              runtime_hooks=[],

@@ -72,7 +72,6 @@ class FuseOperations(llfuse.Operations):
         self.contents = defaultdict(dict)
         self.default_dir = Item(mode=0o40755, mtime=int(time.time() * 1e9), uid=os.getuid(), gid=os.getgid())
         self.pending_archives = {}
-        self.accounted_chunks = {}
         self.cache = ItemCache()
         data_cache_capacity = int(os.environ.get('BORG_MOUNT_DATA_CACHE_ENTRIES', os.cpu_count() or 1))
         logger.debug('mount data cache capacity: %d chunks', data_cache_capacity)
@@ -258,14 +257,9 @@ class FuseOperations(llfuse.Operations):
     def getattr(self, inode, ctx=None):
         item = self.get_item(inode)
         size = 0
-        dsize = 0
         if 'chunks' in item:
-            # if we would not need to compute dsize, we could get size quickly from item.size, if present.
             for key, chunksize, _ in item.chunks:
                 size += chunksize
-                if self.accounted_chunks.get(key, inode) == inode:
-                    self.accounted_chunks[key] = inode
-                    dsize += chunksize
         entry = llfuse.EntryAttributes()
         entry.st_ino = inode
         entry.generation = 0
@@ -278,7 +272,7 @@ class FuseOperations(llfuse.Operations):
         entry.st_rdev = item.get('rdev', 0)
         entry.st_size = size
         entry.st_blksize = 512
-        entry.st_blocks = dsize / 512
+        entry.st_blocks = (size + entry.st_blksize - 1) // entry.st_blksize
         # note: older archives only have mtime (not atime nor ctime)
         mtime_ns = item.mtime
         if have_fuse_xtime_ns:

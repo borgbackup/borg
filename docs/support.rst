@@ -28,6 +28,7 @@ nickname you get by typing "/nick mydesirednickname"):
 
 http://webchat.freenode.net/?randomnick=1&channels=%23borgbackup&uio=MTY9dHJ1ZSY5PXRydWUa8
 
+.. _mailing_list:
 
 Mailing list
 ------------

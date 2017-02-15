@@ -605,9 +605,7 @@ class Archiver:
                 if consider_ids is not None:  # consider only specific chunks
                     size = sum(chunk.size for chunk in item.chunks if chunk.id in consider_ids)
                 else:  # consider all chunks
-                    size = item.get('size')
-                    if size is None:
-                        size = sum(chunk.size for chunk in item.chunks)
+                    size = item.file_size()
             return size
 
         def get_owner(item):

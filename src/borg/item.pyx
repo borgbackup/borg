@@ -172,16 +172,24 @@ class Item(PropDict):
 
     part = PropDict._make_property('part', int)
 
-    def file_size(self, hardlink_masters=None):
+    def file_size(self, hardlink_masters=None, memorize=False):
+        """determine the size of this item"""
         size = self.get('size')
         if size is not None:
             return size
-        hardlink_masters = hardlink_masters or {}
-        chunks, _ = hardlink_masters.get(self.get('source'), (None, None))
-        chunks = self.get('chunks', chunks)
-        if chunks is None:
-            return 0
-        return sum(chunk.size for chunk in chunks)
+        chunks = self.get('chunks')
+        having_chunks = chunks is not None
+        if not having_chunks:
+            # this item has no (own) chunks, but if this is a hardlink slave
+            # and we know the master, we can still compute the size.
+            hardlink_masters = hardlink_masters or {}
+            chunks, _ = hardlink_masters.get(self.get('source'), (None, None))
+            if chunks is None:
+                return 0
+        size = sum(chunk.size for chunk in chunks)
+        if memorize and having_chunks:
+            self.size = size
+        return size
 
 
 class EncryptedKey(PropDict):

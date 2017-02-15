@@ -1701,10 +1701,7 @@ class ItemFormatter(BaseFormatter):
         return len(item.get('chunks', []))
 
     def calculate_size(self, item):
-        size = item.get('size')
-        if size is not None:
-            return size
-        return sum(c.size for c in item.get('chunks', []))
+        return item.file_size()
 
     def calculate_csize(self, item):
         return sum(c.csize for c in item.get('chunks', []))

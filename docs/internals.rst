@@ -5,6 +5,10 @@
 Internals
 =========
 
+.. toctree::
+
+    security
+
 This page documents the internal data structures and storage
 mechanisms of |project_name|. It is partly based on `mailing list
 discussion about internals`_ and also on static code analysis.

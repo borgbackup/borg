@@ -5,6 +5,9 @@
 Frequently asked questions
 ==========================
 
+Usage & Limitations
+###################
+
 Can I backup VM disk images?
 ----------------------------
 
@@ -105,7 +108,6 @@ Are there other known limitations?
   An easy workaround is to create multiple archives with less items each.
   See also the :ref:`archive_limitation` and :issue:`1452`.
 
-
 Why is my backup bigger than with attic? Why doesn't |project_name| do compression by default?
 ----------------------------------------------------------------------------------------------
 
@@ -119,6 +121,70 @@ use case, your data, your hardware -- so you need to do an informed
 decision about whether you want to use compression, which algorithm
 and which level you want to use. This is why compression defaults to
 none.
+
+If a backup stops mid-way, does the already-backed-up data stay there?
+----------------------------------------------------------------------
+
+Yes, |project_name| supports resuming backups.
+
+During a backup a special checkpoint archive named ``<archive-name>.checkpoint``
+is saved every checkpoint interval (the default value for this is 30
+minutes) containing all the data backed-up until that point.
+
+This checkpoint archive is a valid archive,
+but it is only a partial backup (not all files that you wanted to backup are
+contained in it). Having it in the repo until a successful, full backup is
+completed is useful because it references all the transmitted chunks up
+to the checkpoint. This means that in case of an interruption, you only need to
+retransfer the data since the last checkpoint.
+
+If a backup was interrupted, you do not need to do any special considerations,
+just invoke ``borg create`` as you always do. You may use the same archive name
+as in previous attempt or a different one (e.g. if you always include the current
+datetime), it does not matter.
+
+|project_name| always does full single-pass backups, so it will start again
+from the beginning - but it will be much faster, because some of the data was
+already stored into the repo (and is still referenced by the checkpoint
+archive), so it does not need to get transmitted and stored again.
+
+Once your backup has finished successfully, you can delete all
+``<archive-name>.checkpoint`` archives. If you run ``borg prune``, it will
+also care for deleting unneeded checkpoints.
+
+Note: the checkpointing mechanism creates hidden, partial files in an archive,
+so that checkpoints even work while a big file is being processed.
+They are named ``<filename>.borg_part_<N>`` and all operations usually ignore
+these files, but you can make them considered by giving the option
+``--consider-part-files``. You usually only need that option if you are
+really desperate (e.g. if you have no completed backup of that file and you'ld
+rather get a partial file extracted than nothing). You do **not** want to give
+that option under any normal circumstances.
+
+Can |project_name| add redundancy to the backup data to deal with hardware malfunction?
+---------------------------------------------------------------------------------------
+
+No, it can't. While that at first sounds like a good idea to defend against
+some defect HDD sectors or SSD flash blocks, dealing with this in a
+reliable way needs a lot of low-level storage layout information and
+control which we do not have (and also can't get, even if we wanted).
+
+So, if you need that, consider RAID or a filesystem that offers redundant
+storage or just make backups to different locations / different hardware.
+
+See also :issue:`225`.
+
+Can |project_name| verify data integrity of a backup archive?
+-------------------------------------------------------------
+
+Yes, if you want to detect accidental data damage (like bit rot), use the
+``check`` operation. It will notice corruption using CRCs and hashes.
+If you want to be able to detect malicious tampering also, use an encrypted
+repo. It will then be able to check using CRCs and HMACs.
+
+
+Security
+########
 
 How can I specify the encryption passphrase programmatically?
 -------------------------------------------------------------
@@ -210,6 +276,9 @@ Send a private email to the :ref:`security-contact` if you think you
 have discovered a security issue. Please disclose security issues
 responsibly.
 
+Common issues
+#############
+
 Why do I get "connection closed by remote" after a while?
 ---------------------------------------------------------
 
@@ -269,45 +338,6 @@ This has some pros and cons, though:
 
 The long term plan to improve this is called "borgception", see :issue:`474`.
 
-If a backup stops mid-way, does the already-backed-up data stay there?
-----------------------------------------------------------------------
-
-Yes, |project_name| supports resuming backups.
-
-During a backup a special checkpoint archive named ``<archive-name>.checkpoint``
-is saved every checkpoint interval (the default value for this is 30
-minutes) containing all the data backed-up until that point.
-
-This checkpoint archive is a valid archive,
-but it is only a partial backup (not all files that you wanted to backup are
-contained in it). Having it in the repo until a successful, full backup is
-completed is useful because it references all the transmitted chunks up
-to the checkpoint. This means that in case of an interruption, you only need to
-retransfer the data since the last checkpoint.
-
-If a backup was interrupted, you do not need to do any special considerations,
-just invoke ``borg create`` as you always do. You may use the same archive name
-as in previous attempt or a different one (e.g. if you always include the current
-datetime), it does not matter.
-
-|project_name| always does full single-pass backups, so it will start again
-from the beginning - but it will be much faster, because some of the data was
-already stored into the repo (and is still referenced by the checkpoint
-archive), so it does not need to get transmitted and stored again.
-
-Once your backup has finished successfully, you can delete all
-``<archive-name>.checkpoint`` archives. If you run ``borg prune``, it will
-also care for deleting unneeded checkpoints.
-
-Note: the checkpointing mechanism creates hidden, partial files in an archive,
-so that checkpoints even work while a big file is being processed.
-They are named ``<filename>.borg_part_<N>`` and all operations usually ignore
-these files, but you can make them considered by giving the option
-``--consider-part-files``. You usually only need that option if you are
-really desperate (e.g. if you have no completed backup of that file and you'ld
-rather get a partial file extracted than nothing). You do **not** want to give
-that option under any normal circumstances.
-
 How can I backup huge file(s) over a unstable connection?
 ---------------------------------------------------------
 
@@ -337,27 +367,6 @@ If you run into that, try this:
 - avoid the non-ascii characters on the commandline by e.g. extracting
   the parent directory (or even everything)
 - mount the repo using FUSE and use some file manager
-
-Can |project_name| add redundancy to the backup data to deal with hardware malfunction?
----------------------------------------------------------------------------------------
-
-No, it can't. While that at first sounds like a good idea to defend against
-some defect HDD sectors or SSD flash blocks, dealing with this in a
-reliable way needs a lot of low-level storage layout information and
-control which we do not have (and also can't get, even if we wanted).
-
-So, if you need that, consider RAID or a filesystem that offers redundant
-storage or just make backups to different locations / different hardware.
-
-See also :issue:`225`.
-
-Can |project_name| verify data integrity of a backup archive?
--------------------------------------------------------------
-
-Yes, if you want to detect accidental data damage (like bit rot), use the
-``check`` operation. It will notice corruption using CRCs and hashes.
-If you want to be able to detect malicious tampering also, use an encrypted
-repo. It will then be able to check using CRCs and HMACs.
 
 .. _a_status_oddity:
 
@@ -469,6 +478,8 @@ maybe open an issue in their issue tracker. Do not file an issue in the
 If you can reproduce the issue with the proven filesystem, please file an
 issue in the |project_name| issue tracker about that.
 
+Miscellaneous
+#############
 
 Requirements for the borg single-file binary, esp. (g)libc?
 -----------------------------------------------------------

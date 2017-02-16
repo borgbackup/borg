@@ -79,7 +79,13 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
                 archiver = Archiver()
             archiver.prerun_checks = lambda *args: None
             archiver.exit_code = EXIT_SUCCESS
-            args = archiver.parse_args(list(args))
+            try:
+                args = archiver.parse_args(list(args))
+                # argparse parsing may raise SystemExit when the command line is bad or
+                # actions that abort early (eg. --help) where given. Catch this and return
+                # the error code as-if we invoked a Borg binary.
+            except SystemExit as e:
+                return e.code, output.getvalue()
             ret = archiver.run(args)
             return ret, output.getvalue()
         finally:
@@ -879,16 +885,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_create_without_root(self):
         """test create without a root"""
-        self.cmd('init', self.repository_location)
-        args = ['create', self.repository_location + '::test']
-        if self.FORK_DEFAULT:
-            self.cmd(*args, exit_code=2)
-        else:
-            self.assert_raises(SystemExit, lambda: self.cmd(*args))
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', exit_code=2)
 
     def test_create_pattern_root(self):
         """test create with only a root pattern"""
-        self.cmd('init', self.repository_location)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
         output = self.cmd('create', '-v', '--list', '--pattern=R input', self.repository_location + '::test')
@@ -897,7 +899,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_create_pattern(self):
         """test file patterns during create"""
-        self.cmd('init', self.repository_location)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
         self.create_regular_file('file_important', size=1024 * 80)
@@ -910,7 +912,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('x input/file2', output)
 
     def test_extract_pattern_opt(self):
-        self.cmd('init', self.repository_location)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
         self.create_regular_file('file_important', size=1024 * 80)
@@ -920,9 +922,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                      '--pattern=+input/file_important', '--pattern=-input/file*',
                      self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file_important'])
-
-    def test_exclude_caches(self):
-        self.cmd('init', self.repository_location)
 
     def _assert_test_caches(self):
         with changedir('output'):
@@ -1516,12 +1515,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('break-lock', self.repository_location)
 
     def test_usage(self):
-        if self.FORK_DEFAULT:
-            self.cmd(exit_code=0)
-            self.cmd('-h', exit_code=0)
-        else:
-            self.assert_raises(SystemExit, lambda: self.cmd())
-            self.assert_raises(SystemExit, lambda: self.cmd('-h'))
+        self.cmd()
+        self.cmd('-h')
 
     def test_help(self):
         assert 'Borg' in self.cmd('help')
@@ -1776,6 +1771,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with patch.object(KeyfileKeyBase, 'create', raise_eof):
             self.cmd('init', '--encryption=repokey', self.repository_location, exit_code=1)
         assert not os.path.exists(self.repository_location)
+
+    def test_init_requires_encryption_option(self):
+        self.cmd('init', self.repository_location, exit_code=2)
 
     def check_cache(self):
         # First run a regular borg check
@@ -2476,10 +2474,10 @@ class RemoteArchiverTestCase(ArchiverTestCase):
         path_prefix = os.path.dirname(self.repository_path)
         # restrict to repo directory's parent directory:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', path_prefix]):
-            self.cmd('init', self.repository_location + '_2')
+            self.cmd('init', '--encryption=repokey', self.repository_location + '_2')
         # restrict to repo directory's parent directory and another directory:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo', '--restrict-to-path', path_prefix]):
-            self.cmd('init', self.repository_location + '_3')
+            self.cmd('init', '--encryption=repokey', self.repository_location + '_3')
 
     @unittest.skip('only works locally')
     def test_debug_put_get_delete_obj(self):
@@ -2682,7 +2680,7 @@ def test_get_args():
     assert args.restrict_to_paths == ['/p1', '/p2']
     # trying to cheat - try to execute different subcommand
     args = archiver.get_args(['borg', 'serve', '--restrict-to-path=/p1', '--restrict-to-path=/p2', ],
-                             'borg init /')
+                             'borg init --encryption=repokey /')
     assert args.func == archiver.do_serve
 
 

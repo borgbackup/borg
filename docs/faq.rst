@@ -96,7 +96,7 @@ Which file types, attributes, etc. are *not* preserved?
       backed up as (deduplicated and compressed) runs of zero bytes.
       Archive extraction has optional support to extract all-zero chunks as
       holes in a sparse file.
-    * filesystem specific attributes, like ext4 immutable bit, see :issue:`618`.
+    * Some filesystem specific attributes, like btrfs NOCOW, see :ref:`platforms`.
 
 Are there other known limitations?
 ----------------------------------

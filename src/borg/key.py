@@ -98,8 +98,10 @@ def key_creator(repository, args):
         return Blake2RepoKey.create(repository, args)
     elif args.encryption == 'authenticated':
         return AuthenticatedKey.create(repository, args)
-    else:
+    elif args.encryption == 'none':
         return PlaintextKey.create(repository, args)
+    else:
+        raise ValueError('Invalid encryption mode "%s"' % args.encryption)
 
 
 def key_factory(repository, manifest_data):

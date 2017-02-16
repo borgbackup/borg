@@ -1850,9 +1850,8 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to create')
-        subparser.add_argument('-e', '--encryption', dest='encryption',
+        subparser.add_argument('-e', '--encryption', dest='encryption', required=True,
                                choices=('none', 'keyfile', 'repokey', 'keyfile-blake2', 'repokey-blake2', 'authenticated'),
-                               default=None,
                                help='select encryption key mode')
         subparser.add_argument('-a', '--append-only', dest='append_only', action='store_true',
                                help='create an append-only mode repository')

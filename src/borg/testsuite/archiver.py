@@ -1298,9 +1298,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', self.repository_location)
         test_archive = self.repository_location + '::test'
         self.cmd('create', '-C', 'lz4', test_archive, 'input')
-        output = self.cmd('list', '--format', '{size} {csize} {path}{NL}', test_archive)
-        size, csize, path = output.split("\n")[1].split(" ")
+        output = self.cmd('list', '--format', '{size} {csize} {dsize} {dcsize} {path}{NL}', test_archive)
+        size, csize, dsize, dcsize, path = output.split("\n")[1].split(" ")
         assert int(csize) < int(size)
+        assert int(dcsize) < int(dsize)
+        assert int(dsize) <= int(size)
+        assert int(dcsize) <= int(csize)
 
     def _get_sizes(self, compression, compressible, size=10000):
         if compressible:

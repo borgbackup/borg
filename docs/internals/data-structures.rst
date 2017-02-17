@@ -438,12 +438,12 @@ Encryption
 .. seealso:: The :ref:`borgcrypto` section for an in-depth review.
 
 AES_-256 is used in CTR mode (so no need for padding). A 64 bit initialization
-vector is used, a `HMAC-SHA256`_ is computed on the encrypted chunk
+vector is used, a MAC is computed on the encrypted chunk
 and both are stored in the chunk.
-The header of each chunk is: ``TYPE(1)`` + ``HMAC(32)`` + ``NONCE(8)`` + ``CIPHERTEXT``.
-Encryption and HMAC use two different keys.
+The header of each chunk is: ``TYPE(1)`` + ``MAC(32)`` + ``NONCE(8)`` + ``CIPHERTEXT``.
+Encryption and MAC use two different keys.
 
-In AES CTR mode you can think of the IV as the start value for the counter.
+In AES-CTR mode you can think of the IV as the start value for the counter.
 The counter itself is incremented by one after each 16 byte block.
 The IV/counter is not required to be random but it must NEVER be reused.
 So to accomplish this |project_name| initializes the encryption counter to be

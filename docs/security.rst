@@ -8,6 +8,8 @@
 Security
 ========
 
+.. _borgcrypto:
+
 Cryptography in Borg
 ====================
 
@@ -197,6 +199,8 @@ respectively).
 This scheme, and specifically the use of a constant IV with the CTR
 mode, is secure because an identical passphrase will result in a
 different derived KEK for every encryption due to the salt.
+
+Refer to the :ref:`key_files` section for details on the format.
 
 Implementations used
 --------------------

@@ -13,16 +13,27 @@ This page documents the internal data structures and storage
 mechanisms of |project_name|. It is partly based on `mailing list
 discussion about internals`_ and also on static code analysis.
 
+Borg is uses a low-level, key-value store, the Repository_, and implements
+a more complex data structure on top of it, which is made up of the manifest_,
+`archives <archive>`_, `items <item>`_ and `data chunks <chunks>`_.
 
-Repository and Archives
------------------------
+Each repository can hold multiple `archives <archive>`_, which represent
+individual backups that contain a full archive of the files specified
+when the backup was performed.
 
-|project_name| stores its data in a `Repository`. Each repository can
-hold multiple `Archives`, which represent individual backups that
-contain a full archive of the files specified when the backup was
-performed. Deduplication is performed across multiple backups, both on
-data and metadata, using `Chunks` created by the chunker using the Buzhash_
+Deduplication is performed globally across all data in the repository
+(multiple backups and even multiple hosts), both on data and
+metadata, using `chunks <chunk>`_ created by the chunker using the Buzhash_
 algorithm.
+
+Repository
+----------
+
+.. Some parts of this description were taken from the Repository docstring
+
+|project_name| stores its data in a `Repository`, which is a filesystem-based
+transactional key-value store. Thus the repository does not know about
+the concept of archives or items.
 
 Each repository has the following file structure:
 
@@ -44,35 +55,13 @@ index.%d
 lock.roster and lock.exclusive/*
   used by the locking system to manage shared and exclusive locks
 
-
-Lock files
-----------
-
-|project_name| uses locks to get (exclusive or shared) access to the cache and
-the repository.
-
-The locking system is based on creating a directory `lock.exclusive` (for
-exclusive locks). Inside the lock directory, there is a file indicating
-hostname, process id and thread id of the lock holder.
-
-There is also a json file `lock.roster` that keeps a directory of all shared
-and exclusive lockers.
-
-If the process can create the `lock.exclusive` directory for a resource, it has
-the lock for it. If creation fails (because the directory has already been
-created by some other process), lock acquisition fails.
-
-The cache lock is usually in `~/.cache/borg/REPOID/lock.*`.
-The repository lock is in `repository/lock.*`.
-
-In case you run into troubles with the locks, you can use the ``borg break-lock``
-command after you first have made sure that no |project_name| process is
-running on any machine that accesses this resource. Be very careful, the cache
-or repository might get damaged if multiple processes use it at the same time.
-
+Transactionality is achieved by using a log (aka journal) to record changes. The log is a series of numbered files
+called segments_. Each segment is a series of log entries. The segment number together with the offset of each
+entry relative to its segment start establishes an ordering of the log entries. This is the "definition" of
+time for the purposes of the log.
 
 Config file
------------
+~~~~~~~~~~~
 
 Each repository has a ``config`` file which which is a ``INI``-style file
 and looks like this::
@@ -88,61 +77,93 @@ identifier for repositories. It will not change if you move the
 repository around so you can make a local transfer then decide to move
 the repository to another (even remote) location at a later time.
 
-
 Keys
-----
-The key to address the key/value store is usually computed like this:
+~~~~
 
-key = id = id_hash(unencrypted_data)
+Repository keys are byte-strings of fixed length (32 bytes), they
+don't have a particular meaning (except for the Manifest_).
 
-The id_hash function is:
+Normally the keys are computed like this::
 
-* sha256 (no encryption keys available)
-* hmac-sha256 (encryption keys available)
+  key = id = id_hash(unencrypted_data)
 
+The id_hash function depends on the :ref:`encryption mode <borg_init>`.
 
-Segments and archives
----------------------
+Segments
+~~~~~~~~
 
 A |project_name| repository is a filesystem based transactional key/value
 store. It makes extensive use of msgpack_ to store data and, unless
 otherwise noted, data is stored in msgpack_ encoded files.
 
 Objects referenced by a key are stored inline in files (`segments`) of approx.
-5MB size in numbered subdirectories of ``repo/data``.
+500 MB size in numbered subdirectories of ``repo/data``.
 
-They contain:
+A segment starts with a magic number (``BORG_SEG`` as an eight byte ASCII string),
+followed by a number of log entries. Each log entry consists of:
 
-* header size
-* crc
-* size
-* tag
-* key
-* data
+* size of the entry
+* CRC32 of the entire entry (for a PUT this includes the data)
+* entry tag: PUT, DELETE or COMMIT
+* PUT and DELETE follow this with the 32 byte key
+* PUT follow the key with the data
 
-Segments are built locally, and then uploaded. Those files are
-strictly append-only and modified only once.
+Those files are strictly append-only and modified only once.
 
-Tag is either ``PUT``, ``DELETE``, or ``COMMIT``. A segment file is
-basically a transaction log where each repository operation is
-appended to the file. So if an object is written to the repository a
-``PUT`` tag is written to the file followed by the object id and
-data. If an object is deleted a ``DELETE`` tag is appended
-followed by the object id. A ``COMMIT`` tag is written when a
-repository transaction is committed.  When a repository is opened any
-``PUT`` or ``DELETE`` operations not followed by a ``COMMIT`` tag are
-discarded since they are part of a partial/uncommitted transaction.
+Tag is either ``PUT``, ``DELETE``, or ``COMMIT``.
 
+When an object is written to the repository a ``PUT`` entry is written
+to the file containing the object id and data. If an object is deleted
+a ``DELETE`` entry is appended with the object id.
+
+A ``COMMIT`` tag is written when a repository transaction is
+committed.
+
+When a repository is opened any ``PUT`` or ``DELETE`` operations not
+followed by a ``COMMIT`` tag are discarded since they are part of a
+partial/uncommitted transaction.
+
+Compaction
+~~~~~~~~~~
+
+For a given key only the last entry regarding the key, which is called current (all other entries are called
+superseded), is relevant: If there is no entry or the last entry is a DELETE then the key does not exist.
+Otherwise the last PUT defines the value of the key.
+
+By superseding a PUT (with either another PUT or a DELETE) the log entry becomes obsolete. A segment containing
+such obsolete entries is called sparse, while a segment containing no such entries is called compact.
+
+Since writing a ``DELETE`` tag does not actually delete any data and
+thus does not free disk space any log-based data store will need a
+compaction strategy.
+
+Borg tracks which segments are sparse and does a forward compaction
+when a commit is issued (unless the :ref:`append_only_mode` is
+active).
+
+Compaction processes sparse segments from oldest to newest; sparse segments
+which don't contain enough deleted data to justify compaction are skipped. This
+avoids doing e.g. 500 MB of writing current data to a new segment when only
+a couple kB were deleted in a segment.
+
+Segments that are compacted are read in entirety. Current entries are written to
+a new segment, while superseded entries are omitted. After each segment an intermediary
+commit is written to the new segment, data is synced and the old segment is deleted --
+freeing disk space.
+
+(The actual algorithm is more complex to avoid various consistency issues, refer to
+the ``borg.repository`` module for more comments and documentation on these issues.)
+
+.. _manifest:
 
 The manifest
 ------------
 
 The manifest is an object with an all-zero key that references all the
-archives.
-It contains:
+archives. It contains:
 
-* version
-* list of archive infos
+* Manifest version
+* A list of archive infos
 * timestamp
 * config
 
@@ -153,10 +174,12 @@ Each archive info contains:
 * time
 
 It is the last object stored, in the last segment, and is replaced
-each time.
+each time an archive is added or deleted.
 
-The Archive
------------
+.. _archive:
+
+Archives
+--------
 
 The archive metadata does not contain the file items directly. Only
 references to other objects that contain that data. An archive is an
@@ -199,8 +222,10 @@ IntegrityError will be raised.
 A workaround is to create multiple archives with less items each, see
 also :issue:`1452`.
 
-The Item
---------
+.. _item:
+
+Items
+-----
 
 Each item represents a file, directory or other fs item and is stored as an
 ``item`` dictionary that contains:
@@ -251,7 +276,6 @@ size based fingerprinting attacks on your encrypted repo contents (to guess
 what files you have based on a specific set of chunk sizes).
 
 For some more general usage hints see also ``--chunker-params``.
-
 
 Indexes / Caches
 ----------------
@@ -428,6 +452,8 @@ b) with ``create --chunker-params 19,23,21,4095`` (default):
 Encryption
 ----------
 
+.. seealso:: The :ref:`borgcrypto` section for an in-depth review.
+
 AES_-256 is used in CTR mode (so no need for padding). A 64bit initialization
 vector is used, a `HMAC-SHA256`_ is computed on the encrypted chunk with a
 random 64bit nonce and both are stored in the chunk.
@@ -453,6 +479,7 @@ is stored into the keyfile or as repokey).
 The passphrase is passed through the ``BORG_PASSPHRASE`` environment variable
 or prompted for interactive usage.
 
+.. _key_files:
 
 Key files
 ---------
@@ -550,3 +577,28 @@ Compression is applied after deduplication, thus using different compression
 methods in one repo does not influence deduplication.
 
 See ``borg create --help`` about how to specify the compression level and its default.
+
+Lock files
+----------
+
+|project_name| uses locks to get (exclusive or shared) access to the cache and
+the repository.
+
+The locking system is based on creating a directory `lock.exclusive` (for
+exclusive locks). Inside the lock directory, there is a file indicating
+hostname, process id and thread id of the lock holder.
+
+There is also a json file `lock.roster` that keeps a directory of all shared
+and exclusive lockers.
+
+If the process can create the `lock.exclusive` directory for a resource, it has
+the lock for it. If creation fails (because the directory has already been
+created by some other process), lock acquisition fails.
+
+The cache lock is usually in `~/.cache/borg/REPOID/lock.*`.
+The repository lock is in `repository/lock.*`.
+
+In case you run into troubles with the locks, you can use the ``borg break-lock``
+command after you first have made sure that no |project_name| process is
+running on any machine that accesses this resource. Be very careful, the cache
+or repository might get damaged if multiple processes use it at the same time.

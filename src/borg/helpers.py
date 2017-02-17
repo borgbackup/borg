@@ -1425,12 +1425,14 @@ class ItemFormatter(BaseFormatter):
         'source': 'link target for links (identical to linktarget)',
         'extra': 'prepends {source} with " -> " for soft links and " link to " for hard links',
         'csize': 'compressed size',
+        'dsize': 'deduplicated size',
+        'dcsize': 'deduplicated compressed size',
         'num_chunks': 'number of chunks in this file',
         'unique_chunks': 'number of unique chunks in this file',
     }
     KEY_GROUPS = (
         ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget', 'flags'),
-        ('size', 'csize', 'num_chunks', 'unique_chunks'),
+        ('size', 'csize', 'dsize', 'dcsize', 'num_chunks', 'unique_chunks'),
         ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
         tuple(sorted(hashlib.algorithms_guaranteed)),
         ('archiveid', 'archivename', 'extra'),
@@ -1479,6 +1481,8 @@ class ItemFormatter(BaseFormatter):
         self.call_keys = {
             'size': self.calculate_size,
             'csize': self.calculate_csize,
+            'dsize': self.calculate_dsize,
+            'dcsize': self.calculate_dcsize,
             'num_chunks': self.calculate_num_chunks,
             'unique_chunks': self.calculate_unique_chunks,
             'isomtime': partial(self.format_time, 'mtime'),
@@ -1539,6 +1543,14 @@ class ItemFormatter(BaseFormatter):
 
     def calculate_csize(self, item):
         return sum(c.csize for c in item.get('chunks', []))
+
+    def calculate_dsize(self, item):
+        chunk_index = self.archive.cache.chunks
+        return sum(c.size for c in item.get('chunks', []) if chunk_index[c.id].refcount == 1)
+
+    def calculate_dcsize(self, item):
+        chunk_index = self.archive.cache.chunks
+        return sum(c.csize for c in item.get('chunks', []) if chunk_index[c.id].refcount == 1)
 
     def hash_item(self, hash_function, item):
         if 'chunks' not in item:

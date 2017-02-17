@@ -19,7 +19,7 @@ import time
 import unicodedata
 import uuid
 from binascii import hexlify
-from collections import namedtuple, deque, abc
+from collections import namedtuple, deque, abc, Counter
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from functools import wraps, partial, lru_cache
@@ -1546,11 +1546,15 @@ class ItemFormatter(BaseFormatter):
 
     def calculate_dsize(self, item):
         chunk_index = self.archive.cache.chunks
-        return sum(c.size for c in item.get('chunks', []) if chunk_index[c.id].refcount == 1)
+        chunks = item.get('chunks', [])
+        chunks_counter = Counter(c.id for c in chunks)
+        return sum(c.size for c in chunks if chunk_index[c.id].refcount == chunks_counter[c.id])
 
     def calculate_dcsize(self, item):
         chunk_index = self.archive.cache.chunks
-        return sum(c.csize for c in item.get('chunks', []) if chunk_index[c.id].refcount == 1)
+        chunks = item.get('chunks', [])
+        chunks_counter = Counter(c.id for c in chunks)
+        return sum(c.csize for c in chunks if chunk_index[c.id].refcount == chunks_counter[c.id])
 
     def hash_item(self, hash_function, item):
         if 'chunks' not in item:

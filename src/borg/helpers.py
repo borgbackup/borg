@@ -1481,8 +1481,8 @@ class ItemFormatter(BaseFormatter):
         self.call_keys = {
             'size': self.calculate_size,
             'csize': self.calculate_csize,
-            'dsize': self.calculate_dsize,
-            'dcsize': self.calculate_dcsize,
+            'dsize': partial(self.sum_unique_chunks_metadata, lambda chunk: chunk.size),
+            'dcsize': partial(self.sum_unique_chunks_metadata, lambda chunk: chunk.csize),
             'num_chunks': self.calculate_num_chunks,
             'unique_chunks': self.calculate_unique_chunks,
             'isomtime': partial(self.format_time, 'mtime'),
@@ -1531,6 +1531,20 @@ class ItemFormatter(BaseFormatter):
             item_data[key] = self.call_keys[key](item)
         return item_data
 
+    def sum_unique_chunks_metadata(self, metadata_func, item):
+        """
+        sum unique chunks metadata, a unique chunk is a chunk which is referenced globally as often as it is in the
+        item
+
+        item: The item to sum its unique chunks' metadata
+        metadata_func: A function that takes a parameter of type ChunkIndexEntry and returns a number, used to return
+                       the metadata needed from the chunk
+        """
+        chunk_index = self.archive.cache.chunks
+        chunks = item.get('chunks', [])
+        chunks_counter = Counter(c.id for c in chunks)
+        return sum(metadata_func(c) for c in chunks if chunk_index[c.id].refcount == chunks_counter[c.id])
+
     def calculate_num_chunks(self, item):
         return len(item.get('chunks', []))
 
@@ -1543,18 +1557,6 @@ class ItemFormatter(BaseFormatter):
 
     def calculate_csize(self, item):
         return sum(c.csize for c in item.get('chunks', []))
-
-    def calculate_dsize(self, item):
-        chunk_index = self.archive.cache.chunks
-        chunks = item.get('chunks', [])
-        chunks_counter = Counter(c.id for c in chunks)
-        return sum(c.size for c in chunks if chunk_index[c.id].refcount == chunks_counter[c.id])
-
-    def calculate_dcsize(self, item):
-        chunk_index = self.archive.cache.chunks
-        chunks = item.get('chunks', [])
-        chunks_counter = Counter(c.id for c in chunks)
-        return sum(c.csize for c in chunks if chunk_index[c.id].refcount == chunks_counter[c.id])
 
     def hash_item(self, hash_function, item):
         if 'chunks' not in item:

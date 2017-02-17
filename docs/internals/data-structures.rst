@@ -437,9 +437,9 @@ Encryption
 
 .. seealso:: The :ref:`borgcrypto` section for an in-depth review.
 
-AES_-256 is used in CTR mode (so no need for padding). A 64bit initialization
-vector is used, a `HMAC-SHA256`_ is computed on the encrypted chunk with a
-random 64bit nonce and both are stored in the chunk.
+AES_-256 is used in CTR mode (so no need for padding). A 64 bit initialization
+vector is used, a `HMAC-SHA256`_ is computed on the encrypted chunk
+and both are stored in the chunk.
 The header of each chunk is: ``TYPE(1)`` + ``HMAC(32)`` + ``NONCE(8)`` + ``CIPHERTEXT``.
 Encryption and HMAC use two different keys.
 

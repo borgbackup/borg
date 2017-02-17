@@ -1484,7 +1484,7 @@ class ItemFormatter(BaseFormatter):
             'dsize': partial(self.sum_unique_chunks_metadata, lambda chunk: chunk.size),
             'dcsize': partial(self.sum_unique_chunks_metadata, lambda chunk: chunk.csize),
             'num_chunks': self.calculate_num_chunks,
-            'unique_chunks': self.calculate_unique_chunks,
+            'unique_chunks': partial(self.sum_unique_chunks_metadata, lambda chunk: 1),
             'isomtime': partial(self.format_time, 'mtime'),
             'isoctime': partial(self.format_time, 'ctime'),
             'isoatime': partial(self.format_time, 'atime'),
@@ -1547,10 +1547,6 @@ class ItemFormatter(BaseFormatter):
 
     def calculate_num_chunks(self, item):
         return len(item.get('chunks', []))
-
-    def calculate_unique_chunks(self, item):
-        chunk_index = self.archive.cache.chunks
-        return sum(1 for c in item.get('chunks', []) if chunk_index[c.id].refcount == 1)
 
     def calculate_size(self, item):
         return sum(c.size for c in item.get('chunks', []))

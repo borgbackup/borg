@@ -39,7 +39,7 @@ from .item import Item, ArchiveItem
 from .key import key_factory
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth
 from .remote import cache_if_remote
-from .repository import Repository
+from .repository import Repository, LIST_SCAN_LIMIT
 
 has_lchmod = hasattr(os, 'lchmod')
 
@@ -1060,7 +1060,7 @@ class ArchiveChecker:
         self.chunks = ChunkIndex(capacity)
         marker = None
         while True:
-            result = self.repository.list(limit=10000, marker=marker)
+            result = self.repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
             if not result:
                 break
             marker = result[-1]

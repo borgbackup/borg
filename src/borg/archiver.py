@@ -57,7 +57,7 @@ from .key import key_creator, tam_required_file, tam_required, RepoKey, Passphra
 from .keymanager import KeyManager
 from .platform import get_flags, umount, get_process_id
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
-from .repository import Repository
+from .repository import Repository, LIST_SCAN_LIMIT
 from .selftest import selftest
 from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 
@@ -1305,7 +1305,7 @@ class Archiver:
         marker = None
         i = 0
         while True:
-            result = repository.list(limit=10000, marker=marker)
+            result = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
             if not result:
                 break
             marker = result[-1]

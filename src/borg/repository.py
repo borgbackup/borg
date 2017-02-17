@@ -33,6 +33,8 @@ TAG_PUT = 0
 TAG_DELETE = 1
 TAG_COMMIT = 2
 
+LIST_SCAN_LIMIT = 10000  # repo.list() / .scan() result count limit the borg client uses
+
 FreeSpace = partial(defaultdict, int)
 
 

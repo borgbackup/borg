@@ -467,10 +467,15 @@ or prompted for interactive usage.
 Key files
 ---------
 
+.. seealso:: The :ref:`key_encryption` section for an in-depth review of the key encryption.
+
 When initialized with the ``init -e keyfile`` command, |project_name|
 needs an associated file in ``$HOME/.config/borg/keys`` to read and write
 the repository. The format is based on msgpack_, base64 encoding and
 PBKDF2_ SHA256 hashing, which is then encoded again in a msgpack_.
+
+The same data structure is also used in the "repokey" modes, which store
+it in the repository in the configuration file.
 
 The internal data structure is as follows:
 
@@ -492,12 +497,14 @@ id_key
 chunk_seed
   the seed for the buzhash chunking table (signed 32 bit integer)
 
-Those fields are processed using msgpack_. The utf-8 encoded passphrase
+These fields are packed using msgpack_. The utf-8 encoded passphrase
 is processed with PBKDF2_ (SHA256_, 100000 iterations, random 256 bit salt)
-to give us a derived key. The derived key is 256 bits long.
-A `HMAC-SHA256`_ checksum of the above fields is generated with the derived
-key, then the derived key is also used to encrypt the above pack of fields.
-Then the result is stored in a another msgpack_ formatted as follows:
+to derive a 256 bit key encryption key (KEK).
+
+A `HMAC-SHA256`_ checksum of the packed fields is generated with the KEK,
+then the KEK is also used to encrypt the same packed fields using AES-CTR.
+
+The result is stored in a another msgpack_ formatted as follows:
 
 version
   currently always an integer, 1
@@ -513,17 +520,15 @@ algorithm
   checksum (currently the string ``sha256``)
 
 hash
-  the HMAC of the encrypted derived key
+  HMAC-SHA256 of the *plaintext* of the packed fields.
 
 data
-  the derived key, encrypted with AES over a PBKDF2_ SHA256 key
-  described above
+  The encrypted, packed fields.
 
 The resulting msgpack_ is then encoded using base64 and written to the
 key file, wrapped using the standard ``textwrap`` module with a header.
 The header is a single line with a MAGIC string, a space and a hexadecimal
 representation of the repository id.
-
 
 Compression
 -----------

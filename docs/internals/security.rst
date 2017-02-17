@@ -174,6 +174,8 @@ Decryption::
 
        Borg does not support "passphrase" mode otherwise any more.
 
+.. _key_encryption:
+
 Offline key security
 --------------------
 
@@ -185,12 +187,11 @@ user-chosen passphrase.
 
 A 256 bit key encryption key (KEK) is derived from the passphrase
 using PBKDF2-HMAC-SHA256 with a random 256 bit salt which is then used
-to Encrypt-then-MAC a packed representation of the keys with
-AES-256-CTR with a constant initialization vector of 0 (this is the
-same construction used for Encryption_ with HMAC-SHA-256).
-
-The resulting MAC is stored alongside the ciphertext, which is
-converted to base64 in its entirety.
+to Encrypt-*and*-MAC (unlike the Encrypt-*then*-MAC approach used
+otherwise) a packed representation of the keys with AES-256-CTR with a
+constant initialization vector of 0. A HMAC-SHA256 of the plaintext is
+generated using the same KEK and is stored alongside the ciphertext,
+which is converted to base64 in its entirety.
 
 This base64 blob (commonly referred to as *keyblob*) is then stored in
 the key file or in the repository config (keyfile and repokey modes
@@ -198,9 +199,19 @@ respectively).
 
 This scheme, and specifically the use of a constant IV with the CTR
 mode, is secure because an identical passphrase will result in a
-different derived KEK for every encryption due to the salt.
+different derived KEK for every key encryption due to the salt.
 
-Refer to the :ref:`key_files` section for details on the format.
+The use of Encrypt-and-MAC instead of Encrypt-then-MAC is seen as
+uncritical (but not ideal) here, since it is combined with AES-CTR mode,
+which is not vulnerable to padding attacks.
+
+
+.. seealso::
+
+   Refer to the :ref:`key_files` section for details on the format.
+
+   Refer to issue :issue:`747` for suggested improvements of the encryption
+   scheme and password-based key derivation.
 
 Implementations used
 --------------------
@@ -223,6 +234,8 @@ Implemented cryptographic constructions are:
 
 - Encrypt-then-MAC based on AES-256-CTR and either HMAC-SHA-256
   or keyed BLAKE2b256 as described above under Encryption_.
+- Encrypt-and-MAC based on AES-256-CTR and HMAC-SHA-256
+  as described above under `Offline key security`_.
 - HKDF_-SHA-512
 
 .. _Horton principle: https://en.wikipedia.org/wiki/Horton_Principle

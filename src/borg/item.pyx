@@ -1,3 +1,5 @@
+from collections import namedtuple
+
 from .constants import ITEM_KEYS
 from .helpers import safe_encode, safe_decode
 from .helpers import StableDict
@@ -113,6 +115,8 @@ class PropDict:
         return property(_get, _set, _del, doc=doc)
 
 
+ChunkListEntry = namedtuple('ChunkListEntry', 'id size csize')
+
 class Item(PropDict):
     """
     Item abstraction that deals with validation and the low-level details internally:
@@ -172,23 +176,38 @@ class Item(PropDict):
 
     part = PropDict._make_property('part', int)
 
-    def file_size(self, hardlink_masters=None, memorize=False):
-        """determine the size of this item"""
-        size = self.get('size')
-        if size is not None:
-            return size
-        chunks = self.get('chunks')
-        having_chunks = chunks is not None
-        if not having_chunks:
-            # this item has no (own) chunks, but if this is a hardlink slave
-            # and we know the master, we can still compute the size.
-            hardlink_masters = hardlink_masters or {}
-            chunks, _ = hardlink_masters.get(self.get('source'), (None, None))
-            if chunks is None:
-                return 0
-        size = sum(chunk.size for chunk in chunks)
-        if memorize and having_chunks:
-            self.size = size
+    def file_size(self, hardlink_masters=None, memorize=False, compressed=False):
+        """determine the (uncompressed or compressed) size of this item"""
+        attr = 'csize' if compressed else 'size'
+        try:
+            size = getattr(self, attr)
+        except AttributeError:
+            # no precomputed (c)size value available, compute it:
+            try:
+                chunks = getattr(self, 'chunks')
+                having_chunks = True
+            except AttributeError:
+                having_chunks = False
+                # this item has no (own) chunks list, but if this is a hardlink slave
+                # and we know the master, we can still compute the size.
+                if hardlink_masters is None:
+                    chunks = None
+                else:
+                    try:
+                        master = getattr(self, 'source')
+                    except AttributeError:
+                        # not a hardlink slave, likely a directory or special file w/o chunks
+                        chunks = None
+                    else:
+                        # hardlink slave, try to fetch hardlink master's chunks list
+                        # todo: put precomputed size into hardlink_masters' values and use it, if present
+                        chunks, _ = hardlink_masters.get(master, (None, None))
+                if chunks is None:
+                    return 0
+            size = sum(getattr(ChunkListEntry(*chunk), attr) for chunk in chunks)
+            # if requested, memorize the precomputed (c)size for items that have an own chunks list:
+            if memorize and having_chunks:
+                setattr(self, attr, size)
         return size
 
 

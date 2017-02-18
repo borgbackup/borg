@@ -20,13 +20,12 @@ from .helpers import format_file_size
 from .helpers import yes
 from .helpers import remove_surrogates
 from .helpers import ProgressIndicatorPercent, ProgressIndicatorMessage
-from .item import Item, ArchiveItem
+from .item import Item, ArchiveItem, ChunkListEntry
 from .key import PlaintextKey
 from .locking import Lock
 from .platform import SaveFile
 from .remote import cache_if_remote
 
-ChunkListEntry = namedtuple('ChunkListEntry', 'id size csize')
 FileCacheEntry = namedtuple('FileCacheEntry', 'age inode size mtime chunk_ids')
 
 

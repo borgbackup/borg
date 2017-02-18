@@ -1701,10 +1701,12 @@ class ItemFormatter(BaseFormatter):
         return len(item.get('chunks', []))
 
     def calculate_size(self, item):
-        return item.file_size()
+        # note: does not support hardlink slaves, they will be size 0
+        return item.file_size(compressed=False)
 
     def calculate_csize(self, item):
-        return sum(c.csize for c in item.get('chunks', []))
+        # note: does not support hardlink slaves, they will be csize 0
+        return item.file_size(compressed=True)
 
     def hash_item(self, hash_function, item):
         if 'chunks' not in item:

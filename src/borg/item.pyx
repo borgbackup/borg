@@ -176,8 +176,15 @@ class Item(PropDict):
 
     part = PropDict._make_property('part', int)
 
-    def file_size(self, hardlink_masters=None, memorize=False, compressed=False):
-        """determine the (uncompressed or compressed) size of this item"""
+    def get_size(self, hardlink_masters=None, memorize=False, compressed=False):
+        """
+        Determine the (uncompressed or compressed) size of this item.
+
+        For hardlink slaves, the size is computed via the hardlink master's
+        chunk list, if available (otherwise size will be returned as 0).
+
+        If memorize is True, the computed size value will be stored into the item.
+        """
         attr = 'csize' if compressed else 'size'
         try:
             size = getattr(self, attr)

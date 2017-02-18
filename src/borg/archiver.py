@@ -541,7 +541,7 @@ class Archiver:
         if progress:
             pi = ProgressIndicatorPercent(msg='%5.1f%% Extracting: %s', step=0.1)
             pi.output('Calculating size')
-            extracted_size = sum(item.file_size(hardlink_masters) for item in archive.iter_items(filter))
+            extracted_size = sum(item.get_size(hardlink_masters) for item in archive.iter_items(filter))
             pi.total = extracted_size
         else:
             pi = None
@@ -605,7 +605,7 @@ class Archiver:
                 if consider_ids is not None:  # consider only specific chunks
                     size = sum(chunk.size for chunk in item.chunks if chunk.id in consider_ids)
                 else:  # consider all chunks
-                    size = item.file_size()
+                    size = item.get_size()
             return size
 
         def get_owner(item):

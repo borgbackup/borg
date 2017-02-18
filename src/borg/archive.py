@@ -777,7 +777,7 @@ Utilization of max. archive size: {csize_max:.0%}
         length = len(item.chunks)
         # the item should only have the *additional* chunks we processed after the last partial item:
         item.chunks = item.chunks[from_chunk:]
-        item.file_size(memorize=True)
+        item.get_size(memorize=True)
         item.path += '.borg_part_%d' % number
         item.part = number
         number += 1
@@ -826,7 +826,7 @@ Utilization of max. archive size: {csize_max:.0%}
         )
         fd = sys.stdin.buffer  # binary
         self.chunk_file(item, cache, self.stats, backup_io_iter(self.chunker.chunkify(fd)))
-        item.file_size(memorize=True)
+        item.get_size(memorize=True)
         self.stats.nfiles += 1
         self.add_item(item)
         return 'i'  # stdin
@@ -887,7 +887,7 @@ Utilization of max. archive size: {csize_max:.0%}
                 cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
             status = status or 'M'  # regular file, modified (if not 'A' already)
         item.update(self.stat_attrs(st, path))
-        item.file_size(memorize=True)
+        item.get_size(memorize=True)
         if is_special_file:
             # we processed a special file like a regular file. reflect that in mode,
             # so it can be extracted / accessed in FUSE mount like a regular file:

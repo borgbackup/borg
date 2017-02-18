@@ -142,9 +142,9 @@ def test_item_file_size():
         ChunkListEntry(csize=1, size=1000, id=None),
         ChunkListEntry(csize=1, size=2000, id=None),
     ])
-    assert item.file_size() == 3000
+    assert item.get_size() == 3000
 
 
 def test_item_file_size_no_chunks():
     item = Item()
-    assert item.file_size() == 0
+    assert item.get_size() == 0

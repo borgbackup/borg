@@ -1306,6 +1306,13 @@ class ArchiveChecker:
                 logger.info('{}: Completely healed previously damaged file!'.format(item.path))
                 del item.chunks_healthy
             item.chunks = chunk_list
+            if 'size' in item:
+                item_size = item.size
+                item_chunks_size = item.get_size(compressed=False, from_chunks=True)
+                if item_size != item_chunks_size:
+                    # just warn, but keep the inconsistency, so that borg extract can warn about it.
+                    logger.warning('{}: size inconsistency detected: size {}, chunks size {}'.format(
+                                   item.path, item_size, item_chunks_size))
 
         def robust_iterator(archive):
             """Iterates through all archive items

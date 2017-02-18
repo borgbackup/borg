@@ -176,7 +176,7 @@ class Item(PropDict):
 
     part = PropDict._make_property('part', int)
 
-    def get_size(self, hardlink_masters=None, memorize=False, compressed=False):
+    def get_size(self, hardlink_masters=None, memorize=False, compressed=False, from_chunks=False):
         """
         Determine the (uncompressed or compressed) size of this item.
 
@@ -187,6 +187,8 @@ class Item(PropDict):
         """
         attr = 'csize' if compressed else 'size'
         try:
+            if from_chunks:
+                raise AttributeError
             size = getattr(self, attr)
         except AttributeError:
             # no precomputed (c)size value available, compute it:

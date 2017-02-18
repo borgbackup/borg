@@ -20,7 +20,7 @@ import time
 import unicodedata
 import uuid
 from binascii import hexlify
-from collections import namedtuple, deque, abc
+from collections import namedtuple, deque, abc, Counter
 from datetime import datetime, timezone, timedelta
 from fnmatch import translate
 from functools import wraps, partial, lru_cache
@@ -1574,13 +1574,15 @@ class ItemFormatter(BaseFormatter):
         'source': 'link target for links (identical to linktarget)',
         'extra': 'prepends {source} with " -> " for soft links and " link to " for hard links',
         'csize': 'compressed size',
+        'dsize': 'deduplicated size',
+        'dcsize': 'deduplicated compressed size',
         'num_chunks': 'number of chunks in this file',
         'unique_chunks': 'number of unique chunks in this file',
         'health': 'either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)',
     }
     KEY_GROUPS = (
         ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget', 'flags'),
-        ('size', 'csize', 'num_chunks', 'unique_chunks'),
+        ('size', 'csize', 'dsize', 'dcsize', 'num_chunks', 'unique_chunks'),
         ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
         tuple(sorted(hashlib.algorithms_guaranteed)),
         ('archiveid', 'archivename', 'extra'),
@@ -1630,8 +1632,10 @@ class ItemFormatter(BaseFormatter):
         self.call_keys = {
             'size': self.calculate_size,
             'csize': self.calculate_csize,
+            'dsize': partial(self.sum_unique_chunks_metadata, lambda chunk: chunk.size),
+            'dcsize': partial(self.sum_unique_chunks_metadata, lambda chunk: chunk.csize),
             'num_chunks': self.calculate_num_chunks,
-            'unique_chunks': self.calculate_unique_chunks,
+            'unique_chunks': partial(self.sum_unique_chunks_metadata, lambda chunk: 1),
             'isomtime': partial(self.format_time, 'mtime'),
             'isoctime': partial(self.format_time, 'ctime'),
             'isoatime': partial(self.format_time, 'atime'),
@@ -1679,12 +1683,22 @@ class ItemFormatter(BaseFormatter):
             item_data[key] = self.call_keys[key](item)
         return item_data
 
+    def sum_unique_chunks_metadata(self, metadata_func, item):
+        """
+        sum unique chunks metadata, a unique chunk is a chunk which is referenced globally as often as it is in the
+        item
+
+        item: The item to sum its unique chunks' metadata
+        metadata_func: A function that takes a parameter of type ChunkIndexEntry and returns a number, used to return
+                       the metadata needed from the chunk
+        """
+        chunk_index = self.archive.cache.chunks
+        chunks = item.get('chunks', [])
+        chunks_counter = Counter(c.id for c in chunks)
+        return sum(metadata_func(c) for c in chunks if chunk_index[c.id].refcount == chunks_counter[c.id])
+
     def calculate_num_chunks(self, item):
         return len(item.get('chunks', []))
-
-    def calculate_unique_chunks(self, item):
-        chunk_index = self.archive.cache.chunks
-        return sum(1 for c in item.get('chunks', []) if chunk_index[c.id].refcount == 1)
 
     def calculate_size(self, item):
         return sum(c.size for c in item.get('chunks', []))

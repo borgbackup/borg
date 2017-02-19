@@ -828,6 +828,26 @@ class Archiver:
             if not archive_names:
                 return self.exit_code
 
+        if args.forced == 2:
+            deleted = False
+            for i, archive_name in enumerate(archive_names, 1):
+                try:
+                    del manifest.archives[archive_name]
+                except KeyError:
+                    self.exit_code = EXIT_WARNING
+                    logger.warning('Archive {} not found ({}/{}).'.format(archive_name, i, len(archive_names)))
+                else:
+                    deleted = True
+                    logger.info('Deleted {} ({}/{}).'.format(archive_name, i, len(archive_names)))
+            if deleted:
+                manifest.write()
+                # note: might crash in compact() after committing the repo
+                repository.commit()
+                logger.info('Done. Run "borg check --repair" to clean up the mess.')
+            else:
+                logger.warning('Aborted.')
+            return self.exit_code
+
         stats_logger = logging.getLogger('borg.output.stats')
         if args.stats:
             log_multi(DASHES, STATS_HEADER, logger=stats_logger)
@@ -845,7 +865,7 @@ class Archiver:
                 if args.stats:
                     log_multi(stats.summary.format(label='Deleted data:', stats=stats),
                               DASHES, logger=stats_logger)
-                if not args.forced and self.exit_code:
+                if args.forced == 0 and self.exit_code:
                     break
             if args.stats:
                 stats_logger.info(str(cache))
@@ -2383,8 +2403,9 @@ class Archiver:
                                action='store_true', default=False,
                                help='delete only the local cache for the given repository')
         subparser.add_argument('--force', dest='forced',
-                               action='store_true', default=False,
-                               help='force deletion of corrupted archives')
+                               action='count', default=0,
+                               help='force deletion of corrupted archives, '
+                                    'use --force --force in case --force does not work.')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
                                help='work slower, but using less space')

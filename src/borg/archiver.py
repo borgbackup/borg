@@ -2207,8 +2207,8 @@ class Archiver:
                                    metavar='PARAMS',
                                    help='specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
                                         'HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %d,%d,%d,%d' % CHUNKER_PARAMS)
-        archive_group.add_argument('-C', '--compression', dest='compression',
-                                   type=CompressionSpec, default=dict(name='none'), metavar='COMPRESSION',
+        archive_group.add_argument('-C', '--compression', dest='compression', required=True,
+                                   type=CompressionSpec, metavar='COMPRESSION',
                                    help='select compression algorithm, see the output of the '
                                         '"borg help compression" command for details.')
         archive_group.add_argument('--compression-from', dest='compression_files',

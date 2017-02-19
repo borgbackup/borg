@@ -139,6 +139,9 @@ General:
         Main usecase for this is to fully automate ``borg change-passphrase``.
     BORG_DISPLAY_PASSPHRASE
         When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
+    BORG_HOSTNAME_IS_UNIQUE=yes
+        Use this to assert that your hostname is unique.
+        Borg will then automatically remove locks that it could determine to be stale.
     BORG_LOGGING_CONF
         When set, use the given filename as INI_-style logging configuration.
     BORG_RSH

@@ -542,7 +542,7 @@ Number of files: {0.stats.nfiles}'''.format(
                 raise ChunksIndexError(cid)
             except Repository.ObjectNotFound as e:
                 # object not in repo - strange, but we wanted to delete it anyway.
-                if not forced:
+                if forced == 0:
                     raise
                 error = True
 
@@ -564,14 +564,14 @@ Number of files: {0.stats.nfiles}'''.format(
                 except (TypeError, ValueError):
                     # if items metadata spans multiple chunks and one chunk got dropped somehow,
                     # it could be that unpacker yields bad types
-                    if not forced:
+                    if forced == 0:
                         raise
                     error = True
             if progress:
                 pi.finish()
         except (msgpack.UnpackException, Repository.ObjectNotFound):
             # items metadata corrupted
-            if not forced:
+            if forced == 0:
                 raise
             error = True
         # in forced delete mode, we try hard to delete at least the manifest entry,

@@ -503,9 +503,23 @@ class Archiver:
     def do_delete(self, args, repository):
         """Delete an existing repository or archive"""
         if args.location.archive:
+            archive_name = args.location.archive
             manifest, key = Manifest.load(repository)
+
+            if args.forced == 2:
+                try:
+                    del manifest.archives[archive_name]
+                except KeyError:
+                    raise Archive.DoesNotExist(archive_name)
+                logger.info('Archive deleted.')
+                manifest.write()
+                # note: might crash in compact() after committing the repo
+                repository.commit()
+                logger.info('Done. Run "borg check --repair" to clean up the mess.')
+                return self.exit_code
+
             with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
-                archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
+                archive = Archive(repository, key, manifest, archive_name, cache=cache)
                 stats = Statistics()
                 archive.delete(stats, progress=args.progress, forced=args.forced)
                 manifest.write()
@@ -1554,8 +1568,9 @@ class Archiver:
                                action='store_true', default=False,
                                help='delete only the local cache for the given repository')
         subparser.add_argument('--force', dest='forced',
-                               action='store_true', default=False,
-                               help='force deletion of corrupted archives')
+                               action='count', default=0,
+                               help='force deletion of corrupted archives, '
+                                    'use --force --force in case --force does not work.')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
                                help='work slower, but using less space')

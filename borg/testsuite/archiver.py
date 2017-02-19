@@ -914,6 +914,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # Make sure the repo is gone
         self.assertFalse(os.path.exists(self.repository_path))
 
+    def test_delete_double_force(self):
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.create_src_archive('test')
+        with Repository(self.repository_path, exclusive=True) as repository:
+            manifest, key = Manifest.load(repository)
+            archive = Archive(repository, key, manifest, 'test')
+            id = archive.metadata[b'items'][0]
+            repository.put(id, b'corrupted items metadata stream chunk')
+            repository.commit()
+        self.cmd('delete', '--force', '--force', self.repository_location + '::test')
+        self.cmd('check', '--repair', self.repository_location)
+        output = self.cmd('list', self.repository_location)
+        self.assert_not_in('test', output)
+
     def test_corrupted_repository(self):
         self.cmd('init', self.repository_location)
         self.create_src_archive('test')

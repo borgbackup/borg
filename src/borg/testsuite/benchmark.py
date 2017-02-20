@@ -116,7 +116,7 @@ def test_chunk_indexer_setitem(benchmark):
 
     def setup():
         # return *args, **kwargs for the benchmarked function
-        return [ChunkIndex(max_key), ], dict()
+        return [ChunkIndex(445649), ], dict()
 
     def do_inserts(index):
         for key in keys:
@@ -126,7 +126,7 @@ def test_chunk_indexer_setitem(benchmark):
 
 def test_chunk_indexer_getitem(benchmark):
     max_key = 2**20
-    index = ChunkIndex(max_key)
+    index = ChunkIndex(445649)
     keys = [sha256(H(k)).digest() for k in range(max_key)]
     missing_keys = [
         sha256(H(k)).digest()
@@ -158,7 +158,7 @@ def fill(request):
 
 def test_chunk_indexer_c_getitem(benchmark, fill):
     max_key = int(445649 * fill - 10)
-    index = ChunkIndex(max_key)
+    index = ChunkIndex(445649)
     keys = [sha256(H(k)).digest()
      for k in range(max_key)]
     bucket_val = (0, 0, 0)
@@ -177,7 +177,7 @@ def test_chunk_indexer_c_getitem(benchmark, fill):
 
 def test_chunk_indexer_c_getitem_with_misses(benchmark, fill):
     max_key = int(445649 * fill - 10)
-    index = ChunkIndex(max_key)
+    index = ChunkIndex(445649)
     # keys = [b'00'+sha256(H(k)).digest()[2:-2]+b'00'
     #  for k in range(max_key)]
     keys = [sha256(H(k)).digest()
@@ -198,7 +198,7 @@ def test_chunk_indexer_c_getitem_with_misses(benchmark, fill):
 
 def test_chunk_indexer_c_setitem_update(benchmark, fill):
     max_key = int(445649 * fill - 10)
-    index = ChunkIndex(max_key)
+    index = ChunkIndex(445649)
     keys = b"".join((sha256(H(k)).digest()
             for k in range(max_key)))
     bucket_val = (0, 0, 0)
@@ -220,7 +220,7 @@ def test_chunk_indexer_c_setitem(benchmark, fill):
                      for k in range(max_key)))
     def setup():
         # return *args, **kwargs for the benchmarked function
-        index = ChunkIndex(max_key)
+        index = ChunkIndex(445649)
         bucket_val = (5, 5, 5)
         for i in range(0, 32*max_key, 32):
             key = keys[i:i+32]
@@ -240,12 +240,12 @@ def test_chunk_indexer_c_delete(benchmark, fill):
                             for k in range(0, max_key, 3)))
     def setup():
         # return *args, **kwargs for the benchmarked function
-        index = ChunkIndex(max_key)
+        index = ChunkIndex(445649)
         bucket_val = (5, 5, 5)
         for i in range(0, 32*max_key, 32):
             key = keys[i:i+32]
             index[key] = bucket_val
-        return [ChunkIndex(max_key), ], dict()
+        return [ChunkIndex(445649), ], dict()
 
     def do_delete(index):
         bench_delete(index, delete_keys)
@@ -261,7 +261,7 @@ def test_chunk_indexer_c_setitem_after_deletion(benchmark, fill):
                      for k in range(0, max_key, 5)))
     def setup():
         # return *args, **kwargs for the benchmarked function
-        index = ChunkIndex(max_key)
+        index = ChunkIndex(445649)
         bucket_val = (5, 5, 5)
         for i in range(0, len(delete_keys), 32):
             key = delete_keys[i:i+32]
@@ -272,7 +272,7 @@ def test_chunk_indexer_c_setitem_after_deletion(benchmark, fill):
         for i in range(0, len(delete_keys), 32):
             key = delete_keys[i:i+32]
             del index[key]
-        return [ChunkIndex(max_key), ], dict()
+        return [ChunkIndex(445649), ], dict()
 
     def do_sets(index):
         bench_setitem(index, keys)
@@ -285,12 +285,12 @@ def test_chunk_indexer_c_churn(benchmark, fill):
                      for k in range(max_key)))
     def setup():
         # return *args, **kwargs for the benchmarked function
-        index = ChunkIndex(max_key)
+        index = ChunkIndex(445649)
         bucket_val = (5, 5, 5)
         for i in range(0, len(keys), 32):
             key = keys[i:i+32]
             index[key] = bucket_val
-        return [ChunkIndex(max_key), ], dict()
+        return [ChunkIndex(445649), ], dict()
 
     def do_sets(index):
         bench_churn(index, keys)

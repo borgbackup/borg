@@ -232,7 +232,7 @@ cdef class ChunkIndex(IndexBase):
         if not data:
             raise KeyError(key)
         cdef uint32_t refcount = _le32toh(data[0])
-        assert refcount <= _MAX_VALUE
+        assert refcount <= _MAX_VALUE, "invalid reference count"
         return ChunkIndexEntry(refcount, _le32toh(data[1]), _le32toh(data[2]))
 
     def __setitem__(self, key, value):
@@ -250,7 +250,7 @@ cdef class ChunkIndex(IndexBase):
         assert len(key) == self.key_size
         data = <uint32_t *>hashindex_get(self.index, <char *>key)
         if data != NULL:
-            assert data[0] <= _MAX_VALUE
+            assert _le32toh(data[0]) <= _MAX_VALUE, "invalid reference count"
         return data != NULL
 
     def incref(self, key):
@@ -328,8 +328,8 @@ cdef class ChunkIndex(IndexBase):
         if values:
             refcount1 = _le32toh(values[0])
             refcount2 = _le32toh(data[0])
-            assert refcount1 <= _MAX_VALUE
-            assert refcount2 <= _MAX_VALUE
+            assert refcount1 <= _MAX_VALUE, "invalid reference count"
+            assert refcount2 <= _MAX_VALUE, "invalid reference count"
             result64 = refcount1 + refcount2
             values[0] = _htole32(min(result64, _MAX_VALUE))
             values[1] = data[1]

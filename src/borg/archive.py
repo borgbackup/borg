@@ -467,13 +467,20 @@ Utilization of max. archive size: {csize_max:.0%}
         has_damaged_chunks = 'chunks_healthy' in item
         if dry_run or stdout:
             if 'chunks' in item:
+                item_chunks_size = 0
                 for _, data in self.pipeline.fetch_many([c.id for c in item.chunks], is_preloaded=True):
                     if pi:
                         pi.show(increase=len(data), info=[remove_surrogates(item.path)])
                     if stdout:
                         sys.stdout.buffer.write(data)
+                    item_chunks_size += len(data)
                 if stdout:
                     sys.stdout.buffer.flush()
+                if 'size' in item:
+                    item_size = item.size
+                    if item_size != item_chunks_size:
+                        logger.warning('{}: size inconsistency detected: size {}, chunks size {}'.format(
+                            item.path, item_size, item_chunks_size))
             if has_damaged_chunks:
                 logger.warning('File %s has damaged (all-zero) chunks. Try running borg check --repair.' %
                                remove_surrogates(item.path))
@@ -530,10 +537,15 @@ Utilization of max. archive size: {csize_max:.0%}
                         else:
                             fd.write(data)
                 with backup_io('truncate'):
-                    pos = fd.tell()
+                    pos = item_chunks_size = fd.tell()
                     fd.truncate(pos)
                     fd.flush()
                     self.restore_attrs(path, item, fd=fd.fileno())
+            if 'size' in item:
+                item_size = item.size
+                if item_size != item_chunks_size:
+                    logger.warning('{}: size inconsistency detected: size {}, chunks size {}'.format(
+                        item.path, item_size, item_chunks_size))
             if has_damaged_chunks:
                 logger.warning('File %s has damaged (all-zero) chunks. Try running borg check --repair.' %
                                remove_surrogates(item.path))

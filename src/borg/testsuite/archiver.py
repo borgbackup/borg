@@ -1439,7 +1439,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('compressible_file', size=10000)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         test_archive = self.repository_location + '::test'
-        self.cmd('create',  '--compression=lz4', test_archive, 'input')
+        self.cmd('create', '--compression=lz4', test_archive, 'input')
         output = self.cmd('list', '--format', '{size} {csize} {dsize} {dcsize} {path}{NL}', test_archive)
         size, csize, dsize, dcsize, path = output.split("\n")[1].split(" ")
         assert int(csize) < int(size)

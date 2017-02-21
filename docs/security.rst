@@ -248,8 +248,8 @@ denial of repository service.
 The situation were a server can create a general DoS on the client
 should be avoided, but might be possible by e.g. forcing the client to
 allocate large amounts of memory to decode large messages (or messages
-that merely indicate a large amount of data follows). See issue
-:issue:`2139` for details.
+that merely indicate a large amount of data follows). The RPC protocol
+code uses a limited msgpack Unpacker to prohibit this.
 
 We believe that other kinds of attacks, especially critical vulnerabilities
 like remote code execution are inhibited by the design of the protocol:

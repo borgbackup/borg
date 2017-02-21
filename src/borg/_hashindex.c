@@ -211,6 +211,7 @@ hashindex_resize(HashIndex *index, int capacity)
     index->num_buckets = new->num_buckets;
     index->lower_limit = new->lower_limit;
     index->upper_limit = new->upper_limit;
+    free(new->entry_to_insert);
     free(new);
     return 1;
 }
@@ -337,6 +338,7 @@ hashindex_read(const char *path)
             EPRINTF_MSG_PATH(path, "fread buckets failed (expected %ju, got %ju)",
                              (uintmax_t) buckets_length, (uintmax_t) bytes_read);
         }
+        free(index->entry_to_insert);
         free(index->buckets);
         free(index);
         index = NULL;
@@ -397,6 +399,7 @@ static void
 hashindex_free(HashIndex *index)
 {
     free(index->buckets);
+    free(index->entry_to_insert);
     free(index);
 }
 

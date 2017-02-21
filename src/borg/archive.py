@@ -4,6 +4,7 @@ import socket
 import stat
 import sys
 import time
+from collections import namedtuple
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 from functools import partial
@@ -60,6 +61,13 @@ class Statistics:
             self.usize += csize
 
     summary = "{label:15} {stats.osize_fmt:>20s} {stats.csize_fmt:>20s} {stats.usize_fmt:>20s}"
+
+    def get_summary(self):
+        summary = namedtuple('Summary', ['original_size', 'compressed_size', 'unique_size', 'number_files'])
+        return summary(*self.summarize())._asdict()
+
+    def summarize(self):
+        return self.osize, self.csize, self.usize, self.nfiles
 
     def __str__(self):
         return self.summary.format(stats=self, label='This archive:')
@@ -378,6 +386,16 @@ Number of files: {0.stats.nfiles}'''.format(
         self.save(self.checkpoint_name)
         del self.manifest.archives[self.checkpoint_name]
         self.cache.chunk_decref(self.id, self.stats)
+
+    def get_summary(self):
+        summary = namedtuple('Summary', ['name', 'fingerprint', 'comment',
+        'hostname', 'username', 'time_start', 'time_end', 'duration', 'command_line'])
+        return summary(*self.summarize())._asdict()
+
+    def summarize(self):
+        return [self.name, self.fpr, self.metadata.get('comment', ''),
+        self.metadata.hostname, self.metadata.username, format_time(to_localtime(self.ts)),
+        format_time(to_localtime(self.ts_end)), self.duration_from_meta, self.metadata.cmdline]
 
     def save(self, name=None, comment=None, timestamp=None, additional_metadata=None):
         name = name or self.name

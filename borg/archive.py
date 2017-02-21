@@ -501,7 +501,10 @@ Number of files: {0.stats.nfiles}'''.format(
             try:
                 xattr.setxattr(fd or path, k, v, follow_symlinks=False)
             except OSError as e:
-                if e.errno not in (errno.ENOTSUP, errno.EACCES):
+                if e.errno == errno.E2BIG:
+                    logger.warning('%s: Value or key of extended attribute %s is too big for this filesystem' %
+                                   (path, k.decode()))
+                elif e.errno not in (errno.ENOTSUP, errno.EACCES):
                     # only raise if the errno is not on our ignore list:
                     # ENOTSUP == xattrs not supported here
                     # EACCES == permission denied to set this specific xattr

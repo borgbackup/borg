@@ -1246,6 +1246,13 @@ class ArchiveChecker:
             Missing file chunks will be replaced with new chunks of the same length containing all zeros.
             If a previously missing file chunk re-appears, the replacement chunk is replaced by the correct one.
             """
+            def replacement_chunk(size):
+                data = bytes(size)
+                chunk_id = self.key.id_hash(data)
+                cdata = self.key.encrypt(Chunk(data))
+                csize = len(cdata)
+                return chunk_id, size, csize, cdata
+
             offset = 0
             chunk_list = []
             chunks_replaced = False
@@ -1261,16 +1268,20 @@ class ArchiveChecker:
                         logger.error('{}: New missing file chunk detected (Byte {}-{}). '
                                      'Replacing with all-zero chunk.'.format(item.path, offset, offset + size))
                         self.error_found = chunks_replaced = True
-                        data = bytes(size)
-                        chunk_id = self.key.id_hash(data)
-                        cdata = self.key.encrypt(Chunk(data))
-                        csize = len(cdata)
+                        chunk_id, size, csize, cdata = replacement_chunk(size)
                         add_reference(chunk_id, size, csize, cdata)
                     else:
                         logger.info('{}: Previously missing file chunk is still missing (Byte {}-{}). It has a '
                                     'all-zero replacement chunk already.'.format(item.path, offset, offset + size))
                         chunk_id, size, csize = chunk_current
-                        add_reference(chunk_id, size, csize)
+                        if chunk_id in self.chunks:
+                            add_reference(chunk_id, size, csize)
+                        else:
+                            logger.warning('{}: Missing all-zero replacement chunk detected (Byte {}-{}). '
+                                           'Generating new replacement chunk.'.format(item.path, offset, offset + size))
+                            self.error_found = chunks_replaced = True
+                            chunk_id, size, csize, cdata = replacement_chunk(size)
+                            add_reference(chunk_id, size, csize, cdata)
                 else:
                     if chunk_current == chunk_healthy:
                         # normal case, all fine.

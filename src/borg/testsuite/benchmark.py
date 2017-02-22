@@ -178,8 +178,6 @@ def test_chunk_indexer_c_getitem(benchmark, fill):
 def test_chunk_indexer_c_getitem_with_misses(benchmark, fill):
     max_key = int(445649 * fill - 10)
     index = ChunkIndex(445649)
-    # keys = [b'00'+sha256(H(k)).digest()[2:-2]+b'00'
-    #  for k in range(max_key)]
     keys = [sha256(H(k)).digest()
      for k in range(max_key)]
     bucket_val = (0, 0, 0)

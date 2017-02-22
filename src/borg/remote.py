@@ -425,12 +425,16 @@ def api(*, since, **kwargs_decorator):
         def do_rpc(self, *args, **kwargs):
             sig = inspect.signature(f)
             bound_args = sig.bind(self, *args, **kwargs)
-            named = {}
+            named = {}  # Arguments for the remote process
+            extra = {}  # Arguments for the local process
             for name, param in sig.parameters.items():
                 if name == 'self':
                     continue
                 if name in bound_args.arguments:
-                    named[name] = bound_args.arguments[name]
+                    if name == 'wait':
+                        extra[name] = bound_args.arguments[name]
+                    else:
+                        named[name] = bound_args.arguments[name]
                 else:
                     if param.default is not param.empty:
                         named[name] = param.default
@@ -447,7 +451,7 @@ def api(*, since, **kwargs_decorator):
                 raise self.RPCServerOutdated("{0} {1}={2!s}".format(f.__name__, name, named[name]),
                                              format_version(restriction['since']))
 
-            return self.call(f.__name__, named)
+            return self.call(f.__name__, named, **extra)
         return do_rpc
     return decorator
 

@@ -4,11 +4,6 @@
 Internals
 =========
 
-.. toctree::
-
-    internals/security
-    internals/data-structures
-
 This page documents the internal data structures and storage
 mechanisms of |project_name|. It is partly based on `mailing list
 discussion about internals`_ and also on static code analysis.
@@ -30,3 +25,9 @@ Buzhash_ algorithm.
 To actually perform the repository-wide deduplication, a hash of each
 chunk is checked against the :ref:`chunks cache <cache>`, which is a
 hash-table of all chunks that already exist.
+
+.. toctree::
+    :caption: Contents
+
+    internals/security
+    internals/data-structures

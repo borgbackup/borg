@@ -23,10 +23,10 @@ represent individual backups that contain a full archive of the files
 specified when the backup was performed.
 
 Deduplication is performed globally across all data in the repository
-(multiple backups and even multiple hosts), both on data and metadata,
-using :ref:`chunks` created by the chunker using the Buzhash_
-algorithm.
+(multiple backups and even multiple hosts), both on data and file
+metadata, using :ref:`chunks` created by the chunker using the
+Buzhash_ algorithm.
 
 To actually perform the repository-wide deduplication, a hash of each
-chunk is checked against the :ref:`cache`, which is a hash-table of
-all chunks that already exist.
+chunk is checked against the :ref:`chunks cache <cache>`, which is a
+hash-table of all chunks that already exist.

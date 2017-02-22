@@ -154,7 +154,7 @@ Each archive info contains:
 * time
 
 It is the last object stored, in the last segment, and is replaced
-each time an archive is added or deleted.
+each time an archive is added, modified or deleted.
 
 .. _archive:
 

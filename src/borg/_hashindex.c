@@ -159,7 +159,7 @@ hashindex_lookup(HashIndex *index, const void *key, int *skip_hint)
         if(BUCKET_MATCHES_KEY(index, idx, key)) {
             return idx;
         }
-        if(period++ == 15){
+        if(period++ == 63){
 	    period = 0;
 	    if (offset > distance(idx, hashindex_index(index, BUCKET_ADDR(index, idx)), index->num_buckets)) {
 		if (DEBUG) {
@@ -187,7 +187,7 @@ hashindex_lookup(HashIndex *index, const void *key, int *skip_hint)
     if (skip_hint != NULL) {
         /* compensate for the period, hashindex_set will need to re-examine the last
            16 buckets for a suitable bucket to insert it's value */
-        offset = offset - 16;
+        offset = offset - 64;
         if (offset < 0) {
             offset = 0;
         }

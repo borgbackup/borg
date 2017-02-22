@@ -219,10 +219,6 @@ def test_chunk_indexer_c_setitem(benchmark, fill):
     def setup():
         # return *args, **kwargs for the benchmarked function
         index = ChunkIndex(445649)
-        bucket_val = (5, 5, 5)
-        for i in range(0, 32*max_key, 32):
-            key = keys[i:i+32]
-            index[key] = bucket_val
         return (index, ), dict()
 
     def do_sets(index):

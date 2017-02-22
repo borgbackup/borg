@@ -26,7 +26,6 @@ from .crc32 import crc32
 
 logger = create_logger(__name__)
 
-MAX_OBJECT_SIZE = 20 * 1024 * 1024
 MAGIC = b'BORG_SEG'
 MAGIC_LEN = len(MAGIC)
 TAG_PUT = 0
@@ -1204,4 +1203,7 @@ class LoggedIO:
         return self.segment - 1  # close_segment() increments it
 
 
-MAX_DATA_SIZE = MAX_OBJECT_SIZE - LoggedIO.put_header_fmt.size
+# MAX_OBJECT_SIZE = 20 MiB (MAX_DATA_SIZE) + 41 bytes for a Repository PUT header, which consists of
+# a 1 byte tag ID, 4 byte CRC, 4 byte size and 32 bytes for the ID.
+MAX_OBJECT_SIZE = MAX_DATA_SIZE + LoggedIO.put_header_fmt.size
+assert MAX_OBJECT_SIZE == 20971561

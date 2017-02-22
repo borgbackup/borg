@@ -27,6 +27,8 @@ CACHE_TAG_CONTENTS = b'Signature: 8a477f597d28d172789f06886806bc55'
 # bytes. That's why it's 500 MiB instead of 512 MiB.
 DEFAULT_MAX_SEGMENT_SIZE = 500 * 1024 * 1024
 
+MAX_DATA_SIZE = 20 * 1024 * 1024
+
 # A few hundred files per directory to go easy on filesystems which don't like too many files per dir (NTFS)
 DEFAULT_SEGMENTS_PER_DIR = 500
 

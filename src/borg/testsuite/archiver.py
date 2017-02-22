@@ -1029,6 +1029,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 self.cmd('extract', self.repository_location + '::test')
             assert xattr.getxattr('input/file', 'security.capability') == capabilities
 
+    @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='xattr not supported on this system or on this version of'
+                                                         'fakeroot')
+    def test_extract_big_xattrs(self):
+        def patched_setxattr(*args, **kwargs):
+            raise OSError(errno.E2BIG, 'E2BIG')
+        self.create_regular_file('file')
+        xattr.setxattr('input/file', 'attribute', 'value')
+        self.cmd('init', self.repository_location, '-e' 'none')
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            with patch.object(xattr, 'setxattr', patched_setxattr):
+                out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
+                assert out == (os.path.abspath('input/file') + ': Value or key of extended attribute attribute is too big'
+                                                               'for this filesystem\n')
+
     def test_path_normalization(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('dir1/dir2/file', size=1024 * 80)

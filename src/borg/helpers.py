@@ -5,6 +5,7 @@ import grp
 import hashlib
 import logging
 import io
+import json
 import os
 import os.path
 import platform
@@ -1620,8 +1621,9 @@ class ItemFormatter(BaseFormatter):
         assert not keys, str(keys)
         return "\n".join(help)
 
-    def __init__(self, archive, format):
+    def __init__(self, archive, format, *, json=False):
         self.archive = archive
+        self.json = json
         static_keys = {
             'archivename': archive.name,
             'archiveid': archive.fpr,
@@ -1646,7 +1648,34 @@ class ItemFormatter(BaseFormatter):
         for hash_function in hashlib.algorithms_guaranteed:
             self.add_key(hash_function, partial(self.hash_item, hash_function))
         self.used_call_keys = set(self.call_keys) & self.format_keys
-        self.item_data = static_keys
+        if self.json:
+            self.item_data = {}
+            self.format_item = self.format_item_json
+            self.first = True
+        else:
+            self.item_data = static_keys
+
+    def begin(self):
+        from borg.archiver import BorgJsonEncoder
+        if not self.json:
+            return ''
+        return textwrap.dedent("""
+        {{
+            "repository": {repository},
+            "files": [
+        """).strip().format(repository=BorgJsonEncoder().encode(self.archive.repository))
+
+    def end(self):
+        if not self.json:
+            return ''
+        return "]}"
+
+    def format_item_json(self, item):
+        if self.first:
+            self.first = False
+            return json.dumps(self.get_item_data(item))
+        else:
+            return ',' + json.dumps(self.get_item_data(item))
 
     def add_key(self, key, callable_with_item):
         self.call_keys[key] = callable_with_item
@@ -1673,12 +1702,15 @@ class ItemFormatter(BaseFormatter):
         item_data['uid'] = item.uid
         item_data['gid'] = item.gid
         item_data['path'] = remove_surrogates(item.path)
-        item_data['bpath'] = item.path
+        if self.json:
+            item_data['healthy'] = 'chunks_healthy' not in item
+        else:
+            item_data['bpath'] = item.path
+            item_data['extra'] = extra
+            item_data['health'] = 'broken' if 'chunks_healthy' in item else 'healthy'
         item_data['source'] = source
         item_data['linktarget'] = source
-        item_data['extra'] = extra
         item_data['flags'] = item.get('bsdflags')
-        item_data['health'] = 'broken' if 'chunks_healthy' in item else 'healthy'
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)
         return item_data

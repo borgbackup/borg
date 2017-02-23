@@ -962,10 +962,12 @@ class Archiver:
                 format = "{path}{NL}"
             else:
                 format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
-            formatter = ItemFormatter(archive, format)
 
+            formatter = ItemFormatter(archive, format, json=args.json)
+            write(safe_encode(formatter.begin()))
             for item in archive.iter_items(lambda item: matcher.match(item.path)):
                 write(safe_encode(formatter.format_item(item)))
+            write(safe_encode(formatter.end()))
         return self.exit_code
 
     def _list_repository(self, args, manifest, write):
@@ -2504,7 +2506,9 @@ class Archiver:
                                help="""specify format for file listing
                                 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")""")
         subparser.add_argument('--json', action='store_true',
-                               help='format output as JSON')
+                               help='format output as JSON. The form of --format is ignored, but keys used in it '
+                                    'are added to the JSON output. Some keys are always present. Note: JSON can only '
+                                    'represent text. A "bpath" key is therefore not available.')
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='repository/archive to list contents of')

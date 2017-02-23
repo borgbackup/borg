@@ -65,8 +65,25 @@ from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 STATS_HEADER = "                       Original size      Compressed size    Deduplicated size"
 
 
+class BorgJsonEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, Repository) or isinstance(o, RemoteRepository):
+            return {
+                'id': bin_to_hex(o.id),
+                'location': o._location.canonical_path(),
+            }
+        if isinstance(o, Archive):
+            return o.info()
+        if isinstance(o, Cache):
+            return {
+                'path': o.path,
+                'stats': o.stats(),
+            }
+        return super().default(o)
+
+
 def print_as_json(obj):
-    print(json.dumps(obj, sort_keys=True, indent=4))
+    print(json.dumps(obj, sort_keys=True, indent=4, cls=BorgJsonEncoder))
 
 
 def argument(args, str_or_bool):
@@ -371,9 +388,10 @@ class Archiver:
                 if args.stats:
                     if args.json:
                         print_as_json({
-                            'cache_stats': cache.stats(),
+                            'repository': repository,
+                            'cache': cache,
                             'stats': archive.stats.as_dict(),
-                            'archive': archive.info(),
+                            'archive': archive,
                         })
                     else:
                         log_multi(DASHES,
@@ -1026,9 +1044,8 @@ class Archiver:
                 encryption += '\nKey file: %s' % key.find_key()
 
         info = {
-            'id': bin_to_hex(repository.id),
-            'location': repository._location.canonical_path(),
-            'cache': cache.path,
+            'repository': repository,
+            'cache': cache,
             'security_dir': cache.security_manager.dir,
             'encryption': encryption,
         }
@@ -1041,9 +1058,12 @@ class Archiver:
             Repository ID: {id}
             Location: {location}
             {encryption}
-            Cache: {cache}
+            Cache: {cache.path}
             Security dir: {security_dir}
-            """).strip().format_map(info))
+            """).strip().format(
+                id=bin_to_hex(repository.id),
+                location=repository._location.canonical_path(),
+                **info))
             print(DASHES)
             print(STATS_HEADER)
             print(str(cache))

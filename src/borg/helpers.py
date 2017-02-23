@@ -1558,6 +1558,7 @@ class ArchiveFormatter(BaseFormatter):
 
     def get_item_data(self, archive):
         return {
+            'name': remove_surrogates(archive.name),
             'barchive': archive.name,
             'archive': remove_surrogates(archive.name),
             'id': bin_to_hex(archive.id),
@@ -1566,7 +1567,7 @@ class ArchiveFormatter(BaseFormatter):
 
     @staticmethod
     def keys_help():
-        return " - archive: archive name interpreted as text (might be missing non-text characters, see barchive)\n" \
+        return " - archive, name: archive name interpreted as text (might be missing non-text characters, see barchive)\n" \
                " - barchive: verbatim archive name, can contain any character except NUL\n" \
                " - time: time of creation of the archive\n" \
                " - id: internal ID of the archive"

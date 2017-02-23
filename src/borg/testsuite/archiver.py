@@ -1117,10 +1117,27 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
         info_repo = json.loads(self.cmd('info', '--json', self.repository_location))
-        assert len(info_repo['id']) == 64
+        repository = info_repo['repository']
+        assert len(repository['id']) == 64
+        assert 'last_modified' in repository
         assert info_repo['encryption']['mode'] == 'repokey'
         assert 'keyfile' not in info_repo['encryption']
-        assert 'cache-stats' in info_repo
+        cache = info_repo['cache']
+        stats = cache['stats']
+        assert all(isinstance(o, int) for o in stats.values())
+        assert all(key in stats for key in ('total_chunks', 'total_csize', 'total_size', 'total_unique_chunks', 'unique_csize', 'unique_size'))
+
+        info_archive = json.loads(self.cmd('info', '--json', self.repository_location + '::test'))
+        assert info_repo['repository'] == info_archive['repository']
+        assert info_repo['cache'] == info_archive['cache']
+        archives = info_archive['archives']
+        assert len(archives) == 1
+        archive = archives[0]
+        assert archive['name'] == 'test'
+        assert isinstance(archive['command_line'], list)
+        assert isinstance(archive['duration'], float)
+        assert len(archive['id']) == 64
+        assert 'stats' in archive
 
     def test_comment(self):
         self.create_regular_file('file1', size=1024 * 80)
@@ -1272,6 +1289,23 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in("x input/file2", output)
         if has_lchflags:
             self.assert_in("x input/file3", output)
+
+    def test_create_json(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        create_info = json.loads(self.cmd('create', '--json', self.repository_location + '::test', 'input'))
+        # The usual keys
+        assert 'encryption' in create_info
+        assert 'repository' in create_info
+        assert 'cache' in create_info
+        assert 'last_modified' in create_info['repository']
+
+        archive = create_info['archive']
+        assert archive['name'] == 'test'
+        assert isinstance(archive['command_line'], list)
+        assert isinstance(archive['duration'], float)
+        assert len(archive['id']) == 64
+        assert 'stats' in archive
 
     def test_create_topical(self):
         now = time.time()
@@ -1456,6 +1490,33 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert int(dcsize) < int(dsize)
         assert int(dsize) <= int(size)
         assert int(dcsize) <= int(csize)
+
+    def test_list_json(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        list_repo = json.loads(self.cmd('list', '--json', self.repository_location))
+        repository = list_repo['repository']
+        assert len(repository['id']) == 64
+        assert 'last_modified' in repository
+        assert list_repo['encryption']['mode'] == 'repokey'
+        assert 'keyfile' not in list_repo['encryption']
+
+        list_archive = json.loads(self.cmd('list', '--json', self.repository_location + '::test'))
+        assert list_repo['repository'] == list_archive['repository']
+        files = list_archive['files']
+        assert len(files) == 2
+        file1 = files[1]
+        assert file1['path'] == 'input/file1'
+        assert file1['size'] == 81920
+
+        list_archive = json.loads(self.cmd('list', '--json', '--format={sha256}', self.repository_location + '::test'))
+        assert list_repo['repository'] == list_archive['repository']
+        files = list_archive['files']
+        assert len(files) == 2
+        file1 = files[1]
+        assert file1['path'] == 'input/file1'
+        assert file1['sha256'] == 'b2915eb69f260d8d3c25249195f2c8f4f716ea82ec760ae929732c0262442b2b'
 
     def _get_sizes(self, compression, compressible, size=10000):
         if compressible:

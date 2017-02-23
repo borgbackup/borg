@@ -52,6 +52,7 @@ from .helpers import parse_pattern, PatternMatcher, PathPrefixPattern
 from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
 from .helpers import ErrorIgnoringTextIOWrapper
 from .helpers import ProgressIndicatorPercent
+from .helpers import BorgJsonEncoder, basic_json_data, json_print
 from .item import Item
 from .key import key_creator, tam_required_file, tam_required, RepoKey, PassphraseKey
 from .keymanager import KeyManager
@@ -63,27 +64,6 @@ from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 
 
 STATS_HEADER = "                       Original size      Compressed size    Deduplicated size"
-
-
-class BorgJsonEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, Repository) or isinstance(o, RemoteRepository):
-            return {
-                'id': bin_to_hex(o.id),
-                'location': o._location.canonical_path(),
-            }
-        if isinstance(o, Archive):
-            return o.info()
-        if isinstance(o, Cache):
-            return {
-                'path': o.path,
-                'stats': o.stats(),
-            }
-        return super().default(o)
-
-
-def print_as_json(obj):
-    print(json.dumps(obj, sort_keys=True, indent=4, cls=BorgJsonEncoder))
 
 
 def argument(args, str_or_bool):
@@ -385,13 +365,12 @@ class Archiver:
                 archive.save(comment=args.comment, timestamp=args.timestamp)
                 if args.progress:
                     archive.stats.show_progress(final=True)
+                args.stats |= args.json
                 if args.stats:
                     if args.json:
-                        print_as_json({
-                            'repository': repository,
-                            'cache': cache,
+                        json_print(basic_json_data(manifest, cache=cache, extra={
                             'archive': archive,
-                        })
+                        }))
                     else:
                         log_multi(DASHES,
                                   str(archive),
@@ -988,10 +967,9 @@ class Archiver:
                 write(safe_encode(formatter.format_item(archive_info)))
 
         if args.json:
-            print_as_json({
-                'repository': manifest.repository,
-                'archives': output_data,
-            })
+            json_print(basic_json_data(manifest, extra={
+                'archives': output_data
+            }))
 
         return self.exit_code
 
@@ -1001,7 +979,7 @@ class Archiver:
         if any((args.location.archive, args.first, args.last, args.prefix)):
             return self._info_archives(args, repository, manifest, key, cache)
         else:
-            return self._info_repository(args, repository, key, cache)
+            return self._info_repository(args, repository, manifest, key, cache)
 
     def _info_archives(self, args, repository, manifest, key, cache):
         def format_cmdline(cmdline):
@@ -1044,20 +1022,18 @@ class Archiver:
                 print()
 
         if args.json:
-            print_as_json({
-                'repository': repository,
-                'cache': cache,
+            json_print(basic_json_data(manifest, cache=cache, extra={
                 'archives': output_data,
-            })
+            }))
         return self.exit_code
 
-    def _info_repository(self, args, repository, key, cache):
+    def _info_repository(self, args, repository, manifest, key, cache):
+        info = basic_json_data(manifest, cache=cache, extra={
+            'security_dir': cache.security_manager.dir,
+        })
+
         if args.json:
-            encryption = {
-                'mode': key.NAME,
-            }
-            if key.NAME.startswith('key file'):
-                encryption['keyfile'] = key.find_key()
+            json_print(info)
         else:
             encryption = 'Encrypted: '
             if key.NAME == 'plaintext':
@@ -1066,18 +1042,8 @@ class Archiver:
                 encryption += 'Yes (%s)' % key.NAME
             if key.NAME.startswith('key file'):
                 encryption += '\nKey file: %s' % key.find_key()
+            info['encryption'] = encryption
 
-        info = {
-            'repository': repository,
-            'cache': cache,
-            'security_dir': cache.security_manager.dir,
-            'encryption': encryption,
-        }
-
-        if args.json:
-            info['cache_stats'] = cache.stats()
-            print_as_json(info)
-        else:
             print(textwrap.dedent("""
             Repository ID: {id}
             Location: {location}
@@ -2226,7 +2192,7 @@ class Archiver:
         subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
                                help='only display items with the given status characters')
         subparser.add_argument('--json', action='store_true',
-                               help='output stats as JSON')
+                               help='output stats as JSON (implies --stats)')
 
         exclude_group = subparser.add_argument_group('Exclusion options')
         exclude_group.add_argument('-e', '--exclude', dest='patterns',

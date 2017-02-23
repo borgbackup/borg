@@ -207,6 +207,10 @@ class Manifest:
     def id_str(self):
         return bin_to_hex(self.id)
 
+    @property
+    def last_timestamp(self):
+        return datetime.strptime(self.timestamp, "%Y-%m-%dT%H:%M:%S.%f")
+
     @classmethod
     def load(cls, repository, key=None, force_tam_not_required=False):
         from .item import ManifestItem
@@ -251,7 +255,7 @@ class Manifest:
         if self.timestamp is None:
             self.timestamp = datetime.utcnow().isoformat()
         else:
-            prev_ts = datetime.strptime(self.timestamp, "%Y-%m-%dT%H:%M:%S.%f")
+            prev_ts = self.last_timestamp
             incremented = (prev_ts + timedelta(microseconds=1)).isoformat()
             self.timestamp = max(incremented, datetime.utcnow().isoformat())
         manifest = ManifestItem(
@@ -1656,14 +1660,13 @@ class ItemFormatter(BaseFormatter):
             self.item_data = static_keys
 
     def begin(self):
-        from borg.archiver import BorgJsonEncoder
         if not self.json:
             return ''
-        return textwrap.dedent("""
-        {{
-            "repository": {repository},
-            "files": [
-        """).strip().format(repository=BorgJsonEncoder().encode(self.archive.repository))
+        begin = json_dump(basic_json_data(self.archive.manifest))
+        begin, _, _ = begin.rpartition('\n}')  # remove last closing brace, we want to extend the object
+        begin += ',\n'
+        begin += '    "files": [\n'
+        return begin
 
     def end(self):
         if not self.json:
@@ -2090,3 +2093,50 @@ def swidth_slice(string, max_width):
     if reverse:
         result.reverse()
     return ''.join(result)
+
+
+class BorgJsonEncoder(json.JSONEncoder):
+    def default(self, o):
+        from .repository import Repository
+        from .remote import RemoteRepository
+        from .archive import Archive
+        from .cache import Cache
+        if isinstance(o, Repository) or isinstance(o, RemoteRepository):
+            return {
+                'id': bin_to_hex(o.id),
+                'location': o._location.canonical_path(),
+            }
+        if isinstance(o, Archive):
+            return o.info()
+        if isinstance(o, Cache):
+            return {
+                'path': o.path,
+                'stats': o.stats(),
+            }
+        return super().default(o)
+
+
+def basic_json_data(manifest, *, cache=None, extra=None):
+    key = manifest.key
+    data = extra or {}
+    data.update({
+        'repository': BorgJsonEncoder().default(manifest.repository),
+        'encryption': {
+            'mode': key.NAME,
+        },
+    })
+    data['repository']['last_modified'] = format_time(to_localtime(manifest.last_timestamp.replace(tzinfo=timezone.utc)))
+    if key.NAME.startswith('key file'):
+        data['encryption']['keyfile'] = key.find_key()
+    if cache:
+        data['cache'] = cache
+    return data
+
+
+def json_dump(obj):
+    """Dump using BorgJSONEncoder."""
+    return json.dumps(obj, sort_keys=True, indent=4, cls=BorgJsonEncoder)
+
+
+def json_print(obj):
+    print(json_dump(obj))

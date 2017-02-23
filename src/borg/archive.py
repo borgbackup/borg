@@ -68,6 +68,14 @@ class Statistics:
         return "<{cls} object at {hash:#x} ({self.osize}, {self.csize}, {self.usize})>".format(
             cls=type(self).__name__, hash=id(self), self=self)
 
+    def as_dict(self):
+        return {
+            'original_size': self.osize,
+            'compressed_size': self.csize,
+            'deduplicated_size': self.usize,
+            'nfiles': self.nfiles,
+        }
+
     @property
     def osize_fmt(self):
         return format_file_size(self.osize)
@@ -342,6 +350,19 @@ class Archive:
     @property
     def duration_from_meta(self):
         return format_timedelta(self.ts_end - self.ts)
+
+    def info(self):
+        return {
+            'name': self.name,
+            'id': self.fpr,
+            'start': format_time(to_localtime(self.start.replace(tzinfo=timezone.utc))),
+            'end': format_time(to_localtime(self.end.replace(tzinfo=timezone.utc))),
+            'duration': (self.end - self.start).total_seconds(),
+            'nfiles': self.stats.nfiles,
+            'limits': {
+                'max_archive_size': self.cache.chunks[self.id].csize / MAX_DATA_SIZE,
+            },
+        }
 
     def __str__(self):
         return '''\

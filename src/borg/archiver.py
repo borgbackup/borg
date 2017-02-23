@@ -369,13 +369,20 @@ class Archiver:
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 if args.stats:
-                    log_multi(DASHES,
-                              str(archive),
-                              DASHES,
-                              STATS_HEADER,
-                              str(archive.stats),
-                              str(cache),
-                              DASHES, logger=logging.getLogger('borg.output.stats'))
+                    if args.json:
+                        print_as_json({
+                            'cache_stats': cache.stats(),
+                            'stats': archive.stats.as_dict(),
+                            'archive': archive.info(),
+                        })
+                    else:
+                        log_multi(DASHES,
+                                  str(archive),
+                                  DASHES,
+                                  STATS_HEADER,
+                                  str(archive.stats),
+                                  str(cache),
+                                  DASHES, logger=logging.getLogger('borg.output.stats'))
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list
@@ -1027,7 +1034,7 @@ class Archiver:
         }
 
         if args.json:
-            info['cache-stats'] = cache.stats()
+            info['cache_stats'] = cache.stats()
             print_as_json(info)
         else:
             print(textwrap.dedent("""
@@ -2174,6 +2181,8 @@ class Archiver:
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
                                help='only display items with the given status characters')
+        subparser.add_argument('--json', action='store_true',
+                               help='output stats as JSON')
 
         exclude_group = subparser.add_argument_group('Exclusion options')
         exclude_group.add_argument('-e', '--exclude', dest='patterns',

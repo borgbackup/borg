@@ -65,6 +65,10 @@ from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 STATS_HEADER = "                       Original size      Compressed size    Deduplicated size"
 
 
+def print_as_json(obj):
+    print(json.dumps(obj, sort_keys=True, indent=4))
+
+
 def argument(args, str_or_bool):
     """If bool is passed, return it. If str is passed, retrieve named attribute from args."""
     if isinstance(str_or_bool, str):
@@ -960,7 +964,7 @@ class Archiver:
         if any((args.location.archive, args.first, args.last, args.prefix)):
             return self._info_archives(args, repository, manifest, key, cache)
         else:
-            return self._info_repository(repository, key, cache)
+            return self._info_repository(args, repository, key, cache)
 
     def _info_archives(self, args, repository, manifest, key, cache):
         def format_cmdline(cmdline):
@@ -998,20 +1002,44 @@ class Archiver:
                 print()
         return self.exit_code
 
-    def _info_repository(self, repository, key, cache):
-        print('Repository ID: %s' % bin_to_hex(repository.id))
-        if key.NAME == 'plaintext':
-            encrypted = 'No'
+    def _info_repository(self, args, repository, key, cache):
+        if args.json:
+            encryption = {
+                'mode': key.NAME,
+            }
+            if key.NAME.startswith('key file'):
+                encryption['keyfile'] = key.find_key()
         else:
-            encrypted = 'Yes (%s)' % key.NAME
-        print('Encrypted: %s' % encrypted)
-        if key.NAME.startswith('key file'):
-            print('Key file: %s' % key.find_key())
-        print('Cache: %s' % cache.path)
-        print('Security dir: %s' % cache.security_manager.dir)
-        print(DASHES)
-        print(STATS_HEADER)
-        print(str(cache))
+            encryption = 'Encrypted: '
+            if key.NAME == 'plaintext':
+                encryption += 'No'
+            else:
+                encryption += 'Yes (%s)' % key.NAME
+            if key.NAME.startswith('key file'):
+                encryption += '\nKey file: %s' % key.find_key()
+
+        info = {
+            'id': bin_to_hex(repository.id),
+            'location': repository._location.canonical_path(),
+            'cache': cache.path,
+            'security_dir': cache.security_manager.dir,
+            'encryption': encryption,
+        }
+
+        if args.json:
+            info['cache-stats'] = cache.stats()
+            print_as_json(info)
+        else:
+            print(textwrap.dedent("""
+            Repository ID: {id}
+            Location: {location}
+            {encryption}
+            Cache: {cache}
+            Security dir: {security_dir}
+            """).strip().format_map(info))
+            print(DASHES)
+            print(STATS_HEADER)
+            print(str(cache))
         return self.exit_code
 
     @with_repository(exclusive=True)
@@ -2542,6 +2570,8 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='archive or repository to display information about')
+        subparser.add_argument('--json', action='store_true',
+                               help='format output as JSON')
         self.add_archives_filters_args(subparser)
 
         break_lock_epilog = process_epilog("""

@@ -1112,6 +1112,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         info_archive = self.cmd('info', '--first', '1', self.repository_location)
         assert 'Archive name: test\n' in info_archive
 
+    def test_info_json(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        info_repo = json.loads(self.cmd('info', '--json', self.repository_location))
+        assert len(info_repo['id']) == 64
+        assert info_repo['encryption']['mode'] == 'repokey'
+        assert 'keyfile' not in info_repo['encryption']
+        assert 'cache-stats' in info_repo
+
     def test_comment(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)

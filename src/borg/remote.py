@@ -507,6 +507,8 @@ class RemoteRepository:
         self.location = self._location = location
         self.preload_ids = []
         self.msgid = 0
+        self.rx_bytes = 0
+        self.tx_bytes = 0
         self.to_send = b''
         self.chunkid_to_msgids = {}
         self.ignore_responses = set()
@@ -607,6 +609,8 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             # in any case, we want to cleanly close the repo, even if the
             # rollback can not succeed (e.g. because the connection was
             # already closed) and raised another exception:
+            logger.debug('RemoteRepository: %d bytes sent, %d bytes received, %d messages sent',
+                         self.tx_bytes, self.rx_bytes, self.msgid)
             self.close()
 
     @property
@@ -728,6 +732,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     data = os.read(fd, BUFSIZE)
                     if not data:
                         raise ConnectionClosed()
+                    self.rx_bytes += len(data)
                     self.unpacker.feed(data)
                     for unpacked in self.unpacker:
                         if isinstance(unpacked, dict):
@@ -752,6 +757,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     data = os.read(fd, 32768)
                     if not data:
                         raise ConnectionClosed()
+                    self.rx_bytes += len(data)
                     data = data.decode('utf-8')
                     for line in data.splitlines(keepends=True):
                         handle_remote_line(line)
@@ -785,7 +791,9 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
 
                 if self.to_send:
                     try:
-                        self.to_send = self.to_send[self.ratelimit.write(self.stdin_fd, self.to_send):]
+                        written = self.ratelimit.write(self.stdin_fd, self.to_send)
+                        self.tx_bytes += written
+                        self.to_send = self.to_send[written:]
                     except OSError as e:
                         # io.write might raise EAGAIN even though select indicates
                         # that the fd should be writable

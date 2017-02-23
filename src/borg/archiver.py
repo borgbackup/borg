@@ -987,6 +987,7 @@ class Archiver:
             print('Duration: %s' % archive.duration_from_meta)
             print('Number of files: %d' % stats.nfiles)
             print('Command line: %s' % format_cmdline(archive.metadata.cmdline))
+            print('Utilization of max. archive size: %d%%' % (100 * cache.chunks[archive.id].csize / MAX_DATA_SIZE))
             print(DASHES)
             print(STATS_HEADER)
             print(str(stats))

@@ -350,10 +350,13 @@ Archive fingerprint: {0.fpr}
 Time (start): {start}
 Time (end):   {end}
 Duration: {0.duration}
-Number of files: {0.stats.nfiles}'''.format(
+Number of files: {0.stats.nfiles}
+Utilization of max. archive size: {csize_max:.0%}
+'''.format(
             self,
             start=format_time(to_localtime(self.start.replace(tzinfo=timezone.utc))),
-            end=format_time(to_localtime(self.end.replace(tzinfo=timezone.utc))))
+            end=format_time(to_localtime(self.end.replace(tzinfo=timezone.utc))),
+            csize_max=self.cache.chunks[self.id].csize / MAX_DATA_SIZE)
 
     def __repr__(self):
         return 'Archive(%r)' % self.name

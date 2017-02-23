@@ -390,7 +390,6 @@ class Archiver:
                         print_as_json({
                             'repository': repository,
                             'cache': cache,
-                            'stats': archive.stats.as_dict(),
                             'archive': archive,
                         })
                     else:
@@ -1002,29 +1001,41 @@ class Archiver:
             if not archive_names:
                 return self.exit_code
 
+        output_data = []
+
         for i, archive_name in enumerate(archive_names, 1):
             archive = Archive(repository, key, manifest, archive_name, cache=cache,
                               consider_part_files=args.consider_part_files)
-            stats = archive.calc_stats(cache)
-            print('Archive name: %s' % archive.name)
-            print('Archive fingerprint: %s' % archive.fpr)
-            print('Comment: %s' % archive.metadata.get('comment', ''))
-            print('Hostname: %s' % archive.metadata.hostname)
-            print('Username: %s' % archive.metadata.username)
-            print('Time (start): %s' % format_time(to_localtime(archive.ts)))
-            print('Time (end):   %s' % format_time(to_localtime(archive.ts_end)))
-            print('Duration: %s' % archive.duration_from_meta)
-            print('Number of files: %d' % stats.nfiles)
-            print('Command line: %s' % format_cmdline(archive.metadata.cmdline))
-            print('Utilization of max. archive size: %d%%' % (100 * cache.chunks[archive.id].csize / MAX_DATA_SIZE))
-            print(DASHES)
-            print(STATS_HEADER)
-            print(str(stats))
-            print(str(cache))
+            if args.json:
+                output_data.append(archive.info())
+            else:
+                stats = archive.calc_stats(cache)
+                print('Archive name: %s' % archive.name)
+                print('Archive fingerprint: %s' % archive.fpr)
+                print('Comment: %s' % archive.metadata.get('comment', ''))
+                print('Hostname: %s' % archive.metadata.hostname)
+                print('Username: %s' % archive.metadata.username)
+                print('Time (start): %s' % format_time(to_localtime(archive.ts)))
+                print('Time (end):   %s' % format_time(to_localtime(archive.ts_end)))
+                print('Duration: %s' % archive.duration_from_meta)
+                print('Number of files: %d' % stats.nfiles)
+                print('Command line: %s' % format_cmdline(archive.metadata.cmdline))
+                print('Utilization of max. archive size: %d%%' % (100 * cache.chunks[archive.id].csize / MAX_DATA_SIZE))
+                print(DASHES)
+                print(STATS_HEADER)
+                print(str(stats))
+                print(str(cache))
             if self.exit_code:
                 break
-            if len(archive_names) - i:
+            if not args.json and len(archive_names) - i:
                 print()
+
+        if args.json:
+            print_as_json({
+                'repository': repository,
+                'cache': cache,
+                'archives': output_data,
+            })
         return self.exit_code
 
     def _info_repository(self, args, repository, key, cache):

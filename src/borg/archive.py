@@ -290,7 +290,8 @@ class Archive:
         self.end = end
         self.consider_part_files = consider_part_files
         self.pipeline = DownloadPipeline(self.repository, self.key)
-        if create:
+        self.create = create
+        if self.create:
             self.file_compression_logger = create_logger('borg.debug.file-compression')
             self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
             self.chunker = Chunker(self.key.chunk_seed, *chunker_params)
@@ -352,17 +353,34 @@ class Archive:
         return format_timedelta(self.ts_end - self.ts)
 
     def info(self):
-        return {
+        if self.create:
+            stats = self.stats
+            start = self.start.replace(tzinfo=timezone.utc)
+            end = self.end.replace(tzinfo=timezone.utc)
+        else:
+            stats = self.calc_stats(self.cache)
+            start = self.ts
+            end = self.ts_end
+        info = {
             'name': self.name,
             'id': self.fpr,
-            'start': format_time(to_localtime(self.start.replace(tzinfo=timezone.utc))),
-            'end': format_time(to_localtime(self.end.replace(tzinfo=timezone.utc))),
-            'duration': (self.end - self.start).total_seconds(),
-            'nfiles': self.stats.nfiles,
+            'start': format_time(to_localtime(start)),
+            'end': format_time(to_localtime(end)),
+            'duration': (end - start).total_seconds(),
+            'stats': stats.as_dict(),
             'limits': {
                 'max_archive_size': self.cache.chunks[self.id].csize / MAX_DATA_SIZE,
             },
         }
+        if self.create:
+            info['command_line'] = sys.argv
+        else:
+            info.update({
+                'command_line': self.metadata.cmdline,
+                'hostname': self.metadata.hostname,
+                'username': self.metadata.username,
+            })
+        return info
 
     def __str__(self):
         return '''\

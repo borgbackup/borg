@@ -977,8 +977,19 @@ class Archiver:
             format = "{archive:<36} {time} [{id}]{NL}"
         formatter = ArchiveFormatter(format)
 
+        output_data = []
+
         for archive_info in manifest.archives.list_considering(args):
-            write(safe_encode(formatter.format_item(archive_info)))
+            if args.json:
+                output_data.append(formatter.get_item_data(archive_info))
+            else:
+                write(safe_encode(formatter.format_item(archive_info)))
+
+        if args.json:
+            print_as_json({
+                'repository': manifest.repository,
+                'archives': output_data,
+            })
 
         return self.exit_code
 
@@ -2492,6 +2503,8 @@ class Archiver:
         subparser.add_argument('--format', '--list-format', dest='format', type=str,
                                help="""specify format for file listing
                                 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")""")
+        subparser.add_argument('--json', action='store_true',
+                               help='format output as JSON')
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='repository/archive to list contents of')

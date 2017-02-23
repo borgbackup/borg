@@ -17,7 +17,7 @@ import textwrap
 import time
 import traceback
 from binascii import unhexlify
-from datetime import datetime
+from datetime import datetime, timedelta
 from itertools import zip_longest
 
 from .logger import create_logger, setup_logging
@@ -37,7 +37,8 @@ from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError
 from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
 from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS
-from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter, format_time, format_file_size, format_archive
+from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
+from .helpers import format_time, format_timedelta, format_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict
 from .helpers import prune_within, prune_split
 from .helpers import to_localtime, timestamp
@@ -52,7 +53,7 @@ from .helpers import parse_pattern, PatternMatcher, PathPrefixPattern
 from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
 from .helpers import ErrorIgnoringTextIOWrapper
 from .helpers import ProgressIndicatorPercent
-from .helpers import BorgJsonEncoder, basic_json_data, json_print
+from .helpers import basic_json_data, json_print
 from .item import Item
 from .key import key_creator, tam_required_file, tam_required, RepoKey, PassphraseKey
 from .keymanager import KeyManager
@@ -997,25 +998,29 @@ class Archiver:
         for i, archive_name in enumerate(archive_names, 1):
             archive = Archive(repository, key, manifest, archive_name, cache=cache,
                               consider_part_files=args.consider_part_files)
+            info = archive.info()
             if args.json:
-                output_data.append(archive.info())
+                output_data.append(info)
             else:
-                stats = archive.calc_stats(cache)
-                print('Archive name: %s' % archive.name)
-                print('Archive fingerprint: %s' % archive.fpr)
-                print('Comment: %s' % archive.metadata.get('comment', ''))
-                print('Hostname: %s' % archive.metadata.hostname)
-                print('Username: %s' % archive.metadata.username)
-                print('Time (start): %s' % format_time(to_localtime(archive.ts)))
-                print('Time (end):   %s' % format_time(to_localtime(archive.ts_end)))
-                print('Duration: %s' % archive.duration_from_meta)
-                print('Number of files: %d' % stats.nfiles)
-                print('Command line: %s' % format_cmdline(archive.metadata.cmdline))
-                print('Utilization of max. archive size: %d%%' % (100 * cache.chunks[archive.id].csize / MAX_DATA_SIZE))
-                print(DASHES)
-                print(STATS_HEADER)
-                print(str(stats))
-                print(str(cache))
+                info['duration'] = format_timedelta(timedelta(seconds=info['duration']))
+                info['command_line'] = format_cmdline(info['command_line'])
+                print(textwrap.dedent("""
+                Archive name: {name}
+                Archive fingerprint: {id}
+                Comment: {comment}
+                Hostname: {hostname}
+                Username: {username}
+                Time (start): {start}
+                Time (end): {end}
+                Duration: {duration}
+                Number of files: {stats[nfiles]}
+                Command line: {command_line}
+                Utilization of max. archive size: {limits[max_archive_size]:.0%}
+                ------------------------------------------------------------------------------
+                                       Original size      Compressed size    Deduplicated size
+                This archive:   {stats[original_size]:>20s} {stats[compressed_size]:>20s} {stats[deduplicated_size]:>20s}
+                {cache}
+                """).strip().format(cache=cache, **info))
             if self.exit_code:
                 break
             if not args.json and len(archive_names) - i:

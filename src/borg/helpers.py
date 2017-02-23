@@ -831,6 +831,11 @@ def format_file_size(v, precision=2, sign=False):
     return sizeof_fmt_decimal(v, suffix='B', sep=' ', precision=precision, sign=sign)
 
 
+class FileSize(int):
+    def __format__(self, format_spec):
+        return format_file_size(int(self)).__format__(format_spec)
+
+
 def parse_file_size(s):
     """Return int from file size (1234, 55G, 1.7T)."""
     if not s:

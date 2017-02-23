@@ -28,7 +28,7 @@ from .helpers import Chunk, ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError
 from .helpers import uid2user, user2uid, gid2group, group2gid
 from .helpers import parse_timestamp, to_localtime
-from .helpers import format_time, format_timedelta, format_file_size, file_status
+from .helpers import format_time, format_timedelta, format_file_size, file_status, FileSize
 from .helpers import safe_encode, safe_decode, make_path_safe, remove_surrogates
 from .helpers import StableDict
 from .helpers import bin_to_hex
@@ -70,9 +70,9 @@ class Statistics:
 
     def as_dict(self):
         return {
-            'original_size': self.osize,
-            'compressed_size': self.csize,
-            'deduplicated_size': self.usize,
+            'original_size': FileSize(self.osize),
+            'compressed_size': FileSize(self.csize),
+            'deduplicated_size': FileSize(self.usize),
             'nfiles': self.nfiles,
         }
 
@@ -379,6 +379,7 @@ class Archive:
                 'command_line': self.metadata.cmdline,
                 'hostname': self.metadata.hostname,
                 'username': self.metadata.username,
+                'comment': self.metadata.get('comment', ''),
             })
         return info
 

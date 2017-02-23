@@ -51,6 +51,15 @@ def Chunk(data, **meta):
     return _Chunk(meta, data)
 
 
+exit_code = EXIT_SUCCESS
+
+
+def set_ec(ec):
+    global exit_code
+    exit_code = max(exit_code, ec)
+    return exit_code
+
+
 class Error(Exception):
     """Error base class"""
 

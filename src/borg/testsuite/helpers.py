@@ -60,6 +60,11 @@ class TestLocationWithoutEnv:
         assert repr(Location('user@host:/some/path')) == \
             "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
 
+    def test_smb(self, monkeypatch):
+        monkeypatch.delenv('BORG_REPO', raising=False)
+        assert repr(Location('file:////server/share/path::archive')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='//server/share/path', archive='archive')"
+
     def test_folder(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
         assert repr(Location('path::archive')) == \

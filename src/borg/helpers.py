@@ -98,6 +98,10 @@ class DecompressionError(IntegrityError):
     """Decompression error: {}"""
 
 
+class AtticDataError(Error):
+    """Attic (not: Borg) data found: {}"""
+
+
 class ExtensionModuleError(Error):
     """The Borg binary extension modules do not seem to be properly installed"""
 

@@ -1004,10 +1004,17 @@ class Location:
 
     # path must not contain :: (it ends at :: or string end), but may contain single colons.
     # to avoid ambiguities with other regexes, it must also not start with ":" nor with "//" nor with "ssh://".
-    path_re = r"""
+    scp_path_re = r"""
         (?!(:|//|ssh://))                                   # not starting with ":" or // or ssh://
         (?P<path>([^:]|(:(?!:)))+)                          # any chars, but no "::"
         """
+
+    # file_path must not contain :: (it ends at :: or string end), but may contain single colons.
+    # it must start with a / and that slash is part of the path.
+    file_path_re = r"""
+        (?P<path>(([^/]*)/([^:]|(:(?!:)))+))                # start opt. servername, then /, then any chars, but no "::"
+        """
+
     # abs_path must not contain :: (it ends at :: or string end), but may contain single colons.
     # it must start with a / and that slash is part of the path.
     abs_path_re = r"""
@@ -1032,7 +1039,7 @@ class Location:
 
     file_re = re.compile(r"""
         (?P<proto>file)://                                  # file://
-        """ + path_re + optional_archive_re, re.VERBOSE)    # path or path::archive
+        """ + file_path_re + optional_archive_re, re.VERBOSE)  # servername/path, path or path::archive
 
     # note: scp_re is also use for local pathes
     scp_re = re.compile(r"""
@@ -1040,7 +1047,7 @@ class Location:
             """ + optional_user_re + r"""                   # user@  (optional)
             (?P<host>[^:/]+):                               # host: (don't match / in host to disambiguate from file:)
         )?                                                  # user@host: part is optional
-        """ + path_re + optional_archive_re, re.VERBOSE)    # path with optional archive
+        """ + scp_path_re + optional_archive_re, re.VERBOSE)  # path with optional archive
 
     # get the repo from BORG_REPO env and the optional archive from param.
     # if the syntax requires giving REPOSITORY (see "borg mount"),

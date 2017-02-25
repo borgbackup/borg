@@ -17,7 +17,7 @@ import textwrap
 import time
 import traceback
 from binascii import unhexlify
-from datetime import datetime
+from datetime import datetime, timedelta
 from itertools import zip_longest
 
 from .logger import create_logger, setup_logging
@@ -37,7 +37,8 @@ from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError
 from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
 from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS
-from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter, format_time, format_file_size, format_archive
+from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
+from .helpers import format_time, format_timedelta, format_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict
 from .helpers import prune_within, prune_split
 from .helpers import to_localtime, timestamp
@@ -52,6 +53,7 @@ from .helpers import parse_pattern, PatternMatcher, PathPrefixPattern
 from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
 from .helpers import ErrorIgnoringTextIOWrapper
 from .helpers import ProgressIndicatorPercent
+from .helpers import basic_json_data, json_print
 from .item import Item
 from .key import key_creator, tam_required_file, tam_required, RepoKey, PassphraseKey
 from .keymanager import KeyManager
@@ -364,14 +366,20 @@ class Archiver:
                 archive.save(comment=args.comment, timestamp=args.timestamp)
                 if args.progress:
                     archive.stats.show_progress(final=True)
+                args.stats |= args.json
                 if args.stats:
-                    log_multi(DASHES,
-                              str(archive),
-                              DASHES,
-                              STATS_HEADER,
-                              str(archive.stats),
-                              str(cache),
-                              DASHES, logger=logging.getLogger('borg.output.stats'))
+                    if args.json:
+                        json_print(basic_json_data(manifest, cache=cache, extra={
+                            'archive': archive,
+                        }))
+                    else:
+                        log_multi(DASHES,
+                                  str(archive),
+                                  DASHES,
+                                  STATS_HEADER,
+                                  str(archive.stats),
+                                  str(cache),
+                                  DASHES, logger=logging.getLogger('borg.output.stats'))
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list
@@ -934,10 +942,12 @@ class Archiver:
                 format = "{path}{NL}"
             else:
                 format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
-            formatter = ItemFormatter(archive, format)
 
+            formatter = ItemFormatter(archive, format, json=args.json)
+            write(safe_encode(formatter.begin()))
             for item in archive.iter_items(lambda item: matcher.match(item.path)):
                 write(safe_encode(formatter.format_item(item)))
+            write(safe_encode(formatter.end()))
         return self.exit_code
 
     def _list_repository(self, args, manifest, write):
@@ -949,8 +959,18 @@ class Archiver:
             format = "{archive:<36} {time} [{id}]{NL}"
         formatter = ArchiveFormatter(format)
 
+        output_data = []
+
         for archive_info in manifest.archives.list_considering(args):
-            write(safe_encode(formatter.format_item(archive_info)))
+            if args.json:
+                output_data.append(formatter.get_item_data(archive_info))
+            else:
+                write(safe_encode(formatter.format_item(archive_info)))
+
+        if args.json:
+            json_print(basic_json_data(manifest, extra={
+                'archives': output_data
+            }))
 
         return self.exit_code
 
@@ -960,7 +980,7 @@ class Archiver:
         if any((args.location.archive, args.first, args.last, args.prefix)):
             return self._info_archives(args, repository, manifest, key, cache)
         else:
-            return self._info_repository(repository, key, cache)
+            return self._info_repository(args, repository, manifest, key, cache)
 
     def _info_archives(self, args, repository, manifest, key, cache):
         def format_cmdline(cmdline):
@@ -973,45 +993,75 @@ class Archiver:
             if not archive_names:
                 return self.exit_code
 
+        output_data = []
+
         for i, archive_name in enumerate(archive_names, 1):
             archive = Archive(repository, key, manifest, archive_name, cache=cache,
                               consider_part_files=args.consider_part_files)
-            stats = archive.calc_stats(cache)
-            print('Archive name: %s' % archive.name)
-            print('Archive fingerprint: %s' % archive.fpr)
-            print('Comment: %s' % archive.metadata.get('comment', ''))
-            print('Hostname: %s' % archive.metadata.hostname)
-            print('Username: %s' % archive.metadata.username)
-            print('Time (start): %s' % format_time(to_localtime(archive.ts)))
-            print('Time (end):   %s' % format_time(to_localtime(archive.ts_end)))
-            print('Duration: %s' % archive.duration_from_meta)
-            print('Number of files: %d' % stats.nfiles)
-            print('Command line: %s' % format_cmdline(archive.metadata.cmdline))
-            print('Utilization of max. archive size: %d%%' % (100 * cache.chunks[archive.id].csize / MAX_DATA_SIZE))
-            print(DASHES)
-            print(STATS_HEADER)
-            print(str(stats))
-            print(str(cache))
+            info = archive.info()
+            if args.json:
+                output_data.append(info)
+            else:
+                info['duration'] = format_timedelta(timedelta(seconds=info['duration']))
+                info['command_line'] = format_cmdline(info['command_line'])
+                print(textwrap.dedent("""
+                Archive name: {name}
+                Archive fingerprint: {id}
+                Comment: {comment}
+                Hostname: {hostname}
+                Username: {username}
+                Time (start): {start}
+                Time (end): {end}
+                Duration: {duration}
+                Number of files: {stats[nfiles]}
+                Command line: {command_line}
+                Utilization of max. archive size: {limits[max_archive_size]:.0%}
+                ------------------------------------------------------------------------------
+                                       Original size      Compressed size    Deduplicated size
+                This archive:   {stats[original_size]:>20s} {stats[compressed_size]:>20s} {stats[deduplicated_size]:>20s}
+                {cache}
+                """).strip().format(cache=cache, **info))
             if self.exit_code:
                 break
-            if len(archive_names) - i:
+            if not args.json and len(archive_names) - i:
                 print()
+
+        if args.json:
+            json_print(basic_json_data(manifest, cache=cache, extra={
+                'archives': output_data,
+            }))
         return self.exit_code
 
-    def _info_repository(self, repository, key, cache):
-        print('Repository ID: %s' % bin_to_hex(repository.id))
-        if key.NAME == 'plaintext':
-            encrypted = 'No'
+    def _info_repository(self, args, repository, manifest, key, cache):
+        info = basic_json_data(manifest, cache=cache, extra={
+            'security_dir': cache.security_manager.dir,
+        })
+
+        if args.json:
+            json_print(info)
         else:
-            encrypted = 'Yes (%s)' % key.NAME
-        print('Encrypted: %s' % encrypted)
-        if key.NAME.startswith('key file'):
-            print('Key file: %s' % key.find_key())
-        print('Cache: %s' % cache.path)
-        print('Security dir: %s' % cache.security_manager.dir)
-        print(DASHES)
-        print(STATS_HEADER)
-        print(str(cache))
+            encryption = 'Encrypted: '
+            if key.NAME == 'plaintext':
+                encryption += 'No'
+            else:
+                encryption += 'Yes (%s)' % key.NAME
+            if key.NAME.startswith('key file'):
+                encryption += '\nKey file: %s' % key.find_key()
+            info['encryption'] = encryption
+
+            print(textwrap.dedent("""
+            Repository ID: {id}
+            Location: {location}
+            {encryption}
+            Cache: {cache.path}
+            Security dir: {security_dir}
+            """).strip().format(
+                id=bin_to_hex(repository.id),
+                location=repository._location.canonical_path(),
+                **info))
+            print(DASHES)
+            print(STATS_HEADER)
+            print(str(cache))
         return self.exit_code
 
     @with_repository(exclusive=True)
@@ -2146,6 +2196,8 @@ class Archiver:
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
                                help='only display items with the given status characters')
+        subparser.add_argument('--json', action='store_true',
+                               help='output stats as JSON (implies --stats)')
 
         exclude_group = subparser.add_argument_group('Exclusion options')
         exclude_group.add_argument('-e', '--exclude', dest='patterns',
@@ -2424,6 +2476,10 @@ class Archiver:
         subparser.add_argument('--format', '--list-format', dest='format', type=str,
                                help="""specify format for file listing
                                 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")""")
+        subparser.add_argument('--json', action='store_true',
+                               help='format output as JSON. The form of --format is ignored, but keys used in it '
+                                    'are added to the JSON output. Some keys are always present. Note: JSON can only '
+                                    'represent text. A "bpath" key is therefore not available.')
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='repository/archive to list contents of')
@@ -2542,6 +2598,8 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='archive or repository to display information about')
+        subparser.add_argument('--json', action='store_true',
+                               help='format output as JSON')
         self.add_archives_filters_args(subparser)
 
         break_lock_epilog = process_epilog("""

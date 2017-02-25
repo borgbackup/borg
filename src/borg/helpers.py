@@ -5,6 +5,7 @@ import grp
 import hashlib
 import logging
 import io
+import json
 import os
 import os.path
 import platform
@@ -206,6 +207,10 @@ class Manifest:
     def id_str(self):
         return bin_to_hex(self.id)
 
+    @property
+    def last_timestamp(self):
+        return datetime.strptime(self.timestamp, "%Y-%m-%dT%H:%M:%S.%f")
+
     @classmethod
     def load(cls, repository, key=None, force_tam_not_required=False):
         from .item import ManifestItem
@@ -250,7 +255,7 @@ class Manifest:
         if self.timestamp is None:
             self.timestamp = datetime.utcnow().isoformat()
         else:
-            prev_ts = datetime.strptime(self.timestamp, "%Y-%m-%dT%H:%M:%S.%f")
+            prev_ts = self.last_timestamp
             incremented = (prev_ts + timedelta(microseconds=1)).isoformat()
             self.timestamp = max(incremented, datetime.utcnow().isoformat())
         manifest = ManifestItem(
@@ -824,6 +829,11 @@ def format_file_size(v, precision=2, sign=False):
     """Format file size into a human friendly format
     """
     return sizeof_fmt_decimal(v, suffix='B', sep=' ', precision=precision, sign=sign)
+
+
+class FileSize(int):
+    def __format__(self, format_spec):
+        return format_file_size(int(self)).__format__(format_spec)
 
 
 def parse_file_size(s):
@@ -1560,6 +1570,7 @@ class ArchiveFormatter(BaseFormatter):
 
     def get_item_data(self, archive):
         return {
+            'name': remove_surrogates(archive.name),
             'barchive': archive.name,
             'archive': remove_surrogates(archive.name),
             'id': bin_to_hex(archive.id),
@@ -1568,7 +1579,7 @@ class ArchiveFormatter(BaseFormatter):
 
     @staticmethod
     def keys_help():
-        return " - archive: archive name interpreted as text (might be missing non-text characters, see barchive)\n" \
+        return " - archive, name: archive name interpreted as text (might be missing non-text characters, see barchive)\n" \
                " - barchive: verbatim archive name, can contain any character except NUL\n" \
                " - time: time of creation of the archive\n" \
                " - id: internal ID of the archive"
@@ -1627,8 +1638,9 @@ class ItemFormatter(BaseFormatter):
         assert not keys, str(keys)
         return "\n".join(help)
 
-    def __init__(self, archive, format):
+    def __init__(self, archive, format, *, json=False):
         self.archive = archive
+        self.json = json
         static_keys = {
             'archivename': archive.name,
             'archiveid': archive.fpr,
@@ -1653,7 +1665,33 @@ class ItemFormatter(BaseFormatter):
         for hash_function in hashlib.algorithms_guaranteed:
             self.add_key(hash_function, partial(self.hash_item, hash_function))
         self.used_call_keys = set(self.call_keys) & self.format_keys
-        self.item_data = static_keys
+        if self.json:
+            self.item_data = {}
+            self.format_item = self.format_item_json
+            self.first = True
+        else:
+            self.item_data = static_keys
+
+    def begin(self):
+        if not self.json:
+            return ''
+        begin = json_dump(basic_json_data(self.archive.manifest))
+        begin, _, _ = begin.rpartition('\n}')  # remove last closing brace, we want to extend the object
+        begin += ',\n'
+        begin += '    "files": [\n'
+        return begin
+
+    def end(self):
+        if not self.json:
+            return ''
+        return "]}"
+
+    def format_item_json(self, item):
+        if self.first:
+            self.first = False
+            return json.dumps(self.get_item_data(item))
+        else:
+            return ',' + json.dumps(self.get_item_data(item))
 
     def add_key(self, key, callable_with_item):
         self.call_keys[key] = callable_with_item
@@ -1680,12 +1718,15 @@ class ItemFormatter(BaseFormatter):
         item_data['uid'] = item.uid
         item_data['gid'] = item.gid
         item_data['path'] = remove_surrogates(item.path)
-        item_data['bpath'] = item.path
+        if self.json:
+            item_data['healthy'] = 'chunks_healthy' not in item
+        else:
+            item_data['bpath'] = item.path
+            item_data['extra'] = extra
+            item_data['health'] = 'broken' if 'chunks_healthy' in item else 'healthy'
         item_data['source'] = source
         item_data['linktarget'] = source
-        item_data['extra'] = extra
         item_data['flags'] = item.get('bsdflags')
-        item_data['health'] = 'broken' if 'chunks_healthy' in item else 'healthy'
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)
         return item_data
@@ -2065,3 +2106,50 @@ def swidth_slice(string, max_width):
     if reverse:
         result.reverse()
     return ''.join(result)
+
+
+class BorgJsonEncoder(json.JSONEncoder):
+    def default(self, o):
+        from .repository import Repository
+        from .remote import RemoteRepository
+        from .archive import Archive
+        from .cache import Cache
+        if isinstance(o, Repository) or isinstance(o, RemoteRepository):
+            return {
+                'id': bin_to_hex(o.id),
+                'location': o._location.canonical_path(),
+            }
+        if isinstance(o, Archive):
+            return o.info()
+        if isinstance(o, Cache):
+            return {
+                'path': o.path,
+                'stats': o.stats(),
+            }
+        return super().default(o)
+
+
+def basic_json_data(manifest, *, cache=None, extra=None):
+    key = manifest.key
+    data = extra or {}
+    data.update({
+        'repository': BorgJsonEncoder().default(manifest.repository),
+        'encryption': {
+            'mode': key.NAME,
+        },
+    })
+    data['repository']['last_modified'] = format_time(to_localtime(manifest.last_timestamp.replace(tzinfo=timezone.utc)))
+    if key.NAME.startswith('key file'):
+        data['encryption']['keyfile'] = key.find_key()
+    if cache:
+        data['cache'] = cache
+    return data
+
+
+def json_dump(obj):
+    """Dump using BorgJSONEncoder."""
+    return json.dumps(obj, sort_keys=True, indent=4, cls=BorgJsonEncoder)
+
+
+def json_print(obj):
+    print(json_dump(obj))

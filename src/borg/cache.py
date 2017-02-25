@@ -219,18 +219,22 @@ All archives:   {0.total_size:>20s} {0.total_csize:>20s} {0.unique_csize:>20s}
 Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         return fmt.format(self.format_tuple())
 
-    def format_tuple(self):
+    Summary = namedtuple('Summary', ['total_size', 'total_csize', 'unique_size', 'unique_csize', 'total_unique_chunks',
+                                     'total_chunks'])
+
+    def stats(self):
         # XXX: this should really be moved down to `hashindex.pyx`
-        Summary = namedtuple('Summary', ['total_size', 'total_csize', 'unique_size', 'unique_csize', 'total_unique_chunks', 'total_chunks'])
-        stats = Summary(*self.chunks.summarize())._asdict()
+        stats = self.Summary(*self.chunks.summarize())._asdict()
+        return stats
+
+    def format_tuple(self):
+        stats = self.stats()
         for field in ['total_size', 'total_csize', 'unique_csize']:
             stats[field] = format_file_size(stats[field])
-        return Summary(**stats)
+        return self.Summary(**stats)
 
     def chunks_stored_size(self):
-        Summary = namedtuple('Summary', ['total_size', 'total_csize', 'unique_size', 'unique_csize', 'total_unique_chunks', 'total_chunks'])
-        stats = Summary(*self.chunks.summarize())
-        return stats.unique_csize
+        return self.stats()['unique_csize']
 
     def create(self):
         """Create a new empty cache at `self.path`

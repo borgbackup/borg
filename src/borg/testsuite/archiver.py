@@ -1193,6 +1193,23 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # Make sure the repo is gone
         self.assertFalse(os.path.exists(self.repository_path))
 
+    def test_delete_force(self):
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.create_src_archive('test')
+        with Repository(self.repository_path, exclusive=True) as repository:
+            manifest, key = Manifest.load(repository)
+            archive = Archive(repository, key, manifest, 'test')
+            for item in archive.iter_items():
+                if 'chunks' in item:
+                    first_chunk_id = item.chunks[0].id
+                    repository.delete(first_chunk_id)
+                    repository.commit()
+                    break
+        self.cmd('delete', '--force', self.repository_location + '::test')
+        self.cmd('check', '--repair', self.repository_location)
+        output = self.cmd('list', self.repository_location)
+        self.assert_not_in('test', output)
+
     def test_delete_double_force(self):
         self.cmd('init', '--encryption=none', self.repository_location)
         self.create_src_archive('test')

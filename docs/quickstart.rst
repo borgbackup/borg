@@ -118,12 +118,12 @@ sudoers(5), or try ``sudo BORG_PASSPHRASE='yourphrase' borg`` syntax.
 Backup compression
 ------------------
 
-Default is no compression, but we support different methods with high speed
-or high compression:
+The default is lz4 (very fast, but low compression ratio), but other methods are
+supported for different situations.
 
-If you have a fast repo storage and you want some compression: ::
+If you have a fast repo storage and you want minimum CPU usage, no compression::
 
-    $ borg create --compression lz4 /path/to/repo::arch ~
+    $ borg create --compression none /path/to/repo::arch ~
 
 If you have a less fast repo storage and you want a bit more compression (N=0..9,
 0 means no compression, 9 means high compression): ::

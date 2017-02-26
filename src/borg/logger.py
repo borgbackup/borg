@@ -31,6 +31,7 @@ The way to use this is as follows:
 """
 
 import inspect
+import json
 import logging
 import logging.config
 import logging.handlers  # needed for handlers defined there being configurable in logging.conf file
@@ -52,7 +53,7 @@ def _log_warning(message, category, filename, lineno, file=None, line=None):
     logger.warning(msg)
 
 
-def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', level='info', is_serve=False):
+def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', level='info', is_serve=False, json=False):
     """setup logging module according to the arguments provided
 
     if conf_fname is given (or the config file name can be determined via
@@ -91,7 +92,11 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
         fmt = '$LOG %(levelname)s %(name)s Remote: %(message)s'
     else:
         fmt = '%(message)s'
-    handler.setFormatter(logging.Formatter(fmt))
+    formatter = JsonFormatter(fmt) if json else logging.Formatter(fmt)
+    handler.setFormatter(formatter)
+    borg_logger = logging.getLogger('borg')
+    borg_logger.formatter = formatter
+    borg_logger.json = json
     logger.addHandler(handler)
     logger.setLevel(level.upper())
     configured = True
@@ -181,3 +186,31 @@ def create_logger(name=None):
             return self.__logger.critical(*args, **kw)
 
     return LazyLogger(name)
+
+
+class JsonFormatter(logging.Formatter):
+    RECORD_ATTRIBUTES = (
+        'created',
+        'levelname',
+        'name',
+        'message',
+    )
+
+    # Other attributes that are not very useful but do exist:
+    # processName, process, relativeCreated, stack_info, thread, threadName
+    # msg == message
+    # *args* are the unformatted arguments passed to the logger function, not useful now,
+    # become useful if sanitized properly (must be JSON serializable) in the code +
+    # fixed message IDs are assigned.
+    # exc_info, exc_text are generally uninteresting because the message will have that
+
+    def format(self, record):
+        super().format(record)
+        data = {
+            'type': 'log_message',
+        }
+        for attr in self.RECORD_ATTRIBUTES:
+            value = getattr(record, attr, None)
+            if value:
+                data[attr] = value
+        return json.dumps(data)

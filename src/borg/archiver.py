@@ -121,7 +121,7 @@ def with_archive(method):
     def wrapper(self, args, repository, key, manifest, **kwargs):
         archive = Archive(repository, key, manifest, args.location.archive,
                           numeric_owner=getattr(args, 'numeric_owner', False), cache=kwargs.get('cache'),
-                          consider_part_files=args.consider_part_files)
+                          consider_part_files=args.consider_part_files, log_json=args.log_json)
         return method(self, args, repository=repository, manifest=manifest, key=key, archive=archive, **kwargs)
     return wrapper
 
@@ -145,7 +145,14 @@ class Archiver:
 
     def print_file_status(self, status, path):
         if self.output_list and (self.output_filter is None or status in self.output_filter):
-            logging.getLogger('borg.output.list').info("%1s %s", status, remove_surrogates(path))
+            if self.log_json:
+                print(json.dumps({
+                    'type': 'file_status',
+                    'status': status,
+                    'path': remove_surrogates(path),
+                }), file=sys.stderr)
+            else:
+                logging.getLogger('borg.output.list').info("%1s %s", status, remove_surrogates(path))
 
     @staticmethod
     def compare_chunk_contents(chunks1, chunks2):
@@ -395,7 +402,8 @@ class Archiver:
                                   numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime,
                                   progress=args.progress,
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
-                                  compression=args.compression, compression_files=args.compression_files)
+                                  compression=args.compression, compression_files=args.compression_files,
+                                  log_json=args.log_json)
                 create_inner(archive, cache)
         else:
             create_inner(None, None)
@@ -1776,6 +1784,8 @@ class Archiver:
                                   action='append', metavar='TOPIC', default=[],
                                   help='enable TOPIC debugging (can be specified multiple times). '
                                        'The logger path is borg.debug.<TOPIC> if TOPIC is not fully qualified.')
+        common_group.add_argument('--log-json', dest='log_json', action='store_true',
+                                  help='Output one JSON object per log line instead of formatted text.')
         common_group.add_argument('--lock-wait', dest='lock_wait', type=int, metavar='N', default=1,
                                   help='wait for the lock, but max. N seconds (default: %(default)d).')
         common_group.add_argument('--show-version', dest='show_version', action='store_true', default=False,
@@ -3176,7 +3186,9 @@ class Archiver:
         self.lock_wait = args.lock_wait
         # This works around http://bugs.python.org/issue9351
         func = getattr(args, 'func', None) or getattr(args, 'fallback_func')
-        setup_logging(level=args.log_level, is_serve=func == self.do_serve)  # do not use loggers before this!
+        # do not use loggers before this!
+        setup_logging(level=args.log_level, is_serve=func == self.do_serve, json=args.log_json)
+        self.log_json = args.log_json
         self._setup_implied_logging(vars(args))
         self._setup_topic_debugging(args)
         if args.show_version:

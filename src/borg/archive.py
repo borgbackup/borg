@@ -1,4 +1,5 @@
 import errno
+import json
 import os
 import socket
 import stat
@@ -49,7 +50,8 @@ flags_noatime = flags_normal | getattr(os, 'O_NOATIME', 0)
 
 class Statistics:
 
-    def __init__(self):
+    def __init__(self, output_json=False):
+        self.output_json = output_json
         self.osize = self.csize = self.usize = self.nfiles = 0
         self.last_progress = 0  # timestamp when last progress was shown
 
@@ -92,19 +94,29 @@ class Statistics:
         now = time.monotonic()
         if dt is None or now - self.last_progress > dt:
             self.last_progress = now
-            columns, lines = get_terminal_size()
-            if not final:
-                msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
-                path = remove_surrogates(item.path) if item else ''
-                space = columns - swidth(msg)
-                if space < 12:
-                    msg = ''
-                    space = columns - swidth(msg)
-                if space >= 8:
-                    msg += ellipsis_truncate(path, space)
+            if self.output_json:
+                data = self.as_dict()
+                data.update({
+                    'type': 'archive_progress',
+                    'path': remove_surrogates(item.path if item else ''),
+                })
+                msg = json.dumps(data)
+                end = '\n'
             else:
-                msg = ' ' * columns
-            print(msg, file=stream or sys.stderr, end="\r", flush=True)
+                columns, lines = get_terminal_size()
+                if not final:
+                    msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
+                    path = remove_surrogates(item.path) if item else ''
+                    space = columns - swidth(msg)
+                    if space < 12:
+                        msg = ''
+                        space = columns - swidth(msg)
+                    if space >= 8:
+                        msg += ellipsis_truncate(path, space)
+                else:
+                    msg = ' ' * columns
+                end = '\r'
+            print(msg, end=end, file=stream or sys.stderr, flush=True)
 
 
 def is_special(mode):
@@ -264,14 +276,14 @@ class Archive:
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=300, numeric_owner=False, noatime=False, noctime=False, progress=False,
                  chunker_params=CHUNKER_PARAMS, start=None, start_monotonic=None, end=None, compression=None, compression_files=None,
-                 consider_part_files=False):
+                 consider_part_files=False, log_json=False):
         self.cwd = os.getcwd()
         self.key = key
         self.repository = repository
         self.cache = cache
         self.manifest = manifest
         self.hard_links = {}
-        self.stats = Statistics()
+        self.stats = Statistics(output_json=log_json)
         self.show_progress = progress
         self.name = name
         self.checkpoint_interval = checkpoint_interval

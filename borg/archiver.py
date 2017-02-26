@@ -1355,9 +1355,12 @@ class Archiver:
 
         create_epilog = textwrap.dedent("""
         This command creates a backup archive containing all files found while recursively
-        traversing all paths specified. When giving '-' as path, borg will read data
-        from standard input and create a file 'stdin' in the created archive from that
-        data.
+        traversing all paths specified. Paths are added to the archive as they are given,
+        that means if relative paths are desired, the command has to be run from the correct
+        directory.
+
+        When giving '-' as path, borg will read data from standard input and create a
+        file 'stdin' in the created archive from that data.
 
         The archive will consume almost no disk space for files or parts of files that
         have already been stored in other archives.
@@ -1373,6 +1376,11 @@ class Archiver:
         not provide correct inode information the --ignore-inode flag can be used. This
         potentially decreases reliability of change detection, while avoiding always reading
         all files on these file systems.
+
+        The mount points of filesystems or filesystem snapshots should be the same for every
+        creation of a new archive to ensure fast operation. This is because the file cache that
+        is used to determine changed files quickly uses absolute filenames.
+        If this is not possible, consider creating a bind mount to a stable location.
 
         See the output of the "borg help patterns" command for more help on exclude patterns.
         See the output of the "borg help placeholders" command for more help on placeholders.

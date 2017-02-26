@@ -435,6 +435,11 @@ Examples
     # As above, but add nanoseconds
     $ borg create /path/to/repo::{hostname}-{user}-{now:%Y-%m-%dT%H:%M:%S.%f} ~
 
+    # Backing up relative paths by moving into the correct directory first
+    $ cd /home/user/Documents
+    # The root directory of the archive will be "projectA"
+    $ borg create /path/to/repo::daily-projectA-{now:%Y-%m-%d} projectA
+
 Notes
 ~~~~~
 
@@ -442,7 +447,6 @@ Notes
   exclude foo/.bundler/gems. In borg it will not, you need to use --exclude
   '\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
   more information.
-
 
 .. include:: usage/extract.rst.inc
 

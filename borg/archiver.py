@@ -1374,6 +1374,11 @@ class Archiver:
         potentially decreases reliability of change detection, while avoiding always reading
         all files on these file systems.
 
+        The mount points of filesystems or filesystem snapshots should be the same for every
+        creation of a new archive to ensure fast operation. This is because the file cache that
+        is used to determine changed files quickly uses absolute filenames.
+        If this is not possible, consider creating a bind mount to a stable location.
+
         See the output of the "borg help patterns" command for more help on exclude patterns.
         See the output of the "borg help placeholders" command for more help on placeholders.
         """)

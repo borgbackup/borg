@@ -121,14 +121,14 @@ def test_return_codes(cmd, tmpdir):
     input.join('test_file').write('content')
     rc, out = cmd('init', '--encryption=none', '%s' % str(repo))
     assert rc == EXIT_SUCCESS
-    rc, out = cmd('create', '%s::archive' % repo, str(input))
+    rc, out = cmd('create', '--compression=none', '%s::archive' % repo, str(input))
     assert rc == EXIT_SUCCESS
     with changedir(str(output)):
         rc, out = cmd('extract', '%s::archive' % repo)
         assert rc == EXIT_SUCCESS
     rc, out = cmd('extract', '%s::archive' % repo, 'does/not/match')
     assert rc == EXIT_WARNING  # pattern did not match
-    rc, out = cmd('create', '%s::archive' % repo, str(input))
+    rc, out = cmd('create', '--compression=none', '%s::archive' % repo, str(input))
     assert rc == EXIT_ERROR  # duplicate archive name
 
 
@@ -191,7 +191,7 @@ def test_disk_full(cmd):
                             break
                         raise
                     try:
-                        rc, out = cmd('create', '%s::test%03d' % (repo, i), input)
+                        rc, out = cmd('create', '--compression=none', '%s::test%03d' % (repo, i), input)
                         success = rc == EXIT_SUCCESS
                         if not success:
                             print('create', rc, out)
@@ -262,7 +262,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         return output
 
     def create_src_archive(self, name):
-        self.cmd('create', self.repository_location + '::' + name, src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::' + name, src_dir)
 
     def open_archive(self, name):
         repository = Repository(self.repository_path, exclusive=True)
@@ -353,8 +353,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('init', '--encryption=repokey', '--show-version', '--show-rc', self.repository_location, fork=True)
         self.assert_in('borgbackup version', output)
         self.assert_in('terminating with success status, rc 0', output)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        output = self.cmd('create', '--stats', self.repository_location + '::test.2', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
+        output = self.cmd('create', '--compression=none', '--stats', self.repository_location + '::test.2', 'input')
         self.assert_in('Archive name: test.2', output)
         self.assert_in('This archive: ', output)
         with changedir('output'):
@@ -420,7 +420,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 pytest.skip('unix sockets disabled or not supported')
             elif err.errno == errno.EACCES:
                 pytest.skip('permission denied to create unix sockets')
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         sock.close()
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
@@ -430,7 +430,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_symlink_extract(self):
         self.create_test_files()
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
             assert os.readlink('input/link1') == 'somewhere'
@@ -457,7 +457,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         have_noatime = has_noatime('input/file1')
         os.utime('input/file1', (atime, mtime))
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
         sti = os.stat('input/file1')
@@ -521,7 +521,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # we could create a sparse input file, so creating a backup of it and
             # extracting it again (as sparse) should also work:
             self.cmd('init', '--encryption=repokey', self.repository_location)
-            self.cmd('create', self.repository_location + '::test', 'input')
+            self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
             with changedir(self.output_path):
                 self.cmd('extract', '--sparse', self.repository_location + '::test')
             self.assert_dirs_equal('input', 'output/input')
@@ -540,7 +540,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             with open(filename, 'wb'):
                 pass
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         for filename in filenames:
             with changedir('output'):
                 self.cmd('extract', self.repository_location + '::test', os.path.join('input', filename))
@@ -551,51 +551,51 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
         self.cmd('init', '--encryption=repokey', self.repository_location)
         repository_id = self._extract_repository_id(self.repository_path)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         shutil.rmtree(self.repository_path)
         self.cmd('init', '--encryption=none', self.repository_location)
         self._set_repository_id(self.repository_path, repository_id)
         self.assert_equal(repository_id, self._extract_repository_id(self.repository_path))
         if self.FORK_DEFAULT:
-            self.cmd('create', self.repository_location + '::test.2', 'input', exit_code=EXIT_ERROR)
+            self.cmd('create', '--compression=none', self.repository_location + '::test.2', 'input', exit_code=EXIT_ERROR)
         else:
-            self.assert_raises(Cache.EncryptionMethodMismatch, lambda: self.cmd('create', self.repository_location + '::test.2', 'input'))
+            self.assert_raises(Cache.EncryptionMethodMismatch, lambda: self.cmd('create', '--compression=none', self.repository_location + '::test.2', 'input'))
 
     def test_repository_swap_detection2(self):
         self.create_test_files()
         self.cmd('init', '--encryption=none', self.repository_location + '_unencrypted')
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
         self.cmd('init', '--encryption=repokey', self.repository_location + '_encrypted')
-        self.cmd('create', self.repository_location + '_encrypted::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '_encrypted::test', 'input')
         shutil.rmtree(self.repository_path + '_encrypted')
         os.rename(self.repository_path + '_unencrypted', self.repository_path + '_encrypted')
         if self.FORK_DEFAULT:
-            self.cmd('create', self.repository_location + '_encrypted::test.2', 'input', exit_code=EXIT_ERROR)
+            self.cmd('create', '--compression=none', self.repository_location + '_encrypted::test.2', 'input', exit_code=EXIT_ERROR)
         else:
-            self.assert_raises(Cache.RepositoryAccessAborted, lambda: self.cmd('create', self.repository_location + '_encrypted::test.2', 'input'))
+            self.assert_raises(Cache.RepositoryAccessAborted, lambda: self.cmd('create', '--compression=none', self.repository_location + '_encrypted::test.2', 'input'))
 
     def test_repository_swap_detection_no_cache(self):
         self.create_test_files()
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
         self.cmd('init', '--encryption=repokey', self.repository_location)
         repository_id = self._extract_repository_id(self.repository_path)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         shutil.rmtree(self.repository_path)
         self.cmd('init', '--encryption=none', self.repository_location)
         self._set_repository_id(self.repository_path, repository_id)
         self.assert_equal(repository_id, self._extract_repository_id(self.repository_path))
         self.cmd('delete', '--cache-only', self.repository_location)
         if self.FORK_DEFAULT:
-            self.cmd('create', self.repository_location + '::test.2', 'input', exit_code=EXIT_ERROR)
+            self.cmd('create', '--compression=none', self.repository_location + '::test.2', 'input', exit_code=EXIT_ERROR)
         else:
-            self.assert_raises(Cache.EncryptionMethodMismatch, lambda: self.cmd('create', self.repository_location + '::test.2', 'input'))
+            self.assert_raises(Cache.EncryptionMethodMismatch, lambda: self.cmd('create', '--compression=none', self.repository_location + '::test.2', 'input'))
 
     def test_repository_swap_detection2_no_cache(self):
         self.create_test_files()
         self.cmd('init', '--encryption=none', self.repository_location + '_unencrypted')
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
         self.cmd('init', '--encryption=repokey', self.repository_location + '_encrypted')
-        self.cmd('create', self.repository_location + '_encrypted::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '_encrypted::test', 'input')
         self.cmd('delete', '--cache-only', self.repository_location + '_unencrypted')
         self.cmd('delete', '--cache-only', self.repository_location + '_encrypted')
         shutil.rmtree(self.repository_path + '_encrypted')
@@ -604,7 +604,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('create', self.repository_location + '_encrypted::test.2', 'input', exit_code=EXIT_ERROR)
         else:
             with pytest.raises(Cache.RepositoryAccessAborted):
-                self.cmd('create', self.repository_location + '_encrypted::test.2', 'input')
+                self.cmd('create', '--compression=none', self.repository_location + '_encrypted::test.2', 'input')
 
     def test_repository_move(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
@@ -660,7 +660,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_strip_components(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('dir/file')
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test', '--strip-components', '3')
             self.assert_true(not os.path.exists('file'))
@@ -688,7 +688,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 os.path.join(self.input_path, 'dir1/aaaa'))
 
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
 
     @pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
     def test_strip_components_links(self):
@@ -722,7 +722,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file2', size=1024 * 80)
         self.create_regular_file('file3', size=1024 * 80)
         self.create_regular_file('file4', size=1024 * 80)
-        self.cmd('create', '--exclude=input/file4', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', '--exclude=input/file4', self.repository_location + '::test', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test', 'input/file1', )
         self.assert_equal(sorted(os.listdir('output/input')), ['file1'])
@@ -742,7 +742,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file333', size=1024 * 80)
 
         # Create with regular expression exclusion for file4
-        self.cmd('create', '--exclude=re:input/file4$', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', '--exclude=re:input/file4$', self.repository_location + '::test', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2', 'file3', 'file333'])
@@ -780,7 +780,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.write(b're:input/file4$\n')
             fd.write(b'fm:*aa:*thing\n')
 
-        self.cmd('create', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2', 'file3', 'file333'])
@@ -814,7 +814,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file("file4", size=1024 * 80)
         self.create_regular_file("file333", size=1024 * 80)
 
-        self.cmd("create", self.repository_location + "::test", "input")
+        self.cmd("create", '--compression=none', self.repository_location + "::test", "input")
 
         # Extract everything with regular expression
         with changedir("output"):
@@ -843,7 +843,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('file', size=1024 * 80)
 
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
 
         with changedir('output'):
             output = self.cmd('extract', self.repository_location + '::test')
@@ -867,7 +867,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_extract_progress(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('file', size=1024 * 80)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
 
         with changedir('output'):
             output = self.cmd('extract', self.repository_location + '::test', '--progress')
@@ -886,14 +886,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_create_without_root(self):
         """test create without a root"""
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', exit_code=2)
+        self.cmd('create', '--compression=none', self.repository_location + '::test', exit_code=2)
 
     def test_create_pattern_root(self):
         """test create with only a root pattern"""
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
-        output = self.cmd('create', '-v', '--list', '--pattern=R input', self.repository_location + '::test')
+        output = self.cmd('create', '--compression=none', '-v', '--list', '--pattern=R input', self.repository_location + '::test')
         self.assert_in("A input/file1", output)
         self.assert_in("A input/file2", output)
 
@@ -903,7 +903,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
         self.create_regular_file('file_important', size=1024 * 80)
-        output = self.cmd('create', '-v', '--list',
+        output = self.cmd('create', '--compression=none', '-v', '--list',
                           '--pattern=+input/file_important', '--pattern=-input/file*',
                           self.repository_location + '::test', 'input')
         self.assert_in("A input/file_important", output)
@@ -916,7 +916,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
         self.create_regular_file('file_important', size=1024 * 80)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         with changedir('output'):
             self.cmd('extract',
                      '--pattern=+input/file_important', '--pattern=-input/file*',
@@ -931,12 +931,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_exclude_caches(self):
         self._create_test_caches()
-        self.cmd('create', '--exclude-caches', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', '--exclude-caches', self.repository_location + '::test', 'input')
         self._assert_test_caches()
 
     def test_recreate_exclude_caches(self):
         self._create_test_caches()
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         self.cmd('recreate', '--exclude-caches', self.repository_location + '::test')
         self._assert_test_caches()
 
@@ -954,12 +954,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_exclude_tagged(self):
         self._create_test_tagged()
-        self.cmd('create', '--exclude-if-present', '.NOBACKUP', '--exclude-if-present', '00-NOBACKUP', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', '--exclude-if-present', '.NOBACKUP', '--exclude-if-present', '00-NOBACKUP', self.repository_location + '::test', 'input')
         self._assert_test_tagged()
 
     def test_recreate_exclude_tagged(self):
         self._create_test_tagged()
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         self.cmd('recreate', '--exclude-if-present', '.NOBACKUP', '--exclude-if-present', '00-NOBACKUP',
                  self.repository_location + '::test')
         self._assert_test_tagged()
@@ -992,18 +992,18 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_exclude_keep_tagged_deprecation(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        output_warn = self.cmd('create', '--exclude-caches', '--keep-tag-files', self.repository_location + '::test', src_dir)
+        output_warn = self.cmd('create', '--compression=none', '--exclude-caches', '--keep-tag-files', self.repository_location + '::test', src_dir)
         self.assert_in('--keep-tag-files" has been deprecated.', output_warn)
 
     def test_exclude_keep_tagged(self):
         self._create_test_keep_tagged()
-        self.cmd('create', '--exclude-if-present', '.NOBACKUP1', '--exclude-if-present', '.NOBACKUP2',
+        self.cmd('create', '--compression=none', '--exclude-if-present', '.NOBACKUP1', '--exclude-if-present', '.NOBACKUP2',
                  '--exclude-caches', '--keep-exclude-tags', self.repository_location + '::test', 'input')
         self._assert_test_keep_tagged()
 
     def test_recreate_exclude_keep_tagged(self):
         self._create_test_keep_tagged()
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         self.cmd('recreate', '--exclude-if-present', '.NOBACKUP1', '--exclude-if-present', '.NOBACKUP2',
                  '--exclude-caches', '--keep-exclude-tags', self.repository_location + '::test')
         self._assert_test_keep_tagged()
@@ -1023,7 +1023,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file')
         xattr.setxattr('input/file', 'security.capability', capabilities)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         with changedir('output'):
             with patch.object(os, 'fchown', patched_fchown):
                 self.cmd('extract', self.repository_location + '::test')
@@ -1033,7 +1033,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('dir1/dir2/file', size=1024 * 80)
         with changedir('input/dir1/dir2'):
-            self.cmd('create', self.repository_location + '::test', '../../../input/dir1/../dir1/dir2/..')
+            self.cmd('create', '--compression=none', self.repository_location + '::test', '../../../input/dir1/../dir1/dir2/..')
         output = self.cmd('list', self.repository_location + '::test')
         self.assert_not_in('..', output)
         self.assert_in(' input/dir1/dir2/file', output)
@@ -1043,16 +1043,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
         with changedir('input'):
-            self.cmd('create', '--exclude=file1', self.repository_location + '::test1', '.')
+            self.cmd('create', '--compression=none', '--exclude=file1', self.repository_location + '::test1', '.')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test1')
         self.assert_equal(sorted(os.listdir('output')), ['file2'])
         with changedir('input'):
-            self.cmd('create', '--exclude=./file1', self.repository_location + '::test2', '.')
+            self.cmd('create', '--compression=none', '--exclude=./file1', self.repository_location + '::test2', '.')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test2')
         self.assert_equal(sorted(os.listdir('output')), ['file2'])
-        self.cmd('create', '--exclude=input/./file1', self.repository_location + '::test3', 'input')
+        self.cmd('create', '--compression=none', '--exclude=input/./file1', self.repository_location + '::test3', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test3')
         self.assert_equal(sorted(os.listdir('output/input')), ['file2'])
@@ -1060,13 +1060,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_repeated_files(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input', 'input')
 
     def test_overwrite(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('dir2/file2', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         # Overwriting regular files and directories should be supported
         os.mkdir('output/input')
         os.mkdir('output/input/file1')
@@ -1085,8 +1085,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('dir2/file2', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('create', self.repository_location + '::test.2', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test.2', 'input')
         self.cmd('extract', '--dry-run', self.repository_location + '::test')
         self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
         self.cmd('rename', self.repository_location + '::test', 'test.3')
@@ -1104,7 +1104,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_info(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         info_repo = self.cmd('info', self.repository_location)
         assert 'All archives:' in info_repo
         info_archive = self.cmd('info', self.repository_location + '::test')
@@ -1142,10 +1142,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_comment(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test1', 'input')
-        self.cmd('create', '--comment', 'this is the comment', self.repository_location + '::test2', 'input')
-        self.cmd('create', '--comment', '"deleted" comment', self.repository_location + '::test3', 'input')
-        self.cmd('create', '--comment', 'preserved comment', self.repository_location + '::test4', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test1', 'input')
+        self.cmd('create', '--compression=none', '--comment', 'this is the comment', self.repository_location + '::test2', 'input')
+        self.cmd('create', '--compression=none', '--comment', '"deleted" comment', self.repository_location + '::test3', 'input')
+        self.cmd('create', '--compression=none', '--comment', 'preserved comment', self.repository_location + '::test4', 'input')
         assert 'Comment: \n' in self.cmd('info', self.repository_location + '::test1')
         assert 'Comment: this is the comment' in self.cmd('info', self.repository_location + '::test2')
 
@@ -1162,11 +1162,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('dir2/file2', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('create', self.repository_location + '::test.2', 'input')
-        self.cmd('create', self.repository_location + '::test.3', 'input')
-        self.cmd('create', self.repository_location + '::another_test.1', 'input')
-        self.cmd('create', self.repository_location + '::another_test.2', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test.2', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test.3', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::another_test.1', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::another_test.2', 'input')
         self.cmd('extract', '--dry-run', self.repository_location + '::test')
         self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
         self.cmd('delete', '--prefix', 'another_', self.repository_location)
@@ -1183,8 +1183,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('dir2/file2', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('create', self.repository_location + '::test.2', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test.2', 'input')
         os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'no'
         self.cmd('delete', self.repository_location, exit_code=2)
         assert os.path.exists(self.repository_path)
@@ -1255,13 +1255,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_umask(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         mode = os.stat(self.repository_path).st_mode
         self.assertEqual(stat.S_IMODE(mode), 0o700)
 
     def test_create_dry_run(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', '--dry-run', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', '--dry-run', self.repository_location + '::test', 'input')
         # Make sure no archive has been created
         with Repository(self.repository_path) as repository:
             manifest, key = Manifest.load(repository)
@@ -1270,13 +1270,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_progress_on(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', '--progress', self.repository_location + '::test4', 'input')
+        output = self.cmd('create', '--compression=none', '--progress', self.repository_location + '::test4', 'input')
         self.assert_in("\r", output)
 
     def test_progress_off(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', self.repository_location + '::test5', 'input')
+        output = self.cmd('create', '--compression=none', self.repository_location + '::test5', 'input')
         self.assert_not_in("\r", output)
 
     def test_file_status(self):
@@ -1288,11 +1288,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.utime('input/file1', (now - 5, now - 5))  # 5 seconds ago
         self.create_regular_file('file2', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', '--list', self.repository_location + '::test', 'input')
+        output = self.cmd('create', '--compression=none', '--list', self.repository_location + '::test', 'input')
         self.assert_in("A input/file1", output)
         self.assert_in("A input/file2", output)
         # should find first file as unmodified
-        output = self.cmd('create', '--list', self.repository_location + '::test1', 'input')
+        output = self.cmd('create', '--compression=none', '--list', self.repository_location + '::test1', 'input')
         self.assert_in("U input/file1", output)
         # this is expected, although surprising, for why, see:
         # https://borgbackup.readthedocs.org/en/latest/faq.html#i-am-seeing-a-added-status-for-a-unchanged-file
@@ -1309,13 +1309,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.create_regular_file('file3', size=1024 * 80)
             platform.set_flags(os.path.join(self.input_path, 'file3'), stat.UF_NODUMP)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', '--list', self.repository_location + '::test', 'input')
+        output = self.cmd('create', '--compression=none', '--list', self.repository_location + '::test', 'input')
         self.assert_in("A input/file1", output)
         self.assert_in("A input/file2", output)
         if has_lchflags:
             self.assert_in("x input/file3", output)
         # should find second file as excluded
-        output = self.cmd('create', '--list', self.repository_location + '::test1', 'input', '--exclude', '*/file2')
+        output = self.cmd('create', '--compression=none', '--list', self.repository_location + '::test1', 'input', '--exclude', '*/file2')
         self.assert_in("U input/file1", output)
         self.assert_in("x input/file2", output)
         if has_lchflags:
@@ -1345,28 +1345,28 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file2', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         # no listing by default
-        output = self.cmd('create', self.repository_location + '::test', 'input')
+        output = self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         self.assert_not_in('file1', output)
         # shouldn't be listed even if unchanged
-        output = self.cmd('create', self.repository_location + '::test0', 'input')
+        output = self.cmd('create', '--compression=none', self.repository_location + '::test0', 'input')
         self.assert_not_in('file1', output)
         # should list the file as unchanged
-        output = self.cmd('create', '--list', '--filter=U', self.repository_location + '::test1', 'input')
+        output = self.cmd('create', '--compression=none', '--list', '--filter=U', self.repository_location + '::test1', 'input')
         self.assert_in('file1', output)
         # should *not* list the file as changed
-        output = self.cmd('create', '--list', '--filter=AM', self.repository_location + '::test2', 'input')
+        output = self.cmd('create', '--compression=none', '--list', '--filter=AM', self.repository_location + '::test2', 'input')
         self.assert_not_in('file1', output)
         # change the file
         self.create_regular_file('file1', size=1024 * 100)
         # should list the file as changed
-        output = self.cmd('create', '--list', '--filter=AM', self.repository_location + '::test3', 'input')
+        output = self.cmd('create', '--compression=none', '--list', '--filter=AM', self.repository_location + '::test3', 'input')
         self.assert_in('file1', output)
 
     def test_create_read_special_broken_symlink(self):
         os.symlink('somewhere doesnt exist', os.path.join(self.input_path, 'link'))
         self.cmd('init', '--encryption=repokey', self.repository_location)
         archive = self.repository_location + '::test'
-        self.cmd('create', '--read-special', archive, 'input')
+        self.cmd('create', '--compression=none', '--read-special', archive, 'input')
         output = self.cmd('list', archive)
         assert 'input/link -> somewhere doesnt exist' in output
 
@@ -1379,12 +1379,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_prune_repository(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test1', src_dir)
-        self.cmd('create', self.repository_location + '::test2', src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::test1', src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::test2', src_dir)
         # these are not really a checkpoints, but they look like some:
-        self.cmd('create', self.repository_location + '::test3.checkpoint', src_dir)
-        self.cmd('create', self.repository_location + '::test3.checkpoint.1', src_dir)
-        self.cmd('create', self.repository_location + '::test4.checkpoint', src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::test3.checkpoint', src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::test3.checkpoint.1', src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::test4.checkpoint', src_dir)
         output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=2')
         self.assert_in('Keeping archive: test2', output)
         self.assert_in('Would prune:     test1', output)
@@ -1408,7 +1408,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_not_in('test3.checkpoint.1', output)
         self.assert_in('test4.checkpoint', output)
         # now we supercede the latest checkpoint by a successful backup:
-        self.cmd('create', self.repository_location + '::test5', src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::test5', src_dir)
         self.cmd('prune', self.repository_location, '--keep-daily=2')
         output = self.cmd('list', self.repository_location)
         # all checkpoints should be gone now:
@@ -1418,8 +1418,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_prune_repository_save_space(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test1', src_dir)
-        self.cmd('create', self.repository_location + '::test2', src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::test1', src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::test2', src_dir)
         output = self.cmd('prune', '--list', '--stats', '--dry-run', self.repository_location, '--keep-daily=2')
         self.assert_in('Keeping archive: test2', output)
         self.assert_in('Would prune:     test1', output)
@@ -1434,10 +1434,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_prune_repository_prefix(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::foo-2015-08-12-10:00', src_dir)
-        self.cmd('create', self.repository_location + '::foo-2015-08-12-20:00', src_dir)
-        self.cmd('create', self.repository_location + '::bar-2015-08-12-10:00', src_dir)
-        self.cmd('create', self.repository_location + '::bar-2015-08-12-20:00', src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::foo-2015-08-12-10:00', src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::foo-2015-08-12-20:00', src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::bar-2015-08-12-10:00', src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::bar-2015-08-12-20:00', src_dir)
         output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=2', '--prefix=foo-')
         self.assert_in('Keeping archive: foo-2015-08-12-20:00', output)
         self.assert_in('Would prune:     foo-2015-08-12-10:00', output)
@@ -1455,9 +1455,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_list_prefix(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test-1', src_dir)
-        self.cmd('create', self.repository_location + '::something-else-than-test-1', src_dir)
-        self.cmd('create', self.repository_location + '::test-2', src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::test-1', src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::something-else-than-test-1', src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::test-2', src_dir)
         output = self.cmd('list', '--prefix=test-', self.repository_location)
         self.assert_in('test-1', output)
         self.assert_in('test-2', output)
@@ -1466,7 +1466,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_list_format(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         test_archive = self.repository_location + '::test'
-        self.cmd('create', test_archive, src_dir)
+        self.cmd('create', '--compression=none', test_archive, src_dir)
         output_warn = self.cmd('list', '--list-format', '-', test_archive)
         self.assert_in('--list-format" has been deprecated.', output_warn)
         output_1 = self.cmd('list', test_archive)
@@ -1477,8 +1477,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_list_repository_format(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test-1', src_dir)
-        self.cmd('create', self.repository_location + '::test-2', src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::test-1', src_dir)
+        self.cmd('create', '--compression=none', self.repository_location + '::test-2', src_dir)
         output_1 = self.cmd('list', self.repository_location)
         output_2 = self.cmd('list', '--format', '{archive:<36} {time} [{id}]{NL}', self.repository_location)
         self.assertEqual(output_1, output_2)
@@ -1492,7 +1492,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('amb', contents=b'a' * 1000000)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         test_archive = self.repository_location + '::test'
-        self.cmd('create', test_archive, 'input')
+        self.cmd('create', '--compression=none', test_archive, 'input')
         output = self.cmd('list', '--format', '{sha256} {path}{NL}', test_archive)
         assert "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0 input/amb" in output
         assert "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 input/empty_file" in output
@@ -1505,7 +1505,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.write(b'baab' * 2000000)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         test_archive = self.repository_location + '::test'
-        self.cmd('create', test_archive, 'input')
+        self.cmd('create', '--compression=none', test_archive, 'input')
         output = self.cmd('list', '--format', '{num_chunks} {unique_chunks} {path}{NL}', test_archive)
         assert "0 0 input/empty_file" in output
         assert "2 2 input/two_chunks" in output
@@ -1514,7 +1514,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('compressible_file', size=10000)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         test_archive = self.repository_location + '::test'
-        self.cmd('create', '-C', 'lz4', test_archive, 'input')
+        self.cmd('create', '--compression=lz4', test_archive, 'input')
         output = self.cmd('list', '--format', '{size} {csize} {dsize} {dcsize} {path}{NL}', test_archive)
         size, csize, dsize, dcsize, path = output.split("\n")[1].split(" ")
         assert int(csize) < int(size)
@@ -1646,8 +1646,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_test_files()
         have_noatime = has_noatime('input/file1')
-        self.cmd('create', self.repository_location + '::archive', 'input')
-        self.cmd('create', self.repository_location + '::archive2', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::archive', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::archive2', 'input')
         if has_lchflags:
             # remove the file we did not backup, so input and output become equal
             os.remove(os.path.join('input', 'flagfile'))
@@ -1734,9 +1734,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         if are_hardlinks_supported():
             self.create_regular_file('hardlink1', contents=b'')
             os.link('input/hardlink1', 'input/hardlink2')
-        self.cmd('create', self.repository_location + '::archive1', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::archive1', 'input')
         self.create_regular_file('test', contents=b'second')
-        self.cmd('create', self.repository_location + '::archive2', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::archive2', 'input')
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
         # mount the whole repository, archive contents shall show up in versioned view:
         with self.fuse_mount(self.repository_location, mountpoint, '-o', 'versions'):
@@ -1817,9 +1817,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
         self.cmd('init', '--encryption=' + method, self.repository_location)
         verify_uniqueness()
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         verify_uniqueness()
-        self.cmd('create', self.repository_location + '::test.2', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test.2', 'input')
         verify_uniqueness()
         self.cmd('delete', self.repository_location + '::test.2')
         verify_uniqueness()
@@ -1833,7 +1833,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_debug_dump_archive_items(self):
         self.create_test_files()
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         with changedir('output'):
             output = self.cmd('debug', 'dump-archive-items', self.repository_location + '::test')
         output_dir = sorted(os.listdir('output'))
@@ -1843,7 +1843,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_debug_dump_repo_objs(self):
         self.create_test_files()
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         with changedir('output'):
             output = self.cmd('debug', 'dump-repo-objs', self.repository_location)
         output_dir = sorted(os.listdir('output'))
@@ -1904,7 +1904,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_check_cache(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         with self.open_repository() as repository:
             manifest, key = Manifest.load(repository)
             with Cache(repository, key, manifest, sync=False) as cache:
@@ -1924,7 +1924,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.check_cache()
         archive = self.repository_location + '::test0'
-        self.cmd('create', archive, 'input')
+        self.cmd('create', '--compression=none', archive, 'input')
         self.check_cache()
         original_archive = self.cmd('list', self.repository_location)
         self.cmd('recreate', archive, 'input/dir2', '-e', 'input/dir2/file3', '--target=new-archive')
@@ -1944,7 +1944,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('dir2/file3', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         archive = self.repository_location + '::test0'
-        self.cmd('create', archive, 'input')
+        self.cmd('create', '--compression=none', archive, 'input')
         self.cmd('recreate', archive, 'input/dir2', '-e', 'input/dir2/file3')
         self.check_cache()
         listing = self.cmd('list', '--short', archive)
@@ -1956,7 +1956,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_recreate_subtree_hardlinks(self):
         # This is essentially the same problem set as in test_extract_hardlinks
         self._extract_hardlinks_setup()
-        self.cmd('create', self.repository_location + '::test2', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test2', 'input')
         self.cmd('recreate', self.repository_location + '::test', 'input/dir1')
         self.check_cache()
         with changedir('output'):
@@ -1974,8 +1974,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.write(b'a' * 280)
             fd.write(b'b' * 280)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', '--chunker-params', '7,9,8,128', self.repository_location + '::test1', 'input')
-        self.cmd('create', self.repository_location + '::test2', 'input', '--no-files-cache')
+        self.cmd('create', '--compression=none', '--chunker-params', '7,9,8,128', self.repository_location + '::test1', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test2', 'input', '--no-files-cache')
         list = self.cmd('list', self.repository_location + '::test1', 'input/large_file',
                         '--format', '{num_chunks} {unique_chunks}')
         num_chunks, unique_chunks = map(int, list.split(' '))
@@ -1991,7 +1991,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_recreate_recompress(self):
         self.create_regular_file('compressible', size=10000)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input', '-C', 'none')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input', '-C', 'none')
         file_list = self.cmd('list', self.repository_location + '::test', 'input/compressible',
                              '--format', '{size} {csize} {sha256}')
         size, csize, sha256_before = file_list.split(' ')
@@ -2007,7 +2007,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_recreate_dry_run(self):
         self.create_regular_file('compressible', size=10000)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         archives_before = self.cmd('list', self.repository_location + '::test')
         self.cmd('recreate', self.repository_location, '-n', '-e', 'input/compressible')
         self.check_cache()
@@ -2017,7 +2017,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_recreate_skips_nothing_to_do(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         info_before = self.cmd('info', self.repository_location + '::test')
         self.cmd('recreate', self.repository_location, '--chunker-params', 'default')
         self.check_cache()
@@ -2038,7 +2038,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file4', size=0)
         self.create_regular_file('file5', size=0)
 
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
 
         output = self.cmd('recreate', '--list', '--info', self.repository_location + '::test', '-e', 'input/file2')
         self.check_cache()
@@ -2062,7 +2062,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_bad_filters(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         self.cmd('delete', '--first', '1', '--last', '1', self.repository_location, fork=True, exit_code=2)
 
     def test_key_export_keyfile(self):
@@ -2187,7 +2187,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
     def test_debug_dump_manifest(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         dump_file = self.output_path + '/dump'
         output = self.cmd('debug', 'dump-manifest', self.repository_location, dump_file)
         assert output == ""
@@ -2202,7 +2202,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
     def test_debug_dump_archive(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         dump_file = self.output_path + '/dump'
         output = self.cmd('debug', 'dump-archive', self.repository_location + "::test", dump_file)
         assert output == ""
@@ -2595,7 +2595,7 @@ class RemoteArchiverTestCase(ArchiverTestCase):
         self.create_regular_file('skipped-file1', contents=b"test file contents 3")
         self.create_regular_file('skipped-file2', contents=b"test file contents 4")
         self.create_regular_file('skipped-file3', contents=b"test file contents 5")
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test', 'input')
         marker = 'cached responses left in RemoteRepository'
         with changedir('output'):
             res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '3')
@@ -2639,7 +2639,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             os.link('input/file_replaced', 'input/hardlink_target_replaced')
 
         # Create the first snapshot
-        self.cmd('create', self.repository_location + '::test0', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test0', 'input')
 
         # Setup files for the second snapshot
         self.create_regular_file('file_added', size=2048)
@@ -2669,8 +2669,8 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             fd.write(b'appended_data')
 
         # Create the second snapshot
-        self.cmd('create', self.repository_location + '::test1a', 'input')
-        self.cmd('create', '--chunker-params', '16,18,17,4095', self.repository_location + '::test1b', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test1a', 'input')
+        self.cmd('create', '--compression=none', '--chunker-params', '16,18,17,4095', self.repository_location + '::test1b', 'input')
 
         def do_asserts(output, archive):
             # File contents changed (deleted and replaced with a new file)
@@ -2743,7 +2743,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('f_file_removed', size=16)
         self.create_regular_file('c_file_changed', size=32)
         self.create_regular_file('e_file_changed', size=64)
-        self.cmd('create', self.repository_location + '::test0', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test0', 'input')
 
         os.unlink('input/a_file_removed')
         os.unlink('input/f_file_removed')
@@ -2753,7 +2753,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('e_file_changed', size=1024)
         self.create_regular_file('b_file_added', size=128)
         self.create_regular_file('d_file_added', size=256)
-        self.cmd('create', self.repository_location + '::test1', 'input')
+        self.cmd('create', '--compression=none', self.repository_location + '::test1', 'input')
 
         output = self.cmd('diff', '--sort', self.repository_location + '::test0', 'test1')
         expected = [

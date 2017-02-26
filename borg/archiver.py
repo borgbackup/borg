@@ -1355,9 +1355,12 @@ class Archiver:
 
         create_epilog = textwrap.dedent("""
         This command creates a backup archive containing all files found while recursively
-        traversing all paths specified. When giving '-' as path, borg will read data
-        from standard input and create a file 'stdin' in the created archive from that
-        data.
+        traversing all paths specified. Paths are added to the archive as they are given,
+        that means if relative paths are desired, the command has to be run from the correct
+        directory.
+
+        When giving '-' as path, borg will read data from standard input and create a
+        file 'stdin' in the created archive from that data.
 
         The archive will consume almost no disk space for files or parts of files that
         have already been stored in other archives.

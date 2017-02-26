@@ -70,7 +70,7 @@ Examples
         --exclude 'sh:/home/*/.thumbnails'
 
     # Backup the root filesystem into an archive named "root-YYYY-MM-DD"
-    # use zlib compression (good, but slow) - default is no compression
+    # use zlib compression (good, but slow) - default is lz4 (fast, low compression ratio)
     $ borg create -C zlib,6 /path/to/repo::root-{now:%Y-%m-%d} / --one-file-system
 
     # Backup a remote host locally ("pull" style) using sshfs

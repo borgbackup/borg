@@ -108,19 +108,23 @@ Are there other known limitations?
   An easy workaround is to create multiple archives with less items each.
   See also the :ref:`archive_limitation` and :issue:`1452`.
 
-Why is my backup bigger than with attic? Why doesn't |project_name| do compression by default?
-----------------------------------------------------------------------------------------------
+Why is my backup bigger than with attic?
+----------------------------------------
 
 Attic was rather unflexible when it comes to compression, it always
 compressed using zlib level 6 (no way to switch compression off or
 adjust the level or algorithm).
 
-|project_name| offers a lot of different compression algorithms and
-levels. Which of them is the best for you pretty much depends on your
-use case, your data, your hardware -- so you need to do an informed
-decision about whether you want to use compression, which algorithm
-and which level you want to use. This is why compression defaults to
-none.
+The default in Borg is lz4, which is fast enough to not use significant CPU time
+in most cases, but can only achieve modest compression. It still compresses
+easily compressed data fairly well.
+
+zlib compression with all levels (1-9) as well as LZMA (1-6) are available
+as well, for cases where they are worth it.
+
+Which choice is the best option depends on a number of factors, like
+bandwidth to the repository, how well the data compresses, available CPU
+power and so on.
 
 If a backup stops mid-way, does the already-backed-up data stay there?
 ----------------------------------------------------------------------

@@ -92,7 +92,7 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
         fmt = '$LOG %(levelname)s %(name)s Remote: %(message)s'
     else:
         fmt = '%(message)s'
-    formatter = JsonFormatter(fmt) if json else logging.Formatter(fmt)
+    formatter = JsonFormatter(fmt) if json and not is_serve else logging.Formatter(fmt)
     handler.setFormatter(formatter)
     borg_logger = logging.getLogger('borg')
     borg_logger.formatter = formatter

@@ -55,7 +55,6 @@ typedef struct {
     off_t bucket_size;
     int lower_limit;
     int upper_limit;
-    void *entry_to_insert;
     void *tmp_entry;
 } HashIndex;
 
@@ -200,7 +199,7 @@ hashindex_resize(HashIndex *index, int capacity)
     index->num_buckets = new->num_buckets;
     index->lower_limit = new->lower_limit;
     index->upper_limit = new->upper_limit;
-    free(new->entry_to_insert);
+    free(new->tmp_entry);
     free(new);
     return 1;
 }
@@ -309,14 +308,13 @@ hashindex_read(const char *path)
         index = NULL;
         goto fail;
     }
-    if(!(index->entry_to_insert = calloc(2, header.key_size + header.value_size))) {
+    if(!(index->tmp_entry = calloc(1, header.key_size + header.value_size))) {
         EPRINTF_PATH(path, "malloc temp entry failed");
         free(index->buckets);
         free(index);
         index = NULL;
         goto fail;
     }
-    index->tmp_entry = index->entry_to_insert + (header.key_size + header.value_size);
     bytes_read = fread(index->buckets, 1, buckets_length, fd);
     if(bytes_read != buckets_length) {
         if(ferror(fd)) {
@@ -327,7 +325,7 @@ hashindex_read(const char *path)
             EPRINTF_MSG_PATH(path, "fread buckets failed (expected %ju, got %ju)",
                              (uintmax_t) buckets_length, (uintmax_t) bytes_read);
         }
-        free(index->entry_to_insert);
+        free(index->tmp_entry);
         free(index->buckets);
         free(index);
         index = NULL;
@@ -363,13 +361,12 @@ hashindex_init(int capacity, int key_size, int value_size)
         free(index);
         return NULL;
     }
-    if(!(index->entry_to_insert = calloc(2, key_size + value_size))) {
+    if(!(index->tmp_entry = calloc(1, key_size + value_size))) {
         EPRINTF("malloc temp entry failed");
         free(index->buckets);
         free(index);
         return NULL;
     }
-    index->tmp_entry = index->entry_to_insert + (key_size + value_size);
 
     index->num_entries = 0;
     index->key_size = key_size;
@@ -390,7 +387,7 @@ static void
 hashindex_free(HashIndex *index)
 {
     free(index->buckets);
-    free(index->entry_to_insert);
+    free(index->tmp_entry);
     free(index);
 }
 

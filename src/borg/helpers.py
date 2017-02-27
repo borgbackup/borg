@@ -105,7 +105,7 @@ def check_extension_modules():
         raise ExtensionModuleError
     if platform.API_VERSION != platform.OS_API_VERSION != '1.1_01':
         raise ExtensionModuleError
-    if item.API_VERSION != '1.1_01':
+    if item.API_VERSION != '1.1_02':
         raise ExtensionModuleError
 
 
@@ -1759,10 +1759,12 @@ class ItemFormatter(BaseFormatter):
         return len(item.get('chunks', []))
 
     def calculate_size(self, item):
-        return sum(c.size for c in item.get('chunks', []))
+        # note: does not support hardlink slaves, they will be size 0
+        return item.get_size(compressed=False)
 
     def calculate_csize(self, item):
-        return sum(c.csize for c in item.get('chunks', []))
+        # note: does not support hardlink slaves, they will be csize 0
+        return item.get_size(compressed=True)
 
     def hash_item(self, hash_function, item):
         if 'chunks' not in item:

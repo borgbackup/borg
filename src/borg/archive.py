@@ -519,13 +519,20 @@ Utilization of max. archive size: {csize_max:.0%}
         has_damaged_chunks = 'chunks_healthy' in item
         if dry_run or stdout:
             if 'chunks' in item:
+                item_chunks_size = 0
                 for _, data in self.pipeline.fetch_many([c.id for c in item.chunks], is_preloaded=True):
                     if pi:
                         pi.show(increase=len(data), info=[remove_surrogates(item.path)])
                     if stdout:
                         sys.stdout.buffer.write(data)
+                    item_chunks_size += len(data)
                 if stdout:
                     sys.stdout.buffer.flush()
+                if 'size' in item:
+                    item_size = item.size
+                    if item_size != item_chunks_size:
+                        logger.warning('{}: size inconsistency detected: size {}, chunks size {}'.format(
+                            item.path, item_size, item_chunks_size))
             if has_damaged_chunks:
                 logger.warning('File %s has damaged (all-zero) chunks. Try running borg check --repair.' %
                                remove_surrogates(item.path))
@@ -582,10 +589,15 @@ Utilization of max. archive size: {csize_max:.0%}
                         else:
                             fd.write(data)
                 with backup_io('truncate'):
-                    pos = fd.tell()
+                    pos = item_chunks_size = fd.tell()
                     fd.truncate(pos)
                     fd.flush()
                     self.restore_attrs(path, item, fd=fd.fileno())
+            if 'size' in item:
+                item_size = item.size
+                if item_size != item_chunks_size:
+                    logger.warning('{}: size inconsistency detected: size {}, chunks size {}'.format(
+                        item.path, item_size, item_chunks_size))
             if has_damaged_chunks:
                 logger.warning('File %s has damaged (all-zero) chunks. Try running borg check --repair.' %
                                remove_surrogates(item.path))
@@ -829,6 +841,7 @@ Utilization of max. archive size: {csize_max:.0%}
         length = len(item.chunks)
         # the item should only have the *additional* chunks we processed after the last partial item:
         item.chunks = item.chunks[from_chunk:]
+        item.get_size(memorize=True)
         item.path += '.borg_part_%d' % number
         item.part = number
         number += 1
@@ -877,6 +890,7 @@ Utilization of max. archive size: {csize_max:.0%}
         )
         fd = sys.stdin.buffer  # binary
         self.chunk_file(item, cache, self.stats, backup_io_iter(self.chunker.chunkify(fd)))
+        item.get_size(memorize=True)
         self.stats.nfiles += 1
         self.add_item(item)
         return 'i'  # stdin
@@ -937,6 +951,7 @@ Utilization of max. archive size: {csize_max:.0%}
                 cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
             status = status or 'M'  # regular file, modified (if not 'A' already)
         item.update(self.stat_attrs(st, path))
+        item.get_size(memorize=True)
         if is_special_file:
             # we processed a special file like a regular file. reflect that in mode,
             # so it can be extracted / accessed in FUSE mount like a regular file:
@@ -1355,6 +1370,13 @@ class ArchiveChecker:
                 logger.info('{}: Completely healed previously damaged file!'.format(item.path))
                 del item.chunks_healthy
             item.chunks = chunk_list
+            if 'size' in item:
+                item_size = item.size
+                item_chunks_size = item.get_size(compressed=False, from_chunks=True)
+                if item_size != item_chunks_size:
+                    # just warn, but keep the inconsistency, so that borg extract can warn about it.
+                    logger.warning('{}: size inconsistency detected: size {}, chunks size {}'.format(
+                                   item.path, item_size, item_chunks_size))
 
         def robust_iterator(archive):
             """Iterates through all archive items

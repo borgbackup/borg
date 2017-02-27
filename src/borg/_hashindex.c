@@ -99,7 +99,7 @@ static int hash_sizes[] = {
 #define BUCKET_IS_EMPTY(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) == EMPTY)
 
 #define BUCKET_MARK_DELETED(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) = DELETED)
-#define BUCKET_MARK_EMPTY(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) = EMPTY)
+#define BUCKET_MARK_EMPTY(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, (idx)) + index->key_size)) = EMPTY)
 
 #define EPRINTF_MSG(msg, ...) fprintf(stderr, "hashindex: " msg "\n", ##__VA_ARGS__)
 #define EPRINTF_MSG_PATH(path, msg, ...) fprintf(stderr, "hashindex: %s: " msg "\n", path, ##__VA_ARGS__)
@@ -153,7 +153,7 @@ hashindex_lookup(HashIndex *index, const void *key, int *skip_hint)
         }
         if(BUCKET_IS_EMPTY(index, idx)) {
             rv = -1;
-            debug_print("\n empty %d\n", offset);
+            /* debug_print("\n hashindex_lookup:empty %d\n", offset); */
             break;
         }
         if(BUCKET_MATCHES_KEY(index, idx, key)) {
@@ -202,7 +202,7 @@ hashindex_resize(HashIndex *index, int capacity)
     HashIndex *new;
     void *key = NULL;
     int32_t key_size = index->key_size;
-    /* printf("\nresize to %d!\n", capacity); */
+    printf("\nresize to %d!\n", capacity);
 
     if(!(new = hashindex_init(capacity, key_size, index->value_size))) {
         return 0;
@@ -397,7 +397,7 @@ hashindex_init(int capacity, int key_size, int value_size)
     index->bucket_size = index->key_size + index->value_size;
     index->lower_limit = get_lower_limit(index->num_buckets);
     index->upper_limit = get_upper_limit(index->num_buckets);
-    printf("\ninit %d < %d\n", index->lower_limit, index->upper_limit);
+    debug_print("\ninit %d < %d\n", index->lower_limit, index->upper_limit);
 
     for(i = 0; i < capacity; i++) {
         BUCKET_MARK_EMPTY(index, i);
@@ -478,25 +478,38 @@ memswap(void *a, void *b, void *tmp, size_t entry_size) {
     memcpy(b, tmp, entry_size);
 }
 
+void scan(HashIndex *index, uint8_t *key) {
+    int bucket_index = 0;
+    int found = 0;
+    uint8_t * bucket_ptr;
+    while(bucket_index < index->num_buckets) {
+        bucket_ptr = BUCKET_ADDR(index, bucket_index);
+        /* if (bucket_ptr[0] == 0x56 && bucket_ptr[1] == 0x84 && bucket_ptr[30] == 0x5A && bucket_ptr[31] == 0xB1){ */
+        if (memcmp(bucket_ptr, key, index->key_size) == 0) {
+          debug_print("=== found %02X %02X ... %02X %02X at %d\n", bucket_ptr[0], bucket_ptr[1], bucket_ptr[30], bucket_ptr[31], bucket_index);
+            found++;
+        }
+        bucket_index++;
+    }
+}
 
-/* void scan(HashIndex *index) { */
-/*     int bucket_index = 0; */
-/*     int found = 0; */
-/*     uint8_t * bucket_ptr; */
-/*     while(bucket_index < index->num_buckets) { */
-/*         bucket_ptr = BUCKET_ADDR(index, bucket_index); */
-/*         if (bucket_ptr[0] == 0x56 && bucket_ptr[1] == 0x84 && bucket_ptr[30] == 0x5A && bucket_ptr[31] == 0xB1){ */
-/*             printf("\n=== found WKK at %d\n", bucket_index); */
-/*             found++; */
-/*         } */
-/*         bucket_index++; */
-/*     } */
-/*     if (found == 0){ */
-/*         printf("\n!!!  WKK not found\n"); */
-/*     } */
-/* } */
+void scan_wkk(HashIndex *index) {
+    int bucket_index = 0;
+    uint8_t * b_ptr;
+    while(bucket_index < index->num_buckets) {
+        b_ptr = BUCKET_ADDR(index, bucket_index);
+        // D3 12 ... 65 6A
+        if (!(BUCKET_IS_EMPTY(index, bucket_index))
+            && b_ptr[0] == 0xD3 && b_ptr[1] == 0x12 && b_ptr[30] == 0x65 && b_ptr[31] == 0x6A) {
+        /* if (memcmp(b_ptr, key, index->key_size) == 0) { */
+          debug_print("=== wkk found %02X %02X ... %02X %02X at %d\n",
+                      b_ptr[0], b_ptr[1], b_ptr[30], b_ptr[31], bucket_index);
+        }
+        bucket_index++;
+    }
+}
 
-inline int
+static inline int
 chunk_size(HashIndex *index, int bucket_index) {
     int start = bucket_index;
     /* uint8_t * bucket_ptr; */
@@ -513,6 +526,25 @@ chunk_size(HashIndex *index, int bucket_index) {
     return -1;
 }
 
+static inline int
+lshift_chunk_size(HashIndex *index, int bucket_index) {
+    int start = bucket_index;
+    /* uint8_t * bucket_ptr; */
+    while(bucket_index < index->num_buckets) {
+        /* bucket_ptr = BUCKET_ADDR(index, bucket_index); */
+        /* if (bucket_ptr[30] == 0x5A && bucket_ptr[31] == 0xB1){ */
+        /*     printf("\n=== found WKK at %d\n", bucket_index); */
+        /* } */
+        if (BUCKET_IS_EMPTY(index, bucket_index) ||
+            (distance(bucket_index,
+                      hashindex_index(index, BUCKET_ADDR(index, bucket_index)),
+                      index->num_buckets) == 0)) {
+            return (bucket_index - start) * index->bucket_size;
+        }
+        bucket_index++;
+    }
+    return -1;
+}
 
 static int
 hashindex_set(HashIndex *index, const void *key, const void *value)
@@ -530,14 +562,14 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
     /* printf("\n\nset\n"); */
     if(idx >= 0)
     {
-        /* printf("\n\nhit\n"); */
+        printf("\n\nhit\n");
         /* we already have the key in the index we just need to update its value */
         memcpy(BUCKET_ADDR(index, idx) + index->key_size, value, index->value_size);
     }
     else
     {
         /* we don't have the key in the index we need to find an appropriate address */
-        /* printf("\n\nmiss\n"); */
+        debug_print("%s", "\n\nmiss\n");
         if(index->num_entries > index->upper_limit) {
             /* we need to grow the hashindex */
             /* printf("\n\nresize %d > %d\n", index->num_entries, index->upper_limit); */
@@ -559,7 +591,7 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
         /* } */
         while(!BUCKET_IS_EMPTY(index, idx) &&
               (offset <= distance(idx, hashindex_index(index, BUCKET_ADDR(index, idx)), index->num_buckets))) {
-            /* printf("\nskip oo:%d >= mo:%d\n", distance(idx, hashindex_index(index, BUCKET_ADDR(index, idx)), index->num_buckets), offset); */
+            debug_print("\nskip oo:%d >= mo:%d\n", distance(idx, hashindex_index(index, BUCKET_ADDR(index, idx)), index->num_buckets), offset);
             offset ++;
             idx++;
             if (idx >= index->num_buckets){
@@ -569,9 +601,9 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
         if (!BUCKET_IS_EMPTY(index, idx)) {
             /* we have a collision */
             size = chunk_size(index, idx);
-            /* printf("\n collision\n"); */
+            debug_print("%s", "\n collision\n");
             if (size > 0) {
-                /* printf("\nmemmove\n"); */
+                debug_print("%s", "\nmemmove\n");
                 /* printf("\noo:%d >= mo:%d\n", distance(idx, hashindex_index(index, BUCKET_ADDR(index, idx)), index->num_buckets), offset); */
                 /* bucket_ptr = BUCKET_ADDR(index, idx); */
                 /* printf("\n moving %02X %02X\n", bucket_ptr[30], bucket_ptr[31]); */
@@ -590,10 +622,10 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
                 /* scan(index); */
             } else {
                 if (size != -1){
-                    printf("\\\n! size: %d\n\n", size);
+                    debug_print("\n! size: %d\n\n", size);
                 }
                 // we've reached the end of the bucket space, but found no empty bucket
-                /* printf("\nmemcpy last bucket\n"); */
+                debug_print("%s", "\nmemcpy last bucket\n");
                 /* scan(index); */
                 /* printf("\n last bucket num_buckets:%d bs:%ld %p %p %ld\n", */
                 /*        index->num_buckets, index->bucket_size, */
@@ -618,9 +650,9 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
                 if (size > 0) {
                     // shift chunk at start by one
                     memmove(BUCKET_ADDR(index, idx+1), BUCKET_ADDR(index, idx), size);
-                    /* printf("\nnext memove ok: %d\n", size); */
+                    debug_print("\nnext memove ok: %d\n", size);
                 } else if (size == -1) {
-                    printf("\\\n! size: %d\n\n", size);
+                    debug_print("\\\n! size: %d\n\n", size);
                 }
                 // insert key from the last address at index 0
                 memcpy(BUCKET_ADDR(index, idx), index->tmp_entry, index->bucket_size);
@@ -638,6 +670,7 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
 
         /* memcpy(bucket_ptr, entry_to_insert, entry_size); */
         index->num_entries += 1;
+        scan_wkk(index);
     }
     return 1;
 }
@@ -646,17 +679,30 @@ static int
 hashindex_delete(HashIndex *index, const void *key)
 {
     int idx = hashindex_lookup(index, key, NULL);
-    int c_size;
+    int c_size = -1;
+    /* uint8_t * bucket_ptr; */
     if (idx < 0) {
         return 1;  // not in index, nothing to do
     }
-    c_size = chunk_size(index, idx);  // includes current idx in chunk
+    debug_print("%s\n", "<<<");
+    scan_wkk(index);
+    if (idx+1 < index->num_buckets) {
+        c_size = lshift_chunk_size(index, idx+1);  // includes current idx in chunk
+    }
     if(c_size != -1) {
         // the simple case, just shift a chunk
-        memmove(BUCKET_ADDR(index, idx), BUCKET_ADDR(index, idx+1),
-                c_size-index->bucket_size); // substract bucket_size to compensate for current idx
+        debug_print("\ndelete simple: cs:%d i:%d\n", c_size, idx);
+        if (c_size != 0) {
+            memmove(BUCKET_ADDR(index, idx), BUCKET_ADDR(index, (idx+1)), c_size);
+        }
+        /* debug_print("\n%s\n", "ok"); */
         // and mark the last position of the chunk empty
-        BUCKET_MARK_EMPTY(index, idx+(c_size/index->bucket_size)); // TODO -1?
+        /* bucket_ptr = key; */
+        /* printf("\n missing %02X %02X ... %02X %02X\n", bucket_ptr[0], bucket_ptr[1], bucket_ptr[30], bucket_ptr[31]); */
+        debug_print("\nmark empty: i:%d nb:%d\n", (idx + (c_size/index->bucket_size)), index->num_buckets);
+        idx += c_size/index->bucket_size;
+        BUCKET_MARK_EMPTY(index, idx);
+        /* debug_print("\n%s\n", "ok"); */
     } else {
         // the complicated case, we shift all the way to the end of the bucket array
         memmove(BUCKET_ADDR(index, idx), BUCKET_ADDR(index, idx+1),
@@ -664,23 +710,35 @@ hashindex_delete(HashIndex *index, const void *key)
         // then check if we need to take the first bucket and move it to the last position
         if (BUCKET_IS_EMPTY(index, 0)) {
             // no need, it's empty anyway
-            BUCKET_MARK_EMPTY(index, index->num_buckets-1);
+            BUCKET_MARK_EMPTY(index, (index->num_buckets-1));
+            debug_print("\ndelete to last: cs:%d\n", (c_size/index->bucket_size));
         }
         else {
             // move first bucket to last address
             memmove(BUCKET_ADDR(index, index->num_buckets-1), BUCKET_ADDR(index, 0),
                     index->bucket_size);
             // then determine if we need to shift an entire chunk after the first bucket
-            c_size = chunk_size(index, 1);
+            c_size = lshift_chunk_size(index, 1);
             if(c_size == 0) {
                 // nothing to shift, mark first bucket empty and we're done
                 BUCKET_MARK_EMPTY(index, 0);
+                debug_print("\ndelete wrapped no shift: cs:%d\n", (c_size/index->bucket_size));
             } else {
                 memmove(BUCKET_ADDR(index, 0), BUCKET_ADDR(index, 1), c_size);
-                BUCKET_MARK_EMPTY(index, c_size/index->bucket_size);
+                BUCKET_MARK_EMPTY(index, (c_size/index->bucket_size));
+                debug_print("\ndelete wrapped: cs:%d\n", (c_size/index->bucket_size));
             }
         }
     }
+    scan_wkk(index);
+    debug_print("%s\n", "/>>");
+    index->num_entries -= 1;
+    if(index->num_entries < index->lower_limit) {
+        if(!hashindex_resize(index, shrink_size(index->num_buckets))) {
+            return 0;
+        }
+    }
+    return 1;
     
     /* while (1) { */
     /*     next = idx+1; */
@@ -698,13 +756,6 @@ hashindex_delete(HashIndex *index, const void *key)
     /*         break; */
     /*     } */
     /* } */
-    index->num_entries -= 1;
-    if(index->num_entries < index->lower_limit) {
-        if(!hashindex_resize(index, shrink_size(index->num_buckets))) {
-            return 0;
-        }
-    }
-    return 1;
 }
 
 static void *

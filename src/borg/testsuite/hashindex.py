@@ -3,6 +3,7 @@ import hashlib
 import os
 import tempfile
 import zlib
+import sys
 
 from ..hashindex import NSIndex, ChunkIndex
 from .. import hashindex
@@ -126,25 +127,42 @@ class HashIndexExtraTestCase(BaseTestCase):
     """These tests are separate because they should not become part of the selftest
     """
     def test_chunk_indexer(self):
-        # see _hashindex.c hash_sizes, we want to be close to the max fill rate
-        # because interesting errors happen there
-        max_key = int(65537 * 0.75) - 10
+        # max_key is chosen so that when the deleted_keys get added we're close to max fill rate
+        # but never trigger a resize
+        max_key = int(1031 * (0.99*(2./3.)))
         index = ChunkIndex(max_key)
         deleted_keys = [
             hashlib.sha256(H(k)).digest()
-            for k in range(-1, -(max_key//3), -1)]
+            for k in range(-1, -int(max_key/3), -1)]
+        print(max_key + len(deleted_keys))
         keys = [hashlib.sha256(H(k)).digest() for k in range(max_key)]
         for i, key in enumerate(keys):
             index[key] = (i, i, i)
         for i, key in enumerate(deleted_keys):
             index[key] = (i, i, i)
-
         for key in deleted_keys:
             del index[key]
+
+        missing, undeleted, wrong_value = 0, 0, 0
         for i, key in enumerate(keys):
-            assert index[key] == (i, i, i)
-        for key in deleted_keys:
-            assert index.get(key) is None
+            val = index.get(key)
+            if val != (i, i, i):
+                if val is None:
+                    missing += 1
+                else:
+                    wrong_value += 1
+        for i, key in enumerate(deleted_keys):
+            if index.get(key) is not None:
+                undeleted += 1
+            index[key] = (i, i, i)
+        for i, key in enumerate(deleted_keys):
+            val = index.get(key)
+            if val != (i, i, i):
+                if val is None:
+                    missing += 1
+                else:
+                    wrong_value += 1
+        assert (missing, undeleted, wrong_value) == (0, 0, 0)
 
 
 class HashIndexSizeTestCase(BaseTestCase):

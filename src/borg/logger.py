@@ -165,24 +165,38 @@ def create_logger(name=None):
             return self.__logger.setLevel(*args, **kw)
 
         def log(self, *args, **kw):
+            if 'msgid' in kw:
+                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
             return self.__logger.log(*args, **kw)
 
         def exception(self, *args, **kw):
+            if 'msgid' in kw:
+                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
             return self.__logger.exception(*args, **kw)
 
         def debug(self, *args, **kw):
+            if 'msgid' in kw:
+                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
             return self.__logger.debug(*args, **kw)
 
         def info(self, *args, **kw):
+            if 'msgid' in kw:
+                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
             return self.__logger.info(*args, **kw)
 
         def warning(self, *args, **kw):
+            if 'msgid' in kw:
+                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
             return self.__logger.warning(*args, **kw)
 
         def error(self, *args, **kw):
+            if 'msgid' in kw:
+                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
             return self.__logger.error(*args, **kw)
 
         def critical(self, *args, **kw):
+            if 'msgid' in kw:
+                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
             return self.__logger.critical(*args, **kw)
 
     return LazyLogger(name)
@@ -194,6 +208,8 @@ class JsonFormatter(logging.Formatter):
         'levelname',
         'name',
         'message',
+        # msgid is an attribute we made up in Borg to expose a non-changing handle for log messages
+        'msgid',
     )
 
     # Other attributes that are not very useful but do exist:

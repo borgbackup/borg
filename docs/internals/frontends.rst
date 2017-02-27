@@ -45,7 +45,7 @@ progress_message
 
     operation
         unique, opaque integer ID of the operation
-    msgid
+    :ref:`msgid <msgid>`
         Message ID of the operation (may be *none*)
     finished
         boolean indicating whether the operation has finished, only the last object for an *operation*
@@ -58,7 +58,7 @@ progress_percent
 
     operation
         unique, opaque integer ID of the operation
-    msgid
+    :ref:`msgid <msgid>`
         Message ID of the operation (may be *none*)
     finished
         boolean indicating whether the operation has finished, only the last object for an *operation*
@@ -90,6 +90,8 @@ log_message
         Name of the emitting entity
     message
         Formatted log message
+    :ref:`msgid <msgid>`
+        Message ID, may be *none* or absent
 
 Standard output
 ---------------
@@ -188,3 +190,38 @@ comment
 Listing the contents of an archive can produce *a lot* of JSON. Each item (file, directory, ...) is described
 by one object in the *files* array of the :ref:`borg_list` output. Refer to the *borg list* documentation for
 the available keys and their meaning.
+
+.. _msgid:
+
+Message IDs
+-----------
+
+Message IDs are strings that essentially give a log message or operation a name, without actually using the
+full text, since texts change more frequently. Message IDs are unambiguous and reduce the need to parse
+log messages.
+
+Assigned message IDs are:
+
+.. note::
+
+    This list is incomplete.
+
+Errors
+    - Archive.AlreadyExists
+    - Archive.DoesNotExist
+    - Archive.IncompatibleFilesystemEncodingError
+    - IntegrityError
+    - NoManifestError
+    - PlaceholderError
+
+Operations
+    - cache.begin_transaction
+    - cache.commit
+    - cache.sync
+    - repository.compact_segments
+    - repository.replay_segments
+    - repository.check_segments
+    - check.verify_data
+    - extract
+    - extract.permissions
+    - archive.delete

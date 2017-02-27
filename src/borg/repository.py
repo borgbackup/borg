@@ -483,7 +483,8 @@ class Repository:
             unused = []
 
         logger.debug('compaction started.')
-        pi = ProgressIndicatorPercent(total=len(self.compact), msg='Compacting segments %3.0f%%', step=1)
+        pi = ProgressIndicatorPercent(total=len(self.compact), msg='Compacting segments %3.0f%%', step=1,
+                                      msgid='repository.compact_segments')
         for segment, freeable_space in sorted(self.compact.items()):
             if not self.io.segment_exists(segment):
                 logger.warning('segment %d not found, but listed in compaction data', segment)
@@ -584,7 +585,8 @@ class Repository:
         self.prepare_txn(index_transaction_id, do_cleanup=False)
         try:
             segment_count = sum(1 for _ in self.io.segment_iterator())
-            pi = ProgressIndicatorPercent(total=segment_count, msg="Replaying segments %3.0f%%")
+            pi = ProgressIndicatorPercent(total=segment_count, msg='Replaying segments %3.0f%%',
+                                          msgid='repository.replay_segments')
             for i, (segment, filename) in enumerate(self.io.segment_iterator()):
                 pi.show(i)
                 if index_transaction_id is not None and segment <= index_transaction_id:
@@ -694,7 +696,8 @@ class Repository:
         self.prepare_txn(None)  # self.index, self.compact, self.segments all empty now!
         segment_count = sum(1 for _ in self.io.segment_iterator())
         logger.debug('Found %d segments', segment_count)
-        pi = ProgressIndicatorPercent(total=segment_count, msg="Checking segments %3.1f%%", step=0.1)
+        pi = ProgressIndicatorPercent(total=segment_count, msg='Checking segments %3.1f%%', step=0.1,
+                                      msgid='repository.check')
         for i, (segment, filename) in enumerate(self.io.segment_iterator()):
             pi.show(i)
             if segment > transaction_id:

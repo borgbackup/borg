@@ -1384,13 +1384,15 @@ class ProgressIndicatorBase:
 
     @classmethod
     def operation_id(cls):
+        """Unique number, can be used by receiving applications to distinguish different operations."""
         cls.operation_id_counter += 1
         return cls.operation_id_counter
 
-    def __init__(self):
+    def __init__(self, msgid=None):
         self.handler = None
         self.logger = logging.getLogger(self.LOGGER)
         self.id = self.operation_id()
+        self.msgid = msgid
 
         # If there are no handlers, set one up explicitly because the
         # terminator and propagation needs to be set.  If there are,
@@ -1426,12 +1428,13 @@ class ProgressIndicatorBase:
         assert self.json
         if not self.emit:
             return
-        print(json.dumps(dict(
+        kwargs.update(dict(
             operation=self.id,
+            msgid=self.msgid,
             type=self.JSON_TYPE,
-            finished=finished,
-            **kwargs,
-        )), file=sys.stderr)
+            finished=finished
+        ))
+        print(json.dumps(kwargs), file=sys.stderr)
 
     def finish(self):
         if self.json:
@@ -1461,7 +1464,7 @@ class ProgressIndicatorMessage(ProgressIndicatorBase):
 class ProgressIndicatorPercent(ProgressIndicatorBase):
     JSON_TYPE = 'progress_percent'
 
-    def __init__(self, total=0, step=5, start=0, msg="%3.0f%%"):
+    def __init__(self, total=0, step=5, start=0, msg="%3.0f%%", msgid=None):
         """
         Percentage-based progress indicator
 
@@ -1476,7 +1479,7 @@ class ProgressIndicatorPercent(ProgressIndicatorBase):
         self.step = step
         self.msg = msg
 
-        super().__init__()
+        super().__init__(msgid=msgid)
 
     def progress(self, current=None, increase=1):
         if current is not None:

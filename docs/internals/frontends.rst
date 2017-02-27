@@ -44,7 +44,9 @@ progress_message
     saying what is currently worked on.
 
     operation
-        integer ID of the operation
+        unique, opaque integer ID of the operation
+    msgid
+        Message ID of the operation (may be *none*)
     finished
         boolean indicating whether the operation has finished, only the last object for an *operation*
         can have this property set to *true*.
@@ -52,10 +54,12 @@ progress_message
         current progress message (may be empty/absent)
 
 progress_percent
-    Absolute progress display with defined end/total and current value.
+    Absolute progress information with defined end/total and current value.
 
     operation
-        integer ID of the operation
+        unique, opaque integer ID of the operation
+    msgid
+        Message ID of the operation (may be *none*)
     finished
         boolean indicating whether the operation has finished, only the last object for an *operation*
         can have this property set to *true*.
@@ -81,7 +85,7 @@ log_message
     created
         Unix timestamp (float)
     levelname
-        Upper-case log level name (also called severity). Defined levels are: DEBUG, INFO, WARNING, CRITICAL
+        Upper-case log level name (also called severity). Defined levels are: DEBUG, INFO, WARNING, ERROR, CRITICAL
     name
         Name of the emitting entity
     message

@@ -443,6 +443,15 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 (ignore_inode or entry[1] == st.st_ino)):
             # reset entry age
             entry[0] = 0
+            # we ignored the inode number in the comparison above or it is still same.
+            # if it is still the same, replacing it doesn't change it.
+            # if we ignored it, a reason for doing that is that files were moved to a new
+            # disk / new fs (so a one-time change of inode number is expected) and we wanted
+            # to avoid everything getting chunked again. to be able to re-enable the inode
+            # number comparison in a future backup run (and avoid chunking everything
+            # again at that time), we need to update the inode number in the cache with what
+            # we see in the filesystem.
+            entry[1] = st.st_ino
             self.files[path_hash] = msgpack.packb(entry)
             return entry[4]
         else:

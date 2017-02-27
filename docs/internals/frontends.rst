@@ -39,6 +39,33 @@ archive_progress
     path
         Current path
 
+progress_message
+    A message-based progress information with no concrete progress information, just a message
+    saying what is currently worked on.
+
+    operation
+        integer ID of the operation
+    finished
+        boolean indicating whether the operation has finished, only the last object for an *operation*
+        can have this property set to *true*.
+    message
+        current progress message (may be empty/absent)
+
+progress_percent
+    Absolute progress display with defined end/total and current value.
+
+    operation
+        integer ID of the operation
+    finished
+        boolean indicating whether the operation has finished, only the last object for an *operation*
+        can have this property set to *true*.
+    message
+        A formatted progress message, this will include the percentage and perhaps other information
+    current
+        Current value (always less-or-equal to *total*)
+    total
+        Total value
+
 file_status
     This is only output by :ref:`borg_create` and :ref:`borg_recreate` if ``--list`` is specified. The usual
     rules for the file listing applies, including the ``--filter`` option.

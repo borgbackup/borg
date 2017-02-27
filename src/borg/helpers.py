@@ -1377,10 +1377,20 @@ def ellipsis_truncate(msg, space):
 
 class ProgressIndicatorBase:
     LOGGER = 'borg.output.progress'
+    JSON_TYPE = None
+    json = False
+
+    operation_id_counter = 0
+
+    @classmethod
+    def operation_id(cls):
+        cls.operation_id_counter += 1
+        return cls.operation_id_counter
 
     def __init__(self):
         self.handler = None
         self.logger = logging.getLogger(self.LOGGER)
+        self.id = self.operation_id()
 
         # If there are no handlers, set one up explicitly because the
         # terminator and propagation needs to be set.  If there are,
@@ -1394,6 +1404,7 @@ class ProgressIndicatorBase:
             try:
                 formatter = logger.formatter
                 terminator = '\n' if logger.json else '\r'
+                self.json = logger.json
             except AttributeError:
                 terminator = '\r'
             else:
@@ -1404,11 +1415,29 @@ class ProgressIndicatorBase:
             if self.logger.level == logging.NOTSET:
                 self.logger.setLevel(logging.WARN)
             self.logger.propagate = False
+        self.emit = self.logger.getEffectiveLevel() == logging.INFO
 
     def __del__(self):
         if self.handler is not None:
             self.logger.removeHandler(self.handler)
             self.handler.close()
+
+    def output_json(self, *, finished=False, **kwargs):
+        assert self.json
+        if not self.emit:
+            return
+        print(json.dumps(dict(
+            operation=self.id,
+            type=self.JSON_TYPE,
+            finished=finished,
+            **kwargs,
+        )), file=sys.stderr)
+
+    def finish(self):
+        if self.json:
+            self.output_json(finished=True)
+        else:
+            self.output('')
 
 
 def justify_to_terminal_size(message):
@@ -1420,14 +1449,18 @@ def justify_to_terminal_size(message):
 
 
 class ProgressIndicatorMessage(ProgressIndicatorBase):
-    def output(self, msg):
-        self.logger.info(justify_to_terminal_size(msg))
+    JSON_TYPE = 'progress_message'
 
-    def finish(self):
-        self.output('')
+    def output(self, msg):
+        if self.json:
+            self.output_json(message=msg)
+        else:
+            self.logger.info(justify_to_terminal_size(msg))
 
 
 class ProgressIndicatorPercent(ProgressIndicatorBase):
+    JSON_TYPE = 'progress_percent'
+
     def __init__(self, total=0, step=5, start=0, msg="%3.0f%%"):
         """
         Percentage-based progress indicator
@@ -1466,22 +1499,23 @@ class ProgressIndicatorPercent(ProgressIndicatorBase):
         if pct is not None:
             # truncate the last argument, if no space is available
             if info is not None:
-                # no need to truncate if we're not outputing to a terminal
-                terminal_space = get_terminal_size(fallback=(-1, -1))[0]
-                if terminal_space != -1:
-                    space = terminal_space - len(self.msg % tuple([pct] + info[:-1] + ['']))
-                    info[-1] = ellipsis_truncate(info[-1], space)
+                if not self.json:
+                    # no need to truncate if we're not outputing to a terminal
+                    terminal_space = get_terminal_size(fallback=(-1, -1))[0]
+                    if terminal_space != -1:
+                        space = terminal_space - len(self.msg % tuple([pct] + info[:-1] + ['']))
+                        info[-1] = ellipsis_truncate(info[-1], space)
                 return self.output(self.msg % tuple([pct] + info), justify=False)
 
             return self.output(self.msg % pct)
 
     def output(self, message, justify=True):
-        if justify:
-            message = justify_to_terminal_size(message)
-        self.logger.info(message)
-
-    def finish(self):
-        self.output('')
+        if self.json:
+            self.output_json(message=message, current=self.counter, total=self.total)
+        else:
+            if justify:
+                message = justify_to_terminal_size(message)
+            self.logger.info(message)
 
 
 class ProgressIndicatorEndless:

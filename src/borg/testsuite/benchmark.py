@@ -108,49 +108,11 @@ def test_help(benchmark, cmd):
     assert result == 0
 
 
-def test_chunk_indexer_setitem(benchmark):
-    max_key = 2**17
-    # we want 32 byte keys, since that's what we use day to day
-    keys = [sha256(H(k)).digest() for k in range(max_key)]
-    bucket_val = (0, 0, 0)
-
-    def setup():
-        # return *args, **kwargs for the benchmarked function
-        return [ChunkIndex(445649), ], dict()
-
-    def do_inserts(index):
-        for key in keys:
-            index[key] = bucket_val
-    benchmark.pedantic(do_inserts, rounds=200, setup=setup)
-
-
-def test_chunk_indexer_getitem(benchmark):
-    max_key = 2**20
-    index = ChunkIndex(445649)
-    keys = [sha256(H(k)).digest() for k in range(max_key)]
-    missing_keys = [
-        sha256(H(k)).digest()
-        for k in range(max_key, (max_key+int(len(keys)/3)))]
-    bucket_val = (0, 0, 0)
-    for i, key in enumerate(keys):
-        # we want 32 byte keys, since that's what we use day to day
-        index[key] = (i, i, i)
-
-    def do_gets(keys=keys):
-        for i, key in enumerate(keys):
-            # we want 32 byte keys, since that's what we use day to day
-            assert index[key] == (i, i, i)  # noqa
-        for i in range(32, len(missing_keys), 32):
-            index.get(key)  # noqa
-
-    benchmark.pedantic(do_gets, rounds=200)
-
-
 rounds = 10
+
+
 @pytest.fixture(
-    # params=[.30, .50, .75, .80, .85, .90, .93, .95]
     params=[.30, .50, .75, .85, .93, .95]
-    # params=[.75, .93]
 )
 def fill(request):
     return request.param
@@ -163,16 +125,12 @@ def test_chunk_indexer_c_getitem(benchmark, fill):
      for k in range(max_key)]
     bucket_val = (0, 0, 0)
     for key in keys:
-        # we want 32 byte keys, since that's what we use day to day
         index[key] = bucket_val
     keys = b"".join(keys)
 
     def do_gets(keys=keys):
         bench_getitem(index, keys)
-    # import yep
-    # yep.start('getitem.perf')
     benchmark.pedantic(do_gets, rounds=rounds)
-    # yep.stop()
 
 
 def test_chunk_indexer_c_getitem_with_misses(benchmark, fill):
@@ -182,7 +140,6 @@ def test_chunk_indexer_c_getitem_with_misses(benchmark, fill):
      for k in range(max_key)]
     bucket_val = (0, 0, 0)
     for key in keys:
-        # we want 32 byte keys, since that's what we use day to day
         index[key] = bucket_val
     missing_keys = b"".join([
         sha256(H(k)).digest()
@@ -206,10 +163,7 @@ def test_chunk_indexer_c_setitem_update(benchmark, fill):
 
     def do_sets():
         bench_setitem(index, keys)
-    # import yep
-    # yep.start('setitem.perf')
     benchmark.pedantic(do_sets, rounds=rounds)
-    # yep.stop()
 
 
 def test_chunk_indexer_c_setitem(benchmark, fill):
@@ -247,6 +201,10 @@ def test_chunk_indexer_c_delete(benchmark, fill):
 
 
 def test_chunk_indexer_c_setitem_after_deletion(benchmark, fill):
+    """
+    Update a bunch of values after 1/5 of the keys in an index have been deleted
+    This will demonstrate the impact of tombstones on the index.
+    """
     max_key = int(445649 * fill - 10)
     keys = b"".join((sha256(H(k)).digest()
                      for k in range(max_key)
@@ -274,6 +232,10 @@ def test_chunk_indexer_c_setitem_after_deletion(benchmark, fill):
 
 
 def test_chunk_indexer_c_churn(benchmark, fill):
+    """
+    Creates churn by repeatedly deleting, updating, getting and re-inserting keys
+    Will loop over all keys, delete 1 key, update next 5, read next 3 then reinsert the deleted key
+    """
     max_key = int(445649 * fill - 10)
     keys = b"".join((sha256(H(k)).digest()
                      for k in range(max_key)))

@@ -15,7 +15,8 @@ General
 .. include:: usage_general.rst.inc
 
 In case you are interested in more details (like formulas), please see
-:ref:`internals`.
+:ref:`internals`. For details on the available JSON output, refer to
+:ref:`json_output`.
 
 Common options
 ++++++++++++++

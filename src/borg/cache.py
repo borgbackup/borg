@@ -575,7 +575,15 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         entry = FileCacheEntry(*msgpack.unpackb(entry))
         if (entry.size == st.st_size and entry.mtime == st.st_mtime_ns and
                 (ignore_inode or entry.inode == st.st_ino)):
-            self.files[path_hash] = msgpack.packb(entry._replace(age=0))
+            # we ignored the inode number in the comparison above or it is still same.
+            # if it is still the same, replacing it in the tuple doesn't change it.
+            # if we ignored it, a reason for doing that is that files were moved to a new
+            # disk / new fs (so a one-time change of inode number is expected) and we wanted
+            # to avoid everything getting chunked again. to be able to re-enable the inode
+            # number comparison in a future backup run (and avoid chunking everything
+            # again at that time), we need to update the inode number in the cache with what
+            # we see in the filesystem.
+            self.files[path_hash] = msgpack.packb(entry._replace(inode=st.st_ino, age=0))
             return entry.chunk_ids
         else:
             return None

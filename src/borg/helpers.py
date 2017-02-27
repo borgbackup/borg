@@ -1508,13 +1508,13 @@ class ProgressIndicatorPercent(ProgressIndicatorBase):
                     if terminal_space != -1:
                         space = terminal_space - len(self.msg % tuple([pct] + info[:-1] + ['']))
                         info[-1] = ellipsis_truncate(info[-1], space)
-                return self.output(self.msg % tuple([pct] + info), justify=False)
+                return self.output(self.msg % tuple([pct] + info), justify=False, info=info)
 
             return self.output(self.msg % pct)
 
-    def output(self, message, justify=True):
+    def output(self, message, justify=True, info=None):
         if self.json:
-            self.output_json(message=message, current=self.counter, total=self.total)
+            self.output_json(message=message, current=self.counter, total=self.total, info=info)
         else:
             if justify:
                 message = justify_to_terminal_size(message)

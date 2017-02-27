@@ -22,7 +22,8 @@ where each line is a JSON object. The *type* key of the object determines its ot
 
 Since JSON can only encode text, any string representing a file system path may miss non-text parts.
 
-The following types are in use:
+The following types are in use. Progress information is governed by the usual rules for progress information,
+it is not produced unless ``--progress`` is specified.
 
 archive_progress
     Output during operations creating archives (:ref:`borg_create` and :ref:`borg_recreate`).
@@ -67,6 +68,8 @@ progress_percent
         A formatted progress message, this will include the percentage and perhaps other information
     current
         Current value (always less-or-equal to *total*)
+    info
+        Array that describes the current item, may be *none*, contents depend on *msgid*
     total
         Total value
 
@@ -218,10 +221,14 @@ Operations
     - cache.begin_transaction
     - cache.commit
     - cache.sync
+
+      *info* is one string element, the name of the archive currently synced.
     - repository.compact_segments
     - repository.replay_segments
     - repository.check_segments
     - check.verify_data
     - extract
+
+      *info* is one string element, the name of the path currently extracted.
     - extract.permissions
     - archive.delete

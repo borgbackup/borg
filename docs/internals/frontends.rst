@@ -1,5 +1,5 @@
 .. include:: ../global.rst.inc
-.. highlight:: none
+.. highlight:: json
 
 .. _json_output:
 
@@ -141,6 +141,31 @@ stats
     unique_csize
         Compressed and encrypted size of all chunks
 
+Example *borg info* output::
+
+    {
+        "cache": {
+            "path": "/home/user/.cache/borg/0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
+            "stats": {
+                "total_chunks": 511533,
+                "total_csize": 17948017540,
+                "total_size": 22635749792,
+                "total_unique_chunks": 54892,
+                "unique_csize": 1920405405,
+                "unique_size": 2449675468
+            }
+        },
+        "encryption": {
+            "mode": "repokey"
+        },
+        "repository": {
+            "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
+            "last_modified": "Mon, 2017-02-27 21:21:58",
+            "location": "/home/user/testrepo"
+        },
+        "security_dir": "/home/user/.config/borg/security/0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23"
+    }
+
 .. rubric:: Archive formats
 
 :ref:`borg_info` uses an extended format for archives, which is more expensive to retrieve, while
@@ -188,11 +213,114 @@ username
 comment
     Archive comment, if any
 
+Example of a simple archive listing (``borg list --last 1 --json``)::
+
+    {
+        "archives": [
+            {
+                "archive": "2017-02-27T21:21:51",
+                "barchive": "2017-02-27T21:21:51",
+                "id": "80cd07219ad725b3c5f665c1dcf119435c4dee1647a560ecac30f8d40221a46a",
+                "name": "2017-02-27T21:21:51",
+                "time": "Mon, 2017-02-27 21:21:52"
+            }
+        ],
+        "encryption": {
+            "mode": "repokey"
+        },
+        "repository": {
+            "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
+            "last_modified": "Mon, 2017-02-27 21:21:58",
+            "location": "/home/user/repository"
+        }
+    }
+
+The same archive with more information (``borg info --last 1 --json``)::
+
+    {
+        "archives": [
+            {
+                "command_line": [
+                    "/home/user/.local/bin/borg",
+                    "create",
+                    "/home/user/repository",
+                    "..."
+                ],
+                "comment": "",
+                "duration": 5.641542,
+                "end": "Mon, 2017-02-27 21:21:58",
+                "hostname": "host",
+                "id": "80cd07219ad725b3c5f665c1dcf119435c4dee1647a560ecac30f8d40221a46a",
+                "limits": {
+                    "max_archive_size": 0.0001330855110409714
+                },
+                "name": "2017-02-27T21:21:51",
+                "start": "Mon, 2017-02-27 21:21:52",
+                "stats": {
+                    "compressed_size": 1880961894,
+                    "deduplicated_size": 2791,
+                    "nfiles": 53669,
+                    "original_size": 2400471280
+                },
+                "username": "user"
+            }
+        ],
+        "cache": {
+            "path": "/home/user/.cache/borg/0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
+            "stats": {
+                "total_chunks": 511533,
+                "total_csize": 17948017540,
+                "total_size": 22635749792,
+                "total_unique_chunks": 54892,
+                "unique_csize": 1920405405,
+                "unique_size": 2449675468
+            }
+        },
+        "encryption": {
+            "mode": "repokey"
+        },
+        "repository": {
+            "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
+            "last_modified": "Mon, 2017-02-27 21:21:58",
+            "location": "/home/user/repository"
+        }
+    }
+
 .. rubric:: File listings
 
 Listing the contents of an archive can produce *a lot* of JSON. Each item (file, directory, ...) is described
 by one object in the *files* array of the :ref:`borg_list` output. Refer to the *borg list* documentation for
 the available keys and their meaning.
+
+Example (excerpt)::
+
+    {
+        "encryption": {
+            "mode": "repokey"
+        },
+        "repository": {
+            "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
+            "last_modified": "Mon, 2017-02-27 21:21:58",
+            "location": "/home/user/repository"
+        },
+        "files": [
+            {
+                "type": "d",
+                "mode": "drwxr-xr-x",
+                "user": "user",
+                "group": "user",
+                "uid": 1000,
+                "gid": 1000,
+                "path": "linux",
+                "healthy": true,
+                "source": "",
+                "linktarget": "",
+                "flags": null,
+                "isomtime": "Sat, 2016-05-07 19:46:01",
+                "size": 0
+            }
+        ]
+    }
 
 .. _msgid:
 

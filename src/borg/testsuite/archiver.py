@@ -262,7 +262,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         return output
 
     def create_src_archive(self, name):
-        self.cmd('create', self.repository_location + '::' + name, src_dir)
+        self.cmd('create', '--compression=lz4', self.repository_location + '::' + name, src_dir)
 
     def open_archive(self, name):
         repository = Repository(self.repository_path, exclusive=True)

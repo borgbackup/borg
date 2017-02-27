@@ -81,6 +81,10 @@ class IntegrityError(ErrorWithTraceback):
     """Data integrity error: {}"""
 
 
+class DecompressionError(IntegrityError):
+    """Decompressor reported a data format error"""
+
+
 class ExtensionModuleError(Error):
     """The Borg binary extension modules do not seem to be properly installed"""
 
@@ -99,7 +103,7 @@ def check_extension_modules():
         raise ExtensionModuleError
     if chunker.API_VERSION != '1.1_01':
         raise ExtensionModuleError
-    if compress.API_VERSION != '1.1_01':
+    if compress.API_VERSION != '1.1_02':
         raise ExtensionModuleError
     if crypto.API_VERSION != '1.1_01':
         raise ExtensionModuleError

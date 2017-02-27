@@ -57,11 +57,11 @@ class HashIndexTestCase(BaseTestCase):
 
     def test_nsindex(self):
         self._generic_test(NSIndex, lambda x: (x, x),
-                           'b96ec1ddabb4278cc92261ee171f7efc979dc19397cc5e89b778f05fa25bf93f')
+                           'b0025c6246bce1fc098371bb99f537b9bea50294d34e265dc4657876c3ffe083')
 
     def test_chunkindex(self):
         self._generic_test(ChunkIndex, lambda x: (x, x, x),
-                           '9d437a1e145beccc790c69e66ba94fc17bd982d83a401c9c6e524609405529d8')
+                           'a110e776a2632864ceadcaf9144f2705887167c852caa069c4f792e0d033e9e6')
 
     def test_resize(self):
         n = 2000  # Must be >= MIN_BUCKETS

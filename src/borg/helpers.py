@@ -407,7 +407,7 @@ class ArgparsePatternFileAction(argparse.Action):
             self.parse(f, args)
 
     def parse(self, fobj, args):
-        load_pattern_file(fobj, args.roots, args.patterns)
+        load_pattern_file(fobj, args.paths, args.patterns)
 
 
 class ArgparseExcludeFileAction(ArgparsePatternFileAction):

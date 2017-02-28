@@ -173,12 +173,11 @@ Example *borg info* output::
 array under the *archives* key, while :ref:`borg_create` returns a single archive object under the
 *archive* key.
 
-Both formats contain a *name* key with the archive name, and the *id* key with the hexadecimal archive ID.
+Both formats contain a *name* key with the archive name, the *id* key with the hexadecimal archive ID,
+and the *start* key with the start timestamp.
 
- info and create further have:
+info and create further have:
 
-start
-    Start timestamp
 end
     End timestamp
 duration
@@ -222,7 +221,8 @@ Example of a simple archive listing (``borg list --last 1 --json``)::
                 "barchive": "2017-02-27T21:21:51",
                 "id": "80cd07219ad725b3c5f665c1dcf119435c4dee1647a560ecac30f8d40221a46a",
                 "name": "2017-02-27T21:21:51",
-                "time": "Mon, 2017-02-27 21:21:52"
+                "time": "Mon, 2017-02-27 21:21:52",
+                "start": "Mon, 2017-02-27 21:21:52"
             }
         ],
         "encryption": {

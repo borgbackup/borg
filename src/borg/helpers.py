@@ -1622,6 +1622,7 @@ class ArchiveFormatter(BaseFormatter):
             'archive': remove_surrogates(archive.name),
             'id': bin_to_hex(archive.id),
             'time': format_time(to_localtime(archive.ts)),
+            'start': format_time(to_localtime(archive.ts)),
         }
 
     @staticmethod

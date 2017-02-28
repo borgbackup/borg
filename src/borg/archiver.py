@@ -588,6 +588,9 @@ class Archiver:
             except BackupOSError as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 
+        if pi:
+            pi.finish()
+
         if not args.dry_run:
             pi = ProgressIndicatorPercent(total=len(dirs), msg='Setting directory permissions %3.0f%%',
                                           msgid='extract.permissions')

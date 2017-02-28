@@ -1,0 +1,64 @@
+borg benchmark crud
+===================
+
+Here is some example of borg benchmark crud output.
+
+I ran it on my laptop, Core i5-4200u, 8GB RAM, SATA SSD, Linux, ext4 fs.
+"src" as well as repo is local, on this SSD.
+
+$ BORG_PASSPHRASE=secret borg init --encryption repokey-blake2 repo
+$ BORG_PASSPHRASE=secret borg benchmark crud repo src
+
+C-Z-BIG         116.06 MB/s (10 * 100.00 MB all-zero files: 8.62s)
+R-Z-BIG         197.00 MB/s (10 * 100.00 MB all-zero files: 5.08s)
+U-Z-BIG         418.07 MB/s (10 * 100.00 MB all-zero files: 2.39s)
+D-Z-BIG         724.94 MB/s (10 * 100.00 MB all-zero files: 1.38s)
+C-R-BIG          42.21 MB/s (10 * 100.00 MB random files: 23.69s)
+R-R-BIG         134.45 MB/s (10 * 100.00 MB random files: 7.44s)
+U-R-BIG         316.83 MB/s (10 * 100.00 MB random files: 3.16s)
+D-R-BIG         251.10 MB/s (10 * 100.00 MB random files: 3.98s)
+C-Z-MEDIUM      118.53 MB/s (1000 * 1.00 MB all-zero files: 8.44s)
+R-Z-MEDIUM      218.49 MB/s (1000 * 1.00 MB all-zero files: 4.58s)
+U-Z-MEDIUM      591.59 MB/s (1000 * 1.00 MB all-zero files: 1.69s)
+D-Z-MEDIUM      730.04 MB/s (1000 * 1.00 MB all-zero files: 1.37s)
+C-R-MEDIUM       31.46 MB/s (1000 * 1.00 MB random files: 31.79s)
+R-R-MEDIUM      129.64 MB/s (1000 * 1.00 MB random files: 7.71s)
+U-R-MEDIUM      621.86 MB/s (1000 * 1.00 MB random files: 1.61s)
+D-R-MEDIUM      234.82 MB/s (1000 * 1.00 MB random files: 4.26s)
+C-Z-SMALL        19.81 MB/s (10000 * 10.00 kB all-zero files: 5.05s)
+R-Z-SMALL        97.69 MB/s (10000 * 10.00 kB all-zero files: 1.02s)
+U-Z-SMALL        36.35 MB/s (10000 * 10.00 kB all-zero files: 2.75s)
+D-Z-SMALL        57.04 MB/s (10000 * 10.00 kB all-zero files: 1.75s)
+C-R-SMALL         9.81 MB/s (10000 * 10.00 kB random files: 10.19s)
+R-R-SMALL        92.21 MB/s (10000 * 10.00 kB random files: 1.08s)
+U-R-SMALL        64.62 MB/s (10000 * 10.00 kB random files: 1.55s)
+D-R-SMALL        51.62 MB/s (10000 * 10.00 kB random files: 1.94s)
+
+
+A second run some time later gave:
+
+C-Z-BIG         115.22 MB/s (10 * 100.00 MB all-zero files: 8.68s)
+R-Z-BIG         196.06 MB/s (10 * 100.00 MB all-zero files: 5.10s)
+U-Z-BIG         439.50 MB/s (10 * 100.00 MB all-zero files: 2.28s)
+D-Z-BIG         671.11 MB/s (10 * 100.00 MB all-zero files: 1.49s)
+C-R-BIG          43.40 MB/s (10 * 100.00 MB random files: 23.04s)
+R-R-BIG         133.17 MB/s (10 * 100.00 MB random files: 7.51s)
+U-R-BIG         464.50 MB/s (10 * 100.00 MB random files: 2.15s)
+D-R-BIG         245.19 MB/s (10 * 100.00 MB random files: 4.08s)
+C-Z-MEDIUM      110.82 MB/s (1000 * 1.00 MB all-zero files: 9.02s)
+R-Z-MEDIUM      217.96 MB/s (1000 * 1.00 MB all-zero files: 4.59s)
+U-Z-MEDIUM      601.54 MB/s (1000 * 1.00 MB all-zero files: 1.66s)
+D-Z-MEDIUM      686.99 MB/s (1000 * 1.00 MB all-zero files: 1.46s)
+C-R-MEDIUM       39.91 MB/s (1000 * 1.00 MB random files: 25.06s)
+R-R-MEDIUM      128.91 MB/s (1000 * 1.00 MB random files: 7.76s)
+U-R-MEDIUM      599.00 MB/s (1000 * 1.00 MB random files: 1.67s)
+D-R-MEDIUM      230.69 MB/s (1000 * 1.00 MB random files: 4.33s)
+C-Z-SMALL        14.78 MB/s (10000 * 10.00 kB all-zero files: 6.76s)
+R-Z-SMALL        96.86 MB/s (10000 * 10.00 kB all-zero files: 1.03s)
+U-Z-SMALL        35.22 MB/s (10000 * 10.00 kB all-zero files: 2.84s)
+D-Z-SMALL        64.93 MB/s (10000 * 10.00 kB all-zero files: 1.54s)
+C-R-SMALL        11.08 MB/s (10000 * 10.00 kB random files: 9.02s)
+R-R-SMALL        92.34 MB/s (10000 * 10.00 kB random files: 1.08s)
+U-R-SMALL        64.49 MB/s (10000 * 10.00 kB random files: 1.55s)
+D-R-SMALL        46.96 MB/s (10000 * 10.00 kB random files: 2.13s)
+

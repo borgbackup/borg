@@ -125,6 +125,48 @@ class HashIndexTestCase(BaseTestCase):
         assert unique_chunks == 3
 
 
+class HashIndexExtraTestCase(BaseTestCase):
+    """These tests are separate because they should not become part of the selftest
+    """
+    def test_chunk_indexer(self):
+        # max_key is chosen so that when the deleted_keys get added we're close to max fill rate
+        # but never trigger a resize
+        max_key = int(1031 * (0.99*(2./3.)))
+        index = ChunkIndex(max_key)
+        deleted_keys = [
+            hashlib.sha256(H(k)).digest()
+            for k in range(-1, -int(max_key/3), -1)]
+        print(max_key + len(deleted_keys))
+        keys = [hashlib.sha256(H(k)).digest() for k in range(max_key)]
+        for i, key in enumerate(keys):
+            index[key] = (i, i, i)
+        for i, key in enumerate(deleted_keys):
+            index[key] = (i, i, i)
+        for key in deleted_keys:
+            del index[key]
+
+        missing, undeleted, wrong_value = 0, 0, 0
+        for i, key in enumerate(keys):
+            val = index.get(key)
+            if val != (i, i, i):
+                if val is None:
+                    missing += 1
+                else:
+                    wrong_value += 1
+        for i, key in enumerate(deleted_keys):
+            if index.get(key) is not None:
+                undeleted += 1
+            index[key] = (i, i, i)
+        for i, key in enumerate(deleted_keys):
+            val = index.get(key)
+            if val != (i, i, i):
+                if val is None:
+                    missing += 1
+                else:
+                    wrong_value += 1
+        assert (missing, undeleted, wrong_value) == (0, 0, 0)
+
+
 class HashIndexSizeTestCase(BaseTestCase):
     def test_size_on_disk(self):
         idx = ChunkIndex()

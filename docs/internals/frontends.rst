@@ -96,6 +96,39 @@ log_message
     :ref:`msgid <msgid>`
         Message ID, may be *none* or absent
 
+.. rubric:: Examples (reformatted, each object would be on exactly one line)
+
+:ref:`borg_extract` progress::
+
+    {"message": "100.0% Extracting: src/borgbackup.egg-info/entry_points.txt",
+     "current": 13000228, "total": 13004993, "info": ["src/borgbackup.egg-info/entry_points.txt"],
+     "operation": 1, "msgid": "extract", "type": "progress_percent", "finished": false}
+    {"message": "100.0% Extracting: src/borgbackup.egg-info/SOURCES.txt",
+     "current": 13004993, "total": 13004993, "info": ["src/borgbackup.egg-info/SOURCES.txt"],
+     "operation": 1, "msgid": "extract", "type": "progress_percent", "finished": false}
+    {"operation": 1, "msgid": "extract", "type": "progress_percent", "finished": true}
+
+:ref:`borg_create` file listing with progress::
+
+    {"original_size": 0, "compressed_size": 0, "deduplicated_size": 0, "nfiles": 0, "type": "archive_progress", "path": "src"}
+    {"type": "file_status", "status": "U", "path": "src/borgbackup.egg-info/entry_points.txt"}
+    {"type": "file_status", "status": "U", "path": "src/borgbackup.egg-info/SOURCES.txt"}
+    {"type": "file_status", "status": "d", "path": "src/borgbackup.egg-info"}
+    {"type": "file_status", "status": "d", "path": "src"}
+    {"original_size": 13176040, "compressed_size": 11386863, "deduplicated_size": 503, "nfiles": 277, "type": "archive_progress", "path": ""}
+
+Internal transaction progress::
+
+    {"message": "Saving files cache", "operation": 2, "msgid": "cache.commit", "type": "progress_message", "finished": false}
+    {"message": "Saving cache config", "operation": 2, "msgid": "cache.commit", "type": "progress_message", "finished": false}
+    {"message": "Saving chunks cache", "operation": 2, "msgid": "cache.commit", "type": "progress_message", "finished": false}
+    {"operation": 2, "msgid": "cache.commit", "type": "progress_message", "finished": true}
+
+A debug log message::
+
+    {"message": "35 self tests completed in 0.08 seconds",
+     "type": "log_message", "created": 1488278449.5575905, "levelname": "DEBUG", "name": "borg.archiver"}
+
 Standard output
 ---------------
 
@@ -333,17 +366,88 @@ log messages.
 
 Assigned message IDs are:
 
-.. note::
-
-    This list is incomplete.
+.. See scripts/errorlist.py; this is slightly edited.
 
 Errors
-    - Archive.AlreadyExists
-    - Archive.DoesNotExist
-    - Archive.IncompatibleFilesystemEncodingError
-    - IntegrityError
-    - NoManifestError
-    - PlaceholderError
+    Archive.AlreadyExists
+        Archive {} already exists
+    Archive.DoesNotExist
+        Archive {} does not exist
+    Archive.IncompatibleFilesystemEncodingError
+        Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable.
+    Cache.CacheInitAbortedError
+        Cache initialization aborted
+    Cache.EncryptionMethodMismatch
+        Repository encryption method changed since last access, refusing to continue
+    Cache.RepositoryAccessAborted
+        Repository access aborted
+    Cache.RepositoryIDNotUnique
+        Cache is newer than repository - do you have multiple, independently updated repos with same ID?
+    Cache.RepositoryReplay
+        Cache is newer than repository - this is either an attack or unsafe (multiple repos with same ID)
+    Buffer.MemoryLimitExceeded
+        Requested buffer size {} is above the limit of {}.
+    ExtensionModuleError
+        The Borg binary extension modules do not seem to be properly installed
+    IntegrityError
+        Data integrity error: {}
+    NoManifestError
+        Repository has no manifest.
+    PlaceholderError
+        Formatting Error: "{}".format({}): {}({})
+    KeyfileInvalidError
+        Invalid key file for repository {} found in {}.
+    KeyfileMismatchError
+        Mismatch between repository {} and key file {}.
+    KeyfileNotFoundError
+        No key file for repository {} found in {}.
+    PassphraseWrong
+        passphrase supplied in BORG_PASSPHRASE is incorrect
+    PasswordRetriesExceeded
+        exceeded the maximum password retries
+    RepoKeyNotFoundError
+        No key entry found in the config of repository {}.
+    UnsupportedManifestError
+        Unsupported manifest envelope. A newer version is required to access this repository.
+    UnsupportedPayloadError
+        Unsupported payload type {}. A newer version is required to access this repository.
+    NotABorgKeyFile
+        This file is not a borg key backup, aborting.
+    RepoIdMismatch
+        This key backup seems to be for a different backup repository, aborting.
+    UnencryptedRepo
+        Keymanagement not available for unencrypted repositories.
+    UnknownKeyType
+        Keytype {0} is unknown.
+    LockError
+        Failed to acquire the lock {}.
+    LockErrorT
+        Failed to acquire the lock {}.
+    ConnectionClosed
+        Connection closed by remote host
+    InvalidRPCMethod
+        RPC method {} is not valid
+    PathNotAllowed
+        Repository path not allowed
+    RemoteRepository.RPCServerOutdated
+        Borg server is too old for {}. Required version {}
+    UnexpectedRPCDataFormatFromClient
+        Borg {}: Got unexpected RPC data format from client.
+    UnexpectedRPCDataFormatFromServer
+        Got unexpected RPC data format from server:
+        {}
+    Repository.AlreadyExists
+        Repository {} already exists.
+    Repository.CheckNeeded
+        Inconsistency detected. Please run "borg check {}".
+    Repository.DoesNotExist
+        Repository {} does not exist.
+    Repository.InsufficientFreeSpaceError
+        Insufficient free space to complete transaction (required: {}, available: {}).
+    Repository.InvalidRepository
+        {} is not a valid repository. Check repo config.
+    Repository.ObjectNotFound
+        Object with key {} not found in repository {}.
 
 Operations
     - cache.begin_transaction

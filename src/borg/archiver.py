@@ -9,6 +9,7 @@ import logging
 import os
 import re
 import shlex
+import shutil
 import signal
 import stat
 import subprocess
@@ -17,6 +18,7 @@ import textwrap
 import time
 import traceback
 from binascii import unhexlify
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from itertools import zip_longest
 
@@ -57,7 +59,7 @@ from .helpers import basic_json_data, json_print
 from .item import Item
 from .key import key_creator, tam_required_file, tam_required, RepoKey, PassphraseKey
 from .keymanager import KeyManager
-from .platform import get_flags, umount, get_process_id
+from .platform import get_flags, umount, get_process_id, SyncFile
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 from .repository import Repository, LIST_SCAN_LIMIT
 from .selftest import selftest
@@ -321,6 +323,72 @@ class Archiver:
         key_new.change_passphrase()  # option to change key protection passphrase, save
         logger.info('Key updated')
         return EXIT_SUCCESS
+
+    def do_benchmark_crud(self, args):
+        def measurement_run(repo, path):
+            archive = repo + '::borg-benchmark-crud'
+            compression = '--compression=none'
+            # measure create perf (without files cache to always have it chunking)
+            t_start = time.monotonic()
+            rc = self.do_create(self.parse_args(['create', compression, '--no-files-cache', archive + '1', path]))
+            t_end = time.monotonic()
+            dt_create = t_end - t_start
+            assert rc == 0
+            # now build files cache
+            rc1 = self.do_create(self.parse_args(['create', compression, archive + '2', path]))
+            rc2 = self.do_delete(self.parse_args(['delete', archive + '2']))
+            assert rc1 == rc2 == 0
+            # measure a no-change update (archive1 is still present)
+            t_start = time.monotonic()
+            rc1 = self.do_create(self.parse_args(['create', compression, archive + '3', path]))
+            t_end = time.monotonic()
+            dt_update = t_end - t_start
+            rc2 = self.do_delete(self.parse_args(['delete', archive + '3']))
+            assert rc1 == rc2 == 0
+            # measure extraction (dry-run: without writing result to disk)
+            t_start = time.monotonic()
+            rc = self.do_extract(self.parse_args(['extract', '--dry-run', archive + '1']))
+            t_end = time.monotonic()
+            dt_extract = t_end - t_start
+            assert rc == 0
+            # measure archive deletion (of LAST present archive with the data)
+            t_start = time.monotonic()
+            rc = self.do_delete(self.parse_args(['delete', archive + '1']))
+            t_end = time.monotonic()
+            dt_delete = t_end - t_start
+            assert rc == 0
+            return dt_create, dt_update, dt_extract, dt_delete
+
+        @contextmanager
+        def test_files(path, count, size, random):
+            path = os.path.join(path, 'borg-test-data')
+            os.makedirs(path)
+            for i in range(count):
+                fname = os.path.join(path, 'file_%d' % i)
+                data = b'\0' * size if not random else os.urandom(size)
+                with SyncFile(fname, binary=True) as fd:  # used for posix_fadvise's sake
+                    fd.write(data)
+            yield path
+            shutil.rmtree(path)
+
+        for msg, count, size, random in [
+            ('Z-BIG', 10, 100000000, False),
+            ('R-BIG', 10, 100000000, True),
+            ('Z-MEDIUM', 1000, 1000000, False),
+            ('R-MEDIUM', 1000, 1000000, True),
+            ('Z-SMALL', 10000, 10000, False),
+            ('R-SMALL', 10000, 10000, True),
+        ]:
+            with test_files(args.path, count, size, random) as path:
+                dt_create, dt_update, dt_extract, dt_delete = measurement_run(args.location.canonical_path(), path)
+            total_size_MB = count * size / 1e06
+            file_size_formatted = format_file_size(size)
+            content = 'random' if random else 'all-zero'
+            fmt = '%s-%-10s %9.2f MB/s (%d * %s %s files: %.2fs)'
+            print(fmt % ('C', msg, total_size_MB / dt_create, count, file_size_formatted, content, dt_create))
+            print(fmt % ('R', msg, total_size_MB / dt_extract, count, file_size_formatted, content, dt_extract))
+            print(fmt % ('U', msg, total_size_MB / dt_update, count, file_size_formatted, content, dt_update))
+            print(fmt % ('D', msg, total_size_MB / dt_delete, count, file_size_formatted, content, dt_delete))
 
     @with_repository(fake='dry_run', exclusive=True)
     def do_create(self, args, repository, manifest=None, key=None):
@@ -3140,6 +3208,69 @@ class Archiver:
                                help='repository to use')
         subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
                                help='hex object ID(s) to show refcounts for')
+
+        benchmark_epilog = process_epilog("These commands do various benchmarks.")
+
+        subparser = subparsers.add_parser('benchmark', parents=[common_parser], add_help=False,
+                                          description='benchmark command',
+                                          epilog=benchmark_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='benchmark command')
+
+        benchmark_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
+        subparser.set_defaults(fallback_func=functools.partial(self.do_subcommand_help, subparser))
+
+        bench_crud_epilog = process_epilog("""
+        This command benchmarks borg CRUD (create, read, update, delete) operations.
+
+        It creates input data below the given PATH and backups this data into the given REPO.
+        The REPO must already exist (it could be a fresh empty repo or an existing repo, the
+        command will create / read / update / delete some archives named borg-test-data* there.
+
+        Make sure you have free space there, you'll need about 1GB each (+ overhead).
+
+        If your repository is encrypted and borg needs a passphrase to unlock the key, use:
+
+        BORG_PASSPHRASE=mysecret borg benchmark crud REPO PATH
+
+        Measurements are done with different input file sizes and counts.
+        The file contents are very artificial (either all zero or all random),
+        thus the measurement results do not necessarily reflect performance with real data.
+        Also, due to the kind of content used, no compression is used in these benchmarks.
+
+        C- == borg create (1st archive creation, no compression, do not use files cache)
+              C-Z- == all-zero files. full dedup, this is primarily measuring reader/chunker/hasher.
+              C-R- == random files. no dedup, measuring throughput through all processing stages.
+
+        R- == borg extract (extract archive, dry-run, do everything, but do not write files to disk)
+              R-Z- == all zero files. Measuring heavily duplicated files.
+              R-R- == random files. No duplication here, measuring throughput through all processing
+                      stages, except writing to disk.
+
+        U- == borg create (2nd archive creation of unchanged input files, measure files cache speed)
+              The throughput value is kind of virtual here, it does not actually read the file.
+              U-Z- == needs to check the 2 all-zero chunks' existence in the repo.
+              U-R- == needs to check existence of a lot of different chunks in the repo.
+
+        D- == borg delete archive (delete last remaining archive, measure deletion + compaction)
+              D-Z- == few chunks to delete / few segments to compact/remove.
+              D-R- == many chunks to delete / many segments to compact/remove.
+
+        Please note that there might be quite some variance in these measurements.
+        Try multiple measurements and having a otherwise idle machine (and network, if you use it).
+        """)
+        subparser = benchmark_parsers.add_parser('crud', parents=[common_parser], add_help=False,
+                                                 description=self.do_benchmark_crud.__doc__,
+                                                 epilog=bench_crud_epilog,
+                                                 formatter_class=argparse.RawDescriptionHelpFormatter,
+                                                 help='benchmarks borg CRUD (create, extract, update, delete).')
+        subparser.set_defaults(func=self.do_benchmark_crud)
+
+        subparser.add_argument('location', metavar='REPO',
+                               type=location_validator(archive=False),
+                               help='repo to use for benchmark (must exist)')
+
+        subparser.add_argument('path', metavar='PATH', help='path were to create benchmark input data')
 
         return parser
 

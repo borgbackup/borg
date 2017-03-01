@@ -155,7 +155,7 @@ General:
         When set, use this command instead of ``ssh``. This can be used to specify ssh options, such as
         a custom identity file ``ssh -i /path/to/private/key``. See ``man ssh`` for other options.
     BORG_REMOTE_PATH
-        When set, use the given path/filename as remote path (default is "borg").
+        When set, use the given path as borg executable on the remote (defaults to "borg" if unset).
         Using ``--remote-path PATH`` commandline option overrides the environment variable.
     BORG_FILES_CACHE_TTL
         When set to a numeric value, this determines the maximum "time to live" for the files cache

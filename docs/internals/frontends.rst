@@ -42,7 +42,7 @@ archive_progress
 
 progress_message
     A message-based progress information with no concrete progress information, just a message
-    saying what is currently worked on.
+    saying what is currently being worked on.
 
     operation
         unique, opaque integer ID of the operation
@@ -209,7 +209,7 @@ array under the *archives* key, while :ref:`borg_create` returns a single archiv
 Both formats contain a *name* key with the archive name, the *id* key with the hexadecimal archive ID,
 and the *start* key with the start timestamp.
 
-info and create further have:
+*borg info* and *borg create* further have:
 
 end
     End timestamp
@@ -250,11 +250,8 @@ Example of a simple archive listing (``borg list --last 1 --json``)::
     {
         "archives": [
             {
-                "archive": "2017-02-27T21:21:51",
-                "barchive": "2017-02-27T21:21:51",
                 "id": "80cd07219ad725b3c5f665c1dcf119435c4dee1647a560ecac30f8d40221a46a",
-                "name": "2017-02-27T21:21:51",
-                "time": "Mon, 2017-02-27 21:21:52",
+                "name": "host-system-backup-2017-02-27",
                 "start": "Mon, 2017-02-27 21:21:52"
             }
         ],
@@ -287,7 +284,7 @@ The same archive with more information (``borg info --last 1 --json``)::
                 "limits": {
                     "max_archive_size": 0.0001330855110409714
                 },
-                "name": "2017-02-27T21:21:51",
+                "name": "host-system-backup-2017-02-27",
                 "start": "Mon, 2017-02-27 21:21:52",
                 "stats": {
                     "compressed_size": 1880961894,
@@ -322,7 +319,7 @@ The same archive with more information (``borg info --last 1 --json``)::
 .. rubric:: File listings
 
 Listing the contents of an archive can produce *a lot* of JSON. Each item (file, directory, ...) is described
-by one object in the *files* array of the :ref:`borg_list` output. Refer to the *borg list* documentation for
+by one object in the *items* array of the :ref:`borg_list` output. Refer to the *borg list* documentation for
 the available keys and their meaning.
 
 Example (excerpt)::
@@ -336,7 +333,7 @@ Example (excerpt)::
             "last_modified": "Mon, 2017-02-27 21:21:58",
             "location": "/home/user/repository"
         },
-        "files": [
+        "items": [
             {
                 "type": "d",
                 "mode": "drwxr-xr-x",

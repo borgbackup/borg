@@ -1535,17 +1535,17 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         list_archive = json.loads(self.cmd('list', '--json', self.repository_location + '::test'))
         assert list_repo['repository'] == list_archive['repository']
-        files = list_archive['files']
-        assert len(files) == 2
-        file1 = files[1]
+        items = list_archive['items']
+        assert len(items) == 2
+        file1 = items[1]
         assert file1['path'] == 'input/file1'
         assert file1['size'] == 81920
 
         list_archive = json.loads(self.cmd('list', '--json', '--format={sha256}', self.repository_location + '::test'))
         assert list_repo['repository'] == list_archive['repository']
-        files = list_archive['files']
-        assert len(files) == 2
-        file1 = files[1]
+        items = list_archive['items']
+        assert len(items) == 2
+        file1 = items[1]
         assert file1['path'] == 'input/file1'
         assert file1['sha256'] == 'b2915eb69f260d8d3c25249195f2c8f4f716ea82ec760ae929732c0262442b2b'
 

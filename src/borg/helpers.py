@@ -1617,11 +1617,13 @@ class ArchiveFormatter(BaseFormatter):
 
     def get_item_data(self, archive):
         return {
+            # *name* is the key used by borg-info for the archive name, this makes the formats more compatible
             'name': remove_surrogates(archive.name),
             'barchive': archive.name,
             'archive': remove_surrogates(archive.name),
             'id': bin_to_hex(archive.id),
             'time': format_time(to_localtime(archive.ts)),
+            # *start* is the key used by borg-info for this timestamp, this makes the formats more compatible
             'start': format_time(to_localtime(archive.ts)),
         }
 
@@ -1726,7 +1728,7 @@ class ItemFormatter(BaseFormatter):
         begin = json_dump(basic_json_data(self.archive.manifest))
         begin, _, _ = begin.rpartition('\n}')  # remove last closing brace, we want to extend the object
         begin += ',\n'
-        begin += '    "files": [\n'
+        begin += '    "items": [\n'
         return begin
 
     def end(self):

@@ -82,7 +82,7 @@ class IntegrityError(ErrorWithTraceback):
 
 
 class DecompressionError(IntegrityError):
-    """Decompressor reported a data format error"""
+    """Decompression error: {}"""
 
 
 class ExtensionModuleError(Error):

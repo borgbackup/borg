@@ -31,8 +31,7 @@ DEFAULT_MAX_SEGMENT_SIZE = 500 * 1024 * 1024
 # the header, and the total size was set to 20 MiB).
 MAX_DATA_SIZE = 20971479
 
-# A few hundred files per directory to go easy on filesystems which don't like too many files per dir (NTFS)
-DEFAULT_SEGMENTS_PER_DIR = 500
+DEFAULT_SEGMENTS_PER_DIR = 2000
 
 CHUNK_MIN_EXP = 19  # 2**19 == 512kiB
 CHUNK_MAX_EXP = 23  # 2**23 == 8MiB

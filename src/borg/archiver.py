@@ -1888,7 +1888,7 @@ class Archiver:
         common_group.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=UMASK_DEFAULT, metavar='M',
                                   help='set umask to M (local and remote, default: %(default)04o)')
         common_group.add_argument('--remote-path', dest='remote_path', metavar='PATH',
-                                  help='set remote path to executable (default: "borg")')
+                                  help='use PATH as borg executable on the remote (default: "borg")')
         common_group.add_argument('--remote-ratelimit', dest='remote_ratelimit', type=int, metavar='rate',
                                   help='set remote network upload rate limit in kiByte/s (default: 0=unlimited)')
         common_group.add_argument('--consider-part-files', dest='consider_part_files',

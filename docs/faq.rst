@@ -108,6 +108,9 @@ Are there other known limitations?
   An easy workaround is to create multiple archives with less items each.
   See also the :ref:`archive_limitation` and :issue:`1452`.
 
+  :ref:`borg_info` shows how large (relative to the maximum size) existing
+  archives are.
+
 Why is my backup bigger than with attic?
 ----------------------------------------
 
@@ -186,6 +189,46 @@ Yes, if you want to detect accidental data damage (like bit rot), use the
 If you want to be able to detect malicious tampering also, use an encrypted
 repo. It will then be able to check using CRCs and HMACs.
 
+.. _faq-integrityerror:
+
+I get an IntegrityError or similar - what now?
+----------------------------------------------
+
+The first step should be to check whether it's a problem with the disk drive,
+IntegrityErrors can be a sign of drive failure or other hardware issues.
+
+Using the smartmontools one can retrieve self-diagnostics of the drive in question
+(where the repository is located, use *findmnt*, *mount* or *lsblk* to find the
+*/dev/...* path of the drive)::
+
+    # smartctl -a /dev/sdSomething
+
+Attributes that are a typical cause of data corruption are *Offline_Uncorrectable*,
+*Current_Pending_Sector*, *Reported_Uncorrect*. A high *UDMA_CRC_Error_Count* usually
+indicates a bad cable. If the *entire drive* is failing, then all data should be copied
+off it as soon as possible.
+
+Some drives log IO errors, which are also logged by the system (refer to the journal/dmesg).
+IO errors that impact only the filesystem can go unnoticed, since they are not reported
+to applications (e.g. Borg), but can still corrupt data.
+
+If any of these are suspicious, a self-test is recommended::
+
+    # smartctl -t long /dev/sdSomething
+
+Running ``fsck`` if not done already might yield further insights.
+
+:ref:`borg_check` provides diagnostics and ``--repair`` options for repositories with
+issues. We recommend to first run without ``--repair`` to assess the situation and
+if the found issues / proposed repairs sound right re-run it with ``--repair`` enabled.
+
+When errors are intermittent the cause might be bad memory, running memtest86+ or a similar
+test is recommended.
+
+A single error does not indicate bad hardware or a Borg bug -- all hardware has a certain
+bit error rate (BER), for hard drives this is typically specified as less than one error
+every 12 to 120 TB (one bit error in 10e14 to 10e15 bits) and often called
+*unrecoverable read error rate* (URE rate).
 
 Security
 ########

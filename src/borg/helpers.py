@@ -1617,6 +1617,10 @@ class ItemFormatter(BaseFormatter):
         ('health', )
     )
 
+    KEYS_REQUIRING_CACHE = (
+        'dsize', 'dcsize', 'unique_chunks',
+    )
+
     @classmethod
     def available_keys(cls):
         class FakeArchive:
@@ -1647,6 +1651,11 @@ class ItemFormatter(BaseFormatter):
             help.append("")
         assert not keys, str(keys)
         return "\n".join(help)
+
+    @classmethod
+    def format_needs_cache(cls, format):
+        format_keys = {f[1] for f in Formatter().parse(format)}
+        return any(key in cls.KEYS_REQUIRING_CACHE for key in format_keys)
 
     def __init__(self, archive, format, *, json=False):
         self.archive = archive

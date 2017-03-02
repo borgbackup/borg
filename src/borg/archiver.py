@@ -1032,21 +1032,30 @@ class Archiver:
 
     def _list_archive(self, args, repository, manifest, key, write):
         matcher, _ = self.build_matcher(args.patterns, args.paths)
-        with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
+        if args.format is not None:
+            format = args.format
+        elif args.short:
+            format = "{path}{NL}"
+        else:
+            format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
+
+        def _list_inner(cache):
             archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                               consider_part_files=args.consider_part_files)
-            if args.format is not None:
-                format = args.format
-            elif args.short:
-                format = "{path}{NL}"
-            else:
-                format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
 
             formatter = ItemFormatter(archive, format, json=args.json)
             write(safe_encode(formatter.begin()))
             for item in archive.iter_items(lambda item: matcher.match(item.path)):
                 write(safe_encode(formatter.format_item(item)))
             write(safe_encode(formatter.end()))
+
+        # Only load the cache if it will be used
+        if ItemFormatter.format_needs_cache(format):
+            with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
+                _list_inner(cache)
+        else:
+            _list_inner(cache=None)
+
         return self.exit_code
 
     def _list_repository(self, args, manifest, write):

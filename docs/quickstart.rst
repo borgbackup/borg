@@ -57,34 +57,95 @@ Also helpful:
 Automating backups
 ------------------
 
-The following example script backs up ``/home`` and ``/var/www`` to a remote
-server. The script also uses the :ref:`borg_prune` subcommand to maintain a
-certain number of old archives:
+The following example script is meant to be run daily by the ``root`` user on
+different local machines. It backs up a machine's important files (but not the
+complete operating system) to a repository ``~/backup/main``  on a remote server.
+Some files which aren't necessarily needed in this backup are excluded. See
+:ref:`borg_patterns` on how to add more exclude options.
 
-::
+After the backup this script also uses the :ref:`borg_prune` subcommand to keep
+only a certain number of old archives and deletes the others in order to preserve
+disk space.
 
-    #!/bin/sh
-    # setting this, so the repo does not need to be given on the commandline:
-    export BORG_REPO=username@remoteserver.com:backup
+Before running, make sure that the repository is initialized as documented in
+:ref:`remote_repos` and that the script has the correct permissions to be executable
+by the root user, but not executable or readable by anyone else, i.e. root:root 0700.
 
-    # setting this, so you won't be asked for your passphrase - make sure the
-    # script has appropriate owner/group and mode, e.g. root.root 600:
-    export BORG_PASSPHRASE=mysecret
+You can use this script as a starting point and modify it where it's necessary to fit
+your setup.
 
-    # Backup most important stuff:
-    borg create --stats -C lz4 ::'{hostname}-{now:%Y-%m-%d}' \
-        /etc                                                 \
-        /home                                                \
-        /var                                                 \
-        --exclude '/home/*/.cache'                           \
-        --exclude '*.pyc'
+Do not forget to test your created backups to make sure everything you need is being
+backed up and that the ``prune`` command is keeping and deleting the correct backups.
 
-    # Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
-    # archives of THIS machine. The '{hostname}-' prefix is very important to
-    # limit prune's operation to this machine's archives and not apply to
-    # other machine's archives also.
-    borg prune --list $REPOSITORY --prefix '{hostname}-' \
-        --keep-daily=7 --keep-weekly=4 --keep-monthly=6
+
+    ::
+        #!/bin/sh
+
+        # Setting this, so the repo does not need to be given on the commandline:
+        export BORG_REPO=ssh://username@example.com:2022/~/backup/main
+
+        # Setting this, so you won't be asked for your repository passphrase:
+        export BORG_PASSPHRASE='XYZl0ngandsecurepa_55_phrasea&&123'
+
+        # some helpers and error handling:
+        function info  () { echo -e "\n"`date` $@"\n" >&2; }
+        trap "echo `date` Backup interrupted >&2; exit 2" SIGINT SIGTERM
+
+        info "Starting backup"
+
+        # Backup the most important directories into an archive named after
+        # the machine this script is currently running on:
+
+        borg create                         \
+            --verbose                       \
+            --filter AME                    \
+            --list                          \
+            --stats                         \
+            --show-rc                       \
+            --compression lz4               \
+            --exclude-caches                \
+            --exclude '/home/*/.cache/*'    \
+            --exclude '/var/cache/*'        \
+            --exclude '/var/tmp/*'          \
+                                            \
+            ::'{hostname}-{now}'            \
+            /etc                            \
+            /home                           \
+            /root                           \
+            /var                            \
+
+        backup_exit=$?
+
+        info "Pruning repository"
+
+        # Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
+        # archives of THIS machine. The '{hostname}-' prefix is very important to
+        # limit prune's operation to this machine's archives and not apply to
+        # other machines' archives also:
+
+        borg prune                          \
+            --list                          \
+            --prefix '{hostname}-'          \
+            --show-rc                       \
+            --keep-daily    7               \
+            --keep-weekly   4               \
+            --keep-monthly  6               \
+
+        prune_exit=$?
+
+        global_exit=$(( ${backup_exit} >  ${prune_exit} ? ${backup_exit} : ${prune_exit} ))
+
+        if [ ${global_exit} -eq 1 ];
+        then
+            info "Backup and/or Prune finished with a warning"
+        fi
+
+        if [ ${global_exit} -gt 1 ];
+        then
+            info "Backup and/or Prune finished with an error"
+        fi
+
+        exit ${global_exit}
 
 Pitfalls with shell variables and environment variables
 -------------------------------------------------------

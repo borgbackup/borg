@@ -77,75 +77,75 @@ your setup.
 Do not forget to test your created backups to make sure everything you need is being
 backed up and that the ``prune`` command is keeping and deleting the correct backups.
 
+::
 
-    ::
-        #!/bin/sh
+    #!/bin/sh
 
-        # Setting this, so the repo does not need to be given on the commandline:
-        export BORG_REPO=ssh://username@example.com:2022/~/backup/main
+    # Setting this, so the repo does not need to be given on the commandline:
+    export BORG_REPO=ssh://username@example.com:2022/~/backup/main
 
-        # Setting this, so you won't be asked for your repository passphrase:
-        export BORG_PASSPHRASE='XYZl0ngandsecurepa_55_phrasea&&123'
+    # Setting this, so you won't be asked for your repository passphrase:
+    export BORG_PASSPHRASE='XYZl0ngandsecurepa_55_phrasea&&123'
 
-        # some helpers and error handling:
-        function info  () { echo -e "\n"`date` $@"\n" >&2; }
-        trap "echo `date` Backup interrupted >&2; exit 2" SIGINT SIGTERM
+    # some helpers and error handling:
+    function info  () { echo -e "\n"`date` $@"\n" >&2; }
+    trap "echo `date` Backup interrupted >&2; exit 2" SIGINT SIGTERM
 
-        info "Starting backup"
+    info "Starting backup"
 
-        # Backup the most important directories into an archive named after
-        # the machine this script is currently running on:
+    # Backup the most important directories into an archive named after
+    # the machine this script is currently running on:
 
-        borg create                         \
-            --verbose                       \
-            --filter AME                    \
-            --list                          \
-            --stats                         \
-            --show-rc                       \
-            --compression lz4               \
-            --exclude-caches                \
-            --exclude '/home/*/.cache/*'    \
-            --exclude '/var/cache/*'        \
-            --exclude '/var/tmp/*'          \
-                                            \
-            ::'{hostname}-{now}'            \
-            /etc                            \
-            /home                           \
-            /root                           \
-            /var                            \
+    borg create                         \
+        --verbose                       \
+        --filter AME                    \
+        --list                          \
+        --stats                         \
+        --show-rc                       \
+        --compression lz4               \
+        --exclude-caches                \
+        --exclude '/home/*/.cache/*'    \
+        --exclude '/var/cache/*'        \
+        --exclude '/var/tmp/*'          \
+                                        \
+        ::'{hostname}-{now}'            \
+        /etc                            \
+        /home                           \
+        /root                           \
+        /var                            \
 
-        backup_exit=$?
+    backup_exit=$?
 
-        info "Pruning repository"
+    info "Pruning repository"
 
-        # Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
-        # archives of THIS machine. The '{hostname}-' prefix is very important to
-        # limit prune's operation to this machine's archives and not apply to
-        # other machines' archives also:
+    # Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
+    # archives of THIS machine. The '{hostname}-' prefix is very important to
+    # limit prune's operation to this machine's archives and not apply to
+    # other machines' archives also:
 
-        borg prune                          \
-            --list                          \
-            --prefix '{hostname}-'          \
-            --show-rc                       \
-            --keep-daily    7               \
-            --keep-weekly   4               \
-            --keep-monthly  6               \
+    borg prune                          \
+        --list                          \
+        --prefix '{hostname}-'          \
+        --show-rc                       \
+        --keep-daily    7               \
+        --keep-weekly   4               \
+        --keep-monthly  6               \
 
-        prune_exit=$?
+    prune_exit=$?
 
-        global_exit=$(( ${backup_exit} >  ${prune_exit} ? ${backup_exit} : ${prune_exit} ))
+    global_exit=$(( ${backup_exit} >  ${prune_exit} ? ${backup_exit} : ${prune_exit} ))
 
-        if [ ${global_exit} -eq 1 ];
-        then
-            info "Backup and/or Prune finished with a warning"
-        fi
+    if [ ${global_exit} -eq 1 ];
+    then
+        info "Backup and/or Prune finished with a warning"
+    fi
 
-        if [ ${global_exit} -gt 1 ];
-        then
-            info "Backup and/or Prune finished with an error"
-        fi
+    if [ ${global_exit} -gt 1 ];
+    then
+        info "Backup and/or Prune finished with an error"
+    fi
 
-        exit ${global_exit}
+    exit ${global_exit}
 
 Pitfalls with shell variables and environment variables
 -------------------------------------------------------

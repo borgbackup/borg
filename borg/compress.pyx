@@ -4,7 +4,9 @@ try:
 except ImportError:
     lzma = None
 
-from .helpers import Buffer
+from .helpers import Buffer, DecompressionError
+
+API_VERSION = '1.0_01'
 
 cdef extern from "lz4.h":
     int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
@@ -110,7 +112,7 @@ class LZ4(CompressorBase):
                 break
             if osize > 2 ** 30:
                 # this is insane, get out of here
-                raise Exception('lz4 decompress failed')
+                raise DecompressionError('lz4 decompress failed')
             # likely the buffer was too small, get a bigger one:
             osize = int(1.5 * osize)
         return dest[:rsize]
@@ -136,7 +138,10 @@ class LZMA(CompressorBase):
 
     def decompress(self, data):
         data = super().decompress(data)
-        return lzma.decompress(data)
+        try:
+            return lzma.decompress(data)
+        except lzma.LZMAError as e:
+            raise DecompressionError(str(e)) from None
 
 
 class ZLIB(CompressorBase):
@@ -165,7 +170,10 @@ class ZLIB(CompressorBase):
 
     def decompress(self, data):
         # note: for compatibility no super call, do not strip ID bytes
-        return zlib.decompress(data)
+        try:
+            return zlib.decompress(data)
+        except zlib.error as e:
+            raise DecompressionError(str(e)) from None
 
 
 COMPRESSOR_TABLE = {

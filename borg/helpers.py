@@ -74,6 +74,10 @@ class IntegrityError(ErrorWithTraceback):
     """Data integrity error: {}"""
 
 
+class DecompressionError(IntegrityError):
+    """Decompression error: {}"""
+
+
 class ExtensionModuleError(Error):
     """The Borg binary extension modules do not seem to be properly installed"""
 
@@ -87,10 +91,12 @@ class PlaceholderError(Error):
 
 
 def check_extension_modules():
-    from . import platform
+    from . import platform, compress
     if hashindex.API_VERSION != '1.0_01':
         raise ExtensionModuleError
     if chunker.API_VERSION != '1.0_01':
+        raise ExtensionModuleError
+    if compress.API_VERSION != '1.0_01':
         raise ExtensionModuleError
     if crypto.API_VERSION != '1.0_01':
         raise ExtensionModuleError

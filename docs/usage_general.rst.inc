@@ -117,6 +117,7 @@ Borg can exit with the following return codes (rc):
 If you use ``--show-rc``, the return code is also logged at the indicated
 level as the last log entry.
 
+.. _env_vars:
 
 Environment Variables
 ~~~~~~~~~~~~~~~~~~~~~

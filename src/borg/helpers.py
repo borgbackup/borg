@@ -1307,7 +1307,8 @@ DEFAULTISH = ('Default', 'DEFAULT', 'default', 'D', 'd', '', )
 def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
         retry_msg=None, invalid_msg=None, env_msg='{} (from {})',
         falsish=FALSISH, truish=TRUISH, defaultish=DEFAULTISH,
-        default=False, retry=True, env_var_override=None, ofile=None, input=input, prompt=True):
+        default=False, retry=True, env_var_override=None, ofile=None, input=input, prompt=True,
+        msgid=None):
     """Output <msg> (usually a question) and let user input an answer.
     Qualifies the answer according to falsish, truish and defaultish as True, False or <default>.
     If it didn't qualify and retry is False (no retries wanted), return the default [which
@@ -1337,6 +1338,23 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
     :param input: input function [input from builtins]
     :return: boolean answer value, True or False
     """
+    def output(msg, msg_type, is_prompt=False, **kwargs):
+        json_output = getattr(logging.getLogger('borg'), 'json', False)
+        if json_output:
+            kwargs.update(dict(
+                type='question_%s' % msg_type,
+                msgid=msgid,
+                message=msg,
+                is_prompt=is_prompt,
+            ))
+            print(json.dumps(kwargs), file=sys.stderr)
+        else:
+            if is_prompt:
+                print(msg, file=ofile, end='', flush=True)
+            else:
+                print(msg, file=ofile)
+
+    msgid = msgid or env_var_override
     # note: we do not assign sys.stderr as default above, so it is
     # really evaluated NOW,  not at function definition time.
     if ofile is None:
@@ -1344,13 +1362,13 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
     if default not in (True, False):
         raise ValueError("invalid default value, must be True or False")
     if msg:
-        print(msg, file=ofile, end='', flush=True)
+        output(msg, 'prompt', is_prompt=True)
     while True:
         answer = None
         if env_var_override:
             answer = os.environ.get(env_var_override)
             if answer is not None and env_msg:
-                print(env_msg.format(answer, env_var_override), file=ofile)
+                output(env_msg.format(answer, env_var_override), 'env_answer', env_var=env_var_override)
         if answer is None:
             if not prompt:
                 return default
@@ -1361,23 +1379,23 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
                 answer = truish[0] if default else falsish[0]
         if answer in defaultish:
             if default_msg:
-                print(default_msg, file=ofile)
+                output(default_msg, 'accepted_default')
             return default
         if answer in truish:
             if true_msg:
-                print(true_msg, file=ofile)
+                output(true_msg, 'accepted_true')
             return True
         if answer in falsish:
             if false_msg:
-                print(false_msg, file=ofile)
+                output(false_msg, 'accepted_false')
             return False
         # if we get here, the answer was invalid
         if invalid_msg:
-            print(invalid_msg, file=ofile)
+            output(invalid_msg, 'invalid_answer')
         if not retry:
             return default
         if retry_msg:
-            print(retry_msg, file=ofile, end='', flush=True)
+            output(retry_msg, 'prompt_retry', is_prompt=True)
         # in case we used an environment variable and it gave an invalid answer, do not use it again:
         env_var_override = None
 

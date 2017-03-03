@@ -47,7 +47,7 @@ progress_message
     operation
         unique, opaque integer ID of the operation
     :ref:`msgid <msgid>`
-        Message ID of the operation (may be *none*)
+        Message ID of the operation (may be *null*)
     finished
         boolean indicating whether the operation has finished, only the last object for an *operation*
         can have this property set to *true*.
@@ -60,7 +60,7 @@ progress_percent
     operation
         unique, opaque integer ID of the operation
     :ref:`msgid <msgid>`
-        Message ID of the operation (may be *none*)
+        Message ID of the operation (may be *null*)
     finished
         boolean indicating whether the operation has finished, only the last object for an *operation*
         can have this property set to *true*.
@@ -69,7 +69,7 @@ progress_percent
     current
         Current value (always less-or-equal to *total*)
     info
-        Array that describes the current item, may be *none*, contents depend on *msgid*
+        Array that describes the current item, may be *null*, contents depend on *msgid*
     total
         Total value
 
@@ -94,7 +94,7 @@ log_message
     message
         Formatted log message
     :ref:`msgid <msgid>`
-        Message ID, may be *none* or absent
+        Message ID, may be *null* or absent
 
 See Prompts_ for the types used by prompts.
 

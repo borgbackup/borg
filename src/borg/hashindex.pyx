@@ -7,6 +7,8 @@ cimport cython
 from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
 from libc.errno cimport errno
 from cpython.exc cimport PyErr_SetFromErrnoWithFilename
+from cpython.bytes cimport PyBytes_AS_STRING
+
 
 API_VERSION = '1.1_01'
 
@@ -27,6 +29,10 @@ cdef extern from "_hashindex.c":
     int hashindex_set(HashIndex *index, void *key, void *value)
     uint32_t _htole32(uint32_t v)
     uint32_t _le32toh(uint32_t v)
+    void benchmark_getitem(HashIndex *index, char *keys, int key_count)
+    void benchmark_setitem(HashIndex *index, char *keys, int key_count)
+    void benchmark_delete(HashIndex *index, char *keys, int key_count)
+    void benchmark_churn(HashIndex *index, char *keys, int key_count)
 
     double HASH_MAX_LOAD
 
@@ -374,3 +380,20 @@ cdef class ChunkKeyIterator:
         cdef uint32_t refcount = _le32toh(value[0])
         assert refcount <= _MAX_VALUE, "invalid reference count"
         return (<char *>self.key)[:self.key_size], ChunkIndexEntry(refcount, _le32toh(value[1]), _le32toh(value[2]))
+
+
+def bench_getitem(ChunkIndex chunk_index, bytes keys):
+    cdef key_count = len(keys) // chunk_index.key_size
+    benchmark_getitem(chunk_index.index, PyBytes_AS_STRING(keys), key_count)
+
+def bench_setitem(ChunkIndex chunk_index, bytes keys):
+    cdef key_count = len(keys) // chunk_index.key_size
+    benchmark_setitem(chunk_index.index, PyBytes_AS_STRING(keys), key_count)
+
+def bench_delete(ChunkIndex chunk_index, bytes keys):
+    cdef key_count = len(keys) // chunk_index.key_size
+    benchmark_delete(chunk_index.index, PyBytes_AS_STRING(keys), key_count)
+
+def bench_churn(ChunkIndex chunk_index, bytes keys):
+    cdef key_count = len(keys) // chunk_index.key_size
+    benchmark_churn(chunk_index.index, PyBytes_AS_STRING(keys), key_count)

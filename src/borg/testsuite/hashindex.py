@@ -57,11 +57,11 @@ class HashIndexTestCase(BaseTestCase):
 
     def test_nsindex(self):
         self._generic_test(NSIndex, lambda x: (x, x),
-                           'b96ec1ddabb4278cc92261ee171f7efc979dc19397cc5e89b778f05fa25bf93f')
+                           'b0025c6246bce1fc098371bb99f537b9bea50294d34e265dc4657876c3ffe083')
 
     def test_chunkindex(self):
         self._generic_test(ChunkIndex, lambda x: (x, x, x),
-                           '9d437a1e145beccc790c69e66ba94fc17bd982d83a401c9c6e524609405529d8')
+                           'a110e776a2632864ceadcaf9144f2705887167c852caa069c4f792e0d033e9e6')
 
     def test_resize(self):
         n = 2000  # Must be >= MIN_BUCKETS
@@ -123,6 +123,48 @@ class HashIndexTestCase(BaseTestCase):
         assert unique_csize == 100 + 200 + 300
         assert chunks == 1 + 2 + 3
         assert unique_chunks == 3
+
+
+class HashIndexExtraTestCase(BaseTestCase):
+    """These tests are separate because they should not become part of the selftest
+    """
+    def test_chunk_indexer(self):
+        # max_key is chosen so that when the deleted_keys get added we're close to max fill rate
+        # but never trigger a resize
+        max_key = int(1031 * (0.99*(2./3.)))
+        index = ChunkIndex(max_key)
+        deleted_keys = [
+            hashlib.sha256(H(k)).digest()
+            for k in range(-1, -int(max_key/3), -1)]
+        print(max_key + len(deleted_keys))
+        keys = [hashlib.sha256(H(k)).digest() for k in range(max_key)]
+        for i, key in enumerate(keys):
+            index[key] = (i, i, i)
+        for i, key in enumerate(deleted_keys):
+            index[key] = (i, i, i)
+        for key in deleted_keys:
+            del index[key]
+
+        missing, undeleted, wrong_value = 0, 0, 0
+        for i, key in enumerate(keys):
+            val = index.get(key)
+            if val != (i, i, i):
+                if val is None:
+                    missing += 1
+                else:
+                    wrong_value += 1
+        for i, key in enumerate(deleted_keys):
+            if index.get(key) is not None:
+                undeleted += 1
+            index[key] = (i, i, i)
+        for i, key in enumerate(deleted_keys):
+            val = index.get(key)
+            if val != (i, i, i):
+                if val is None:
+                    missing += 1
+                else:
+                    wrong_value += 1
+        assert (missing, undeleted, wrong_value) == (0, 0, 0)
 
 
 class HashIndexSizeTestCase(BaseTestCase):

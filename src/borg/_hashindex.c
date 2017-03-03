@@ -47,11 +47,13 @@ typedef struct {
     void *buckets;
     int num_entries;
     int num_buckets;
+    int num_empty;
     int key_size;
     int value_size;
     off_t bucket_size;
     int lower_limit;
     int upper_limit;
+    int min_empty;
 } HashIndex;
 
 /* prime (or w/ big prime factors) hash table sizes
@@ -77,6 +79,7 @@ static int hash_sizes[] = {
 
 #define HASH_MIN_LOAD .25
 #define HASH_MAX_LOAD .75  /* don't go higher than 0.75, otherwise performance severely suffers! */
+#define HASH_MAX_EFF_LOAD .93
 
 #define MAX(x, y) ((x) > (y) ? (x): (y))
 #define NELEMS(x) (sizeof(x) / sizeof((x)[0]))
@@ -171,8 +174,10 @@ hashindex_resize(HashIndex *index, int capacity)
     free(index->buckets);
     index->buckets = new->buckets;
     index->num_buckets = new->num_buckets;
+    index->num_empty = index->num_buckets - index->num_entries;
     index->lower_limit = new->lower_limit;
     index->upper_limit = new->upper_limit;
+    index->min_empty = new->min_empty;
     free(new);
     return 1;
 }
@@ -189,6 +194,11 @@ int get_upper_limit(int num_buckets){
     if (num_buckets >= max_buckets)
         return num_buckets;
     return (int)(num_buckets * HASH_MAX_LOAD);
+}
+
+int get_min_empty(int num_buckets){
+    /* Differently from load, the effective load also considers tombstones (deleted buckets). */
+    return (int)(num_buckets * (1.0 - HASH_MAX_EFF_LOAD));
 }
 
 int size_idx(int size){
@@ -222,6 +232,19 @@ int shrink_size(int current){
     if (i < 0)
         return hash_sizes[0];
     return hash_sizes[i];
+}
+
+int
+count_empty(HashIndex *index)
+{   /* count empty (never used) buckets. this does NOT include deleted buckets (tombstones).
+     * TODO: if we ever change HashHeader, save the count there so we do not need this function.
+     */
+    int i, count = 0, capacity = index->num_buckets;
+    for(i = 0; i < capacity; i++) {
+        if(BUCKET_IS_EMPTY(index, i))
+            count++;
+    }
+    return count;
 }
 
 /* Public API */
@@ -303,6 +326,17 @@ hashindex_read(const char *path)
     index->bucket_size = index->key_size + index->value_size;
     index->lower_limit = get_lower_limit(index->num_buckets);
     index->upper_limit = get_upper_limit(index->num_buckets);
+    index->min_empty = get_min_empty(index->num_buckets);
+    index->num_empty = count_empty(index);
+    if(index->num_empty < index->min_empty) {
+        /* too many tombstones here / not enough empty buckets, do a same-size rebuild */
+        if(!hashindex_resize(index, index->num_buckets)) {
+            free(index->buckets);
+            free(index);
+            index = NULL;
+            goto fail;
+        }
+    }
 fail:
     if(fclose(fd) < 0) {
         EPRINTF_PATH(path, "fclose failed");
@@ -330,9 +364,11 @@ hashindex_init(int capacity, int key_size, int value_size)
     index->key_size = key_size;
     index->value_size = value_size;
     index->num_buckets = capacity;
+    index->num_empty = capacity;
     index->bucket_size = index->key_size + index->value_size;
     index->lower_limit = get_lower_limit(index->num_buckets);
     index->upper_limit = get_upper_limit(index->num_buckets);
+    index->min_empty = get_min_empty(index->num_buckets);
     for(i = 0; i < capacity; i++) {
         BUCKET_MARK_EMPTY(index, i);
     }
@@ -405,6 +441,15 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
         idx = start_idx;
         while(!BUCKET_IS_EMPTY(index, idx) && !BUCKET_IS_DELETED(index, idx)) {
             idx = (idx + 1) % index->num_buckets;
+        }
+        if(BUCKET_IS_EMPTY(index, idx)){
+            index->num_empty--;
+            if(index->num_empty < index->min_empty) {
+                /* too many tombstones here / not enough empty buckets, do a same-size rebuild */
+                if(!hashindex_resize(index, index->num_buckets)) {
+                    return 0;
+                }
+            }
         }
         ptr = BUCKET_ADDR(index, idx);
         memcpy(ptr, key, index->key_size);

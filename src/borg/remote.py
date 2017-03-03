@@ -636,6 +636,12 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 opts.append('--critical')
             else:
                 raise ValueError('log level missing, fix this code')
+            try:
+                borg_logger = logging.getLogger('borg')
+                if borg_logger.json:
+                    opts.append('--log-json')
+            except AttributeError:
+                pass
         env_vars = []
         if yes(env_var_override='BORG_HOSTNAME_IS_UNIQUE', env_msg=None, prompt=False):
             env_vars.append('BORG_HOSTNAME_IS_UNIQUE=yes')

@@ -734,7 +734,7 @@ Utilization of max. archive size: {csize_max:.0%}
         try:
             unpacker = msgpack.Unpacker(use_list=False)
             items_ids = self.metadata.items
-            pi = ProgressIndicatorPercent(total=len(items_ids), msg="Decrementing references %3.0f%%")
+            pi = ProgressIndicatorPercent(total=len(items_ids), msg="Decrementing references %3.0f%%", msgid='archive.delete')
             for (i, (items_id, data)) in enumerate(zip(items_ids, self.repository.get_many(items_ids))):
                 if progress:
                     pi.show(i)
@@ -1153,7 +1153,8 @@ class ArchiveChecker:
         chunks_count_segments = 0
         errors = 0
         defect_chunks = []
-        pi = ProgressIndicatorPercent(total=chunks_count_index, msg="Verifying data %6.2f%%", step=0.01)
+        pi = ProgressIndicatorPercent(total=chunks_count_index, msg="Verifying data %6.2f%%", step=0.01,
+                                      msgid='check.verify_data')
         marker = None
         while True:
             chunk_ids = self.repository.scan(limit=100, marker=marker)

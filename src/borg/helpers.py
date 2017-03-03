@@ -1377,10 +1377,22 @@ def ellipsis_truncate(msg, space):
 
 class ProgressIndicatorBase:
     LOGGER = 'borg.output.progress'
+    JSON_TYPE = None
+    json = False
 
-    def __init__(self):
+    operation_id_counter = 0
+
+    @classmethod
+    def operation_id(cls):
+        """Unique number, can be used by receiving applications to distinguish different operations."""
+        cls.operation_id_counter += 1
+        return cls.operation_id_counter
+
+    def __init__(self, msgid=None):
         self.handler = None
         self.logger = logging.getLogger(self.LOGGER)
+        self.id = self.operation_id()
+        self.msgid = msgid
 
         # If there are no handlers, set one up explicitly because the
         # terminator and propagation needs to be set.  If there are,
@@ -1394,6 +1406,7 @@ class ProgressIndicatorBase:
             try:
                 formatter = logger.formatter
                 terminator = '\n' if logger.json else '\r'
+                self.json = logger.json
             except AttributeError:
                 terminator = '\r'
             else:
@@ -1404,11 +1417,30 @@ class ProgressIndicatorBase:
             if self.logger.level == logging.NOTSET:
                 self.logger.setLevel(logging.WARN)
             self.logger.propagate = False
+        self.emit = self.logger.getEffectiveLevel() == logging.INFO
 
     def __del__(self):
         if self.handler is not None:
             self.logger.removeHandler(self.handler)
             self.handler.close()
+
+    def output_json(self, *, finished=False, **kwargs):
+        assert self.json
+        if not self.emit:
+            return
+        kwargs.update(dict(
+            operation=self.id,
+            msgid=self.msgid,
+            type=self.JSON_TYPE,
+            finished=finished
+        ))
+        print(json.dumps(kwargs), file=sys.stderr)
+
+    def finish(self):
+        if self.json:
+            self.output_json(finished=True)
+        else:
+            self.output('')
 
 
 def justify_to_terminal_size(message):
@@ -1420,15 +1452,19 @@ def justify_to_terminal_size(message):
 
 
 class ProgressIndicatorMessage(ProgressIndicatorBase):
-    def output(self, msg):
-        self.logger.info(justify_to_terminal_size(msg))
+    JSON_TYPE = 'progress_message'
 
-    def finish(self):
-        self.output('')
+    def output(self, msg):
+        if self.json:
+            self.output_json(message=msg)
+        else:
+            self.logger.info(justify_to_terminal_size(msg))
 
 
 class ProgressIndicatorPercent(ProgressIndicatorBase):
-    def __init__(self, total=0, step=5, start=0, msg="%3.0f%%"):
+    JSON_TYPE = 'progress_percent'
+
+    def __init__(self, total=0, step=5, start=0, msg="%3.0f%%", msgid=None):
         """
         Percentage-based progress indicator
 
@@ -1443,7 +1479,7 @@ class ProgressIndicatorPercent(ProgressIndicatorBase):
         self.step = step
         self.msg = msg
 
-        super().__init__()
+        super().__init__(msgid=msgid)
 
     def progress(self, current=None, increase=1):
         if current is not None:
@@ -1466,22 +1502,23 @@ class ProgressIndicatorPercent(ProgressIndicatorBase):
         if pct is not None:
             # truncate the last argument, if no space is available
             if info is not None:
-                # no need to truncate if we're not outputing to a terminal
-                terminal_space = get_terminal_size(fallback=(-1, -1))[0]
-                if terminal_space != -1:
-                    space = terminal_space - len(self.msg % tuple([pct] + info[:-1] + ['']))
-                    info[-1] = ellipsis_truncate(info[-1], space)
-                return self.output(self.msg % tuple([pct] + info), justify=False)
+                if not self.json:
+                    # no need to truncate if we're not outputing to a terminal
+                    terminal_space = get_terminal_size(fallback=(-1, -1))[0]
+                    if terminal_space != -1:
+                        space = terminal_space - len(self.msg % tuple([pct] + info[:-1] + ['']))
+                        info[-1] = ellipsis_truncate(info[-1], space)
+                return self.output(self.msg % tuple([pct] + info), justify=False, info=info)
 
             return self.output(self.msg % pct)
 
-    def output(self, message, justify=True):
-        if justify:
-            message = justify_to_terminal_size(message)
-        self.logger.info(message)
-
-    def finish(self):
-        self.output('')
+    def output(self, message, justify=True, info=None):
+        if self.json:
+            self.output_json(message=message, current=self.counter, total=self.total, info=info)
+        else:
+            if justify:
+                message = justify_to_terminal_size(message)
+            self.logger.info(message)
 
 
 class ProgressIndicatorEndless:
@@ -1580,11 +1617,14 @@ class ArchiveFormatter(BaseFormatter):
 
     def get_item_data(self, archive):
         return {
+            # *name* is the key used by borg-info for the archive name, this makes the formats more compatible
             'name': remove_surrogates(archive.name),
             'barchive': archive.name,
             'archive': remove_surrogates(archive.name),
             'id': bin_to_hex(archive.id),
             'time': format_time(to_localtime(archive.ts)),
+            # *start* is the key used by borg-info for this timestamp, this makes the formats more compatible
+            'start': format_time(to_localtime(archive.ts)),
         }
 
     @staticmethod
@@ -1697,7 +1737,7 @@ class ItemFormatter(BaseFormatter):
         begin = json_dump(basic_json_data(self.archive.manifest))
         begin, _, _ = begin.rpartition('\n}')  # remove last closing brace, we want to extend the object
         begin += ',\n'
-        begin += '    "files": [\n'
+        begin += '    "items": [\n'
         return begin
 
     def end(self):

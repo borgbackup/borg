@@ -320,7 +320,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
 
     def begin_txn(self):
         # Initialize transaction snapshot
-        pi = ProgressIndicatorMessage()
+        pi = ProgressIndicatorMessage(msgid='cache.begin_transaction')
         txn_dir = os.path.join(self.path, 'txn.tmp')
         os.mkdir(txn_dir)
         pi.output('Initializing cache transaction: Reading config')
@@ -340,7 +340,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not self.txn_active:
             return
         self.security_manager.save(self.manifest, self.key, self)
-        pi = ProgressIndicatorMessage()
+        pi = ProgressIndicatorMessage(msgid='cache.commit')
         if self.files is not None:
             if self._newest_mtime is None:
                 # was never set because no files were modified/added
@@ -468,7 +468,8 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 chunk_idx = None
                 if self.progress:
                     pi = ProgressIndicatorPercent(total=len(archive_ids), step=0.1,
-                                                  msg='%3.0f%% Syncing chunks cache. Processing archive %s')
+                                                  msg='%3.0f%% Syncing chunks cache. Processing archive %s',
+                                                  msgid='cache.sync')
                 for archive_id in archive_ids:
                     archive_name = lookup_name(archive_id)
                     if self.progress:

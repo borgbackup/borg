@@ -1,5 +1,5 @@
 .. include:: ../global.rst.inc
-.. highlight:: none
+.. highlight:: json
 
 .. _json_output:
 
@@ -22,7 +22,8 @@ where each line is a JSON object. The *type* key of the object determines its ot
 
 Since JSON can only encode text, any string representing a file system path may miss non-text parts.
 
-The following types are in use:
+The following types are in use. Progress information is governed by the usual rules for progress information,
+it is not produced unless ``--progress`` is specified.
 
 archive_progress
     Output during operations creating archives (:ref:`borg_create` and :ref:`borg_recreate`).
@@ -39,6 +40,39 @@ archive_progress
     path
         Current path
 
+progress_message
+    A message-based progress information with no concrete progress information, just a message
+    saying what is currently being worked on.
+
+    operation
+        unique, opaque integer ID of the operation
+    :ref:`msgid <msgid>`
+        Message ID of the operation (may be *none*)
+    finished
+        boolean indicating whether the operation has finished, only the last object for an *operation*
+        can have this property set to *true*.
+    message
+        current progress message (may be empty/absent)
+
+progress_percent
+    Absolute progress information with defined end/total and current value.
+
+    operation
+        unique, opaque integer ID of the operation
+    :ref:`msgid <msgid>`
+        Message ID of the operation (may be *none*)
+    finished
+        boolean indicating whether the operation has finished, only the last object for an *operation*
+        can have this property set to *true*.
+    message
+        A formatted progress message, this will include the percentage and perhaps other information
+    current
+        Current value (always less-or-equal to *total*)
+    info
+        Array that describes the current item, may be *none*, contents depend on *msgid*
+    total
+        Total value
+
 file_status
     This is only output by :ref:`borg_create` and :ref:`borg_recreate` if ``--list`` is specified. The usual
     rules for the file listing applies, including the ``--filter`` option.
@@ -54,11 +88,46 @@ log_message
     created
         Unix timestamp (float)
     levelname
-        Upper-case log level name (also called severity). Defined levels are: DEBUG, INFO, WARNING, CRITICAL
+        Upper-case log level name (also called severity). Defined levels are: DEBUG, INFO, WARNING, ERROR, CRITICAL
     name
         Name of the emitting entity
     message
         Formatted log message
+    :ref:`msgid <msgid>`
+        Message ID, may be *none* or absent
+
+.. rubric:: Examples (reformatted, each object would be on exactly one line)
+
+:ref:`borg_extract` progress::
+
+    {"message": "100.0% Extracting: src/borgbackup.egg-info/entry_points.txt",
+     "current": 13000228, "total": 13004993, "info": ["src/borgbackup.egg-info/entry_points.txt"],
+     "operation": 1, "msgid": "extract", "type": "progress_percent", "finished": false}
+    {"message": "100.0% Extracting: src/borgbackup.egg-info/SOURCES.txt",
+     "current": 13004993, "total": 13004993, "info": ["src/borgbackup.egg-info/SOURCES.txt"],
+     "operation": 1, "msgid": "extract", "type": "progress_percent", "finished": false}
+    {"operation": 1, "msgid": "extract", "type": "progress_percent", "finished": true}
+
+:ref:`borg_create` file listing with progress::
+
+    {"original_size": 0, "compressed_size": 0, "deduplicated_size": 0, "nfiles": 0, "type": "archive_progress", "path": "src"}
+    {"type": "file_status", "status": "U", "path": "src/borgbackup.egg-info/entry_points.txt"}
+    {"type": "file_status", "status": "U", "path": "src/borgbackup.egg-info/SOURCES.txt"}
+    {"type": "file_status", "status": "d", "path": "src/borgbackup.egg-info"}
+    {"type": "file_status", "status": "d", "path": "src"}
+    {"original_size": 13176040, "compressed_size": 11386863, "deduplicated_size": 503, "nfiles": 277, "type": "archive_progress", "path": ""}
+
+Internal transaction progress::
+
+    {"message": "Saving files cache", "operation": 2, "msgid": "cache.commit", "type": "progress_message", "finished": false}
+    {"message": "Saving cache config", "operation": 2, "msgid": "cache.commit", "type": "progress_message", "finished": false}
+    {"message": "Saving chunks cache", "operation": 2, "msgid": "cache.commit", "type": "progress_message", "finished": false}
+    {"operation": 2, "msgid": "cache.commit", "type": "progress_message", "finished": true}
+
+A debug log message::
+
+    {"message": "35 self tests completed in 0.08 seconds",
+     "type": "log_message", "created": 1488278449.5575905, "levelname": "DEBUG", "name": "borg.archiver"}
 
 Standard output
 ---------------
@@ -105,6 +174,31 @@ stats
     unique_csize
         Compressed and encrypted size of all chunks
 
+Example *borg info* output::
+
+    {
+        "cache": {
+            "path": "/home/user/.cache/borg/0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
+            "stats": {
+                "total_chunks": 511533,
+                "total_csize": 17948017540,
+                "total_size": 22635749792,
+                "total_unique_chunks": 54892,
+                "unique_csize": 1920405405,
+                "unique_size": 2449675468
+            }
+        },
+        "encryption": {
+            "mode": "repokey"
+        },
+        "repository": {
+            "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
+            "last_modified": "Mon, 2017-02-27 21:21:58",
+            "location": "/home/user/testrepo"
+        },
+        "security_dir": "/home/user/.config/borg/security/0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23"
+    }
+
 .. rubric:: Archive formats
 
 :ref:`borg_info` uses an extended format for archives, which is more expensive to retrieve, while
@@ -112,12 +206,11 @@ stats
 array under the *archives* key, while :ref:`borg_create` returns a single archive object under the
 *archive* key.
 
-Both formats contain a *name* key with the archive name, and the *id* key with the hexadecimal archive ID.
+Both formats contain a *name* key with the archive name, the *id* key with the hexadecimal archive ID,
+and the *start* key with the start timestamp.
 
- info and create further have:
+*borg info* and *borg create* further have:
 
-start
-    Start timestamp
 end
     End timestamp
 duration
@@ -152,8 +245,219 @@ username
 comment
     Archive comment, if any
 
+Example of a simple archive listing (``borg list --last 1 --json``)::
+
+    {
+        "archives": [
+            {
+                "id": "80cd07219ad725b3c5f665c1dcf119435c4dee1647a560ecac30f8d40221a46a",
+                "name": "host-system-backup-2017-02-27",
+                "start": "Mon, 2017-02-27 21:21:52"
+            }
+        ],
+        "encryption": {
+            "mode": "repokey"
+        },
+        "repository": {
+            "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
+            "last_modified": "Mon, 2017-02-27 21:21:58",
+            "location": "/home/user/repository"
+        }
+    }
+
+The same archive with more information (``borg info --last 1 --json``)::
+
+    {
+        "archives": [
+            {
+                "command_line": [
+                    "/home/user/.local/bin/borg",
+                    "create",
+                    "/home/user/repository",
+                    "..."
+                ],
+                "comment": "",
+                "duration": 5.641542,
+                "end": "Mon, 2017-02-27 21:21:58",
+                "hostname": "host",
+                "id": "80cd07219ad725b3c5f665c1dcf119435c4dee1647a560ecac30f8d40221a46a",
+                "limits": {
+                    "max_archive_size": 0.0001330855110409714
+                },
+                "name": "host-system-backup-2017-02-27",
+                "start": "Mon, 2017-02-27 21:21:52",
+                "stats": {
+                    "compressed_size": 1880961894,
+                    "deduplicated_size": 2791,
+                    "nfiles": 53669,
+                    "original_size": 2400471280
+                },
+                "username": "user"
+            }
+        ],
+        "cache": {
+            "path": "/home/user/.cache/borg/0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
+            "stats": {
+                "total_chunks": 511533,
+                "total_csize": 17948017540,
+                "total_size": 22635749792,
+                "total_unique_chunks": 54892,
+                "unique_csize": 1920405405,
+                "unique_size": 2449675468
+            }
+        },
+        "encryption": {
+            "mode": "repokey"
+        },
+        "repository": {
+            "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
+            "last_modified": "Mon, 2017-02-27 21:21:58",
+            "location": "/home/user/repository"
+        }
+    }
+
 .. rubric:: File listings
 
 Listing the contents of an archive can produce *a lot* of JSON. Each item (file, directory, ...) is described
-by one object in the *files* array of the :ref:`borg_list` output. Refer to the *borg list* documentation for
+by one object in the *items* array of the :ref:`borg_list` output. Refer to the *borg list* documentation for
 the available keys and their meaning.
+
+Example (excerpt)::
+
+    {
+        "encryption": {
+            "mode": "repokey"
+        },
+        "repository": {
+            "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
+            "last_modified": "Mon, 2017-02-27 21:21:58",
+            "location": "/home/user/repository"
+        },
+        "items": [
+            {
+                "type": "d",
+                "mode": "drwxr-xr-x",
+                "user": "user",
+                "group": "user",
+                "uid": 1000,
+                "gid": 1000,
+                "path": "linux",
+                "healthy": true,
+                "source": "",
+                "linktarget": "",
+                "flags": null,
+                "isomtime": "Sat, 2016-05-07 19:46:01",
+                "size": 0
+            }
+        ]
+    }
+
+.. _msgid:
+
+Message IDs
+-----------
+
+Message IDs are strings that essentially give a log message or operation a name, without actually using the
+full text, since texts change more frequently. Message IDs are unambiguous and reduce the need to parse
+log messages.
+
+Assigned message IDs are:
+
+.. See scripts/errorlist.py; this is slightly edited.
+
+Errors
+    Archive.AlreadyExists
+        Archive {} already exists
+    Archive.DoesNotExist
+        Archive {} does not exist
+    Archive.IncompatibleFilesystemEncodingError
+        Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable.
+    Cache.CacheInitAbortedError
+        Cache initialization aborted
+    Cache.EncryptionMethodMismatch
+        Repository encryption method changed since last access, refusing to continue
+    Cache.RepositoryAccessAborted
+        Repository access aborted
+    Cache.RepositoryIDNotUnique
+        Cache is newer than repository - do you have multiple, independently updated repos with same ID?
+    Cache.RepositoryReplay
+        Cache is newer than repository - this is either an attack or unsafe (multiple repos with same ID)
+    Buffer.MemoryLimitExceeded
+        Requested buffer size {} is above the limit of {}.
+    ExtensionModuleError
+        The Borg binary extension modules do not seem to be properly installed
+    IntegrityError
+        Data integrity error: {}
+    NoManifestError
+        Repository has no manifest.
+    PlaceholderError
+        Formatting Error: "{}".format({}): {}({})
+    KeyfileInvalidError
+        Invalid key file for repository {} found in {}.
+    KeyfileMismatchError
+        Mismatch between repository {} and key file {}.
+    KeyfileNotFoundError
+        No key file for repository {} found in {}.
+    PassphraseWrong
+        passphrase supplied in BORG_PASSPHRASE is incorrect
+    PasswordRetriesExceeded
+        exceeded the maximum password retries
+    RepoKeyNotFoundError
+        No key entry found in the config of repository {}.
+    UnsupportedManifestError
+        Unsupported manifest envelope. A newer version is required to access this repository.
+    UnsupportedPayloadError
+        Unsupported payload type {}. A newer version is required to access this repository.
+    NotABorgKeyFile
+        This file is not a borg key backup, aborting.
+    RepoIdMismatch
+        This key backup seems to be for a different backup repository, aborting.
+    UnencryptedRepo
+        Keymanagement not available for unencrypted repositories.
+    UnknownKeyType
+        Keytype {0} is unknown.
+    LockError
+        Failed to acquire the lock {}.
+    LockErrorT
+        Failed to acquire the lock {}.
+    ConnectionClosed
+        Connection closed by remote host
+    InvalidRPCMethod
+        RPC method {} is not valid
+    PathNotAllowed
+        Repository path not allowed
+    RemoteRepository.RPCServerOutdated
+        Borg server is too old for {}. Required version {}
+    UnexpectedRPCDataFormatFromClient
+        Borg {}: Got unexpected RPC data format from client.
+    UnexpectedRPCDataFormatFromServer
+        Got unexpected RPC data format from server:
+        {}
+    Repository.AlreadyExists
+        Repository {} already exists.
+    Repository.CheckNeeded
+        Inconsistency detected. Please run "borg check {}".
+    Repository.DoesNotExist
+        Repository {} does not exist.
+    Repository.InsufficientFreeSpaceError
+        Insufficient free space to complete transaction (required: {}, available: {}).
+    Repository.InvalidRepository
+        {} is not a valid repository. Check repo config.
+    Repository.ObjectNotFound
+        Object with key {} not found in repository {}.
+
+Operations
+    - cache.begin_transaction
+    - cache.commit
+    - cache.sync
+
+      *info* is one string element, the name of the archive currently synced.
+    - repository.compact_segments
+    - repository.replay_segments
+    - repository.check_segments
+    - check.verify_data
+    - extract
+
+      *info* is one string element, the name of the path currently extracted.
+    - extract.permissions
+    - archive.delete

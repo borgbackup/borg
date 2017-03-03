@@ -623,7 +623,7 @@ class Archiver:
 
         filter = self.build_filter(matcher, peek_and_store_hardlink_masters, strip_components)
         if progress:
-            pi = ProgressIndicatorPercent(msg='%5.1f%% Extracting: %s', step=0.1)
+            pi = ProgressIndicatorPercent(msg='%5.1f%% Extracting: %s', step=0.1, msgid='extract')
             pi.output('Calculating size')
             extracted_size = sum(item.get_size(hardlink_masters) for item in archive.iter_items(filter))
             pi.total = extracted_size
@@ -656,8 +656,12 @@ class Archiver:
             except BackupOSError as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 
+        if pi:
+            pi.finish()
+
         if not args.dry_run:
-            pi = ProgressIndicatorPercent(total=len(dirs), msg='Setting directory permissions %3.0f%%')
+            pi = ProgressIndicatorPercent(total=len(dirs), msg='Setting directory permissions %3.0f%%',
+                                          msgid='extract.permissions')
             while dirs:
                 pi.show()
                 dir_item = dirs.pop(-1)
@@ -3426,7 +3430,7 @@ def main():  # pragma: no cover
          signal_handler('SIGUSR2', sig_trace_handler), \
          signal_handler('SIGINFO', sig_info_handler):
         archiver = Archiver()
-        msg = tb = None
+        msg = msgid = tb = None
         tb_log_level = logging.ERROR
         try:
             args = archiver.get_args(sys.argv, os.environ.get('SSH_ORIGINAL_COMMAND'))
@@ -3443,11 +3447,13 @@ def main():  # pragma: no cover
             exit_code = archiver.run(args)
         except Error as e:
             msg = e.get_message()
+            msgid = type(e).__qualname__
             tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
             tb = "%s\n%s" % (traceback.format_exc(), sysinfo())
             exit_code = e.exit_code
         except RemoteRepository.RPCError as e:
             important = e.exception_class not in ('LockTimeout', )
+            msgid = e.exception_class
             tb_log_level = logging.ERROR if important else logging.DEBUG
             if important:
                 msg = e.exception_full
@@ -3458,6 +3464,7 @@ def main():  # pragma: no cover
             exit_code = EXIT_ERROR
         except Exception:
             msg = 'Local Exception'
+            msgid = 'Exception'
             tb_log_level = logging.ERROR
             tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
             exit_code = EXIT_ERROR
@@ -3468,14 +3475,16 @@ def main():  # pragma: no cover
             exit_code = EXIT_ERROR
         except SigTerm:
             msg = 'Received SIGTERM'
+            msgid = 'Signal.SIGTERM'
             tb_log_level = logging.DEBUG
             tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
             exit_code = EXIT_ERROR
         except SigHup:
             msg = 'Received SIGHUP.'
+            msgid = 'Signal.SIGHUP'
             exit_code = EXIT_ERROR
         if msg:
-            logger.error(msg)
+            logger.error(msg, msgid=msgid)
         if tb:
             logger.log(tb_log_level, tb)
         if args.show_rc:

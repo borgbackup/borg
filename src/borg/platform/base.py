@@ -1,5 +1,6 @@
 import errno
 import os
+import tempfile
 
 """
 platform base module
@@ -152,14 +153,10 @@ class SaveFile:
     def __init__(self, path, binary=False):
         self.binary = binary
         self.path = path
-        self.tmppath = self.path + self.SUFFIX
+        self.tmppath = tempfile.mktemp(dir=os.path.dirname(path), prefix=os.path.basename(path), suffix=self.SUFFIX)
 
     def __enter__(self):
         from .. import platform
-        try:
-            os.unlink(self.tmppath)
-        except FileNotFoundError:
-            pass
         self.fd = platform.SyncFile(self.tmppath, self.binary)
         return self.fd
 

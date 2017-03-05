@@ -26,7 +26,7 @@ from .constants import *  # NOQA
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Manifest
 from .helpers import Chunk, ChunkIteratorFileWrapper, open_item
-from .helpers import Error, IntegrityError
+from .helpers import Error, IntegrityError, set_ec
 from .helpers import uid2user, user2uid, gid2group, group2gid
 from .helpers import parse_timestamp, to_localtime
 from .helpers import format_time, format_timedelta, format_file_size, file_status, FileSize
@@ -691,6 +691,7 @@ Utilization of max. archive size: {csize_max:.0%}
                 if e.errno == errno.E2BIG:
                     logger.warning('%s: Value or key of extended attribute %s is too big for this filesystem' %
                                    (path, k.decode()))
+                    set_ec(EXIT_WARNING)
                 elif e.errno not in (errno.ENOTSUP, errno.EACCES):
                     # only raise if the errno is not on our ignore list:
                     # ENOTSUP == xattrs not supported here

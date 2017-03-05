@@ -1255,7 +1255,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                     repository.delete(first_chunk_id)
                     repository.commit()
                     break
-        self.cmd('delete', '--force', self.repository_location + '::test')
+        output = self.cmd('delete', '--force', self.repository_location + '::test')
+        self.assert_in('deleted archive was corrupted', output)
         self.cmd('check', '--repair', self.repository_location)
         output = self.cmd('list', self.repository_location)
         self.assert_not_in('test', output)

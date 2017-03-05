@@ -513,6 +513,7 @@ class RemoteRepository:
         self.chunkid_to_msgids = {}
         self.ignore_responses = set()
         self.responses = {}
+        self.async_responses = {}
         self.ratelimit = SleepingBandwidthLimiter(args.remote_ratelimit * 1024 if args and args.remote_ratelimit else 0)
         self.unpacker = get_limited_unpacker('client')
         self.server_version = parse_version('1.0.8')  # fallback version if server is too old to send version information
@@ -670,8 +671,8 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
         for resp in self.call_many(cmd, [args], **kw):
             return resp
 
-    def call_many(self, cmd, calls, wait=True, is_preloaded=False):
-        if not calls:
+    def call_many(self, cmd, calls, wait=True, is_preloaded=False, async_wait=True):
+        if not calls and cmd != 'async_responses':
             return
 
         def pop_preload_msgid(chunkid):
@@ -726,6 +727,22 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                             return
                 except KeyError:
                     break
+            if cmd == 'async_responses':
+                while True:
+                    try:
+                        msgid, unpacked = self.async_responses.popitem()
+                    except KeyError:
+                        # there is nothing left what we already have received
+                        if async_wait and self.ignore_responses:
+                            # but do not return if we shall wait and there is something left to wait for:
+                            break
+                        else:
+                            return
+                    else:
+                        if b'exception_class' in unpacked:
+                            handle_error(unpacked)
+                        else:
+                            yield unpacked[RESULT]
             if self.to_send or ((calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT):
                 w_fds = [self.stdin_fd]
             else:
@@ -755,8 +772,14 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                             raise UnexpectedRPCDataFormatFromServer(data)
                         if msgid in self.ignore_responses:
                             self.ignore_responses.remove(msgid)
+                            # async methods never return values, but may raise exceptions.
                             if b'exception_class' in unpacked:
-                                handle_error(unpacked)
+                                self.async_responses[msgid] = unpacked
+                            else:
+                                # we currently do not have async result values except "None",
+                                # so we do not add them into async_responses.
+                                if unpacked[RESULT] is not None:
+                                    self.async_responses[msgid] = unpacked
                         else:
                             self.responses[msgid] = unpacked
                 elif fd is self.stderr_fd:
@@ -805,7 +828,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                         # that the fd should be writable
                         if e.errno != errno.EAGAIN:
                             raise
-        self.ignore_responses |= set(waiting_for)
+        self.ignore_responses |= set(waiting_for)  # we lose order here
 
     @api(since=parse_version('1.0.0'),
          append_only={'since': parse_version('1.0.7'), 'previously': False})
@@ -882,6 +905,10 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             self.p.stdout.close()
             self.p.wait()
             self.p = None
+
+    def async_response(self, wait=True):
+        for resp in self.call_many('async_responses', calls=[], wait=True, async_wait=wait):
+            return resp
 
     def preload(self, ids):
         self.preload_ids += ids

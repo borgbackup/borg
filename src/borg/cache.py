@@ -524,7 +524,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             self.do_cache = os.path.isdir(archive_path)
             self.chunks = create_master_idx(self.chunks)
 
-    def add_chunk(self, id, chunk, stats, overwrite=False):
+    def add_chunk(self, id, chunk, stats, overwrite=False, wait=True):
         if not self.txn_active:
             self.begin_txn()
         size = len(chunk.data)
@@ -533,7 +533,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             return self.chunk_incref(id, stats)
         data = self.key.encrypt(chunk)
         csize = len(data)
-        self.repository.put(id, data, wait=False)
+        self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size, csize)
         stats.update(size, csize, not refcount)
         return ChunkListEntry(id, size, csize)
@@ -554,13 +554,13 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         stats.update(size, csize, False)
         return ChunkListEntry(id, size, csize)
 
-    def chunk_decref(self, id, stats):
+    def chunk_decref(self, id, stats, wait=True):
         if not self.txn_active:
             self.begin_txn()
         count, size, csize = self.chunks.decref(id)
         if count == 0:
             del self.chunks[id]
-            self.repository.delete(id, wait=False)
+            self.repository.delete(id, wait=wait)
             stats.update(-size, -csize, True)
         else:
             stats.update(-size, -csize, False)

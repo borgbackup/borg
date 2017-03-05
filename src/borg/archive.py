@@ -260,7 +260,8 @@ class CacheChunkBuffer(ChunkBuffer):
         self.stats = stats
 
     def write_chunk(self, chunk):
-        id_, _, _ = self.cache.add_chunk(self.key.id_hash(chunk.data), chunk, self.stats)
+        id_, _, _ = self.cache.add_chunk(self.key.id_hash(chunk.data), chunk, self.stats, wait=False)
+        self.cache.repository.async_response(wait=False)
         return id_
 
 
@@ -469,6 +470,8 @@ Utilization of max. archive size: {csize_max:.0%}
         data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b'archive')
         self.id = self.key.id_hash(data)
         self.cache.add_chunk(self.id, Chunk(data), self.stats)
+        while self.repository.async_response(wait=True) is not None:
+            pass
         self.manifest.archives[name] = (self.id, metadata.time)
         self.manifest.write()
         self.repository.commit()
@@ -730,18 +733,27 @@ Utilization of max. archive size: {csize_max:.0%}
         class ChunksIndexError(Error):
             """Chunk ID {} missing from chunks index, corrupted chunks index - aborting transaction."""
 
-        def chunk_decref(id, stats):
-            nonlocal error
+        exception_ignored = object()
+
+        def fetch_async_response(wait=True):
             try:
-                self.cache.chunk_decref(id, stats)
-            except KeyError:
-                cid = bin_to_hex(id)
-                raise ChunksIndexError(cid)
+                return self.repository.async_response(wait=wait)
             except Repository.ObjectNotFound as e:
+                nonlocal error
                 # object not in repo - strange, but we wanted to delete it anyway.
                 if forced == 0:
                     raise
                 error = True
+                return exception_ignored  # must not return None here
+
+        def chunk_decref(id, stats):
+            try:
+                self.cache.chunk_decref(id, stats, wait=False)
+            except KeyError:
+                cid = bin_to_hex(id)
+                raise ChunksIndexError(cid)
+            else:
+                fetch_async_response(wait=False)
 
         error = False
         try:
@@ -778,6 +790,10 @@ Utilization of max. archive size: {csize_max:.0%}
         # some harmless exception.
         chunk_decref(self.id, stats)
         del self.manifest.archives[self.name]
+        while fetch_async_response(wait=True) is not None:
+            # we did async deletes, process outstanding results (== exceptions),
+            # so there is nothing pending when we return and our caller wants to commit.
+            pass
         if error:
             logger.warning('forced deletion succeeded, but the deleted archive was corrupted.')
             logger.warning('borg check --repair is required to free all space.')
@@ -865,7 +881,9 @@ Utilization of max. archive size: {csize_max:.0%}
     def chunk_file(self, item, cache, stats, chunk_iter, chunk_processor=None, **chunk_kw):
         if not chunk_processor:
             def chunk_processor(data):
-                return cache.add_chunk(self.key.id_hash(data), Chunk(data, **chunk_kw), stats)
+                chunk_entry = cache.add_chunk(self.key.id_hash(data), Chunk(data, **chunk_kw), stats, wait=False)
+                self.cache.repository.async_response(wait=False)
+                return chunk_entry
 
         item.chunks = []
         from_chunk = 0
@@ -1654,7 +1672,8 @@ class ArchiveRecreater:
             if Compressor.detect(old_chunk.data).name == compression_spec.name:
                 # Stored chunk has the same compression we wanted
                 overwrite = False
-        chunk_entry = self.cache.add_chunk(chunk_id, chunk, target.stats, overwrite=overwrite)
+        chunk_entry = self.cache.add_chunk(chunk_id, chunk, target.stats, overwrite=overwrite, wait=False)
+        self.cache.repository.async_response(wait=False)
         self.seen_chunks.add(chunk_entry.id)
         return chunk_entry
 

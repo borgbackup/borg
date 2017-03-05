@@ -23,7 +23,7 @@ from .helpers import Error, location_validator, archivename_validator, format_li
     PathPrefixPattern, to_localtime, timestamp, safe_timestamp, bin_to_hex, get_cache_dir, prune_within, prune_split, \
     Manifest, NoManifestError, remove_surrogates, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, PrefixSpec, is_slow_msgpack, yes, sysinfo, \
-    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ErrorIgnoringTextIOWrapper
+    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ErrorIgnoringTextIOWrapper, set_ec
 from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
 from .logger import create_logger, setup_logging
 logger = create_logger()
@@ -2075,7 +2075,7 @@ class Archiver:
         check_extension_modules()
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
-        return func(args)
+        return set_ec(func(args))
 
 
 def sig_info_handler(sig_no, stack):  # pragma: no cover

@@ -19,7 +19,7 @@ from hashlib import sha256
 import msgpack
 import pytest
 
-from .. import xattr
+from .. import xattr, helpers
 from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP, flags_noatime, flags_normal
 from ..archiver import Archiver
 from ..cache import Cache
@@ -68,6 +68,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
             if archiver is None:
                 archiver = Archiver()
             archiver.exit_code = EXIT_SUCCESS
+            helpers.exit_code = EXIT_SUCCESS
             args = archiver.parse_args(list(args))
             ret = archiver.run(args)
             return ret, output.getvalue()

@@ -52,6 +52,26 @@ def Chunk(data, **meta):
     return _Chunk(meta, data)
 
 
+'''
+The global exit_code variable is used so that modules other than archiver can increase the program exit code if a
+warning or error occured during their operation. This is different from archiver.exit_code, which is only accessible
+from the archiver object.
+'''
+exit_code = EXIT_SUCCESS
+
+
+def set_ec(ec):
+    '''
+    Sets the exit code of the program, if an exit code higher or equal than this is set, this does nothing. This
+    makes EXIT_ERROR override EXIT_WARNING, etc..
+
+    ec: exit code to set
+    '''
+    global exit_code
+    exit_code = max(exit_code, ec)
+    return exit_code
+
+
 class Error(Exception):
     """Error base class"""
 

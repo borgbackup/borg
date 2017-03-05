@@ -36,7 +36,7 @@ from .cache import Cache
 from .constants import *  # NOQA
 from .crc32 import crc32
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
-from .helpers import Error, NoManifestError
+from .helpers import Error, NoManifestError, set_ec
 from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
 from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
@@ -3372,7 +3372,7 @@ class Archiver:
         self.prerun_checks(logger)
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
-        return func(args)
+        return set_ec(func(args))
 
 
 def sig_info_handler(sig_no, stack):  # pragma: no cover

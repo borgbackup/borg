@@ -45,6 +45,12 @@ class TestLocationWithoutEnv:
             "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive=None)"
         assert repr(Location('ssh://user@host/some/path')) == \
             "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
+        assert repr(Location('ssh://user@[::]:1234/some/path::archive')) == \
+            "Location(proto='ssh', user='user', host='::', port=1234, path='/some/path', archive='archive')"
+        assert repr(Location('ssh://user@[::]:1234/some/path')) == \
+            "Location(proto='ssh', user='user', host='::', port=1234, path='/some/path', archive=None)"
+        assert repr(Location('ssh://user@[::]/some/path')) == \
+            "Location(proto='ssh', user='user', host='::', port=None, path='/some/path', archive=None)"
 
     def test_file(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
@@ -59,6 +65,10 @@ class TestLocationWithoutEnv:
             "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='archive')"
         assert repr(Location('user@host:/some/path')) == \
             "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
+        assert repr(Location('user@[::]:/some/path::archive')) == \
+            "Location(proto='ssh', user='user', host='::', port=None, path='/some/path', archive='archive')"
+        assert repr(Location('user@[::]:/some/path')) == \
+            "Location(proto='ssh', user='user', host='::', port=None, path='/some/path', archive=None)"
 
     def test_smb(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)

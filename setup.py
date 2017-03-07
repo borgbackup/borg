@@ -600,7 +600,7 @@ if not on_rtd:
     ext_modules += [
     Extension('borg.compress', [compress_source], libraries=['lz4'], include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
     Extension('borg.crypto.low_level', [crypto_ll_source], libraries=crypto_libraries, include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
-    Extension('borg.hashindex', [hashindex_source]),
+    Extension('borg.hashindex', [hashindex_source], libraries=['msgpackc']),
     Extension('borg.item', [item_source]),
     Extension('borg.algorithms.chunker', [chunker_source]),
     Extension('borg.algorithms.checksums', [checksums_source]),

@@ -12,7 +12,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from .constants import CACHE_README
-from .hashindex import ChunkIndex, ChunkIndexEntry
+from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
 from .helpers import Location
 from .helpers import Error
 from .helpers import get_cache_dir, get_security_dir
@@ -571,17 +571,11 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
             if archive.version != 1:
                 raise Exception('Unknown archive metadata version')
-            unpacker = msgpack.Unpacker()
+            sync = CacheSynchronizer(chunk_idx)
             for item_id, chunk in zip(archive.items, repository.get_many(archive.items)):
                 data = key.decrypt(item_id, chunk)
                 chunk_idx.add(item_id, 1, len(data), len(chunk))
-                unpacker.feed(data)
-                for item in unpacker:
-                    if not isinstance(item, dict):
-                        logger.error('Error: Did not get expected metadata dict - archive corrupted!')
-                        continue   # XXX: continue?!
-                    for chunk_id, size, csize in item.get(b'chunks', []):
-                        chunk_idx.add(chunk_id, 1, size, csize)
+                sync.feed(data)
             if self.do_cache:
                 fn = mkpath(archive_id)
                 fn_tmp = mkpath(archive_id, suffix='.tmp')

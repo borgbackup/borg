@@ -88,7 +88,7 @@ class TAMUnsupportedSuiteError(IntegrityError):
 
 
 class KeyBlobStorage:
-    NO_BLOB = 'no_blob'
+    NO_STORAGE = 'no_storage'
     KEYFILE = 'keyfile'
     REPO = 'repository'
 
@@ -137,7 +137,7 @@ class KeyBase:
     # Name used in command line / API (e.g. borg init --encryption=...)
     ARG_NAME = 'UNDEFINED'
     # Storage type (no key blob storage / keyfile / repo)
-    STORAGE = KeyBlobStorage.NO_BLOB
+    STORAGE = KeyBlobStorage.NO_STORAGE
 
     def __init__(self, repository):
         self.TYPE_STR = bytes([self.TYPE])
@@ -237,7 +237,7 @@ class PlaintextKey(KeyBase):
     TYPE = 0x02
     NAME = 'plaintext'
     ARG_NAME = 'none'
-    STORAGE = KeyBlobStorage.NO_BLOB
+    STORAGE = KeyBlobStorage.NO_STORAGE
 
     chunk_seed = 0
 
@@ -469,7 +469,7 @@ class PassphraseKey(ID_HMAC_SHA_256, AESKeyBase):
     TYPE = 0x01
     NAME = 'passphrase'
     ARG_NAME = None
-    STORAGE = KeyBlobStorage.NO_BLOB
+    STORAGE = KeyBlobStorage.NO_STORAGE
 
     iterations = 100000  # must not be changed ever!
 
@@ -747,7 +747,6 @@ class AuthenticatedKey(ID_BLAKE2b_256, RepoKey):
     ARG_NAME = 'authenticated'
     STORAGE = KeyBlobStorage.REPO
 
-
     def encrypt(self, chunk):
         chunk = self.compress(chunk)
         return b''.join([self.TYPE_STR, chunk.data])
@@ -761,6 +760,7 @@ class AuthenticatedKey(ID_BLAKE2b_256, RepoKey):
         data = self.compressor.decompress(payload)
         self.assert_id(id, data)
         return Chunk(data)
+
 
 AVAILABLE_KEY_TYPES = (
     PlaintextKey,

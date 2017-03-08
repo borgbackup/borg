@@ -991,7 +991,6 @@ SSH batch mode
 ~~~~~~~~~~~~~~
 
 When running |project_name| using an automated script, ``ssh`` might still ask for a password,
-even if there is an SSH key for the target server. To make scripts more robust, set the
-``BORG_RSH`` environment variable in your script with ``-oBatchMode=yes``::
+even if there is an SSH key for the target server. Use this to make scripts more robust::
 
     export BORG_RSH='ssh -oBatchMode=yes'

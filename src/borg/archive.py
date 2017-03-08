@@ -26,7 +26,7 @@ from .constants import *  # NOQA
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Manifest
 from .helpers import Chunk, ChunkIteratorFileWrapper, open_item
-from .helpers import Error, IntegrityError
+from .helpers import Error, IntegrityError, set_ec
 from .helpers import uid2user, user2uid, gid2group, group2gid
 from .helpers import parse_timestamp, to_localtime
 from .helpers import format_time, format_timedelta, format_file_size, file_status, FileSize
@@ -689,13 +689,19 @@ Utilization of max. archive size: {csize_max:.0%}
                 xattr.setxattr(fd or path, k, v, follow_symlinks=False)
             except OSError as e:
                 if e.errno == errno.E2BIG:
+                    # xattr is too big
                     logger.warning('%s: Value or key of extended attribute %s is too big for this filesystem' %
                                    (path, k.decode()))
-                elif e.errno not in (errno.ENOTSUP, errno.EACCES):
-                    # only raise if the errno is not on our ignore list:
-                    # ENOTSUP == xattrs not supported here
-                    # EACCES == permission denied to set this specific xattr
-                    #           (this may happen related to security.* keys)
+                    set_ec(EXIT_WARNING)
+                elif e.errno == errno.ENOTSUP:
+                    # xattrs not supported here
+                    logger.warning('%s: Extended attributes are not supported on this filesystem' % path)
+                    set_ec(EXIT_WARNING)
+                elif e.errno == errno.EACCES:
+                    # permission denied to set this specific xattr (this may happen related to security.* keys)
+                    logger.warning('%s: Permission denied when setting extended attribute %s' % (path, k.decode()))
+                    set_ec(EXIT_WARNING)
+                else:
                     raise
 
     def set_meta(self, key, value):

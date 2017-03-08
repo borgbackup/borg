@@ -4,7 +4,7 @@ import textwrap
 from hashlib import sha256
 import pkgutil
 
-from .key import KeyfileKey, RepoKey, PassphraseKey, KeyfileNotFoundError, PlaintextKey
+from .key import KeyfileKey, KeyfileNotFoundError, KeyBlobStorage, identify_key
 from .helpers import Manifest, NoManifestError, Error, yes, bin_to_hex
 from .repository import Repository
 
@@ -31,10 +31,6 @@ def sha256_truncated(data, num):
     return h.hexdigest()[:num]
 
 
-KEYBLOB_LOCAL = 'local'
-KEYBLOB_REPO = 'repo'
-
-
 class KeyManager:
     def __init__(self, repository):
         self.repository = repository
@@ -42,32 +38,27 @@ class KeyManager:
         self.keyblob_storage = None
 
         try:
-            cdata = self.repository.get(Manifest.MANIFEST_ID)
+            manifest_data = self.repository.get(Manifest.MANIFEST_ID)
         except Repository.ObjectNotFound:
             raise NoManifestError
 
-        key_type = cdata[0]
-        if key_type == KeyfileKey.TYPE:
-            self.keyblob_storage = KEYBLOB_LOCAL
-        elif key_type == RepoKey.TYPE or key_type == PassphraseKey.TYPE:
-            self.keyblob_storage = KEYBLOB_REPO
-        elif key_type == PlaintextKey.TYPE:
+        key = identify_key(manifest_data)
+        self.keyblob_storage = key.STORAGE
+        if self.keyblob_storage == KeyBlobStorage.NO_STORAGE:
             raise UnencryptedRepo()
-        else:
-            raise UnknownKeyType(key_type)
 
     def load_keyblob(self):
-        if self.keyblob_storage == KEYBLOB_LOCAL:
+        if self.keyblob_storage == KeyBlobStorage.KEYFILE:
             k = KeyfileKey(self.repository)
             target = k.find_key()
             with open(target, 'r') as fd:
                 self.keyblob = ''.join(fd.readlines()[1:])
 
-        elif self.keyblob_storage == KEYBLOB_REPO:
+        elif self.keyblob_storage == KeyBlobStorage.REPO:
             self.keyblob = self.repository.load_key().decode()
 
     def store_keyblob(self, args):
-        if self.keyblob_storage == KEYBLOB_LOCAL:
+        if self.keyblob_storage == KeyBlobStorage.KEYFILE:
             k = KeyfileKey(self.repository)
             try:
                 target = k.find_key()
@@ -75,7 +66,7 @@ class KeyManager:
                 target = k.get_new_target(args)
 
             self.store_keyfile(target)
-        elif self.keyblob_storage == KEYBLOB_REPO:
+        elif self.keyblob_storage == KeyBlobStorage.REPO:
             self.repository.save_key(self.keyblob.encode('utf-8'))
 
     def get_keyfile_data(self):

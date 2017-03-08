@@ -986,3 +986,12 @@ for e.g. regular pruning.
 Further protections can be implemented, but are outside of Borgs scope. For example,
 file system snapshots or wrapping ``borg serve`` to set special permissions or ACLs on
 new data files.
+
+SSH batch mode
+~~~~~~~~~~~~~~
+
+When running |project_name| using an automated script, ``ssh`` might still ask for a password,
+even if there is an SSH key for the target server. To make scripts more robust, set the
+``BORG_RSH`` environment variable in your script with ``-oBatchMode=yes``::
+
+    export BORG_RSH='ssh -oBatchMode=yes'

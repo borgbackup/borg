@@ -53,6 +53,8 @@ def test_bin_to_hex():
 class TestLocationWithoutEnv:
     def test_ssh(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
+        assert repr(Location('ssh://user@host:1234/some/path::foo/bar')) == \
+            "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive='foo/bar')"
         assert repr(Location('ssh://user@host:1234/some/path::archive')) == \
             "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive='archive')"
         assert repr(Location('ssh://user@host:1234/some/path')) == \
@@ -62,6 +64,8 @@ class TestLocationWithoutEnv:
 
     def test_file(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
+        assert repr(Location('file:///some/path::foo/bar')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='foo/bar')"
         assert repr(Location('file:///some/path::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')"
         assert repr(Location('file:///some/path')) == \
@@ -69,6 +73,8 @@ class TestLocationWithoutEnv:
 
     def test_scp(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
+        assert repr(Location('user@host:/some/path::foo/bar')) == \
+            "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='foo/bar')"
         assert repr(Location('user@host:/some/path::archive')) == \
             "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='archive')"
         assert repr(Location('user@host:/some/path')) == \
@@ -76,11 +82,15 @@ class TestLocationWithoutEnv:
 
     def test_smb(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
+        assert repr(Location('file:////server/share/path::foo/bar')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='//server/share/path', archive='foo/bar')"
         assert repr(Location('file:////server/share/path::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='//server/share/path', archive='archive')"
 
     def test_folder(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
+        assert repr(Location('path::foo/bar')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='path', archive='foo/bar')"
         assert repr(Location('path::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='path', archive='archive')"
         assert repr(Location('path')) == \
@@ -88,6 +98,8 @@ class TestLocationWithoutEnv:
 
     def test_abspath(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
+        assert repr(Location('/some/absolute/path::foo/bar')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive='foo/bar')"
         assert repr(Location('/some/absolute/path::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive='archive')"
         assert repr(Location('/some/absolute/path')) == \
@@ -97,6 +109,12 @@ class TestLocationWithoutEnv:
 
     def test_relpath(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
+        assert repr(Location('some/relative/path::foo/bar')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='foo/bar')"
+        assert repr(Location('some/relative/path::foo..bar')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='foo..bar')"
+        assert repr(Location('some/relative/path::.archive')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='.archive')"
         assert repr(Location('some/relative/path::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='archive')"
         assert repr(Location('some/relative/path')) == \
@@ -110,6 +128,8 @@ class TestLocationWithoutEnv:
 
     def test_with_colons(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
+        assert repr(Location('/abs/path:w:cols::fo/bar:col/baz')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='/abs/path:w:cols', archive='fo/bar:col/baz')"
         assert repr(Location('/abs/path:w:cols::arch:col')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/abs/path:w:cols', archive='arch:col')"
         assert repr(Location('/abs/path:with:colons::archive')) == \
@@ -119,6 +139,8 @@ class TestLocationWithoutEnv:
 
     def test_user_parsing(self):
         # see issue #1930
+        assert repr(Location('host:path::2016-12-31@23:59:59/foo/bar')) == \
+            "Location(proto='ssh', user=None, host='host', port=None, path='path', archive='2016-12-31@23:59:59/foo/bar')"
         assert repr(Location('host:path::2016-12-31@23:59:59')) == \
             "Location(proto='ssh', user=None, host='host', port=None, path='path', archive='2016-12-31@23:59:59')"
         assert repr(Location('ssh://host/path::2016-12-31@23:59:59')) == \
@@ -133,10 +155,23 @@ class TestLocationWithoutEnv:
         with pytest.raises(ValueError):
             Location()
 
-    def test_no_slashes(self, monkeypatch):
+    @pytest.mark.parametrize('location', (
+        '/some/path/to/repo::archive_name_with/../indirection/is_invalid',
+        # all of these are invalid, since their normalized POSIX path form is different
+        # from the form given. This is never the case with anything containing no /
+        # and different from exactly (beginning to end) "." and ".."
+        '/some/path/to/repo::.',
+        '/some/path/to/repo::..',
+        '/some/path/to/repo::foo/.',
+        '/some/path/to/repo::foo/..',
+        '/some/path/to/repo::foo/./',
+        '/some/path/to/repo::foo/../',
+        '/some/path/to/repo::foo/./bar',
+    ))
+    def test_no_strange_paths(self, monkeypatch, location):
         monkeypatch.delenv('BORG_REPO', raising=False)
         with pytest.raises(ValueError):
-            Location('/some/path/to/repo::archive_name_with/slashes/is_invalid')
+            Location(location)
 
     def test_canonical_path(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
@@ -166,6 +201,8 @@ class TestLocationWithoutEnv:
 class TestLocationWithEnv:
     def test_ssh(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'ssh://user@host:1234/some/path')
+        assert repr(Location('::foo/bar')) == \
+            "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive='foo/bar')"
         assert repr(Location('::archive')) == \
             "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive='archive')"
         assert repr(Location('::')) == \
@@ -175,6 +212,8 @@ class TestLocationWithEnv:
 
     def test_file(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'file:///some/path')
+        assert repr(Location('::foo/bar')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='foo/bar')"
         assert repr(Location('::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')"
         assert repr(Location('::')) == \
@@ -184,6 +223,8 @@ class TestLocationWithEnv:
 
     def test_scp(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'user@host:/some/path')
+        assert repr(Location('::foo/bar')) == \
+            "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='foo/bar')"
         assert repr(Location('::archive')) == \
             "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='archive')"
         assert repr(Location('::')) == \
@@ -193,6 +234,8 @@ class TestLocationWithEnv:
 
     def test_folder(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'path')
+        assert repr(Location('::foo/bar')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='path', archive='foo/bar')"
         assert repr(Location('::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='path', archive='archive')"
         assert repr(Location('::')) == \
@@ -202,6 +245,8 @@ class TestLocationWithEnv:
 
     def test_abspath(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', '/some/absolute/path')
+        assert repr(Location('::foo/bar')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive='foo/bar')"
         assert repr(Location('::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive='archive')"
         assert repr(Location('::')) == \
@@ -211,6 +256,8 @@ class TestLocationWithEnv:
 
     def test_relpath(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'some/relative/path')
+        assert repr(Location('::foo/bar')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='foo/bar')"
         assert repr(Location('::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='archive')"
         assert repr(Location('::')) == \
@@ -220,17 +267,14 @@ class TestLocationWithEnv:
 
     def test_with_colons(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', '/abs/path:w:cols')
+        assert repr(Location('::fo/bar:col/baz')) == \
+            "Location(proto='file', user=None, host=None, port=None, path='/abs/path:w:cols', archive='fo/bar:col/baz')"
         assert repr(Location('::arch:col')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/abs/path:w:cols', archive='arch:col')"
         assert repr(Location('::')) == \
                "Location(proto='file', user=None, host=None, port=None, path='/abs/path:w:cols', archive=None)"
         assert repr(Location()) == \
                "Location(proto='file', user=None, host=None, port=None, path='/abs/path:w:cols', archive=None)"
-
-    def test_no_slashes(self, monkeypatch):
-        monkeypatch.setenv('BORG_REPO', '/some/absolute/path')
-        with pytest.raises(ValueError):
-            Location('::archive_name_with/slashes/is_invalid')
 
 
 class FormatTimedeltaTestCase(BaseTestCase):

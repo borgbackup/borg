@@ -2651,6 +2651,10 @@ class Archiver:
         option is given the command will run in the background until the filesystem
         is ``umounted``.
 
+        When mounting an entire repository (without the 'versions' option), archive names
+        are used as paths from the root of the mountpoint. Names containing slashes thus
+        form a directory hierarchy.
+
         The command ``borgfs`` provides a wrapper for ``borg mount``. This can also be
         used in fstab entries:
         ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto 0 0``

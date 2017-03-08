@@ -29,6 +29,7 @@ from itertools import islice
 from operator import attrgetter
 from string import Formatter
 from shutil import get_terminal_size
+from posixpath import normpath
 
 import msgpack
 import msgpack.fallback
@@ -1093,7 +1094,7 @@ class Location:
     optional_archive_re = r"""
         (?:
             ::                                              # "::" as separator
-            (?P<archive>[^/]+)                              # archive name must not contain "/"
+            (?P<archive>[^/]{1}.*)
         )?$"""                                              # must match until the end
 
     # regexes for misc. kinds of supported location specifiers:
@@ -1133,7 +1134,7 @@ class Location:
         text = replace_placeholders(text)
         valid = self._parse(text)
         if valid:
-            return True
+            return self._archive_valid()
         m = self.env_re.match(text)
         if not m:
             return False
@@ -1144,7 +1145,7 @@ class Location:
         if not valid:
             return False
         self.archive = m.group('archive')
-        return True
+        return self._archive_valid()
 
     def _parse(self, text):
         def normpath_special(p):
@@ -1177,6 +1178,9 @@ class Location:
             self.proto = self.host and 'ssh' or 'file'
             return True
         return False
+
+    def _archive_valid(self):
+        return not self.archive or (self.archive == normpath(self.archive) and self.archive not in ('..', '.'))
 
     def __str__(self):
         items = [

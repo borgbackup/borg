@@ -2254,6 +2254,15 @@ class Archiver:
         '\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
         more information.
 
+        In addition to using ``--exclude`` patterns, it is possible to use
+        ``--exclude-if-present`` to specify the name of a filesystem object (e.g. a file
+        or folder name) which, when contained within another folder, will prevent the
+        containing folder from being backed up.  By default, the containing folder and
+        all of its contents will be omitted from the backup.  If, however, you wish to
+        only include the objects specified by ``--exclude-if-present`` in your backup,
+        and not include any other contents of the containing folder, this can be enabled
+        through using the ``--keep-exclude-tags`` option.
+
         Item flags
         ++++++++++
 
@@ -2337,8 +2346,8 @@ class Archiver:
                                         'the given NAME')
         exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
                                    action='store_true', default=False,
-                                   help='keep tag objects (i.e.: arguments to --exclude-if-present) in otherwise '
-                                        'excluded caches/directories')
+                                   help='if tag objects are specified with --exclude-if-present, don\'t omit the tag '
+                                        'objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
                                    action=ArgparsePatternAction,
                                    metavar="PATTERN", help='include/exclude paths matching PATTERN')
@@ -2510,8 +2519,8 @@ class Archiver:
                                         'the given NAME')
         exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
                                    action='store_true', default=False,
-                                   help='keep tag objects (i.e.: arguments to --exclude-if-present) in otherwise '
-                                        'excluded caches/directories')
+                                   help='if tag objects are specified with --exclude-if-present, don\'t omit the tag '
+                                        'objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
                                    action=ArgparsePatternAction,
                                    metavar="PATTERN", help='include/exclude paths matching PATTERN')
@@ -2626,8 +2635,8 @@ class Archiver:
                                         'the given NAME')
         exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
                                    action='store_true', default=False,
-                                   help='keep tag objects (i.e.: arguments to --exclude-if-present) in otherwise '
-                                        'excluded caches/directories')
+                                   help='if tag objects are specified with --exclude-if-present, don\'t omit the tag '
+                                        'objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
                                    action=ArgparsePatternAction,
                                    metavar="PATTERN", help='include/exclude paths matching PATTERN')
@@ -2921,9 +2930,9 @@ class Archiver:
 
         This is an *experimental* feature. Do *not* use this on your only backup.
 
-        --exclude, --exclude-from and PATH have the exact same semantics
-        as in "borg create". If PATHs are specified the resulting archive
-        will only contain files from these PATHs.
+        --exclude, --exclude-from, --exclude-if-present, --keep-exclude-tags, and PATH
+        have the exact same semantics as in "borg create". If PATHs are specified the
+        resulting archive will only contain files from these PATHs.
 
         Note that all paths in an archive are relative, therefore absolute patterns/paths
         will *not* match (--exclude, --exclude-from, --compression-from, PATHs).
@@ -2991,8 +3000,8 @@ class Archiver:
                                         'the given NAME')
         exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
                                    action='store_true', default=False,
-                                   help='keep tag objects (i.e.: arguments to --exclude-if-present) in otherwise '
-                                        'excluded caches/directories')
+                                   help='if tag objects are specified with --exclude-if-present, don\'t omit the tag '
+                                        'objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
                                    action=ArgparsePatternAction,
                                    metavar="PATTERN", help='include/exclude paths matching PATTERN')

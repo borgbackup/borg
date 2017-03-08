@@ -783,18 +783,35 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='xattr not supported on this system or on this version of'
                                                          'fakeroot')
-    def test_extract_big_xattrs(self):
-        def patched_setxattr(*args, **kwargs):
+    def test_extract_xattrs_errors(self):
+        def patched_setxattr_E2BIG(*args, **kwargs):
             raise OSError(errno.E2BIG, 'E2BIG')
+
+        def patched_setxattr_ENOTSUP(*args, **kwargs):
+            raise OSError(errno.ENOTSUP, 'ENOTSUP')
+
+        def patched_setxattr_EACCES(*args, **kwargs):
+            raise OSError(errno.EACCES, 'EACCES')
+
         self.create_regular_file('file')
         xattr.setxattr('input/file', 'attribute', 'value')
         self.cmd('init', self.repository_location, '-e' 'none')
         self.cmd('create', self.repository_location + '::test', 'input')
         with changedir('output'):
-            with patch.object(xattr, 'setxattr', patched_setxattr):
+            input_abspath = os.path.abspath('input/file')
+            with patch.object(xattr, 'setxattr', patched_setxattr_E2BIG):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
-                assert out == (os.path.abspath('input/file') + ': Value or key of extended attribute attribute is too big'
-                                                               'for this filesystem\n')
+                assert out == (input_abspath + ': Value or key of extended attribute attribute is too big for this '
+                                               'filesystem\n')
+            os.remove(input_abspath)
+            with patch.object(xattr, 'setxattr', patched_setxattr_ENOTSUP):
+                out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
+                assert out == (input_abspath + ': Extended attributes are not supported on this filesystem\n')
+            os.remove(input_abspath)
+            with patch.object(xattr, 'setxattr', patched_setxattr_EACCES):
+                out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
+                assert out == (input_abspath + ': Permission denied when setting extended attribute attribute\n')
+            assert os.path.isfile(input_abspath)
 
     def test_path_normalization(self):
         self.cmd('init', self.repository_location)

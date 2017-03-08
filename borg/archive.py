@@ -19,7 +19,7 @@ from . import xattr
 from .helpers import Error, uid2user, user2uid, gid2group, group2gid, bin_to_hex, \
     parse_timestamp, to_localtime, format_time, format_timedelta, remove_surrogates, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
-    ProgressIndicatorPercent, IntegrityError
+    ProgressIndicatorPercent, IntegrityError, set_ec, EXIT_WARNING
 from .platform import acl_get, acl_set
 from .chunker import Chunker
 from .hashindex import ChunkIndex
@@ -502,13 +502,19 @@ Number of files: {0.stats.nfiles}'''.format(
                 xattr.setxattr(fd or path, k, v, follow_symlinks=False)
             except OSError as e:
                 if e.errno == errno.E2BIG:
+                    # xattr is too big
                     logger.warning('%s: Value or key of extended attribute %s is too big for this filesystem' %
                                    (path, k.decode()))
-                elif e.errno not in (errno.ENOTSUP, errno.EACCES):
-                    # only raise if the errno is not on our ignore list:
-                    # ENOTSUP == xattrs not supported here
-                    # EACCES == permission denied to set this specific xattr
-                    #           (this may happen related to security.* keys)
+                    set_ec(EXIT_WARNING)
+                elif e.errno == errno.ENOTSUP:
+                    # xattrs not supported here
+                    logger.warning('%s: Extended attributes are not supported on this filesystem' % path)
+                    set_ec(EXIT_WARNING)
+                elif e.errno == errno.EACCES:
+                    # permission denied to set this specific xattr (this may happen related to security.* keys)
+                    logger.warning('%s: Permission denied when setting extended attribute %s' % (path, k.decode()))
+                    set_ec(EXIT_WARNING)
+                else:
                     raise
 
     def rename(self, name):

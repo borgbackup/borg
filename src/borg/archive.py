@@ -97,6 +97,7 @@ class Statistics:
             if self.output_json:
                 data = self.as_dict()
                 data.update({
+                    'time': time.time(),
                     'type': 'archive_progress',
                     'path': remove_surrogates(item.path if item else ''),
                 })

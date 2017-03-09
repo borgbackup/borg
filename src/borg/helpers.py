@@ -1321,7 +1321,6 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
                 type='question_%s' % msg_type,
                 msgid=msgid,
                 message=msg,
-                is_prompt=is_prompt,
             ))
             print(json.dumps(kwargs), file=sys.stderr)
         else:
@@ -1450,7 +1449,8 @@ class ProgressIndicatorBase:
             operation=self.id,
             msgid=self.msgid,
             type=self.JSON_TYPE,
-            finished=finished
+            finished=finished,
+            time=time.time(),
         ))
         print(json.dumps(kwargs), file=sys.stderr)
 

@@ -18,6 +18,7 @@ from .helpers import Location
 from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
 from .helpers import yes
+from .helpers import secure_erase
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .lrucache import LRUCache
@@ -182,8 +183,26 @@ class Repository:
 
     def save_config(self, path, config):
         config_path = os.path.join(path, 'config')
+        old_config_path = os.path.join(path, 'config.old')
+
+        if os.path.isfile(old_config_path):
+            logger.warning("Old config file not securely erased on previous config update")
+            secure_erase(old_config_path)
+
+        if os.path.isfile(config_path):
+            try:
+                os.link(config_path, old_config_path)
+            except OSError as e:
+                if e.errno in (errno.EMLINK, errno.EPERM):
+                    logger.warning("Hardlink failed, cannot securely erase old config file")
+                else:
+                    raise
+
         with SaveFile(config_path) as fd:
             config.write(fd)
+
+        if os.path.isfile(old_config_path):
+            secure_erase(old_config_path)
 
     def save_key(self, keydata):
         assert self.config

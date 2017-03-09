@@ -182,8 +182,28 @@ class Repository:
 
     def save_config(self, path, config):
         config_path = os.path.join(path, 'config')
+        old_config_path = os.path.join(path, 'config.old')
+
+        if os.path.isfile(old_config_path):
+            logger.warning("Old config file not securely erased on previous config update")
+            self.secure_erase_config(old_config_path)
+
+        if os.path.isfile(config_path):
+            os.link(config_path, old_config_path)
+
         with SaveFile(config_path) as fd:
             config.write(fd)
+
+        if os.path.isfile(old_config_path):
+            self.secure_erase_config(old_config_path)
+
+    def secure_erase_config(self, path):
+        with open(path, 'r+b') as config:
+            length = os.stat(config.fileno()).st_size
+            config.write(os.urandom(length))
+            config.flush()
+            os.fsync(config.fileno())
+        os.unlink(path)
 
     def save_key(self, keydata):
         assert self.config

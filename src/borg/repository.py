@@ -18,6 +18,7 @@ from .helpers import Location
 from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
 from .helpers import yes
+from .helpers import secure_erase
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .lrucache import LRUCache
@@ -186,7 +187,7 @@ class Repository:
 
         if os.path.isfile(old_config_path):
             logger.warning("Old config file not securely erased on previous config update")
-            self.secure_erase_config(old_config_path)
+            secure_erase(old_config_path)
 
         if os.path.isfile(config_path):
             os.link(config_path, old_config_path)
@@ -195,15 +196,7 @@ class Repository:
             config.write(fd)
 
         if os.path.isfile(old_config_path):
-            self.secure_erase_config(old_config_path)
-
-    def secure_erase_config(self, path):
-        with open(path, 'r+b') as config:
-            length = os.stat(config.fileno()).st_size
-            config.write(os.urandom(length))
-            config.flush()
-            os.fsync(config.fileno())
-        os.unlink(path)
+            secure_erase(old_config_path)
 
     def save_key(self, keydata):
         assert self.config

@@ -190,7 +190,13 @@ class Repository:
             secure_erase(old_config_path)
 
         if os.path.isfile(config_path):
-            os.link(config_path, old_config_path)
+            try:
+                os.link(config_path, old_config_path)
+            except OSError as e:
+                if e.errno in (errno.EMLINK, errno.EPERM):
+                    logger.warning("Hardlink failed, cannot securely erase old config file")
+                else:
+                    raise
 
         with SaveFile(config_path) as fd:
             config.write(fd)

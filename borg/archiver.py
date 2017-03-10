@@ -29,7 +29,7 @@ from .logger import create_logger, setup_logging
 logger = create_logger()
 from .compress import Compressor
 from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
-from .repository import Repository
+from .repository import Repository, LIST_SCAN_LIMIT
 from .cache import Cache
 from .key import key_creator, tam_required_file, tam_required, RepoKey, PassphraseKey
 from .keymanager import KeyManager
@@ -813,7 +813,7 @@ class Archiver:
         marker = None
         i = 0
         while True:
-            result = repository.list(limit=10000, marker=marker)
+            result = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
             if not result:
                 break
             marker = result[-1]

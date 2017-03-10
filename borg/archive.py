@@ -23,7 +23,7 @@ from .helpers import Error, uid2user, user2uid, gid2group, group2gid, bin_to_hex
 from .platform import acl_get, acl_set
 from .chunker import Chunker
 from .hashindex import ChunkIndex
-from .repository import Repository
+from .repository import Repository, LIST_SCAN_LIMIT
 
 import msgpack
 
@@ -882,7 +882,7 @@ class ArchiveChecker:
         self.chunks = ChunkIndex(capacity)
         marker = None
         while True:
-            result = self.repository.list(limit=10000, marker=marker)
+            result = self.repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
             if not result:
                 break
             marker = result[-1]

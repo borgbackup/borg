@@ -15,7 +15,7 @@ from . import __version__
 from .helpers import Error, IntegrityError, sysinfo
 from .helpers import replace_placeholders
 from .helpers import bin_to_hex
-from .repository import Repository
+from .repository import Repository, LIST_SCAN_LIMIT, MAX_OBJECT_SIZE
 from .logger import create_logger
 
 import msgpack
@@ -44,6 +44,27 @@ def os_write(fd, data):
         data = data[count:]
         time.sleep(count * 1e-09)
     return amount
+
+
+def get_limited_unpacker(kind):
+    """return a limited Unpacker because we should not trust msgpack data received from remote"""
+    args = dict(use_list=False,  # return tuples, not lists
+                max_bin_len=0,  # not used
+                max_ext_len=0,  # not used
+                max_buffer_size=3 * max(BUFSIZE, MAX_OBJECT_SIZE),
+                max_str_len=MAX_OBJECT_SIZE,  # a chunk or other repo object
+                )
+    if kind == 'server':
+        args.update(dict(max_array_len=100,  # misc. cmd tuples
+                         max_map_len=100,  # misc. cmd dicts
+                         ))
+    elif kind == 'client':
+        args.update(dict(max_array_len=LIST_SCAN_LIMIT,  # result list from repo.list() / .scan()
+                         max_map_len=100,  # misc. result dicts
+                         ))
+    else:
+        raise ValueError('kind must be "server" or "client"')
+    return msgpack.Unpacker(**args)
 
 
 class ConnectionClosed(Error):
@@ -115,7 +136,7 @@ class RepositoryServer:  # pragma: no cover
         # Make stderr blocking
         fl = fcntl.fcntl(stderr_fd, fcntl.F_GETFL)
         fcntl.fcntl(stderr_fd, fcntl.F_SETFL, fl & ~os.O_NONBLOCK)
-        unpacker = msgpack.Unpacker(use_list=False)
+        unpacker = get_limited_unpacker('server')
         while True:
             r, w, es = select.select([stdin_fd], [], [], 10)
             if r:
@@ -205,7 +226,7 @@ class RemoteRepository:
         self.cache = {}
         self.ignore_responses = set()
         self.responses = {}
-        self.unpacker = msgpack.Unpacker(use_list=False)
+        self.unpacker = get_limited_unpacker('client')
         self.p = None
         testing = location.host == '__testsuite__'
         borg_cmd = self.borg_cmd(args, testing)

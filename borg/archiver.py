@@ -331,92 +331,90 @@ class Archiver:
     def _process(self, archive, cache, matcher, exclude_caches, exclude_if_present,
                  keep_tag_files, skip_inodes, path, restrict_dev,
                  read_special=False, dry_run=False):
+        """
+        Process *path* recursively according to the various parameters.
+
+        This should only raise on critical errors. Per-item errors must be handled within this method.
+        """
         if not matcher.match(path):
             return
 
         try:
-            st = os.lstat(path)
-        except OSError as e:
-            self.print_warning('%s: %s', path, e)
-            return
-        if (st.st_ino, st.st_dev) in skip_inodes:
-            return
-        # Entering a new filesystem?
-        if restrict_dev is not None and st.st_dev != restrict_dev:
-            return
-        status = None
-        # Ignore if nodump flag is set
-        if has_lchflags and (st.st_flags & stat.UF_NODUMP):
-            return
-        if stat.S_ISREG(st.st_mode):
-            if not dry_run:
-                try:
-                    status = archive.process_file(path, st, cache, self.ignore_inode)
-                except BackupOSError as e:
-                    status = 'E'
-                    self.print_warning('%s: %s', path, e)
-        elif stat.S_ISDIR(st.st_mode):
-            tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)
-            if tag_paths:
-                if keep_tag_files and not dry_run:
-                    archive.process_dir(path, st)
-                    for tag_path in tag_paths:
-                        self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
-                                      keep_tag_files, skip_inodes, tag_path, restrict_dev,
-                                      read_special=read_special, dry_run=dry_run)
+            with backup_io():
+                st = os.lstat(path)
+            if (st.st_ino, st.st_dev) in skip_inodes:
                 return
-            if not dry_run:
-                status = archive.process_dir(path, st)
-            try:
-                entries = os.listdir(path)
-            except OSError as e:
-                status = 'E'
-                self.print_warning('%s: %s', path, e)
-            else:
+            # Entering a new filesystem?
+            if restrict_dev is not None and st.st_dev != restrict_dev:
+                return
+            status = None
+            # Ignore if nodump flag is set
+            if has_lchflags and (st.st_flags & stat.UF_NODUMP):
+                return
+            if stat.S_ISREG(st.st_mode):
+                if not dry_run:
+                    status = archive.process_file(path, st, cache, self.ignore_inode)
+            elif stat.S_ISDIR(st.st_mode):
+                tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)
+                if tag_paths:
+                    if keep_tag_files and not dry_run:
+                        archive.process_dir(path, st)
+                        for tag_path in tag_paths:
+                            self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
+                                          keep_tag_files, skip_inodes, tag_path, restrict_dev,
+                                          read_special=read_special, dry_run=dry_run)
+                    return
+                if not dry_run:
+                    status = archive.process_dir(path, st)
+                with backup_io():
+                    entries = os.listdir(path)
                 for filename in sorted(entries):
                     entry_path = os.path.normpath(os.path.join(path, filename))
                     self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
                                   keep_tag_files, skip_inodes, entry_path, restrict_dev,
                                   read_special=read_special, dry_run=dry_run)
-        elif stat.S_ISLNK(st.st_mode):
-            if not dry_run:
-                if not read_special:
-                    status = archive.process_symlink(path, st)
-                else:
-                    try:
-                        st_target = os.stat(path)
-                    except OSError:
-                        special = False
-                    else:
-                        special = is_special(st_target.st_mode)
-                    if special:
-                        status = archive.process_file(path, st_target, cache)
-                    else:
+            elif stat.S_ISLNK(st.st_mode):
+                if not dry_run:
+                    if not read_special:
                         status = archive.process_symlink(path, st)
-        elif stat.S_ISFIFO(st.st_mode):
-            if not dry_run:
-                if not read_special:
-                    status = archive.process_fifo(path, st)
-                else:
-                    status = archive.process_file(path, st, cache)
-        elif stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
-            if not dry_run:
-                if not read_special:
-                    status = archive.process_dev(path, st)
-                else:
-                    status = archive.process_file(path, st, cache)
-        elif stat.S_ISSOCK(st.st_mode):
-            # Ignore unix sockets
-            return
-        elif stat.S_ISDOOR(st.st_mode):
-            # Ignore Solaris doors
-            return
-        elif stat.S_ISPORT(st.st_mode):
-            # Ignore Solaris event ports
-            return
-        else:
-            self.print_warning('Unknown file type: %s', path)
-            return
+                    else:
+                        try:
+                            st_target = os.stat(path)
+                        except OSError:
+                            special = False
+                        else:
+                            special = is_special(st_target.st_mode)
+                        if special:
+                            status = archive.process_file(path, st_target, cache)
+                        else:
+                            status = archive.process_symlink(path, st)
+            elif stat.S_ISFIFO(st.st_mode):
+                if not dry_run:
+                    if not read_special:
+                        status = archive.process_fifo(path, st)
+                    else:
+                        status = archive.process_file(path, st, cache)
+            elif stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
+                if not dry_run:
+                    if not read_special:
+                        status = archive.process_dev(path, st)
+                    else:
+                        status = archive.process_file(path, st, cache)
+            elif stat.S_ISSOCK(st.st_mode):
+                # Ignore unix sockets
+                return
+            elif stat.S_ISDOOR(st.st_mode):
+                # Ignore Solaris doors
+                return
+            elif stat.S_ISPORT(st.st_mode):
+                # Ignore Solaris event ports
+                return
+            else:
+                self.print_warning('Unknown file type: %s', path)
+                return
+        except BackupOSError as e:
+            self.print_warning('%s: %s', path, e)
+            status = 'E'
         # Status output
         if status is None:
             if not dry_run:

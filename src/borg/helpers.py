@@ -2256,3 +2256,12 @@ def json_dump(obj):
 
 def json_print(obj):
     print(json_dump(obj))
+
+def secure_erase(path):
+    """Attempt to securely erase a file by writing random data over a file before deleting it."""
+    with open(path, 'r+b') as fd:
+        length = os.stat(fd.fileno()).st_size
+        fd.write(os.urandom(length))
+        fd.flush()
+        os.fsync(fd.fileno())
+    os.unlink(path)

@@ -81,8 +81,20 @@ were collected:
 2. Branch a backporting branch off the maintenance branch.
 3. Cherry pick and backport the changes from each labelled PR, remove
    the label for each PR you've backported.
+
+   To preserve authorship metadata, do not follow the ``git cherry-pick``
+   instructions to use ``git commit`` after resolving conflicts. Instead,
+   stage conflict resolutions and run ``git cherry-pick --continue``,
+   much like using ``git rebase``.
+
+   To avoid merge issues (a cherry pick is a form of merge), use
+   these options (similar to the ``git merge`` options used previously,
+   the ``-x`` option adds a reference to the original commit)::
+
+     git cherry-pick --strategy recursive -X rename-threshold=5% -x
+
 4. Make a PR of the backporting branch against the maintenance branch
-   for backport review. Mention the backported PRs in this PR, eg:
+   for backport review. Mention the backported PRs in this PR, e.g.:
 
        Includes changes from #2055 #2057 #2381
 
@@ -273,15 +285,6 @@ If you encounter issues, see also our `Vagrantfile` for details.
           work on same OS, same architecture (x86 32bit, amd64 64bit)
           without external dependencies.
 
-
-Merging maintenance branches
-----------------------------
-
-As mentioned above bug fixes will usually be merged into a maintenance branch (x.y-maint) and then
-merged back into the master branch. Large diffs between these branches can make automatic merges troublesome,
-therefore we recommend to use these merge parameters::
-
-  git merge 1.0-maint -s recursive -X rename-threshold=20%
 
 .. _releasing:
 

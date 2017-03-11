@@ -2075,10 +2075,11 @@ class Archiver:
             args = self.preprocess_args(args)
         parser = self.build_parser(args)
         args = parser.parse_args(args or ['-h'])
-        if args.func == self.do_create:
+        # This works around http://bugs.python.org/issue9351
+        func = getattr(args, 'func', None) or getattr(args, 'fallback_func')
+        if func == self.do_create and not args.paths:
             # need at least 1 path but args.paths may also be populated from patterns
-            if not args.paths:
-                parser.error('Need at least one PATH argument.')
+            parser.error('Need at least one PATH argument.')
         return args
 
     def run(self, args):

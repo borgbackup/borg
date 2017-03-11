@@ -313,6 +313,8 @@ class Archive:
             self.chunker = Chunker(self.key.chunk_seed, *chunker_params)
             if name in manifest.archives:
                 raise self.AlreadyExists(name)
+            if '/' in name:
+                logger.warning('Note: Slashes in archive names result in a directory hierarchy when the repository is mounted.')
             self.last_checkpoint = time.monotonic()
             i = 0
             while True:

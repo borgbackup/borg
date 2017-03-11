@@ -346,18 +346,23 @@ def parse_timestamp(timestamp):
         return datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
 
 
-def parse_add_pattern(patternstr, roots, patterns):
+def parse_add_pattern(patternstr, roots, patterns, fallback):
     """Parse a pattern string and add it to roots or patterns depending on the pattern type."""
-    pattern = parse_inclexcl_pattern(patternstr)
+    pattern = parse_inclexcl_pattern(patternstr, fallback=fallback)
     if pattern.ptype is RootPath:
         roots.append(pattern.pattern)
+    elif pattern.ptype is PatternStyle:
+        fallback = pattern.pattern
     else:
         patterns.append(pattern)
+    return fallback
 
 
-def load_pattern_file(fileobj, roots, patterns):
+def load_pattern_file(fileobj, roots, patterns, fallback=None):
+    if fallback is None:
+        fallback = ShellPattern  # ShellPattern is defined later in this module
     for patternstr in clean_lines(fileobj):
-        parse_add_pattern(patternstr, roots, patterns)
+        fallback = parse_add_pattern(patternstr, roots, patterns, fallback)
 
 
 def load_exclude_file(fileobj, patterns):
@@ -370,7 +375,7 @@ class ArgparsePatternAction(argparse.Action):
         super().__init__(nargs=nargs, **kw)
 
     def __call__(self, parser, args, values, option_string=None):
-        parse_add_pattern(values[0], args.paths, args.patterns)
+        parse_add_pattern(values[0], args.paths, args.patterns, ShellPattern)
 
 
 class ArgparsePatternFileAction(argparse.Action):
@@ -566,6 +571,14 @@ _PATTERN_STYLE_BY_PREFIX = dict((i.PREFIX, i) for i in _PATTERN_STYLES)
 
 InclExclPattern = namedtuple('InclExclPattern', 'pattern ptype')
 RootPath = object()
+PatternStyle = object()
+
+
+def get_pattern_style(prefix):
+    try:
+        return _PATTERN_STYLE_BY_PREFIX[prefix]
+    except KeyError:
+        raise ValueError("Unknown pattern style: {}".format(prefix)) from None
 
 
 def parse_pattern(pattern, fallback=FnmatchPattern):
@@ -573,14 +586,9 @@ def parse_pattern(pattern, fallback=FnmatchPattern):
     """
     if len(pattern) > 2 and pattern[2] == ":" and pattern[:2].isalnum():
         (style, pattern) = (pattern[:2], pattern[3:])
-
-        cls = _PATTERN_STYLE_BY_PREFIX.get(style, None)
-
-        if cls is None:
-            raise ValueError("Unknown pattern style: {}".format(style))
+        cls = get_pattern_style(style)
     else:
         cls = fallback
-
     return cls(pattern)
 
 
@@ -598,6 +606,8 @@ def parse_inclexcl_pattern(pattern, fallback=ShellPattern):
         '+': True,
         'R': RootPath,
         'r': RootPath,
+        'P': PatternStyle,
+        'p': PatternStyle,
     }
     try:
         ptype = type_prefix_map[pattern[0]]
@@ -608,6 +618,11 @@ def parse_inclexcl_pattern(pattern, fallback=ShellPattern):
         raise argparse.ArgumentTypeError("Unable to parse pattern: {}".format(pattern))
     if ptype is RootPath:
         pobj = pattern
+    elif ptype is PatternStyle:
+        try:
+            pobj = get_pattern_style(pattern)
+        except ValueError:
+            raise argparse.ArgumentTypeError("Unable to parse pattern: {}".format(pattern))
     else:
         pobj = parse_pattern(pattern, fallback)
     return InclExclPattern(pobj, ptype)

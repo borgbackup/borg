@@ -19,7 +19,7 @@ from hashlib import sha256
 import msgpack
 import pytest
 
-from .. import xattr
+from .. import xattr, helpers
 from ..archive import Archive, ChunkBuffer, CHUNK_MAX_EXP, flags_noatime, flags_normal
 from ..archiver import Archiver
 from ..cache import Cache
@@ -68,6 +68,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
             if archiver is None:
                 archiver = Archiver()
             archiver.exit_code = EXIT_SUCCESS
+            helpers.exit_code = EXIT_SUCCESS
             args = archiver.parse_args(list(args))
             ret = archiver.run(args)
             return ret, output.getvalue()
@@ -245,7 +246,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         return output
 
     def create_src_archive(self, name):
-        self.cmd('create', self.repository_location + '::' + name, src_dir)
+        self.cmd('create', '--compression=lz4', self.repository_location + '::' + name, src_dir)
 
     def open_archive(self, name):
         repository = Repository(self.repository_path, exclusive=True)
@@ -780,6 +781,38 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 self.cmd('extract', self.repository_location + '::test')
             assert xattr.getxattr('input/file', 'security.capability') == capabilities
 
+    @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='xattr not supported on this system or on this version of'
+                                                         'fakeroot')
+    def test_extract_xattrs_errors(self):
+        def patched_setxattr_E2BIG(*args, **kwargs):
+            raise OSError(errno.E2BIG, 'E2BIG')
+
+        def patched_setxattr_ENOTSUP(*args, **kwargs):
+            raise OSError(errno.ENOTSUP, 'ENOTSUP')
+
+        def patched_setxattr_EACCES(*args, **kwargs):
+            raise OSError(errno.EACCES, 'EACCES')
+
+        self.create_regular_file('file')
+        xattr.setxattr('input/file', 'attribute', 'value')
+        self.cmd('init', self.repository_location, '-e' 'none')
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            input_abspath = os.path.abspath('input/file')
+            with patch.object(xattr, 'setxattr', patched_setxattr_E2BIG):
+                out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
+                assert out == (input_abspath + ': Value or key of extended attribute attribute is too big for this '
+                                               'filesystem\n')
+            os.remove(input_abspath)
+            with patch.object(xattr, 'setxattr', patched_setxattr_ENOTSUP):
+                out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
+                assert out == (input_abspath + ': Extended attributes are not supported on this filesystem\n')
+            os.remove(input_abspath)
+            with patch.object(xattr, 'setxattr', patched_setxattr_EACCES):
+                out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
+                assert out == (input_abspath + ': Permission denied when setting extended attribute attribute\n')
+            assert os.path.isfile(input_abspath)
+
     def test_path_normalization(self):
         self.cmd('init', self.repository_location)
         self.create_regular_file('dir1/dir2/file', size=1024 * 80)
@@ -880,6 +913,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('delete', self.repository_location)
         # Make sure the repo is gone
         self.assertFalse(os.path.exists(self.repository_path))
+
+    def test_delete_double_force(self):
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.create_src_archive('test')
+        with Repository(self.repository_path, exclusive=True) as repository:
+            manifest, key = Manifest.load(repository)
+            archive = Archive(repository, key, manifest, 'test')
+            id = archive.metadata[b'items'][0]
+            repository.put(id, b'corrupted items metadata stream chunk')
+            repository.commit()
+        self.cmd('delete', '--force', '--force', self.repository_location + '::test')
+        self.cmd('check', '--repair', self.repository_location)
+        output = self.cmd('list', self.repository_location)
+        self.assert_not_in('test', output)
 
     def test_corrupted_repository(self):
         self.cmd('init', self.repository_location)

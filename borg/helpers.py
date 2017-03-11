@@ -45,6 +45,26 @@ EXIT_WARNING = 1  # reached normal end of operation, but there were issues
 EXIT_ERROR = 2  # terminated abruptly, did not reach end of operation
 
 
+'''
+The global exit_code variable is used so that modules other than archiver can increase the program exit code if a
+warning or error occured during their operation. This is different from archiver.exit_code, which is only accessible
+from the archiver object.
+'''
+exit_code = EXIT_SUCCESS
+
+
+def set_ec(ec):
+    '''
+    Sets the exit code of the program, if an exit code higher or equal than this is set, this does nothing. This
+    makes EXIT_ERROR override EXIT_WARNING, etc..
+
+    ec: exit code to set
+    '''
+    global exit_code
+    exit_code = max(exit_code, ec)
+    return exit_code
+
+
 class Error(Exception):
     """Error base class"""
 
@@ -74,6 +94,10 @@ class IntegrityError(ErrorWithTraceback):
     """Data integrity error: {}"""
 
 
+class DecompressionError(IntegrityError):
+    """Decompression error: {}"""
+
+
 class ExtensionModuleError(Error):
     """The Borg binary extension modules do not seem to be properly installed"""
 
@@ -87,10 +111,12 @@ class PlaceholderError(Error):
 
 
 def check_extension_modules():
-    from . import platform
+    from . import platform, compress
     if hashindex.API_VERSION != '1.0_01':
         raise ExtensionModuleError
     if chunker.API_VERSION != '1.0_01':
+        raise ExtensionModuleError
+    if compress.API_VERSION != '1.0_01':
         raise ExtensionModuleError
     if crypto.API_VERSION != '1.0_01':
         raise ExtensionModuleError
@@ -899,10 +925,17 @@ class Location:
 
     # path must not contain :: (it ends at :: or string end), but may contain single colons.
     # to avoid ambiguities with other regexes, it must also not start with ":" nor with "//" nor with "ssh://".
-    path_re = r"""
+    scp_path_re = r"""
         (?!(:|//|ssh://))                                   # not starting with ":" or // or ssh://
         (?P<path>([^:]|(:(?!:)))+)                          # any chars, but no "::"
         """
+
+    # file_path must not contain :: (it ends at :: or string end), but may contain single colons.
+    # it must start with a / and that slash is part of the path.
+    file_path_re = r"""
+        (?P<path>(([^/]*)/([^:]|(:(?!:)))+))                # start opt. servername, then /, then any chars, but no "::"
+        """
+
     # abs_path must not contain :: (it ends at :: or string end), but may contain single colons.
     # it must start with a / and that slash is part of the path.
     abs_path_re = r"""
@@ -927,7 +960,7 @@ class Location:
 
     file_re = re.compile(r"""
         (?P<proto>file)://                                  # file://
-        """ + path_re + optional_archive_re, re.VERBOSE)    # path or path::archive
+        """ + file_path_re + optional_archive_re, re.VERBOSE)  # servername/path, path or path::archive
 
     # note: scp_re is also use for local pathes
     scp_re = re.compile(r"""
@@ -935,7 +968,7 @@ class Location:
             """ + optional_user_re + r"""                   # user@  (optional)
             (?P<host>[^:/]+):                               # host: (don't match / in host to disambiguate from file:)
         )?                                                  # user@host: part is optional
-        """ + path_re + optional_archive_re, re.VERBOSE)    # path with optional archive
+        """ + scp_path_re + optional_archive_re, re.VERBOSE)  # path with optional archive
 
     # get the repo from BORG_REPO env and the optional archive from param.
     # if the syntax requires giving REPOSITORY (see "borg mount"),

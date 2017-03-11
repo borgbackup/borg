@@ -19,11 +19,11 @@ from . import xattr
 from .helpers import Error, uid2user, user2uid, gid2group, group2gid, bin_to_hex, \
     parse_timestamp, to_localtime, format_time, format_timedelta, remove_surrogates, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
-    ProgressIndicatorPercent, IntegrityError
+    ProgressIndicatorPercent, IntegrityError, set_ec, EXIT_WARNING
 from .platform import acl_get, acl_set
 from .chunker import Chunker
 from .hashindex import ChunkIndex
-from .repository import Repository
+from .repository import Repository, LIST_SCAN_LIMIT
 
 import msgpack
 
@@ -501,11 +501,20 @@ Number of files: {0.stats.nfiles}'''.format(
             try:
                 xattr.setxattr(fd or path, k, v, follow_symlinks=False)
             except OSError as e:
-                if e.errno not in (errno.ENOTSUP, errno.EACCES):
-                    # only raise if the errno is not on our ignore list:
-                    # ENOTSUP == xattrs not supported here
-                    # EACCES == permission denied to set this specific xattr
-                    #           (this may happen related to security.* keys)
+                if e.errno == errno.E2BIG:
+                    # xattr is too big
+                    logger.warning('%s: Value or key of extended attribute %s is too big for this filesystem' %
+                                   (path, k.decode()))
+                    set_ec(EXIT_WARNING)
+                elif e.errno == errno.ENOTSUP:
+                    # xattrs not supported here
+                    logger.warning('%s: Extended attributes are not supported on this filesystem' % path)
+                    set_ec(EXIT_WARNING)
+                elif e.errno == errno.EACCES:
+                    # permission denied to set this specific xattr (this may happen related to security.* keys)
+                    logger.warning('%s: Permission denied when setting extended attribute %s' % (path, k.decode()))
+                    set_ec(EXIT_WARNING)
+                else:
                     raise
 
     def rename(self, name):
@@ -533,7 +542,7 @@ Number of files: {0.stats.nfiles}'''.format(
                 raise ChunksIndexError(cid)
             except Repository.ObjectNotFound as e:
                 # object not in repo - strange, but we wanted to delete it anyway.
-                if not forced:
+                if forced == 0:
                     raise
                 error = True
 
@@ -555,14 +564,14 @@ Number of files: {0.stats.nfiles}'''.format(
                 except (TypeError, ValueError):
                     # if items metadata spans multiple chunks and one chunk got dropped somehow,
                     # it could be that unpacker yields bad types
-                    if not forced:
+                    if forced == 0:
                         raise
                     error = True
             if progress:
                 pi.finish()
         except (msgpack.UnpackException, Repository.ObjectNotFound):
             # items metadata corrupted
-            if not forced:
+            if forced == 0:
                 raise
             error = True
         # in forced delete mode, we try hard to delete at least the manifest entry,
@@ -882,7 +891,7 @@ class ArchiveChecker:
         self.chunks = ChunkIndex(capacity)
         marker = None
         while True:
-            result = self.repository.list(limit=10000, marker=marker)
+            result = self.repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
             if not result:
                 break
             marker = result[-1]
@@ -984,6 +993,13 @@ class ArchiveChecker:
             Missing file chunks will be replaced with new chunks of the same length containing all zeros.
             If a previously missing file chunk re-appears, the replacement chunk is replaced by the correct one.
             """
+            def replacement_chunk(size):
+                data = bytes(size)
+                chunk_id = self.key.id_hash(data)
+                cdata = self.key.encrypt(data)
+                csize = len(cdata)
+                return chunk_id, size, csize, cdata
+
             offset = 0
             chunk_list = []
             chunks_replaced = False
@@ -1000,17 +1016,21 @@ class ArchiveChecker:
                                      'Replacing with all-zero chunk.'.format(
                                      item[b'path'].decode('utf-8', 'surrogateescape'), offset, offset + size))
                         self.error_found = chunks_replaced = True
-                        data = bytes(size)
-                        chunk_id = self.key.id_hash(data)
-                        cdata = self.key.encrypt(data)
-                        csize = len(cdata)
+                        chunk_id, size, csize, cdata = replacement_chunk(size)
                         add_reference(chunk_id, size, csize, cdata)
                     else:
                         logger.info('{}: Previously missing file chunk is still missing (Byte {}-{}). '
                                     'It has a all-zero replacement chunk already.'.format(
                                     item[b'path'].decode('utf-8', 'surrogateescape'), offset, offset + size))
                         chunk_id, size, csize = chunk_current
-                        add_reference(chunk_id, size, csize)
+                        if chunk_id in self.chunks:
+                            add_reference(chunk_id, size, csize)
+                        else:
+                            logger.warning('{}: Missing all-zero replacement chunk detected (Byte {}-{}). '
+                                           'Generating new replacement chunk.'.format(item.path, offset, offset + size))
+                            self.error_found = chunks_replaced = True
+                            chunk_id, size, csize, cdata = replacement_chunk(size)
+                            add_reference(chunk_id, size, csize, cdata)
                 else:
                     if chunk_current == chunk_healthy:
                         # normal case, all fine.

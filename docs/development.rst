@@ -19,18 +19,7 @@ Some guidance for contributors:
 
 - discuss about changes on github issue tracker, IRC or mailing list
 
-- choose the branch you base your changesets on wisely:
-
-  - choose x.y-maint for stuff that should go into next x.y.z release
-    (it usually gets merged into master branch later also), like:
-
-    - bug fixes (code or docs)
-    - missing *important* (and preferably small) features
-    - docs rearrangements (so stuff stays in-sync to avoid merge
-      troubles in future)
-  - choose master if that does not apply, like for:
-
-    - developing new features
+- make your PRs on the ``master`` branch (see `Branching Model`_ for details)
 
 - do clean changesets:
 
@@ -56,6 +45,67 @@ Some guidance for contributors:
 
 - wait for review by other developers
 
+Branching model
+---------------
+
+Borg development happens on the ``master`` branch and uses GitHub pull
+requests (if you don't have GitHub or don't want to use it you can
+send smaller patches via the borgbackup :ref:`mailing_list` to the maintainers).
+
+Stable releases are maintained on maintenance branches named x.y-maint, eg.
+the maintenance branch of the 1.0.x series is 1.0-maint.
+
+Most PRs should be made against the ``master`` branch. Only if an
+issue affects **only** a particular maintenance branch a PR should be
+made against it directly.
+
+While discussing / reviewing a PR it will be decided whether the
+change should be applied to maintenance branch(es). Each maintenance
+branch has a corresponding *backport/x.y-maint* label, which will then
+be applied.
+
+Changes that are typically considered for backporting:
+
+- Data loss, corruption and inaccessibility fixes
+- Security fixes
+- Forward-compatibility improvements
+- Documentation corrections
+
+.. rubric:: Maintainer part
+
+From time to time a maintainer will backport the changes for a
+maintenance branch, typically before a release or if enough changes
+were collected:
+
+1. Notify others that you're doing this to avoid duplicate work.
+2. Branch a backporting branch off the maintenance branch.
+3. Cherry pick and backport the changes from each labelled PR, remove
+   the label for each PR you've backported.
+4. Make a PR of the backporting branch against the maintenance branch
+   for backport review. Mention the backported PRs in this PR, eg:
+
+       Includes changes from #2055 #2057 #2381
+
+   This way GitHub will automatically show in these PRs where they
+   were backported.
+
+.. rubric:: Historic model
+
+Previously (until release 1.0.10) Borg used a `"merge upwards"
+<https://git-scm.com/docs/gitworkflows#_merging_upwards>`_ model where
+most minor changes and fixes where committed to a maintenance branch
+(eg. 1.0-maint), and the maintenance branch(es) were regularly merged
+back into the main development branch. This became more and more
+troublesome due to merges growing more conflict-heavy and error-prone.
+
+Code and issues
+---------------
+
+Code is stored on Github, in the `Borgbackup organization
+<https://github.com/borgbackup/borg/>`_. `Issues
+<https://github.com/borgbackup/borg/issues>`_ and `pull requests
+<https://github.com/borgbackup/borg/pulls>`_ should be sent there as
+well. See also the :ref:`support` section for more details.
 
 Style guide
 -----------

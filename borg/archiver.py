@@ -23,13 +23,13 @@ from .helpers import Error, location_validator, archivename_validator, format_li
     PathPrefixPattern, to_localtime, timestamp, safe_timestamp, bin_to_hex, get_cache_dir, prune_within, prune_split, \
     Manifest, NoManifestError, remove_surrogates, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, PrefixSpec, is_slow_msgpack, yes, sysinfo, \
-    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ErrorIgnoringTextIOWrapper
+    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ErrorIgnoringTextIOWrapper, set_ec
 from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
 from .logger import create_logger, setup_logging
 logger = create_logger()
 from .compress import Compressor
 from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
-from .repository import Repository
+from .repository import Repository, LIST_SCAN_LIMIT
 from .cache import Cache
 from .key import key_creator, tam_required_file, tam_required, RepoKey, PassphraseKey
 from .keymanager import KeyManager
@@ -331,92 +331,90 @@ class Archiver:
     def _process(self, archive, cache, matcher, exclude_caches, exclude_if_present,
                  keep_tag_files, skip_inodes, path, restrict_dev,
                  read_special=False, dry_run=False):
+        """
+        Process *path* recursively according to the various parameters.
+
+        This should only raise on critical errors. Per-item errors must be handled within this method.
+        """
         if not matcher.match(path):
             return
 
         try:
-            st = os.lstat(path)
-        except OSError as e:
-            self.print_warning('%s: %s', path, e)
-            return
-        if (st.st_ino, st.st_dev) in skip_inodes:
-            return
-        # Entering a new filesystem?
-        if restrict_dev is not None and st.st_dev != restrict_dev:
-            return
-        status = None
-        # Ignore if nodump flag is set
-        if has_lchflags and (st.st_flags & stat.UF_NODUMP):
-            return
-        if stat.S_ISREG(st.st_mode):
-            if not dry_run:
-                try:
-                    status = archive.process_file(path, st, cache, self.ignore_inode)
-                except BackupOSError as e:
-                    status = 'E'
-                    self.print_warning('%s: %s', path, e)
-        elif stat.S_ISDIR(st.st_mode):
-            tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)
-            if tag_paths:
-                if keep_tag_files and not dry_run:
-                    archive.process_dir(path, st)
-                    for tag_path in tag_paths:
-                        self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
-                                      keep_tag_files, skip_inodes, tag_path, restrict_dev,
-                                      read_special=read_special, dry_run=dry_run)
+            with backup_io():
+                st = os.lstat(path)
+            if (st.st_ino, st.st_dev) in skip_inodes:
                 return
-            if not dry_run:
-                status = archive.process_dir(path, st)
-            try:
-                entries = os.listdir(path)
-            except OSError as e:
-                status = 'E'
-                self.print_warning('%s: %s', path, e)
-            else:
+            # Entering a new filesystem?
+            if restrict_dev is not None and st.st_dev != restrict_dev:
+                return
+            status = None
+            # Ignore if nodump flag is set
+            if has_lchflags and (st.st_flags & stat.UF_NODUMP):
+                return
+            if stat.S_ISREG(st.st_mode):
+                if not dry_run:
+                    status = archive.process_file(path, st, cache, self.ignore_inode)
+            elif stat.S_ISDIR(st.st_mode):
+                tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)
+                if tag_paths:
+                    if keep_tag_files and not dry_run:
+                        archive.process_dir(path, st)
+                        for tag_path in tag_paths:
+                            self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
+                                          keep_tag_files, skip_inodes, tag_path, restrict_dev,
+                                          read_special=read_special, dry_run=dry_run)
+                    return
+                if not dry_run:
+                    status = archive.process_dir(path, st)
+                with backup_io():
+                    entries = os.listdir(path)
                 for filename in sorted(entries):
                     entry_path = os.path.normpath(os.path.join(path, filename))
                     self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
                                   keep_tag_files, skip_inodes, entry_path, restrict_dev,
                                   read_special=read_special, dry_run=dry_run)
-        elif stat.S_ISLNK(st.st_mode):
-            if not dry_run:
-                if not read_special:
-                    status = archive.process_symlink(path, st)
-                else:
-                    try:
-                        st_target = os.stat(path)
-                    except OSError:
-                        special = False
-                    else:
-                        special = is_special(st_target.st_mode)
-                    if special:
-                        status = archive.process_file(path, st_target, cache)
-                    else:
+            elif stat.S_ISLNK(st.st_mode):
+                if not dry_run:
+                    if not read_special:
                         status = archive.process_symlink(path, st)
-        elif stat.S_ISFIFO(st.st_mode):
-            if not dry_run:
-                if not read_special:
-                    status = archive.process_fifo(path, st)
-                else:
-                    status = archive.process_file(path, st, cache)
-        elif stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
-            if not dry_run:
-                if not read_special:
-                    status = archive.process_dev(path, st)
-                else:
-                    status = archive.process_file(path, st, cache)
-        elif stat.S_ISSOCK(st.st_mode):
-            # Ignore unix sockets
-            return
-        elif stat.S_ISDOOR(st.st_mode):
-            # Ignore Solaris doors
-            return
-        elif stat.S_ISPORT(st.st_mode):
-            # Ignore Solaris event ports
-            return
-        else:
-            self.print_warning('Unknown file type: %s', path)
-            return
+                    else:
+                        try:
+                            st_target = os.stat(path)
+                        except OSError:
+                            special = False
+                        else:
+                            special = is_special(st_target.st_mode)
+                        if special:
+                            status = archive.process_file(path, st_target, cache)
+                        else:
+                            status = archive.process_symlink(path, st)
+            elif stat.S_ISFIFO(st.st_mode):
+                if not dry_run:
+                    if not read_special:
+                        status = archive.process_fifo(path, st)
+                    else:
+                        status = archive.process_file(path, st, cache)
+            elif stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
+                if not dry_run:
+                    if not read_special:
+                        status = archive.process_dev(path, st)
+                    else:
+                        status = archive.process_file(path, st, cache)
+            elif stat.S_ISSOCK(st.st_mode):
+                # Ignore unix sockets
+                return
+            elif stat.S_ISDOOR(st.st_mode):
+                # Ignore Solaris doors
+                return
+            elif stat.S_ISPORT(st.st_mode):
+                # Ignore Solaris event ports
+                return
+            else:
+                self.print_warning('Unknown file type: %s', path)
+                return
+        except BackupOSError as e:
+            self.print_warning('%s: %s', path, e)
+            status = 'E'
         # Status output
         if status is None:
             if not dry_run:
@@ -505,9 +503,23 @@ class Archiver:
     def do_delete(self, args, repository):
         """Delete an existing repository or archive"""
         if args.location.archive:
+            archive_name = args.location.archive
             manifest, key = Manifest.load(repository)
+
+            if args.forced == 2:
+                try:
+                    del manifest.archives[archive_name]
+                except KeyError:
+                    raise Archive.DoesNotExist(archive_name)
+                logger.info('Archive deleted.')
+                manifest.write()
+                # note: might crash in compact() after committing the repo
+                repository.commit()
+                logger.info('Done. Run "borg check --repair" to clean up the mess.')
+                return self.exit_code
+
             with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
-                archive = Archive(repository, key, manifest, args.location.archive, cache=cache)
+                archive = Archive(repository, key, manifest, archive_name, cache=cache)
                 stats = Statistics()
                 archive.delete(stats, progress=args.progress, forced=args.forced)
                 manifest.write()
@@ -815,7 +827,7 @@ class Archiver:
         marker = None
         i = 0
         while True:
-            result = repository.list(limit=10000, marker=marker)
+            result = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
             if not result:
                 break
             marker = result[-1]
@@ -1556,8 +1568,9 @@ class Archiver:
                                action='store_true', default=False,
                                help='delete only the local cache for the given repository')
         subparser.add_argument('--force', dest='forced',
-                               action='store_true', default=False,
-                               help='force deletion of corrupted archives')
+                               action='count', default=0,
+                               help='force deletion of corrupted archives, '
+                                    'use --force --force in case --force does not work.')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
                                help='work slower, but using less space')
@@ -2077,7 +2090,7 @@ class Archiver:
         check_extension_modules()
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
-        return func(args)
+        return set_ec(func(args))
 
 
 def sig_info_handler(sig_no, stack):  # pragma: no cover

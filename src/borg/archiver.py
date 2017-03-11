@@ -110,7 +110,9 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True, excl
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
                                do_files=getattr(args, 'cache_files', False),
-                               progress=getattr(args, 'progress', False), lock_wait=self.lock_wait) as cache_:
+                               progress=getattr(args, 'progress', False),
+                               avoid_cache_sync=getattr(args, 'avoid_cache_sync', False),
+                               lock_wait=self.lock_wait) as cache_:
                         return method(self, args, repository=repository, cache=cache_, **kwargs)
                 else:
                     return method(self, args, repository=repository, **kwargs)
@@ -2329,6 +2331,8 @@ class Archiver:
                                help='only display items with the given status characters')
         subparser.add_argument('--json', action='store_true',
                                help='output stats as JSON (implies --stats)')
+        subparser.add_argument('--avoid-cache-sync', dest='avoid_cache_sync', action='store_true',
+                               help='Avoid synchronizing the local cache')
 
         exclude_group = subparser.add_argument_group('Exclusion options')
         exclude_group.add_argument('-e', '--exclude', dest='patterns',

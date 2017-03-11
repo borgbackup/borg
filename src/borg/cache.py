@@ -169,7 +169,7 @@ class Cache:
             shutil.rmtree(path)
 
     def __init__(self, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True,
-                 progress=False, lock_wait=None):
+                 progress=False, avoid_cache_sync=False, lock_wait=None):
         """
         :param do_files: use file metadata cache
         :param warn_if_unencrypted: print warning if accessing unknown unencrypted repository

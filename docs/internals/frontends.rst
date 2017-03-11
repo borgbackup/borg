@@ -526,6 +526,7 @@ Operations
     - cache.sync
 
       *info* is one string element, the name of the archive currently synced.
+    - cache.download_chunks
     - repository.compact_segments
     - repository.replay_segments
     - repository.check_segments

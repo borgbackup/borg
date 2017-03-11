@@ -25,6 +25,7 @@ from .key import PlaintextKey
 from .locking import Lock
 from .platform import SaveFile
 from .remote import cache_if_remote
+from .repository import LIST_SCAN_LIMIT
 
 FileCacheEntry = namedtuple('FileCacheEntry', 'age inode size mtime chunk_ids')
 
@@ -302,22 +303,6 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             self.lock.release()
             self.lock = None
 
-    def _read_files(self):
-        self.files = {}
-        self._newest_mtime = None
-        logger.debug('Reading files cache ...')
-        with open(os.path.join(self.path, 'files'), 'rb') as fd:
-            u = msgpack.Unpacker(use_list=True)
-            while True:
-                data = fd.read(64 * 1024)
-                if not data:
-                    break
-                u.feed(data)
-                for path_hash, item in u:
-                    entry = FileCacheEntry(*item)
-                    # in the end, this takes about 240 Bytes per file
-                    self.files[path_hash] = msgpack.packb(entry._replace(age=entry.age + 1))
-
     def begin_txn(self):
         # Initialize transaction snapshot
         pi = ProgressIndicatorMessage(msgid='cache.begin_transaction')
@@ -388,6 +373,126 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 shutil.rmtree(os.path.join(self.path, 'txn.tmp'))
         self.txn_active = False
         self._do_open()
+
+
+class FilesCache:
+    def file_known_and_unchanged(self, path_hash, st, ignore_inode=False):
+        if not (self.do_files and stat.S_ISREG(st.st_mode)):
+            return None
+        if self.files is None:
+            self._read_files()
+        entry = self.files.get(path_hash)
+        if not entry:
+            return None
+        entry = FileCacheEntry(*msgpack.unpackb(entry))
+        if (entry.size == st.st_size and entry.mtime == st.st_mtime_ns and
+                (ignore_inode or entry.inode == st.st_ino)):
+            # we ignored the inode number in the comparison above or it is still same.
+            # if it is still the same, replacing it in the tuple doesn't change it.
+            # if we ignored it, a reason for doing that is that files were moved to a new
+            # disk / new fs (so a one-time change of inode number is expected) and we wanted
+            # to avoid everything getting chunked again. to be able to re-enable the inode
+            # number comparison in a future backup run (and avoid chunking everything
+            # again at that time), we need to update the inode number in the cache with what
+            # we see in the filesystem.
+            self.files[path_hash] = msgpack.packb(entry._replace(inode=st.st_ino, age=0))
+            return entry.chunk_ids
+        else:
+            return None
+
+    def memorize_file(self, path_hash, st, ids):
+        if not (self.do_files and stat.S_ISREG(st.st_mode)):
+            return
+        entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, mtime=st.st_mtime_ns, chunk_ids=ids)
+        self.files[path_hash] = msgpack.packb(entry)
+        self._newest_mtime = max(self._newest_mtime or 0, st.st_mtime_ns)
+
+    def _read_files(self):
+        self.files = {}
+        self._newest_mtime = None
+        logger.debug('Reading files cache ...')
+        with open(os.path.join(self.path, 'files'), 'rb') as fd:
+            u = msgpack.Unpacker(use_list=True)
+            while True:
+                data = fd.read(64 * 1024)
+                if not data:
+                    break
+                u.feed(data)
+                for path_hash, item in u:
+                    entry = FileCacheEntry(*item)
+                    # in the end, this takes about 240 Bytes per file
+                    self.files[path_hash] = msgpack.packb(entry._replace(age=entry.age + 1))
+
+
+class ChunksCache:
+    def add_chunk(self, id, chunk, stats, overwrite=False):
+        """
+        Add *chunk* with *id* to the underlying repository, updating *stats*.
+
+        If *overwrite* is true, then an existing chunk is replaced, if any;
+        otherwise the data in *chunk* is ignored if a chunk with *id* already
+        exists.
+
+        Return a ChunkListEntry.
+        """
+        if not self.txn_active:
+            self.begin_txn()
+        size = len(chunk.data)
+        refcount = self.seen_chunk(id, size)
+        if refcount and not overwrite:
+            return self.chunk_incref(id, stats)
+        data = self.key.encrypt(chunk)
+        csize = len(data)
+        self.repository.put(id, data, wait=False)
+        self.chunks.add(id, 1, size, csize)
+        stats.update(size, csize, not refcount)
+        return ChunkListEntry(id, size, csize)
+
+    def seen_chunk(self, id, size=None):
+        """
+        Return whether a chunk with *id* was seen. Optionally verify *size* for
+        enhanced collision resistance.
+        """
+
+    def chunk_incref(self, id, stats):
+        """
+        Add reference to chunk with *id*, updating *stats*, return ChunkListEntry.
+        """
+
+    def chunk_decref(self, id, stats):
+        """
+        Delete reference to chunk with *id*, updating *stats*.
+        """
+
+
+class LocalChunksCache:
+
+    def seen_chunk(self, id, size=None):
+        refcount, stored_size, _ = self.chunks.get(id, ChunkIndexEntry(0, None, None))
+        if size is not None and stored_size is not None and size != stored_size:
+            # we already have a chunk with that id, but different size.
+            # this is either a hash collision (unlikely) or corruption or a bug.
+            raise Exception("chunk has same id [%r], but different size (stored: %d new: %d)!" % (
+                            id, stored_size, size))
+        return refcount
+
+    def chunk_incref(self, id, stats):
+        if not self.txn_active:
+            self.begin_txn()
+        count, size, csize = self.chunks.incref(id)
+        stats.update(size, csize, False)
+        return ChunkListEntry(id, size, csize)
+
+    def chunk_decref(self, id, stats):
+        if not self.txn_active:
+            self.begin_txn()
+        count, size, csize = self.chunks.decref(id)
+        if count == 0:
+            del self.chunks[id]
+            self.repository.delete(id, wait=False)
+            stats.update(-size, -csize, True)
+        else:
+            stats.update(-size, -csize, False)
 
     def sync(self):
         """Re-synchronize chunks cache with repository.
@@ -523,39 +628,61 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             self.do_cache = os.path.isdir(archive_path)
             self.chunks = create_master_idx(self.chunks)
 
+
+class AdhocChunksCache(ChunksCache):
+    def __init__(self):
+        self.init_chunks()
+
+    def init_chunks(self):
+        # Explicitly set the initial hash table capacity to avoid performance issues
+        # due to hash table "resonance".
+        # Since we're creating an archive, add 10 % from the start
+        num_chunks = len(self.repository)
+        capacity = int(num_chunks / ChunkIndex.MAX_LOAD_FACTOR * 1.1)
+        self.chunks = ChunkIndex(capacity)
+        marker = None
+        pi = ProgressIndicatorPercent(total=num_chunks, msg="Downloading chunk list... %3.0f%%", msgid='cache.download_chunks')
+        while True:
+            result = self.repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
+            if not result:
+                break
+            pi.show(len(result))
+            marker = result[-1]
+            # All chunks from the repository have a refcount of MAX_VALUE, which is sticky,
+            # therefore we can't/won't delete them. Chunks we added ourselves in this transaction
+            # (e.g. checkpoint archives) are tracked correctly.
+            init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0, csize=-1)
+            for id_ in result:
+                self.chunks[id_] = init_entry
+        pi.finish()
+
     def add_chunk(self, id, chunk, stats, overwrite=False):
-        if not self.txn_active:
-            self.begin_txn()
+        assert not overwrite, 'Logic Bug'
         size = len(chunk.data)
-        refcount = self.seen_chunk(id, size)
-        if refcount and not overwrite:
-            return self.chunk_incref(id, stats)
-        data = self.key.encrypt(chunk)
-        csize = len(data)
-        self.repository.put(id, data, wait=False)
-        self.chunks.add(id, 1, size, csize)
-        stats.update(size, csize, not refcount)
-        return ChunkListEntry(id, size, csize)
+        entry = self.chunks.get(id)
+        if entry is not None:
+            if entry.size == 0 and size != 0:
+                # Update size for chunks we got from the repo (size=0)
+                self.chunks.add(id, 1, size, entry.csize)
+                stats.update(size, entry.csize, False)
+            return ChunkListEntry(id, entry.size, -1)
+        else:
+            data = self.key.encrypt(chunk)
+            csize = len(data)
+            self.repository.put(id, data, wait=False)
+            self.chunks.add(id, 1, size, csize)
+            stats.update(size, csize, True)
+            return ChunkListEntry(id, size, csize)
 
     def seen_chunk(self, id, size=None):
-        refcount, stored_size, _ = self.chunks.get(id, ChunkIndexEntry(0, None, None))
-        if size is not None and stored_size is not None and size != stored_size:
-            # we already have a chunk with that id, but different size.
-            # this is either a hash collision (unlikely) or corruption or a bug.
-            raise Exception("chunk has same id [%r], but different size (stored: %d new: %d)!" % (
-                            id, stored_size, size))
-        return refcount
+        return id in self.chunks
 
     def chunk_incref(self, id, stats):
-        if not self.txn_active:
-            self.begin_txn()
         count, size, csize = self.chunks.incref(id)
         stats.update(size, csize, False)
         return ChunkListEntry(id, size, csize)
 
     def chunk_decref(self, id, stats):
-        if not self.txn_active:
-            self.begin_txn()
         count, size, csize = self.chunks.decref(id)
         if count == 0:
             del self.chunks[id]
@@ -563,34 +690,3 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             stats.update(-size, -csize, True)
         else:
             stats.update(-size, -csize, False)
-
-    def file_known_and_unchanged(self, path_hash, st, ignore_inode=False):
-        if not (self.do_files and stat.S_ISREG(st.st_mode)):
-            return None
-        if self.files is None:
-            self._read_files()
-        entry = self.files.get(path_hash)
-        if not entry:
-            return None
-        entry = FileCacheEntry(*msgpack.unpackb(entry))
-        if (entry.size == st.st_size and entry.mtime == st.st_mtime_ns and
-                (ignore_inode or entry.inode == st.st_ino)):
-            # we ignored the inode number in the comparison above or it is still same.
-            # if it is still the same, replacing it in the tuple doesn't change it.
-            # if we ignored it, a reason for doing that is that files were moved to a new
-            # disk / new fs (so a one-time change of inode number is expected) and we wanted
-            # to avoid everything getting chunked again. to be able to re-enable the inode
-            # number comparison in a future backup run (and avoid chunking everything
-            # again at that time), we need to update the inode number in the cache with what
-            # we see in the filesystem.
-            self.files[path_hash] = msgpack.packb(entry._replace(inode=st.st_ino, age=0))
-            return entry.chunk_ids
-        else:
-            return None
-
-    def memorize_file(self, path_hash, st, ids):
-        if not (self.do_files and stat.S_ISREG(st.st_mode)):
-            return
-        entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, mtime=st.st_mtime_ns, chunk_ids=ids)
-        self.files[path_hash] = msgpack.packb(entry)
-        self._newest_mtime = max(self._newest_mtime or 0, st.st_mtime_ns)

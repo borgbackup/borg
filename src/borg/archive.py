@@ -57,7 +57,8 @@ class Statistics:
 
     def update(self, size, csize, unique):
         self.osize += size
-        self.csize += csize
+        if csize != -1:
+            self.csize += csize
         if unique:
             self.usize += csize
 

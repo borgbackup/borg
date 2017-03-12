@@ -290,7 +290,7 @@ class Manifest:
         manifest_dict, manifest.tam_verified = key.unpack_and_verify_manifest(data, force_tam_not_required=force_tam_not_required)
         m = ManifestItem(internal_dict=manifest_dict)
         manifest.id = key.id_hash(data)
-        if m.get('version') != 1:
+        if m.get('version') not in (1, 2):
             raise ValueError('Invalid manifest version')
         manifest.archives.set_raw_dict(m.archives)
         manifest.timestamp = m.get('timestamp')

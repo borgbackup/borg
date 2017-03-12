@@ -4,6 +4,7 @@ import stat
 import shutil
 from binascii import unhexlify
 from collections import namedtuple
+from time import perf_counter
 
 import msgpack
 
@@ -181,6 +182,7 @@ class Cache:
         self.timestamp = None
         self.lock = None
         self.txn_active = False
+        self.txn_set = ['config']
         self.repository = repository
         self.key = key
         self.manifest = manifest
@@ -190,7 +192,10 @@ class Cache:
         self.hostname_is_unique = yes(env_var_override='BORG_HOSTNAME_IS_UNIQUE', prompt=False, env_msg=None)
         if self.hostname_is_unique:
             logger.info('Enabled removal of stale cache locks')
-        self.do_files = do_files
+        if do_files:
+            self.files = FilesCache(self)
+        else:
+            self.files = DummyFilesCache()
         # Warn user before sending data to a never seen before unencrypted repository
         if not os.path.exists(self.path):
             self.security_manager.assert_access_unknown(warn_if_unencrypted, key)
@@ -199,8 +204,14 @@ class Cache:
         try:
             self.security_manager.assert_secure(manifest, key, self)
             if sync and self.manifest.id != self.manifest_id:
-                self.sync()
-                self.commit()
+                if avoid_cache_sync:
+                    self.chunks = AdhocChunksCache(self)
+                else:
+                    self.chunks = LocalChunksCache(self)
+                    self.chunks.sync()
+                    self.commit()
+            else:
+                self.chunks = LocalChunksCache(self)
         except:
             self.close()
             raise
@@ -224,7 +235,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
 
     def stats(self):
         # XXX: this should really be moved down to `hashindex.pyx`
-        stats = self.Summary(*self.chunks.summarize())._asdict()
+        stats = self.Summary(*self.chunks.chunks.summarize())._asdict()
         return stats
 
     def format_tuple(self):
@@ -289,7 +300,6 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         self.timestamp = self.config.get('cache', 'timestamp', fallback=None)
         self.key_type = self.config.get('cache', 'key_type', fallback=None)
         self.previous_location = self.config.get('cache', 'previous_location', fallback=None)
-        self.chunks = ChunkIndex.read(os.path.join(self.path, 'chunks').encode('utf-8'))
         self.files = None
 
     def open(self, lock_wait=None):
@@ -303,17 +313,17 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             self.lock.release()
             self.lock = None
 
+    def txn_register(self, file):
+        self.txn_set.append(file)
+
     def begin_txn(self):
         # Initialize transaction snapshot
         pi = ProgressIndicatorMessage(msgid='cache.begin_transaction')
         txn_dir = os.path.join(self.path, 'txn.tmp')
         os.mkdir(txn_dir)
-        pi.output('Initializing cache transaction: Reading config')
-        shutil.copy(os.path.join(self.path, 'config'), txn_dir)
-        pi.output('Initializing cache transaction: Reading chunks')
-        shutil.copy(os.path.join(self.path, 'chunks'), txn_dir)
-        pi.output('Initializing cache transaction: Reading files')
-        shutil.copy(os.path.join(self.path, 'files'), txn_dir)
+        for item in self.txn_set:
+            pi.output('Initializing cache transaction: Reading ' + item)
+            shutil.copy(os.path.join(self.path, item), txn_dir)
         os.rename(os.path.join(self.path, 'txn.tmp'),
                   os.path.join(self.path, 'txn.active'))
         self.txn_active = True
@@ -326,30 +336,16 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             return
         self.security_manager.save(self.manifest, self.key, self)
         pi = ProgressIndicatorMessage(msgid='cache.commit')
-        if self.files is not None:
-            if self._newest_mtime is None:
-                # was never set because no files were modified/added
-                self._newest_mtime = 2 ** 63 - 1  # nanoseconds, good until y2262
-            ttl = int(os.environ.get('BORG_FILES_CACHE_TTL', 20))
-            pi.output('Saving files cache')
-            with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
-                for path_hash, item in self.files.items():
-                    # Only keep files seen in this backup that are older than newest mtime seen in this backup -
-                    # this is to avoid issues with filesystem snapshots and mtime granularity.
-                    # Also keep files from older backups that have not reached BORG_FILES_CACHE_TTL yet.
-                    entry = FileCacheEntry(*msgpack.unpackb(item))
-                    if entry.age == 0 and entry.mtime < self._newest_mtime or \
-                       entry.age > 0 and entry.age < ttl:
-                        msgpack.pack((path_hash, entry), fd)
+        pi.output('Saving files cache')
+        self.files.commit()
+        pi.output('Saving chunks cache')
+        self.chunks.commit(self.config)
         pi.output('Saving cache config')
-        self.config.set('cache', 'manifest', self.manifest.id_str)
         self.config.set('cache', 'timestamp', self.manifest.timestamp)
         self.config.set('cache', 'key_type', str(self.key.TYPE))
         self.config.set('cache', 'previous_location', self.repository._location.canonical_path())
         with SaveFile(os.path.join(self.path, 'config')) as fd:
             self.config.write(fd)
-        pi.output('Saving chunks cache')
-        self.chunks.write(os.path.join(self.path, 'chunks').encode('utf-8'))
         os.rename(os.path.join(self.path, 'txn.active'),
                   os.path.join(self.path, 'txn.tmp'))
         shutil.rmtree(os.path.join(self.path, 'txn.tmp'))
@@ -374,10 +370,60 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         self.txn_active = False
         self._do_open()
 
+    ###################
+    # Forwarding methods
+
+    # Chunks cache
+
+    def add_chunk(self, id, chunk, stats, overwrite=False):
+        return self.chunks.add_chunk(id, chunk, stats, overwrite)
+
+    def seen_chunk(self, id, size=None):
+        if not self.txn_active:
+            self.begin_txn()
+        return self.chunks.seen_chunk(id, size)
+
+    def chunk_incref(self, id, stats):
+        if not self.txn_active:
+            self.begin_txn()
+        return self.chunks.chunk_incref(id, stats)
+
+    def chunk_decref(self, id, stats):
+        if not self.txn_active:
+            self.begin_txn()
+        return self.chunks.chunk_decref(id, stats)
+
+    # Files cache
+
+    def file_known_and_unchanged(self, path_hash, st, ignore_inode=False):
+        if not self.txn_active:
+            self.begin_txn()
+        return self.files.file_known_and_unchanged(path_hash, st, ignore_inode)
+
+    def memorize_file(self, path_hash, st, ids):
+        if not self.txn_active:
+            self.begin_txn()
+        return self.files.memorize_file(path_hash, st, ids)
+
+
+class DummyFilesCache:
+    def file_known_and_unchanged(self, path_hash, st, ignore_inode=False):
+        return None
+
+    def memorize_file(self, path_hash, st, ids):
+        return None
+
+    def commit(self):
+        pass
+
 
 class FilesCache:
+    def __init__(self, cache):
+        self.cache = cache
+        self.cache.txn_register('files')
+
     def file_known_and_unchanged(self, path_hash, st, ignore_inode=False):
-        if not (self.do_files and stat.S_ISREG(st.st_mode)):
+        if not stat.S_ISREG(st.st_mode):
             return None
         if self.files is None:
             self._read_files()
@@ -401,17 +447,32 @@ class FilesCache:
             return None
 
     def memorize_file(self, path_hash, st, ids):
-        if not (self.do_files and stat.S_ISREG(st.st_mode)):
+        if not stat.S_ISREG(st.st_mode):
             return
         entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, mtime=st.st_mtime_ns, chunk_ids=ids)
         self.files[path_hash] = msgpack.packb(entry)
         self._newest_mtime = max(self._newest_mtime or 0, st.st_mtime_ns)
 
+    def commit(self):
+        if self._newest_mtime is None:
+            # was never set because no files were modified/added
+            self._newest_mtime = 2 ** 63 - 1  # nanoseconds, good until y2262
+        ttl = int(os.environ.get('BORG_FILES_CACHE_TTL', 20))
+        with SaveFile(os.path.join(self.cache.path, 'files'), binary=True) as fd:
+            for path_hash, item in self.files.items():
+                # Only keep files seen in this backup that are older than newest mtime seen in this backup -
+                # this is to avoid issues with filesystem snapshots and mtime granularity.
+                # Also keep files from older backups that have not reached BORG_FILES_CACHE_TTL yet.
+                entry = FileCacheEntry(*msgpack.unpackb(item))
+                if entry.age == 0 and entry.mtime < self._newest_mtime or \
+                                      entry.age > 0 and entry.age < ttl:
+                    msgpack.pack((path_hash, entry), fd)
+
     def _read_files(self):
         self.files = {}
         self._newest_mtime = None
         logger.debug('Reading files cache ...')
-        with open(os.path.join(self.path, 'files'), 'rb') as fd:
+        with open(os.path.join(self.cache.path, 'files'), 'rb') as fd:
             u = msgpack.Unpacker(use_list=True)
             while True:
                 data = fd.read(64 * 1024)
@@ -425,6 +486,9 @@ class FilesCache:
 
 
 class ChunksCache:
+    def __init__(self, cache):
+        self.cache = cache
+
     def add_chunk(self, id, chunk, stats, overwrite=False):
         """
         Add *chunk* with *id* to the underlying repository, updating *stats*.
@@ -435,18 +499,7 @@ class ChunksCache:
 
         Return a ChunkListEntry.
         """
-        if not self.txn_active:
-            self.begin_txn()
-        size = len(chunk.data)
-        refcount = self.seen_chunk(id, size)
-        if refcount and not overwrite:
-            return self.chunk_incref(id, stats)
-        data = self.key.encrypt(chunk)
-        csize = len(data)
-        self.repository.put(id, data, wait=False)
-        self.chunks.add(id, 1, size, csize)
-        stats.update(size, csize, not refcount)
-        return ChunkListEntry(id, size, csize)
+
 
     def seen_chunk(self, id, size=None):
         """
@@ -465,7 +518,22 @@ class ChunksCache:
         """
 
 
-class LocalChunksCache:
+class LocalChunksCache(ChunksCache):
+    def __init__(self, cache):
+        super().__init__(cache=cache)
+        self.chunks = ChunkIndex.read(os.path.join(cache.path, 'chunks').encode('utf-8'))
+
+    def add_chunk(self, id, chunk, stats, overwrite=False):
+        size = len(chunk.data)
+        refcount = self.seen_chunk(id, size)
+        if refcount and not overwrite:
+            return self.chunk_incref(id, stats)
+        data = self.cache.key.encrypt(chunk)
+        csize = len(data)
+        self.cache.repository.put(id, data, wait=False)
+        self.chunks.add(id, 1, size, csize)
+        stats.update(size, csize, not refcount)
+        return ChunkListEntry(id, size, csize)
 
     def seen_chunk(self, id, size=None):
         refcount, stored_size, _ = self.chunks.get(id, ChunkIndexEntry(0, None, None))
@@ -477,22 +545,22 @@ class LocalChunksCache:
         return refcount
 
     def chunk_incref(self, id, stats):
-        if not self.txn_active:
-            self.begin_txn()
         count, size, csize = self.chunks.incref(id)
         stats.update(size, csize, False)
         return ChunkListEntry(id, size, csize)
 
     def chunk_decref(self, id, stats):
-        if not self.txn_active:
-            self.begin_txn()
         count, size, csize = self.chunks.decref(id)
         if count == 0:
             del self.chunks[id]
-            self.repository.delete(id, wait=False)
+            self.cache.repository.delete(id, wait=False)
             stats.update(-size, -csize, True)
         else:
             stats.update(-size, -csize, False)
+
+    def commit(self, config):
+        config.set('cache', 'manifest', self.cache.manifest.id_str)
+        self.chunks.write(os.path.join(self.cache.path, 'chunks').encode('utf-8'))
 
     def sync(self):
         """Re-synchronize chunks cache with repository.
@@ -504,7 +572,7 @@ class LocalChunksCache:
         get removed and a new master chunks index is built by merging all
         archive indexes.
         """
-        archive_path = os.path.join(self.path, 'chunks.archive.d')
+        archive_path = os.path.join(self.cache.path, 'chunks.archive.d')
 
         def mkpath(id, suffix=''):
             id_hex = bin_to_hex(id)
@@ -520,7 +588,7 @@ class LocalChunksCache:
                 return set()
 
         def repo_archives():
-            return set(info.id for info in self.manifest.archives.list())
+            return set(info.id for info in self.cache.manifest.archives.list())
 
         def cleanup_outdated(ids):
             for id in ids:
@@ -555,7 +623,7 @@ class LocalChunksCache:
                     os.rename(fn_tmp, fn)
 
         def lookup_name(archive_id):
-            for info in self.manifest.archives.list():
+            for info in self.cache.manifest.archives.list():
                 if info.id == archive_id:
                     return info.name
 
@@ -571,13 +639,13 @@ class LocalChunksCache:
             cleanup_outdated(cached_ids - archive_ids)
             if archive_ids:
                 chunk_idx = None
-                if self.progress:
+                if self.cache.progress:
                     pi = ProgressIndicatorPercent(total=len(archive_ids), step=0.1,
                                                   msg='%3.0f%% Syncing chunks cache. Processing archive %s',
                                                   msgid='cache.sync')
                 for archive_id in archive_ids:
                     archive_name = lookup_name(archive_id)
-                    if self.progress:
+                    if self.cache.progress:
                         pi.show(info=[remove_surrogates(archive_name)])
                     if self.do_cache:
                         if archive_id in cached_ids:
@@ -587,7 +655,7 @@ class LocalChunksCache:
                         else:
                             logger.info('Fetching and building archive index for %s ...' % archive_name)
                             archive_chunk_idx = ChunkIndex()
-                            fetch_and_build_idx(archive_id, repository, self.key, archive_chunk_idx)
+                            fetch_and_build_idx(archive_id, repository, self.cache.key, archive_chunk_idx)
                         logger.info("Merging into master chunks index ...")
                         if chunk_idx is None:
                             # we just use the first archive's idx as starting point,
@@ -599,8 +667,8 @@ class LocalChunksCache:
                     else:
                         chunk_idx = chunk_idx or ChunkIndex()
                         logger.info('Fetching archive index for %s ...' % archive_name)
-                        fetch_and_build_idx(archive_id, repository, self.key, chunk_idx)
-                if self.progress:
+                        fetch_and_build_idx(archive_id, repository, self.cache.key, chunk_idx)
+                if self.cache.progress:
                     pi.finish()
             logger.info('Done.')
             return chunk_idx
@@ -608,11 +676,11 @@ class LocalChunksCache:
         def legacy_cleanup():
             """bring old cache dirs into the desired state (cleanup and adapt)"""
             try:
-                os.unlink(os.path.join(self.path, 'chunks.archive'))
+                os.unlink(os.path.join(self.cache.path, 'chunks.archive'))
             except:
                 pass
             try:
-                os.unlink(os.path.join(self.path, 'chunks.archive.tmp'))
+                os.unlink(os.path.join(self.cache.path, 'chunks.archive.tmp'))
             except:
                 pass
             try:
@@ -620,8 +688,8 @@ class LocalChunksCache:
             except:
                 pass
 
-        self.begin_txn()
-        with cache_if_remote(self.repository) as repository:
+        self.cache.begin_txn()
+        with cache_if_remote(self.cache.repository) as repository:
             legacy_cleanup()
             # TEMPORARY HACK: to avoid archive index caching, create a FILE named ~/.cache/borg/REPOID/chunks.archive.d -
             # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local disk)
@@ -630,20 +698,25 @@ class LocalChunksCache:
 
 
 class AdhocChunksCache(ChunksCache):
-    def __init__(self):
+    def __init__(self, cache):
+        logger.warning('Note: --avoid-cache-sync is an experimental feature.')
+        super().__init__(cache=cache)
         self.init_chunks()
 
     def init_chunks(self):
         # Explicitly set the initial hash table capacity to avoid performance issues
         # due to hash table "resonance".
         # Since we're creating an archive, add 10 % from the start
-        num_chunks = len(self.repository)
+        t0 = perf_counter()
+        num_requests = 0
+        num_chunks = len(self.cache.repository)
         capacity = int(num_chunks / ChunkIndex.MAX_LOAD_FACTOR * 1.1)
         self.chunks = ChunkIndex(capacity)
         marker = None
         pi = ProgressIndicatorPercent(total=num_chunks, msg="Downloading chunk list... %3.0f%%", msgid='cache.download_chunks')
         while True:
-            result = self.repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
+            num_requests += 1
+            result = self.cache.repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
             if not result:
                 break
             pi.show(len(result))
@@ -655,6 +728,8 @@ class AdhocChunksCache(ChunksCache):
             for id_ in result:
                 self.chunks[id_] = init_entry
         pi.finish()
+        duration = perf_counter() - t0
+        logger.debug('AdhocChunksCache: downloaded %d chunks in %.2f s (%d requests)', num_chunks, duration, num_requests)
 
     def add_chunk(self, id, chunk, stats, overwrite=False):
         assert not overwrite, 'Logic Bug'
@@ -667,9 +742,9 @@ class AdhocChunksCache(ChunksCache):
                 stats.update(size, entry.csize, False)
             return ChunkListEntry(id, entry.size, -1)
         else:
-            data = self.key.encrypt(chunk)
+            data = self.cache.key.encrypt(chunk)
             csize = len(data)
-            self.repository.put(id, data, wait=False)
+            self.cache.repository.put(id, data, wait=False)
             self.chunks.add(id, 1, size, csize)
             stats.update(size, csize, True)
             return ChunkListEntry(id, size, csize)
@@ -686,7 +761,10 @@ class AdhocChunksCache(ChunksCache):
         count, size, csize = self.chunks.decref(id)
         if count == 0:
             del self.chunks[id]
-            self.repository.delete(id, wait=False)
+            self.cache.repository.delete(id, wait=False)
             stats.update(-size, -csize, True)
         else:
             stats.update(-size, -csize, False)
+
+    def commit(self, config):
+        config.set('cache', 'manifest', 'not in sync')

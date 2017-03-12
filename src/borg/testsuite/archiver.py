@@ -41,7 +41,7 @@ from ..crypto.key import KeyfileKeyBase, RepoKey, KeyfileKey, Passphrase, TAMReq
 from ..crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..crypto.file_integrity import FileIntegrityError
 from ..helpers import Location, get_security_dir
-from ..helpers import Manifest
+from ..helpers import Manifest, MandatoryFeatureUnsupported
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
 from ..helpers import MAX_S
@@ -1419,6 +1419,67 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with Repository(self.repository_path) as repository:
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         self.assert_equal(len(manifest.archives), 0)
+
+    def add_unknown_feature(self, operation):
+        with Repository(self.repository_path, exclusive=True) as repository:
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            manifest.config[b'feature_flags'] = {operation.value.encode(): {b'mandatory': [b'unknown-feature']}}
+            manifest.write()
+            repository.commit()
+
+    def cmd_raises_unknown_feature(self, args):
+        if self.FORK_DEFAULT:
+            self.cmd(*args, exit_code=EXIT_ERROR)
+        else:
+            with pytest.raises(MandatoryFeatureUnsupported) as excinfo:
+                self.cmd(*args)
+            assert excinfo.value.args == (['unknown-feature'],)
+
+    def test_unknown_feature_on_create(self):
+        print(self.cmd('init', '--encryption=repokey', self.repository_location))
+        self.add_unknown_feature(Manifest.Operation.WRITE)
+        self.cmd_raises_unknown_feature(['create', self.repository_location + '::test', 'input'])
+
+    def test_unknown_feature_on_change_passphrase(self):
+        print(self.cmd('init', '--encryption=repokey', self.repository_location))
+        self.add_unknown_feature(Manifest.Operation.CHECK)
+        self.cmd_raises_unknown_feature(['change-passphrase', self.repository_location])
+
+    def test_unknown_feature_on_read(self):
+        print(self.cmd('init', '--encryption=repokey', self.repository_location))
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.add_unknown_feature(Manifest.Operation.READ)
+        with changedir('output'):
+            self.cmd_raises_unknown_feature(['extract', self.repository_location + '::test'])
+
+        self.cmd_raises_unknown_feature(['list', self.repository_location])
+        self.cmd_raises_unknown_feature(['info', self.repository_location + '::test'])
+
+    def test_unknown_feature_on_rename(self):
+        print(self.cmd('init', '--encryption=repokey', self.repository_location))
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.add_unknown_feature(Manifest.Operation.CHECK)
+        self.cmd_raises_unknown_feature(['rename', self.repository_location + '::test', 'other'])
+
+    def test_unknown_feature_on_delete(self):
+        print(self.cmd('init', '--encryption=repokey', self.repository_location))
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.add_unknown_feature(Manifest.Operation.DELETE)
+        # delete of an archive raises
+        self.cmd_raises_unknown_feature(['delete', self.repository_location + '::test'])
+        self.cmd_raises_unknown_feature(['prune', '--keep-daily=3', self.repository_location])
+        # delete of the whole repository ignores features
+        self.cmd('delete', self.repository_location)
+
+    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    def test_unknown_feature_on_mount(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.add_unknown_feature(Manifest.Operation.READ)
+        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
+        os.mkdir(mountpoint)
+        # XXX this might hang if it doesn't raise an error
+        self.cmd_raises_unknown_feature(['mount', self.repository_location + '::test', mountpoint])
 
     def test_progress_on(self):
         self.create_regular_file('file1', size=1024 * 80)

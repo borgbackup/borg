@@ -466,7 +466,7 @@ class Archiver:
         t0_monotonic = time.monotonic()
         if not dry_run:
             with Cache(repository, key, manifest, do_files=args.cache_files, progress=args.progress,
-                       lock_wait=self.lock_wait) as cache:
+                       avoid_cache_sync=args.avoid_cache_sync, lock_wait=self.lock_wait) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
                                   numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime,
@@ -1548,7 +1548,7 @@ class Archiver:
                 print("object id %s is invalid." % hex_id)
             else:
                 try:
-                    refcount = cache.chunks[id][0]
+                    refcount = cache.chunks.chunks[id][0]
                     print("object %s has %d referrers [info from chunks cache]." % (hex_id, refcount))
                 except KeyError:
                     print("object %s not found [info from chunks cache]." % hex_id)

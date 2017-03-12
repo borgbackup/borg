@@ -57,7 +57,7 @@ class Statistics:
 
     def update(self, size, csize, unique):
         self.osize += size
-        if csize != -1:
+        if csize != ChunkIndex.MAX_VALUE:
             self.csize += csize
         if unique:
             self.usize += csize
@@ -383,7 +383,7 @@ class Archive:
             'duration': (end - start).total_seconds(),
             'stats': stats.as_dict(),
             'limits': {
-                'max_archive_size': self.cache.chunks[self.id].csize / MAX_DATA_SIZE,
+                'max_archive_size': self.cache.chunks.chunks[self.id].csize / MAX_DATA_SIZE,
             },
         }
         if self.create:
@@ -410,7 +410,7 @@ Utilization of max. archive size: {csize_max:.0%}
             self,
             start=format_time(to_localtime(self.start.replace(tzinfo=timezone.utc))),
             end=format_time(to_localtime(self.end.replace(tzinfo=timezone.utc))),
-            csize_max=self.cache.chunks[self.id].csize / MAX_DATA_SIZE)
+            csize_max=self.cache.chunks.chunks[self.id].csize / MAX_DATA_SIZE)
 
     def __repr__(self):
         return 'Archive(%r)' % self.name
@@ -476,9 +476,9 @@ Utilization of max. archive size: {csize_max:.0%}
 
     def calc_stats(self, cache):
         def add(id):
-            count, size, csize = cache.chunks[id]
+            count, size, csize = cache.chunks.chunks[id]
             stats.update(size, csize, count == 1)
-            cache.chunks[id] = count - 1, size, csize
+            cache.chunks.chunks[id] = count - 1, size, csize
 
         def add_file_chunks(chunks):
             for id, _, _ in chunks:
@@ -1646,7 +1646,7 @@ class ArchiveRecreater:
         chunk = Chunk(data, compress=compress)
         compression_spec, chunk = self.key.compression_decider2.decide(chunk)
         overwrite = self.recompress
-        if self.recompress and not self.always_recompress and chunk_id in self.cache.chunks:
+        if self.recompress and not self.always_recompress and chunk_id in self.cache.chunks.chunks:
             # Check if this chunk is already compressed the way we want it
             old_chunk = self.key.decrypt(None, self.repository.get(chunk_id), decompress=False)
             if Compressor.detect(old_chunk.data).name == compression_spec['name']:

@@ -211,6 +211,8 @@ class Cache:
                     self.chunks.sync()
                     self.commit()
             else:
+                if avoid_cache_sync:
+                    logger.debug('--avoid-cache-sync enabled, but cache is in sync - using local cache.')
                 self.chunks = LocalChunksCache(self)
         except:
             self.close()
@@ -300,7 +302,6 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         self.timestamp = self.config.get('cache', 'timestamp', fallback=None)
         self.key_type = self.config.get('cache', 'key_type', fallback=None)
         self.previous_location = self.config.get('cache', 'previous_location', fallback=None)
-        self.files = None
 
     def open(self, lock_wait=None):
         if not os.path.isdir(self.path):
@@ -421,6 +422,8 @@ class FilesCache:
     def __init__(self, cache):
         self.cache = cache
         self.cache.txn_register('files')
+        self.files = None
+        self._newest_mtime = None
 
     def file_known_and_unchanged(self, path_hash, st, ignore_inode=False):
         if not stat.S_ISREG(st.st_mode):
@@ -454,6 +457,8 @@ class FilesCache:
         self._newest_mtime = max(self._newest_mtime or 0, st.st_mtime_ns)
 
     def commit(self):
+        if self.files is None:
+            return
         if self._newest_mtime is None:
             # was never set because no files were modified/added
             self._newest_mtime = 2 ** 63 - 1  # nanoseconds, good until y2262
@@ -521,6 +526,7 @@ class ChunksCache:
 class LocalChunksCache(ChunksCache):
     def __init__(self, cache):
         super().__init__(cache=cache)
+        self.cache.txn_register('chunks')
         self.chunks = ChunkIndex.read(os.path.join(cache.path, 'chunks').encode('utf-8'))
 
     def add_chunk(self, id, chunk, stats, overwrite=False):
@@ -724,7 +730,7 @@ class AdhocChunksCache(ChunksCache):
             # All chunks from the repository have a refcount of MAX_VALUE, which is sticky,
             # therefore we can't/won't delete them. Chunks we added ourselves in this transaction
             # (e.g. checkpoint archives) are tracked correctly.
-            init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0, csize=-1)
+            init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0, csize=ChunkIndex.MAX_VALUE)
             for id_ in result:
                 self.chunks[id_] = init_entry
         pi.finish()

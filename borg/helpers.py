@@ -186,7 +186,7 @@ class Manifest:
         data = key.decrypt(None, cdata)
         m, manifest.tam_verified = key.unpack_and_verify_manifest(data, force_tam_not_required=force_tam_not_required)
         manifest.id = key.id_hash(data)
-        if not m.get(b'version') == 1:
+        if m.get(b'version') not in (1, 2):
             raise ValueError('Invalid manifest version')
         manifest.archives = dict((k.decode('utf-8'), v) for k, v in m[b'archives'].items())
         manifest.timestamp = m.get(b'timestamp')

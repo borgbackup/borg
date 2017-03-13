@@ -167,6 +167,36 @@ Decryption::
 
     ASSERT( CONSTANT-TIME-COMPARISON( chunk-id, AUTHENTICATOR(id_key, decompressed) ) )
 
+The client needs to track which counter values have been used, since
+encrypting a chunk requires a starting counter value and no two chunks
+may have overlapping counter ranges (otherwise the bitwise XOR of the
+overlapping plaintexts is revealed).
+
+The client does not directly track the counter value, because it
+changes often (with each encrypted chunk), instead it commits a
+"reservation" to the security database and the repository by taking
+the current counter value and adding 4 GiB / 16 bytes (the block size)
+to the counter. Thus the client only needs to commit a new reservation
+every few gigabytes of encrypted data.
+
+This mechanism also avoids reusing counter values in case the client
+crashes or the connection to the repository is severed, since any
+reservation would have been committed to both the security database
+and the repository before any data is encrypted. Borg uses its
+standard mechanism (SaveFile) to ensure that reservations are durable
+(on most hardware / storage systems), therefore a crash of the
+client's host would not impact tracking of reservations.
+
+However, this design is not infallible, and requires synchronization
+between clients, which is handled through the repository. Therefore in
+a multiple-client scenario a repository can trick a client into
+reusing counter values by ignoring counter reservations and replaying
+the manifest (which will fail if the client has seen a more recent
+manifest or has a more recent nonce reservation). If the repository is
+untrusted, but a trusted synchronization channel exists between
+clients, the security database could be synchronized between them over
+said trusted channel. This is not part of Borgs functionality.
+
 .. [#] Using the :ref:`borg key migrate-to-repokey <borg_key_migrate-to-repokey>`
        command a user can convert repositories created using Attic in "passphrase"
        mode to "repokey" mode. In this case the keys were directly derived from

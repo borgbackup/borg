@@ -285,9 +285,21 @@ over an encrypted SSH channel (the system's SSH client is used for this
 by piping data from/to it).
 
 This means that the authorization and transport security properties
-are inherited from SSH and the configuration of the SSH client
-and the SSH server. Therefore the remainder of this section
-will focus on the security of the RPC protocol within Borg.
+are inherited from SSH and the configuration of the SSH client and the
+SSH server -- Borg RPC does not contain *any* networking
+code. Networking is done by the SSH client running in a separate
+process, Borg only communicates over the standard pipes (stdout,
+stderr and stdin) with this process. This also means that Borg doesn't
+have to directly use a SSH client (or SSH at all). For example,
+``sudo`` or ``qrexec`` could be used as an intermediary.
+
+By using the system's SSH client and not implementing a
+(cryptographic) network protocol Borg sidesteps many security issues
+that would normally impact distributing statically linked / standalone
+binaries.
+
+The remainder of this section will focus on the security of the RPC
+protocol within Borg.
 
 The assumed worst-case a server can inflict to a client is a
 denial of repository service.

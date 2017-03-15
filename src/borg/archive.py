@@ -325,7 +325,7 @@ class Archive:
             if info is None:
                 raise self.DoesNotExist(name)
             self.load(info.id)
-            self.zeros = b'\0' * (1 << chunker_params[1])
+            self.zeros = None
 
     def _load_meta(self, id):
         _, data = self.key.decrypt(id, self.repository.get(id))
@@ -578,6 +578,8 @@ Utilization of max. archive size: {csize_max:.0%}
                 # Extract chunks, since the item which had the chunks was not extracted
             with backup_io('open'):
                 fd = open(path, 'wb')
+            if sparse and self.zeros is None:
+                self.zeros = b'\0' * (1 << self.chunker_params[1])
             with fd:
                 ids = [c.id for c in item.chunks]
                 for _, data in self.pipeline.fetch_many(ids, is_preloaded=True):

@@ -665,7 +665,7 @@ def timestamp(s):
     """Convert a --timestamp=s argument to a datetime object"""
     try:
         # is it pointing to a file / directory?
-        ts = os.stat(s).st_mtime
+        ts = safe_s(os.stat(s).st_mtime)
         return datetime.utcfromtimestamp(ts)
     except OSError:
         # didn't work, try parsing as timestamp. UTC, no TZ, no microsecs support.
@@ -818,12 +818,34 @@ def SortBySpec(text):
     return text.replace('timestamp', 'ts')
 
 
+# Not too rarely, we get crappy timestamps from the fs, that overflow some computations.
+# As they are crap anyway, nothing is lost if we just clamp them to the max valid value.
+# msgpack can only pack uint64. datetime is limited to year 9999.
+MAX_NS = 18446744073000000000  # less than 2**64 - 1 ns. also less than y9999.
+MAX_S = MAX_NS // 1000000000
+
+
+def safe_s(ts):
+    if 0 <= ts <= MAX_S:
+        return ts
+    elif ts < 0:
+        return 0
+    else:
+        return MAX_S
+
+
+def safe_ns(ts):
+    if 0 <= ts <= MAX_NS:
+        return ts
+    elif ts < 0:
+        return 0
+    else:
+        return MAX_NS
+
+
 def safe_timestamp(item_timestamp_ns):
-    try:
-        return datetime.fromtimestamp(item_timestamp_ns / 1e9)
-    except OverflowError:
-        # likely a broken file time and datetime did not want to go beyond year 9999
-        return datetime(9999, 12, 31, 23, 59, 59)
+    t_ns = safe_ns(item_timestamp_ns)
+    return datetime.fromtimestamp(t_ns / 1e9)
 
 
 def format_time(t):

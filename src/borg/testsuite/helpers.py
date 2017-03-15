@@ -27,6 +27,7 @@ from ..helpers import CompressionSpec, CompressionDecider1, CompressionDecider2
 from ..helpers import parse_pattern, PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern
 from ..helpers import swidth_slice
 from ..helpers import chunkit
+from ..helpers import safe_ns, safe_s
 
 from . import BaseTestCase, FakeInputs
 
@@ -1221,3 +1222,18 @@ def test_swidth_slice_mixed_characters():
     string = '나윤a선나윤선나윤선나윤선나윤선'
     assert swidth_slice(string, 5) == '나윤a'
     assert swidth_slice(string, 6) == '나윤a'
+
+
+def test_safe_timestamps():
+    # ns fit into uint64
+    assert safe_ns(2 ** 64) < 2 ** 64
+    assert safe_ns(-1) == 0
+    # s are so that their ns conversion fits into uint64
+    assert safe_s(2 ** 64) * 1000000000 < 2 ** 64
+    assert safe_s(-1) == 0
+    # datetime won't fall over its y10k problem
+    beyond_y10k = 2 ** 100
+    with pytest.raises(OverflowError):
+        datetime.utcfromtimestamp(beyond_y10k)
+    assert datetime.utcfromtimestamp(safe_s(beyond_y10k)) > datetime(2500, 12, 31)
+    assert datetime.utcfromtimestamp(safe_ns(beyond_y10k) / 1000000000) > datetime(2500, 12, 31)

@@ -17,7 +17,8 @@ from ..helpers import Location, format_file_size, format_timedelta, format_line,
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
     ProgressIndicatorPercent, ProgressIndicatorEndless, parse_pattern, load_exclude_file, load_pattern_file, \
     PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, \
-    Buffer
+    Buffer, safe_ns, safe_s
+
 from . import BaseTestCase, FakeInputs
 
 
@@ -1115,3 +1116,18 @@ def test_format_line_erroneous():
         assert format_line('{invalid}', data)
     with pytest.raises(PlaceholderError):
         assert format_line('{}', data)
+
+
+def test_safe_timestamps():
+    # ns fit into uint64
+    assert safe_ns(2 ** 64) < 2 ** 64
+    assert safe_ns(-1) == 0
+    # s are so that their ns conversion fits into uint64
+    assert safe_s(2 ** 64) * 1000000000 < 2 ** 64
+    assert safe_s(-1) == 0
+    # datetime won't fall over its y10k problem
+    beyond_y10k = 2 ** 100
+    with pytest.raises(OverflowError):
+        datetime.utcfromtimestamp(beyond_y10k)
+    assert datetime.utcfromtimestamp(safe_s(beyond_y10k)) > datetime(2500, 12, 31)
+    assert datetime.utcfromtimestamp(safe_ns(beyond_y10k) / 1000000000) > datetime(2500, 12, 31)

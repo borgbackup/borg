@@ -19,7 +19,7 @@ from . import xattr
 from .helpers import Error, uid2user, user2uid, gid2group, group2gid, bin_to_hex, \
     parse_timestamp, to_localtime, format_time, format_timedelta, remove_surrogates, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
-    ProgressIndicatorPercent, IntegrityError, set_ec, EXIT_WARNING
+    ProgressIndicatorPercent, IntegrityError, set_ec, EXIT_WARNING, safe_ns
 from .platform import acl_get, acl_set
 from .chunker import Chunker
 from .hashindex import ChunkIndex
@@ -588,15 +588,15 @@ Number of files: {0.stats.nfiles}'''.format(
             b'mode': st.st_mode,
             b'uid': st.st_uid, b'user': uid2user(st.st_uid),
             b'gid': st.st_gid, b'group': gid2group(st.st_gid),
-            b'mtime': int_to_bigint(st.st_mtime_ns),
+            b'mtime': int_to_bigint(safe_ns(st.st_mtime_ns)),
         }
         # borg can work with archives only having mtime (older attic archives do not have
         # atime/ctime). it can be useful to omit atime/ctime, if they change without the
         # file content changing - e.g. to get better metadata deduplication.
         if not self.noatime:
-            item[b'atime'] = int_to_bigint(st.st_atime_ns)
+            item[b'atime'] = int_to_bigint(safe_ns(st.st_atime_ns))
         if not self.noctime:
-            item[b'ctime'] = int_to_bigint(st.st_ctime_ns)
+            item[b'ctime'] = int_to_bigint(safe_ns(st.st_ctime_ns))
         if self.numeric_owner:
             item[b'user'] = item[b'group'] = None
         with backup_io():

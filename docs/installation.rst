@@ -59,7 +59,7 @@ Ubuntu       `Ubuntu packages`_, `Ubuntu PPA`_             ``apt install borgbac
 .. _Wily 15.10 (backport PPA): https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
 .. _Trusty 14.04 (backport PPA): https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
 .. _.nix file: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/backup/borg/default.nix
-.. _Brew cask: http://caskroom.io/
+.. _Brew cask: https://caskroom.github.io/
 .. _Raspbian testing: http://archive.raspbian.org/raspbian/pool/main/b/borgbackup/
 .. _Ubuntu packages: http://packages.ubuntu.com/xenial/borgbackup
 .. _Ubuntu PPA: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup

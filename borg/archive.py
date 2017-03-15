@@ -204,6 +204,7 @@ class Archive:
         if start is None:
             start = datetime.utcnow()
             start_monotonic = time.monotonic()
+        self.chunker_params = chunker_params
         self.start = start
         self.start_monotonic = start_monotonic
         if end is None:
@@ -227,7 +228,7 @@ class Archive:
                 raise self.DoesNotExist(name)
             info = self.manifest.archives[name]
             self.load(info[b'id'])
-            self.zeros = b'\0' * (1 << chunker_params[1])
+            self.zeros = None
 
     def _load_meta(self, id):
         data = self.key.decrypt(id, self.repository.get(id))
@@ -405,6 +406,8 @@ Number of files: {0.stats.nfiles}'''.format(
                 with backup_io():
                     os.link(source, path)
             else:
+                if sparse and self.zeros is None:
+                    self.zeros = b'\0' * (1 << self.chunker_params[1])
                 with backup_io():
                     fd = open(path, 'wb')
                 with fd:

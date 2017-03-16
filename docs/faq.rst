@@ -441,8 +441,12 @@ If the directory where you mount a filesystem is different every time,
 Is there a way to limit bandwidth with |project_name|?
 ------------------------------------------------------
 
-There is no command line option to limit bandwidth with |project_name|, but
-bandwidth limiting can be accomplished with pipeviewer_:
+To limit upload (i.e. :ref:`borg_create`) bandwidth, use the
+``--remote-ratelimit`` option.
+
+There is no built-in way to limit *download*
+(i.e. :ref:`borg_extract`) bandwidth, but limiting download bandwidth
+can be accomplished with pipeviewer_:
 
 Create a wrapper script:  /usr/local/bin/pv-wrapper  ::
 

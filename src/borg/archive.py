@@ -33,6 +33,7 @@ from .helpers import format_time, format_timedelta, format_file_size, file_statu
 from .helpers import safe_encode, safe_decode, make_path_safe, remove_surrogates
 from .helpers import StableDict
 from .helpers import bin_to_hex
+from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
 from .helpers import PathPrefixPattern, FnmatchPattern
 from .helpers import CompressionDecider1, CompressionDecider2, CompressionSpec
@@ -786,15 +787,15 @@ Utilization of max. archive size: {csize_max:.0%}
             mode=st.st_mode,
             uid=st.st_uid,
             gid=st.st_gid,
-            mtime=st.st_mtime_ns,
+            mtime=safe_ns(st.st_mtime_ns),
         )
         # borg can work with archives only having mtime (older attic archives do not have
         # atime/ctime). it can be useful to omit atime/ctime, if they change without the
         # file content changing - e.g. to get better metadata deduplication.
         if not self.noatime:
-            attrs['atime'] = st.st_atime_ns
+            attrs['atime'] = safe_ns(st.st_atime_ns)
         if not self.noctime:
-            attrs['ctime'] = st.st_ctime_ns
+            attrs['ctime'] = safe_ns(st.st_ctime_ns)
         if self.numeric_owner:
             attrs['user'] = attrs['group'] = None
         else:

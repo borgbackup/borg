@@ -17,6 +17,7 @@ from .helpers import Error
 from .helpers import get_cache_dir, get_security_dir
 from .helpers import bin_to_hex
 from .helpers import format_file_size
+from .helpers import safe_ns
 from .helpers import yes
 from .helpers import remove_surrogates
 from .helpers import ProgressIndicatorPercent, ProgressIndicatorMessage
@@ -591,6 +592,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
     def memorize_file(self, path_hash, st, ids):
         if not (self.do_files and stat.S_ISREG(st.st_mode)):
             return
-        entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, mtime=st.st_mtime_ns, chunk_ids=ids)
+        mtime_ns = safe_ns(st.st_mtime_ns)
+        entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, mtime=mtime_ns, chunk_ids=ids)
         self.files[path_hash] = msgpack.packb(entry)
-        self._newest_mtime = max(self._newest_mtime or 0, st.st_mtime_ns)
+        self._newest_mtime = max(self._newest_mtime or 0, mtime_ns)

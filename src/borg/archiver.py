@@ -1663,7 +1663,7 @@ class Archiver:
 
         Note that the default pattern style for `--pattern` and `--patterns-from` is
         shell style (`sh:`), so those patterns behave similar to rsync include/exclude
-        patterns.
+        patterns. The pattern style can be set via the `P` prefix.
 
         Patterns (`--pattern`) and excludes (`--exclude`) from the command line are
         considered first (in the order of appearance). Then patterns from `--patterns-from`
@@ -1671,6 +1671,8 @@ class Archiver:
 
         An example `--patterns-from` file could look like that::
 
+            # "sh:" pattern style is the default, so the following line is not needed:
+            P sh
             R /
             # can be rebuild
             - /home/*/.cache

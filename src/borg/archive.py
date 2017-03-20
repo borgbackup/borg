@@ -36,7 +36,7 @@ from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
-from .helpers import PathPrefixPattern, FnmatchPattern
+from .helpers import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem
 from .key import key_factory
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth
@@ -1721,10 +1721,10 @@ class ArchiveRecreater:
         """Add excludes to the matcher created by exclude_cache and exclude_if_present."""
         def exclude(dir, tag_item):
             if self.keep_exclude_tags:
-                tag_files.append(PathPrefixPattern(tag_item.path))
-                tagged_dirs.append(FnmatchPattern(dir + '/'))
+                tag_files.append(PathPrefixPattern(tag_item.path, recurse_dir=False))
+                tagged_dirs.append(FnmatchPattern(dir + '/', recurse_dir=False))
             else:
-                tagged_dirs.append(PathPrefixPattern(dir))
+                tagged_dirs.append(PathPrefixPattern(dir, recurse_dir=False))
 
         matcher = self.matcher
         tag_files = []
@@ -1747,8 +1747,8 @@ class ArchiveRecreater:
                         file = open_item(archive, cachedir_masters[item.source])
                     if file.read(len(CACHE_TAG_CONTENTS)).startswith(CACHE_TAG_CONTENTS):
                         exclude(dir, item)
-        matcher.add(tag_files, True)
-        matcher.add(tagged_dirs, False)
+        matcher.add(tag_files, IECommand.Include)
+        matcher.add(tagged_dirs, IECommand.ExcludeNoRecurse)
 
     def create_target(self, archive, target_name=None):
         """Create target archive."""

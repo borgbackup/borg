@@ -929,6 +929,23 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('x input/file2', output)
         self.assert_in('x input/otherfile', output)
 
+    def test_create_pattern_exclude_parent_and_include_child(self):
+        """test when patterns exclude a parent folder, but include a child"""
+        self.patterns_file_path2 = os.path.join(self.tmpdir, 'patterns2')
+        with open(self.patterns_file_path2, 'wb') as fd:
+            fd.write(b'+ input/x/b\n- input/x*\n')
+
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_regular_file('x/a/foo_a', size=1024 * 80)
+        self.create_regular_file('x/b/foo_b', size=1024 * 80)
+        self.create_regular_file('y/foo_y', size=1024 * 80)
+        output = self.cmd('create', '-v', '--list',
+                          '--patterns-from=' + self.patterns_file_path2,
+                          self.repository_location + '::test', 'input')
+        self.assert_in('x input/x/a/foo_a', output)
+        self.assert_in("A input/x/b/foo_b", output)
+        self.assert_in('A input/y/foo_y', output)
+
     def test_extract_pattern_opt(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)

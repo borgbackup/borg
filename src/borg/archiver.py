@@ -487,13 +487,20 @@ class Archiver:
 
         This should only raise on critical errors. Per-item errors must be handled within this method.
         """
+        if st is None:
+            with backup_io('stat'):
+                st = os.lstat(path)
+
+        dir_excluded = False
         if not matcher.match(path):
             self.print_file_status('x', path)
-            return
+
+            if stat.S_ISDIR(st.st_mode):
+                dir_excluded = True
+            else:
+                return
+
         try:
-            if st is None:
-                with backup_io('stat'):
-                    st = os.lstat(path)
             if (st.st_ino, st.st_dev) in skip_inodes:
                 return
             # if restrict_dev is given, we do not want to recurse into a new filesystem,
@@ -521,7 +528,8 @@ class Archiver:
                                               read_special=read_special, dry_run=dry_run)
                         return
                 if not dry_run:
-                    status = archive.process_dir(path, st)
+                    if not dir_excluded:
+                        status = archive.process_dir(path, st)
                 if recurse:
                     with backup_io('scandir'):
                         entries = helpers.scandir_inorder(path)

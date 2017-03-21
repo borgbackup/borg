@@ -157,6 +157,7 @@ class Item(PropDict):
     rdev = PropDict._make_property('rdev', int)
     bsdflags = PropDict._make_property('bsdflags', int)
 
+    # note: we need to keep the bigint conversion for compatibility with borg 1.0 archives.
     atime = PropDict._make_property('atime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
     ctime = PropDict._make_property('ctime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
     mtime = PropDict._make_property('mtime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)

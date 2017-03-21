@@ -859,7 +859,7 @@ def safe_ns(ts):
 
 
 def safe_timestamp(item_timestamp_ns):
-    t_ns = safe_ns(bigint_to_int(item_timestamp_ns))
+    t_ns = safe_ns(item_timestamp_ns)
     return datetime.fromtimestamp(t_ns / 1e9)
 
 

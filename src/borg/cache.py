@@ -15,7 +15,7 @@ from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Location
 from .helpers import Error
 from .helpers import get_cache_dir, get_security_dir
-from .helpers import bin_to_hex
+from .helpers import int_to_bigint, bigint_to_int, bin_to_hex
 from .helpers import format_file_size
 from .helpers import safe_ns
 from .helpers import yes
@@ -354,7 +354,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     # this is to avoid issues with filesystem snapshots and mtime granularity.
                     # Also keep files from older backups that have not reached BORG_FILES_CACHE_TTL yet.
                     entry = FileCacheEntry(*msgpack.unpackb(item))
-                    if entry.age == 0 and entry.mtime < self._newest_mtime or \
+                    if entry.age == 0 and bigint_to_int(entry.mtime) < self._newest_mtime or \
                        entry.age > 0 and entry.age < ttl:
                         msgpack.pack((path_hash, entry), fd)
         pi.output('Saving cache config')
@@ -574,7 +574,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not entry:
             return None
         entry = FileCacheEntry(*msgpack.unpackb(entry))
-        if (entry.size == st.st_size and entry.mtime == st.st_mtime_ns and
+        if (entry.size == st.st_size and bigint_to_int(entry.mtime) == st.st_mtime_ns and
                 (ignore_inode or entry.inode == st.st_ino)):
             # we ignored the inode number in the comparison above or it is still same.
             # if it is still the same, replacing it in the tuple doesn't change it.
@@ -593,6 +593,6 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not (self.do_files and stat.S_ISREG(st.st_mode)):
             return
         mtime_ns = safe_ns(st.st_mtime_ns)
-        entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, mtime=mtime_ns, chunk_ids=ids)
+        entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, mtime=int_to_bigint(mtime_ns), chunk_ids=ids)
         self.files[path_hash] = msgpack.packb(entry)
         self._newest_mtime = max(self._newest_mtime or 0, mtime_ns)

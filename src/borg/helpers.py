@@ -1332,6 +1332,24 @@ class StableDict(dict):
         return sorted(super().items())
 
 
+def bigint_to_int(mtime):
+    """Convert bytearray to int
+    """
+    if isinstance(mtime, bytes):
+        return int.from_bytes(mtime, 'little', signed=True)
+    return mtime
+
+
+def int_to_bigint(value):
+    """Convert integers larger than 64 bits to bytearray
+
+    Smaller integers are left alone
+    """
+    if value.bit_length() > 63:
+        return value.to_bytes((value.bit_length() + 9) // 8, 'little', signed=True)
+    return value
+
+
 def is_slow_msgpack():
     return msgpack.Packer is msgpack.fallback.Packer
 

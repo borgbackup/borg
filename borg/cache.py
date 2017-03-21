@@ -10,7 +10,7 @@ from .key import PlaintextKey
 from .logger import create_logger
 logger = create_logger()
 from .helpers import Error, get_cache_dir, decode_dict, int_to_bigint, \
-    bigint_to_int, format_file_size, yes, bin_to_hex, Location
+    bigint_to_int, format_file_size, yes, bin_to_hex, Location, safe_ns
 from .locking import Lock
 from .hashindex import ChunkIndex
 
@@ -461,6 +461,6 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not (self.do_files and stat.S_ISREG(st.st_mode)):
             return
         # Entry: Age, inode, size, mtime, chunk ids
-        mtime_ns = st.st_mtime_ns
+        mtime_ns = safe_ns(st.st_mtime_ns)
         self.files[path_hash] = msgpack.packb((0, st.st_ino, st.st_size, int_to_bigint(mtime_ns), ids))
         self._newest_mtime = max(self._newest_mtime or 0, mtime_ns)

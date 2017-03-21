@@ -859,7 +859,7 @@ def safe_ns(ts):
 
 
 def safe_timestamp(item_timestamp_ns):
-    t_ns = safe_ns(item_timestamp_ns)
+    t_ns = safe_ns(bigint_to_int(item_timestamp_ns))
     return datetime.fromtimestamp(t_ns / 1e9)
 
 
@@ -1330,6 +1330,24 @@ class StableDict(dict):
     """A dict subclass with stable items() ordering"""
     def items(self):
         return sorted(super().items())
+
+
+def bigint_to_int(mtime):
+    """Convert bytearray to int
+    """
+    if isinstance(mtime, bytes):
+        return int.from_bytes(mtime, 'little', signed=True)
+    return mtime
+
+
+def int_to_bigint(value):
+    """Convert integers larger than 64 bits to bytearray
+
+    Smaller integers are left alone
+    """
+    if value.bit_length() > 63:
+        return value.to_bytes((value.bit_length() + 9) // 8, 'little', signed=True)
+    return value
 
 
 def is_slow_msgpack():

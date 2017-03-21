@@ -34,6 +34,7 @@ from .helpers import safe_encode, safe_decode, make_path_safe, remove_surrogates
 from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
+from .helpers import int_to_bigint, bigint_to_int
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
 from .helpers import PathPrefixPattern, FnmatchPattern
 from .helpers import CompressionDecider1, CompressionDecider2, CompressionSpec

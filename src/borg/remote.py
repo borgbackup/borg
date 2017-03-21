@@ -514,6 +514,7 @@ class RemoteRepository:
         self.ignore_responses = set()
         self.responses = {}
         self.async_responses = {}
+        self.shutdown_time = None
         self.ratelimit = SleepingBandwidthLimiter(args.remote_ratelimit * 1024 if args and args.remote_ratelimit else 0)
         self.unpacker = get_limited_unpacker('client')
         self.server_version = parse_version('1.0.8')  # fallback version if server is too old to send version information
@@ -605,6 +606,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
     def __exit__(self, exc_type, exc_val, exc_tb):
         try:
             if exc_type is not None:
+                self.shutdown_time = time.monotonic() + 30
                 self.rollback()
         finally:
             # in any case, we want to cleanly close the repo, even if the
@@ -715,6 +717,12 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
         calls = list(calls)
         waiting_for = []
         while wait or calls:
+            if self.shutdown_time and time.monotonic() > self.shutdown_time:
+                # we are shutting this RemoteRepository down already, make sure we do not waste
+                # a lot of time in case a lot of async stuff is coming in or remote is gone or slow.
+                logger.debug('shutdown_time reached, shutting down with %d waiting_for and %d async_responses.',
+                             len(waiting_for), len(self.async_responses))
+                return
             while waiting_for:
                 try:
                     unpacked = self.responses.pop(waiting_for[0])

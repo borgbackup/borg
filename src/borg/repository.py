@@ -785,6 +785,7 @@ class Repository:
         self._active_txn = False
 
     def rollback(self):
+        # note: when used in remote mode, this is time limited, see RemoteRepository.shutdown_time.
         self._rollback(cleanup=False)
 
     def __len__(self):

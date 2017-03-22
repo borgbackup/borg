@@ -128,6 +128,42 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
+Version 1.0.11rc1 (not released yet)
+------------------------------------
+
+Bug fixes:
+
+- extract: warning for unextracted big extended attributes, #2258
+- archive check: detect and fix missing all-zero replacement chunks, #2180
+- fix (de)compression exceptions, #2224 #2221
+- performance: rebuild hashtable if we have too little empty buckets, #2246
+- files cache: update inode number, #2226
+- borg rpc: use limited msgpack.Unpacker (security precaution), #2139
+- Location: accept //servername/share/path
+- fix ChunkIndex.__contains__ assertion  for big-endian archs (harmless)
+- create: handle BackupOSError on a per-path level in one spot
+- fix error msg, there is no --keep-last in borg 1.0.x, #2282
+- clamp (nano)second values to unproblematic range, #2304
+- FUSE: fix st_blocks to be an integer (not float) value
+
+New features:
+
+- new options --pattern and --patterns-from, #1406
+- borg delete --force --force to delete severely corrupted archives, #1975
+
+Other changes:
+
+- docs:
+
+  - fix caskroom link, #2299
+  - address SSH batch mode, #2202 #2270
+  - improve remote-path description
+  - document snapshot usage, #2178
+  - document relative path usage, #1868
+  - one link per distro in the installation page
+  - development: new branching model in git repository
+
+
 Version 1.0.10 (2017-02-13)
 ---------------------------
 

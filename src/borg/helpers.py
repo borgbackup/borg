@@ -801,7 +801,7 @@ def format_archive(archive):
     )
 
 
-class Buffer:
+class Buffer(threading.local):
     """
     provide a thread-local buffer
     """
@@ -816,13 +816,12 @@ class Buffer:
         """
         assert callable(allocator), 'must give alloc(size) function as first param'
         assert limit is None or size <= limit, 'initial size must be <= limit'
-        self._thread_local = threading.local()
         self.allocator = allocator
         self.limit = limit
         self.resize(size, init=True)
 
     def __len__(self):
-        return len(self._thread_local.buffer)
+        return len(self.buffer)
 
     def resize(self, size, init=False):
         """
@@ -834,7 +833,7 @@ class Buffer:
         if self.limit is not None and size > self.limit:
             raise Buffer.MemoryLimitExceeded(size, self.limit)
         if init or len(self) < size:
-            self._thread_local.buffer = self.allocator(size)
+            self.buffer = self.allocator(size)
 
     def get(self, size=None, init=False):
         """
@@ -843,7 +842,7 @@ class Buffer:
         """
         if size is not None:
             self.resize(size, init)
-        return self._thread_local.buffer
+        return self.buffer
 
 
 @lru_cache(maxsize=None)

@@ -133,16 +133,143 @@ Version 1.1.0b4 (not released yet)
 
 Compatibility notes:
 
-- Moved "borg migrate-to-repokey" to "borg key migrate-to-repokey".
-- "borg change-passphrase" is deprecated, use "borg key change-passphrase" instead.
-
-New features:
-
+- init: the --encryption argument is mandatory now (there are several choices)
+- moved "borg migrate-to-repokey" to "borg key migrate-to-repokey".
+- "borg change-passphrase" is deprecated, use "borg key change-passphrase"
+  instead.
 - the --exclude-if-present option now supports tagging a folder with any
   filesystem object type (file, folder, etc), instead of expecting only files
   as tags, #1999
-- the --keep-tag-files option has been deprecated in favor of the new 
+- the --keep-tag-files option has been deprecated in favor of the new
   --keep-exclude-tags, to account for the change mentioned above.
+- use lz4 compression by default, #2179
+
+New features:
+
+- JSON API to make developing frontends and automation easier
+  (see :ref:`json_output`)
+
+  - add JSON output to commands: `borg create/list/info --json ...`.
+  - add --log-json option for structured logging output.
+  - add JSON progress information, JSON support for confirmations (yes()).
+- add two new options --pattern and --patterns-from as discussed in #1406
+- new path full match pattern style (pf:) for very fast matching, #2334
+- add 'debug dump-manifest' and 'debug dump-archive' commands
+- add 'borg benchmark crud' command, #1788
+- new 'borg delete --force --force' to delete severely corrupted archives, #1975
+- info: show utilization of maximum archive size, #1452
+- list: add dsize and dcsize keys, #2164
+- paperkey.html: Add interactive html template for printing key backups.
+- key export: add qr html export mode
+- securely erase config file (which might have old encryption key), #2257
+- archived file items: add size to metadata, 'borg extract' and 'borg check' do
+  check the file size for consistency, FUSE uses precomputed size from Item.
+
+Fixes:
+
+- fix remote speed regression introduced in 1.1.0b3, #2185
+- fix regression handling timestamps beyond 2262 (revert bigint removal),
+  introduced in 1.1.0b3, #2321
+- clamp (nano)second values to unproblematic range, #2304
+- hashindex: rebuild hashtable if we have too little empty buckets
+  (performance fix), #2246
+- Location regex: fix bad parsing of wrong syntax
+- ignore posix_fadvise errors in repository.py, #2095
+- borg rpc: use limited msgpack.Unpacker (security precaution), #2139
+- Manifest: Make sure manifest timestamp is strictly monotonically increasing.
+- create: handle BackupOSError on a per-path level in one spot
+- create: clarify -x option / meaning of "same filesystem"
+- create: don't create hard link refs to failed files
+- archive check: detect and fix missing all-zero replacement chunks, #2180
+- files cache: update inode number when --ignore-inode is used, #2226
+- fix decompression exceptions crashing ``check --verify-data`` and others
+  instead of reporting integrity error, #2224 #2221
+- extract: warning for unextracted big extended attributes, #2258, #2161
+- mount: umount on SIGINT/^C when in foreground
+- mount: handle invalid hard link refs
+- mount: fix huge RAM consumption when mounting a repository (saves number of
+  archives * 8 MiB), #2308
+- hashindex: detect mingw byte order #2073
+- hashindex: fix wrong skip_hint on hashindex_set when encountering tombstones,
+  the regression was introduced in #1748
+- fix ChunkIndex.__contains__ assertion  for big-endian archs
+- fix borg key/debug/benchmark crashing without subcommand, #2240
+- Location: accept //servername/share/path
+- correct/refactor calculation of unique/non-unique chunks
+- extract: fix missing call to ProgressIndicator.finish
+- prune: fix error msg, it is --keep-within, not --within
+- fix "auto" compression mode bug (not compressing), #2331
+- fix symlink item fs size computation, #2344
+
+Other changes:
+
+- remote repository: improved async exception processing, #2255 #2225
+- with --compression auto,C, only use C if lz4 achieves at least 3% compression
+- PatternMatcher: only normalize path once, #2338
+- hashindex: separate endian-dependent defs from endian detection
+- migrate-to-repokey: ask using canonical_path() as we do everywhere else.
+- SyncFile: fix use of fd object after close
+- make LoggedIO.close_segment reentrant
+- creating a new segment: use "xb" mode, #2099
+- redo key_creator, key_factory, centralise key knowledge, #2272
+- add return code functions, #2199
+- list: only load cache if needed
+- list: files->items, clarifications
+- list: add "name" key for consistency with info cmd
+- ArchiveFormatter: add "start" key for compatibility with "info"
+- RemoteRepository: account rx/tx bytes
+- setup.py build_usage/build_man/build_api fixes
+- Manifest.in: simplify, exclude *.{so,dll,orig}, #2066
+- FUSE: get rid of chunk accounting, st_blocks = ceil(size / blocksize).
+- tests:
+
+  - help python development by testing 3.6-dev
+  - test for borg delete --force
+- vagrant:
+
+  - freebsd: some fixes, #2067
+  - darwin64: use osxfuse 3.5.4 for tests / to build binaries
+  - darwin64: improve VM settings
+  - use python 3.5.3 to build binaries, #2078
+  - upgrade pyinstaller from 3.1.1+ to 3.2.1
+  - pyinstaller: use fixed AND freshly compiled bootloader, #2002
+  - pyinstaller: automatically builds bootloader if missing
+- docs:
+
+  - create really nice man pages
+  - faq: mention --remote-ratelimit in bandwidth limit question
+  - fix caskroom link, #2299
+  - docs/security: reiterate that RPC in Borg does no networking
+  - docs/security: counter tracking, #2266
+  - docs/development: update merge remarks
+  - address SSH batch mode in docs, #2202 #2270
+  - add warning about running build_usage on Python >3.4, #2123
+  - one link per distro in the installation page
+  - improve --exclude-if-present and --keep-exclude-tags, #2268
+  - improve automated backup script in doc, #2214
+  - improve remote-path description
+  - update docs for create -C default change (lz4)
+  - document relative path usage, #1868
+  - document snapshot usage, #2178
+  - corrected some stuff in internals+security
+  - internals: move toctree to after the introduction text
+  - clarify metadata kind, manifest ops
+  - key enc: correct / clarify some stuff, link to internals/security
+  - datas: enc: 1.1.x mas different MACs
+  - datas: enc: correct factual error -- no nonce involved there.
+  - make internals.rst an index page and edit it a bit
+  - add "Cryptography in Borg" and "Remote RPC protocol security" sections
+  - document BORG_HOSTNAME_IS_UNIQUE, #2087
+  - FAQ by categories as proposed by @anarcat in #1802
+  - FAQ: update Which file types, attributes, etc. are *not* preserved?
+  - development: new branching model for git repository
+  - development: define "ours" merge strategy for auto-generated files
+  - create: move --exclude note to main doc
+  - create: move item flags to main doc
+  - fix examples using borg init without -e/--encryption
+  - list: don't print key listings in fat (html + man)
+  - remove Python API docs (were very incomplete, build problems on RTFD)
+  - added FAQ section about backing up root partition
 
 
 Version 1.0.10 (2017-02-13)

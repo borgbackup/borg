@@ -705,6 +705,9 @@ def ChunkerParams(s):
     return int(chunk_min), int(chunk_max), int(chunk_mask), int(window_size)
 
 
+ComprSpec = namedtuple('ComprSpec', ('name', 'spec'))
+
+
 def CompressionSpec(s):
     values = s.split(',')
     count = len(values)
@@ -713,7 +716,7 @@ def CompressionSpec(s):
     # --compression algo[,level]
     name = values[0]
     if name in ('none', 'lz4', ):
-        return dict(name=name)
+        return ComprSpec(name=name, spec=None)
     if name in ('zlib', 'lzma', ):
         if count < 2:
             level = 6  # default compression level in py stdlib
@@ -723,13 +726,13 @@ def CompressionSpec(s):
                 raise ValueError
         else:
             raise ValueError
-        return dict(name=name, level=level)
+        return ComprSpec(name=name, spec=level)
     if name == 'auto':
         if 2 <= count <= 3:
             compression = ','.join(values[1:])
         else:
             raise ValueError
-        return dict(name=name, spec=CompressionSpec(compression))
+        return ComprSpec(name=name, spec=CompressionSpec(compression))
     raise ValueError
 
 
@@ -2147,7 +2150,7 @@ class CompressionDecider2:
         # if we compress the data here to decide, we can even update the chunk data
         # and modify the metadata as desired.
         compr_spec = chunk.meta.get('compress', self.compression)
-        if compr_spec['name'] == 'auto':
+        if compr_spec.name == 'auto':
             # we did not decide yet, use heuristic:
             compr_spec, chunk = self.heuristic_lz4(compr_spec, chunk)
         return compr_spec, chunk
@@ -2160,14 +2163,14 @@ class CompressionDecider2:
         data_len = len(data)
         cdata_len = len(cdata)
         if cdata_len < data_len:
-            compr_spec = compr_args['spec']
+            compr_spec = compr_args.spec
         else:
             # uncompressible - we could have a special "uncompressible compressor"
             # that marks such data as uncompressible via compression-type metadata.
             compr_spec = CompressionSpec('none')
-        compr_args.update(compr_spec)
         self.logger.debug("len(data) == %d, len(lz4(data)) == %d, choosing %s", data_len, cdata_len, compr_spec)
-        return compr_args, Chunk(data, **meta)
+        meta['compress'] = compr_spec
+        return compr_spec, Chunk(data, **meta)
 
 
 class ErrorIgnoringTextIOWrapper(io.TextIOWrapper):

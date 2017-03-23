@@ -953,7 +953,7 @@ Utilization of max. archive size: {csize_max:.0%}
             item.chunks = chunks
         else:
             compress = self.compression_decider1.decide(path)
-            self.file_compression_logger.debug('%s -> compression %s', path, compress['name'])
+            self.file_compression_logger.debug('%s -> compression %s', path, compress.name)
             with backup_io('open'):
                 fh = Archive._open_rb(path)
             with os.fdopen(fh, 'rb') as fd:
@@ -1651,7 +1651,7 @@ class ArchiveRecreater:
         if self.recompress and not self.always_recompress and chunk_id in self.cache.chunks:
             # Check if this chunk is already compressed the way we want it
             old_chunk = self.key.decrypt(None, self.repository.get(chunk_id), decompress=False)
-            if Compressor.detect(old_chunk.data).name == compression_spec['name']:
+            if Compressor.detect(old_chunk.data).name == compression_spec.name:
                 # Stored chunk has the same compression we wanted
                 overwrite = False
         chunk_entry = self.cache.add_chunk(chunk_id, chunk, target.stats, overwrite=overwrite)

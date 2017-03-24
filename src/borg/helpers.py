@@ -518,6 +518,17 @@ class PatternBase:
         raise NotImplementedError
 
 
+class PathFullPattern(PatternBase):
+    """Full match of a path."""
+    PREFIX = "pf"
+
+    def _prepare(self, pattern):
+        self.pattern = os.path.normpath(pattern)
+
+    def _match(self, path):
+        return path == self.pattern
+
+
 # For PathPrefixPattern, FnmatchPattern and ShellPattern, we require that the pattern either match the whole path
 # or an initial segment of the path up to but not including a path separator. To unify the two cases, we add a path
 # separator to the end of the path before matching.
@@ -600,6 +611,7 @@ class RegexPattern(PatternBase):
 
 _PATTERN_STYLES = set([
     FnmatchPattern,
+    PathFullPattern,
     PathPrefixPattern,
     RegexPattern,
     ShellPattern,

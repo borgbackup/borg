@@ -25,7 +25,8 @@ from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams, 
 from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
 from ..helpers import load_exclude_file, load_pattern_file
 from ..helpers import CompressionSpec, ComprSpec, CompressionDecider1, CompressionDecider2
-from ..helpers import parse_pattern, PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern
+from ..helpers import parse_pattern, PatternMatcher
+from ..helpers import PathFullPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, RegexPattern
 from ..helpers import swidth_slice
 from ..helpers import chunkit
 from ..helpers import safe_ns, safe_s
@@ -252,6 +253,35 @@ def check_patterns(files, pattern, expected):
     matched = [f for f in files if pattern.match(f)]
 
     assert matched == (files if expected is None else expected)
+
+
+@pytest.mark.parametrize("pattern, expected", [
+    # "None" means all files, i.e. all match the given pattern
+    ("/", []),
+    ("/home", ["/home"]),
+    ("/home///", ["/home"]),
+    ("/./home", ["/home"]),
+    ("/home/user", ["/home/user"]),
+    ("/home/user2", ["/home/user2"]),
+    ("/home/user/.bashrc", ["/home/user/.bashrc"]),
+    ])
+def test_patterns_full(pattern, expected):
+    files = ["/home", "/home/user", "/home/user2", "/home/user/.bashrc", ]
+
+    check_patterns(files, PathFullPattern(pattern), expected)
+
+
+@pytest.mark.parametrize("pattern, expected", [
+    # "None" means all files, i.e. all match the given pattern
+    ("", []),
+    ("relative", []),
+    ("relative/path/", ["relative/path"]),
+    ("relative/path", ["relative/path"]),
+    ])
+def test_patterns_full_relative(pattern, expected):
+    files = ["relative/path", "relative/path2", ]
+
+    check_patterns(files, PathFullPattern(pattern), expected)
 
 
 @pytest.mark.parametrize("pattern, expected", [

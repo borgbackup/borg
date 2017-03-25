@@ -342,7 +342,7 @@ if not on_rtd:
     elif sys.platform == 'darwin':
         ext_modules.append(Extension('borg.platform.darwin', [platform_darwin_source]))
     elif sys.platform == 'win32':
-        ext_modules.append(Extension('borg.platform.windows', [platform_windows_source]))
+        ext_modules.append(Extension('borg.platform.windows', [platform_windows_source], define_macros=[('UNICODE', None), ('_UNICODE', None)]))
 
 
 def parse(root, describe_command=None):

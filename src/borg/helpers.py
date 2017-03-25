@@ -467,10 +467,10 @@ class PatternMatcher:
         self._items.extend(patterns)
 
     def match(self, path):
+        path = normalize_path(path)
         for (pattern, value) in self._items:
-            if pattern.match(path):
+            if pattern.match(path, normalize=False):
                 return value
-
         return self.fallback
 
 
@@ -492,8 +492,14 @@ class PatternBase:
         pattern = normalize_path(pattern)
         self._prepare(pattern)
 
-    def match(self, path):
-        path = normalize_path(path)
+    def match(self, path, normalize=True):
+        """match the given path against this pattern.
+
+        If normalize is True (default), the path will get normalized using normalize_path(),
+        otherwise it is assumed that it already is normalized using that function.
+        """
+        if normalize:
+            path = normalize_path(path)
         matches = self._match(path)
         if matches:
             self.match_count += 1

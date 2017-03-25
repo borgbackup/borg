@@ -24,7 +24,7 @@ from ..helpers import StableDict, int_to_bigint, bigint_to_int, bin_to_hex
 from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams, Chunk
 from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
 from ..helpers import load_exclude_file, load_pattern_file
-from ..helpers import CompressionSpec, CompressionDecider1, CompressionDecider2
+from ..helpers import CompressionSpec, ComprSpec, CompressionDecider1, CompressionDecider2
 from ..helpers import parse_pattern, PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern
 from ..helpers import swidth_slice
 from ..helpers import chunkit
@@ -671,16 +671,16 @@ def test_pattern_matcher():
 def test_compression_specs():
     with pytest.raises(ValueError):
         CompressionSpec('')
-    assert CompressionSpec('none') == dict(name='none')
-    assert CompressionSpec('lz4') == dict(name='lz4')
-    assert CompressionSpec('zlib') == dict(name='zlib', level=6)
-    assert CompressionSpec('zlib,0') == dict(name='zlib', level=0)
-    assert CompressionSpec('zlib,9') == dict(name='zlib', level=9)
+    assert CompressionSpec('none') == ComprSpec(name='none', spec=None)
+    assert CompressionSpec('lz4') == ComprSpec(name='lz4', spec=None)
+    assert CompressionSpec('zlib') == ComprSpec(name='zlib', spec=6)
+    assert CompressionSpec('zlib,0') == ComprSpec(name='zlib', spec=0)
+    assert CompressionSpec('zlib,9') == ComprSpec(name='zlib', spec=9)
     with pytest.raises(ValueError):
         CompressionSpec('zlib,9,invalid')
-    assert CompressionSpec('lzma') == dict(name='lzma', level=6)
-    assert CompressionSpec('lzma,0') == dict(name='lzma', level=0)
-    assert CompressionSpec('lzma,9') == dict(name='lzma', level=9)
+    assert CompressionSpec('lzma') == ComprSpec(name='lzma', spec=6)
+    assert CompressionSpec('lzma,0') == ComprSpec(name='lzma', spec=0)
+    assert CompressionSpec('lzma,9') == ComprSpec(name='lzma', spec=9)
     with pytest.raises(ValueError):
         CompressionSpec('lzma,9,invalid')
     with pytest.raises(ValueError):
@@ -1202,14 +1202,14 @@ none:*.zip
 """.splitlines()
 
     cd = CompressionDecider1(default, [])  # no conf, always use default
-    assert cd.decide('/srv/vm_disks/linux')['name'] == 'zlib'
-    assert cd.decide('test.zip')['name'] == 'zlib'
-    assert cd.decide('test')['name'] == 'zlib'
+    assert cd.decide('/srv/vm_disks/linux').name == 'zlib'
+    assert cd.decide('test.zip').name == 'zlib'
+    assert cd.decide('test').name == 'zlib'
 
     cd = CompressionDecider1(default, [conf, ])
-    assert cd.decide('/srv/vm_disks/linux')['name'] == 'lz4'
-    assert cd.decide('test.zip')['name'] == 'none'
-    assert cd.decide('test')['name'] == 'zlib'  # no match in conf, use default
+    assert cd.decide('/srv/vm_disks/linux').name == 'lz4'
+    assert cd.decide('test.zip').name == 'none'
+    assert cd.decide('test').name == 'zlib'  # no match in conf, use default
 
 
 def test_compression_decider2():
@@ -1217,9 +1217,9 @@ def test_compression_decider2():
 
     cd = CompressionDecider2(default)
     compr_spec, chunk = cd.decide(Chunk(None))
-    assert compr_spec['name'] == 'zlib'
+    assert compr_spec.name == 'zlib'
     compr_spec, chunk = cd.decide(Chunk(None, compress=CompressionSpec('lzma')))
-    assert compr_spec['name'] == 'lzma'
+    assert compr_spec.name == 'lzma'
 
 
 def test_format_line():

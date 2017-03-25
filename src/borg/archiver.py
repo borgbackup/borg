@@ -37,7 +37,7 @@ from .constants import *  # NOQA
 from .crc32 import crc32
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError, set_ec
-from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
+from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec, ComprSpec
 from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
 from .helpers import format_time, format_timedelta, format_file_size, format_archive
@@ -2394,7 +2394,7 @@ class Archiver:
                                    help='specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
                                         'HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %d,%d,%d,%d' % CHUNKER_PARAMS)
         archive_group.add_argument('-C', '--compression', dest='compression',
-                                   type=CompressionSpec, default=dict(name='lz4'), metavar='COMPRESSION',
+                                   type=CompressionSpec, default=ComprSpec(name='lz4', spec=None), metavar='COMPRESSION',
                                    help='select compression algorithm, see the output of the '
                                         '"borg help compression" command for details.')
         archive_group.add_argument('--compression-from', dest='compression_files',

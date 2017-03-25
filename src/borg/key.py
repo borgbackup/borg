@@ -153,7 +153,7 @@ class KeyBase:
 
     def compress(self, chunk):
         compr_args, chunk = self.compression_decider2.decide(chunk)
-        compressor = Compressor(**compr_args)
+        compressor = Compressor(name=compr_args.name, level=compr_args.spec)
         meta, data = chunk
         data = compressor.compress(data)
         return Chunk(data, **meta)

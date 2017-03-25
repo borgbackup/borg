@@ -366,7 +366,12 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "centos6_32" do |b|
-    b.vm.box = "centos6-32"
+    b.vm.box = "bento/centos-6.8-i386"
+    config.vm.provider "virtualbox" do |vb|
+     # required for bento box as per:
+     # https://stackoverflow.com/questions/39316612/vagrant-up-fails-for-bento-ubuntu-16-04-on-oracle-virtualbox-5-0-16-r105871
+     vb.customize ["modifyvm", :id, "--cableconnected1", "on"]
+    end
     b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_32")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_32")
@@ -376,7 +381,14 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "centos6_64" do |b|
-    b.vm.box = "centos6-64"
+    b.vm.box = "bento/centos-6.8"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 768
+
+      # required for bento box as per:
+      # https://stackoverflow.com/questions/39316612/vagrant-up-fails-for-bento-ubuntu-16-04-on-oracle-virtualbox-5-0-16-r105871
+      v.customize ["modifyvm", :id, "--cableconnected1", "on"]
+    end
     b.vm.provider :virtualbox do |v|
       v.memory = 768
     end

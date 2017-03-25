@@ -467,29 +467,18 @@ class PatternMatcher:
         self._items.extend(patterns)
 
     def match(self, path):
+        path = normalize_path(path)
         for (pattern, value) in self._items:
-            if pattern.match(path):
+            if pattern.match(path, normalize=False):
                 return value
-
         return self.fallback
 
 
-def normalized(func):
-    """ Decorator for the Pattern match methods, returning a wrapper that
-    normalizes OSX paths to match the normalized pattern on OSX, and
-    returning the original method on other platforms"""
-    @wraps(func)
-    def normalize_wrapper(self, path):
-        return func(self, unicodedata.normalize("NFD", path))
-
-    if sys.platform in ('darwin',):
-        # HFS+ converts paths to a canonical form, so users shouldn't be
-        # required to enter an exact match
-        return normalize_wrapper
-    else:
-        # Windows and Unix filesystems allow different forms, so users
-        # always have to enter an exact match
-        return func
+def normalize_path(path):
+    """normalize paths for MacOS (but do nothing on other platforms)"""
+    # HFS+ converts paths to a canonical form, so users shouldn't be required to enter an exact match.
+    # Windows and Unix filesystems allow different forms, so users always have to enter an exact match.
+    return unicodedata.normalize('NFD', path) if sys.platform == 'darwin' else path
 
 
 class PatternBase:
@@ -500,19 +489,20 @@ class PatternBase:
     def __init__(self, pattern):
         self.pattern_orig = pattern
         self.match_count = 0
-
-        if sys.platform in ('darwin',):
-            pattern = unicodedata.normalize("NFD", pattern)
-
+        pattern = normalize_path(pattern)
         self._prepare(pattern)
 
-    @normalized
-    def match(self, path):
-        matches = self._match(path)
+    def match(self, path, normalize=True):
+        """match the given path against this pattern.
 
+        If normalize is True (default), the path will get normalized using normalize_path(),
+        otherwise it is assumed that it already is normalized using that function.
+        """
+        if normalize:
+            path = normalize_path(path)
+        matches = self._match(path)
         if matches:
             self.match_count += 1
-
         return matches
 
     def __repr__(self):

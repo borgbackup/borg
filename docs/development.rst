@@ -217,12 +217,6 @@ However, we prefer to do this as part of our :ref:`releasing`
 preparations, so it is generally not necessary to update these when
 submitting patches that change something about the command line.
 
-The code documentation (which is currently not part of the released
-docs) also uses a generated file (``docs/api.rst``), that needs to be
-updated when a module is added or removed::
-
-  python setup.py build_api
-
 Building the docs with Sphinx
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -300,9 +294,9 @@ Checklist:
 - update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``
 - check version number of upcoming release in ``CHANGES.rst``
 - verify that ``MANIFEST.in`` and ``setup.py`` are complete
-- ``python setup.py build_api ; python setup.py build_usage ; python
-  setup.py build_man`` and commit (be sure to build with Python 3.4 as
-  Python 3.6 added `more guaranteed hashing algorithms
+- ``python setup.py build_usage ; python setup.py build_man`` and
+  commit (be sure to build with Python 3.4 or 3.5 as Python 3.6 added `more
+  guaranteed hashing algorithms
   <https://github.com/borgbackup/borg/issues/2123>`_)
 - tag the release::
 

@@ -560,7 +560,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         count, size, csize = self.chunks.decref(id)
         if count == 0:
             del self.chunks[id]
-            self.repository.delete(id, wait=False)
+            self.repository.delete(id, wait=False) # wait=False responsible for #2225?
             stats.update(-size, -csize, True)
         else:
             stats.update(-size, -csize, False)

@@ -353,6 +353,10 @@ How can I restore huge file(s) over a unstable connection?
 If you can not manage to extract the whole big file in one go, you can extract
 all the part files (see above) and manually concatenate them together.
 
+Can i backup my root partition (/) with borg?
+--------------------------------------------
+Backing up your entire root partition works just fine, but remember to exclude directories that make no sense to backup, such as /dev, /proc, /sys, /tmp and /run.
+
 If it crashes with a UnicodeError, what can I do?
 -------------------------------------------------
 

@@ -941,43 +941,44 @@ Utilization of max. archive size: {csize_max:.0%}
             else:
                 hardlink_master = True
         is_special_file = is_special(st.st_mode)
-        if not is_special_file:
-            path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
-            ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode)
-        else:
-            # in --read-special mode, we may be called for special files.
-            # there should be no information in the cache about special files processed in
-            # read-special mode, but we better play safe as this was wrong in the past:
-            path_hash = ids = None
-        first_run = not cache.files and cache.do_files
-        if first_run:
-            logger.debug('Processing files ...')
-        chunks = None
-        if ids is not None:
-            # Make sure all ids are available
-            for id_ in ids:
-                if not cache.seen_chunk(id_):
-                    break
-            else:
-                chunks = [cache.chunk_incref(id_, self.stats) for id_ in ids]
-                status = 'U'  # regular file, unchanged
-        else:
-            status = 'A'  # regular file, added
-        item.hardlink_master = hardlinked
-        item.update(self.stat_simple_attrs(st))
-        # Only chunkify the file if needed
-        if chunks is not None:
-            item.chunks = chunks
-        else:
-            with backup_io('open'):
-                fh = Archive._open_rb(path)
-            with os.fdopen(fh, 'rb') as fd:
-                self.chunk_file(item, cache, self.stats, backup_io_iter(self.chunker.chunkify(fd, fh)))
+        if True:
             if not is_special_file:
-                # we must not memorize special files, because the contents of e.g. a
-                # block or char device will change without its mtime/size/inode changing.
-                cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
-            status = status or 'M'  # regular file, modified (if not 'A' already)
+                path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
+                ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode)
+            else:
+                # in --read-special mode, we may be called for special files.
+                # there should be no information in the cache about special files processed in
+                # read-special mode, but we better play safe as this was wrong in the past:
+                path_hash = ids = None
+            first_run = not cache.files and cache.do_files
+            if first_run:
+                logger.debug('Processing files ...')
+            chunks = None
+            if ids is not None:
+                # Make sure all ids are available
+                for id_ in ids:
+                    if not cache.seen_chunk(id_):
+                        break
+                else:
+                    chunks = [cache.chunk_incref(id_, self.stats) for id_ in ids]
+                    status = 'U'  # regular file, unchanged
+            else:
+                status = 'A'  # regular file, added
+            item.hardlink_master = hardlinked
+            item.update(self.stat_simple_attrs(st))
+            # Only chunkify the file if needed
+            if chunks is not None:
+                item.chunks = chunks
+            else:
+                with backup_io('open'):
+                    fh = Archive._open_rb(path)
+                with os.fdopen(fh, 'rb') as fd:
+                    self.chunk_file(item, cache, self.stats, backup_io_iter(self.chunker.chunkify(fd, fh)))
+                if not is_special_file:
+                    # we must not memorize special files, because the contents of e.g. a
+                    # block or char device will change without its mtime/size/inode changing.
+                    cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
+                status = status or 'M'  # regular file, modified (if not 'A' already)
         item.update(self.stat_attrs(st, path))
         item.get_size(memorize=True)
         if is_special_file:

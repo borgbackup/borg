@@ -927,15 +927,19 @@ Utilization of max. archive size: {csize_max:.0%}
     def process_file(self, path, st, cache, ignore_inode=False):
         status = None
         safe_path = make_path_safe(path)
-        # Is it a hard link?
-        if st.st_nlink > 1:
+        item = Item(path=safe_path)
+        hardlink_master = False
+        hardlinked = st.st_nlink > 1
+        if hardlinked:
             source = self.hard_links.get((st.st_ino, st.st_dev))
             if source is not None:
-                item = Item(path=safe_path, source=source)
+                item.source = source
                 item.update(self.stat_attrs(st, path))
                 self.add_item(item)
                 status = 'h'  # regular file, hardlink (to already seen inodes)
                 return status
+            else:
+                hardlink_master = True
         is_special_file = is_special(st.st_mode)
         if not is_special_file:
             path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
@@ -959,10 +963,7 @@ Utilization of max. archive size: {csize_max:.0%}
                 status = 'U'  # regular file, unchanged
         else:
             status = 'A'  # regular file, added
-        item = Item(
-            path=safe_path,
-            hardlink_master=st.st_nlink > 1,  # item is a hard link and has the chunks
-        )
+        item.hardlink_master = hardlinked
         item.update(self.stat_simple_attrs(st))
         # Only chunkify the file if needed
         if chunks is not None:
@@ -985,7 +986,7 @@ Utilization of max. archive size: {csize_max:.0%}
             item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
         self.stats.nfiles += 1
         self.add_item(item)
-        if st.st_nlink > 1 and source is None:
+        if hardlinked and hardlink_master:
             # Add the hard link reference *after* the file has been added to the archive.
             self.hard_links[st.st_ino, st.st_dev] = safe_path
         return status

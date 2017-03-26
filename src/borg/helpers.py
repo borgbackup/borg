@@ -451,23 +451,42 @@ class PatternMatcher:
         # Value to return from match function when none of the patterns match.
         self.fallback = fallback
 
+        # optimizations
+        self._path_full_patterns = {}  # full path -> return value
+
     def empty(self):
-        return not len(self._items)
+        return not len(self._items) and not len(self._path_full_patterns)
+
+    def _add(self, pattern, value):
+        if isinstance(pattern, PathFullPattern):
+            key = pattern.pattern  # full, normalized path
+            self._path_full_patterns[key] = value
+        else:
+            self._items.append((pattern, value))
 
     def add(self, patterns, value):
         """Add list of patterns to internal list. The given value is returned from the match function when one of the
         given patterns matches.
         """
-        self._items.extend((i, value) for i in patterns)
+        for pattern in patterns:
+            self._add(pattern, value)
 
     def add_inclexcl(self, patterns):
         """Add list of patterns (of type InclExclPattern) to internal list. The patterns ptype member is returned from
         the match function when one of the given patterns matches.
         """
-        self._items.extend(patterns)
+        for pattern, pattern_type in patterns:
+            self._add(pattern, pattern_type)
 
     def match(self, path):
         path = normalize_path(path)
+        # do a fast lookup for full path matches (note: we do not count such matches):
+        non_existent = object()
+        value = self._path_full_patterns.get(path, non_existent)
+        if value is not non_existent:
+            # we have a full path match!
+            return value
+        # this is the slow way, if we have many patterns in self._items:
         for (pattern, value) in self._items:
             if pattern.match(path, normalize=False):
                 return value
@@ -516,6 +535,17 @@ class PatternBase:
 
     def _match(self, path):
         raise NotImplementedError
+
+
+class PathFullPattern(PatternBase):
+    """Full match of a path."""
+    PREFIX = "pf"
+
+    def _prepare(self, pattern):
+        self.pattern = os.path.normpath(pattern)
+
+    def _match(self, path):
+        return path == self.pattern
 
 
 # For PathPrefixPattern, FnmatchPattern and ShellPattern, we require that the pattern either match the whole path
@@ -600,6 +630,7 @@ class RegexPattern(PatternBase):
 
 _PATTERN_STYLES = set([
     FnmatchPattern,
+    PathFullPattern,
     PathPrefixPattern,
     RegexPattern,
     ShellPattern,

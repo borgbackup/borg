@@ -1604,10 +1604,26 @@ class Archiver:
             regular expression syntax is described in the `Python documentation for
             the re module <https://docs.python.org/3/library/re.html>`_.
 
-        Prefix path, selector `pp:`
+        Path prefix, selector `pp:`
 
             This pattern style is useful to match whole sub-directories. The pattern
             `pp:/data/bar` matches `/data/bar` and everything therein.
+
+        Path full-match, selector `pf:`
+
+            This pattern style is useful to match whole paths.
+            This is kind of a pseudo pattern as it can not have any variable or
+            unspecified parts - the full, precise path must be given.
+            `pf:/data/foo.txt` matches `/data/foo.txt` only.
+
+            Implementation note: this is implemented via very time-efficient O(1)
+            hashtable lookups (this means you can have huge amounts of such patterns
+            without impacting performance much).
+            Due to that, this kind of pattern does not respect any context or order.
+            If you use such a pattern to include a file, it will always be included
+            (if the directory recursion encounters it).
+            Other include/exclude patterns that would normally match will be ignored.
+            Same logic applies for exclude.
 
         Exclusions can be passed via the command line option `--exclude`. When used
         from within a shell the patterns should be quoted to protect them from

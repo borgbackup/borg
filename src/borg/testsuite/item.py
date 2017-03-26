@@ -149,7 +149,7 @@ def test_unknown_property():
 
 
 def test_item_file_size():
-    item = Item(chunks=[
+    item = Item(mode=0o100666, chunks=[
         ChunkListEntry(csize=1, size=1000, id=None),
         ChunkListEntry(csize=1, size=2000, id=None),
     ])
@@ -157,5 +157,5 @@ def test_item_file_size():
 
 
 def test_item_file_size_no_chunks():
-    item = Item()
+    item = Item(mode=0o100666)
     assert item.get_size() == 0

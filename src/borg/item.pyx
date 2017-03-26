@@ -1,3 +1,4 @@
+import stat
 from collections import namedtuple
 
 from .constants import ITEM_KEYS
@@ -193,6 +194,10 @@ class Item(PropDict):
                 raise AttributeError
             size = getattr(self, attr)
         except AttributeError:
+            if stat.S_ISLNK(self.mode):
+                # get out of here quickly. symlinks have no own chunks, their fs size is the length of the target name.
+                # also, there is the dual-use issue of .source (#2343), so don't confuse it with a hardlink slave.
+                return len(self.source)
             # no precomputed (c)size value available, compute it:
             try:
                 chunks = getattr(self, 'chunks')

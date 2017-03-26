@@ -2152,13 +2152,13 @@ class CompressionDecider2:
         cdata = lz4.compress(data)
         data_len = len(data)
         cdata_len = len(cdata)
-        if cdata_len < data_len:
+        if cdata_len < 0.97 * data_len:
             compr_spec = compr_args.spec
         else:
             # uncompressible - we could have a special "uncompressible compressor"
             # that marks such data as uncompressible via compression-type metadata.
             compr_spec = CompressionSpec('none')
-        self.logger.debug("len(data) == %d, len(lz4(data)) == %d, choosing %s", data_len, cdata_len, compr_spec)
+        self.logger.debug("len(data) == %d, len(lz4(data)) == %d, ratio == %.3f, choosing %s", data_len, cdata_len, cdata_len/data_len, compr_spec)
         meta['compress'] = compr_spec
         return compr_spec, Chunk(data, **meta)
 

@@ -835,11 +835,11 @@ Utilization of max. archive size: {csize_max:.0%}
         return attrs
 
     @contextmanager
-    def create_helper(self, path, st, status=None):
+    def create_helper(self, path, st, status=None, hardlinkable=True):
         safe_path = make_path_safe(path)
         item = Item(path=safe_path)
         hardlink_master = False
-        hardlinked = st.st_nlink > 1
+        hardlinked = hardlinkable and st.st_nlink > 1
         if hardlinked:
             source = self.hard_links.get((st.st_ino, st.st_dev))
             if source is not None:
@@ -855,7 +855,7 @@ Utilization of max. archive size: {csize_max:.0%}
             self.hard_links[(st.st_ino, st.st_dev)] = safe_path
 
     def process_dir(self, path, st):
-        with self.create_helper(path, st, 'd') as (item, status, hardlinked, hardlink_master):  # directory
+        with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
             item.update(self.stat_attrs(st, path))
             return status
 
@@ -871,12 +871,14 @@ Utilization of max. archive size: {csize_max:.0%}
             return status
 
     def process_symlink(self, path, st):
-        with self.create_helper(path, st, 's') as (item, status, hardlinked, hardlink_master):  # symlink
+        # note: using hardlinkable=False because we can not support hardlinked symlinks,
+        #       due to the dual-use of item.source, see issue #2343:
+        with self.create_helper(path, st, 's', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
             with backup_io('readlink'):
                 source = os.readlink(path)
-            item.source = source  # XXX this overwrites hardlink slave's usage of item.source
-            if hardlinked:
-                logger.warning('hardlinked symlinks will be extracted as non-hardlinked symlinks!')
+            item.source = source
+            if st.st_nlink > 1:
+                logger.warning('hardlinked symlinks will be archived as non-hardlinked symlinks!')
             item.update(self.stat_attrs(st, path))
             return status
 

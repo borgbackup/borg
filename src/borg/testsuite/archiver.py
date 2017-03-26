@@ -1748,6 +1748,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 out_fn = os.path.join(mountpoint, 'input', 'link1')
                 sti = os.stat(in_fn, follow_symlinks=False)
                 sto = os.stat(out_fn, follow_symlinks=False)
+                assert sti.st_size == len('somewhere')
+                assert sto.st_size == len('somewhere')
                 assert stat.S_ISLNK(sti.st_mode)
                 assert stat.S_ISLNK(sto.st_mode)
                 assert os.readlink(in_fn) == os.readlink(out_fn)

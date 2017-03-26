@@ -785,6 +785,7 @@ class Repository:
         self._active_txn = False
 
     def rollback(self):
+        # note: when used in remote mode, this is time limited, see RemoteRepository.shutdown_time.
         self._rollback(cleanup=False)
 
     def __len__(self):
@@ -862,6 +863,11 @@ class Repository:
             yield self.get(id_)
 
     def put(self, id, data, wait=True):
+        """put a repo object
+
+        Note: when doing calls with wait=False this gets async and caller must
+              deal with async results / exceptions later.
+        """
         if not self._active_txn:
             self.prepare_txn(self.get_transaction_id())
         try:
@@ -881,6 +887,11 @@ class Repository:
         self.index[id] = segment, offset
 
     def delete(self, id, wait=True):
+        """delete a repo object
+
+        Note: when doing calls with wait=False this gets async and caller must
+              deal with async results / exceptions later.
+        """
         if not self._active_txn:
             self.prepare_txn(self.get_transaction_id())
         try:
@@ -894,6 +905,17 @@ class Repository:
         segment, size = self.io.write_delete(id)
         self.compact[segment] += size
         self.segments.setdefault(segment, 0)
+
+    def async_response(self, wait=True):
+        """Get one async result (only applies to remote repositories).
+
+        async commands (== calls with wait=False, e.g. delete and put) have no results,
+        but may raise exceptions. These async exceptions must get collected later via
+        async_response() calls. Repeat the call until it returns None.
+        The previous calls might either return one (non-None) result or raise an exception.
+        If wait=True is given and there are outstanding responses, it will wait for them
+        to arrive. With wait=False, it will only return already received responses.
+        """
 
     def preload(self, ids):
         """Preload objects (only applies to remote repositories)

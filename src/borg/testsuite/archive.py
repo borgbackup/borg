@@ -63,10 +63,15 @@ This archive:                   20 B                 10 B                 10 B""
 
 class MockCache:
 
+    class MockRepo:
+        def async_response(self, wait=True):
+            pass
+
     def __init__(self):
         self.objects = {}
+        self.repository = self.MockRepo()
 
-    def add_chunk(self, id, chunk, stats=None):
+    def add_chunk(self, id, chunk, stats=None, wait=True):
         self.objects[id] = chunk.data
         return id, len(chunk.data), len(chunk.data)
 

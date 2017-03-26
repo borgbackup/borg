@@ -864,14 +864,11 @@ Utilization of max. archive size: {csize_max:.0%}
             item.update(self.stat_attrs(st, path))
             return status
 
-    def process_dev(self, path, st):
-        with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
+    def process_dev(self, path, st, dev_type):
+        with self.create_helper(path, st, dev_type) as (item, status, hardlinked, hardlink_master):  # char/block device
             item.rdev = st.st_rdev
             item.update(self.stat_attrs(st, path))
-            if stat.S_ISCHR(st.st_mode):
-                return 'c'  # char device
-            elif stat.S_ISBLK(st.st_mode):
-                return 'b'  # block device
+            return status
 
     def process_symlink(self, path, st):
         with self.create_helper(path, st, 's') as (item, status, hardlinked, hardlink_master):  # symlink

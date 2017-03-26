@@ -562,10 +562,16 @@ class Archiver:
                         status = archive.process_fifo(path, st)
                     else:
                         status = archive.process_file(path, st, cache)
-            elif stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
+            elif stat.S_ISCHR(st.st_mode):
                 if not dry_run:
                     if not read_special:
-                        status = archive.process_dev(path, st)
+                        status = archive.process_dev(path, st, 'c')
+                    else:
+                        status = archive.process_file(path, st, cache)
+            elif stat.S_ISBLK(st.st_mode):
+                if not dry_run:
+                    if not read_special:
+                        status = archive.process_dev(path, st, 'b')
                     else:
                         status = archive.process_file(path, st, cache)
             elif stat.S_ISSOCK(st.st_mode):

@@ -37,9 +37,13 @@ Exclusion options
     ``--exclude-caches``
         | exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)
     ``--exclude-if-present NAME``
-        | exclude directories that are tagged by containing a filesystem object with                                          the given NAME
+        | exclude directories that are tagged by containing a filesystem object with the given NAME
     ``--keep-exclude-tags``, ``--keep-tag-files``
-        | keep tag objects (i.e.: arguments to --exclude-if-present) in otherwise                                          excluded caches/directories
+        | if tag objects are specified with --exclude-if-present, don't omit the tag objects themselves from the backup archive
+    ``--pattern PATTERN``
+        | include/exclude paths matching PATTERN
+    ``--patterns-from PATTERNFILE``
+        | read include/exclude patterns from PATTERNFILE, one per line
 
 Archive options
     ``--target TARGET``
@@ -66,9 +70,9 @@ Recreate the contents of existing archives.
 
 This is an *experimental* feature. Do *not* use this on your only backup.
 
---exclude, --exclude-from and PATH have the exact same semantics
-as in "borg create". If PATHs are specified the resulting archive
-will only contain files from these PATHs.
+--exclude, --exclude-from, --exclude-if-present, --keep-exclude-tags, and PATH
+have the exact same semantics as in "borg create". If PATHs are specified the
+resulting archive will only contain files from these PATHs.
 
 Note that all paths in an archive are relative, therefore absolute patterns/paths
 will *not* match (--exclude, --exclude-from, --compression-from, PATHs).

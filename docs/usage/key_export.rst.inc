@@ -17,6 +17,8 @@ positional arguments
 optional arguments
     ``--paper``
         | Create an export suitable for printing and later type-in
+    ``--qr-html``
+        | Create an html file suitable for printing and later type-in or qr scan
 
 `Common options`_
     |

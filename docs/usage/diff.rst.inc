@@ -17,10 +17,6 @@ positional arguments
         paths of items inside the archives to compare; patterns are supported
 
 optional arguments
-    ``-e PATTERN``, ``--exclude PATTERN``
-        | exclude paths matching PATTERN
-    ``--exclude-from EXCLUDEFILE``
-        | read exclude patterns from EXCLUDEFILE, one per line
     ``--numeric-owner``
         | only consider numeric user and group identifiers
     ``--same-chunker-params``
@@ -30,6 +26,22 @@ optional arguments
 
 `Common options`_
     |
+
+Exclusion options
+    ``-e PATTERN``, ``--exclude PATTERN``
+        | exclude paths matching PATTERN
+    ``--exclude-from EXCLUDEFILE``
+        | read exclude patterns from EXCLUDEFILE, one per line
+    ``--exclude-caches``
+        | exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)
+    ``--exclude-if-present NAME``
+        | exclude directories that are tagged by containing a filesystem object with the given NAME
+    ``--keep-exclude-tags``, ``--keep-tag-files``
+        | if tag objects are specified with --exclude-if-present, don't omit the tag objects themselves from the backup archive
+    ``--pattern PATTERN``
+        | include/exclude paths matching PATTERN
+    ``--patterns-from PATTERNFILE``
+        | read include/exclude patterns from PATTERNFILE, one per line
 
 Description
 ~~~~~~~~~~~

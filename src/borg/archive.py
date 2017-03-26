@@ -934,14 +934,11 @@ Utilization of max. archive size: {csize_max:.0%}
             source = self.hard_links.get((st.st_ino, st.st_dev))
             if source is not None:
                 item.source = source
-                item.update(self.stat_attrs(st, path))
-                self.add_item(item)
                 status = 'h'  # regular file, hardlink (to already seen inodes)
-                return status
             else:
                 hardlink_master = True
         is_special_file = is_special(st.st_mode)
-        if True:
+        if not hardlinked or hardlink_master:
             if not is_special_file:
                 path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
                 ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode)
@@ -979,15 +976,15 @@ Utilization of max. archive size: {csize_max:.0%}
                     # block or char device will change without its mtime/size/inode changing.
                     cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
                 status = status or 'M'  # regular file, modified (if not 'A' already)
+            self.stats.nfiles += 1
         item.update(self.stat_attrs(st, path))
         item.get_size(memorize=True)
         if is_special_file:
             # we processed a special file like a regular file. reflect that in mode,
             # so it can be extracted / accessed in FUSE mount like a regular file:
             item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
-        self.stats.nfiles += 1
         self.add_item(item)
-        if hardlinked and hardlink_master:
+        if hardlink_master:
             # Add the hard link reference *after* the file has been added to the archive.
             self.hard_links[st.st_ino, st.st_dev] = safe_path
         return status

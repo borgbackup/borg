@@ -325,6 +325,7 @@ class Archiver:
         return EXIT_SUCCESS
 
     def do_benchmark_crud(self, args):
+        """Benchmark Create, Read, Update, Delete for archives."""
         def measurement_run(repo, path):
             archive = repo + '::borg-benchmark-crud'
             compression = '--compression=none'

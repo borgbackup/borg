@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-COMPRESSION 1 "2017-02-11" "" "borg backup tool"
+.TH BORG-COMPRESSION 1 "2017-03-26" "" "borg backup tool"
 .SH NAME
 borg-compression \- Details regarding compression
 .
@@ -32,21 +32,21 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH DESCRIPTION
 .sp
-Compression is off by default, if you want some, you have to specify what you want.
+Compression is lz4 by default. If you want something else, you have to specify what you want.
 .sp
 Valid compression specifiers are:
 .sp
 none
 .INDENT 0.0
 .INDENT 3.5
-Do not compress. (default)
+Do not compress.
 .UNINDENT
 .UNINDENT
 .sp
 lz4
 .INDENT 0.0
 .INDENT 3.5
-Use lz4 compression. High speed, low compression.
+Use lz4 compression. High speed, low compression. (default)
 .UNINDENT
 .UNINDENT
 .sp

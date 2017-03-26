@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-DIFF 1 "2017-02-11" "" "borg backup tool"
+.TH BORG-DIFF 1 "2017-03-26" "" "borg backup tool"
 .SH NAME
 borg-diff \- Diff contents of two archives
 .
@@ -69,12 +69,6 @@ paths of items inside the archives to compare; patterns are supported
 .SS optional arguments
 .INDENT 0.0
 .TP
-.BI \-e \ PATTERN\fP,\fB \ \-\-exclude \ PATTERN
-exclude paths matching PATTERN
-.TP
-.BI \-\-exclude\-from \ EXCLUDEFILE
-read exclude patterns from EXCLUDEFILE, one per line
-.TP
 .B \-\-numeric\-owner
 only consider numeric user and group identifiers
 .TP
@@ -83,6 +77,30 @@ Override check of chunker parameters.
 .TP
 .B \-\-sort
 Sort the output lines by file path.
+.UNINDENT
+.SS Exclusion options
+.INDENT 0.0
+.TP
+.BI \-e \ PATTERN\fP,\fB \ \-\-exclude \ PATTERN
+exclude paths matching PATTERN
+.TP
+.BI \-\-exclude\-from \ EXCLUDEFILE
+read exclude patterns from EXCLUDEFILE, one per line
+.TP
+.B \-\-exclude\-caches
+exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.brynosaurus.com/cachedir/spec.html\fP)
+.TP
+.BI \-\-exclude\-if\-present \ NAME
+exclude directories that are tagged by containing a filesystem object with the given NAME
+.TP
+.B \-\-keep\-exclude\-tags\fP,\fB  \-\-keep\-tag\-files
+if tag objects are specified with \-\-exclude\-if\-present, don\(aqt omit the tag objects themselves from the backup archive
+.TP
+.BI \-\-pattern \ PATTERN
+include/exclude paths matching PATTERN
+.TP
+.BI \-\-patterns\-from \ PATTERNFILE
+read include/exclude patterns from PATTERNFILE, one per line
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0

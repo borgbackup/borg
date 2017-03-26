@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-COMMON 1 "2017-02-11" "" "borg backup tool"
+.TH BORG-COMMON 1 "2017-03-26" "" "borg backup tool"
 .SH NAME
 borg-common \- Common options of Borg commands
 .
@@ -54,6 +54,9 @@ enable debug output, work on log level DEBUG
 .BI \-\-debug\-topic \ TOPIC
 enable TOPIC debugging (can be specified multiple times). The logger path is borg.debug.<TOPIC> if TOPIC is not fully qualified.
 .TP
+.B \-\-log\-json
+Output one JSON object per log line instead of formatted text.
+.TP
 .BI \-\-lock\-wait \ N
 wait for the lock, but max. N seconds (default: 1).
 .TP
@@ -70,7 +73,7 @@ do not load/update the file metadata cache used to detect unchanged files
 set umask to M (local and remote, default: 0077)
 .TP
 .BI \-\-remote\-path \ PATH
-set remote path to executable (default: "borg")
+use PATH as borg executable on the remote (default: "borg")
 .TP
 .BI \-\-remote\-ratelimit \ rate
 set remote network upload rate limit in kiByte/s (default: 0=unlimited)

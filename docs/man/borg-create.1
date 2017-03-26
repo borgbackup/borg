@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2017-02-12" "" "borg backup tool"
+.TH BORG-CREATE 1 "2017-03-26" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -36,9 +36,12 @@ borg create <options> ARCHIVE PATH
 .SH DESCRIPTION
 .sp
 This command creates a backup archive containing all files found while recursively
-traversing all paths specified. When giving \(aq\-\(aq as path, borg will read data
-from standard input and create a file \(aqstdin\(aq in the created archive from that
-data.
+traversing all paths specified. Paths are added to the archive as they are given,
+that means if relative paths are desired, the command has to be run from the correct
+directory.
+.sp
+When giving \(aq\-\(aq as path, borg will read data from standard input and create a
+file \(aqstdin\(aq in the created archive from that data.
 .sp
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
@@ -54,6 +57,11 @@ To speed up pulling backups over sshfs and similar network file systems which do
 not provide correct inode information the \-\-ignore\-inode flag can be used. This
 potentially decreases reliability of change detection, while avoiding always reading
 all files on these file systems.
+.sp
+The mount points of filesystems or filesystem snapshots should be the same for every
+creation of a new archive to ensure fast operation. This is because the file cache that
+is used to determine changed files quickly uses absolute filenames.
+If this is not possible, consider creating a bind mount to a stable location.
 .sp
 See the output of the "borg help patterns" command for more help on exclude patterns.
 See the output of the "borg help placeholders" command for more help on placeholders.
@@ -86,6 +94,9 @@ output verbose list of items (files, dirs, ...)
 .TP
 .BI \-\-filter \ STATUSCHARS
 only display items with the given status characters
+.TP
+.B \-\-json
+output stats as JSON (implies \-\-stats)
 .UNINDENT
 .SS Exclusion options
 .INDENT 0.0
@@ -103,13 +114,19 @@ exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.brynosauru
 exclude directories that are tagged by containing a filesystem object with the given NAME
 .TP
 .B \-\-keep\-exclude\-tags\fP,\fB  \-\-keep\-tag\-files
-keep tag objects (i.e.: arguments to \-\-exclude\-if\-present) in otherwise excluded caches/directories
+if tag objects are specified with \-\-exclude\-if\-present, don\(aqt omit the tag objects themselves from the backup archive
+.TP
+.BI \-\-pattern \ PATTERN
+include/exclude paths matching PATTERN
+.TP
+.BI \-\-patterns\-from \ PATTERNFILE
+read include/exclude patterns from PATTERNFILE, one per line
 .UNINDENT
 .SS Filesystem options
 .INDENT 0.0
 .TP
 .B \-x\fP,\fB  \-\-one\-file\-system
-stay in same file system, do not cross mount points
+stay in the same file system and do not store mount points of other file systems
 .TP
 .B \-\-numeric\-owner
 only store numeric user and group identifiers
@@ -175,7 +192,7 @@ $ borg create /path/to/repo::my\-files /home \e
     \-\-exclude \(aqsh:/home/*/.thumbnails\(aq
 
 # Backup the root filesystem into an archive named "root\-YYYY\-MM\-DD"
-# use zlib compression (good, but slow) \- default is no compression
+# use zlib compression (good, but slow) \- default is lz4 (fast, low compression ratio)
 $ borg create \-C zlib,6 /path/to/repo::root\-{now:%Y\-%m\-%d} / \-\-one\-file\-system
 
 # Backup a remote host locally ("pull" style) using sshfs
@@ -212,6 +229,11 @@ $ borg create /path/to/repo::{hostname}\-{user}\-{now} ~
 $ borg create /path/to/repo::{hostname}\-{user}\-{now:%Y\-%m\-%dT%H:%M:%S} ~
 # As above, but add nanoseconds
 $ borg create /path/to/repo::{hostname}\-{user}\-{now:%Y\-%m\-%dT%H:%M:%S.%f} ~
+
+# Backing up relative paths by moving into the correct directory first
+$ cd /home/user/Documents
+# The root directory of the archive will be "projectA"
+$ borg create /path/to/repo::daily\-projectA\-{now:%Y\-%m\-%d} projectA
 .ft P
 .fi
 .UNINDENT
@@ -222,6 +244,15 @@ The \-\-exclude patterns are not like tar. In tar \-\-exclude .bundler/gems will
 exclude foo/.bundler/gems. In borg it will not, you need to use \-\-exclude
 \(aq*/.bundler/gems\(aq to get the same effect. See \fBborg help patterns\fP for
 more information.
+.sp
+In addition to using \fB\-\-exclude\fP patterns, it is possible to use
+\fB\-\-exclude\-if\-present\fP to specify the name of a filesystem object (e.g. a file
+or folder name) which, when contained within another folder, will prevent the
+containing folder from being backed up.  By default, the containing folder and
+all of its contents will be omitted from the backup.  If, however, you wish to
+only include the objects specified by \fB\-\-exclude\-if\-present\fP in your backup,
+and not include any other contents of the containing folder, this can be enabled
+through using the \fB\-\-keep\-exclude\-tags\fP option.
 .SS Item flags
 .sp
 \fB\-\-list\fP outputs a list of all files, directories and other

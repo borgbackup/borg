@@ -325,6 +325,7 @@ class Archiver:
         return EXIT_SUCCESS
 
     def do_benchmark_crud(self, args):
+        """Benchmark Create, Read, Update, Delete for archives."""
         def measurement_run(repo, path):
             archive = repo + '::borg-benchmark-crud'
             compression = '--compression=none'
@@ -1561,8 +1562,8 @@ class Archiver:
 
     helptext = collections.OrderedDict()
     helptext['patterns'] = textwrap.dedent('''
-        File patterns support four separate styles: fnmatch, shell, regular
-        expressions and path prefixes. By default, fnmatch is used for
+        File patterns support these styles: fnmatch, shell, regular expressions,
+        path prefixes and path full-matches. By default, fnmatch is used for
         `--exclude` patterns and shell-style is used for `--pattern`. If followed
         by a colon (':') the first two characters of a pattern are used as a
         style selector. Explicit style selection is necessary when a

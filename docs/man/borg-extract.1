@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-EXTRACT 1 "2017-02-11" "" "borg backup tool"
+.TH BORG-EXTRACT 1 "2017-03-26" "" "borg backup tool"
 .SH NAME
 borg-extract \- Extract archive contents
 .
@@ -74,6 +74,12 @@ exclude paths matching PATTERN
 .TP
 .BI \-\-exclude\-from \ EXCLUDEFILE
 read exclude patterns from EXCLUDEFILE, one per line
+.TP
+.BI \-\-pattern \ PATTERN
+include/exclude paths matching PATTERN
+.TP
+.BI \-\-patterns\-from \ PATTERNFILE
+read include/exclude patterns from PATTERNFILE, one per line
 .TP
 .B \-\-numeric\-owner
 only obey numeric user and group identifiers

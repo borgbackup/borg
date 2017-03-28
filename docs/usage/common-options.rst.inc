@@ -12,6 +12,8 @@
         | enable debug output, work on log level DEBUG
     ``--debug-topic TOPIC``
         | enable TOPIC debugging (can be specified multiple times). The logger path is borg.debug.<TOPIC> if TOPIC is not fully qualified.
+    ``--log-json``
+        | Output one JSON object per log line instead of formatted text.
     ``--lock-wait N``
         | wait for the lock, but max. N seconds (default: 1).
     ``--show-version``
@@ -23,7 +25,7 @@
     ``--umask M``
         | set umask to M (local and remote, default: 0077)
     ``--remote-path PATH``
-        | set remote path to executable (default: "borg")
+        | use PATH as borg executable on the remote (default: "borg")
     ``--remote-ratelimit rate``
         | set remote network upload rate limit in kiByte/s (default: 0=unlimited)
     ``--consider-part-files``

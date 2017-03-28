@@ -12,6 +12,10 @@ positional arguments
     REPOSITORY_OR_ARCHIVE
         archive or repository to display information about
 
+optional arguments
+    ``--json``
+        | format output as JSON
+
 `Common options`_
     |
 

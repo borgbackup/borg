@@ -336,6 +336,10 @@ Main usecase for this is to fully automate \fBborg change\-passphrase\fP\&.
 .B BORG_DISPLAY_PASSPHRASE
 When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
 .TP
+.B BORG_HOSTNAME_IS_UNIQUE=yes
+Use this to assert that your hostname is unique.
+Borg will then automatically remove locks that it could determine to be stale.
+.TP
 .B BORG_LOGGING_CONF
 When set, use the given filename as \fI\%INI\fP\-style logging configuration.
 .TP
@@ -344,7 +348,7 @@ When set, use this command instead of \fBssh\fP\&. This can be used to specify s
 a custom identity file \fBssh \-i /path/to/private/key\fP\&. See \fBman ssh\fP for other options.
 .TP
 .B BORG_REMOTE_PATH
-When set, use the given path/filename as remote path (default is "borg").
+When set, use the given path as borg executable on the remote (defaults to "borg" if unset).
 Using \fB\-\-remote\-path PATH\fP commandline option overrides the environment variable.
 .TP
 .B BORG_FILES_CACHE_TTL

@@ -104,13 +104,16 @@ class LZ4(CompressorBase):
         # allocate more if isize * 3 is already bigger, to avoid having to resize often.
         osize = max(int(1.1 * 2**23), isize * 3)
         while True:
-            buf = buffer.get(osize)
+            try:
+                buf = buffer.get(osize)
+            except MemoryError:
+                raise DecompressionError('MemoryError')
             dest = <char *> buf
             with nogil:
                 rsize = LZ4_decompress_safe(source, dest, isize, osize)
             if rsize >= 0:
                 break
-            if osize > 2 ** 30:
+            if osize > 2 ** 27:  # 128MiB (should be enough, considering max. repo obj size and very good compression)
                 # this is insane, get out of here
                 raise DecompressionError('lz4 decompress failed')
             # likely the buffer was too small, get a bigger one:

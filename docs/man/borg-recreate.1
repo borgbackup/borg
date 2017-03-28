@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-RECREATE 1 "2017-02-11" "" "borg backup tool"
+.TH BORG-RECREATE 1 "2017-03-26" "" "borg backup tool"
 .SH NAME
 borg-recreate \- Re-create archives
 .
@@ -39,9 +39,9 @@ Recreate the contents of existing archives.
 .sp
 This is an \fIexperimental\fP feature. Do \fInot\fP use this on your only backup.
 .sp
-\-\-exclude, \-\-exclude\-from and PATH have the exact same semantics
-as in "borg create". If PATHs are specified the resulting archive
-will only contain files from these PATHs.
+\-\-exclude, \-\-exclude\-from, \-\-exclude\-if\-present, \-\-keep\-exclude\-tags, and PATH
+have the exact same semantics as in "borg create". If PATHs are specified the
+resulting archive will only contain files from these PATHs.
 .sp
 Note that all paths in an archive are relative, therefore absolute patterns/paths
 will \fInot\fP match (\-\-exclude, \-\-exclude\-from, \-\-compression\-from, PATHs).
@@ -114,10 +114,16 @@ read exclude patterns from EXCLUDEFILE, one per line
 exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.brynosaurus.com/cachedir/spec.html\fP)
 .TP
 .BI \-\-exclude\-if\-present \ NAME
-exclude directories that are tagged by containing a filesystem object with                                          the given NAME
+exclude directories that are tagged by containing a filesystem object with the given NAME
 .TP
 .B \-\-keep\-exclude\-tags\fP,\fB  \-\-keep\-tag\-files
-keep tag objects (i.e.: arguments to \-\-exclude\-if\-present) in otherwise                                          excluded caches/directories
+if tag objects are specified with \-\-exclude\-if\-present, don\(aqt omit the tag objects themselves from the backup archive
+.TP
+.BI \-\-pattern \ PATTERN
+include/exclude paths matching PATTERN
+.TP
+.BI \-\-patterns\-from \ PATTERNFILE
+read include/exclude patterns from PATTERNFILE, one per line
 .UNINDENT
 .SS Archive options
 .INDENT 0.0

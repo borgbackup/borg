@@ -1614,15 +1614,13 @@ class ArchiveRecreater:
             return (target_is_subset and
                     stat.S_ISREG(item.mode) and
                     item.get('hardlink_master', True) and
-                    'source' not in item and
-                    not matcher.match(item.path))
+                    'source' not in item)
 
         for item in archive.iter_items():
-            if item_is_hardlink_master(item):
-                hardlink_masters[item.path] = (item.get('chunks'), None)
-                continue
             if not matcher.match(item.path):
                 self.print_file_status('x', item.path)
+                if item_is_hardlink_master(item):
+                    hardlink_masters[item.path] = (item.get('chunks'), None)
                 continue
             if target_is_subset and stat.S_ISREG(item.mode) and item.get('source') in hardlink_masters:
                 # master of this hard link is outside the target subset

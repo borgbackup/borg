@@ -559,11 +559,16 @@ Utilization of max. archive size: {csize_max:.0%}
             raise self.IncompatibleFilesystemEncodingError(path, sys.getfilesystemencoding()) from None
         except OSError:
             pass
+
+        def make_parent(path):
+            parent_dir = os.path.dirname(path)
+            if not os.path.exists(parent_dir):
+                os.makedirs(parent_dir)
+
         mode = item.mode
         if stat.S_ISREG(mode):
             with backup_io('makedirs'):
-                if not os.path.exists(os.path.dirname(path)):
-                    os.makedirs(os.path.dirname(path))
+                make_parent(path)
             # Hard link?
             if 'source' in item:
                 source = os.path.join(dest, *item.source.split(os.sep)[stripped_components:])
@@ -615,13 +620,13 @@ Utilization of max. archive size: {csize_max:.0%}
         with backup_io:
             # No repository access beyond this point.
             if stat.S_ISDIR(mode):
+                make_parent(path)
                 if not os.path.exists(path):
-                    os.makedirs(path)
+                    os.mkdir(path)
                 if restore_attrs:
                     self.restore_attrs(path, item)
             elif stat.S_ISLNK(mode):
-                if not os.path.exists(os.path.dirname(path)):
-                    os.makedirs(os.path.dirname(path))
+                make_parent(path)
                 source = item.source
                 if os.path.exists(path):
                     os.unlink(path)
@@ -631,11 +636,11 @@ Utilization of max. archive size: {csize_max:.0%}
                     raise self.IncompatibleFilesystemEncodingError(source, sys.getfilesystemencoding()) from None
                 self.restore_attrs(path, item, symlink=True)
             elif stat.S_ISFIFO(mode):
-                if not os.path.exists(os.path.dirname(path)):
-                    os.makedirs(os.path.dirname(path))
+                make_parent(path)
                 os.mkfifo(path)
                 self.restore_attrs(path, item)
             elif stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
+                make_parent(path)
                 os.mknod(path, item.mode, item.rdev)
                 self.restore_attrs(path, item)
             else:
@@ -1614,15 +1619,13 @@ class ArchiveRecreater:
             return (target_is_subset and
                     stat.S_ISREG(item.mode) and
                     item.get('hardlink_master', True) and
-                    'source' not in item and
-                    not matcher.match(item.path))
+                    'source' not in item)
 
         for item in archive.iter_items():
-            if item_is_hardlink_master(item):
-                hardlink_masters[item.path] = (item.get('chunks'), None)
-                continue
             if not matcher.match(item.path):
                 self.print_file_status('x', item.path)
+                if item_is_hardlink_master(item):
+                    hardlink_masters[item.path] = (item.get('chunks'), None)
                 continue
             if target_is_subset and stat.S_ISREG(item.mode) and item.get('source') in hardlink_masters:
                 # master of this hard link is outside the target subset

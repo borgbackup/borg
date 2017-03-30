@@ -157,6 +157,8 @@ chunker_fill(Chunker *c)
     off_t offset, length;
     int overshoot;
     PyObject *data;
+    PyThreadState *thread_state;
+
     memmove(c->data, c->data + c->last, c->position + c->remaining - c->last);
     c->position -= c->last;
     c->last = 0;
@@ -165,6 +167,8 @@ chunker_fill(Chunker *c)
         return 1;
     }
     if(c->fh >= 0) {
+        thread_state = PyEval_SaveThread();
+
         offset = c->bytes_read;
         // if we have a os-level file descriptor, use os-level API
         n = read(c->fh, c->data + c->position + c->remaining, n);
@@ -177,6 +181,7 @@ chunker_fill(Chunker *c)
             c->eof = 1;
         }
         else {
+            PyEval_RestoreThread(thread_state);
             // some error happened
             PyErr_SetFromErrno(PyExc_OSError);
             return 0;
@@ -211,6 +216,8 @@ chunker_fill(Chunker *c)
 
         posix_fadvise(c->fh, offset & ~pagemask, length - overshoot, POSIX_FADV_DONTNEED);
         #endif
+
+        PyEval_RestoreThread(thread_state);
     }
     else {
         // no os-level file descriptor, use Python file object API

@@ -970,12 +970,12 @@ Utilization of max. archive size: {csize_max:.0%}
         if chunks is not None:
             item.chunks = chunks
         else:
-            compress = self.compression_decider1.decide(path)
-            self.file_compression_logger.debug('%s -> compression %s', path, compress.name)
+            compressor = self.compression_decider1.decide(path)
+            self.file_compression_logger.debug('%s -> compression %s', path, compressor.name)
             with backup_io('open'):
                 fh = Archive._open_rb(path)
             with os.fdopen(fh, 'rb') as fd:
-                self.chunk_file(item, cache, self.stats, backup_io_iter(self.chunker.chunkify(fd, fh)), compress=compress)
+                self.chunk_file(item, cache, self.stats, backup_io_iter(self.chunker.chunkify(fd, fh)), compressor=compressor)
             if not is_special_file:
                 # we must not memorize special files, because the contents of e.g. a
                 # block or char device will change without its mtime/size/inode changing.
@@ -1652,20 +1652,20 @@ class ArchiveRecreater:
                 self.cache.chunk_incref(chunk_id, target.stats)
             return item.chunks
         chunk_iterator = self.iter_chunks(archive, target, list(item.chunks))
-        compress = self.compression_decider1.decide(item.path)
-        chunk_processor = partial(self.chunk_processor, target, compress)
+        compressor = self.compression_decider1.decide(item.path)
+        chunk_processor = partial(self.chunk_processor, target, compressor)
         target.chunk_file(item, self.cache, target.stats, chunk_iterator, chunk_processor)
 
-    def chunk_processor(self, target, compress, data):
+    def chunk_processor(self, target, compressor, data):
         chunk_id = self.key.id_hash(data)
         if chunk_id in self.seen_chunks:
             return self.cache.chunk_incref(chunk_id, target.stats)
-        chunk = Chunk(data, compress=compress)
+        chunk = Chunk(data, compressor=compressor)
         overwrite = self.recompress
         if self.recompress and not self.always_recompress and chunk_id in self.cache.chunks:
             # Check if this chunk is already compressed the way we want it
             old_chunk = self.key.decrypt(None, self.repository.get(chunk_id), decompress=False)
-            if Compressor.detect(old_chunk.data).name == compress.name:
+            if Compressor.detect(old_chunk.data).name == compressor.name:
                 # Stored chunk has the same compression we wanted
                 overwrite = False
         chunk_entry = self.cache.add_chunk(chunk_id, chunk, target.stats, overwrite=overwrite, wait=False)

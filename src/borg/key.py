@@ -152,7 +152,7 @@ class KeyBase:
 
     def compress(self, chunk):
         meta, data = chunk
-        return meta.get('compress', self.compressor).compress(data)
+        return meta.get('compressor', self.compressor).compress(data)
 
     def encrypt(self, chunk):
         pass

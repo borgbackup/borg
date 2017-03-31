@@ -12,15 +12,19 @@ which sets the .compressor attribute on the Key.
 
 For chunks that emanate from files CompressionDecider1 may set a specific
 Compressor based on patterns (this is the --compression-from option). This is stored
-as a Compressor instance in the "compress" key in the Chunk's meta dictionary.
+as a Compressor instance in the "compressor" key in the Chunk's meta dictionary.
 
-When compressing either the Compressor specified in the Chunk's meta dictionary
-is used, or the default Compressor of the key.
+When compressing (KeyBase.compress) either the Compressor specified in the Chunk's
+meta dictionary is used, or the default Compressor of the key.
 
 The "auto" mode (e.g. --compression auto,lzma,4) is implemented as a meta Compressor,
 meaning that Auto acts like a Compressor, but defers actual work to others (namely
 LZ4 as a heuristic whether compression is worth it, and the specified Compressor
 for the actual compression).
+
+Decompression is normally handled through Compressor.decompress which will detect
+which compressor has been used to compress the data and dispatch to the correct
+decompressor.
 """
 
 import zlib

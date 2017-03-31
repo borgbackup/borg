@@ -1,9 +1,12 @@
 import zlib
+from collections import namedtuple
+
 try:
     import lzma
 except ImportError:
     lzma = None
 
+from .logger import create_logger
 from .helpers import Buffer, DecompressionError
 
 API_VERSION = '1.1_02'
@@ -179,12 +182,50 @@ class ZLIB(CompressorBase):
             raise DecompressionError(str(e)) from None
 
 
+class Auto(CompressorBase):
+    """
+    Meta-Compressor that decides which compression to use based on LZ4's ratio.
+
+    As a meta-Compressor the actual compression is deferred to other Compressors,
+    therefore this Compressor has no ID, no detect() and no decompress().
+    """
+
+    ID = None
+    name = 'auto'
+
+    logger = create_logger('borg.debug.file-compression')
+
+    def __init__(self, compressor):
+        super().__init__()
+        self.compressor = compressor
+        self.lz4 = get_compressor('lz4')
+        self.none = get_compressor('none')
+
+    def compress(self, data):
+        lz4_data = self.lz4.compress(data)
+        if len(lz4_data) < 0.97 * len(data):
+            return self.compressor.compress(data)
+        elif len(lz4_data) < len(data):
+            return lz4_data
+        else:
+            return self.none.compress(data)
+
+    def decompress(self, data):
+        raise NotImplementedError
+
+    def detect(cls, data):
+        raise NotImplementedError
+
+
+# Maps valid compressor names to their class
 COMPRESSOR_TABLE = {
     CNONE.name: CNONE,
     LZ4.name: LZ4,
     ZLIB.name: ZLIB,
     LZMA.name: LZMA,
+    Auto.name: Auto,
 }
+# List of possible compression types. Does not include Auto, since it is a meta-Compressor.
 COMPRESSOR_LIST = [LZ4, CNONE, ZLIB, LZMA, ]  # check fast stuff first
 
 def get_compressor(name, **kwargs):
@@ -216,3 +257,37 @@ class Compressor:
                 return cls
         else:
             raise ValueError('No decompressor for this data found: %r.', data[:2])
+
+
+ComprSpec = namedtuple('ComprSpec', ('name', 'spec', 'compressor'))
+
+
+def CompressionSpec(s):
+    values = s.split(',')
+    count = len(values)
+    if count < 1:
+        raise ValueError
+    # --compression algo[,level]
+    name = values[0]
+    if name == 'none':
+        return ComprSpec(name=name, spec=None, compressor=CNONE())
+    elif name == 'lz4':
+        return ComprSpec(name=name, spec=None, compressor=LZ4())
+    if name in ('zlib', 'lzma', ):
+        if count < 2:
+            level = 6  # default compression level in py stdlib
+        elif count == 2:
+            level = int(values[1])
+            if not 0 <= level <= 9:
+                raise ValueError
+        else:
+            raise ValueError
+        return ComprSpec(name=name, spec=level, compressor=get_compressor(name, level=level))
+    if name == 'auto':
+        if 2 <= count <= 3:
+            compression = ','.join(values[1:])
+        else:
+            raise ValueError
+        inner = CompressionSpec(compression)
+        return ComprSpec(name=name, spec=inner, compressor=Auto(inner.compressor))
+    raise ValueError

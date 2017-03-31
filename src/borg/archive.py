@@ -21,7 +21,7 @@ logger = create_logger()
 from . import xattr
 from .cache import ChunkListEntry
 from .chunker import Chunker
-from .compress import Compressor
+from .compress import Compressor, CompressionSpec
 from .constants import *  # NOQA
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Manifest
@@ -36,7 +36,7 @@ from .helpers import bin_to_hex
 from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
 from .helpers import PathPrefixPattern, FnmatchPattern
-from .helpers import CompressionDecider1, CompressionDecider2, CompressionSpec
+from .helpers import CompressionDecider1
 from .item import Item, ArchiveItem
 from .key import key_factory
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth
@@ -312,7 +312,6 @@ class Archive:
             self.chunker = Chunker(self.key.chunk_seed, *chunker_params)
             self.compression_decider1 = CompressionDecider1(compression or CompressionSpec('none'),
                                                             compression_files or [])
-            key.compression_decider2 = CompressionDecider2(compression or CompressionSpec('none'))
             if name in manifest.archives:
                 raise self.AlreadyExists(name)
             self.last_checkpoint = time.monotonic()
@@ -1585,7 +1584,6 @@ class ArchiveRecreater:
         self.seen_chunks = set()
         self.compression_decider1 = CompressionDecider1(compression or CompressionSpec('none'),
                                                         compression_files or [])
-        key.compression_decider2 = CompressionDecider2(compression or CompressionSpec('none'))
 
         self.dry_run = dry_run
         self.stats = stats
@@ -1663,12 +1661,11 @@ class ArchiveRecreater:
         if chunk_id in self.seen_chunks:
             return self.cache.chunk_incref(chunk_id, target.stats)
         chunk = Chunk(data, compress=compress)
-        compression_spec, chunk = self.key.compression_decider2.decide(chunk)
         overwrite = self.recompress
         if self.recompress and not self.always_recompress and chunk_id in self.cache.chunks:
             # Check if this chunk is already compressed the way we want it
             old_chunk = self.key.decrypt(None, self.repository.get(chunk_id), decompress=False)
-            if Compressor.detect(old_chunk.data).name == compression_spec.name:
+            if Compressor.detect(old_chunk.data).name == compress.name:
                 # Stored chunk has the same compression we wanted
                 overwrite = False
         chunk_entry = self.cache.add_chunk(chunk_id, chunk, target.stats, overwrite=overwrite, wait=False)

@@ -13,14 +13,13 @@ from .logger import create_logger
 logger = create_logger()
 
 from .constants import *  # NOQA
-from .compress import Compressor, get_compressor
+from .compress import Compressor
 from .crypto import AES, bytes_to_long, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
 from .helpers import Chunk, StableDict
 from .helpers import Error, IntegrityError
 from .helpers import yes
 from .helpers import get_keys_dir, get_security_dir
 from .helpers import bin_to_hex
-from .helpers import CompressionDecider2, CompressionSpec
 from .item import Key, EncryptedKey
 from .platform import SaveFile
 from .nonces import NonceManager
@@ -143,8 +142,8 @@ class KeyBase:
         self.TYPE_STR = bytes([self.TYPE])
         self.repository = repository
         self.target = None  # key location file path / repo obj
-        self.compression_decider2 = CompressionDecider2(CompressionSpec('none'))
         self.compressor = Compressor('none')  # for decompression
+        self.decompress = self.compressor.decompress
         self.tam_required = True
 
     def id_hash(self, data):
@@ -152,10 +151,8 @@ class KeyBase:
         """
 
     def compress(self, chunk):
-        compr_args, chunk = self.compression_decider2.decide(chunk)
-        compressor = Compressor(name=compr_args.name, level=compr_args.spec)
         meta, data = chunk
-        data = compressor.compress(data)
+        data = meta.get('compress', self.compressor).compress(data)
         return Chunk(data, **meta)
 
     def encrypt(self, chunk):
@@ -268,7 +265,7 @@ class PlaintextKey(KeyBase):
         payload = memoryview(data)[1:]
         if not decompress:
             return Chunk(payload)
-        data = self.compressor.decompress(payload)
+        data = self.decompress(payload)
         self.assert_id(id, data)
         return Chunk(data)
 
@@ -362,7 +359,7 @@ class AESKeyBase(KeyBase):
         payload = self.dec_cipher.decrypt(data_view[41:])
         if not decompress:
             return Chunk(payload)
-        data = self.compressor.decompress(payload)
+        data = self.decompress(payload)
         self.assert_id(id, data)
         return Chunk(data)
 
@@ -757,7 +754,7 @@ class AuthenticatedKey(ID_BLAKE2b_256, RepoKey):
         payload = memoryview(data)[1:]
         if not decompress:
             return Chunk(payload)
-        data = self.compressor.decompress(payload)
+        data = self.decompress(payload)
         self.assert_id(id, data)
         return Chunk(data)
 

@@ -12,6 +12,7 @@ import msgpack
 import msgpack.fallback
 
 from .. import platform
+from ..compress import CompressionSpec
 from ..helpers import Location
 from ..helpers import Buffer
 from ..helpers import partial_format, format_file_size, parse_file_size, format_timedelta, format_line, PlaceholderError, replace_placeholders
@@ -24,7 +25,7 @@ from ..helpers import StableDict, int_to_bigint, bigint_to_int, bin_to_hex
 from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams, Chunk
 from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
 from ..helpers import load_exclude_file, load_pattern_file
-from ..helpers import CompressionSpec, ComprSpec, CompressionDecider1, CompressionDecider2
+from ..helpers import CompressionDecider1
 from ..helpers import parse_pattern, PatternMatcher
 from ..helpers import PathFullPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, RegexPattern
 from ..helpers import swidth_slice
@@ -698,25 +699,6 @@ def test_pattern_matcher():
     assert PatternMatcher(fallback="hey!").fallback == "hey!"
 
 
-def test_compression_specs():
-    with pytest.raises(ValueError):
-        CompressionSpec('')
-    assert CompressionSpec('none') == ComprSpec(name='none', spec=None)
-    assert CompressionSpec('lz4') == ComprSpec(name='lz4', spec=None)
-    assert CompressionSpec('zlib') == ComprSpec(name='zlib', spec=6)
-    assert CompressionSpec('zlib,0') == ComprSpec(name='zlib', spec=0)
-    assert CompressionSpec('zlib,9') == ComprSpec(name='zlib', spec=9)
-    with pytest.raises(ValueError):
-        CompressionSpec('zlib,9,invalid')
-    assert CompressionSpec('lzma') == ComprSpec(name='lzma', spec=6)
-    assert CompressionSpec('lzma,0') == ComprSpec(name='lzma', spec=0)
-    assert CompressionSpec('lzma,9') == ComprSpec(name='lzma', spec=9)
-    with pytest.raises(ValueError):
-        CompressionSpec('lzma,9,invalid')
-    with pytest.raises(ValueError):
-        CompressionSpec('invalid')
-
-
 def test_chunkerparams():
     assert ChunkerParams('19,23,21,4095') == (19, 23, 21, 4095)
     assert ChunkerParams('10,23,16,4095') == (10, 23, 16, 4095)
@@ -1240,16 +1222,6 @@ none:*.zip
     assert cd.decide('/srv/vm_disks/linux').name == 'lz4'
     assert cd.decide('test.zip').name == 'none'
     assert cd.decide('test').name == 'zlib'  # no match in conf, use default
-
-
-def test_compression_decider2():
-    default = CompressionSpec('zlib')
-
-    cd = CompressionDecider2(default)
-    compr_spec, chunk = cd.decide(Chunk(None))
-    assert compr_spec.name == 'zlib'
-    compr_spec, chunk = cd.decide(Chunk(None, compress=CompressionSpec('lzma')))
-    assert compr_spec.name == 'lzma'
 
 
 def test_format_line():

@@ -7,7 +7,7 @@ except ImportError:
 
 import pytest
 
-from ..compress import get_compressor, Compressor, CNONE, ZLIB, LZ4
+from ..compress import get_compressor, Compressor, CompressionSpec, ComprSpec, CNONE, ZLIB, LZ4, LZMA, Auto
 
 
 buffer = bytes(2**16)
@@ -107,3 +107,48 @@ def test_compressor():
     for params in params_list:
         c = Compressor(**params)
         assert data == c.decompress(c.compress(data))
+
+
+def test_auto():
+    compressor = CompressionSpec('auto,zlib,9').compressor
+
+    compressed = compressor.compress(bytes(500))
+    assert Compressor.detect(compressed) == ZLIB
+
+    compressed = compressor.compress(b'\x00\xb8\xa3\xa2-O\xe1i\xb6\x12\x03\xc21\xf3\x8a\xf78\\\x01\xa5b\x07\x95\xbeE\xf8\xa3\x9ahm\xb1~')
+    assert Compressor.detect(compressed) == CNONE
+
+
+def test_compression_specs():
+    with pytest.raises(ValueError):
+        CompressionSpec('')
+
+    assert isinstance(CompressionSpec('none').compressor, CNONE)
+    assert isinstance(CompressionSpec('lz4').compressor, LZ4)
+
+    zlib = CompressionSpec('zlib').compressor
+    assert isinstance(zlib, ZLIB)
+    assert zlib.level == 6
+    zlib = CompressionSpec('zlib,0').compressor
+    assert isinstance(zlib, ZLIB)
+    assert zlib.level == 0
+    zlib = CompressionSpec('zlib,9').compressor
+    assert isinstance(zlib, ZLIB)
+    assert zlib.level == 9
+    with pytest.raises(ValueError):
+        CompressionSpec('zlib,9,invalid')
+
+    lzma = CompressionSpec('lzma').compressor
+    assert isinstance(lzma, LZMA)
+    assert lzma.level == 6
+    lzma = CompressionSpec('lzma,0').compressor
+    assert isinstance(lzma, LZMA)
+    assert lzma.level == 0
+    lzma = CompressionSpec('lzma,9').compressor
+    assert isinstance(lzma, LZMA)
+    assert lzma.level == 9
+
+    with pytest.raises(ValueError):
+        CompressionSpec('lzma,9,invalid')
+    with pytest.raises(ValueError):
+        CompressionSpec('invalid')

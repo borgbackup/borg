@@ -726,37 +726,6 @@ def ChunkerParams(s):
     return int(chunk_min), int(chunk_max), int(chunk_mask), int(window_size)
 
 
-ComprSpec = namedtuple('ComprSpec', ('name', 'spec'))
-
-
-def CompressionSpec(s):
-    values = s.split(',')
-    count = len(values)
-    if count < 1:
-        raise ValueError
-    # --compression algo[,level]
-    name = values[0]
-    if name in ('none', 'lz4', ):
-        return ComprSpec(name=name, spec=None)
-    if name in ('zlib', 'lzma', ):
-        if count < 2:
-            level = 6  # default compression level in py stdlib
-        elif count == 2:
-            level = int(values[1])
-            if not 0 <= level <= 9:
-                raise ValueError
-        else:
-            raise ValueError
-        return ComprSpec(name=name, spec=level)
-    if name == 'auto':
-        if 2 <= count <= 3:
-            compression = ','.join(values[1:])
-        else:
-            raise ValueError
-        return ComprSpec(name=name, spec=CompressionSpec(compression))
-    raise ValueError
-
-
 def dir_is_cachedir(path):
     """Determines whether the specified path is a cache directory (and
     therefore should potentially be excluded from the backup) according to
@@ -2136,11 +2105,12 @@ class CompressionDecider1:
         :param compression_files: list of compression config files (e.g. from --compression-from) or
                                   a list of other line iterators
         """
-        self.compression = compression
+        from .compress import CompressionSpec
+        self.compressor = compression.compressor
         if not compression_files:
             self.matcher = None
         else:
-            self.matcher = PatternMatcher(fallback=compression)
+            self.matcher = PatternMatcher(fallback=compression.compressor)
             for file in compression_files:
                 try:
                     for line in clean_lines(file):
@@ -2148,7 +2118,7 @@ class CompressionDecider1:
                             compr_spec, fn_pattern = line.split(':', 1)
                         except:
                             continue
-                        self.matcher.add([parse_pattern(fn_pattern)], CompressionSpec(compr_spec))
+                        self.matcher.add([parse_pattern(fn_pattern)], CompressionSpec(compr_spec).compressor)
                 finally:
                     if hasattr(file, 'close'):
                         file.close()
@@ -2156,42 +2126,7 @@ class CompressionDecider1:
     def decide(self, path):
         if self.matcher is not None:
             return self.matcher.match(path)
-        return self.compression
-
-
-class CompressionDecider2:
-    logger = create_logger('borg.debug.file-compression')
-
-    def __init__(self, compression):
-        self.compression = compression
-
-    def decide(self, chunk):
-        # nothing fancy here yet: we either use what the metadata says or the default
-        # later, we can decide based on the chunk data also.
-        # if we compress the data here to decide, we can even update the chunk data
-        # and modify the metadata as desired.
-        compr_spec = chunk.meta.get('compress', self.compression)
-        if compr_spec.name == 'auto':
-            # we did not decide yet, use heuristic:
-            compr_spec, chunk = self.heuristic_lz4(compr_spec, chunk)
-        return compr_spec, chunk
-
-    def heuristic_lz4(self, compr_args, chunk):
-        from .compress import get_compressor
-        meta, data = chunk
-        lz4 = get_compressor('lz4')
-        cdata = lz4.compress(data)
-        data_len = len(data)
-        cdata_len = len(cdata)
-        if cdata_len < 0.97 * data_len:
-            compr_spec = compr_args.spec
-        else:
-            # uncompressible - we could have a special "uncompressible compressor"
-            # that marks such data as uncompressible via compression-type metadata.
-            compr_spec = CompressionSpec('none')
-        self.logger.debug("len(data) == %d, len(lz4(data)) == %d, ratio == %.3f, choosing %s", data_len, cdata_len, cdata_len/data_len, compr_spec)
-        meta['compress'] = compr_spec
-        return compr_spec, Chunk(data, **meta)
+        return self.compressor
 
 
 class ErrorIgnoringTextIOWrapper(io.TextIOWrapper):

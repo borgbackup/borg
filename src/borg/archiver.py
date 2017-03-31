@@ -108,7 +108,14 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True, excl
             with repository:
                 if manifest or cache:
                     kwargs['manifest'], kwargs['key'] = Manifest.load(repository)
-                    if args.__dict__.get('compression'):
+                    # do_recreate uses args.compression is None as in band signalling for "don't recompress",
+                    # note that it does not look at key.compressor. In this case the default compressor applies
+                    # to new chunks.
+                    #
+                    # We can't use a check like `'compression' in args` (an argparse.Namespace speciality),
+                    # since the compression attribute is set. So we need to see whether it's set to something
+                    # true-ish, like a CompressionSpec instance.
+                    if getattr(args, 'compression', False):
                         kwargs['key'].compressor = args.compression.compressor
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],

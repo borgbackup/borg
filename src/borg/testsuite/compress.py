@@ -7,7 +7,7 @@ except ImportError:
 
 import pytest
 
-from ..compress import get_compressor, Compressor, CompressionSpec, ComprSpec, CNONE, ZLIB, LZ4, LZMA, Auto
+from ..compress import get_compressor, Compressor, CompressionSpec, CNONE, ZLIB, LZ4, LZMA, Auto
 
 
 buffer = bytes(2**16)

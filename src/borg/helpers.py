@@ -123,7 +123,7 @@ def check_extension_modules():
         raise ExtensionModuleError
     if chunker.API_VERSION != '1.1_01':
         raise ExtensionModuleError
-    if compress.API_VERSION != '1.1_02':
+    if compress.API_VERSION != '1.1_03':
         raise ExtensionModuleError
     if crypto.API_VERSION != '1.1_01':
         raise ExtensionModuleError

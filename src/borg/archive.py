@@ -1660,14 +1660,14 @@ class ArchiveRecreater:
         chunk_id = self.key.id_hash(data)
         if chunk_id in self.seen_chunks:
             return self.cache.chunk_incref(chunk_id, target.stats)
-        chunk = Chunk(data, compressor=compressor)
         overwrite = self.recompress
         if self.recompress and not self.always_recompress and chunk_id in self.cache.chunks:
             # Check if this chunk is already compressed the way we want it
             old_chunk = self.key.decrypt(None, self.repository.get(chunk_id), decompress=False)
-            if Compressor.detect(old_chunk.data).name == compressor.name:
+            if Compressor.detect(old_chunk.data).name == compressor.decide(data).name:
                 # Stored chunk has the same compression we wanted
                 overwrite = False
+        chunk = Chunk(data, compressor=compressor)
         chunk_entry = self.cache.add_chunk(chunk_id, chunk, target.stats, overwrite=overwrite, wait=False)
         self.cache.repository.async_response(wait=False)
         self.seen_chunks.add(chunk_entry.id)

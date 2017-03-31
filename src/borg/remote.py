@@ -2,6 +2,8 @@ import errno
 import sys
 if sys.platform != 'win32':
     import fcntl
+else:
+    import shutil
 import logging
 import os
 import select
@@ -18,6 +20,12 @@ from .helpers import get_home_dir
 from .helpers import sysinfo
 from .helpers import bin_to_hex
 from .repository import Repository
+
+if sys.platform == 'win32':
+    from .platform import select as windowsSelect
+    select.select = windowsSelect
+    class NoSSHClient(Error):
+        """Could not find supported ssh client. Supported  clients are {}."""
 
 RPC_PROTOCOL_VERSION = 2
 
@@ -237,12 +245,27 @@ class RemoteRepository:
     def ssh_cmd(self, location):
         """return a ssh command line that can be prefixed to a borg command line"""
         args = shlex.split(os.environ.get('BORG_RSH', 'ssh'))
-        if location.port:
-            args += ['-p', str(location.port)]
-        if location.user:
-            args.append('%s@%s' % (location.user, location.host))
+        if sys.platform == 'win32' and 'BORG_RSH' not in os.environ:
+            if shutil.which('ssh') is not None:
+                args = ['ssh']
+            elif shutil.which('plink') is not None:
+                args = ['plink', '-ssh', '-batch']
+            else:
+                raise NoSSHClient('ssh and plink')
+        if args[0] == 'plink':
+            if location.port:
+                args += ['-P', str(location.port)]
+            if location.user:
+                args.append('%s@%s' % (location.user, location.host))
+            else:
+                args.append('%s' % location.host)
         else:
-            args.append('%s' % location.host)
+            if location.port:
+                args += ['-p', str(location.port)]
+            if location.user:
+                args.append('%s@%s' % (location.user, location.host))
+            else:
+                args.append('%s' % location.host)
         return args
 
     def call(self, cmd, *args, **kw):

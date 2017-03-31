@@ -10,7 +10,7 @@ Borg has a flexible scheme for deciding which compression to use for chunks.
 First, there is a global default set by the --compression command line option,
 which sets the .compressor attribute on the Key.
 
-For chunks that emanate from files CompressionDecider1 may set a specific
+For chunks that emanate from files CompressionDecider may set a specific
 Compressor based on patterns (this is the --compression-from option). This is stored
 as a Compressor instance in the "compressor" key in the Chunk's meta dictionary.
 

@@ -36,7 +36,7 @@ from .helpers import bin_to_hex
 from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
 from .helpers import PathPrefixPattern, FnmatchPattern
-from .helpers import CompressionDecider1
+from .helpers import CompressionDecider
 from .item import Item, ArchiveItem
 from .key import key_factory
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth
@@ -310,8 +310,8 @@ class Archive:
             self.file_compression_logger = create_logger('borg.debug.file-compression')
             self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
             self.chunker = Chunker(self.key.chunk_seed, *chunker_params)
-            self.compression_decider1 = CompressionDecider1(compression or CompressionSpec('none'),
-                                                            compression_files or [])
+            self.compression_decider = CompressionDecider(compression or CompressionSpec('none'),
+                                                          compression_files or [])
             if name in manifest.archives:
                 raise self.AlreadyExists(name)
             self.last_checkpoint = time.monotonic()
@@ -970,7 +970,7 @@ Utilization of max. archive size: {csize_max:.0%}
         if chunks is not None:
             item.chunks = chunks
         else:
-            compressor = self.compression_decider1.decide(path)
+            compressor = self.compression_decider.decide(path)
             self.file_compression_logger.debug('%s -> compression %s', path, compressor.name)
             with backup_io('open'):
                 fh = Archive._open_rb(path)
@@ -1582,8 +1582,8 @@ class ArchiveRecreater:
         self.always_recompress = always_recompress
         self.compression = compression or CompressionSpec('none')
         self.seen_chunks = set()
-        self.compression_decider1 = CompressionDecider1(compression or CompressionSpec('none'),
-                                                        compression_files or [])
+        self.compression_decider = CompressionDecider(compression or CompressionSpec('none'),
+                                                      compression_files or [])
 
         self.dry_run = dry_run
         self.stats = stats
@@ -1652,7 +1652,7 @@ class ArchiveRecreater:
                 self.cache.chunk_incref(chunk_id, target.stats)
             return item.chunks
         chunk_iterator = self.iter_chunks(archive, target, list(item.chunks))
-        compressor = self.compression_decider1.decide(item.path)
+        compressor = self.compression_decider.decide(item.path)
         chunk_processor = partial(self.chunk_processor, target, compressor)
         target.chunk_file(item, self.cache, target.stats, chunk_iterator, chunk_processor)
 

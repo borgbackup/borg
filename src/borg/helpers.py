@@ -2096,7 +2096,7 @@ def clean_lines(lines, lstrip=None, rstrip=None, remove_empty=True, remove_comme
         yield line
 
 
-class CompressionDecider1:
+class CompressionDecider:
     def __init__(self, compression, compression_files):
         """
         Initialize a CompressionDecider instance (and read config files, if needed).

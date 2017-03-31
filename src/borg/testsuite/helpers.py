@@ -25,7 +25,7 @@ from ..helpers import StableDict, int_to_bigint, bigint_to_int, bin_to_hex
 from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams, Chunk
 from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
 from ..helpers import load_exclude_file, load_pattern_file
-from ..helpers import CompressionDecider1
+from ..helpers import CompressionDecider
 from ..helpers import parse_pattern, PatternMatcher
 from ..helpers import PathFullPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, RegexPattern
 from ..helpers import swidth_slice
@@ -1202,7 +1202,7 @@ data2
     assert list(clean_lines(conf, remove_comments=False)) == ['#comment', 'data1 #data1', 'data2', 'data3', ]
 
 
-def test_compression_decider1():
+def test_compression_decider():
     default = CompressionSpec('zlib')
     conf = """
 # use super-fast lz4 compression on huge VM files in this path:
@@ -1213,12 +1213,12 @@ none:*.jpeg
 none:*.zip
 """.splitlines()
 
-    cd = CompressionDecider1(default, [])  # no conf, always use default
+    cd = CompressionDecider(default, [])  # no conf, always use default
     assert cd.decide('/srv/vm_disks/linux').name == 'zlib'
     assert cd.decide('test.zip').name == 'zlib'
     assert cd.decide('test').name == 'zlib'
 
-    cd = CompressionDecider1(default, [conf, ])
+    cd = CompressionDecider(default, [conf, ])
     assert cd.decide('/srv/vm_disks/linux').name == 'lz4'
     assert cd.decide('test.zip').name == 'none'
     assert cd.decide('test').name == 'zlib'  # no match in conf, use default

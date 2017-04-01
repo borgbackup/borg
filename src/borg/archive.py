@@ -502,6 +502,26 @@ Utilization of max. archive size: {csize_max:.0%}
         cache.rollback()
         return stats
 
+    @contextmanager
+    def extract_helper(self, dest, item, path, stripped_components, original_path, hardlink_masters):
+        hardlink_set = False
+        # Hard link?
+        if 'source' in item:
+            source = os.path.join(dest, *item.source.split(os.sep)[stripped_components:])
+            chunks, link_target = hardlink_masters.get(item.source, (None, source))
+            if link_target:
+                # Hard link was extracted previously, just link
+                with backup_io('link'):
+                    os.link(link_target, path)
+                    hardlink_set = True
+            elif chunks is not None:
+                # assign chunks to this item, since the item which had the chunks was not extracted
+                item.chunks = chunks
+        yield hardlink_set
+        if not hardlink_set and hardlink_masters:  # 2nd term, is it correct/needed?
+            # Update master entry with extracted item path, so that following hardlinks don't extract twice.
+            hardlink_masters[item.get('source') or original_path] = (None, path)
+
     def extract_item(self, item, restore_attrs=True, dry_run=False, stdout=False, sparse=False,
                      hardlink_masters=None, stripped_components=0, original_path=None, pi=None):
         """
@@ -566,20 +586,8 @@ Utilization of max. archive size: {csize_max:.0%}
         if stat.S_ISREG(mode):
             with backup_io('makedirs'):
                 make_parent(path)
-            hardlink_set = False
-            # Hard link?
-            if 'source' in item:
-                source = os.path.join(dest, *item.source.split(os.sep)[stripped_components:])
-                chunks, link_target = hardlink_masters.get(item.source, (None, source))
-                if link_target:
-                    # Hard link was extracted previously, just link
-                    with backup_io('link'):
-                        os.link(link_target, path)
-                        hardlink_set = True
-                elif chunks is not None:
-                    # assign chunks to this item, since the item which had the chunks was not extracted
-                    item.chunks = chunks
-            if True:
+            with self.extract_helper(dest, item, path, stripped_components, original_path,
+                                     hardlink_masters) as hardlink_set:
                 if hardlink_set:
                     return
                 if sparse and self.zeros is None:
@@ -610,9 +618,6 @@ Utilization of max. archive size: {csize_max:.0%}
                 if has_damaged_chunks:
                     logger.warning('File %s has damaged (all-zero) chunks. Try running borg check --repair.' %
                                    remove_surrogates(item.path))
-            if not hardlink_set and hardlink_masters:  # 2nd term, is it correct/needed?
-                # Update master entry with extracted file path, so that following hardlinks don't extract twice.
-                hardlink_masters[item.get('source') or original_path] = (None, path)
             return
         with backup_io:
             # No repository access beyond this point.
@@ -632,12 +637,20 @@ Utilization of max. archive size: {csize_max:.0%}
                 self.restore_attrs(path, item, symlink=True)
             elif stat.S_ISFIFO(mode):
                 make_parent(path)
-                os.mkfifo(path)
-                self.restore_attrs(path, item)
+                with self.extract_helper(dest, item, path, stripped_components, original_path,
+                                         hardlink_masters) as hardlink_set:
+                    if hardlink_set:
+                        return
+                    os.mkfifo(path)
+                    self.restore_attrs(path, item)
             elif stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
                 make_parent(path)
-                os.mknod(path, item.mode, item.rdev)
-                self.restore_attrs(path, item)
+                with self.extract_helper(dest, item, path, stripped_components, original_path,
+                                         hardlink_masters) as hardlink_set:
+                    if hardlink_set:
+                        return
+                    os.mknod(path, item.mode, item.rdev)
+                    self.restore_attrs(path, item)
             else:
                 raise Exception('Unknown archive item type %r' % item.mode)
 

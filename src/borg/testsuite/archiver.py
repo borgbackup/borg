@@ -2841,6 +2841,13 @@ def test_get_args():
                              'borg init --encryption=repokey /')
     assert args.func == archiver.do_serve
 
+    # Check that environment variables in the forced command don't cause issues. If the command
+    # were not forced, environment variables would be interpreted by the shell, but this does not
+    # happen for forced commands - we get the verbatim command line and need to deal with env vars.
+    args = archiver.get_args(['borg', 'serve', ],
+                             'BORG_HOSTNAME_IS_UNIQUE=yes borg serve --info')
+    assert args.func == archiver.do_serve
+
 
 def test_compare_chunk_contents():
     def ccc(a, b):

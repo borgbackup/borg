@@ -18,7 +18,7 @@ from .helpers import get_cache_dir, get_security_dir
 from .helpers import int_to_bigint, bigint_to_int, bin_to_hex
 from .helpers import format_file_size
 from .helpers import safe_ns
-from .helpers import yes
+from .helpers import yes, hostname_is_unique
 from .helpers import remove_surrogates
 from .helpers import ProgressIndicatorPercent, ProgressIndicatorMessage
 from .item import Item, ArchiveItem, ChunkListEntry
@@ -187,9 +187,6 @@ class Cache:
         self.progress = progress
         self.path = path or os.path.join(get_cache_dir(), repository.id_str)
         self.security_manager = SecurityManager(repository)
-        self.hostname_is_unique = yes(env_var_override='BORG_HOSTNAME_IS_UNIQUE', prompt=False, env_msg=None)
-        if self.hostname_is_unique:
-            logger.info('Enabled removal of stale cache locks')
         self.do_files = do_files
         # Warn user before sending data to a never seen before unencrypted repository
         if not os.path.exists(self.path):
@@ -295,7 +292,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
     def open(self, lock_wait=None):
         if not os.path.isdir(self.path):
             raise Exception('%s Does not look like a Borg cache' % self.path)
-        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait, kill_stale_locks=self.hostname_is_unique).acquire()
+        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait, kill_stale_locks=hostname_is_unique()).acquire()
         self.rollback()
 
     def close(self):

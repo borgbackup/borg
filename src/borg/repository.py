@@ -17,7 +17,7 @@ from .helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size
 from .helpers import Location
 from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
-from .helpers import yes
+from .helpers import hostname_is_unique
 from .helpers import secure_erase
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
@@ -124,9 +124,6 @@ class Repository:
         self.created = False
         self.exclusive = exclusive
         self.append_only = append_only
-        self.hostname_is_unique = yes(env_var_override='BORG_HOSTNAME_IS_UNIQUE', env_msg=None, prompt=False)
-        if self.hostname_is_unique:
-            logger.info('Enabled removal of stale repository locks')
 
     def __del__(self):
         if self.lock:
@@ -279,7 +276,7 @@ class Repository:
         if not os.path.isdir(path):
             raise self.DoesNotExist(path)
         if lock:
-            self.lock = Lock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait, kill_stale_locks=self.hostname_is_unique).acquire()
+            self.lock = Lock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait, kill_stale_locks=hostname_is_unique()).acquire()
         else:
             self.lock = None
         self.config = ConfigParser(interpolation=None)

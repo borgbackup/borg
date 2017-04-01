@@ -8,7 +8,6 @@ import select
 import shlex
 import sys
 import tempfile
-import time
 import traceback
 import textwrap
 import time
@@ -22,7 +21,7 @@ from .helpers import get_home_dir
 from .helpers import sysinfo
 from .helpers import bin_to_hex
 from .helpers import replace_placeholders
-from .helpers import yes
+from .helpers import hostname_is_unique
 from .repository import Repository, MAX_OBJECT_SIZE, LIST_SCAN_LIMIT
 from .version import parse_version, format_version
 from .logger import create_logger
@@ -646,8 +645,8 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             except AttributeError:
                 pass
         env_vars = []
-        if yes(env_var_override='BORG_HOSTNAME_IS_UNIQUE', env_msg=None, prompt=False):
-            env_vars.append('BORG_HOSTNAME_IS_UNIQUE=yes')
+        if not hostname_is_unique():
+            env_vars.append('BORG_HOSTNAME_IS_UNIQUE=no')
         if testing:
             return env_vars + [sys.executable, '-m', 'borg.archiver', 'serve'] + opts + self.extra_test_args
         else:  # pragma: no cover

@@ -128,6 +128,13 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
+Version 1.1.0b5 (not released)
+------------------------------
+
+Compatibility notes:
+
+- BORG_HOSTNAME_IS_UNIQUE is now on by default.
+
 Version 1.1.0b4 (2017-03-27)
 ----------------------------
 

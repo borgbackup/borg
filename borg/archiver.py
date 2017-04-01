@@ -6,6 +6,7 @@ import argparse
 import faulthandler
 import functools
 import inspect
+import itertools
 import os
 import re
 import shlex
@@ -2060,6 +2061,9 @@ class Archiver:
         if cmd is not None and result.func == self.do_serve:
             forced_result = result
             argv = shlex.split(cmd)
+            # Drop environment variables (do *not* interpret them) before trying to parse
+            # the borg command line.
+            argv = list(itertools.dropwhile(lambda arg: '=' in arg, argv))
             result = self.parse_args(argv[1:])
             if result.func != forced_result.func:
                 # someone is trying to execute a different borg subcommand, don't do that!

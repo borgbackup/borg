@@ -579,36 +579,37 @@ Utilization of max. archive size: {csize_max:.0%}
                 elif chunks is not None:
                     # assign chunks to this item, since the item which had the chunks was not extracted
                     item.chunks = chunks
-            if hardlink_set:
-                return
-            if sparse and self.zeros is None:
-                self.zeros = b'\0' * (1 << self.chunker_params[1])
-            with backup_io('open'):
-                fd = open(path, 'wb')
-            with fd:
-                ids = [c.id for c in item.chunks]
-                for data in self.pipeline.fetch_many(ids, is_preloaded=True):
-                    if pi:
-                        pi.show(increase=len(data), info=[remove_surrogates(item.path)])
-                    with backup_io('write'):
-                        if sparse and self.zeros.startswith(data):
-                            # all-zero chunk: create a hole in a sparse file
-                            fd.seek(len(data), 1)
-                        else:
-                            fd.write(data)
-                with backup_io('truncate_and_attrs'):
-                    pos = item_chunks_size = fd.tell()
-                    fd.truncate(pos)
-                    fd.flush()
-                    self.restore_attrs(path, item, fd=fd.fileno())
-            if 'size' in item:
-                item_size = item.size
-                if item_size != item_chunks_size:
-                    logger.warning('{}: size inconsistency detected: size {}, chunks size {}'.format(
-                        item.path, item_size, item_chunks_size))
-            if has_damaged_chunks:
-                logger.warning('File %s has damaged (all-zero) chunks. Try running borg check --repair.' %
-                               remove_surrogates(item.path))
+            if True:
+                if hardlink_set:
+                    return
+                if sparse and self.zeros is None:
+                    self.zeros = b'\0' * (1 << self.chunker_params[1])
+                with backup_io('open'):
+                    fd = open(path, 'wb')
+                with fd:
+                    ids = [c.id for c in item.chunks]
+                    for data in self.pipeline.fetch_many(ids, is_preloaded=True):
+                        if pi:
+                            pi.show(increase=len(data), info=[remove_surrogates(item.path)])
+                        with backup_io('write'):
+                            if sparse and self.zeros.startswith(data):
+                                # all-zero chunk: create a hole in a sparse file
+                                fd.seek(len(data), 1)
+                            else:
+                                fd.write(data)
+                    with backup_io('truncate_and_attrs'):
+                        pos = item_chunks_size = fd.tell()
+                        fd.truncate(pos)
+                        fd.flush()
+                        self.restore_attrs(path, item, fd=fd.fileno())
+                if 'size' in item:
+                    item_size = item.size
+                    if item_size != item_chunks_size:
+                        logger.warning('{}: size inconsistency detected: size {}, chunks size {}'.format(
+                            item.path, item_size, item_chunks_size))
+                if has_damaged_chunks:
+                    logger.warning('File %s has damaged (all-zero) chunks. Try running borg check --repair.' %
+                                   remove_surrogates(item.path))
             if not hardlink_set and hardlink_masters:  # 2nd term, is it correct/needed?
                 # Update master entry with extracted file path, so that following hardlinks don't extract twice.
                 hardlink_masters[item.get('source') or original_path] = (None, path)

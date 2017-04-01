@@ -403,8 +403,6 @@ Number of files: {0.stats.nfiles}'''.format(
             if b'source' in item:
                 source = os.path.join(dest, item[b'source'])
                 with backup_io():
-                    if os.path.exists(path):
-                        os.unlink(path)
                     os.link(source, path)
             else:
                 with backup_io():
@@ -438,8 +436,6 @@ Number of files: {0.stats.nfiles}'''.format(
             elif stat.S_ISLNK(mode):
                 make_parent(path)
                 source = item[b'source']
-                if os.path.exists(path):
-                    os.unlink(path)
                 try:
                     os.symlink(source, path)
                 except UnicodeEncodeError:

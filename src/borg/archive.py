@@ -573,8 +573,6 @@ Utilization of max. archive size: {csize_max:.0%}
             if 'source' in item:
                 source = os.path.join(dest, *item.source.split(os.sep)[stripped_components:])
                 with backup_io('link'):
-                    if os.path.exists(path):
-                        os.unlink(path)
                     if item.source not in hardlink_masters:
                         os.link(source, path)
                         return
@@ -628,8 +626,6 @@ Utilization of max. archive size: {csize_max:.0%}
             elif stat.S_ISLNK(mode):
                 make_parent(path)
                 source = item.source
-                if os.path.exists(path):
-                    os.unlink(path)
                 try:
                     os.symlink(source, path)
                 except UnicodeEncodeError:

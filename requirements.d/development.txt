@@ -1,4 +1,5 @@
 setuptools
+setuptools_scm
 pip
 virtualenv<14.0
 tox

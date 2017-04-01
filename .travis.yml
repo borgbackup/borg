@@ -38,6 +38,7 @@ matrix:
           env: TOXENV=py36
 
 install:
+    - git fetch --unshallow --tags
     - ./.travis/install.sh
 
 script:

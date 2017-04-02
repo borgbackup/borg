@@ -48,6 +48,7 @@ from .helpers import prune_within, prune_split
 from .helpers import to_localtime, timestamp
 from .helpers import get_cache_dir
 from .helpers import Manifest
+from .helpers import hardlinkable
 from .helpers import StableDict
 from .helpers import check_extension_modules
 from .helpers import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
@@ -634,7 +635,7 @@ class Archiver:
         hardlink_masters = {} if partial_extract else None
 
         def peek_and_store_hardlink_masters(item, matched):
-            if (partial_extract and not matched and stat.S_ISREG(item.mode) and
+            if (partial_extract and not matched and hardlinkable(item.mode) and
                     item.get('hardlink_master', True) and 'source' not in item):
                 hardlink_masters[item.get('path')] = (item.get('chunks'), None)
 
@@ -726,7 +727,7 @@ class Archiver:
                 return [None]
 
         def has_hardlink_master(item, hardlink_masters):
-            return stat.S_ISREG(item.mode) and item.get('source') in hardlink_masters
+            return hardlinkable(item.mode) and item.get('source') in hardlink_masters
 
         def compare_link(item1, item2):
             # These are the simple link cases. For special cases, e.g. if a
@@ -822,7 +823,7 @@ class Archiver:
 
         def compare_archives(archive1, archive2, matcher):
             def hardlink_master_seen(item):
-                return 'source' not in item or not stat.S_ISREG(item.mode) or item.source in hardlink_masters
+                return 'source' not in item or not hardlinkable(item.mode) or item.source in hardlink_masters
 
             def is_hardlink_master(item):
                 return item.get('hardlink_master', True) and 'source' not in item

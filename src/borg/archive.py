@@ -25,6 +25,7 @@ from .compress import Compressor, CompressionSpec
 from .constants import *  # NOQA
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Manifest
+from .helpers import hardlinkable
 from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec
 from .helpers import uid2user, user2uid, gid2group, group2gid
@@ -1623,7 +1624,7 @@ class ArchiveRecreater:
 
         def item_is_hardlink_master(item):
             return (target_is_subset and
-                    stat.S_ISREG(item.mode) and
+                    hardlinkable(item.mode) and
                     item.get('hardlink_master', True) and
                     'source' not in item)
 
@@ -1633,7 +1634,7 @@ class ArchiveRecreater:
                 if item_is_hardlink_master(item):
                     hardlink_masters[item.path] = (item.get('chunks'), None)
                 continue
-            if target_is_subset and stat.S_ISREG(item.mode) and item.get('source') in hardlink_masters:
+            if target_is_subset and hardlinkable(item.mode) and item.get('source') in hardlink_masters:
                 # master of this hard link is outside the target subset
                 chunks, new_source = hardlink_masters[item.source]
                 if new_source is None:

@@ -144,7 +144,7 @@ class FuseOperations(llfuse.Operations):
         self.file_versions = {}  # for versions mode: original path -> version
         unpacker = msgpack.Unpacker()
         for key, chunk in zip(archive.metadata.items, self.repository.get_many(archive.metadata.items)):
-            _, data = self.key.decrypt(key, chunk)
+            data = self.key.decrypt(key, chunk)
             unpacker.feed(data)
             for item in unpacker:
                 item = Item(internal_dict=item)
@@ -340,7 +340,7 @@ class FuseOperations(llfuse.Operations):
                     # evict fully read chunk from cache
                     del self.data_cache[id]
             else:
-                _, data = self.key.decrypt(id, self.repository.get(id))
+                data = self.key.decrypt(id, self.repository.get(id))
                 if offset + n < len(data):
                     # chunk was only partially read, cache it
                     self.data_cache[id] = data

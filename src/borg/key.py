@@ -15,7 +15,7 @@ logger = create_logger()
 from .constants import *  # NOQA
 from .compress import Compressor
 from .crypto import AES, bytes_to_long, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
-from .helpers import Chunk, StableDict
+from .helpers import StableDict
 from .helpers import Error, IntegrityError
 from .helpers import yes
 from .helpers import get_keys_dir, get_security_dir
@@ -252,7 +252,7 @@ class PlaintextKey(KeyBase):
         return sha256(data).digest()
 
     def encrypt(self, chunk):
-        data = self.compressor.compress(chunk.data)
+        data = self.compressor.compress(chunk)
         return b''.join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):
@@ -261,10 +261,10 @@ class PlaintextKey(KeyBase):
             raise IntegrityError('Chunk %s: Invalid encryption envelope' % id_str)
         payload = memoryview(data)[1:]
         if not decompress:
-            return Chunk(payload)
+            return payload
         data = self.decompress(payload)
         self.assert_id(id, data)
-        return Chunk(data)
+        return data
 
     def _tam_key(self, salt, context):
         return salt + context
@@ -330,7 +330,7 @@ class AESKeyBase(KeyBase):
     MAC = hmac_sha256
 
     def encrypt(self, chunk):
-        data = self.compressor.compress(chunk.data)
+        data = self.compressor.compress(chunk)
         self.nonce_manager.ensure_reservation(num_aes_blocks(len(data)))
         self.enc_cipher.reset()
         data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(data)))
@@ -355,10 +355,10 @@ class AESKeyBase(KeyBase):
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
         payload = self.dec_cipher.decrypt(data_view[41:])
         if not decompress:
-            return Chunk(payload)
+            return payload
         data = self.decompress(payload)
         self.assert_id(id, data)
-        return Chunk(data)
+        return data
 
     def extract_nonce(self, payload):
         if not (payload[0] == self.TYPE or
@@ -742,7 +742,7 @@ class AuthenticatedKey(ID_BLAKE2b_256, RepoKey):
     STORAGE = KeyBlobStorage.REPO
 
     def encrypt(self, chunk):
-        data = self.compressor.compress(chunk.data)
+        data = self.compressor.compress(chunk)
         return b''.join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):
@@ -750,10 +750,10 @@ class AuthenticatedKey(ID_BLAKE2b_256, RepoKey):
             raise IntegrityError('Chunk %s: Invalid envelope' % bin_to_hex(id))
         payload = memoryview(data)[1:]
         if not decompress:
-            return Chunk(payload)
+            return payload
         data = self.decompress(payload)
         self.assert_id(id, data)
-        return Chunk(data)
+        return data
 
 
 AVAILABLE_KEY_TYPES = (

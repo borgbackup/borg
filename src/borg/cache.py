@@ -424,14 +424,14 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
 
         def fetch_and_build_idx(archive_id, repository, key, chunk_idx):
             cdata = repository.get(archive_id)
-            _, data = key.decrypt(archive_id, cdata)
+            data = key.decrypt(archive_id, cdata)
             chunk_idx.add(archive_id, 1, len(data), len(cdata))
             archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
             if archive.version != 1:
                 raise Exception('Unknown archive metadata version')
             unpacker = msgpack.Unpacker()
             for item_id, chunk in zip(archive.items, repository.get_many(archive.items)):
-                _, data = key.decrypt(item_id, chunk)
+                data = key.decrypt(item_id, chunk)
                 chunk_idx.add(item_id, 1, len(data), len(chunk))
                 unpacker.feed(data)
                 for item in unpacker:
@@ -527,7 +527,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
     def add_chunk(self, id, chunk, stats, overwrite=False, wait=True):
         if not self.txn_active:
             self.begin_txn()
-        size = len(chunk.data)
+        size = len(chunk)
         refcount = self.seen_chunk(id, size)
         if refcount and not overwrite:
             return self.chunk_incref(id, stats)

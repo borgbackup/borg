@@ -177,14 +177,14 @@ class Archiver:
                 a = next(chunks1, end)
                 if a is end:
                     return not blen - bi and next(chunks2, end) is end
-                a = memoryview(a.data)
+                a = memoryview(a)
                 alen = len(a)
                 ai = 0
             if not blen - bi:
                 b = next(chunks2, end)
                 if b is end:
                     return not alen - ai and next(chunks1, end) is end
-                b = memoryview(b.data)
+                b = memoryview(b)
                 blen = len(b)
                 bi = 0
             slicelen = min(alen - ai, blen - bi)
@@ -1395,7 +1395,7 @@ class Archiver:
         archive = Archive(repository, key, manifest, args.location.archive,
                           consider_part_files=args.consider_part_files)
         for i, item_id in enumerate(archive.metadata.items):
-            _, data = key.decrypt(item_id, repository.get(item_id))
+            data = key.decrypt(item_id, repository.get(item_id))
             filename = '%06d_%s.items' % (i, bin_to_hex(item_id))
             print('Dumping', filename)
             with open(filename, 'wb') as fd:
@@ -1425,7 +1425,7 @@ class Archiver:
             fd.write(do_indent(prepare_dump_dict(archive_meta_orig)))
             fd.write(',\n')
 
-            _, data = key.decrypt(archive_meta_orig[b'id'], repository.get(archive_meta_orig[b'id']))
+            data = key.decrypt(archive_meta_orig[b'id'], repository.get(archive_meta_orig[b'id']))
             archive_org_dict = msgpack.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape')
 
             fd.write('    "_meta":\n')
@@ -1436,7 +1436,7 @@ class Archiver:
             unpacker = msgpack.Unpacker(use_list=False, object_hook=StableDict)
             first = True
             for item_id in archive_org_dict[b'items']:
-                _, data = key.decrypt(item_id, repository.get(item_id))
+                data = key.decrypt(item_id, repository.get(item_id))
                 unpacker.feed(data)
                 for item in unpacker:
                     item = prepare_dump_dict(item)
@@ -1460,7 +1460,7 @@ class Archiver:
     def do_debug_dump_manifest(self, args, repository, manifest, key):
         """dump decoded repository manifest"""
 
-        _, data = key.decrypt(None, repository.get(manifest.MANIFEST_ID))
+        data = key.decrypt(None, repository.get(manifest.MANIFEST_ID))
 
         meta = prepare_dump_dict(msgpack.fallback.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape'))
 
@@ -1484,7 +1484,7 @@ class Archiver:
             for id in result:
                 cdata = repository.get(id)
                 give_id = id if id != Manifest.MANIFEST_ID else None
-                _, data = key.decrypt(give_id, cdata)
+                data = key.decrypt(give_id, cdata)
                 filename = '%06d_%s.obj' % (i, bin_to_hex(id))
                 print('Dumping', filename)
                 with open(filename, 'wb') as fd:

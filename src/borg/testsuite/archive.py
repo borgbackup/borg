@@ -72,8 +72,8 @@ class MockCache:
         self.repository = self.MockRepo()
 
     def add_chunk(self, id, chunk, stats=None, wait=True):
-        self.objects[id] = chunk.data
-        return id, len(chunk.data), len(chunk.data)
+        self.objects[id] = chunk
+        return id, len(chunk), len(chunk)
 
 
 class ArchiveTimestampTestCase(BaseTestCase):

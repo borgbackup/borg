@@ -44,13 +44,6 @@ from . import hashindex
 from . import shellpattern
 from .constants import *  # NOQA
 
-# meta dict, data bytes
-_Chunk = namedtuple('_Chunk', 'meta data')
-
-
-def Chunk(data, **meta):
-    return _Chunk(meta, data)
-
 
 '''
 The global exit_code variable is used so that modules other than archiver can increase the program exit code if a
@@ -247,7 +240,7 @@ class Manifest:
         if not key:
             key = key_factory(repository, cdata)
         manifest = cls(key, repository)
-        data = key.decrypt(None, cdata).data
+        data = key.decrypt(None, cdata)
         manifest_dict, manifest.tam_verified = key.unpack_and_verify_manifest(data, force_tam_not_required=force_tam_not_required)
         m = ManifestItem(internal_dict=manifest_dict)
         manifest.id = key.id_hash(data)
@@ -292,7 +285,7 @@ class Manifest:
         self.tam_verified = True
         data = self.key.pack_and_authenticate_metadata(manifest.as_dict())
         self.id = self.key.id_hash(data)
-        self.repository.put(self.MANIFEST_ID, self.key.encrypt(Chunk(data, compression={'name': 'none'})))
+        self.repository.put(self.MANIFEST_ID, self.key.encrypt(data))
 
 
 def prune_within(archives, within):
@@ -1909,7 +1902,7 @@ class ItemFormatter(BaseFormatter):
         if 'chunks' not in item:
             return ""
         hash = hashlib.new(hash_function)
-        for _, data in self.archive.pipeline.fetch_many([c.id for c in item.chunks]):
+        for data in self.archive.pipeline.fetch_many([c.id for c in item.chunks]):
             hash.update(data)
         return hash.hexdigest()
 
@@ -1934,7 +1927,7 @@ class ChunkIteratorFileWrapper:
         if not remaining:
             try:
                 chunk = next(self.chunk_iterator)
-                self.chunk = memoryview(chunk.data)
+                self.chunk = memoryview(chunk)
             except StopIteration:
                 self.exhausted = True
                 return 0  # EOF

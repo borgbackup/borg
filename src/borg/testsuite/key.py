@@ -246,8 +246,9 @@ class TestKey:
         key = AuthenticatedKey.create(self.MockRepository(), self.MockArgs())
         plaintext = Chunk(b'123456789')
         authenticated = key.encrypt(plaintext)
-        # 0x06 is the key TYPE, 0x0000 identifies CNONE compression
-        assert authenticated == b'\x06\x00\x00' + plaintext.data
+        # 0x06 is the key TYPE, 0x0100 identifies LZ4 compression, 0x90 is part of LZ4 and means that an uncompressed
+        # block of length nine follows (the plaintext).
+        assert authenticated == b'\x06\x01\x00\x90' + plaintext.data
 
 
 class TestPassphrase:

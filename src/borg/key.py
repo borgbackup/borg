@@ -142,7 +142,9 @@ class KeyBase:
         self.TYPE_STR = bytes([self.TYPE])
         self.repository = repository
         self.target = None  # key location file path / repo obj
-        self.compressor = Compressor('none')  # for decompression
+        # Some commands write new chunks (e.g. rename) but don't take a --compression argument. This duplicates
+        # the default used by those commands who do take a --compression argument.
+        self.compressor = Compressor('lz4')
         self.decompress = self.compressor.decompress
         self.tam_required = True
 

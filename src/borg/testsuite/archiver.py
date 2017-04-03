@@ -34,7 +34,7 @@ from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto import bytes_to_long, num_aes_blocks
 from ..helpers import PatternMatcher, parse_pattern, Location, get_security_dir
-from ..helpers import Chunk, Manifest
+from ..helpers import Manifest
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
 from ..item import Item
@@ -2449,7 +2449,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                 'version': 1,
             })
             archive_id = key.id_hash(archive)
-            repository.put(archive_id, key.encrypt(Chunk(archive)))
+            repository.put(archive_id, key.encrypt(archive))
             repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', '--repair', self.repository_location, exit_code=0)
@@ -2537,12 +2537,12 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
     def spoof_manifest(self, repository):
         with repository:
             _, key = Manifest.load(repository)
-            repository.put(Manifest.MANIFEST_ID, key.encrypt(Chunk(msgpack.packb({
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
                 'version': 1,
                 'archives': {},
                 'config': {},
                 'timestamp': (datetime.utcnow() + timedelta(days=1)).isoformat(),
-            }))))
+            })))
             repository.commit()
 
     def test_fresh_init_tam_required(self):
@@ -2550,11 +2550,11 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
         repository = Repository(self.repository_path, exclusive=True)
         with repository:
             manifest, key = Manifest.load(repository)
-            repository.put(Manifest.MANIFEST_ID, key.encrypt(Chunk(msgpack.packb({
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
                 'version': 1,
                 'archives': {},
                 'timestamp': (datetime.utcnow() + timedelta(days=1)).isoformat(),
-            }))))
+            })))
             repository.commit()
 
         with pytest.raises(TAMRequiredError):
@@ -2570,9 +2570,9 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
             key.tam_required = False
             key.change_passphrase(key._passphrase)
 
-            manifest = msgpack.unpackb(key.decrypt(None, repository.get(Manifest.MANIFEST_ID)).data)
+            manifest = msgpack.unpackb(key.decrypt(None, repository.get(Manifest.MANIFEST_ID)))
             del manifest[b'tam']
-            repository.put(Manifest.MANIFEST_ID, key.encrypt(Chunk(msgpack.packb(manifest))))
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb(manifest)))
             repository.commit()
         output = self.cmd('list', '--debug', self.repository_location)
         assert 'archive1234' in output
@@ -2844,8 +2844,8 @@ def test_get_args():
 
 def test_compare_chunk_contents():
     def ccc(a, b):
-        chunks_a = [Chunk(data) for data in a]
-        chunks_b = [Chunk(data) for data in b]
+        chunks_a = [data for data in a]
+        chunks_b = [data for data in b]
         compare1 = Archiver.compare_chunk_contents(iter(chunks_a), iter(chunks_b))
         compare2 = Archiver.compare_chunk_contents(iter(chunks_b), iter(chunks_a))
         assert compare1 == compare2

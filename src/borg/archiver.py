@@ -34,10 +34,11 @@ from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_s
 from .archive import BackupOSError, backup_io
 from .cache import Cache
 from .constants import *  # NOQA
+from .compress import CompressionSpec
 from .crc32 import crc32
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError, set_ec
-from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec, ComprSpec
+from .helpers import location_validator, archivename_validator, ChunkerParams
 from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
 from .helpers import format_time, format_timedelta, format_file_size, format_archive
@@ -107,6 +108,15 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True, excl
             with repository:
                 if manifest or cache:
                     kwargs['manifest'], kwargs['key'] = Manifest.load(repository)
+                    # do_recreate uses args.compression is None as in band signalling for "don't recompress",
+                    # note that it does not look at key.compressor. In this case the default compressor applies
+                    # to new chunks.
+                    #
+                    # We can't use a check like `'compression' in args` (an argparse.Namespace speciality),
+                    # since the compression attribute is set. So we need to see whether it's set to something
+                    # true-ish, like a CompressionSpec instance.
+                    if getattr(args, 'compression', False):
+                        kwargs['key'].compressor = args.compression.compressor
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
                                do_files=getattr(args, 'cache_files', False),
@@ -167,14 +177,14 @@ class Archiver:
                 a = next(chunks1, end)
                 if a is end:
                     return not blen - bi and next(chunks2, end) is end
-                a = memoryview(a.data)
+                a = memoryview(a)
                 alen = len(a)
                 ai = 0
             if not blen - bi:
                 b = next(chunks2, end)
                 if b is end:
                     return not alen - ai and next(chunks1, end) is end
-                b = memoryview(b.data)
+                b = memoryview(b)
                 blen = len(b)
                 bi = 0
             slicelen = min(alen - ai, blen - bi)
@@ -471,7 +481,6 @@ class Archiver:
                                   numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime,
                                   progress=args.progress,
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
-                                  compression=args.compression, compression_files=args.compression_files,
                                   log_json=args.log_json)
                 create_inner(archive, cache)
         else:
@@ -1325,8 +1334,7 @@ class Archiver:
         recreater = ArchiveRecreater(repository, manifest, key, cache, matcher,
                                      exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
                                      keep_exclude_tags=args.keep_exclude_tags, chunker_params=args.chunker_params,
-                                     compression=args.compression, compression_files=args.compression_files,
-                                     always_recompress=args.always_recompress,
+                                     compression=args.compression, always_recompress=args.always_recompress,
                                      progress=args.progress, stats=args.stats,
                                      file_status_printer=self.print_file_status,
                                      checkpoint_interval=args.checkpoint_interval,
@@ -1387,7 +1395,7 @@ class Archiver:
         archive = Archive(repository, key, manifest, args.location.archive,
                           consider_part_files=args.consider_part_files)
         for i, item_id in enumerate(archive.metadata.items):
-            _, data = key.decrypt(item_id, repository.get(item_id))
+            data = key.decrypt(item_id, repository.get(item_id))
             filename = '%06d_%s.items' % (i, bin_to_hex(item_id))
             print('Dumping', filename)
             with open(filename, 'wb') as fd:
@@ -1417,7 +1425,7 @@ class Archiver:
             fd.write(do_indent(prepare_dump_dict(archive_meta_orig)))
             fd.write(',\n')
 
-            _, data = key.decrypt(archive_meta_orig[b'id'], repository.get(archive_meta_orig[b'id']))
+            data = key.decrypt(archive_meta_orig[b'id'], repository.get(archive_meta_orig[b'id']))
             archive_org_dict = msgpack.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape')
 
             fd.write('    "_meta":\n')
@@ -1428,7 +1436,7 @@ class Archiver:
             unpacker = msgpack.Unpacker(use_list=False, object_hook=StableDict)
             first = True
             for item_id in archive_org_dict[b'items']:
-                _, data = key.decrypt(item_id, repository.get(item_id))
+                data = key.decrypt(item_id, repository.get(item_id))
                 unpacker.feed(data)
                 for item in unpacker:
                     item = prepare_dump_dict(item)
@@ -1452,7 +1460,7 @@ class Archiver:
     def do_debug_dump_manifest(self, args, repository, manifest, key):
         """dump decoded repository manifest"""
 
-        _, data = key.decrypt(None, repository.get(manifest.MANIFEST_ID))
+        data = key.decrypt(None, repository.get(manifest.MANIFEST_ID))
 
         meta = prepare_dump_dict(msgpack.fallback.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape'))
 
@@ -1476,7 +1484,7 @@ class Archiver:
             for id in result:
                 cdata = repository.get(id)
                 give_id = id if id != Manifest.MANIFEST_ID else None
-                _, data = key.decrypt(give_id, cdata)
+                data = key.decrypt(give_id, cdata)
                 filename = '%06d_%s.obj' % (i, bin_to_hex(id))
                 print('Dumping', filename)
                 with open(filename, 'wb') as fd:
@@ -1789,43 +1797,13 @@ class Archiver:
             For compressible data, it uses the given C[,L] compression - with C[,L]
             being any valid compression specifier.
 
-        The decision about which compression to use is done by borg like this:
-
-        1. find a compression specifier (per file):
-           match the path/filename against all patterns in all --compression-from
-           files (if any). If a pattern matches, use the compression spec given for
-           that pattern. If no pattern matches (and also if you do not give any
-           --compression-from option), default to the compression spec given by
-           --compression. See docs/misc/compression.conf for an example config.
-
-        2. if the found compression spec is not "auto", the decision is taken:
-           use the found compression spec.
-
-        3. if the found compression spec is "auto", test compressibility of each
-           chunk using lz4.
-           If it is compressible, use the C,[L] compression spec given within the
-           "auto" specifier. If it is not compressible, use no compression.
-
         Examples::
 
             borg create --compression lz4 REPO::ARCHIVE data
             borg create --compression zlib REPO::ARCHIVE data
             borg create --compression zlib,1 REPO::ARCHIVE data
             borg create --compression auto,lzma,6 REPO::ARCHIVE data
-            borg create --compression-from compression.conf --compression auto,lzma ...
-
-        compression.conf has entries like::
-
-            # example config file for --compression-from option
-            #
-            # Format of non-comment / non-empty lines:
-            # <compression-spec>:<path/filename pattern>
-            # compression-spec is same format as for --compression option
-            # path/filename pattern is same format as for --exclude option
-            none:*.gz
-            none:*.zip
-            none:*.mp3
-            none:*.ogg
+            borg create --compression auto,lzma ...
 
         General remarks:
 
@@ -2411,13 +2389,8 @@ class Archiver:
                                    help='specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
                                         'HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %d,%d,%d,%d' % CHUNKER_PARAMS)
         archive_group.add_argument('-C', '--compression', dest='compression',
-                                   type=CompressionSpec, default=ComprSpec(name='lz4', spec=None), metavar='COMPRESSION',
+                                   type=CompressionSpec, default=CompressionSpec('lz4'), metavar='COMPRESSION',
                                    help='select compression algorithm, see the output of the '
-                                        '"borg help compression" command for details.')
-        archive_group.add_argument('--compression-from', dest='compression_files',
-                                   type=argparse.FileType('r'), action='append',
-                                   metavar='COMPRESSIONCONFIG',
-                                   help='read compression patterns from COMPRESSIONCONFIG, see the output of the '
                                         '"borg help compression" command for details.')
 
         subparser.add_argument('location', metavar='ARCHIVE',
@@ -2954,7 +2927,7 @@ class Archiver:
         resulting archive will only contain files from these PATHs.
 
         Note that all paths in an archive are relative, therefore absolute patterns/paths
-        will *not* match (--exclude, --exclude-from, --compression-from, PATHs).
+        will *not* match (--exclude, --exclude-from, PATHs).
 
         --compression: all chunks seen will be stored using the given method.
         Due to how Borg stores compressed size information this might display
@@ -3049,11 +3022,6 @@ class Archiver:
         archive_group.add_argument('--always-recompress', dest='always_recompress', action='store_true',
                                    help='always recompress chunks, don\'t skip chunks already compressed with the same '
                                         'algorithm.')
-        archive_group.add_argument('--compression-from', dest='compression_files',
-                                   type=argparse.FileType('r'), action='append',
-                                   metavar='COMPRESSIONCONFIG',
-                                   help='read compression patterns from COMPRESSIONCONFIG, see the output of the '
-                                        '"borg help compression" command for details.')
         archive_group.add_argument('--chunker-params', dest='chunker_params',
                                    type=ChunkerParams, default=CHUNKER_PARAMS,
                                    metavar='PARAMS',

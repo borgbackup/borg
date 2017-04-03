@@ -9,7 +9,7 @@ import msgpack
 
 from ..crypto import bytes_to_long, num_aes_blocks
 from ..helpers import Location
-from ..helpers import Chunk, StableDict
+from ..helpers import StableDict
 from ..helpers import IntegrityError
 from ..helpers import get_security_dir
 from ..key import PlaintextKey, PassphraseKey, KeyfileKey, RepoKey, Blake2KeyfileKey, Blake2RepoKey, AuthenticatedKey
@@ -104,17 +104,17 @@ class TestKey:
 
     def test_plaintext(self):
         key = PlaintextKey.create(None, None)
-        chunk = Chunk(b'foo')
-        assert hexlify(key.id_hash(chunk.data)) == b'2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae'
-        assert chunk == key.decrypt(key.id_hash(chunk.data), key.encrypt(chunk))
+        chunk = b'foo'
+        assert hexlify(key.id_hash(chunk)) == b'2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae'
+        assert chunk == key.decrypt(key.id_hash(chunk), key.encrypt(chunk))
 
     def test_keyfile(self, monkeypatch, keys_dir):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
         key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
         assert bytes_to_long(key.enc_cipher.iv, 8) == 0
-        manifest = key.encrypt(Chunk(b'ABC'))
+        manifest = key.encrypt(b'ABC')
         assert key.extract_nonce(manifest) == 0
-        manifest2 = key.encrypt(Chunk(b'ABC'))
+        manifest2 = key.encrypt(b'ABC')
         assert manifest != manifest2
         assert key.decrypt(None, manifest) == key.decrypt(None, manifest2)
         assert key.extract_nonce(manifest2) == 1
@@ -124,8 +124,8 @@ class TestKey:
         # Key data sanity check
         assert len({key2.id_key, key2.enc_key, key2.enc_hmac_key}) == 3
         assert key2.chunk_seed != 0
-        chunk = Chunk(b'foo')
-        assert chunk == key2.decrypt(key.id_hash(chunk.data), key.encrypt(chunk))
+        chunk = b'foo'
+        assert chunk == key2.decrypt(key.id_hash(chunk), key.encrypt(chunk))
 
     def test_keyfile_nonce_rollback_protection(self, monkeypatch, keys_dir):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
@@ -133,9 +133,9 @@ class TestKey:
         with open(os.path.join(get_security_dir(repository.id_str), 'nonce'), "w") as fd:
             fd.write("0000000000002000")
         key = KeyfileKey.create(repository, self.MockArgs())
-        data = key.encrypt(Chunk(b'ABC'))
+        data = key.encrypt(b'ABC')
         assert key.extract_nonce(data) == 0x2000
-        assert key.decrypt(None, data).data == b'ABC'
+        assert key.decrypt(None, data) == b'ABC'
 
     def test_keyfile_kfenv(self, tmpdir, monkeypatch):
         keyfile = tmpdir.join('keyfile')
@@ -144,8 +144,8 @@ class TestKey:
         assert not keyfile.exists()
         key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
         assert keyfile.exists()
-        chunk = Chunk(b'ABC')
-        chunk_id = key.id_hash(chunk.data)
+        chunk = b'ABC'
+        chunk_id = key.id_hash(chunk)
         chunk_cdata = key.encrypt(chunk)
         key = KeyfileKey.detect(self.MockRepository(), chunk_cdata)
         assert chunk == key.decrypt(chunk_id, chunk_cdata)
@@ -158,7 +158,7 @@ class TestKey:
             fd.write(self.keyfile2_key_file)
         monkeypatch.setenv('BORG_PASSPHRASE', 'passphrase')
         key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
-        assert key.decrypt(self.keyfile2_id, self.keyfile2_cdata).data == b'payload'
+        assert key.decrypt(self.keyfile2_id, self.keyfile2_cdata) == b'payload'
 
     def test_keyfile2_kfenv(self, tmpdir, monkeypatch):
         keyfile = tmpdir.join('keyfile')
@@ -167,14 +167,14 @@ class TestKey:
         monkeypatch.setenv('BORG_KEY_FILE', str(keyfile))
         monkeypatch.setenv('BORG_PASSPHRASE', 'passphrase')
         key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
-        assert key.decrypt(self.keyfile2_id, self.keyfile2_cdata).data == b'payload'
+        assert key.decrypt(self.keyfile2_id, self.keyfile2_cdata) == b'payload'
 
     def test_keyfile_blake2(self, monkeypatch, keys_dir):
         with keys_dir.join('keyfile').open('w') as fd:
             fd.write(self.keyfile_blake2_key_file)
         monkeypatch.setenv('BORG_PASSPHRASE', 'passphrase')
         key = Blake2KeyfileKey.detect(self.MockRepository(), self.keyfile_blake2_cdata)
-        assert key.decrypt(self.keyfile_blake2_id, self.keyfile_blake2_cdata).data == b'payload'
+        assert key.decrypt(self.keyfile_blake2_id, self.keyfile_blake2_cdata) == b'payload'
 
     def test_passphrase(self, keys_dir, monkeypatch):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
@@ -184,9 +184,9 @@ class TestKey:
         assert hexlify(key.enc_hmac_key) == b'b885a05d329a086627412a6142aaeb9f6c54ab7950f996dd65587251f6bc0901'
         assert hexlify(key.enc_key) == b'2ff3654c6daf7381dbbe718d2b20b4f1ea1e34caa6cc65f6bb3ac376b93fed2a'
         assert key.chunk_seed == -775740477
-        manifest = key.encrypt(Chunk(b'ABC'))
+        manifest = key.encrypt(b'ABC')
         assert key.extract_nonce(manifest) == 0
-        manifest2 = key.encrypt(Chunk(b'ABC'))
+        manifest2 = key.encrypt(b'ABC')
         assert manifest != manifest2
         assert key.decrypt(None, manifest) == key.decrypt(None, manifest2)
         assert key.extract_nonce(manifest2) == 1
@@ -197,9 +197,9 @@ class TestKey:
         assert key.enc_hmac_key == key2.enc_hmac_key
         assert key.enc_key == key2.enc_key
         assert key.chunk_seed == key2.chunk_seed
-        chunk = Chunk(b'foo')
-        assert hexlify(key.id_hash(chunk.data)) == b'818217cf07d37efad3860766dcdf1d21e401650fed2d76ed1d797d3aae925990'
-        assert chunk == key2.decrypt(key2.id_hash(chunk.data), key.encrypt(chunk))
+        chunk = b'foo'
+        assert hexlify(key.id_hash(chunk)) == b'818217cf07d37efad3860766dcdf1d21e401650fed2d76ed1d797d3aae925990'
+        assert chunk == key2.decrypt(key2.id_hash(chunk), key.encrypt(chunk))
 
     def _corrupt_byte(self, key, data, offset):
         data = bytearray(data)
@@ -224,7 +224,7 @@ class TestKey:
             key.decrypt(id, data)
 
     def test_decrypt_decompress(self, key):
-        plaintext = Chunk(b'123456789')
+        plaintext = b'123456789'
         encrypted = key.encrypt(plaintext)
         assert key.decrypt(None, encrypted, decompress=False) != plaintext
         assert key.decrypt(None, encrypted) == plaintext
@@ -244,10 +244,11 @@ class TestKey:
     def test_authenticated_encrypt(self, monkeypatch):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
         key = AuthenticatedKey.create(self.MockRepository(), self.MockArgs())
-        plaintext = Chunk(b'123456789')
+        plaintext = b'123456789'
         authenticated = key.encrypt(plaintext)
-        # 0x06 is the key TYPE, 0x0000 identifies CNONE compression
-        assert authenticated == b'\x06\x00\x00' + plaintext.data
+        # 0x06 is the key TYPE, 0x0100 identifies LZ4 compression, 0x90 is part of LZ4 and means that an uncompressed
+        # block of length nine follows (the plaintext).
+        assert authenticated == b'\x06\x01\x00\x90' + plaintext
 
 
 class TestPassphrase:

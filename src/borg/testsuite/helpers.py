@@ -21,10 +21,9 @@ from ..helpers import get_cache_dir, get_keys_dir, get_security_dir
 from ..helpers import is_slow_msgpack
 from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
 from ..helpers import StableDict, int_to_bigint, bigint_to_int, bin_to_hex
-from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams, Chunk
+from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams
 from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
 from ..helpers import load_exclude_file, load_pattern_file
-from ..helpers import CompressionSpec, ComprSpec, CompressionDecider1, CompressionDecider2
 from ..helpers import parse_pattern, PatternMatcher
 from ..helpers import PathFullPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, RegexPattern
 from ..helpers import swidth_slice
@@ -698,25 +697,6 @@ def test_pattern_matcher():
     assert PatternMatcher(fallback="hey!").fallback == "hey!"
 
 
-def test_compression_specs():
-    with pytest.raises(ValueError):
-        CompressionSpec('')
-    assert CompressionSpec('none') == ComprSpec(name='none', spec=None)
-    assert CompressionSpec('lz4') == ComprSpec(name='lz4', spec=None)
-    assert CompressionSpec('zlib') == ComprSpec(name='zlib', spec=6)
-    assert CompressionSpec('zlib,0') == ComprSpec(name='zlib', spec=0)
-    assert CompressionSpec('zlib,9') == ComprSpec(name='zlib', spec=9)
-    with pytest.raises(ValueError):
-        CompressionSpec('zlib,9,invalid')
-    assert CompressionSpec('lzma') == ComprSpec(name='lzma', spec=6)
-    assert CompressionSpec('lzma,0') == ComprSpec(name='lzma', spec=0)
-    assert CompressionSpec('lzma,9') == ComprSpec(name='lzma', spec=9)
-    with pytest.raises(ValueError):
-        CompressionSpec('lzma,9,invalid')
-    with pytest.raises(ValueError):
-        CompressionSpec('invalid')
-
-
 def test_chunkerparams():
     assert ChunkerParams('19,23,21,4095') == (19, 23, 21, 4095)
     assert ChunkerParams('10,23,16,4095') == (10, 23, 16, 4095)
@@ -1178,7 +1158,7 @@ def test_partial_format():
 
 
 def test_chunk_file_wrapper():
-    cfw = ChunkIteratorFileWrapper(iter([Chunk(b'abc'), Chunk(b'def')]))
+    cfw = ChunkIteratorFileWrapper(iter([b'abc', b'def']))
     assert cfw.read(2) == b'ab'
     assert cfw.read(50) == b'cdef'
     assert cfw.exhausted
@@ -1218,38 +1198,6 @@ data2
     assert list(clean_lines(conf, rstrip=False)) == ['data1 #data1\n', 'data2\n', 'data3\n', ]
     assert list(clean_lines(conf, remove_empty=False)) == ['data1 #data1', 'data2', '', 'data3', ]
     assert list(clean_lines(conf, remove_comments=False)) == ['#comment', 'data1 #data1', 'data2', 'data3', ]
-
-
-def test_compression_decider1():
-    default = CompressionSpec('zlib')
-    conf = """
-# use super-fast lz4 compression on huge VM files in this path:
-lz4:/srv/vm_disks
-
-# jpeg or zip files do not compress:
-none:*.jpeg
-none:*.zip
-""".splitlines()
-
-    cd = CompressionDecider1(default, [])  # no conf, always use default
-    assert cd.decide('/srv/vm_disks/linux').name == 'zlib'
-    assert cd.decide('test.zip').name == 'zlib'
-    assert cd.decide('test').name == 'zlib'
-
-    cd = CompressionDecider1(default, [conf, ])
-    assert cd.decide('/srv/vm_disks/linux').name == 'lz4'
-    assert cd.decide('test.zip').name == 'none'
-    assert cd.decide('test').name == 'zlib'  # no match in conf, use default
-
-
-def test_compression_decider2():
-    default = CompressionSpec('zlib')
-
-    cd = CompressionDecider2(default)
-    compr_spec, chunk = cd.decide(Chunk(None))
-    assert compr_spec.name == 'zlib'
-    compr_spec, chunk = cd.decide(Chunk(None, compress=CompressionSpec('lzma')))
-    assert compr_spec.name == 'lzma'
 
 
 def test_format_line():

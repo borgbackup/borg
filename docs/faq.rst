@@ -321,6 +321,13 @@ for a potential solution.
 
 Please note that this workaround only helps you for backup, not for restore.
 
+Can I backup my root partition (/) with Borg?
+---------------------------------------------
+
+Backing up your entire root partition works just fine, but remember to
+exclude directories that make no sense to backup, such as /dev, /proc,
+/sys, /tmp and /run.
+
 If it crashes with a UnicodeError, what can I do?
 -------------------------------------------------
 

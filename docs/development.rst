@@ -183,19 +183,18 @@ Important notes:
 Regenerate usage files
 ----------------------
 
-Usage and API documentation is currently committed directly to git,
+Usage documentation is currently committed directly to git,
 although those files are generated automatically from the source
 tree.
-
-When a new module is added, the ``docs/api.rst`` file needs to be
-regenerated::
-
-  ./setup.py build_api
 
 When a command is added, a commandline flag changed, added or removed,
 the usage docs need to be rebuilt as well::
 
   ./setup.py build_usage
+
+However, we prefer to do this as part of our :ref:`releasing`
+preparations, so it is generally not necessary to update these when
+submitting patches that change something about the command line.
 
 Building the docs with Sphinx
 -----------------------------
@@ -270,7 +269,7 @@ Checklist:
 - update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``
 - check version number of upcoming release in ``CHANGES.rst``
 - verify that ``MANIFEST.in`` and ``setup.py`` are complete
-- ``python setup.py build_api ; python setup.py build_usage`` and commit
+- ``python setup.py build_usage`` and commit
 - tag the release::
 
     git tag -s -m "tagged/signed release X.Y.Z" X.Y.Z

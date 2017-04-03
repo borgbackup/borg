@@ -152,10 +152,6 @@ class KeyBase:
         """Return HMAC hash using the "id" HMAC key
         """
 
-    def compress(self, chunk):
-        meta, data = chunk
-        return meta.get('compressor', self.compressor).compress(data)
-
     def encrypt(self, chunk):
         pass
 
@@ -256,7 +252,7 @@ class PlaintextKey(KeyBase):
         return sha256(data).digest()
 
     def encrypt(self, chunk):
-        data = self.compress(chunk)
+        data = self.compressor.compress(chunk.data)
         return b''.join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):
@@ -334,7 +330,7 @@ class AESKeyBase(KeyBase):
     MAC = hmac_sha256
 
     def encrypt(self, chunk):
-        data = self.compress(chunk)
+        data = self.compressor.compress(chunk.data)
         self.nonce_manager.ensure_reservation(num_aes_blocks(len(data)))
         self.enc_cipher.reset()
         data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(data)))
@@ -746,7 +742,7 @@ class AuthenticatedKey(ID_BLAKE2b_256, RepoKey):
     STORAGE = KeyBlobStorage.REPO
 
     def encrypt(self, chunk):
-        data = self.compress(chunk)
+        data = self.compressor.compress(chunk.data)
         return b''.join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):

@@ -5,18 +5,6 @@ borg.compress
 Compression is applied to chunks after ID hashing (so the ID is a direct function of the
 plain chunk, compression is irrelevant to it), and of course before encryption.
 
-Borg has a flexible scheme for deciding which compression to use for chunks.
-
-First, there is a global default set by the --compression command line option,
-which sets the .compressor attribute on the Key.
-
-For chunks that emanate from files CompressionDecider may set a specific
-Compressor based on patterns (this is the --compression-from option). This is stored
-as a Compressor instance in the "compressor" key in the Chunk's meta dictionary.
-
-When compressing (KeyBase.compress) either the Compressor specified in the Chunk's
-meta dictionary is used, or the default Compressor of the key.
-
 The "auto" mode (e.g. --compression auto,lzma,4) is implemented as a meta Compressor,
 meaning that Auto acts like a Compressor, but defers actual work to others (namely
 LZ4 as a heuristic whether compression is worth it, and the specified Compressor

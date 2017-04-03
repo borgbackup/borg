@@ -2096,39 +2096,6 @@ def clean_lines(lines, lstrip=None, rstrip=None, remove_empty=True, remove_comme
         yield line
 
 
-class CompressionDecider:
-    def __init__(self, compression, compression_files):
-        """
-        Initialize a CompressionDecider instance (and read config files, if needed).
-
-        :param compression: default CompressionSpec (e.g. from --compression option)
-        :param compression_files: list of compression config files (e.g. from --compression-from) or
-                                  a list of other line iterators
-        """
-        from .compress import CompressionSpec
-        self.compressor = compression.compressor
-        if not compression_files:
-            self.matcher = None
-        else:
-            self.matcher = PatternMatcher(fallback=compression.compressor)
-            for file in compression_files:
-                try:
-                    for line in clean_lines(file):
-                        try:
-                            compr_spec, fn_pattern = line.split(':', 1)
-                        except:
-                            continue
-                        self.matcher.add([parse_pattern(fn_pattern)], CompressionSpec(compr_spec).compressor)
-                finally:
-                    if hasattr(file, 'close'):
-                        file.close()
-
-    def decide(self, path):
-        if self.matcher is not None:
-            return self.matcher.match(path)
-        return self.compressor
-
-
 class ErrorIgnoringTextIOWrapper(io.TextIOWrapper):
     def read(self, n):
         if not self.closed:

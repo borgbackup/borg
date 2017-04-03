@@ -481,7 +481,6 @@ class Archiver:
                                   numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime,
                                   progress=args.progress,
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
-                                  compression=args.compression, compression_files=args.compression_files,
                                   log_json=args.log_json)
                 create_inner(archive, cache)
         else:
@@ -1335,8 +1334,7 @@ class Archiver:
         recreater = ArchiveRecreater(repository, manifest, key, cache, matcher,
                                      exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
                                      keep_exclude_tags=args.keep_exclude_tags, chunker_params=args.chunker_params,
-                                     compression=args.compression, compression_files=args.compression_files,
-                                     always_recompress=args.always_recompress,
+                                     compression=args.compression, always_recompress=args.always_recompress,
                                      progress=args.progress, stats=args.stats,
                                      file_status_printer=self.print_file_status,
                                      checkpoint_interval=args.checkpoint_interval,
@@ -1799,43 +1797,13 @@ class Archiver:
             For compressible data, it uses the given C[,L] compression - with C[,L]
             being any valid compression specifier.
 
-        The decision about which compression to use is done by borg like this:
-
-        1. find a compression specifier (per file):
-           match the path/filename against all patterns in all --compression-from
-           files (if any). If a pattern matches, use the compression spec given for
-           that pattern. If no pattern matches (and also if you do not give any
-           --compression-from option), default to the compression spec given by
-           --compression. See docs/misc/compression.conf for an example config.
-
-        2. if the found compression spec is not "auto", the decision is taken:
-           use the found compression spec.
-
-        3. if the found compression spec is "auto", test compressibility of each
-           chunk using lz4.
-           If it is compressible, use the C,[L] compression spec given within the
-           "auto" specifier. If it is not compressible, use no compression.
-
         Examples::
 
             borg create --compression lz4 REPO::ARCHIVE data
             borg create --compression zlib REPO::ARCHIVE data
             borg create --compression zlib,1 REPO::ARCHIVE data
             borg create --compression auto,lzma,6 REPO::ARCHIVE data
-            borg create --compression-from compression.conf --compression auto,lzma ...
-
-        compression.conf has entries like::
-
-            # example config file for --compression-from option
-            #
-            # Format of non-comment / non-empty lines:
-            # <compression-spec>:<path/filename pattern>
-            # compression-spec is same format as for --compression option
-            # path/filename pattern is same format as for --exclude option
-            none:*.gz
-            none:*.zip
-            none:*.mp3
-            none:*.ogg
+            borg create --compression auto,lzma ...
 
         General remarks:
 
@@ -2424,11 +2392,6 @@ class Archiver:
                                    type=CompressionSpec, default=CompressionSpec('lz4'), metavar='COMPRESSION',
                                    help='select compression algorithm, see the output of the '
                                         '"borg help compression" command for details.')
-        archive_group.add_argument('--compression-from', dest='compression_files',
-                                   type=argparse.FileType('r'), action='append',
-                                   metavar='COMPRESSIONCONFIG',
-                                   help='read compression patterns from COMPRESSIONCONFIG, see the output of the '
-                                        '"borg help compression" command for details.')
 
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
@@ -2964,7 +2927,7 @@ class Archiver:
         resulting archive will only contain files from these PATHs.
 
         Note that all paths in an archive are relative, therefore absolute patterns/paths
-        will *not* match (--exclude, --exclude-from, --compression-from, PATHs).
+        will *not* match (--exclude, --exclude-from, PATHs).
 
         --compression: all chunks seen will be stored using the given method.
         Due to how Borg stores compressed size information this might display
@@ -3059,11 +3022,6 @@ class Archiver:
         archive_group.add_argument('--always-recompress', dest='always_recompress', action='store_true',
                                    help='always recompress chunks, don\'t skip chunks already compressed with the same '
                                         'algorithm.')
-        archive_group.add_argument('--compression-from', dest='compression_files',
-                                   type=argparse.FileType('r'), action='append',
-                                   metavar='COMPRESSIONCONFIG',
-                                   help='read compression patterns from COMPRESSIONCONFIG, see the output of the '
-                                        '"borg help compression" command for details.')
         archive_group.add_argument('--chunker-params', dest='chunker_params',
                                    type=ChunkerParams, default=CHUNKER_PARAMS,
                                    metavar='PARAMS',

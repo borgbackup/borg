@@ -1557,7 +1557,7 @@ class ArchiveRecreater:
 
     def __init__(self, repository, manifest, key, cache, matcher,
                  exclude_caches=False, exclude_if_present=None, keep_exclude_tags=False,
-                 chunker_params=None, compression=None, always_recompress=False,
+                 chunker_params=None, compression=None, recompress=False, always_recompress=False,
                  dry_run=False, stats=False, progress=False, file_status_printer=None,
                  checkpoint_interval=1800):
         self.repository = repository
@@ -1574,7 +1574,7 @@ class ArchiveRecreater:
         if self.rechunkify:
             logger.debug('Rechunking archives to %s', chunker_params)
         self.chunker_params = chunker_params or CHUNKER_PARAMS
-        self.recompress = bool(compression)
+        self.recompress = recompress
         self.always_recompress = always_recompress
         self.compression = compression or CompressionSpec('none')
         self.seen_chunks = set()

@@ -1323,11 +1323,13 @@ class Archiver:
         matcher, include_patterns = self.build_matcher(args.patterns, args.paths)
         self.output_list = args.output_list
         self.output_filter = args.output_filter
+        recompress = args.recompress != 'never'
+        always_recompress = args.recompress == 'always'
 
         recreater = ArchiveRecreater(repository, manifest, key, cache, matcher,
                                      exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
                                      keep_exclude_tags=args.keep_exclude_tags, chunker_params=args.chunker_params,
-                                     compression=args.compression, recompress=args.recompress, always_recompress=args.always_recompress,
+                                     compression=args.compression, recompress=recompress, always_recompress=always_recompress,
                                      progress=args.progress, stats=args.stats,
                                      file_status_printer=self.print_file_status,
                                      checkpoint_interval=args.checkpoint_interval,
@@ -2922,8 +2924,7 @@ class Archiver:
         Note that all paths in an archive are relative, therefore absolute patterns/paths
         will *not* match (--exclude, --exclude-from, PATHs).
 
-        --recompress: all chunks seen will be recompressed using the --compression
-        specified.
+        --recompress allows to change the compression of existing data in archives.
         Due to how Borg stores compressed size information this might display
         incorrect information for archives that were not recreated at the same time.
         There is no risk of data loss by this.
@@ -3013,11 +3014,12 @@ class Archiver:
                                    type=CompressionSpec, default=CompressionSpec('lz4'), metavar='COMPRESSION',
                                    help='select compression algorithm, see the output of the '
                                         '"borg help compression" command for details.')
-        archive_group.add_argument('--recompress', dest='recompress', action='store_true',
-                                   help='recompress chunks according to --compression.')
-        archive_group.add_argument('--always-recompress', dest='always_recompress', action='store_true',
-                                   help='always recompress chunks, don\'t skip chunks already compressed with the same '
-                                        'algorithm.')
+        archive_group.add_argument('--recompress', dest='recompress', nargs='?', default='never', const='if-different',
+                                   choices=('never', 'if-different', 'always'),
+                                   help='recompress data chunks according to --compression if "if-different". '
+                                        'When "always", chunks that are already compressed that way are not skipped, '
+                                        'but compressed again. Only the algorithm is considered for "if-different", '
+                                        'not the compression level (if any).')
         archive_group.add_argument('--chunker-params', dest='chunker_params',
                                    type=ChunkerParams, default=CHUNKER_PARAMS,
                                    metavar='PARAMS',

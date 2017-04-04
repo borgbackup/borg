@@ -790,6 +790,8 @@ def format_line(format, data):
             raise InvalidPlaceholder(key, format)
     try:
         return format.format(**data)
+    except KeyError as ke:
+        raise InvalidPlaceholder(ke.args[0], format)
     except Exception as e:
         raise PlaceholderError(format, data, e.__class__.__name__, str(e))
 

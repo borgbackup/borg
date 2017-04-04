@@ -784,9 +784,10 @@ class DatetimeWrapper:
 
 
 def format_line(format, data):
-    keys = [f[1] for f in Formatter().parse(format)]
-    for key in keys:
-        if '.' in key or '__' in key:
+    for _, key, _, conversion in Formatter().parse(format):
+        if not key:
+            continue
+        if '.' in key or '__' in key or conversion:
             raise InvalidPlaceholder(key, format)
     try:
         return format.format(**data)

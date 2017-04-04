@@ -1213,6 +1213,10 @@ def test_format_line_erroneous():
         assert format_line('{invalid}', data)
     with pytest.raises(PlaceholderError):
         assert format_line('{}', data)
+    with pytest.raises(PlaceholderError):
+        assert format_line('{now!r}', data)
+    with pytest.raises(PlaceholderError):
+        assert format_line('{now.__class__.__module__.__builtins__}', data)
 
 
 def test_replace_placeholders():

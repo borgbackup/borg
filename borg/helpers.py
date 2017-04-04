@@ -216,9 +216,9 @@ def prune_within(archives, within):
         hours = int(within[:-1]) * multiplier[within[-1]]
     except (KeyError, ValueError):
         # I don't like how this displays the original exception too:
-        raise argparse.ArgumentTypeError('Unable to parse --within option: "%s"' % within)
+        raise argparse.ArgumentTypeError('Unable to parse --keep-within option: "%s"' % within)
     if hours <= 0:
-        raise argparse.ArgumentTypeError('Number specified using --within option must be positive')
+        raise argparse.ArgumentTypeError('Number specified using --keep-within option must be positive')
     target = datetime.now(timezone.utc) - timedelta(seconds=hours * 3600)
     return [a for a in archives if a.ts > target]
 

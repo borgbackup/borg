@@ -6,6 +6,7 @@ import argparse
 import faulthandler
 import functools
 import inspect
+import itertools
 import os
 import re
 import shlex
@@ -2060,6 +2061,9 @@ class Archiver:
         if cmd is not None and result.func == self.do_serve:
             forced_result = result
             argv = shlex.split(cmd)
+            # Drop environment variables (do *not* interpret them) before trying to parse
+            # the borg command line.
+            argv = list(itertools.dropwhile(lambda arg: '=' in arg, argv))
             result = self.parse_args(argv[1:])
             if result.func != forced_result.func:
                 # someone is trying to execute a different borg subcommand, don't do that!
@@ -2075,10 +2079,11 @@ class Archiver:
             args = self.preprocess_args(args)
         parser = self.build_parser(args)
         args = parser.parse_args(args or ['-h'])
-        if args.func == self.do_create:
+        # This works around http://bugs.python.org/issue9351
+        func = getattr(args, 'func', None) or getattr(args, 'fallback_func')
+        if func == self.do_create and not args.paths:
             # need at least 1 path but args.paths may also be populated from patterns
-            if not args.paths:
-                parser.error('Need at least one PATH argument.')
+            parser.error('Need at least one PATH argument.')
         return args
 
     def run(self, args):

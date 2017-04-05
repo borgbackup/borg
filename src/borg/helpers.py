@@ -1987,6 +1987,11 @@ def file_status(mode):
     return '?'
 
 
+def hardlinkable(mode):
+    """return True if we support hardlinked items of this type"""
+    return stat.S_ISREG(mode) or stat.S_ISBLK(mode) or stat.S_ISCHR(mode) or stat.S_ISFIFO(mode)
+
+
 def chunkit(it, size):
     """
     Chunk an iterator <it> into pieces of <size>.

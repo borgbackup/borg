@@ -124,7 +124,6 @@ Features & platforms
 
 Besides regular file and directory structures, |project_name| can preserve
 
-    * Hardlinks (considering all files in the same archive)
     * Symlinks (stored as symlink, the symlink is not followed)
     * Special files:
 
@@ -132,6 +131,7 @@ Besides regular file and directory structures, |project_name| can preserve
         * FIFOs ("named pipes")
         * Special file *contents* can be backed up in ``--read-special`` mode.
           By default the metadata to create them with mknod(2), mkfifo(2) etc. is stored.
+    * Hardlinked regular files, devices, FIFOs (considering all items in the same archive)
     * Timestamps in nanosecond precision: mtime, atime, ctime
     * Permissions:
 

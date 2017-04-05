@@ -24,7 +24,8 @@ from .helpers import Error, location_validator, archivename_validator, format_li
     PathPrefixPattern, to_localtime, timestamp, safe_timestamp, bin_to_hex, get_cache_dir, prune_within, prune_split, \
     Manifest, NoManifestError, remove_surrogates, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, PrefixSpec, is_slow_msgpack, yes, sysinfo, \
-    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ErrorIgnoringTextIOWrapper, set_ec
+    EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ErrorIgnoringTextIOWrapper, set_ec, \
+    replace_placeholders
 from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
 from .logger import create_logger, setup_logging
 logger = create_logger()
@@ -494,7 +495,8 @@ class Archiver:
     @with_archive
     def do_rename(self, args, repository, manifest, key, cache, archive):
         """Rename an existing archive"""
-        archive.rename(args.name)
+        name = replace_placeholders(args.name)
+        archive.rename(name)
         manifest.write()
         repository.commit()
         cache.commit()

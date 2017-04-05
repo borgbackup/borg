@@ -519,7 +519,7 @@ Utilization of max. archive size: {csize_max:.0%}
                 # assign chunks to this item, since the item which had the chunks was not extracted
                 item.chunks = chunks
         yield hardlink_set
-        if not hardlink_set and hardlink_masters:  # 2nd term, is it correct/needed?
+        if not hardlink_set and hardlink_masters:
             # Update master entry with extracted item path, so that following hardlinks don't extract twice.
             hardlink_masters[item.get('source') or original_path] = (None, path)
 

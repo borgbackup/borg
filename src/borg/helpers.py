@@ -110,6 +110,10 @@ class PlaceholderError(Error):
     """Formatting Error: "{}".format({}): {}({})"""
 
 
+class InvalidPlaceholder(PlaceholderError):
+    """Invalid placeholder "{}" in string: {}"""
+
+
 def check_extension_modules():
     from . import platform, compress, item
     if hashindex.API_VERSION != '1.1_01':
@@ -780,8 +784,13 @@ class DatetimeWrapper:
 
 
 def format_line(format, data):
+    for _, key, _, conversion in Formatter().parse(format):
+        if not key:
+            continue
+        if conversion or key not in data:
+            raise InvalidPlaceholder(key, format)
     try:
-        return format.format(**data)
+        return format.format_map(data)
     except Exception as e:
         raise PlaceholderError(format, data, e.__class__.__name__, str(e))
 

@@ -1750,6 +1750,10 @@ class Archiver:
 
             The version of borg, only major, minor and patch version, e.g.: 1.0.8
 
+        If literal curly braces need to be used, double them for escaping::
+
+            borg create /path/to/repo::{{literal_text}}
+
         Examples::
 
             borg create /path/to/repo::{hostname}-{user}-{utcnow} ...

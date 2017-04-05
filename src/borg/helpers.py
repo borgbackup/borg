@@ -787,12 +787,10 @@ def format_line(format, data):
     for _, key, _, conversion in Formatter().parse(format):
         if not key:
             continue
-        if '.' in key or '__' in key or conversion:
+        if conversion or key not in data:
             raise InvalidPlaceholder(key, format)
     try:
-        return format.format(**data)
-    except KeyError as ke:
-        raise InvalidPlaceholder(ke.args[0], format)
+        return format.format_map(data)
     except Exception as e:
         raise PlaceholderError(format, data, e.__class__.__name__, str(e))
 

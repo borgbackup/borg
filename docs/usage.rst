@@ -463,7 +463,7 @@ Examples
     $ borg create /mnt/backup::archive /some/files --compression lz4
     # Then compress it - this might take longer, but the backup has already completed, so no inconsistencies
     # from a long-running backup job.
-    $ borg recreate /mnt/backup::archive --compression zlib,9
+    $ borg recreate /mnt/backup::archive --recompress --compression zlib,9
 
     # Remove unwanted files from all archives in a repository
     $ borg recreate /mnt/backup -e /home/icke/Pictures/drunk_photos

@@ -2049,7 +2049,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                              '--format', '{size} {csize} {sha256}')
         size, csize, sha256_before = file_list.split(' ')
         assert int(csize) >= int(size)  # >= due to metadata overhead
-        self.cmd('recreate', self.repository_location, '-C', 'lz4')
+        self.cmd('recreate', self.repository_location, '-C', 'lz4', '--recompress')
         self.check_cache()
         file_list = self.cmd('list', self.repository_location + '::test', 'input/compressible',
                              '--format', '{size} {csize} {sha256}')

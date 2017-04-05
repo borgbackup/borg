@@ -109,14 +109,7 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True, excl
             with repository:
                 if manifest or cache:
                     kwargs['manifest'], kwargs['key'] = Manifest.load(repository)
-                    # do_recreate uses args.compression is None as in band signalling for "don't recompress",
-                    # note that it does not look at key.compressor. In this case the default compressor applies
-                    # to new chunks.
-                    #
-                    # We can't use a check like `'compression' in args` (an argparse.Namespace speciality),
-                    # since the compression attribute is set. So we need to see whether it's set to something
-                    # true-ish, like a CompressionSpec instance.
-                    if getattr(args, 'compression', False):
+                    if 'compression' in args:
                         kwargs['key'].compressor = args.compression.compressor
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
@@ -1331,11 +1324,13 @@ class Archiver:
         matcher, include_patterns = self.build_matcher(args.patterns, args.paths)
         self.output_list = args.output_list
         self.output_filter = args.output_filter
+        recompress = args.recompress != 'never'
+        always_recompress = args.recompress == 'always'
 
         recreater = ArchiveRecreater(repository, manifest, key, cache, matcher,
                                      exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
                                      keep_exclude_tags=args.keep_exclude_tags, chunker_params=args.chunker_params,
-                                     compression=args.compression, always_recompress=args.always_recompress,
+                                     compression=args.compression, recompress=recompress, always_recompress=always_recompress,
                                      progress=args.progress, stats=args.stats,
                                      file_status_printer=self.print_file_status,
                                      checkpoint_interval=args.checkpoint_interval,
@@ -2930,7 +2925,7 @@ class Archiver:
         Note that all paths in an archive are relative, therefore absolute patterns/paths
         will *not* match (--exclude, --exclude-from, PATHs).
 
-        --compression: all chunks seen will be stored using the given method.
+        --recompress allows to change the compression of existing data in archives.
         Due to how Borg stores compressed size information this might display
         incorrect information for archives that were not recreated at the same time.
         There is no risk of data loss by this.
@@ -3017,12 +3012,15 @@ class Archiver:
                                    help='manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). '
                                         'alternatively, give a reference file/directory.')
         archive_group.add_argument('-C', '--compression', dest='compression',
-                                   type=CompressionSpec, default=None, metavar='COMPRESSION',
+                                   type=CompressionSpec, default=CompressionSpec('lz4'), metavar='COMPRESSION',
                                    help='select compression algorithm, see the output of the '
                                         '"borg help compression" command for details.')
-        archive_group.add_argument('--always-recompress', dest='always_recompress', action='store_true',
-                                   help='always recompress chunks, don\'t skip chunks already compressed with the same '
-                                        'algorithm.')
+        archive_group.add_argument('--recompress', dest='recompress', nargs='?', default='never', const='if-different',
+                                   choices=('never', 'if-different', 'always'),
+                                   help='recompress data chunks according to --compression if "if-different". '
+                                        'When "always", chunks that are already compressed that way are not skipped, '
+                                        'but compressed again. Only the algorithm is considered for "if-different", '
+                                        'not the compression level (if any).')
         archive_group.add_argument('--chunker-params', dest='chunker_params',
                                    type=ChunkerParams, default=CHUNKER_PARAMS,
                                    metavar='PARAMS',

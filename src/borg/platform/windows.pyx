@@ -9,6 +9,16 @@ import array
 
 import platform
 
+import ctypes
+import ctypes.wintypes
+import msvcrt
+
+PeekNamedPipe = ctypes.windll.kernel32.PeekNamedPipe
+PeekNamedPipe.argtypes = [ctypes.wintypes.HANDLE, ctypes.c_void_p, ctypes.wintypes.DWORD,
+    ctypes.POINTER(ctypes.wintypes.DWORD), ctypes.POINTER(ctypes.wintypes.DWORD),
+    ctypes.POINTER(ctypes.wintypes.DWORD)]
+PeekNamedPipe.restype = ctypes.c_bool
+
 API_VERSION = 3
 
 
@@ -544,3 +554,16 @@ def get_ads(path):
     FindClose(searchHandle)
     PyMem_Free(cstrPath)
     return ret
+
+
+def select(rlist, wlist, xlist, timeout=0):
+    retRlist = []
+    retXlist = []
+    for pipe in rlist:
+        size = ctypes.wintypes.DWORD(0)
+        if not PeekNamedPipe(msvcrt.get_osfhandle(pipe), None, 0, None, ctypes.byref(size), None):
+            if size.value == 0 and pipe in xlist:
+                retXlist.append(pipe)
+        if size.value > 0:
+            retRlist.append(pipe)
+    return retRlist, wlist, retXlist

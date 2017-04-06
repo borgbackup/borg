@@ -9,6 +9,7 @@ import json
 import os
 import os.path
 import platform
+import posixpath
 import pwd
 import re
 import signal
@@ -29,7 +30,6 @@ from itertools import islice
 from operator import attrgetter
 from string import Formatter
 from shutil import get_terminal_size
-from posixpath import normpath
 
 import msgpack
 import msgpack.fallback
@@ -1088,13 +1088,11 @@ class Location:
         (?P<path>(/([^:]|(:(?!:)))+))                       # start with /, then any chars, but no "::"
         """
 
-    # optional ::archive_name at the end, archive name must not contain "/".
-    # borg mount's FUSE filesystem creates one level of directories from
-    # the archive names and of course "/" is not valid in a directory name.
+    # optional ::archive_name at the end.
     optional_archive_re = r"""
         (?:
             ::                                              # "::" as separator
-            (?P<archive>[^/]{1}.*)
+            (?P<archive>[^/].*)
         )?$"""                                              # must match until the end
 
     # regexes for misc. kinds of supported location specifiers:
@@ -1181,7 +1179,7 @@ class Location:
 
     @staticmethod
     def archive_valid(archive):
-        return not archive or (archive == normpath(archive) and archive not in ('..', '.') and '::' not in archive)
+        return not archive or (archive == posixpath.normpath(archive) and archive not in ('..', '.') and '::' not in archive)
 
     def __str__(self):
         items = [

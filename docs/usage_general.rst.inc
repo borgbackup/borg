@@ -60,28 +60,25 @@ Repository / Archive Locations
 Many commands want either a repository (just give the repo URL, see above) or
 an archive location, which is a repo URL followed by ``::archive_name``.
 
-Borg does not assume a particular meaning or structuring of archive names,
-but for use with :ref:`borg_prune` and other commands it makes sense
-to structure names with prefixes (e.g. ``{hostname}-{date}``) for the
-``--prefix`` option.
+Archive names can be almost any string, but Borg places two important restrictions
+on them:
 
-When mounting an entire repository with :ref:`borg_mount` (without the
-'versions' option) the archive names are used as paths in the
-virtual filesystem.
-
-Archive names can contain ``/`` (slash) characters, but may not begin
-nor end with a slash, and may not contain consecutive slashes.
-Further, the usual path constructs involving ``.`` and ``..`` are not permitted;
-for example, these are all invalid archive names: ``/foo``, ``foo/../bar``, ``foo/.``,
-``//foohost/share``. The archive names ``.`` and ``..`` are invalid as well,
-but otherwise there is no restriction on using dots, e.g. ``foo.example.net....myfiles``
-is valid.
-
-This is to ensure a direct mapping to file system paths in :ref:`borg_mount`.
+1. Since archives can only be filtered by ``--prefix`` (for e.g. :ref:`borg_prune`),
+   grouping needs to be prefix based. For example, when backing up multiple hosts
+   into the same repository ``{hostname}-{date}`` makes sense, while ``{date}-{hostname}``
+   will pose issues for pruning.
+2. When mounting (:ref:`borg_mount`) an entire repository, archive names are interpreted
+   as paths. Therefore archives cannot be named ".", "..", cannot start nor end with a slash,
+   and may not contain two or more consecutive slashes.
 
 Otherwise any string can be used, including whitespace, newlines, Unicode
 and so on, however, to cause less confusion and maximize portability it's
-likely a good idea to avoid special characters.
+likely a good idea to avoid special characters. Similarly backslashes are permitted,
+but should not be used to improve portability.
+
+In summary, these are valid archive names: ``foo.example.net..myfiles``,
+``foo.example.net-system@2017-04-01``, whereas these are invalid: ``/foo``,
+``foo/../bar``, ``foo/.``, ``//foohost/share``.
 
 If you have set BORG_REPO (see above) and an archive location is needed, use
 ``::archive_name`` - the repo URL part is then read from BORG_REPO.

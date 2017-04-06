@@ -1347,10 +1347,11 @@ class Archiver:
 
         if args.location.archive:
             name = args.location.archive
+            target = replace_placeholders(args.target) if args.target else None
             if recreater.is_temporary_archive(name):
                 self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
                 return self.exit_code
-            recreater.recreate(name, args.comment, args.target)
+            recreater.recreate(name, args.comment, target)
         else:
             if args.target is not None:
                 self.print_error('--target: Need to specify single archive')

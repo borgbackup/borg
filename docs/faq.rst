@@ -347,7 +347,7 @@ How can I backup huge file(s) over a unstable connection?
 
 This is not a problem any more, see previous FAQ item.
 
-How can I restore huge file(s) over a unstable connection?
+How can I restore huge file(s) over an unstable connection?
 ----------------------------------------------------------
 
 If you can not manage to extract the whole big file in one go, you can extract
@@ -381,7 +381,7 @@ If you run into that, try this:
 
 .. _a_status_oddity:
 
-I am seeing 'A' (added) status for a unchanged file!?
+I am seeing 'A' (added) status for an unchanged file!?
 -----------------------------------------------------
 
 The files cache is used to determine whether |project_name| already
@@ -492,6 +492,37 @@ maybe open an issue in their issue tracker. Do not file an issue in the
 
 If you can reproduce the issue with the proven filesystem, please file an
 issue in the |project_name| issue tracker about that.
+
+Why does running 'borgbackup check --repair' warn about data loss?
+------------------------------------------------------------------
+
+Due to the nature of backup, and especially deduplicated backups as used
+by |project_name|, some repair operations may require a roll-back to an
+earlier version of the repository. Some errors, especially where data
+corruption is involved, may require purging corrupted data to bring the
+repository back to a known good state.
+
+Also, we can't predict every possible corruption vector for a repository.
+Some forms of corruption may be undetected, and some attempts to repair
+corruption could break other parts of the repository.
+
+Repair is considered a destructive operation in that it will modify the
+repository in order to automatically repair some known methods of corruption.
+
+In other words, the warning is there to emphasize that |project_name| will:
+  - Perform automated routines that will modify your backup repository
+  - May not actually fix the problem you are experiencing
+  - May further corrupt your repository
+  - May cause other problems which may not be noticable
+  - May cause contents of backed up data to become corrupted or changed
+
+Aside from this, if you find yourself in a position where you believe your
+repository is corrupt, this operation may result in recovering at least
+some of your backup data. You are **STRONGLY ENCOURAGED** to attempt the
+repair on a copy of the repo in case the repository becomes more unusable
+after the repair.
+
+If you are still unsure, seek :ref:`support`!
 
 Miscellaneous
 #############

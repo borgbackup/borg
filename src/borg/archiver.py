@@ -59,6 +59,7 @@ from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
 from .helpers import ErrorIgnoringTextIOWrapper
 from .helpers import ProgressIndicatorPercent
 from .helpers import basic_json_data, json_print
+from .helpers import replace_placeholders
 from .item import Item
 from .key import key_creator, tam_required_file, tam_required, RepoKey, PassphraseKey
 from .keymanager import KeyManager
@@ -905,7 +906,8 @@ class Archiver:
     @with_archive
     def do_rename(self, args, repository, manifest, key, cache, archive):
         """Rename an existing archive"""
-        archive.rename(args.name)
+        name = replace_placeholders(args.name)
+        archive.rename(name)
         manifest.write()
         repository.commit()
         cache.commit()

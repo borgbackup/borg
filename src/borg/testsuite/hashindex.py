@@ -126,28 +126,34 @@ class HashIndexTestCase(BaseTestCase):
 
 
 class HashIndexExtraTestCase(BaseTestCase):
-    """These tests are separate because they should not become part of the selftest
+    """These tests are separate because they should not become part of the selftest.
     """
     def test_chunk_indexer(self):
-        # see _hashindex.c hash_sizes, we want to be close to the max fill rate
-        # because interesting errors happen there
-        max_key = int(65537 * 0.75) - 10
-        index = ChunkIndex(max_key)
-        deleted_keys = [
-            hashlib.sha256(H(k)).digest()
-            for k in range(-1, -(max_key//3), -1)]
-        keys = [hashlib.sha256(H(k)).digest() for k in range(max_key)]
+        # see _hashindex.c hash_sizes, we want to be close to the max. load
+        # because interesting errors happen there.
+        key_count = int(65537 * ChunkIndex.MAX_LOAD_FACTOR) - 10
+        index = ChunkIndex(key_count)
+        all_keys = [hashlib.sha256(H(k)).digest() for k in range(key_count)]
+        # we're gonna delete 1/3 of all_keys, so let's split them 2/3 and 1/3:
+        keys, to_delete_keys = all_keys[0:(2*key_count//3)], all_keys[(2*key_count//3):]
+
         for i, key in enumerate(keys):
             index[key] = (i, i, i)
-        for i, key in enumerate(deleted_keys):
+        for i, key in enumerate(to_delete_keys):
             index[key] = (i, i, i)
 
-        for key in deleted_keys:
+        for key in to_delete_keys:
             del index[key]
         for i, key in enumerate(keys):
             assert index[key] == (i, i, i)
-        for key in deleted_keys:
+        for key in to_delete_keys:
             assert index.get(key) is None
+
+        # now delete every key still in the index
+        for key in keys:
+            del index[key]
+        # the index should now be empty
+        assert list(index.iteritems()) == []
 
 
 class HashIndexSizeTestCase(BaseTestCase):

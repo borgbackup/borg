@@ -190,7 +190,7 @@ class Repository:
             try:
                 os.link(config_path, old_config_path)
             except OSError as e:
-                if e.errno in (errno.EMLINK, errno.EPERM):
+                if e.errno in (errno.EMLINK, errno.ENOSYS, errno.EPERM):
                     logger.warning("Hardlink failed, cannot securely erase old config file")
                 else:
                     raise

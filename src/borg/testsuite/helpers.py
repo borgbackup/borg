@@ -28,7 +28,7 @@ from ..helpers import parse_pattern, PatternMatcher
 from ..helpers import PathFullPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, RegexPattern
 from ..helpers import swidth_slice
 from ..helpers import chunkit
-from ..helpers import safe_ns, safe_s
+from ..helpers import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS
 
 from . import BaseTestCase, FakeInputs
 
@@ -1250,15 +1250,29 @@ def test_swidth_slice_mixed_characters():
 
 
 def test_safe_timestamps():
-    # ns fit into uint64
-    assert safe_ns(2 ** 64) < 2 ** 64
-    assert safe_ns(-1) == 0
-    # s are so that their ns conversion fits into uint64
-    assert safe_s(2 ** 64) * 1000000000 < 2 ** 64
-    assert safe_s(-1) == 0
-    # datetime won't fall over its y10k problem
-    beyond_y10k = 2 ** 100
-    with pytest.raises(OverflowError):
-        datetime.utcfromtimestamp(beyond_y10k)
-    assert datetime.utcfromtimestamp(safe_s(beyond_y10k)) > datetime(2500, 12, 31)
-    assert datetime.utcfromtimestamp(safe_ns(beyond_y10k) / 1000000000) > datetime(2500, 12, 31)
+    if SUPPORT_32BIT_PLATFORMS:
+        # ns fit into int64
+        assert safe_ns(2 ** 64) <= 2 ** 63 - 1
+        assert safe_ns(-1) == 0
+        # s fit into int32
+        assert safe_s(2 ** 64) <= 2 ** 31 - 1
+        assert safe_s(-1) == 0
+        # datetime won't fall over its y10k problem
+        beyond_y10k = 2 ** 100
+        with pytest.raises(OverflowError):
+            datetime.utcfromtimestamp(beyond_y10k)
+        assert datetime.utcfromtimestamp(safe_s(beyond_y10k)) > datetime(2038, 1, 1)
+        assert datetime.utcfromtimestamp(safe_ns(beyond_y10k) / 1000000000) > datetime(2038, 1, 1)
+    else:
+        # ns fit into int64
+        assert safe_ns(2 ** 64) <= 2 ** 63 - 1
+        assert safe_ns(-1) == 0
+        # s are so that their ns conversion fits into int64
+        assert safe_s(2 ** 64) * 1000000000 <= 2 ** 63 - 1
+        assert safe_s(-1) == 0
+        # datetime won't fall over its y10k problem
+        beyond_y10k = 2 ** 100
+        with pytest.raises(OverflowError):
+            datetime.utcfromtimestamp(beyond_y10k)
+        assert datetime.utcfromtimestamp(safe_s(beyond_y10k)) > datetime(2262, 1, 1)
+        assert datetime.utcfromtimestamp(safe_ns(beyond_y10k) / 1000000000) > datetime(2262, 1, 1)

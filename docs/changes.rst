@@ -134,6 +134,46 @@ Version 1.1.0b5 (not released)
 Compatibility notes:
 
 - BORG_HOSTNAME_IS_UNIQUE is now on by default.
+- remove --compression-from feature
+- recreate: add --recompress flag, unify --always-recompress and
+  --recompress
+
+Fixes:
+
+- catch exception for os.link when hardlinks are not supported
+- borg rename / recreate: expand placeholders, fixes #2386
+- generic support for hardlinks (files, devices, FIFOs)
+- extract: also create parent dir for device files, if needed.
+- extract: if a hardlink master is not in the to-be-extracted subset,
+  the "x" status was not displayed for it.
+
+Other changes:
+
+- refactor compression decision stuff
+- change global compression default to lz4 as well, to be consistent
+  with --compression defaults.
+- placeholders: deny access to internals and other unspecified stuff
+- clearer error message for unrecognized placeholder
+- docs:
+
+  - placeholders: document escaping
+  - serve: env vars in original commands are ignored
+  - tell what kind of hardlinks we support
+  - more docs about compression
+  - LICENSE: use canonical formulation
+    ("copyright holders and contributors" instead of "author")
+- tests:
+
+  - enhance travis setuptools_scm situation
+  - add extra test for the hashindex
+
+These belong to 1.1.0b4 release, but did not make it into changelog by then:
+
+- vagrant: increase memory for parallel testing
+- lz4 compress: lower max. buffer size, exception handling
+- add docstring to do_benchmark_crud
+- patterns help: mention path full-match in intro
+
 
 Version 1.1.0b4 (2017-03-27)
 ----------------------------

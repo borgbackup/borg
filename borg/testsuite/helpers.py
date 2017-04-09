@@ -494,6 +494,32 @@ def test_load_patterns_from_file(tmpdir, lines, expected_roots, expected_numpatt
     assert numpatterns == expected_numpatterns
 
 
+def test_switch_patterns_style():
+    patterns = """\
+        +0_initial_default_is_shell
+        p fm
+        +1_fnmatch
+        P re
+        +2_regex
+        +3_more_regex
+        P pp
+        +4_pathprefix
+        p fm
+        p sh
+        +5_shell
+    """
+    pattern_file = StringIO(patterns)
+    roots, patterns = [], []
+    load_pattern_file(pattern_file, roots, patterns)
+    assert len(patterns) == 6
+    assert isinstance(patterns[0].pattern, ShellPattern)
+    assert isinstance(patterns[1].pattern, FnmatchPattern)
+    assert isinstance(patterns[2].pattern, RegexPattern)
+    assert isinstance(patterns[3].pattern, RegexPattern)
+    assert isinstance(patterns[4].pattern, PathPrefixPattern)
+    assert isinstance(patterns[5].pattern, ShellPattern)
+
+
 @pytest.mark.parametrize("lines", [
     (["X /data"]),  # illegal pattern type prefix
     (["/data"]),    # need a pattern type prefix

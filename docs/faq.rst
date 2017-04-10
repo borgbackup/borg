@@ -496,33 +496,22 @@ issue in the |project_name| issue tracker about that.
 Why does running 'borgbackup check --repair' warn about data loss?
 ------------------------------------------------------------------
 
-Due to the nature of backup, and especially deduplicated backups as used
-by |project_name|, some repair operations may require a roll-back to an
-earlier version of the repository. Some errors, especially where data
-corruption is involved, may require purging corrupted data to bring the
-repository back to a known good state.
-
-Also, we can't predict every possible corruption vector for a repository.
-Some forms of corruption may be undetected, and some attempts to repair
-corruption could break other parts of the repository.
-
-Repair is considered a destructive operation in that it will modify the
-repository in order to automatically repair some known methods of corruption.
+Repair usually works for recovering data in a corrupted archive. However,
+it's impossible to predict all modes of corruption. In some very rare
+instances, such as malfunctioning storage hardware, additional repo
+corruption may occur. If you can't afford to lose the repo, it's strongly
+recommended that you perform repair on a copy of the repo.
 
 In other words, the warning is there to emphasize that |project_name| will:
   - Perform automated routines that will modify your backup repository
   - May not actually fix the problem you are experiencing
   - May further corrupt your repository
-  - May cause other problems which may not be noticable
-  - May cause contents of backed up data to become corrupted or changed
 
-Aside from this, if you find yourself in a position where you believe your
-repository is corrupt, this operation may result in recovering at least
-some of your backup data. You are **STRONGLY ENCOURAGED** to attempt the
-repair on a copy of the repo in case the repository becomes more unusable
-after the repair.
-
-If you are still unsure, seek :ref:`support`!
+In the case of malfunctioning hardware, such as a drive or USB hub
+corrupting data when read or written, it's best to diagnose and fix the
+cause of the initial corruption before attempting to repair the repo. If
+the corruption is caused by a one time event such as a power outage,
+running `borg check --repair` will fix most problems.
 
 Miscellaneous
 #############

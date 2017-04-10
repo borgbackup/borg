@@ -505,7 +505,7 @@ recommended that you perform repair on a copy of the repo.
 In other words, the warning is there to emphasize that |project_name| will:
   - Perform automated routines that will modify your backup repository
   - May not actually fix the problem you are experiencing
-  - May further corrupt your repository
+  - In very rare cases, may further corrupt your repository
 
 In the case of malfunctioning hardware, such as a drive or USB hub
 corrupting data when read or written, it's best to diagnose and fix the

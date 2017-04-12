@@ -493,6 +493,7 @@ maybe open an issue in their issue tracker. Do not file an issue in the
 If you can reproduce the issue with the proven filesystem, please file an
 issue in the |project_name| issue tracker about that.
 
+
 Why does running 'borg check --repair' warn about data loss?
 ------------------------------------------------------------------
 
@@ -512,6 +513,7 @@ corrupting data when read or written, it's best to diagnose and fix the
 cause of the initial corruption before attempting to repair the repo. If
 the corruption is caused by a one time event such as a power outage,
 running `borg check --repair` will fix most problems.
+
 
 Miscellaneous
 #############

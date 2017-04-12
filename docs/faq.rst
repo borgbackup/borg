@@ -503,10 +503,10 @@ instances, such as malfunctioning storage hardware, additional repo
 corruption may occur. If you can't afford to lose the repo, it's strongly
 recommended that you perform repair on a copy of the repo.
 
-In other words, the warning is there to emphasize that |project_name| will:
-  - Perform automated routines that will modify your backup repository
-  - May not actually fix the problem you are experiencing
-  - In very rare cases, may further corrupt your repository
+In other words, the warning is there to emphasize that |project_name|:
+  - will perform automated routines that modify your backup repository.
+  - Might not actually fix the problem you are experiencing.
+  - might, in very rare cases, further corrupt your repository.
 
 In the case of malfunctioning hardware, such as a drive or USB hub
 corrupting data when read or written, it's best to diagnose and fix the

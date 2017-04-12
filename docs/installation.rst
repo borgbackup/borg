@@ -27,13 +27,10 @@ Pre-Installation Considerations
 
 Repository Filesystem
 ~~~~~~~~~~~~~~~~~~~~~
-
+:ref:data-structures-and-file-formats
 - File names may contain any valid ascii character and be of any length. |project_name|
   stores data only 3 directory levels deep and uses short directory and file names.
 - |project_name| requires read and write permissions on the repository file system.
-- Source files are split up into pieces called "chunks". During the chunking
-  process, small files will typically yield one chunk while larger files will
-  be broken up into chunks of ~2MiB in size.
 - |project_name| stores backup metadata and data into so-called segment files. The 
   target size of these files and also the count of these files per directory is set 
   in the :ref:config-file.
@@ -49,6 +46,8 @@ Repository Filesystem
   - posix_fadvise - to not flood the operating system's cache
   - sync on files and directories to ensure data is written onto storage media
 
+:ref:data-structures-and-file-formats contains additional information about how |project_name|
+manages data.
 
 .. _distribution-package:
 

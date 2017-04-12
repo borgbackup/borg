@@ -28,14 +28,15 @@ Pre-Installation Considerations
 Repository Filesystem
 ~~~~~~~~~~~~~~~~~~~~~
 
-- Filenames may contain any valid ascii character and be of any length. |project_name|
-  stores data only 3 directory levels deep and uses short directory and filenames.
-- |project_name| requires read and write permissions on the repository filesystem.
+- File names may contain any valid ascii character and be of any length. |project_name|
+  stores data only 3 directory levels deep and uses short directory and file names.
+- |project_name| requires read and write permissions on the repository file system.
 - Source files are split up into pieces called "chunks". During the chunking
   process, small files will typically yield one chunk while larger files will
   be broken up into chunks of ~2MiB in size.
-- Chunks are combined into segment files. The number and size of segment files
-  can be set in the :ref:`config-file`.
+- |project_name| stores backup metadata and data into so-called segment files. The 
+  target size of these files and also the count of these files per directory is set 
+  in the :ref:config-file.
 - |project_name| uses Mkdir based `file locking<https://en.wikipedia.org/wiki/File_locking#Lock_files`_.
 - Hardlinks are only required when performing an in-place upgrade of an Attic
   repository. 

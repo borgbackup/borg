@@ -493,7 +493,7 @@ maybe open an issue in their issue tracker. Do not file an issue in the
 If you can reproduce the issue with the proven filesystem, please file an
 issue in the |project_name| issue tracker about that.
 
-Why does running 'borgbackup check --repair' warn about data loss?
+Why does running 'borg check --repair' warn about data loss?
 ------------------------------------------------------------------
 
 Repair usually works for recovering data in a corrupted archive. However,

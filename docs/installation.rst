@@ -30,7 +30,7 @@ Repository Filesystem
 
 - Filenames may contain any valid ascii character and be of any length. |project_name|
   stores data only 3 directory levels deep and uses short directory and filenames.
-- |project_name| requires only read/write permissions within the repository filesystem.
+- |project_name| requires read and write permissions on the repository filesystem.
 - Source files are split up into pieces called "chunks". During the chunking
   process, small files will typically yield one chunk while larger files will
   be broken up into chunks of ~2MiB in size.

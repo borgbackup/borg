@@ -358,7 +358,8 @@ Can I backup my root partition (/) with Borg?
 
 Backing up your entire root partition works just fine, but remember to
 exclude directories that make no sense to backup, such as /dev, /proc,
-/sys, /tmp and /run.
+/sys, /tmp and /run, and to use --one-file-system if you only want to
+backup the root partition (and not any mounted devices e.g.).
 
 If it crashes with a UnicodeError, what can I do?
 -------------------------------------------------

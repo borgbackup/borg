@@ -1,6 +1,5 @@
 import os
 import re
-import resource
 import stat
 import subprocess
 
@@ -53,6 +52,10 @@ cdef extern from "linux/fs.h":
 
 cdef extern from "sys/ioctl.h":
     int ioctl(int fildes, int request, ...)
+
+cdef extern from "unistd.h":
+    int _SC_PAGESIZE
+    long sysconf(int name)
 
 cdef extern from "string.h":
     char *strerror(int errnum)
@@ -219,7 +222,7 @@ cdef _sync_file_range(fd, offset, length, flags):
         raise OSError(errno.errno, os.strerror(errno.errno))
     safe_fadvise(fd, offset, length, 'DONTNEED')
 
-cdef unsigned PAGE_MASK = resource.getpagesize() - 1
+cdef unsigned PAGE_MASK = sysconf(_SC_PAGESIZE) - 1
 
 
 class SyncFile(BaseSyncFile):

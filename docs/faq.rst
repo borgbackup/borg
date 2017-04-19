@@ -208,6 +208,8 @@ key file based encryption with a blank passphrase. See
           the environment of a process is `accessible only to that
           user
           <https://security.stackexchange.com/questions/14000/environment-variable-accessibility-in-linux/14009#14009>`_.
+          Using the ``env`` command or inline shell scripts may also
+          cause the passphrase to be recorded in shell history file.
 
 When backing up to remote encrypted repos, is encryption done locally?
 ----------------------------------------------------------------------

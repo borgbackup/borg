@@ -145,6 +145,16 @@ Bug fixes:
 - fix error msg, there is no --keep-last in borg 1.0.x, #2282
 - clamp (nano)second values to unproblematic range, #2304
 - FUSE: fix st_blocks to be an integer (not float) value
+- borg rename: expand placeholders, #2386
+- use pyinstaller v3.2.1, #2396
+  this fixes that the prelink cronjob on some distros kills the
+  borg binary by stripping away parts of it.
+- serve: fix forced command lines containing BORG_ env vars
+- fix error msg, it is --keep-within, not --within
+- fix borg key/debug/benchmark crashing without subcommand, #2240
+- Archive: allocate zeros when needed, #2308
+  fixes huge memory usage of mount (8 MiB × number of archives)
+- extract: also create parent dir for device files, if needed.
 
 New features:
 
@@ -162,6 +172,12 @@ Other changes:
   - document relative path usage, #1868
   - one link per distro in the installation page
   - development: new branching model in git repository
+  - kill api page
+  - added FAQ section about backing up root partition
+- tests:
+
+  - enhance travis setuptools_scm situation
+  - add test for borg delete --force
 
 
 Version 1.0.10 (2017-02-13)

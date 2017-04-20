@@ -152,7 +152,13 @@ class Repository:
         index_transaction_id = self.get_index_transaction_id()
         segments_transaction_id = self.io.get_segments_transaction_id()
         if index_transaction_id is not None and segments_transaction_id is None:
-            raise self.CheckNeeded(self.path)
+            # we have a transaction id from the index, but we did not find *any*
+            # commit in the segment files (thus no segments transaction id).
+            # this can happen if a lot of segment files are lost, e.g. due to a
+            # filesystem or hardware malfunction. it means we have no identifiable
+            # valid (committed) state of the repo which we could use.
+            msg = '%s" - although likely this is "beyond repair' % self.path  # dirty hack
+            raise self.CheckNeeded(msg)
         # Attempt to automatically rebuild index if we crashed between commit
         # tag write and index save
         if index_transaction_id != segments_transaction_id:

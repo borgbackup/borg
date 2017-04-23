@@ -495,7 +495,7 @@ issue in the |project_name| issue tracker about that.
 
 
 Why does running 'borg check --repair' warn about data loss?
-------------------------------------------------------------------
+------------------------------------------------------------
 
 Repair usually works for recovering data in a corrupted archive. However,
 it's impossible to predict all modes of corruption. In some very rare
@@ -504,9 +504,9 @@ corruption may occur. If you can't afford to lose the repo, it's strongly
 recommended that you perform repair on a copy of the repo.
 
 In other words, the warning is there to emphasize that |project_name|:
-  - will perform automated routines that modify your backup repository.
-  - Might not actually fix the problem you are experiencing.
-  - might, in very rare cases, further corrupt your repository.
+  - Will perform automated routines that modify your backup repository
+  - Might not actually fix the problem you are experiencing
+  - Might, in very rare cases, further corrupt your repository
 
 In the case of malfunctioning hardware, such as a drive or USB hub
 corrupting data when read or written, it's best to diagnose and fix the

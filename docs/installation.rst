@@ -25,11 +25,11 @@ There are different ways to install |project_name|:
 Pre-Installation Considerations
 -------------------------------
 
-Repository Filesystem
-~~~~~~~~~~~~~~~~~~~~~
+Repository File System
+~~~~~~~~~~~~~~~~~~~~~~
 :ref:data-structures-and-file-formats
-- File names may contain any valid ascii character and be of any length. |project_name|
-  stores data only 3 directory levels deep and uses short directory and file names.
+- |project_name| stores data only 3 directory levels deep and uses short file and
+  directory names.
 - |project_name| requires read and write permissions on the repository file system.
 - |project_name| stores backup metadata and data into so-called segment files. The 
   target size of these files and also the count of these files per directory is set 

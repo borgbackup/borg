@@ -1158,7 +1158,7 @@ class Location:
             self.proto = m.group('proto')
             self.user = m.group('user')
             self.host = m.group('host')
-            if isinstance(self.host, str):
+            if self.host is not None:
                 self.host = self.host.lstrip('[').rstrip(']')
             self.port = m.group('port') and int(m.group('port')) or None
             self.path = normpath_special(m.group('path'))
